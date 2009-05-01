@@ -20,7 +20,9 @@
 package com.sun.sgs.test.impl.profile;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.AggregateProfileCounter;
 import com.sun.sgs.profile.AggregateProfileOperation;
@@ -90,7 +92,8 @@ public class TestProfileDataAggregateImpl {
         // these tests, but we cannot start up additional nodes if we don't
         // have at least the core services started.
         Properties p = SgsTestNode.getDefaultProperties(APP_NAME, null, null);
-        p.setProperty("com.sun.sgs.finalService", "NodeMappingService");
+        p.setProperty(StandardProperties.NODE_TYPE, 
+                      NodeType.coreServerNode.name());
         setUp(p);
     }
 

@@ -41,6 +41,7 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -71,9 +72,10 @@ import javax.management.JMException;
  * <dt> <i>Property:</i> <code><b>{@value #DATA_STORE_CLASS_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i>
- *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
- *	the {@code com.sun.sgs.server.start} property is {@code false}, else
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
+ *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> 
+ *      unless the {@code com.sun.sgs.node.type} property is {@code singleNode},
+ *      which defaults to 
+ *      <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
  *	DataStore}.  The class should be public, not abstract, and should
@@ -410,8 +412,11 @@ public final class DataServiceImpl implements DataService {
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
-	    boolean serverStart = wrappedProps.getBooleanProperty(
-		StandardProperties.SERVER_START, true);
+            NodeType nodeType = 
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
+
 	    AccessCoordinator accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
 	    DataStore baseStore;
@@ -421,7 +426,7 @@ public final class DataServiceImpl implements DataService {
 		    new Class[] { Properties.class, AccessCoordinator.class },
 		    properties, accessCoordinator);
 		logger.log(Level.CONFIG, "Using data store {0}", baseStore);
-	    } else if (serverStart) {
+	    } else if (nodeType == NodeType.singleNode) {
 		baseStore = new DataStoreImpl(
 		    properties, accessCoordinator, scheduler);
 	    } else {
@@ -953,7 +958,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 	}
     }
-
+    
     /**
      * Checks that the specified context is currently active.  Throws
      * TransactionNotActiveException if there is no current transaction or if

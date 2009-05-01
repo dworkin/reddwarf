@@ -24,7 +24,7 @@ import java.util.NoSuchElementException;
 
 /**
  * An interface which defines some common functionality for all
- * <code>QuadTree</code> iterators, used to iterate through
+ * {@link QuadTree} iterators, used to iterate through
  * elements of a <code>QuadTree</code>.
  *
  * <p>
@@ -36,9 +36,11 @@ import java.util.NoSuchElementException;
  * called, otherwise an {@link IllegalStateException} will be thrown. An
  * {@code IllegalStateException} is also thrown in the case when a call
  * to {@code current()}, {@code currentX()} or {@code currentY()} is made
- * after the element has been removed due to a call to {@code remove()}.
+ * after the element has been removed due to a call to {@code remove()}. The
+ * behavior of the iterator when elements are concurrently added and removed
+ * from the tree is implementation dependent.
  *
- * @param <E> the element stored in the quadtree's leaves and returned
+ * @param <E> the element stored in the {@code QuadTree}'s leaves and returned
  * by this iterator
  * @see Iterator
  * @see QuadTree
@@ -85,9 +87,6 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
      * @throws IllegalStateException if neither the <tt>next()</tt> nor
      * <tt>nextNoReturn()</tt> method has yet been called or if the
      * current element has been removed.
-     * @throws CurrentConcurrentRemovedException if the current element was
-     * removed from the {@code QuadTree} without calling {@code remove()} on
-     * this iterator.
      */
     E current();
 
@@ -97,8 +96,7 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
      * or {@code nextNoReturn()} has been called and that next element has
      * not been removed from the tree, otherwise returns {@code false}.
      * Use this method to check if calling {@code current()} will throw
-     * {@code IllegalStateException} or
-     * {@code CurrentConcurrentRemovedException}.
+     * {@code IllegalStateException}.
      * @return {@code true} if the iterator is on a valid current element
      * and {@code false} otherwise
      * */

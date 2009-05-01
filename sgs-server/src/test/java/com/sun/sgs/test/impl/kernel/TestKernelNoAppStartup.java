@@ -23,8 +23,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 
 
 /**
- * Tests startup cases for running without an application and running with
- * a sub-set of services.
+ * Tests startup cases for running without an application.
  */
 public class TestKernelNoAppStartup extends KernelSimpleAppTestCase {
 
@@ -41,31 +40,30 @@ public class TestKernelNoAppStartup extends KernelSimpleAppTestCase {
         return 33336;
     }
     
-    public void testNoListener() throws Exception {
-        runApp(true, null, false);
+    // We must have a listener in single node
+    public void testNoListenerSingleNode() throws Exception {
+        runApp(true, "singleNode", true);
     }
-
-    public void testLimitedServices() throws Exception {
-        runApp(true, "WatchdogService", false);
+    
+    // Core server node will succeed whether or not there is a listener
+    public void testNoListenerCoreServerNode() throws Exception {
+        runApp(true, "coreServerNode", false);
     }
-
-    public void testUnknownLimitedService() throws Exception {
-        runApp(true, "FooService", true);
+    
+    public void testCoreServerNode() throws Exception {
+        runApp(false, "coreServerNode", false);
     }
-
-    public void testLimitedServicesWithApp() throws Exception {
-        runApp(false, "WatchdogService", true);
-    }
+    
 
     /** Utility that runs the server and looks for specific logging output. */
-    private void runApp(boolean noListener, String finalService,
+    private void runApp(boolean noListener, String nodeType,
                         final boolean shouldFail) throws Exception {
         config.setProperty(StandardProperties.APP_NAME, APP_NAME);
-        if (noListener)
-            config.setProperty(StandardProperties.APP_LISTENER,
-                               StandardProperties.APP_LISTENER_NONE);
-        if (finalService != null)
-            config.setProperty(StandardProperties.FINAL_SERVICE, finalService);
+        if (noListener) {
+            config.remove(StandardProperties.APP_LISTENER);
+        }
+        config.setProperty(StandardProperties.NODE_TYPE, nodeType);
+        
         logging.setProperty(".level", "INFO");
         logging.setProperty("java.util.logging.ConsoleHandler.level", "INFO");
         new RunProcess(createProcessBuilder(), RUN_PROCESS_MILLIS) {
@@ -81,7 +79,15 @@ public class TestKernelNoAppStartup extends KernelSimpleAppTestCase {
                     else
                         failed(new RuntimeException("App failed to start"));
                 }
-                    
+                if (line.endsWith("SEVERE: Missing required property " + "" +
+                                  "com.sun.sgs.app.listener for application: " +
+                                  APP_NAME)) 
+                {
+                    if (shouldFail)
+                        done();
+                    else
+                        failed(new RuntimeException("App failed to start"));
+                }
             }
         }.run();
     }

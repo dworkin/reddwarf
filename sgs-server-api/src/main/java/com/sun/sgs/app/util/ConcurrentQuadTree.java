@@ -95,7 +95,7 @@ import com.sun.sgs.app.Task;
  * iterated over which could take more time than the minimum allowed for a
  * single {@link Task}. As a result, several tasks may be needed to iterate
  * over all the necessary elements, requiring the iterator to be serialized
- * between each task. 
+ * between each task.
  *
  * <p>
  * The iterator throws {@link ConcurrentModificationException} if the current 
@@ -104,6 +104,8 @@ import com.sun.sgs.app.Task;
  * The iterator will also throw {@link CurrentConcurrentRemovedException} if
  * the current element was removed from the {@code ConcurrentQuadTree}
  * and it was not removed by the iterator through a call to {@code remove()}.
+ *
+ * <p>
  * Whenever an iterator has just been deserialized, it is recommended that
  * {@code hasCurrent()} and {@code hasNext()} be called before a call to
  * {@code current()} and {@code next()} or {@code nextNoReturn()} respectively
@@ -112,7 +114,14 @@ import com.sun.sgs.app.Task;
  * avoiding exceptions when iterating through the {@code ConcurrentQuadTree} if
  * it is being modified simultaneously.
  *
- *
+ * <p>
+ * In terms of concurrency, if an element is removed and then re-added, while
+ * an iterator is iterating through the tree, the iterator might visit the
+ * element twice, or completely ignore the element. New elements which are added
+ * around an element which has been removed and added back to the same position
+ * might also be ignored by the iterator. Elements in the tree which are not
+ * added or removed while an iterator is iterating through the tree are
+ * guaranteeded to not be missed or seen twice by that iterator.
  *
  * @param <E> the type of element the {@code ConcurrentQuadTree} is to hold
  */
@@ -468,7 +477,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * If a {@code null} is passed in as the {@code boundingBox} then there will
      * be no restrictions on the region that the iterator can iterate over and
      * it will iterate over all elements of the {@code Quadtree}.
-     *
+     * 
      * For improved performance, the iterator caches the dataIntegrityValue
      * of the current leaf it is on. As a result, the iterator can quickly
      * check if the current leaf has changed by comparing its cached
@@ -536,6 +545,8 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         /**
          * {@inheritDoc}
+         * This method can also be used to check if calling {@code current()}
+         * wil result in {@code CurrentConcurrentRemovedException}.
          */
         public boolean hasCurrent() {
             if (!accordingToIteratorCurrExists) {

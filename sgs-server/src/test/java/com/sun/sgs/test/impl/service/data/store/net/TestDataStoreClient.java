@@ -21,14 +21,15 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.impl.service.data.store.net.NetworkException;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
-import com.sun.sgs.test.util.DummyTransaction;
 import java.util.Properties;
 import junit.framework.TestSuite;
 
@@ -77,11 +78,13 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	Properties props = super.getProperties();
 	String host = serverHost;
 	int port = serverPort;
+        String nodeType = NodeType.appNode.toString();
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
+	    nodeType = NodeType.coreServerNode.toString();
 	}
+        props.setProperty(StandardProperties.NODE_TYPE, nodeType);
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
@@ -186,7 +189,8 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	store.shutdown();
 	store = null;
 	txn = createTransaction();
-	props.setProperty(DataStoreNetPackage + ".server.start", "false");
+                props.setProperty(StandardProperties.NODE_TYPE, 
+                          NodeType.appNode.toString());
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port", "0");
 	try {
@@ -247,7 +251,8 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	store.shutdown();
 	store = null;
 	txn = createTransaction();
-        props.setProperty(DataStoreNetPackage + ".server.start", "false");
+        props.setProperty(StandardProperties.NODE_TYPE, 
+                          NodeType.appNode.toString());
 	props.remove(DataStoreNetPackage + ".server.host");
 	try {
 	    createDataStore(props);
@@ -291,7 +296,8 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(server.getPort()));
-	props.setProperty(DataStoreNetPackage + ".server.start", "false");
+                props.setProperty(StandardProperties.NODE_TYPE, 
+                          NodeType.appNode.toString());
 	txn = createTransaction();	
 	store = createDataStore(props);
 	server.shutdown();
