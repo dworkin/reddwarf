@@ -28,6 +28,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
@@ -71,16 +72,6 @@ import javax.management.JMException;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.watchdog.server.start
- *	</b></code><br>
- *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
- *	property, if present, else {@code true} <br>
- *	Specifies whether the watchdog server should be started by this service.
- *	If {@code true}, the watchdog server is started.  If this property value
- *	is {@code true}, then the properties supported by the
- *	{@link WatchdogServerImpl} class should be specified.<p>
- *
- * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.host
  *	</b></code><br>
  *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
@@ -90,10 +81,9 @@ import javax.management.JMException;
  * <dd style="padding-top: .5em">
  *	Specifies the host name for the watchdog server that this service
  *	contacts.  If the {@code
- *	com.sun.sgs.impl.service.watchdog.server.start} property
- *	is {@code true}, then this property's default is used (since
- *	the watchdog server to contact will be the one started on
- *	the local host).
+ *	com.sun.sgs.node.type} property is not {@code appNode}, then this
+ *	property's default is used (since the watchdog server to contact will 
+ *      be the one started on the local host).
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.port
@@ -102,11 +92,11 @@ import javax.management.JMException;
  *
  * <dd style="padding-top: .5em">
  *	Specifies the network port for the watchdog server that this service
- *	contacts (and, optionally, starts).  If the {@code
- *	com.sun.sgs.impl.service.watchdog.server.start} property
- *	is {@code true}, then the value must be greater than or equal to
- *	{@code 0} and no greater than {@code 65535}, otherwise the value
- *	must be greater than {@code 0}, and no greater than {@code 65535}.<p>
+ *	contacts (and, optionally, starts).  If the {@code 
+ *      com.sun.sgs.node.type} property is not {@code singleNode}, then the
+ *      value must be greater than or equal to {@code 0} and no greater than 
+ *      {@code 65535}, otherwise the value must be greater than {@code 0}, 
+ *      and no greater than {@code 65535}.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.client.host
@@ -171,10 +161,6 @@ public final class WatchdogServiceImpl
 
     /** The prefix for client properties. */
     private static final String CLIENT_PROPERTY_PREFIX = PKG_NAME + ".client";
-
-    /** The property to specify that the watchdog server should be started. */
-    private static final String START_SERVER_PROPERTY =
-	SERVER_PROPERTY_PREFIX + ".start";
 
     /** The property name for the watchdog server host. */
     private static final String HOST_PROPERTY =
@@ -286,23 +272,15 @@ public final class WatchdogServiceImpl
 	shutdownController = ctrl;
 	
 	try {
-	    boolean startServer = wrappedProps.getBooleanProperty(
- 		START_SERVER_PROPERTY,
-		wrappedProps.getBooleanProperty(
-		    StandardProperties.SERVER_START, true));
 	    localHost = InetAddress.getLocalHost().getHostName();
-           
-             String finalService =
-                properties.getProperty(StandardProperties.FINAL_SERVICE);
-             boolean isFullStack = true;
-             if (finalService == null) {
-                 isFullStack = true;
-             } else {
-                 isFullStack = 
-                    !(properties.getProperty(StandardProperties.APP_LISTENER)
-                     .equals(StandardProperties.APP_LISTENER_NONE));
-             }
-        
+                
+            NodeType nodeType = 
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
+            boolean startServer = nodeType != NodeType.appNode;
+            boolean isFullStack = nodeType != NodeType.coreServerNode;
+            
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
             

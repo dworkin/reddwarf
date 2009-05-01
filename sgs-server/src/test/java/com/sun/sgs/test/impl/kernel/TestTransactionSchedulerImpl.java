@@ -23,7 +23,9 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TransactionScheduler;
 
@@ -66,7 +68,8 @@ public class TestTransactionSchedulerImpl {
         Properties properties =
             SgsTestNode.getDefaultProperties("TestTransactionSchedulerImpl",
 					     null, null);
-        properties.setProperty("com.sun.sgs.finalService", "DataService");
+        properties.setProperty(StandardProperties.NODE_TYPE, 
+                               NodeType.coreServerNode.name());
         serverNode = new SgsTestNode("TestTransactionSchedulerImpl",
                                      null, properties);
         txnScheduler = serverNode.getSystemRegistry().
