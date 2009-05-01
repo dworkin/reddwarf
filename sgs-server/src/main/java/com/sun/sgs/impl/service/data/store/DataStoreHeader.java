@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store;
 
-import com.sun.sgs.impl.service.data.store.db.DataEncoding;
+import com.sun.sgs.impl.service.data.store.DataEncoding;
 import com.sun.sgs.impl.service.data.store.db.DbDatabase;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import java.math.BigInteger;

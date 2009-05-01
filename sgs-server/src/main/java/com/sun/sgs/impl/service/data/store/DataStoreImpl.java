@@ -33,7 +33,6 @@ import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.PLACEHOLDER_OBJ_VALUE;
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.QUOTE_OBJ_VALUE;
-import com.sun.sgs.impl.service.data.store.db.DataEncoding;
 import com.sun.sgs.impl.service.data.store.db.DbCursor;
 import com.sun.sgs.impl.service.data.store.db.DbDatabase;
 import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
