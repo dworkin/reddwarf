@@ -561,11 +561,11 @@ public final class ClientSessionServiceImpl
 				ClientSessionImpl.getSession(
 				    dataService, handler.sessionRefId);
 			    if (session != null) {
-				// TBD: if session already moving, need to put off
-				// this move.
+				// TBD: if session already moving, need to
+				// put off this move.
 				session.addMoveEvent(newNode);
 			    }
-			}},
+			} },
 		    id);
 	    }
 	}
@@ -785,7 +785,7 @@ public final class ClientSessionServiceImpl
     /**
      * Contains pending changes for a given client session.
      */
-    private class CommitActions extends LinkedList<Action> {
+    private static class CommitActions extends LinkedList<Action> {
 
 	/**
 	 * Flushes all actions enqueued with this instance.
@@ -911,9 +911,9 @@ public final class ClientSessionServiceImpl
 			if (getHandler(new BigInteger(1, sessionId)) != null) {
 			    // TBD: should the handler just be passsed here?
 			    ClientSessionImpl.serviceEventQueue(sessionId);
-			} else {
-			    // TBD: or else what?
 			}
+			// TBD: or else what?
+
 		    } }, taskOwner);
 	    } finally {
 		callFinished();
@@ -939,7 +939,7 @@ public final class ClientSessionServiceImpl
 		// Cache relocation information.
 		byte[] relocationKey = getNextRelocationKey();
 		RelocationInfo info =
-		    new RelocationInfo(identity, sessionId, oldNode);
+		    new RelocationInfo(identity, sessionId);
 		BigInteger key = new BigInteger(1, relocationKey);
 		relocatingSessions.put(key, info);
 
@@ -1433,12 +1433,10 @@ public final class ClientSessionServiceImpl
     private static class RelocationInfo {
 	final Identity identity;
 	final byte[] sessionId;
-	final long oldNode;
 
-	RelocationInfo(Identity identity, byte[] sessionId, long oldNode) {
+	RelocationInfo(Identity identity, byte[] sessionId) {
 	    this.identity = identity;
 	    this.sessionId = sessionId;
-	    this.oldNode = oldNode;
 	}
     }
 

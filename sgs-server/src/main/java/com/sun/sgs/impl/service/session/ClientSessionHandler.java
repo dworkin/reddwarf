@@ -962,9 +962,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    throw ex;
 		}
 		sessionService.checkContext().
-		    addCommitAction(sessionRefId,
-				    new LoginResultAction(false, loginFailureEx),
-				    true);
+		    addCommitAction(
+			sessionRefId,
+			new LoginResultAction(false, loginFailureEx),
+			true);
 
 		sessionImpl.disconnect();
 	    }
@@ -1249,7 +1250,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 */
 	MoveAction(Node newNode) {
 	    this.newNode = newNode;
-	    this.server = sessionService.getClientSessionServer(newNode.getId());
+	    this.server =
+		sessionService.getClientSessionServer(newNode.getId());
 	}
 
 	/** {@inheritDoc} */

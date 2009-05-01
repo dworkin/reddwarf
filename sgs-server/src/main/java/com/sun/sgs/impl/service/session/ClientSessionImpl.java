@@ -811,7 +811,7 @@ public class ClientSessionImpl
 			    sessionService.runIoTask(
 				new IoRunnable() {
 				    public void run() throws IOException {
-					sessionServer.serviceEventQueue(idBytes);
+				      sessionServer.serviceEventQueue(idBytes);
 				    } },
 				nodeId);
 			}

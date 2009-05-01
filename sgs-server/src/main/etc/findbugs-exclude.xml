@@ -368,7 +368,10 @@
   <!-- Dead but overwritten parameter. -->
   <Match>
     <Class name="com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl"/>
-    <Method name="loginFailure"/>
+    <Or>
+      <Method name="loginFailure"/>
+      <Method name="relocateFailure"/>
+    </Or>
     <Parameter name="reason"/>
     <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
   </Match>
@@ -379,5 +382,13 @@
     <Feild name="txnProxy"/>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
   </Match>
-  
+
+  <!-- ClientSessionServiceImpl$CommitActions isn't serializable
+   so it doesn't need a serialVersionUid -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$CommitActions"/>
+    <Bug pattern="SE_NO_SERIALVERSIONID"/>
+  </Match>
+
+
 </FindBugsFilter>
