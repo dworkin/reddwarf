@@ -311,6 +311,7 @@ public class ClientSessionImpl
      */
     void addMoveEvent(Node newNode) {
 	if (isConnected()) {
+	    // TBD: what if this session is already relocating?
 	    addEvent(new MoveEvent(newNode));
 	}
     }

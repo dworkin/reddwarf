@@ -109,6 +109,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static final int WAIT_TIME = 5000;
 
+    /** Number of managed objects per client session: 4 (ClientSessionImpl,
+     * ClientSessionWrapper, EventQueue, ManagedQueue).
+     */
+    private static final int MANAGED_OBJECTS_PER_SESSION = 4;
+
     private static final String RETURN_NULL = "return null";
 
     private static final String NON_SERIALIZABLE = "non-serializable";
@@ -261,7 +266,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-    ///*
+    /*
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -1225,7 +1230,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
-    //*/
+    */
     public void testClientSessionReceiveRelocateNotification() throws Exception {
 	DummyClient client = createClientToRelocate("newNode");
 	client.disconnect();
@@ -1234,9 +1239,16 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testRelocateClientSession() throws Exception {
 	String newNodeHost = "newNode";
 	DummyClient client = createClientToRelocate(newNodeHost);
+	int objectCount = getObjectCount();
 	try {
 	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	    client.relocate(newNode.getAppPort(), true, true);
+	    // need to wait here to get the true object count to make sure
+	    // that objects and bindings aren't cleaned up.
+	    Thread.sleep(WAIT_TIME);
+	    assertEquals(objectCount, getObjectCount());
+	    checkBindings(1);
+	    assertFalse(client.receivedDisconnectedCallback);
 	} finally {
 	    client.disconnect();
 	}
@@ -1257,6 +1269,125 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testRelocateInvalidRelocationKey()  throws Exception {
+	String newNodeHost = "new";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	try {
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    int objectCount = getObjectCount();
+	    client.relocate(newNode.getAppPort(), false, false);
+	    waitForExpectedObjectCount(
+		objectCount - MANAGED_OBJECTS_PER_SESSION);
+	    checkBindings(0);
+	    assertTrue(client.receivedDisconnectedCallback);
+	    assertFalse(client.graceful);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithInterveningClientLoginBlockingRelocate()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	DummyClient otherClient = new DummyClient("foo");
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	try {
+	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    otherClient.connect(newPort).login();
+	    int objectCount = getObjectCount();
+	    client.relocate(newPort, true, false);
+	    waitForExpectedObjectCount(
+		objectCount - MANAGED_OBJECTS_PER_SESSION);
+	    checkBindings(1);
+	    assertTrue(client.receivedDisconnectedCallback);
+	    assertFalse(client.graceful);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithInterveningClientLoginPreempted()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	allowNewLogin = true;	// enable login preemption on new node
+	DummyClient client = createClientToRelocate(newNodeHost);
+	DummyClient otherClient = new DummyClient("foo");
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	try {
+	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    otherClient.connect(newPort).login();
+	    int objectCount = getObjectCount();
+	    client.relocate(newPort, true, true);
+	    waitForExpectedObjectCount(
+		objectCount - MANAGED_OBJECTS_PER_SESSION);
+	    checkBindings(1);
+	    assertTrue(otherClient.receivedDisconnectedCallback);
+	    assertFalse(otherClient.graceful);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithRedirect()
+	throws Exception
+    {
+	String host2 = "host2";
+	String host3 = "host3";
+	DummyClient client = createClientToRelocate(host2);
+	addNodes(host3);
+	SgsTestNode node2 = additionalNodes.get(host2);
+	SgsTestNode node3 = additionalNodes.get(host3);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity("foo", node2.getNodeId(),
+			 node3.getNodeId());
+	int objectCount = getObjectCount();
+	client.relocate(node2.getAppPort(), true, false);
+	waitForExpectedObjectCount(
+	    objectCount - MANAGED_OBJECTS_PER_SESSION);
+	checkBindings(0);
+	assertTrue(client.receivedDisconnectedCallback);
+	assertFalse(client.graceful);
+    }
+
+    /**
+     * Performs the following in preparation for a relocation test:
+     * <ul>
+     * <li>creates a new {@code DummyClient} named "foo"
+     * <li>creates a new node named {@code newNodeHost} 
+     * <li>logs the client into the server node
+     * <li>reassigns the client's identity to the new node
+     * <li>waits for the client to receive the relocate notification
+     * <li>returns the constructed {@code DummyClient}
+     * </ul>
+     */
+    private DummyClient createClientToRelocate(String newNodeHost)
+	throws Exception
+    {
+	final String name = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	addNodes(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	client.connect(serverNode.getAppPort()).login();
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	System.err.println("reassigning identity from server node to host: " +
+			   newNodeHost);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	System.err.println("(done) reassigning identity");
+	System.err.println("waiting for relocation to client...");
+	client.waitForRelocationNotification(newNode.getAppPort());
+	return client;
+    }
+
+    /**
+     * Sends the number of specified messages from the specified node to
+     * the specified client and waits for the client to receive the
+     * messages.  The content of each message is a consecutive integer
+     * starting at the specified offset.
+     */
     private void sendMessagesFromNodeToClient(
 	SgsTestNode node, final DummyClient client, final int numMessages,
 	final int offset)
@@ -1295,84 +1426,21 @@ public class TestClientSessionServiceImpl extends TestCase {
 	messages.clear();
     }
 
-    public void testRelocateInvalidRelocationKey()  throws Exception {
-	String newNodeHost = "new";
-	DummyClient client = createClientToRelocate(newNodeHost);
-	try {
-	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	    client.relocate(newNode.getAppPort(), false, false);
-	} finally {
-	    client.disconnect();
+    private void waitForExpectedObjectCount(int expectedCount)
+	throws Exception
+    {
+	int objectCount = 0;
+	for (int i = 0; i < 10; i++) {
+	    objectCount = getObjectCount();
+	    if (objectCount == expectedCount) {
+		return;
+	    } else {
+		Thread.sleep(WAIT_TIME / 10);
+	    }
 	}
+	assertEquals(expectedCount, objectCount);
     }
 
-    public void testRelocateWithInterveningClientLoginBlockingRelocate()
-	throws Exception
-    {
-	String newNodeHost = "newNode";
-	DummyClient client = createClientToRelocate(newNodeHost);
-	DummyClient otherClient = new DummyClient("foo");
-	SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	try {
-	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
-	    otherClient.connect(newPort).login();
-	    client.relocate(newPort, true, false);
-	} finally {
-	    client.disconnect();
-	}
-    }
-
-    public void testRelocateWithInterveningClientLoginPreempted()
-	throws Exception
-    {
-	String newNodeHost = "newNode";
-	allowNewLogin = true;	// enable login preemption on new node
-	DummyClient client = createClientToRelocate(newNodeHost);
-	DummyClient otherClient = new DummyClient("foo");
-	SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	try {
-	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
-	    otherClient.connect(newPort).login();
-	    client.relocate(newPort, true, true);
-	} finally {
-	    client.disconnect();
-	}
-    }
-
-    public void testRelocateWithRedirect()
-	throws Exception
-    {
-	String host2 = "host2";
-	String host3 = "host3";
-	DummyClient client = createClientToRelocate(host2);
-	addNodes(host3);
-	SgsTestNode node2 = additionalNodes.get(host2);
-	SgsTestNode node3 = additionalNodes.get(host3);
-	DirectiveNodeAssignmentPolicy.instance.
-	    moveIdentity("foo", node2.getNodeId(),
-			 node3.getNodeId());
-	client.relocate(node2.getAppPort(), true, false);
-    }
-    
-    private DummyClient createClientToRelocate(String newNodeHost)
-	throws Exception
-    {
-	final String name = "foo";
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
-	addNodes(newNodeHost);
-	DummyClient client = new DummyClient(name);
-	client.connect(serverNode.getAppPort()).login();
-	SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	System.err.println("reassigning identity from server node to host: " +
-			   newNodeHost);
-	DirectiveNodeAssignmentPolicy.instance.
-	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
-	System.err.println("(done) reassigning identity");
-	System.err.println("waiting for relocation to client...");
-	client.waitForRelocationNotification(newNode.getAppPort());
-	return client;
-    }
-    
     /* -- other methods -- */
 
     private void sendMessagesAndCheck(
@@ -1894,15 +1962,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
 	private class Listener implements ConnectionListener {
 
-	    Queue<byte[]> messageList = new ConcurrentLinkedQueue<byte[]>();
+	    final Queue<byte[]> messageList = new ConcurrentLinkedQueue<byte[]>();
 
 	    Queue<byte[]> getMessageList() {
-		synchronized (lock) {
-		    Queue<byte[]> oldMessageList = messageList;
-		    //messageList = new LinkedList<byte[]>();
-		    return oldMessageList;
-		}
+		return messageList;
 	    }
+
 	    
             /** {@inheritDoc} */
 	    public void bytesReceived(Connection conn, byte[] buffer) {
@@ -2284,6 +2349,55 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    throw new RuntimeException(
 			"Unexpected exception:" + cause, cause);
 		}
+	    }
+	}
+    }
+
+    private int getObjectCount() throws Exception {
+	GetObjectCountTask task = new GetObjectCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+    
+    private class GetObjectCountTask extends TestAbstractKernelRunnable {
+
+	volatile int count = 0;
+	
+	GetObjectCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    BigInteger last = null;
+	    while (true) {
+		BigInteger next = dataService.nextObjectId(last);
+		if (next == null) {
+		    break;
+		}
+                // NOTE: this count is used at the end of the test to make sure
+                // that no objects were leaked in stressing the structure but
+                // any given service (e.g., the task service) may accumulate
+                // managed objects, so a more general way to exclude these from
+                // the count would be nice but for now the specific types that
+                // are accumulated get excluded from the count.
+		ManagedReference ref =
+		    dataService.createReferenceForId(next);
+		Object obj = ref.get();
+                String name = obj.getClass().getName();
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask") &&
+		    ! name.equals("com.sun.sgs.impl.service.nodemap.IdentityMO"))
+		{
+		    /*
+		    System.err.print(count + "[" + obj.getClass().getName() + "]:");
+		    try {
+			System.err.println(obj.toString());
+		    } catch (ObjectNotFoundException e) {
+			System.err.println("<< caught ObjectNotFoundException >>");
+		    }
+		    */
+                    count++;
+		}
+                last = next;
 	    }
 	}
     }

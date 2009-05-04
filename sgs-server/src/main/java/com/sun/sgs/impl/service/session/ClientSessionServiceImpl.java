@@ -518,7 +518,9 @@ public final class ClientSessionServiceImpl
      * If an identity is added to this node ({@link #mappingAdded})
      * and the {@code oldNode} is non-{@code null}, then its
      * corresponding client session (if any) may be moving to this
-     * node from the old node.
+     * node from the old node.  If the identity is moving to this node,
+     * there is no action to take because the old node initiates relocation
+     * to the new node.
      */
     private class NodeMappingListenerImpl implements NodeMappingListener {
 
@@ -529,19 +531,6 @@ public final class ClientSessionServiceImpl
 			   "identity:{0} localNode:{1} oldNode:{2}",
 			   id, localNodeId, oldNode);
 	    }
-	    if (oldNode == null) {
-		// This indicates a new mapping, so a session
-		// can't be relocating.
-		return;
-	    } /* else if (addedIdentities.putIfAbsent(id, oldNode) == null) {
-		// TBD: Keep track of pending login or relocation to
-		// node and clean up session if it doesn't relocate
-		// to the local node in a timely fashion.
-		
-	    } else {
-		// TBD: what if the identity is already moving here?
-		}*/
-	    
 	}
 
 	/** {@inheritDoc} */
@@ -561,8 +550,6 @@ public final class ClientSessionServiceImpl
 				ClientSessionImpl.getSession(
 				    dataService, handler.sessionRefId);
 			    if (session != null) {
-				// TBD: if session already moving, need to
-				// put off this move.
 				session.addMoveEvent(newNode);
 			    }
 			} },
@@ -924,7 +911,7 @@ public final class ClientSessionServiceImpl
 	/** {@inheritDoc} */
 	public byte[] relocatingSession(
 	    Identity identity, byte[] sessionId, long oldNode)
-	// throws RelocationFailedException?
+	// throws RelocationFailedException
 	{
 	    callStarted();
 	    try {
