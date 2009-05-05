@@ -90,10 +90,6 @@ import java.util.logging.Logger;
  * href="../../../../app/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
  *
- * The constructor also passes the properties to {@link
- * DbEnvironmentFactory#getEnvironment DbEnvironmentFactory.getEnvironment},
- * which supports additional properties. <p>
- *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> to log
  * information at the following logging levels: <p>
@@ -126,6 +122,14 @@ public class DataStoreImpl extends AbstractDataStore {
 
     /** The default directory for database files from the app root. */
     private static final String DEFAULT_DIRECTORY = "dsdb";
+    
+    /** The property that specifies the environment class. */
+    public static final String ENVIRONMENT_CLASS_PROPERTY =
+	"com.sun.sgs.impl.service.data.store.db.environment.class";
+    
+    /** The default environment class. */
+    private static final String DEFAULT_ENVIRONMENT_CLASS =
+        "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -831,8 +835,14 @@ public class DataStoreImpl extends AbstractDataStore {
                                                  directoryFile.getName());
                 }
 	    }
-	    env = DbEnvironmentFactory.getEnvironment(
-		directory, properties, scheduler);
+            env = wrappedProps.getClassInstanceProperty(
+                    ENVIRONMENT_CLASS_PROPERTY,
+                    DEFAULT_ENVIRONMENT_CLASS,
+                    DbEnvironment.class,
+                    new Class<?>[]{
+                        String.class, Properties.class, Scheduler.class
+                    },
+                    directory, properties, scheduler);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
 	    Databases dbs = getDatabases(dbTxn);
 	    infoDb = dbs.info;
@@ -862,7 +872,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	    }
 	}
     }
-
+    
     /**
      * Opens or creates the Berkeley DB databases associated with this data
      * store.
