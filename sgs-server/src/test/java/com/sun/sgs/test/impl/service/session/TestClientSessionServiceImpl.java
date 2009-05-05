@@ -1276,11 +1276,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = createClientToRelocate(newNodeHost);
 	try {
 	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    int objectCount = getObjectCount();
 	    sendMessagesFromNode(serverNode, client, 4, 0);
 	    sendMessagesFromNode(newNode, client, 4, 10);
 	    client.relocate(newNode.getAppPort(), true, true);
 	    waitForClientMessages(client, 4, 0);
 	    waitForClientMessages(client, 4, 10);
+	    waitForExpectedObjectCount(objectCount);
 	} finally {
 	    client.disconnect();
 	}

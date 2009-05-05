@@ -53,7 +53,7 @@ public class DirectiveNodeAssignmentPolicy extends RoundRobinPolicy {
     public long chooseNode(Identity id, long requestingNode)
         throws NoNodesAvailableException 
     {
-	if (roundRobin) {
+	if (roundRobin || requestingNode == -1) {
 	    return super.chooseNode(id, requestingNode);
 	} else {
 	    return requestingNode;

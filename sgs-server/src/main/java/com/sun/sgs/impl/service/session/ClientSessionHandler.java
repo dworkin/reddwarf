@@ -548,9 +548,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /**
      * Invokes the {@code setStatus} method on the node mapping service
-     * with {@code false} to mark
-     * the identity as inactive.  This method is invoked when a login is
-     * redirected and also when a this client session is disconnected.
+     * with {@code false} to mark the identity as inactive.  This method
+     * is invoked when a login is redirected and also when this client
+     * session is disconnected.
      */
     void deactivateIdentity() {
 	try {
