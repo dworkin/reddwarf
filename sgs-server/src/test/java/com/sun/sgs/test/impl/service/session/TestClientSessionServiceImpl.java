@@ -1254,14 +1254,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testRelocateClientSessionAndSend() throws Exception {
+    public void testRelocateClientSessionSendingAfterRelocate()
+	throws Exception
+    {
 	String newNodeHost = "newNode";
 	DummyClient client = createClientToRelocate(newNodeHost);
 	try {
 	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	    System.err.println("waiting for relocation to client...");
 	    client.relocate(newNode.getAppPort(), true, true);
-	    System.err.println("Sending messages from old node");
 	    sendMessagesFromNodeToClient(serverNode, client, 4, 0);
 	    sendMessagesFromNodeToClient(newNode, client, 4, 10);
 	} finally {
@@ -1269,6 +1269,23 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testRelocateClientSessionSendingDuringRelocate()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	try {
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    sendMessagesFromNode(serverNode, client, 4, 0);
+	    sendMessagesFromNode(newNode, client, 4, 10);
+	    client.relocate(newNode.getAppPort(), true, true);
+	    waitForClientMessages(client, 4, 0);
+	    waitForClientMessages(client, 4, 10);
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
     public void testRelocateInvalidRelocationKey()  throws Exception {
 	String newNodeHost = "new";
 	DummyClient client = createClientToRelocate(newNodeHost);
@@ -1372,27 +1389,27 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	client.connect(serverNode.getAppPort()).login();
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	System.err.println("reassigning identity from server node to host: " +
+	System.err.println("reassigning identity:" + name +
+			   " from server node to host: " +
 			   newNodeHost);
 	DirectiveNodeAssignmentPolicy.instance.
 	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
 	System.err.println("(done) reassigning identity");
-	System.err.println("waiting for relocation to client...");
 	client.waitForRelocationNotification(newNode.getAppPort());
 	return client;
     }
 
     /**
      * Sends the number of specified messages from the specified node to
-     * the specified client and waits for the client to receive the
-     * messages.  The content of each message is a consecutive integer
-     * starting at the specified offset.
+     * the specified client.  The content of each message is a consecutive
+     * integer starting at the specified offset.
      */
-    private void sendMessagesFromNodeToClient(
+    private void sendMessagesFromNode(
 	SgsTestNode node, final DummyClient client, final int numMessages,
 	final int offset)
 	throws Exception
     {
+	System.err.println("sending messages to client [" + client.name + "]");
         TransactionScheduler transactionScheduler = 
             node.getSystemRegistry(). getComponent(TransactionScheduler.class);
 	for (int i = 0; i < numMessages; i++) {
@@ -1406,8 +1423,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 			session.send(buf, Delivery.RELIABLE);
 		    } }, taskOwner);
 	}
+    }
 
-	System.err.println("waiting for client to receive messages");
+    /**
+     * Waits for the client to receive the specified number of messages and
+     * verifies the message content.  The content of each message is a
+     * consecutive integer starting at the specified offset.
+     */
+    private void waitForClientMessages(
+	 DummyClient client, int numMessages, int offset)
+	throws Exception
+    {
+	System.err.println("waiting for client [" + client.name +
+			   "] to receive messages");
 	Queue<byte[]> messages =
 	    client.waitForClientToReceiveExpectedMessages(numMessages);
 	int expected = offset;
@@ -1424,6 +1452,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    expected++;
 	}
 	messages.clear();
+    }
+    
+    /**
+     * Sends the number of specified messages from the specified node to
+     * the specified client and waits for the client to receive the
+     * expected messages.  The content of each message is a consecutive
+     * integer starting at the specified offset.
+     */
+    private void sendMessagesFromNodeToClient(
+	SgsTestNode node,  DummyClient client, int numMessages, int offset)
+	throws Exception
+    {
+        sendMessagesFromNode(node, client, numMessages, offset);
+	waitForClientMessages(client, numMessages, offset);
     }
 
     private void waitForExpectedObjectCount(int expectedCount)
@@ -1541,7 +1583,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean connected = false;
 	private final Object lock = new Object();
 	private final Object disconnectedCallbackLock = new Object();
-	private final Object receivedAllMessagesLock = new Object();
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
 	private boolean loginRedirect = false;
@@ -1560,6 +1601,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean relocateAck;
 	private boolean relocateSuccess;
 	private boolean relocateMessage;
+	private int messagesReceivedDuringRelocation = 0;
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -1712,7 +1754,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	void relocate(int newPort, boolean useValidKey, boolean shouldSucceed) {
-	    waitForRelocationNotification(newPort);
+	    synchronized (lock) {
+		if (!relocateSession) {
+		    waitForRelocationNotification(newPort);
+		} else {
+		    assertEquals(newPort, relocatePort);
+		}
+	    }
+	    System.err.println(toString() + " relocating...");
 	    disconnect();
 	    relocateAck = false;
 	    relocateSuccess = false;
@@ -1728,7 +1777,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
-
 	    synchronized (lock) {
 		try {
 		    if (!relocateAck) {
@@ -1750,6 +1798,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			toString() + " relocate timed out", e);
 		}
 	    }
+	    assertEquals(0, messagesReceivedDuringRelocation);
 	}
 
 	/**
@@ -1759,6 +1808,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * in the notification does not match the specified {@code newPort}.
 	 */
 	void waitForRelocationNotification(int newPort) {
+	    System.err.println(toString() +
+			       " waiting for relocation notification...");
 	    synchronized (lock) {
 		try {
 		    if (relocateSession == false) {
@@ -1850,10 +1901,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Queue<byte[]> messageQueue, int expectedMessages)
 	{
 	    this.expectedMessages = expectedMessages;
-	    synchronized (receivedAllMessagesLock) {
+	    synchronized (messageQueue) {
 		if (messageQueue.size() != expectedMessages) {
 		    try {
-			receivedAllMessagesLock.wait(WAIT_TIME);
+			messageQueue.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
 		}
@@ -2042,6 +2093,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    synchronized (lock) {
 			relocateAck = true;
 			relocateSuccess = true;
+			messagesReceivedDuringRelocation = messages.size();
 			System.err.println("relocate succeeded: " + name);
 			lock.notifyAll();
 		    }
@@ -2053,6 +2105,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    synchronized (lock) {
 			relocateAck = true;
 			relocateSuccess = false;
+			messagesReceivedDuringRelocation = messages.size();
 			System.err.println("relocate failed: " + name +
 					   ", reason:" + reason);
 			lock.notifyAll();
@@ -2069,11 +2122,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
 		    byte[] message = buf.getBytes(buf.limit() - buf.position());
-		    synchronized (lock) {
+		    synchronized (messageList) {
 			messageList.add(message);
 			printIt("[" + name + "] received SESSION_MESSAGE: " +
 				HexDumper.toHexString(message));
-			lock.notifyAll();
+			if (messageList.size() == expectedMessages) {
+			    messageList.notifyAll();
+			}
 		    }
 		    break;
 
@@ -2258,9 +2313,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		AppContext.getDataManager().markForUpdate(this);
 		client.messages.add(bytes);
 	    }
-	    if (client.messages.size() == client.expectedMessages) {
-		synchronized (client.receivedAllMessagesLock) {
-		    client.receivedAllMessagesLock.notifyAll();
+	    synchronized (client.messages) {
+		if (client.messages.size() == client.expectedMessages) {
+		    client.messages.notifyAll();
 		}
 	    }
 	}

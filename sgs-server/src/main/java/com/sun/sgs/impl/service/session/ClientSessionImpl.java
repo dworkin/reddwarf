@@ -321,12 +321,27 @@ public class ClientSessionImpl
      * The {@code relocating} flag is set to {@code true} when a move event
      * is processed on the original node, and is set to {@code false} when
      * the client connects to the new node to re-estblish the client session.
+     * If the flag is set from {@code true} to {@code false} (meaning that
+     * the session has completed relocation, then service this session's
+     * event queue.
      *
      * @param	relocating the new value for the flag
+     * @throws	IllegalStateException if this method is invoked from a node
+     *		other than the session's local node
      */
     void setRelocating(boolean relocating) {
+	if (!isLocalSession()) {
+	    throw new IllegalStateException(
+		"'setRelocating' can only be invoked on the local node:" +
+		nodeId + " for this session: " + toString());
+	}
+
 	sessionService.getDataService().markForUpdate(this);
+	boolean serviceEventQueue = this.relocating && !relocating;
 	this.relocating = relocating;
+	if (serviceEventQueue) {
+	    getEventQueue().serviceEvent();
+	}
     }
     
     /**
@@ -334,8 +349,15 @@ public class ClientSessionImpl
      * session to reflect its reassignment to {@code newNodeId}.
      *
      * @param	newNodeId the node this session is relocating to
+     * @throws	IllegalArgumentException if {@code newNodeId} does not match
+     *		the local node ID
      */
     void move(long newNodeId) {
+	if (newNodeId != sessionService.getLocalNodeId()) {
+	    throw new IllegalArgumentException(
+		"newNodeId:" + newNodeId + " must match the local node ID:" +
+		sessionService.getLocalNodeId());
+	}
 	DataService dataService = sessionService.getDataService();
 	dataService.markForUpdate(this);
 	dataService.removeServiceBinding(getSessionNodeKey());
@@ -1066,41 +1088,40 @@ public class ClientSessionImpl
 	void serviceEvent() {
 	    checkState();
 
-	    ManagedQueue<SessionEvent> eventQueue = getQueue();
 	    ClientSessionServiceImpl sessionService =
 		ClientSessionServiceImpl.getInstance();
-	    DataService dataService =
-		ClientSessionServiceImpl.getDataService();
 	    ClientSessionHandler handler =
 		sessionService.getHandler(getSessionRefId());
-	    if (handler == null) {
+	    ClientSessionImpl sessionImpl = getClientSession();
+	    
+	    if (handler == null || !sessionImpl.isLocalSession() ||
+		sessionImpl.relocating)
+	    {
 		// Only service events on the session's local node, so return.
-		// TBD: should this log a warning or redirect the
-		// serviceEventQueue request to the correct node (since the
-		// session has probably moved?
-		return;
-	    }
-	    if (!getClientSession().isLocalSession()) {
 		// The session may be moving, and this might be a left over
-		// serviceEventQueue request.  Need to check that only the
-		// client session's local node is processing its events.
-		// TBD: is there any way to determine this information from
-		// local information only without deserializing the client
-		// session? 
+		// serviceEventQueue request
+		// TBD: should this print a log messaeg?
 		return;
 	    }
 
+	    ManagedQueue<SessionEvent> eventQueue = getQueue();
+	    DataService dataService =
+		ClientSessionServiceImpl.getDataService();
+	    
 	    for (int i = 0; i < sessionService.eventsPerTxn; i++) {
 		SessionEvent event = eventQueue.poll();
 		if (event == null) {
 		    // no more events
-		    break;
+		    // TBD: should the session's task queue for servicing
+		    // events be cleared?
+		    return;
 		}
 
 		logger.log(Level.FINEST, "processing event:{0}", event);
 
                 int cost = event.getCost();
 		if (cost > 0) {
+		    // TBD: this update is costly.
 		    dataService.markForUpdate(this);
 		    writeBufferAvailable += cost;
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -1112,6 +1133,11 @@ public class ClientSessionImpl
 		}
 
 		event.serviceEvent(this, sessionService, handler);
+	    }
+
+	    // Make sure the next event gets serviced.
+	    if (eventQueue.peek() != null) {
+		sessionService.addServiceEventQueueTask(sessionImpl.idBytes);
 	    }
 	}
 

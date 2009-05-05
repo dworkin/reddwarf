@@ -868,40 +868,14 @@ public final class ClientSessionServiceImpl
     private class SessionServerImpl implements ClientSessionServer {
 
 	/** {@inheritDoc} */
-	public void serviceEventQueue(final byte[] sessionId) {
+	public void serviceEventQueue(byte[] sessionId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "serviceEventQueue sessionId:{0}",
 			       HexDumper.toHexString(sessionId));
 		}
-
-		BigInteger sessionRefId = new BigInteger(1, sessionId);
-		if (!handlers.containsKey(sessionRefId)) {
-		    // The session is not local, so this node should not
-		    // service the event queue.
-		    return;
-		}
-		TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
-		if (taskQueue == null) {
-		    TaskQueue newTaskQueue =
-			transactionScheduler.createTaskQueue();
-		    taskQueue = sessionTaskQueues.
-			putIfAbsent(sessionRefId, newTaskQueue);
-		    if (taskQueue == null) {
-			taskQueue = newTaskQueue;
-		    }
-		}
-		taskQueue.addTask(
-		  new AbstractKernelRunnable("ServiceEventQueue") {
-		    public void run() {
-			if (getHandler(new BigInteger(1, sessionId)) != null) {
-			    // TBD: should the handler just be passsed here?
-			    ClientSessionImpl.serviceEventQueue(sessionId);
-			}
-			// TBD: or else what?
-
-		    } }, taskOwner);
+		addServiceEventQueueTask(sessionId);
 	    } finally {
 		callFinished();
 	    }
@@ -1012,6 +986,9 @@ public final class ClientSessionServiceImpl
     
     /* -- Other methods -- */
 
+    /**
+     * Returns the transaction proxy.
+     */
     TransactionProxy getTransactionProxy() {
 	return txnProxy;
     }
@@ -1198,6 +1175,35 @@ public final class ClientSessionServiceImpl
 	}
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
+    }
+
+    void addServiceEventQueueTask(final byte[] sessionId) {
+	final BigInteger sessionRefId = new BigInteger(1, sessionId);
+	if (!handlers.containsKey(sessionRefId)) {
+	    // The session is not local, so this node should not
+	    // service the event queue.
+	    return;
+	}
+
+	TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
+	if (taskQueue == null) {
+	    TaskQueue newTaskQueue =
+		transactionScheduler.createTaskQueue();
+	    taskQueue = sessionTaskQueues.
+		putIfAbsent(sessionRefId, newTaskQueue);
+	    if (taskQueue == null) {
+		taskQueue = newTaskQueue;
+	    }
+	}
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("ServiceEventQueue") {
+		public void run() {
+		    if (getHandler(sessionRefId) != null) {
+			// TBD: should the handler just be passsed here?
+			ClientSessionImpl.serviceEventQueue(sessionId);
+		    }
+		    // TBD: or else what?
+		} }, taskOwner);
     }
 
     /**
