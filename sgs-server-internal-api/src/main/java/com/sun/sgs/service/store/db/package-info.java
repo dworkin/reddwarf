@@ -17,25 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.nio;
-
-import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
-
 /**
- * Factory for obtaining the default {@code AsynchronousChannelProvider}.
- * Used by {@link AsynchronousChannelProvider#provider()}.
+ * Provides a database abstraction layer for use by the default implementation
+ * of the {@link com.sun.sgs.service.store.DataStore} class.
  */
-public final class DefaultAsyncChannelProvider {
-
-    /** Prevents instantiation of this class. */
-    private DefaultAsyncChannelProvider() { }
-
-    /**
-     * Returns the system-default {@code AsynchronousChannelProvider}.
-     *
-     * @return the system-default {@code AsynchronousChannelProvider}
-     */
-    public static AsynchronousChannelProvider create() {
-        return new ReactiveAsyncChannelProvider();
-    }
-}
+package com.sun.sgs.service.store.db;

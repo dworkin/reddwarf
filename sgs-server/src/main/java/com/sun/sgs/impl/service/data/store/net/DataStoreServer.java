@@ -24,7 +24,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.BindingValue;
-import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import java.io.IOException;
 import java.io.ObjectStreamClass;
 import java.rmi.Remote;

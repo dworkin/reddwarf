@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store;
+package com.sun.sgs.service.store;
 
 /**
  * Thrown when no class information is found to be associated with a class ID.

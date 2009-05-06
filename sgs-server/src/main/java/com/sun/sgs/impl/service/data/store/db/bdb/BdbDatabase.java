@@ -31,10 +31,10 @@ import static com.sleepycat.db.OperationStatus.KEYEXIST;
 import static com.sleepycat.db.OperationStatus.NOTFOUND;
 import static com.sleepycat.db.OperationStatus.SUCCESS;
 import com.sleepycat.db.Transaction;
-import com.sun.sgs.impl.service.data.store.db.DbCursor;
-import com.sun.sgs.impl.service.data.store.db.DbDatabase;
-import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.service.store.db.DbCursor;
+import com.sun.sgs.service.store.db.DbDatabase;
+import com.sun.sgs.service.store.db.DbDatabaseException;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.io.FileNotFoundException;
 
 /** Provides a database implementation using Berkeley DB. */

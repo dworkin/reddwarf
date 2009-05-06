@@ -5,6 +5,9 @@ Version 0.9.10:
 - Service startup is modified so a guaranteed set of services is always
   started, allowing services to use services that are started after them
   (issue #145)
+- Split internal API classes used to write custom services, transports,
+  protocols, and authenticators into a separate sgs-server-internal-api.jar
+  file (issue #162)
 - Also fix issues #5, #44, #48, #73, #82, #89, #98, #130, #131, #136, #142,
   #143, #144, #149, #151, #153, #154, #155, #158, #160
 
