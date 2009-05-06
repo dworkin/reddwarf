@@ -1371,6 +1371,47 @@ public class TestClientSessionServiceImpl extends TestCase {
 	assertFalse(client.graceful);
     }
 
+    public void testOldNodeFailsDuringRelocateToNewNode()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	int objectCount = getObjectCount();
+	checkBindings(1);
+	try {
+	    // Simulate oldNode crashing by having client not connect to
+	    // newNode by the timeout period.
+	    Thread.sleep(WAIT_TIME);
+	    assertEquals(objectCount - MANAGED_OBJECTS_PER_SESSION,
+			 getObjectCount());
+	    checkBindings(0);
+	    assertTrue(client.receivedDisconnectedCallback);
+	    assertFalse(client.graceful);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testNewNodeFailsDuringRelocateToNewNode()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	checkBindings(1);
+	try {
+	    // Simulate oldNode crashing by having client not connect to
+	    // newNode by the timeout period.
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    newNode.shutdown(false);
+	    Thread.sleep(WAIT_TIME);
+	    checkBindings(0);
+	    assertTrue(client.receivedDisconnectedCallback);
+	    assertFalse(client.graceful);
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
     /**
      * Performs the following in preparation for a relocation test:
      * <ul>
