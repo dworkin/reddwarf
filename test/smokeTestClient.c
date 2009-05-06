@@ -33,7 +33,7 @@
 
 /* Some global variables, declared to make life easier */
 
-static char *g_hostname = DEFAULT_HOST;
+static char* g_hostname = DEFAULT_HOST;
 static int g_port = DEFAULT_PORT;
 
 
@@ -59,6 +59,14 @@ void getCommandArgs(int count, char *args[]){
     }
 }
 
+void waitForInput(sgs_connection* connection)
+{
+    inputReceived = 1;
+    while (inputReceived == 1){
+        sgs_connection_do_work(connection);
+    }
+}
+
 void loadContext(sgs_context *context)
 {
     sgs_ctx_set_channel_joined_cb(context, channel_joined_cb);
@@ -73,7 +81,15 @@ void loadContext(sgs_context *context)
 
 int testLogin(sgs_connection *connection)
 {
-
+    char loginName[] = "kickme";
+    loginFail = 1;
+    printf("calling login\n");
+    sgs_connection_login(connection, loginName, loginName);
+    waitForInput(connection);
+    if (loginFail == 1){
+        printf("Log in failure test failed\n");
+        exit(1);
+    }
 }
 
 int main(int argc, char** argv) {
@@ -95,6 +111,8 @@ int main(int argc, char** argv) {
      * of the server, and ask for the usage message
      * to be printed
      */
+    g_hostname = DEFAULT_HOST;
+    g_port = DEFAULT_PORT;
     getCommandArgs(argc, argv);
     printf("parsed command line; hostname = %s, port = %d\n", g_hostname, g_port);
 
@@ -118,7 +136,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    if (testLogin(context) != 0) {
+    if (testLogin(connection) != 0) {
         printf ("unable to log into server\n");
         exit(1);
     }

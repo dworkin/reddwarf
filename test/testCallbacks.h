@@ -26,6 +26,7 @@ static int g_maxfd;
 
 int loginFail, loginRedirect, loginSuccess, channelJoin, channelLeave,
         channelMessage, sessionMessage;
+int inputReceived;
 
 void channel_joined_cb(sgs_connection *conn,
             sgs_channel *channel);
