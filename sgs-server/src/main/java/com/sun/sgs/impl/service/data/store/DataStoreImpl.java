@@ -89,6 +89,12 @@ import java.util.logging.Logger;
  * supports these public <a
  * href="../../../../app/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
+ * 
+ * The constructor also passes the properties to the constructor of
+ * the {@link DbEnvironment} class chosen at runtime with the
+ * {@code com.sun.sgs.impl.service.data.store.db.environment.class} property.
+ * Each implementation of {@code DbEnvironment} may support additional
+ * properties. <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> to log
