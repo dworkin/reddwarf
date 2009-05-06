@@ -681,7 +681,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 				ClientSessionImpl sessionImpl =
 				    ClientSessionImpl.getSession(
  				        dataService, sessionRefId);
-				sessionImpl.setRelocating(false);
+				sessionImpl.relocationComplete();
 			    } }, identity);
 		    setupSuccess();
 		} catch (Exception e) {

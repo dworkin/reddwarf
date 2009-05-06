@@ -114,8 +114,9 @@ public class ClientSessionImpl
     /** The capacity of the write buffer, in bytes. */
     private final int writeBufferCapacity;
 
-    /** Indicates whether this session is in the process of relocating. */
-    private boolean relocating = false;
+    /** If the value is not {@code -1}, indicates the node ID that this
+     * session is relocating to. */
+    private long relocatingToNode = -1;
 
     /*
      * TBD: Should a managed reference to the ClientSessionListener be
@@ -317,19 +318,18 @@ public class ClientSessionImpl
     }
 
     /**
-     * Sets the {@code relocating} flag to the specified boolean value.
-     * The {@code relocating} flag is set to {@code true} when a move event
-     * is processed on the original node, and is set to {@code false} when
-     * the client connects to the new node to re-estblish the client session.
-     * If the flag is set from {@code true} to {@code false} (meaning that
-     * the session has completed relocation, then service this session's
-     * event queue.
+     * Sets the {@code relocatingToNode} field to the specified node ID.
+     * This method is invoked when a move event is processed on the
+     * original node to flag this client session as one that is
+     * relocating.  When relocation is complete, the {@link
+     * #relocationComplete} method should be invoked on the client
+     * session's new node to mark the client session as having moved.
      *
-     * @param	relocating the new value for the flag
+     * @param	newNodeId the new node that client session is relocating to
      * @throws	IllegalStateException if this method is invoked from a node
      *		other than the session's local node
      */
-    void setRelocating(boolean relocating) {
+    private void setRelocatingToNode(long newNodeId) {
 	if (!isLocalSession()) {
 	    throw new IllegalStateException(
 		"'setRelocating' can only be invoked on the local node:" +
@@ -337,11 +337,35 @@ public class ClientSessionImpl
 	}
 
 	sessionService.getDataService().markForUpdate(this);
-	boolean serviceEventQueue = this.relocating && !relocating;
-	this.relocating = relocating;
-	if (serviceEventQueue) {
-	    getEventQueue().serviceEvent();
+	relocatingToNode = newNodeId;
+    }
+
+    /**
+     * Marks this client session as having completed relocation, and then
+     * services this session's event queue.  This method is invoked when
+     * the associated client connects to the new node to re-estblish the
+     * client session.
+     *
+     * @throws	IllegalStateException if this method is invoked from a node
+     *		other than the session's local node
+     */
+    void relocationComplete() {
+	if (!isLocalSession()) {
+	    throw new IllegalStateException(
+		"'relocationComplete' can only be invoked on the local node:" +
+		nodeId + " for this session: " + toString());
 	}
+	sessionService.getDataService().markForUpdate(this);
+	relocatingToNode = -1;
+	getEventQueue().serviceEvent();
+    }
+
+    /**
+     * Returns {@code true} if the session is relocating, and {@code
+     * false} otherwise.
+     */
+    private boolean relocating() {
+	return relocatingToNode != -1;
     }
     
     /**
@@ -383,6 +407,11 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     public long getNodeId() {
 	return nodeId;
+    }
+
+    /** {@inheritDoc} */
+    public long getRelocatingToNodeId() {
+	return relocatingToNode;
     }
 
     /* -- Implement Object -- */
@@ -801,7 +830,7 @@ public class ClientSessionImpl
 	 * resume when the client connects to the new node to re-establish
 	 * the client session.
 	 */
-	if (isLocalSession && eventQueue.isEmpty() && !relocating) {
+	if (isLocalSession && eventQueue.isEmpty() && !relocating()) {
 	    event.serviceEvent(
  		eventQueue,
 		sessionService,
@@ -811,7 +840,7 @@ public class ClientSessionImpl
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add client session event");
 
-	} else if (!relocating) {
+	} else if (!relocating()) {
 	    if (isLocalSession) {
 		eventQueue.serviceEvent();
 	    } else {
@@ -956,7 +985,7 @@ public class ClientSessionImpl
 			  ClientSessionHandler handler)
 	{
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.setRelocating(true);
+	    sessionImpl.setRelocatingToNode(newNode.getId());
 	    
 	    sessionService.checkContext().addCommitAction(
 		eventQueue.getSessionRefId(),
@@ -1095,7 +1124,7 @@ public class ClientSessionImpl
 	    ClientSessionImpl sessionImpl = getClientSession();
 	    
 	    if (handler == null || !sessionImpl.isLocalSession() ||
-		sessionImpl.relocating)
+		sessionImpl.relocating())
 	    {
 		// Only service events on the session's local node, so return.
 		// The session may be moving, and this might be a left over
