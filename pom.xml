@@ -45,6 +45,7 @@
     <module>sgs-server-api</module>
     <module>sgs-server-dist</module>
     <module>sgs-server-javadoc</module>
+    <module>sgs-server-internal-api</module>
     <module>sgs-tutorial-server</module>
     <module>sgs-tutorial-server-dist</module>
   </modules>
@@ -171,6 +172,17 @@
       <dependency>
 	<groupId>com.projectdarkstar.server</groupId>
 	<artifactId>sgs-server-api</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-internal-api</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-internal-api</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs.version}</version>
       </dependency>

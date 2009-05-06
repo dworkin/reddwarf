@@ -28,8 +28,8 @@ import static com.sleepycat.db.OperationStatus.KEYEXIST;
 import static com.sleepycat.db.OperationStatus.NOTFOUND;
 import static com.sleepycat.db.OperationStatus.SUCCESS;
 import com.sleepycat.db.Transaction;
-import com.sun.sgs.impl.service.data.store.db.DbCursor;
-import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
+import com.sun.sgs.service.store.db.DbCursor;
+import com.sun.sgs.service.store.db.DbDatabaseException;
 
 /** Provides a cursor implementation using Berkeley DB. */
 public class BdbCursor implements DbCursor {

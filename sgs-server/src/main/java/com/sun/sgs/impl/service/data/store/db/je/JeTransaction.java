@@ -23,7 +23,7 @@ import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Transaction;
 import com.sleepycat.je.TransactionConfig;
 import com.sleepycat.je.XAEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.util.Arrays;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;

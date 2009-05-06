@@ -21,11 +21,11 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
+import com.sun.sgs.service.store.DataStore;
 import java.math.BigInteger;
 import java.util.IdentityHashMap;
 import java.util.logging.Level;

@@ -25,6 +25,8 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.DataStore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;

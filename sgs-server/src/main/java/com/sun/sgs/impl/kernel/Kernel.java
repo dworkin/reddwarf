@@ -148,7 +148,7 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
-
+    
     // default timeout the kernel's shutdown method (15 minutes)
     private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 600000;
     
@@ -200,7 +200,6 @@ class Kernel {
         
         // check the standard properties
         checkProperties(appProperties);
-        
         this.appProperties = appProperties;
 
         try {

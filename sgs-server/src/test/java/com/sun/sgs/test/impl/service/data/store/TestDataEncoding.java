@@ -17,9 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.test.impl.service.data.store.db;
+package com.sun.sgs.test.impl.service.data.store;
 
-import com.sun.sgs.impl.service.data.store.db.DataEncoding;
+import com.sun.sgs.impl.service.data.store.DataEncoding;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.util.Arrays;
 import junit.framework.TestCase;

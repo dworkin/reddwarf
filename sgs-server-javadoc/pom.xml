@@ -34,6 +34,11 @@
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-internal-api</artifactId>
+      <classifier>sources</classifier>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server-api</artifactId>
       <classifier>sources</classifier>
     </dependency>
@@ -123,6 +128,20 @@
 	      </bottom>
 	      <finalName>all</finalName>
 	      <subpackages>com.sun.sgs</subpackages>
+	      <groups>
+		<group>
+		  <title>External API</title>
+		  <packages>com.sun.sgs.app*:com.sun.sgs.internal*:com.sun.sgs.protocol.simple*</packages>
+		</group>
+		<group>
+		  <title>Internal API</title>
+		  <packages>com.sun.sgs.auth*:com.sun.sgs.kernel*:com.sun.sgs.management*:com.sun.sgs.nio*:com.sun.sgs.profile*:com.sun.sgs.protocol*:com.sun.sgs.service*:com.sun.sgs.transport*</packages>
+		</group>
+		<group>
+		  <title>Implementation</title>
+		  <packages>com.sun.sgs.impl*</packages>
+		</group>
+	      </groups>
 	      <outputDirectory>${project.build.directory}/all-docs</outputDirectory>
 	    </configuration>
 	  </execution>

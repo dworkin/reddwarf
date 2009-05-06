@@ -22,6 +22,7 @@
 	<include>com.projectdarkstar.server:sgs-server:jar</include>
 	<include>com.projectdarkstar.server:sgs-shared:jar</include>
 	<include>com.projectdarkstar.server:sgs-server-api:jar</include>
+	<include>com.projectdarkstar.server:sgs-server-internal-api:jar</include>
 	<include>com.projectdarkstar.ext.berkeleydb:db:jar</include>
 	<include>com.sleepycat:je:jar</include>
       </includes>
@@ -35,6 +36,7 @@
 	<include>com.projectdarkstar.server:sgs-server:jar:sources</include>
 	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
 	<include>com.projectdarkstar.server:sgs-server-api:jar:sources</include>
+	<include>com.projectdarkstar.server:sgs-server-internal-api:jar:sources</include>
       </includes>
       <outputDirectory>src</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
