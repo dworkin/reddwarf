@@ -20,10 +20,10 @@
 package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.kernel.NodeType;
+import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.TestDataStorePerformance;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 
