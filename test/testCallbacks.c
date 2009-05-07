@@ -1,11 +1,23 @@
 #include <stdio.h>
-#include "testCallbacks.h"
+#include <string.h>
 #include "sgs/connection.h"
 #include "sgs/channel.h"
+#include "testCallbacks.h"
 
+void clearMessageBuffer(){
+    int i, j;
+    j = strnlen(messageBuffer);
+    for (i = 0; i < j; i++){
+        *messageBuffer = '\0';
+    }
+}
 void channel_joined_cb(sgs_connection *conn,
         sgs_channel *channel) {
     inputReceived--;
+    clearMessageBuffer();
+    messageBuffer = strncat(messageBuffer, "joinedChannel:");
+    messageBuffer = strncat(messageBuffer, sgs_channel_name(channel);
+    channelJoinFail = 0;
     printf("received channel join callback\n");
 }
 
@@ -23,14 +35,20 @@ void channel_recv_msg_cb(sgs_connection *conn,
 
 void disconnected_cb(sgs_connection *conn) {
     inputReceived--;
-    loginDisconnect = 0;
+    loginDisconnectFail = 0;
     printf("received disconnected callback\n");
 
 }
 
 void logged_in_cb(sgs_connection *conn,
         sgs_session *session) {
-    inputReceived--;
+    clearMessageBuffer();
+    messageBuffer = strncat(messageBuffer, "loggedIn:");
+    messageBuffer = strncat(messageBuffer, loginName);
+    if (sgs_session_direct_send(session, messageBuffer, strnlen(messageBuffer) )== -1){
+        printf("error in sending login response to server\n");
+    }
+    loginFail = 0;
     printf("received logged in callback\n");
 
 }
@@ -38,7 +56,7 @@ void logged_in_cb(sgs_connection *conn,
 void login_failed_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
     inputReceived--;
     printf("received login failed callback\n");
-    loginFail = 0;
+    loginFailFail = 0;
 }
 
 void reconnected_cb(sgs_connection *conn) {

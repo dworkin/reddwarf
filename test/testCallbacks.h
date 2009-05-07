@@ -12,20 +12,24 @@
 extern "C" {
 #endif
 
-#include "sgs/connection.h";
-#include "sgs/channel.h";
-#include "sgs/session.h";"
+#include "sgs/connection.h"
+#include "sgs/channel.h"
+#include "sgs/session.h"
 
 static fd_set g_master_readset, g_master_writeset, g_master_exceptset;
 static int g_maxfd;
+static char* loginName;
+static char messageBuffer[512] = "";
+
 /* A set of flags for the callback function tests-- the flag will
  * be set before a call that should trigger a callback, and then will
  * be reset by the callback; the main program can do the set, make the
  * call, wait on the callback, and then check the flag.
  */
 
-int loginFail, loginDisconnect, loginSuccess, channelJoin, channelLeave,
-        channelMessage, sessionMessage;
+int loginFailFail, loginDisconnectFail,
+        loginFail, channelJoinFail, channelLeaveFail,
+        channelMessageFail, sessionMessageFail;
 int inputReceived;
 
 void channel_joined_cb(sgs_connection *conn,

@@ -81,20 +81,18 @@ void loadContext(sgs_context *context)
 
 int testLogin(sgs_connection *connection)
 {
-    loginFail = 1;
-    printf("calling login\n");
+
     sgs_connection_login(connection, "kickme", "password1");
     waitForInput(connection, 1);
-    if (loginFail == 1){
+    if (loginFailFail == 1){
         printf("Log in failure test failed\n");
     } else {
         printf("Log in failure test passed\n");
     }
 
-    loginDisconnect = 1;
     sgs_connection_login(connection, "discme", "password2");
     waitForInput(connection, 1);
-    if (loginDisconnect == 1){
+    if (loginDisconnectFail == 1){
         printf("Log in disconnect test failed\n");
     } else {
         printf("Log in disconnect test passed\n");
@@ -113,6 +111,14 @@ int main(int argc, char** argv) {
     FD_ZERO(&g_master_readset);
     FD_ZERO(&g_master_writeset);
     FD_ZERO(&g_master_exceptset);
+
+    /* Now, initialize all of the flags that will be
+     * used to keep track of which tests pass and which
+     * tests fail
+     */
+    loginFailFail = loginDisconnectFail = loginFail = 1;
+    channelJoinFail = channelLeaveFail = channelMessageFail = 1;
+    sessionMessageFail = 1;
 
     /* Get any command line argumentss, and
      * set the appropriate (global) variables. Currently,
