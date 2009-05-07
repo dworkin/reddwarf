@@ -23,6 +23,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import java.io.IOException;
 import java.io.ObjectStreamClass;
 import java.io.Serializable;
+import java.net.InetAddress;
 import java.rmi.Remote;
 
 /** Defines the network interface for the caching data store server. */
@@ -30,15 +31,18 @@ public interface CachingDataStoreServer extends Remote {
 
     /**
      * Registers a node with the data server, supplying a callback server that
-     * the data server can use to make callback requests.  Returns the update
-     * queue that this node should use to send updates to the data server.
+     * the data server can use to make callback requests.  Returns the network
+     * address that the node should connect to for sending updates to the data
+     * server.
      *
      * @param	nodeId the ID of the node
      * @param	callbackServer the callback server
-     * @return	the update queue
+     * @return	the network address
+     * @throws	IllegalArgumentException if {@code nodeId} has already been
+     *		registered
      * @throws	IOException if a network problem occurs
      */
-    UpdateQueue registerNode(long nodeId, CallbackServer callbackServer)
+    InetAddress registerNode(long nodeId, CallbackServer callbackServer)
 	throws IOException;
 
     /* -- Object methods -- */
@@ -63,7 +67,8 @@ public interface CachingDataStoreServer extends Remote {
      * @param	oid the object ID
      * @return	information about the object, or {@code null} if the object is
      *		not found
-     * @throws	IllegalArgumentException if {@code timestamp} or {@code oid} is
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered, or if either {@code timestamp} or {@code oid} is
      *		negative
      * @throws	IOException if a network problem occurs
      */
@@ -108,11 +113,12 @@ public interface CachingDataStoreServer extends Remote {
      * @param	oid the object ID
      * @return	information about the object, or {@code null} if the object is
      *		not found
-     * @throws	IllegalArgumentException if {@code timestamp} or {@code oid} is
-     *		negative
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered, or if {@code timestamp} or {@code oid} is negative
      * @throws	IOException if a network problem occurs
      */
-    GetObjectResults getObjectForUpdate(long nodeId, long timestamp, long oid)
+    GetObjectForUpdateResults getObjectForUpdate(
+	long nodeId, long timestamp, long oid)
 	throws IOException;
 
     /** The results of a call to {@link #getObjectForUpdate}. */
@@ -154,8 +160,8 @@ public interface CachingDataStoreServer extends Remote {
      *		{@code -1}
      * @throws	CacheConsistencyException if the requesting node does not have
      *		read access for the object ID
-     * @throws	IllegalArgumentException if {@code timestamp} or {@code oid} is
-     *		negative
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered, or if {@code timestamp} or {@code oid} is negative
      * @throws	IOException if a network problem occurs
      */
     long upgradeObject(long nodeId, long timestamp, long oid)
@@ -177,8 +183,8 @@ public interface CachingDataStoreServer extends Remote {
      *		{@code -1} to request the first object
      * @return	information about the next object, or {@code null} if there are
      *		no more objects
-     * @throws	IllegalArgumentException if {@code timestamp} or {@code oid} is
-     *		negative
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered, or if {@code timestamp} or {@code oid} is negative
      * @throws	IOException if a network problem occurs
      */
     NextObjectResults nextObjectId(long nodeId, long timestamp, long oid)
@@ -232,7 +238,8 @@ public interface CachingDataStoreServer extends Remote {
      *		making the request
      * @param	name the name
      * @return	information about the name binding
-     * @throws	IllegalArgumentException if {@code timestamp} is negative
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered or if {@code timestamp} is negative
      * @throws	IOException if a network problem occurs
      */
     GetBindingResults getBinding(long nodeId, long timestamp, String name)
@@ -311,7 +318,8 @@ public interface CachingDataStoreServer extends Remote {
      *		making the request
      * @param	name the name
      * @return	information about the name binding
-     * @throws	IllegalArgumentException if {@code timestamp} is negative
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered or if {@code timestamp} is negative
      * @throws	IOException if a network problem occurs
      */
     GetBindingForUpdateResults getBindingForUpdate(
@@ -363,7 +371,8 @@ public interface CachingDataStoreServer extends Remote {
      *		making the request
      * @param	name the name
      * @return	information about the object ID and the next name
-     * @throws	IllegalArgumentException if {@code timestamp} is negative
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered or if {@code timestamp} is negative
      * @throws	IOException if a network problem occurs
      */
     GetBindingForRemoveResults getBindingForRemove(
@@ -489,7 +498,8 @@ public interface CachingDataStoreServer extends Remote {
      *		making the request
      * @param	name the name
      * @return	information about the next bound name
-     * @throws	IllegalArgumentException if {@code timestamp} is negative
+     * @throws	IllegalArgumentException if {@code nodeId} has not been
+     *		registered or if {@code timestamp} is negative
      * @throws	IOException if a network problem occurs
      */
     NextBoundNameResults nextBoundName(

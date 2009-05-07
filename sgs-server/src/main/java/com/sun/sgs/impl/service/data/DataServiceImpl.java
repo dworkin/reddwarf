@@ -30,8 +30,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
-import com.sun.sgs.impl.service.data.store.Scheduler;
-import com.sun.sgs.impl.service.data.store.TaskHandle;
+import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -40,8 +39,6 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector;
@@ -200,9 +197,6 @@ public final class DataServiceImpl implements DataService {
     /** The name of this application. */
     private final String appName;
 
-    /** Scheduler supplied to the data store. */
-    private final Scheduler scheduler;
-
     /** The underlying data store. */
     private final DataStore store;
 
@@ -302,62 +296,6 @@ public final class DataServiceImpl implements DataService {
     }
 
     /**
-     * Provides an implementation of Scheduler that uses the TaskScheduler and
-     * TaskOwner.  Note that this class is created in the DataServiceImpl
-     * constructor, so the TaskOwner used does not have access to managers or
-     * to the full AppContext.
-     */
-    private static class DelegatingScheduler implements Scheduler {
-
-	/** The task scheduler. */
-	private final TaskScheduler taskScheduler;
-
-	/** The task owner. */
-	private final Identity taskOwner;
-
-	DelegatingScheduler(TaskScheduler taskScheduler, Identity taskOwner) {
-	    this.taskScheduler = taskScheduler;
-	    this.taskOwner = taskOwner;
-	}
-
-	public TaskHandle scheduleRecurringTask(Runnable task, long period) {
-	    return new Handle(task, period);
-	}
-
-	/** Implementation of task handle. */
-	private class Handle implements TaskHandle, KernelRunnable {
-	    private final Runnable task;
-	    private final long period;
-	    private final RecurringTaskHandle handle;
-
-	    Handle(Runnable task, long period) {
-		this.task = task;
-		this.period = period;
-		handle = taskScheduler.scheduleRecurringTask(
-		    this, taskOwner, System.currentTimeMillis() + period,
-		    period);
-		handle.start();
-	    }
-
-	    public String toString() {
-		return "Handle[task:" + task + ", period:" + period + "]";
-	    }
-
-	    public String getBaseTaskType() {
-		return task.getClass().getName();
-	    }
-
-	    public void run() {
-		task.run();
-	    }
-
-	    public void cancel() {
-		handle.cancel();
-	    }
-	}
-    }
-
-    /**
      * Creates an instance of this class configured with the specified
      * properties and services.  See the {@link DataServiceImpl class
      * documentation} for the list of supported properties.
@@ -409,7 +347,8 @@ public final class DataServiceImpl implements DataService {
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
-	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
+	    DelegatingScheduler scheduler =
+		new DelegatingScheduler(taskScheduler, taskOwner);
 	    boolean serverStart = wrappedProps.getBooleanProperty(
 		StandardProperties.SERVER_START, true);
 	    AccessCoordinator accessCoordinator = 

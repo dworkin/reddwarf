@@ -422,7 +422,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	/** Record the new request and use a local class. */
 	@Override
 	protected LockRequest<Key, TxnLocker> newLockRequest(
-	    Key key, boolean forWrite, boolean upgrade)
+	    Key key,
+	    boolean forWrite,
+	    boolean upgrade,
+	    long requestedStartTime)
 	{
 	    AccessedObjectImpl request =
 		new AccessedObjectImpl(this, key, forWrite, upgrade);
@@ -544,7 +547,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 
 	/** {@inheritDoc} */
 	public AccessType getAccessType() {
-	    return getForWrite() ? AccessType.WRITE: AccessType.READ;
+	    return getForWrite() ? AccessType.WRITE : AccessType.READ;
 	}
 
 	/** {@inheritDoc} */
