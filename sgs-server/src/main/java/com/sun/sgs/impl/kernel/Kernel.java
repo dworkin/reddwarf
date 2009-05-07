@@ -40,8 +40,7 @@ import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
-import com.sun.sgs.impl.service.data.DataServiceImpl;
-
+import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -365,6 +364,9 @@ class Kernel {
             }
         }
 
+        // Add the affinity graph listener
+        profileCollector.addListener(new GraphListener(appProperties), false);
+        
         // finally, register the scheduler as a listener too
         // NOTE: if we make the schedulers pluggable, or add other components
         // that are listeners, then we should scan through all of the system
@@ -387,7 +389,7 @@ class Kernel {
         }
 
         // start the service creation 
-        IdentityImpl owner = new IdentityImpl("app:" + appName);
+        IdentityImpl owner = new SystemIdentity("app:" + appName);
         createServices(appName, owner);
         startApplication(appName, owner);
     }

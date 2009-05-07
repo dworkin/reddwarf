@@ -227,6 +227,37 @@
 	<version>${bdb.je.version}</version>
       </dependency>
 
+    <dependency>
+      <groupId>net.sf.jung</groupId>
+      <artifactId>jung-algorithms</artifactId>
+      <version>${jung.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jung</groupId>
+      <artifactId>jung-api</artifactId>
+      <version>${jung.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jung</groupId>
+      <artifactId>jung-graph-impl</artifactId>
+      <version>${jung.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jung</groupId>
+      <artifactId>jung-io</artifactId>
+      <version>${jung.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jung</groupId>
+      <artifactId>jung-samples</artifactId>
+      <version>${jung.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jung</groupId>
+      <artifactId>jung-visualization</artifactId>
+      <version>${jung.version}</version>
+    </dependency>
+    
       <dependency>
 	<groupId>com.projectdarkstar.tools.test</groupId>
 	<artifactId>sgs-test-ext</artifactId>
@@ -421,6 +452,7 @@
     <sgs-client.version>0.9.9</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
+    <jung.version>2.0.1-SNAPSHOT</jung.version>
     <sgs-test-ext.version>1.0</sgs-test-ext.version>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
