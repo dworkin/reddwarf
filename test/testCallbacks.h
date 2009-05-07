@@ -24,7 +24,7 @@ static int g_maxfd;
  * call, wait on the callback, and then check the flag.
  */
 
-int loginFail, loginRedirect, loginSuccess, channelJoin, channelLeave,
+int loginFail, loginDisconnect, loginSuccess, channelJoin, channelLeave,
         channelMessage, sessionMessage;
 int inputReceived;
 

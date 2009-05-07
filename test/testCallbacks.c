@@ -5,46 +5,49 @@
 
 void channel_joined_cb(sgs_connection *conn,
         sgs_channel *channel) {
-    inputReceived = 0;
+    inputReceived--;
     printf("received channel join callback\n");
 }
 
 void channel_left_cb(sgs_connection *conn,
         sgs_channel *channel) {
-    inputReceived = 0;
+    inputReceived--;
     printf("received channle left callback\n");
 }
 
 void channel_recv_msg_cb(sgs_connection *conn,
         sgs_channel *channel, const uint8_t *msg, size_t msglen) {
-    inputReceived = 0;
+    inputReceived--;
 
 }
 
 void disconnected_cb(sgs_connection *conn) {
+    inputReceived--;
+    loginDisconnect = 0;
     printf("received disconnected callback\n");
+
 }
 
 void logged_in_cb(sgs_connection *conn,
         sgs_session *session) {
-    inputReceived = 0;
+    inputReceived--;
     printf("received logged in callback\n");
 
 }
 
 void login_failed_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
-    inputReceived = 0;
-    printf("received login failed callback");
+    inputReceived--;
+    printf("received login failed callback\n");
     loginFail = 0;
 }
 
 void reconnected_cb(sgs_connection *conn) {
-    inputReceived = 0;
+    inputReceived--;
     printf("received reconnected callback \n");
 }
 
 void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
-    inputReceived = 0;
+    inputReceived--;
     printf("received message callback\n");
 }
 

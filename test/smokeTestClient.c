@@ -59,10 +59,10 @@ void getCommandArgs(int count, char *args[]){
     }
 }
 
-void waitForInput(sgs_connection* connection)
+void waitForInput(sgs_connection* connection, int num)
 {
-    inputReceived = 1;
-    while (inputReceived == 1){
+    inputReceived = num;
+    while (inputReceived){
         sgs_connection_do_work(connection);
     }
 }
@@ -81,14 +81,23 @@ void loadContext(sgs_context *context)
 
 int testLogin(sgs_connection *connection)
 {
-    char loginName[] = "kickme";
     loginFail = 1;
     printf("calling login\n");
-    sgs_connection_login(connection, loginName, loginName);
-    waitForInput(connection);
+    sgs_connection_login(connection, "kickme", "password1");
+    waitForInput(connection, 1);
     if (loginFail == 1){
         printf("Log in failure test failed\n");
-        exit(1);
+    } else {
+        printf("Log in failure test passed\n");
+    }
+
+    loginDisconnect = 1;
+    sgs_connection_login(connection, "discme", "password2");
+    waitForInput(connection, 1);
+    if (loginDisconnect == 1){
+        printf("Log in disconnect test failed\n");
+    } else {
+        printf("Log in disconnect test passed\n");
     }
 }
 
