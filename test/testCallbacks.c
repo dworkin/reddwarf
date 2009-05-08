@@ -4,38 +4,38 @@
 #include "sgs/channel.h"
 #include "testCallbacks.h"
 
+static char messageBuffer[256] = "";
+
 void clearMessageBuffer(){
     int i, j;
-    j = strnlen(messageBuffer);
+    j = strlen(messageBuffer);
     for (i = 0; i < j; i++){
         *messageBuffer = '\0';
     }
 }
 void channel_joined_cb(sgs_connection *conn,
         sgs_channel *channel) {
-    inputReceived--;
     clearMessageBuffer();
-    messageBuffer = strncat(messageBuffer, "joinedChannel:");
-    messageBuffer = strncat(messageBuffer, sgs_channel_name(channel);
+    messageBuffer = strncat(messageBuffer, "joinedChannel:", strlen("joinedChannel"));
+    messageBuffer = strncat(messageBuffer, sgs_channel_name(channel),
+            strlen(sgs_channel_name(channel))) ;
     channelJoinFail = 0;
     printf("received channel join callback\n");
 }
 
 void channel_left_cb(sgs_connection *conn,
         sgs_channel *channel) {
-    inputReceived--;
     printf("received channle left callback\n");
 }
 
 void channel_recv_msg_cb(sgs_connection *conn,
         sgs_channel *channel, const uint8_t *msg, size_t msglen) {
-    inputReceived--;
 
 }
 
 void disconnected_cb(sgs_connection *conn) {
-    inputReceived--;
     loginDisconnectFail = 0;
+    inputReceived = 0;
     printf("received disconnected callback\n");
 
 }
@@ -43,9 +43,9 @@ void disconnected_cb(sgs_connection *conn) {
 void logged_in_cb(sgs_connection *conn,
         sgs_session *session) {
     clearMessageBuffer();
-    messageBuffer = strncat(messageBuffer, "loggedIn:");
-    messageBuffer = strncat(messageBuffer, loginName);
-    if (sgs_session_direct_send(session, messageBuffer, strnlen(messageBuffer) )== -1){
+    messageBuffer = strncat(messageBuffer, "loggedIn:", strlen("loggedIn"));
+    messageBuffer = strncat(messageBuffer, loginName, strlen(loginName));;
+    if (sgs_session_direct_send(session, messageBuffer, strlen(messageBuffer) )== -1){
         printf("error in sending login response to server\n");
     }
     loginFail = 0;
@@ -54,7 +54,7 @@ void logged_in_cb(sgs_connection *conn,
 }
 
 void login_failed_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
-    inputReceived--;
+    inputReceived = 0;
     printf("received login failed callback\n");
     loginFailFail = 0;
 }
