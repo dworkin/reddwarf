@@ -2,34 +2,75 @@
 #include <string.h>
 #include "sgs/connection.h"
 #include "sgs/channel.h"
+#include "sgs/connection.h"
 #include "testCallbacks.h"
 
-static char messageBuffer[256] = "";
+static uint8_t messageBuffer[256] ;
 
-void clearMessageBuffer(){
-    int i, j;
-    j = strlen(messageBuffer);
-    for (i = 0; i < j; i++){
-        *messageBuffer = '\0';
-    }
-}
+
 void channel_joined_cb(sgs_connection *conn,
         sgs_channel *channel) {
-    clearMessageBuffer();
-    messageBuffer = strncat(messageBuffer, "joinedChannel:", strlen("joinedChannel"));
-    messageBuffer = strncat(messageBuffer, sgs_channel_name(channel),
-            strlen(sgs_channel_name(channel))) ;
+    char* channelName;
+    char* buf;
+    char prefix[] = "joinedChannel:";
+
+    buf = (char*)messageBuffer;
+    *buf = '\0';
+    buf = strncat(buf, prefix, strlen(prefix));
+    channelName = (char*)sgs_channel_name(channel);
+    buf = strncat(buf, channelName, strlen(channelName));
+    if (sgs_session_direct_send(sgs_connection_get_session(conn),
+            messageBuffer, strlen(buf))== -1){
+        printf("error in sending response to channel join message\n");
+        return;
+    }
     channelJoinFail = 0;
     printf("received channel join callback\n");
 }
 
 void channel_left_cb(sgs_connection *conn,
         sgs_channel *channel) {
-    printf("received channle left callback\n");
+    char prefix[] = "lefChannel:";
+    char* buf;
+    char* channelName;
+
+    buf = (char*)messageBuffer;
+    *buf = '\0';
+    channelName = (char*) sgs_channel_name(channel);
+    buf = strncat(buf, channelName, strlen(channelName));
+    if (sgs_session_direct_send(sgs_connection_get_session(conn),
+            messageBuffer, strlen(buf)) == -1){
+        printf("error in sending response to a channel left message\n");
+        return;
+    }
+    channelLeaveFail = 0;
+    printf("received channel left callback\n");
 }
 
 void channel_recv_msg_cb(sgs_connection *conn,
         sgs_channel *channel, const uint8_t *msg, size_t msglen) {
+    char prefix[] = "receivedChannelMessage:";
+    char* buf;
+    char* channelName;
+    uint8_t* copyBuf;
+    int len;
+    
+    buf = (char*)messageBuffer;
+    *buf = '\0';
+    channelName = (char*)sgs_channel_name(channel);
+    buf = strncat(buf, prefix, strlen(prefix));
+    buf = strncat(buf, channelName, strlen(channelName));
+    len = strlen(buf);
+    copyBuf = buf + len;
+    copyBuf = memcpy(copyBuf, msg, msglen);
+
+    if (sgs_session_direct_send(sgs_connection_get_session(conn),
+            messageBuffer, len + msglen) == -1){
+        printf("error in sending channel receive ack to server\n");
+        return;
+    }
+    channelMessageFail = 0;
+    return;
 
 }
 
@@ -42,10 +83,13 @@ void disconnected_cb(sgs_connection *conn) {
 
 void logged_in_cb(sgs_connection *conn,
         sgs_session *session) {
-    clearMessageBuffer();
-    messageBuffer = strncat(messageBuffer, "loggedIn:", strlen("loggedIn"));
-    messageBuffer = strncat(messageBuffer, loginName, strlen(loginName));;
-    if (sgs_session_direct_send(session, messageBuffer, strlen(messageBuffer) )== -1){
+    char* buf;
+
+    buf = (char*) messageBuffer;
+    *buf = '\0';
+    buf = strncat(buf, "loggedIn:", strlen("loggedIn"));
+    buf  = strncat(buf, loginName, strlen(loginName));
+    if (sgs_session_direct_send(session, messageBuffer, strlen(messageBuffer) ) == -1){
         printf("error in sending login response to server\n");
     }
     loginFail = 0;
@@ -60,8 +104,22 @@ void login_failed_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
 }
 
 void reconnected_cb(sgs_connection *conn) {
-    inputReceived--;
+    char* buf;
+    char prefix[] = "reconnected";
+
+    buf = (char*)messageBuffer;
+    *buf = '\0';
+
+    buf = strncat(buf, prefix, strlen(prefix));
+
+    if (sgs_session_direct_send(sgs_connection_get_session(conn),
+            messageBuffer, strlen(prefix)) == -1){
+        printf("error in sending reconnected ack\n");
+        return;
+    }
+
     printf("received reconnected callback \n");
+    return;
 }
 
 void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
