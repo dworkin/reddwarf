@@ -71,8 +71,13 @@ import java.util.logging.Logger;
  *   find deadlocks.  It also stores a value in a single conflict field.  Hmmm.
  */
 
-public class CachingDataStoreServerImpl
-    extends AbstractComponent
+/*
+ * Note that, to avoid deadlocks, operations that grab multiple locks should
+ * grab them in key order.  This only applies to getBindingForUpdate and
+ * getBindingForRemove.
+ */
+
+public class CachingDataStoreServerImpl extends AbstractComponent
     implements CachingDataStoreServer
 {
     /** The package for this class. */
@@ -506,8 +511,9 @@ public class CachingDataStoreServerImpl
     {
 	checkTimestamp(timestamp);
 	checkNull("name", name);
-	DbTransaction txn = env.beginTransaction(txnTimeout);
 	boolean done = false;
+	DbTransaction txn = env.beginTransaction(txnTimeout);
+	String nextName = null;
 	boolean found;
 	long oid;
 	try {
@@ -520,7 +526,7 @@ public class CachingDataStoreServerImpl
 		DbCursor cursor = namesDb.openCursor(txn);
 		try {
 		    boolean hasNext = cursor.findNext(encodedName);
-		    name = hasNext ? decodeString(cursor.getKey()) : null;
+		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
 		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
 		} finally {
 		    cursor.close();
@@ -534,8 +540,11 @@ public class CachingDataStoreServerImpl
 	    }
 	}
 	lock(nodeId, timestamp, name, true);
+	if (!found) {
+	    lock(nodeId, timestamp, nextName, true);
+	}
 	return new GetBindingForUpdateResults(
-	    found, found ? null : name, oid,
+	    found, found ? null : nextName, oid,
 	    (oid == -1) ? -1 : getWaitingTimestamp(name, true),
 	    (oid == -1) ? -1 : getWaitingTimestamp(name, false));
     }
