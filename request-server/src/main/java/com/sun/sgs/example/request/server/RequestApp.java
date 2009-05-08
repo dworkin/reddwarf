@@ -69,6 +69,7 @@ import java.util.logging.Logger;
  * <li> SendChannel <i>channelName</i> <i>message</i>
  * <li> GetItem <i>itemName</i>
  * <li> SetItem <i>itemName</i> <i>value</i>
+ * <li> Ping
  * </ul> <p>
  *
  * This class supports the following properties:
@@ -129,6 +130,12 @@ public class RequestApp implements AppListener, Serializable {
      * name, which should not contain spaces, followed by the new value.
      */
     private static final String SET_ITEM = "SetItem ";
+    
+    /**
+     * The request for a ping message.  There are no arguments associated
+     * with this message.
+     */
+    private static final String PING = "Ping";
 
     /** The request for logging a comment.  Argument is the comment to log. */
     private static final String COMMENT = "Comment ";
@@ -139,12 +146,15 @@ public class RequestApp implements AppListener, Serializable {
 
     /* -- Operation counters -- */
 
+    static volatile int login;
     static volatile int receivedMessage;
     static volatile int joinChannel;
     static volatile int leaveChannel;
     static volatile int sendChannel;
     static volatile int getItem;
     static volatile int setItem;
+    static volatile int ping;
+    static volatile int totalSessions;
 
     /* Log operations */
     static {
@@ -165,6 +175,8 @@ public class RequestApp implements AppListener, Serializable {
 
     /** {@inheritDoc} */
     public ClientSessionListener loggedIn(ClientSession session) {
+        login++;
+        totalSessions++;
 	return new SessionListener(session);
     }
 
@@ -239,9 +251,11 @@ public class RequestApp implements AppListener, Serializable {
 			getItem(request.substring(GET_ITEM.length()));
 		    } else if (request.startsWith(SET_ITEM)) {
 			setItem(request.substring(SET_ITEM.length()));
+		    } else if (request.startsWith(PING)) {
+                        ping();
 		    } else if (request.startsWith(COMMENT)) {
-			logger.log(Level.INFO, "{0}", request);
-		    } else {
+			logger.log(Level.INFO, "{0}", request);                        
+                    } else {
 			throw new RuntimeException("Unknown operation");
 		    }
 		} catch (Exception e) {
@@ -257,6 +271,7 @@ public class RequestApp implements AppListener, Serializable {
 
 	/** {@inheritDoc} */
 	public void disconnected(boolean graceful) {
+            totalSessions--;
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE,
 			   sessionId(session) +
@@ -347,6 +362,14 @@ public class RequestApp implements AppListener, Serializable {
 		dataManager.setBinding(binding, new ManagedString(value));
 	    }
 	}
+        
+        /**
+         * Returns the PING message back to the sender
+         */
+        private void ping() {
+            ping++;
+            send(PING);
+        }
 
 	/**
 	 * Returns the channel with the specified name, creating the channel
@@ -422,12 +445,16 @@ public class RequestApp implements AppListener, Serializable {
 		}
 		if (logger.isLoggable(Level.INFO)) {
 		    logger.log(Level.INFO,
-			       "rcv/sec=" + (receivedMessage / REPORT) +
+                               "login/sec=" + (login / REPORT) +
+			       " rcv/sec=" + (receivedMessage / REPORT) +
 			       " join/sec=" + (joinChannel / REPORT) +
 			       " leave/sec=" + (leaveChannel / REPORT) +
 			       " send/sec=" + (sendChannel / REPORT) +
 			       " get/sec=" + (getItem / REPORT) +
-			       " set/sec=" + (setItem / REPORT));
+			       " set/sec=" + (setItem / REPORT) +
+                               " ping/sec=" + (ping / REPORT));
+                    logger.log(Level.INFO,
+                               "total sessions = " + totalSessions);
 		}
 		receivedMessage = 0;
 		joinChannel = 0;

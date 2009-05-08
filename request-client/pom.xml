@@ -55,15 +55,17 @@
 		</goals>
 		<configuration>
 		  <tasks>
-		    <java classname="com.sun.sgs.example.request.client.WandererClient"
+		    <java classname="com.sun.sgs.example.request.client.${class}"
 			  fork="true">
 		      <jvmarg line="${jvm.args} ${jvm.args.extra}"/>
 		      <sysproperty key="java.util.logging.config.file"
 				   file="${logging.properties}"/>
-		      <sysproperty key="com.sun.sgs.example.request.client.wanderer.host"
-				   value="${wanderer.host}"/>
-		      <sysproperty key="com.sun.sgs.example.request.client.wanderer.clients"
-				   value="${wanderer.clients}"/>
+		      <sysproperty key="request.client.host"
+				   value="${host}"/>
+		      <sysproperty key="request.client.port"
+				   value="${port}"/>
+		      <sysproperty key="request.client.clients"
+				   value="${clients}"/>
 		      <classpath>
 			<path refid="maven.test.classpath"/>
 		      </classpath>
@@ -83,8 +85,10 @@
     <jvm.args></jvm.args>
     <jvm.args.extra></jvm.args.extra>
     <logging.properties>${basedir}/src/test/properties/logging.properties</logging.properties>
-    <wanderer.host>localhost</wanderer.host>
-    <wanderer.clients>10</wanderer.clients>
+    <class>MaxSessions</class>
+    <host>localhost</host>
+    <port>11469</port>
+    <clients>1000</clients>
   </properties>
 
 
