@@ -113,6 +113,10 @@ final class Lock<K, L extends Locker<K, L>> {
 		    /* Found conflict */
 		    conflict = ownerRequest.locker;
 		    break;
+		} else if (!waiters.isEmpty()) {
+		    /* Reads need to wait for already waiting writes */
+		    conflict = waiters.get(0).locker;
+		    break;
 		}
 	    }
 	    if (conflict == null && upgrade) {

@@ -738,7 +738,7 @@ public final class LockManager<K, L extends Locker<K, L>> {
 		    conflict.getLocker());
 		getWaiterInfo(victim.getLocker()).waitingFor = null;
 		victim.getLocker().setConflict(deadlock);
-		if (victim == rootRequest) {
+		if (victim.getLocker() == rootRequest.getLocker()) {
 		    return deadlock;
 		} else {
 		    result = new LockConflict<K, L>(

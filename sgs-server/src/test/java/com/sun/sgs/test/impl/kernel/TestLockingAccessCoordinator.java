@@ -439,6 +439,35 @@ public class TestLockingAccessCoordinator
 	assertGranted(locker.getResult());
     }
 
+    /**
+     * Test read/write/read conflict
+     *
+     * txn2: read o1	=> granted
+     * txn3: write o1	=> blocked
+     * txn:  read o1	=> blocked
+     * txn2: commit
+     * txn3:		=> granted
+     * txn3: commit
+     * txn:		=> granted
+     */
+    @Test
+    public void testReadWriteReadConflict() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(acquireLock(txn2, "s1", "o1", false));
+	DummyTransaction txn3 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn3, 0, 1);
+	AcquireLock locker3 = new AcquireLock(txn3, "s1", "o1", true);
+	locker3.assertBlocked();
+	AcquireLock locker = new AcquireLock(txn, "s1", "o1", false);
+	locker.assertBlocked();
+	txn2.commit();
+	assertGranted(locker3.getResult());
+	locker.assertBlocked();
+	txn3.commit();
+	assertGranted(locker.getResult());
+    }
+
     /* -- Test deadlocks -- */
 
     /**
