@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,9 +19,8 @@
 
 package com.sun.sgs.impl.service.data.store;
 
-import com.sun.sgs.impl.service.data.store.db.DataEncoding;
-import com.sun.sgs.impl.service.data.store.db.DbDatabase;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.service.store.db.DbDatabase;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.math.BigInteger;
 
 /**

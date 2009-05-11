@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -132,7 +132,6 @@ public class LoggerPropertiesInit {
         InputStream fileStream = null;
         
         try {
-            System.err.println(filename);
             if (filename != null) {
                 fileStream = new FileInputStream(new File(filename));
             }

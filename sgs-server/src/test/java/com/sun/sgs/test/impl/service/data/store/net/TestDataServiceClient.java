@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,7 +19,9 @@
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.test.impl.service.data.TestDataServiceImpl;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.Properties;
@@ -60,11 +62,13 @@ public class TestDataServiceClient extends TestDataServiceImpl {
 	Properties props = super.getProperties();
 	String host = serverHost;
 	int port = serverPort;
+        String nodeType = NodeType.appNode.toString();
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
-	}
+            nodeType = NodeType.coreServerNode.toString();
+        }
+        props.setProperty(StandardProperties.NODE_TYPE, nodeType);
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));

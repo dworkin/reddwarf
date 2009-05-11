@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,7 +19,7 @@
 
 /**
  * Provides an implementation of {@link
- * com.sun.sgs.impl.service.data.store.DataStore} that supports clients
+ * com.sun.sgs.service.store.DataStore} that supports clients
  * communicating to a shared data store server over the network.
  */
 package com.sun.sgs.impl.service.data.store.net;

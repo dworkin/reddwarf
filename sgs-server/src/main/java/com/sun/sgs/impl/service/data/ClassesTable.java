@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -21,10 +21,10 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectIOException;
-import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.util.Int30;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.DataStore;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

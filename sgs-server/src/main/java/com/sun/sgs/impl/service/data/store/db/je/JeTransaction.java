@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -21,8 +21,9 @@ package com.sun.sgs.impl.service.data.store.db.je;
 
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Transaction;
+import com.sleepycat.je.TransactionConfig;
 import com.sleepycat.je.XAEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.util.Arrays;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
@@ -87,17 +88,21 @@ class JeTransaction implements DbTransaction {
      * @param	env the Berkeley DB environment
      * @param	timeout the number of milliseconds the transaction should be
      *		allowed to run
+     * @param	txnConfig the Berkeley DB transaction configuration, or {@code
+     *		null} for the default
      * @throws	IllegalArgumentException if timeout is less than {@code 1}
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    JeTransaction(XAEnvironment env, long timeout) {
+    JeTransaction(
+	XAEnvironment env, long timeout, TransactionConfig txnConfig)
+    {
 	this.env = env;
 	if (timeout <= 0) {
 	    throw new IllegalArgumentException(
 		"Timeout must be greater than 0");
 	}
 	try {
-	    txn = env.beginTransaction(null, null);
+	    txn = env.beginTransaction(null, txnConfig);
 	    /* Avoid overflow -- BDB treats 0 as unlimited */
 	    long timeoutMicros =
 		(timeout < (Long.MAX_VALUE / 1000)) ? timeout * 1000 : 0;

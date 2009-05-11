@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.kernel;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.AbstractAccessCoordinator;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;

@@ -2,6 +2,19 @@ Project Darkstar Server API Changes
 
 Version 0.9.10
 
+- Remove ManagedObject superinterface from AppListener
+
+  This change was made to make the behavior of the AppListener
+  consistent with that of ClientSessionListener and ChannelListener,
+  neither of which extend the ManagedObject interface.  Only
+  listeners with mutable state should explicitly implement 
+  the ManagedObject interface.
+
+- Add @RunWithNewIdentity annotation to com.sun.sgs.app package
+
+  This addresses issue #48, allowing an application to start tasks
+  that are owned by new identities.
+
 - Add a method for getting a name binding for update
 
   The method DataManager.getBindingForUpdate(String) has been added.

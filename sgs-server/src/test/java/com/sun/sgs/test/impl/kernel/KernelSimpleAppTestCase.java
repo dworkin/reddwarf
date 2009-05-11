@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -78,9 +78,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	    StandardProperties.APP_NAME, "SimpleApp",
             com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 String.valueOf(getPort()),
-	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath(),
-	    "com.sun.sgs.impl.service.nodemap.server.start", "true",
-	    "com.sun.sgs.impl.service.watchdog.server.start", "true");
+	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath());
 	/* Create logging properties to log at WARNING or higher */
 	logging = createProperties(
 	    ".level", "WARNING",

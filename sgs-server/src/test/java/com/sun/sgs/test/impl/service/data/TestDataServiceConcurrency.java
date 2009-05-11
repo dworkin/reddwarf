@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -218,15 +218,13 @@ public class TestDataServiceConcurrency extends TestCase {
     /** A utility to get the properties for the node. */
     protected Properties getNodeProps() throws Exception {
 	Properties props =
-	    SgsTestNode.getDefaultProperties("TestDataServicePerformance",
+	    SgsTestNode.getDefaultProperties("TestDataServiceConcurrency",
 					     null, null);
-	props.setProperty("com.sun.sgs.finalService", "DataService");
 	props.setProperty("com.sun.sgs.impl.kernel.profile.level", "max");
 	props.setProperty("com.sun.sgs.impl.kernel.profile.listeners",
 			  "com.sun.sgs.impl.profile.listener." +
 			  "OperationLoggingProfileOpListener");
 	props.setProperty("com.sun.sgs.txn.timeout", "10000");
-	props.setProperty("com.sun.sgs.server.start", "false");
 	props.setProperty("com.sun.sgs.impl.service.data.DataServiceImpl." +
 	                  "data.store.class",
 	                  "com.sun.sgs.impl.service.data.store.DataStoreImpl");
