@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>13</version>
+  <version>14</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -104,6 +104,18 @@
 	      <configuration>
 		<resourceBundles>
 		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl:${sgs-jar-resources-gpl.version}</resourceBundle>
+		</resourceBundles>
+	      </configuration>
+	    </execution>
+	    <execution>
+	      <id>include-gpl-classpath-license</id>
+	      <goals>
+		<goal>process</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<resourceBundles>
+		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl-classpath:${sgs-jar-resources-gpl-classpath.version}</resourceBundle>
 		</resourceBundles>
 	      </configuration>
 	    </execution>
@@ -299,6 +311,7 @@
     
     <sgs-build-utilities.version>1.0</sgs-build-utilities.version>
     <sgs-jar-resources-gpl.version>1.0</sgs-jar-resources-gpl.version>
+    <sgs-jar-resources-gpl-classpath.version>1.0</sgs-jar-resources-gpl-classpath.version>
     <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
 
     <junit.version>4.5</junit.version>

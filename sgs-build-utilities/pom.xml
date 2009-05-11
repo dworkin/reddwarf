@@ -4,13 +4,6 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- Inherit from the global SGS super POM -->
-  <parent>
-    <groupId>com.projectdarkstar</groupId>
-    <artifactId>sgs</artifactId>
-    <version>5</version>
-  </parent>
-
   <groupId>com.projectdarkstar.tools.build</groupId>
   <artifactId>sgs-build-utilities</artifactId>
   <name>Project Darkstar Build Utilities</name>
@@ -25,6 +18,7 @@
     <dependency>
       <groupId>checkstyle</groupId>
       <artifactId>checkstyle</artifactId>
+      <version>${checkstyle.version}</version>
     </dependency>
   </dependencies>
 
@@ -36,5 +30,9 @@
       <layout>default</layout>
     </repository>
   </repositories>
+
+  <properties>
+    <checkstyle.version>4.4</checkstyle.version>
+  </properties>
 
 </project>
