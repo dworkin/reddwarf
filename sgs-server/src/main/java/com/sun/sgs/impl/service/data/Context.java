@@ -83,7 +83,7 @@ final class Context extends TransactionContext implements TransactionListener {
      * Stores information about managed references.  This field is logically
      * part of the ManagedReferenceImpl class.
      */
-    final ReferenceTable refs = new ReferenceTable();
+    final ReferenceTable refs;
 
     /** The proxy for notifying of object accesses. */
     final AccessReporter<BigInteger> oidAccesses;
@@ -103,7 +103,8 @@ final class Context extends TransactionContext implements TransactionListener {
 	    int debugCheckInterval,
 	    boolean detectModifications,
 	    ClassesTable classesTable,
-	    AccessReporter<BigInteger> oidAccesses)
+	    AccessReporter<BigInteger> oidAccesses,
+	    boolean trackStaleObjects)
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
@@ -113,6 +114,7 @@ final class Context extends TransactionContext implements TransactionListener {
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	refs = new ReferenceTable(trackStaleObjects);
 	this.oidAccesses = oidAccesses;
 	classSerial = classesTable.createClassSerialization(this.txn);
 	txn.registerListener(this);

@@ -72,6 +72,7 @@ import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import static org.junit.Assert.*;
 import org.junit.Before;
@@ -873,6 +874,47 @@ public class TestDataServiceImpl{
                     System.err.println(e);
                 }
         }}, taskOwner);
+    }
+
+    @Test
+    public void testSetBindingStaleObject() throws Exception {
+	testSetBindingStaleObject(true);
+    }
+    @Test
+    public void testSetServiceBindingStaleObject() throws Exception {
+	testSetBindingStaleObject(false);
+    }
+    private void testSetBindingStaleObject(final boolean app)
+	throws Exception
+    {
+	Properties properties = getProperties();
+	properties.setProperty(
+	    DataServiceImpl.TRACK_STALE_OBJECTS_PROPERTY, "true");
+	serverNodeRestart(properties, true);
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    setBinding(app, service, "dummy", dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		service.removeObject(dummy);
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    setBinding(app, service, "dummy", dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
     }
 
     /* -- Unusual states -- */
@@ -1798,6 +1840,39 @@ public class TestDataServiceImpl{
         }}, taskOwner);
     }
 
+    @Test
+    public void testRemoveObjectStaleObject() throws Exception {
+	Properties properties = getProperties();
+	properties.setProperty(
+	    DataServiceImpl.TRACK_STALE_OBJECTS_PROPERTY, "true");
+	serverNodeRestart(properties, true);
+	dummy = new DummyManagedObject();
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    service.removeObject(dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		service.removeObject(dummy);
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    service.removeObject(dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+    }
+
     @Test 
     public void testRemoveObjectRemoval() throws Exception {
         class TestTask extends InitialTestRunnable {
@@ -1807,9 +1882,10 @@ public class TestDataServiceImpl{
                 count = getObjectCount();
                 ObjectWithRemoval removal = new ObjectWithRemoval();
                 service.removeObject(removal);
-                assertFalse("Shouldn't call removingObject for transient objects",
-                            removal.removingCalled);
-                service.setBinding("removal", removal);
+                assertTrue(
+		    "Should call removingObject for transient objects",
+		    removal.removingCalled);
+                service.setBinding("removal", new ObjectWithRemoval());
             }
         }
         final TestTask task = new TestTask();
@@ -1974,6 +2050,39 @@ public class TestDataServiceImpl{
                     System.err.println(e);
                 }
         }}, taskOwner);
+    }
+
+    @Test
+    public void testMarkForUpdateStaleObject() throws Exception {
+	Properties properties = getProperties();
+	properties.setProperty(
+	    DataServiceImpl.TRACK_STALE_OBJECTS_PROPERTY, "true");
+	serverNodeRestart(properties, true);
+	dummy = new DummyManagedObject();
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    service.markForUpdate(dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		service.removeObject(dummy);
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    service.markForUpdate(dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
     }
 
     /* -- Unusual states -- */
@@ -2242,6 +2351,39 @@ public class TestDataServiceImpl{
             public void run() {
                 assertEquals(dummy, service.createReference(dummy).get());
         }}, taskOwner);
+    }
+
+    @Test
+    public void testCreateReferenceStaleObject() throws Exception {
+	Properties properties = getProperties();
+	properties.setProperty(
+	    DataServiceImpl.TRACK_STALE_OBJECTS_PROPERTY, "true");
+	serverNodeRestart(properties, true);
+	dummy = new DummyManagedObject();
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    service.createReference(dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		service.removeObject(dummy);
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    service.createReference(dummy);
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
     }
 
     @Test 
@@ -2727,6 +2869,44 @@ public class TestDataServiceImpl{
         }}, taskOwner);
     }
 
+    @Test
+    public void testGetReferenceStaleObject() throws Exception {
+	Properties properties = getProperties();
+	properties.setProperty(
+	    DataServiceImpl.TRACK_STALE_OBJECTS_PROPERTY, "true");
+	serverNodeRestart(properties, true);
+	final AtomicReference<ManagedReference<DummyManagedObject>> ref =
+	    new AtomicReference<ManagedReference<DummyManagedObject>>();
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		ref.set(service.createReference(dummy));
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    ref.get().get();
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		ref.set(service.createReference(dummy));
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    ref.get().get();
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+    }
+
     @Test 
     public void testGetReferenceTimeout() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
@@ -3178,6 +3358,44 @@ public class TestDataServiceImpl{
                     System.err.println(e);
                 }
         }}, taskOwner);
+    }
+
+    @Test
+    public void testGetReferenceForUpdateStaleObject() throws Exception {
+	Properties properties = getProperties();
+	properties.setProperty(
+	    DataServiceImpl.TRACK_STALE_OBJECTS_PROPERTY, "true");
+	serverNodeRestart(properties, true);
+	final AtomicReference<ManagedReference<DummyManagedObject>> ref =
+	    new AtomicReference<ManagedReference<DummyManagedObject>>();
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		ref.set(service.createReference(dummy));
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    ref.get().getForUpdate();
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
+        txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		ref.set(service.createReference(dummy));
+	    }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		try {
+		    ref.get().getForUpdate();
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }}, taskOwner);
     }
 
     @Test 
@@ -4786,6 +5004,9 @@ public class TestDataServiceImpl{
 	    }
 	    left = service.createReference(new ObjectWithRemoval(depth));
 	    right = service.createReference(new ObjectWithRemoval(depth));
+	}
+	ObjectWithRemoval getLeftChild() {
+	    return left != null ? left.get() : null;
 	}
 	public void removingObject() {
 	    removingCalled = true;

@@ -1,8 +1,10 @@
 Version 0.9.10:
+- Add DataManager.getObjectId (issue #99) and
+  DataManager.getBindingForUpdate (issue #120)
 - Add a locking AccessCoordinator and add a configuration option for
   specifying the access coordinator (issue #138)
-- Also fix issues #5, #73, #82, #130, #131, #136, #142, #143, #144, #151,
-  #153, #155
+- Also fix issues #5, #61, #73, #82, #109, #115, #130, #131, #136, #142,
+  #143, #144, #151, #153, #155
 
 Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)

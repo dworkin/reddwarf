@@ -116,6 +116,16 @@ import javax.management.JMException;
  *	typically when there is low contention.  Note that setting this flag to
  *	<code>true</code> does not delay write locks when removing objects.<p>
  *
+ * <dt> <i>Property:</i> <code><b>{@value #TRACK_STALE_OBJECTS_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to track references to stale managed
+ *	objects.  If <code>true</code>, the <code>DataService</code> keeps
+ *	track of persistent or removed objects from completed transactions and
+ *	throws {@link ObjectStaleException} if the application refers to those
+ *	objects from another transaction. <p>
+ *
  * </dl> <p>
  *
  * The constructor also passes the properties to the {@link DataStoreImpl}
@@ -183,6 +193,10 @@ public final class DataServiceImpl implements DataService {
     public static final String OPTIMISTIC_WRITE_LOCKS =
 	CLASSNAME + ".optimistic.write.locks";
 
+    /** The property that specifies whether to track stale objects. */
+    public static final String TRACK_STALE_OBJECTS_PROPERTY =
+	CLASSNAME + ".track.stale.objects";
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -222,6 +236,9 @@ public final class DataServiceImpl implements DataService {
 
     /** Whether to delay obtaining write locks. */
     final boolean optimisticWriteLocks;
+
+    /** Whether to track stale objects. */
+    private final boolean trackStaleObjects;
 
     /** The data service profiling information. */
     private final DataServiceStats serviceStats;
@@ -305,7 +322,8 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    return new Context(
 		DataServiceImpl.this, store, txn, debugCheckInterval,
-		detectModifications, classesTable, oidAccesses);
+		detectModifications, classesTable, oidAccesses,
+		trackStaleObjects);
 	}
 	@Override protected TransactionParticipant createParticipant() {
 	    /* Create a durable participant */
@@ -431,6 +449,8 @@ public final class DataServiceImpl implements DataService {
 		DATA_STORE_CLASS_PROPERTY);
 	    optimisticWriteLocks = wrappedProps.getBooleanProperty(
 		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
+	    trackStaleObjects = wrappedProps.getBooleanProperty(
+		TRACK_STALE_OBJECTS_PROPERTY, Boolean.FALSE);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
@@ -557,15 +577,16 @@ public final class DataServiceImpl implements DataService {
 		// mark that this object has been write locked
 		oidAccesses.reportObjectAccess(ref.getId(), AccessType.WRITE,
 					       object);
-
-		if (object instanceof ManagedObjectRemoval) {
-		    context.removingObject((ManagedObjectRemoval) object);
-		    /*
-		     * Get the context again in case something changed as a
-		     * result of the call to removingObject.
-		     */
-		    getContext();
-		}
+	    }
+	    if (object instanceof ManagedObjectRemoval) {
+		context.removingObject((ManagedObjectRemoval) object);
+		/*
+		 * Get the context again in case something changed as a
+		 * result of the call to removingObject.
+		 */
+		getContext();
+	    }
+	    if (ref != null) {
 		ref.removeObject();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
