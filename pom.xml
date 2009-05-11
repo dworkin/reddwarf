@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>13</version>
+    <version>14</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
@@ -60,17 +60,11 @@
 	<plugin>
 	  <groupId>org.apache.maven.plugins</groupId>
 	  <artifactId>maven-remote-resources-plugin</artifactId>
-	  <executions>
-	    <execution>
-	      <id>include-gpl-license</id>
-	      <phase>generate-resources</phase>
-	      <configuration>
-		<properties>
-		  <projectName>Project Darkstar Server</projectName>
-		</properties>
-	      </configuration>
-	    </execution>
-	  </executions>
+	  <configuration>
+	    <properties>
+	      <projectName>Project Darkstar Server</projectName>
+	    </properties>
+	  </configuration>
 	</plugin>
 
 	<!-- The berkeleydb binary package must be retrieved and unpacked
@@ -102,6 +96,34 @@
               </configuration>
             </execution>
           </executions>
+	</plugin>
+
+	<!-- The license plugin should be activated in modules that
+	     contain source code and thus need to verify correct license
+	     headers in each source code file -->
+	<plugin>
+	  <groupId>com.google.code.maven-license-plugin</groupId>
+          <artifactId>maven-license-plugin</artifactId>
+          <version>${maven-license-plugin.version}</version>
+	  <configuration>
+	    <header>${basedir}/src/main/etc/header.txt</header>
+	    <includes>
+	      <include>**/*.java</include>
+	    </includes>
+	    <properties>
+	      <startYear>${project.inceptionYear}</startYear>
+	      <endYear>${projectYear}</endYear>
+	      <projectName>Project Darkstar Server</projectName>
+	    </properties>
+	  </configuration>
+	  <executions>
+	    <execution>
+	      <phase>process-sources</phase>
+	      <goals>
+		<goal>check</goal>
+	      </goals>
+	    </execution>
+	  </executions>
 	</plugin>
 
 	
@@ -422,6 +444,7 @@
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
     <sgs-test-ext.version>1.0</sgs-test-ext.version>
+    <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.bdb.env>
