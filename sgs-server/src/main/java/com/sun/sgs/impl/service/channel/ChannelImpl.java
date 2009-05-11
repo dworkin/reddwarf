@@ -272,7 +272,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    delivery.equals(Delivery.UNRELIABLE) ?
 	    new UnreliableChannel(name, listener, delivery,
 				  writeBufferCapacity) :
-	    new ReliableChannel(name, listener, delivery,
+	    new OrderedChannel(name, listener, delivery,
 				writeBufferCapacity);
 	return channel.getWrappedChannel();
     }
@@ -1609,6 +1609,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    final BigInteger channelRefId = channel.channelRefId;
+	    final byte deliveryOrdinal = (byte) channel.delivery.ordinal();
 	    for (final long nodeId : channel.servers) {
 		channelService.addChannelTask(
 		    channelRefId,
@@ -1616,7 +1617,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			public void run() throws IOException {
 			    ChannelServer server = getChannelServer(nodeId);
 			    if (server != null) {
-				server.send(channelRefId, message);
+				server.send(channelRefId, message,
+					    deliveryOrdinal);
 			    }
 			} },
 		    nodeId);
