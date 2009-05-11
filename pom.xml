@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>13</version>
+    <version>14</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-shared</artifactId>
   <name>Project Darkstar Shared</name>
   <packaging>jar</packaging>
-  <version>1.6</version>
+  <version>1.7</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
@@ -88,6 +88,31 @@
 	</configuration>
       </plugin>
 
+      <!-- Verify correct license headers in each source code file -->
+      <plugin>
+	<groupId>com.google.code.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
+        <version>${maven-license-plugin.version}</version>
+	<configuration>
+	  <header>${basedir}/src/main/etc/header.txt</header>
+	  <includes>
+	    <include>**/*.java</include>
+	  </includes>
+	  <properties>
+	    <startYear>${project.inceptionYear}</startYear>
+	    <endYear>${projectYear}</endYear>
+	  </properties>
+	</configuration>
+	<executions>
+	  <execution>
+	    <phase>process-sources</phase>
+	    <goals>
+	      <goal>check</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+      
     </plugins>
 
   </build>
@@ -122,5 +147,9 @@
       <layout>default</layout>
     </repository>
   </repositories>
+
+  <properties>
+    <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
+  </properties>
 
 </project>
