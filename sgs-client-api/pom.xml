@@ -61,6 +61,7 @@
 		<filter>
                   <artifact>com.projectdarkstar.client:sgs-client</artifact>
                   <includes>
+		    <include>META-INF/*</include>
                     <include>com/sun/sgs/client/**</include>
                   </includes>
 		</filter>
