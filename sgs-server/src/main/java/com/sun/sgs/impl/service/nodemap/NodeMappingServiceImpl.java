@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -270,13 +271,6 @@ public class NodeMappingServiceImpl
     //    available (see note above).  It's probably very possible to make it
     //    work correctly and locally if the server isn't available, if we 
     //    choose to not give up on server disconnects.
-    //  - Perhaps all methods that should NOT be called within a transaction
-    //    should be declared to throw an exception if they are called from
-    //    within a transaction?  This would used for all service APIs with
-    //    non-transactional methods.   Some methods must be called from within
-    //    a transaction, some must not, and for some it won't matter (e.g.
-    //    equals() or toString().
-    //
 
     /** Package name for this class */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
@@ -568,6 +562,9 @@ public class NodeMappingServiceImpl
             throw new NullPointerException("null identity");
         }
         
+        // Cannot call within a transaction
+        checkNonTransactionalContext();
+        
         serviceStats.assignNodeOp.report();
         
         // We could check here to see if there's already a mapping, 
@@ -609,6 +606,9 @@ public class NodeMappingServiceImpl
             throw new NullPointerException("null identity");
         }       
 
+        // Cannot call within a transaction
+        checkNonTransactionalContext();
+        
         serviceStats.setStatusOp.report();
         
         SetStatusTask stask = 
