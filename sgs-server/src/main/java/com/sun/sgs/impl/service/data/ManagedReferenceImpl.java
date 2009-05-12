@@ -413,7 +413,6 @@ final class ManagedReferenceImpl<T>
 	return getForUpdate(true);
     }
 
-
     /**
      * Like getForUpdate, but with optional checking of the context.  Suppress
      * the check if the reference was just obtained from the context.

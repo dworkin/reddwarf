@@ -89,8 +89,8 @@ import java.math.BigInteger;
  *     removeObject}, {@code markForUpdate}, {@code createReference}, or {@code
  *     getObjectId}, as well as calling {@code ManagedReference.get} or {@code
  *     ManagedReference.getForUpdate} on a reference to the removed object,
- *     will cause a {@link TransactionNotActiveException} to be thrown, if the
- *     system has tracked the object's removed state. <p>
+ *     will cause a {@link ObjectNotFoundException} to be thrown, if the system
+ *     has tracked the object's removed state. <p>
  *
  * <li><a name="stale"><b>Stale</b></a> - A managed object that was persistent
  *     or removed in another, completed transaction.  Stale objects are objects
@@ -104,7 +104,7 @@ import java.math.BigInteger;
  *     {@code markForUpdate}, {@code createReference}, or {@code getObjectId},
  *     as well as calling {@code ManagedReference.get} or {@code
  *     ManagedReference.getForUpdate} on a reference to the stale object, will
- *     cause a {@code TransactionNotActiveException} to be thrown, if the
+ *     cause a {@link TransactionNotActiveException} to be thrown, if the
  *     system has tracked the object's stale state. <p>
  *
  * </ul> <p>
