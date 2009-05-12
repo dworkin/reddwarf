@@ -41,7 +41,7 @@ import java.math.BigInteger;
  * needed and to remove them explicitly from the <code>DataManager</code> using
  * the {@link #removeObject removeObject} method. <p>
  *
- * Managed objects have one of the following states with respect to the data
+ * Managed objects are in one of the following states with respect to the data
  * manager: <ul>
  *
  * <li><a name="transient"><b>Transient</b></a> - A managed object that has not
@@ -60,13 +60,12 @@ import java.math.BigInteger;
  *     method to be called. <p>
  *
  * <li><a name="persistent"><b>Persistent</b></a> - A managed object that has
- *     been stored in the data manager using a call to {@code setBinding},
- *     {@code createReference}, or {@code getObjectId}, either in the current
- *     transaction, or else retrieved from the data manager through a call to
- *     {@link #getBinding getBinding}, {@link #getBindingForUpdate
- *     getBindingForUpdate}, {@link ManagedReference#get ManagedReference.get},
- *     or {@link ManagedReference#getForUpdate
- *     ManagedReference.getForUpdate}. <p>
+ *     been stored in the data manager by calling to {@code setBinding}, {@code
+ *     createReference}, or {@code getObjectId} in the current transaction, or
+ *     else retrieved from the data manager by calling {@link #getBinding
+ *     getBinding}, {@link #getBindingForUpdate getBindingForUpdate}, {@link
+ *     ManagedReference#get ManagedReference.get}, or {@link
+ *     ManagedReference#getForUpdate ManagedReference.getForUpdate}. <p>
  *
  *     Passing a persistent object to {@code setBinding}, {@code
  *     createReference}, {@code markForUpdate}, or {@code getObjectId} does not
@@ -102,8 +101,10 @@ import java.math.BigInteger;
  *     they will be considered transient. <p>
  *
  *     Passing a stale object to {@code setBinding}, {@code removeObject},
- *     {@code markForUpdate}, {@code createReference}, or {@code getObjectId}
- *     will cause a {@code TransactionNotActiveException} to be thrown, if the
+ *     {@code markForUpdate}, {@code createReference}, or {@code getObjectId},
+ *     as well as calling {@code ManagedReference.get} or {@code
+ *     ManagedReference.getForUpdate} on a reference to the stale object, will
+ *     cause a {@code TransactionNotActiveException} to be thrown, if the
  *     system has tracked the object's stale state. <p>
  *
  * </ul> <p>
@@ -111,16 +112,16 @@ import java.math.BigInteger;
  * Because storing a managed object in a name binding or creating a managed
  * reference to it causes the object to be stored in data manager, applications
  * should insure that they remove such objects if they end up not referring to
- * them.  For example, if an application stores a transient object as the value
- * of a name binding, but replaces that object with another object before the
- * end of the task, it should make sure to remove the unused object from the
- * data manager.  Otherwise, the object will remain stored in the data manager
- * but will not be referenced.  The {@code removeObject} method is designed to
- * thrown no exceptions when called on a transient object so that applications
- * can safely remove such objects even if they are uncertain if the objects
- * have become persistent.  That uncertainty could result from calling methods
- * whose precise usage of managed references or name bindings is not
- * documented. <p>
+ * them persistently.  For example, if an application stores a transient object
+ * as the value of a name binding, but replaces that object with another object
+ * before the end of the task, it should make sure to remove the unused object
+ * from the data manager.  Otherwise, the object will remain stored in the data
+ * manager but will not be referenced.  The {@code removeObject} method is
+ * designed to thrown no exceptions when called on a transient object so that
+ * applications can safely remove such objects even if they are uncertain if
+ * the objects have become persistent.  That uncertainty could result from
+ * calling methods whose precise usage of managed references or name bindings
+ * is not documented. <p>
  *
  * Some implementations may need to be notified when managed objects and the
  * objects they refer to are modified, while other implementations may be
@@ -168,8 +169,7 @@ public interface DataManager {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    // FIXME: Wait for upcoming data service changes
-    //ManagedObject getBindingForUpdate(String name);
+    ManagedObject getBindingForUpdate(String name);
 
     /**
      * Binds an object to a name, replacing any previous binding, and storing
@@ -314,5 +314,5 @@ public interface DataManager {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    //BigInteger getObjectId(Object object);
+    BigInteger getObjectId(Object object);
 }

@@ -526,7 +526,13 @@ public final class DataServiceImpl implements DataService {
     /** {@inheritDoc} */
     public ManagedObject getBinding(String name) {
         serviceStats.getBindingOp.report();
-	return getBindingInternal(name, false);
+	return getBindingInternal(name, false, false, "getBinding");
+    }
+
+    /** {@inheritDoc} */
+    public ManagedObject getBindingForUpdate(String name) {
+	serviceStats.getBindingForUpdateOp.report();
+	return getBindingInternal(name, false, true, "getBindingForUpdate");
     }
 
     /** {@inheritDoc} */
@@ -556,15 +562,15 @@ public final class DataServiceImpl implements DataService {
 	    checkManagedObject(object);
 	    context = getContext();
 	    ref = context.findReference(object);
+	    if (object instanceof ManagedObjectRemoval) {
+		context.removingObject((ManagedObjectRemoval) object);
+		/*
+		 * Get the context again in case something changed as a
+		 * result of the call to removingObject.
+		 */
+		getContext();
+	    }
 	    if (ref != null) {
-		if (object instanceof ManagedObjectRemoval) {
-		    context.removingObject((ManagedObjectRemoval) object);
-		    /*
-		     * Get the context again in case something changed as a
-		     * result of the call to removingObject.
-		     */
-		    getContext();
-		}
 		ref.removeObject();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -647,12 +653,46 @@ public final class DataServiceImpl implements DataService {
 	}
     }
 
+    /** {@inheritDoc} */
+    public BigInteger getObjectId(Object object) {
+	serviceStats.getObjectIdOp.report();
+	Context context = null;
+	try {
+	    checkManagedObject(object);
+	    context = getContext();
+	    BigInteger result = context.getReference(object).getId();
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "getObjectId tid:{0,number,#}, type:{1}" +
+			   " returns oid:{2,number,#}",
+			   contextTxnId(context), typeName(object), result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
+		    Level.FINEST, e,
+		    "getObjectId tid:{0,number,#}, type:{1} throws",
+		    contextTxnId(context), typeName(object));
+	    }
+	    throw e;
+	}
+    }
+
     /* -- Implement DataService -- */
 
     /** {@inheritDoc} */
     public ManagedObject getServiceBinding(String name) {
         serviceStats.getServiceBindingOp.report();
-	return getBindingInternal(name, true);
+	return getBindingInternal(name, true, false, "getServiceBinding");
+    }
+
+    /** {@inheritDoc} */
+    public ManagedObject getServiceBindingForUpdate(String name) {
+        serviceStats.getServiceBindingForUpdateOp.report();
+	return getBindingInternal(
+	    name, true, true, "getServiceBindingForUpdate");
     }
 
     /** {@inheritDoc} */
@@ -724,9 +764,14 @@ public final class DataServiceImpl implements DataService {
 
     /* -- Generic binding methods -- */
 
-    /** Implement getBinding and getServiceBinding. */
-    private ManagedObject getBindingInternal(
-	String name, boolean serviceBinding)
+    /**
+     * Implement getBinding, getBindingForUpdate, getServiceBinding, and
+     * getServiceBindingForUpdate.
+     */
+    private ManagedObject getBindingInternal(String name,
+					     boolean serviceBinding,
+					     boolean forUpdate,
+					     String methodName)
     {
 	Context context = null;
 	try {
@@ -737,7 +782,7 @@ public final class DataServiceImpl implements DataService {
 	    ManagedObject result;
 	    try {
 		result = context.getBinding(
-		    getInternalName(name, serviceBinding));
+		    getInternalName(name, serviceBinding), forUpdate);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -747,8 +792,7 @@ public final class DataServiceImpl implements DataService {
 		    Level.FINEST,
 		    "{0} tid:{1,number,#}, name:{2} returns type:{3}," +
 		    " oid:{4,number,#}",
-		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, typeName(result),
+		    methodName, contextTxnId(context), name, typeName(result),
 		    objectId(context, result));
 	    }
 	    return result;
@@ -758,8 +802,7 @@ public final class DataServiceImpl implements DataService {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "{0} tid:{1,number,#}, name:{2} throws",
-		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name);
+		    methodName, contextTxnId(context), name);
 	    }
 	    throw e;
 	}

@@ -56,8 +56,23 @@ public interface DataService extends DataManager, Service {
      *		found
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
+     * @see	#getServiceBindingForUpdate getServiceBindingForUpdate
      */
     ManagedObject getServiceBinding(String name);
+
+    /**
+     * Obtains the object associated with the service binding of a name, and
+     * notifies the system that the object is going to be modified.
+     *
+     * @param	name the name
+     * @return	the object associated with the service binding of the name
+     * @throws	NameNotBoundException if no object is bound to the name
+     * @throws	ObjectNotFoundException if the object bound to the name is not
+     *		found
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    ManagedObject getServiceBindingForUpdate(String name);
 
     /**
      * Specifies an object for the service binding of a name, replacing any

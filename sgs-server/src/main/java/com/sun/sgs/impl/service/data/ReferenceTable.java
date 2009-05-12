@@ -21,12 +21,12 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.util.WeakIdentityMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.WeakHashMap;
 
 /**
  * Stores information about managed references within a particular transaction.
@@ -37,8 +37,8 @@ final class ReferenceTable {
     /**
      * A map whose keys are stale managed objects, if tracking stale objects.
      */
-    private static final Map<ManagedObject, Boolean> staleObjects =
-	new WeakHashMap<ManagedObject, Boolean>();
+    private static final WeakIdentityMap<Object, Boolean>
+	staleObjects = new WeakIdentityMap<Object, Boolean>();
 
     /** Maps object IDs to managed references. */
     private final SortedMap<Long, ManagedReferenceImpl<?>> oids =

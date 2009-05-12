@@ -117,18 +117,6 @@
 	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
 	      <windowtitle>Project Darkstar Server ${project.version} API</windowtitle>
 	      <doctitle>Project Darkstar Server ${project.version} API</doctitle>
-	      <groups>
-		<group>
-		  <title>API</title>
-		  <packages>com.sun.sgs.app*</packages>
-		</group>
-		<group>
-		  <title>Service and internal APIs</title>
-		  <packages>
-		    com.sun.sgs.auth:com.sun.sgs.internal:com.sun.sgs.kernel:com.sun.sgs.management:com.sun.sgs.profile:com.sun.sgs.protocol:com.sun.sgs.service:com.sun.sgs.transport
-		  </packages>
-		</group>
-	      </groups>
 	      <footer>
 		<![CDATA[<font size="-1">Project Darkstar, Version
                 ${project.version}<br/>${buildNumber}</font>]]>
