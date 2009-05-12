@@ -25,7 +25,12 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-/** A map that with weak keys that are compared for identity. */
+/**
+ * A map that with weak keys that are compared for identity.
+ *
+ * @param	<K> the key type
+ * @param	<V> the value type
+ */
 public class WeakIdentityMap<K, V> {
 
     /** The underlying map. */
@@ -125,7 +130,7 @@ public class WeakIdentityMap<K, V> {
      *
      * @param	<K> the type of the referenced object
     */
-    private static class Key<K> extends WeakReference<K> {
+    private static final class Key<K> extends WeakReference<K> {
 
 	/** The identity hash code of the referenced object. */
 	private final int hash;

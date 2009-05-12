@@ -60,7 +60,7 @@ import java.math.BigInteger;
  *     method to be called. <p>
  *
  * <li><a name="persistent"><b>Persistent</b></a> - A managed object that has
- *     been stored in the data manager by calling to {@code setBinding}, {@code
+ *     been stored in the data manager by calling {@code setBinding}, {@code
  *     createReference}, or {@code getObjectId} in the current transaction, or
  *     else retrieved from the data manager by calling {@link #getBinding
  *     getBinding}, {@link #getBindingForUpdate getBindingForUpdate}, {@link
@@ -308,6 +308,7 @@ public interface DataManager {
      * #createReference createReference}.
      *
      * @param	object the object
+     * @return	a unique identifier for the object
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed

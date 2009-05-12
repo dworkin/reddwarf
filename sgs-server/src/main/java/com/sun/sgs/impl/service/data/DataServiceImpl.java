@@ -25,6 +25,7 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -123,8 +124,8 @@ import javax.management.JMException;
  * <dd style="padding-top: .5em">Whether to track references to stale managed
  *	objects.  If <code>true</code>, the <code>DataService</code> keeps
  *	track of persistent or removed objects from completed transactions and
- *	throws {@link ObjectStaleException} if the application refers to those
- *	objects from another transaction. <p>
+ *	throws {@link TransactionNotActiveException} if the application refers
+ *	to those objects from another transaction. <p>
  *
  * </dl> <p>
  *
