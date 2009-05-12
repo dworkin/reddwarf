@@ -52,7 +52,7 @@ public interface TransactionProxy {
      * 
      * @return {@code true} if there is a current transaction
      */
-    boolean inTransactionalContext();
+    boolean inTransaction();
     
     /**
      * Returns the owner of the task that is executing the current

@@ -685,7 +685,7 @@ public abstract class AbstractService implements Service {
      * transactional context.
      */
     protected void checkNonTransactionalContext() {
-        if (txnProxy.inTransactionalContext()) {
+        if (txnProxy.inTransaction()) {
 	    throw new IllegalStateException(
 		"operation not allowed from a transactional context");
 	}
