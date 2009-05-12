@@ -55,6 +55,13 @@ final class TransactionProxyImpl implements TransactionProxy {
     /**
      * {@inheritDoc}
      */
+    public boolean inTransactionalContext() {
+        return ContextResolver.inTransactionalContext();
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
     public Identity getCurrentOwner() {
         return ContextResolver.getCurrentOwner();
     }

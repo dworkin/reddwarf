@@ -563,12 +563,7 @@ public class NodeMappingServiceImpl
         }
         
         // Cannot call within a transaction
-        try {
-            txnProxy.getCurrentTransaction();
-            throw new IllegalStateException("Cannot call within a transaction");
-        } catch (TransactionNotActiveException expected) {
-            // Do nothing, we hoped to get the expected error
-        }
+        checkNonTransactionalContext();
         
         serviceStats.assignNodeOp.report();
         
@@ -612,12 +607,7 @@ public class NodeMappingServiceImpl
         }       
 
         // Cannot call within a transaction
-        try {
-            txnProxy.getCurrentTransaction();
-            throw new IllegalStateException("Cannot call within a transaction");
-        } catch (TransactionNotActiveException expected) {
-            // Do nothing, we hoped to get the expected error
-        }
+        checkNonTransactionalContext();
         
         serviceStats.setStatusOp.report();
         
