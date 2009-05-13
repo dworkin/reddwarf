@@ -35,12 +35,14 @@ package com.sun.sgs.example.request.client;
 /**
  *
  */
-public class MaxSessions extends AbstractRequestClient {
+public class MaxChannelSessions extends AbstractRequestClient {
+    
+    private static String CHANNEL = "MyChannel";
     
     public static void main(String[] args) {
         new Thread(new StatsThread()).start();
         for(int i = 0; i < CLIENTS; i++) {
-            new MaxSessions();
+            new MaxChannelSessions();
         }
     }
 
@@ -51,7 +53,7 @@ public class MaxSessions extends AbstractRequestClient {
 
     @Override
     public void loginComplete() {
-        //no op
+        this.sendJoinChannel(CHANNEL);
     }
 
     @Override

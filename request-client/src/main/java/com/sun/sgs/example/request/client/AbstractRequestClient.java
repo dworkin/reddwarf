@@ -106,8 +106,10 @@ public abstract class AbstractRequestClient implements SimpleClientListener {
     protected static volatile long loginRequestFail;
     protected static volatile long loginSuccess;
     protected static volatile long loginFail;
+    protected static volatile long joinSuccess;
     
     protected static volatile long loginTime;
+    protected static volatile long joinTime;
     protected static volatile long pingTime;
     protected static volatile long pingSuccess;
     
@@ -124,6 +126,7 @@ public abstract class AbstractRequestClient implements SimpleClientListener {
     protected final String user = "User-" + random.nextInt(Integer.MAX_VALUE);
     
     private long loginStartTime;
+    private Deque<Long> joinStartTimes;
     private Deque<Long> pingStartTimes;
     
     private Map<String, ClientChannel> channels;
@@ -139,6 +142,7 @@ public abstract class AbstractRequestClient implements SimpleClientListener {
         props.setProperty("host", HOST);
         props.setProperty("port", String.valueOf(PORT));
         simpleClient = new SimpleClient(this);
+        joinStartTimes = new LinkedList<Long>();
         pingStartTimes = new LinkedList<Long>();
         channels = new HashMap<String, ClientChannel>();
 	requestLogin();
@@ -188,10 +192,12 @@ public abstract class AbstractRequestClient implements SimpleClientListener {
     
     public void sendJoinChannel(String name) {
         send++;
+        joinStartTimes.add(System.currentTimeMillis());
         try {
             simpleClient.send(stringToBuffer(JOIN_CHANNEL + name));
         } catch (IOException ioe) {
             sendFailure++;
+            joinStartTimes.removeLast();
         }
     }
     
@@ -217,6 +223,8 @@ public abstract class AbstractRequestClient implements SimpleClientListener {
     }
     
     public ClientChannelListener joinedChannel(ClientChannel channel) {
+        joinSuccess++;
+        joinTime += (System.currentTimeMillis() - joinStartTimes.remove());
         channels.put(channel.getName(), channel);
         channelJoinComplete();
         return new RequestChannelListener();
@@ -306,6 +314,8 @@ public abstract class AbstractRequestClient implements SimpleClientListener {
                 System.out.println(" Login Successes      : " + loginSuccess);
                 System.out.println(" Login Failures       : " + loginFail);
                 System.out.println(" Avg Login Latency    : " + (double)loginTime/(double)loginSuccess + "ms");
+                System.out.println("Channel Joins         : " + joinSuccess);
+                System.out.println(" Avg Join Latency     : " + (double)joinTime/(double)joinSuccess + "ms");
                 System.out.println("Pings                 : " + pingSuccess);
                 System.out.println(" Avg Ping Latency     : " + (double)pingTime/(double)pingSuccess + "ms");
                 System.out.println("Message Sends         : " + send);
