@@ -171,6 +171,17 @@ final class ContextResolver {
     }
 
     /**
+     * Returns {@code true} if there is a current transaction, no matter
+     * the state of that transaction. 
+     * 
+     * @return {@code true} if there is a current transaction
+     */
+    static boolean inTransaction() {
+        Transaction txn = currentTransaction.get();
+        return (txn != null);
+    }
+    
+    /**
      * Sets the current <code>Transaction</code>, throwing an exception if
      * there is already an active transaction.
      *
