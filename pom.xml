@@ -78,6 +78,18 @@
 	</executions>
       </plugin>
 
+      <!-- Verify correct license headers in each source code file -->
+      <plugin>
+	<groupId>com.google.code.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>check-LICENSE</id>
+	    <phase>compile</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
       <!-- Ensure 1.5 target -->
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
@@ -88,31 +100,6 @@
 	</configuration>
       </plugin>
 
-      <!-- Verify correct license headers in each source code file -->
-      <plugin>
-	<groupId>com.google.code.maven-license-plugin</groupId>
-        <artifactId>maven-license-plugin</artifactId>
-        <version>${maven-license-plugin.version}</version>
-	<configuration>
-	  <header>${basedir}/src/main/etc/header.txt</header>
-	  <includes>
-	    <include>**/*.java</include>
-	  </includes>
-	  <properties>
-	    <startYear>${project.inceptionYear}</startYear>
-	    <endYear>${projectYear}</endYear>
-	  </properties>
-	</configuration>
-	<executions>
-	  <execution>
-	    <phase>process-sources</phase>
-	    <goals>
-	      <goal>check</goal>
-	    </goals>
-	  </execution>
-	</executions>
-      </plugin>
-      
     </plugins>
 
   </build>
@@ -147,9 +134,5 @@
       <layout>default</layout>
     </repository>
   </repositories>
-
-  <properties>
-    <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
-  </properties>
 
 </project>
