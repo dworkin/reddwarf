@@ -91,6 +91,9 @@ public interface NodeMappingService extends Service {
      *
      * @param service the class of the caller
      * @param identity the identity to assign to a node
+     * 
+     *@throws IllegalStateException if this method is called while in a
+     *        transaction
      *
      */
     void assignNode(Class service, Identity identity);
@@ -118,6 +121,8 @@ public interface NodeMappingService extends Service {
      *               {@code false} if the identity is inactive
      *
      * @throws UnknownIdentityException if the identity is not in the map
+     * @throws IllegalStateException if this method is called while in a
+     *         transaction
      */
     void setStatus(Class service, Identity identity, 
                    boolean active) throws UnknownIdentityException;

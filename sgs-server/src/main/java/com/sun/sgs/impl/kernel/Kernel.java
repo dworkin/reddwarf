@@ -236,7 +236,11 @@ class Kernel {
                 profileCollector.registerMBean(config, 
                                                ConfigManager.MXBEAN_NAME);
             } catch (JMException e) {
-                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+                logger.logThrow(Level.WARNING, e, "Could not register MBean");
+                // Stop bringing up the kernel - the ConfigManager is used
+                // by other parts of the system, who rely on it being 
+                // successfully registered.
+                throw e;
             }
 
             // create the authenticators and identity coordinator
