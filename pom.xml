@@ -67,6 +67,20 @@
 	  </configuration>
 	</plugin>
 
+	<!-- The license plugin should be activated in modules that
+	     contain source code and thus need to verify correct license
+	     headers in each source code file -->
+	<plugin>
+	  <groupId>com.google.code.maven-license-plugin</groupId>
+          <artifactId>maven-license-plugin</artifactId>
+	  <executions>
+	    <execution>
+	      <id>check-NOTICE</id>
+	      <phase>compile</phase>
+	    </execution>
+	  </executions>
+	</plugin>
+
 	<!-- The berkeleydb binary package must be retrieved and unpacked
 	     Before the test phase so that they are available during
 	     runtime of the unit tests.
@@ -96,34 +110,6 @@
               </configuration>
             </execution>
           </executions>
-	</plugin>
-
-	<!-- The license plugin should be activated in modules that
-	     contain source code and thus need to verify correct license
-	     headers in each source code file -->
-	<plugin>
-	  <groupId>com.google.code.maven-license-plugin</groupId>
-          <artifactId>maven-license-plugin</artifactId>
-          <version>${maven-license-plugin.version}</version>
-	  <configuration>
-	    <header>${basedir}/src/main/etc/header.txt</header>
-	    <includes>
-	      <include>**/*.java</include>
-	    </includes>
-	    <properties>
-	      <startYear>${project.inceptionYear}</startYear>
-	      <endYear>${projectYear}</endYear>
-	      <projectName>Project Darkstar Server</projectName>
-	    </properties>
-	  </configuration>
-	  <executions>
-	    <execution>
-	      <phase>process-sources</phase>
-	      <goals>
-		<goal>check</goal>
-	      </goals>
-	    </execution>
-	  </executions>
 	</plugin>
 
 	
@@ -444,7 +430,6 @@
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
     <sgs-test-ext.version>1.0</sgs-test-ext.version>
-    <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.bdb.env>

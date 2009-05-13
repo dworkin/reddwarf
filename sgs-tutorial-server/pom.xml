@@ -61,6 +61,12 @@
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-remote-resources-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>include-gpl-license</id>
+	    <phase>generate-resources</phase>
+	  </execution>
+	</executions>
       </plugin>
 
       <!-- Activate the license plugin to check for license headers -->
