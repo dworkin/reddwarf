@@ -134,6 +134,46 @@
 	  </executions>
 	</plugin>
 
+	<!-- The license plugin should be activated in modules that
+	     wish to verify correct headers are included in every source file.
+	     This should be used in conjunction with the remote-resources
+	     plugin above as it checks that the header for each source
+	     file is equal to either the LICENSE or NOTICE file pulled
+	     over by the remote-resources plugin -->
+	<plugin>
+	  <groupId>com.google.code.maven-license-plugin</groupId>
+          <artifactId>maven-license-plugin</artifactId>
+          <version>${maven-license-plugin.version}</version>
+	  <executions>
+	    <execution>
+	      <id>check-NOTICE</id>
+	      <goals>
+		<goal>check</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<header>${basedir}/target/classes/META-INF/NOTICE</header>
+		<includes>
+		  <include>**/*.java</include>
+		</includes>
+	      </configuration>
+	    </execution>
+	    <execution>
+	      <id>check-LICENSE</id>
+	      <goals>
+		<goal>check</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<header>${basedir}/target/classes/META-INF/LICENSE</header>
+		<includes>
+		  <include>**/*.java</include>
+		</includes>
+	      </configuration>
+	    </execution>
+	  </executions>
+	</plugin>
+	
       </plugins>
       
     </pluginManagement>
@@ -309,10 +349,11 @@
     
     <projectYear>2009</projectYear>
     
-    <sgs-build-utilities.version>1.0</sgs-build-utilities.version>
-    <sgs-jar-resources-gpl.version>1.0</sgs-jar-resources-gpl.version>
+    <sgs-build-utilities.version>1.1</sgs-build-utilities.version>
+    <sgs-jar-resources-gpl.version>1.1</sgs-jar-resources-gpl.version>
     <sgs-jar-resources-gpl-classpath.version>1.0</sgs-jar-resources-gpl-classpath.version>
-    <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
+    <sgs-jar-resources-bsd.version>1.1</sgs-jar-resources-bsd.version>
+    <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
 
     <junit.version>4.5</junit.version>
     <easymock.version>2.4</easymock.version>
