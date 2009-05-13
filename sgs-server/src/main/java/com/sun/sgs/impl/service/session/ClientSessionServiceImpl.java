@@ -236,10 +236,16 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
+    /** The map of relocation information for sessions relocating to
+     * this node, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, RelocationInfo>
 	relocatingSessions =
 	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
 
+    /** The set of identities that are relocating to this node. */
+    private final Set<Identity> relocatingIdentities =
+	Collections.synchronizedSet(new HashSet<Identity>());
+    
     /** The maximum number of session events to service per transaction. */
     final int eventsPerTxn;
 
@@ -593,16 +599,6 @@ public final class ClientSessionServiceImpl
 		ClientSessionServiceImpl.this, dataService, protocol,
 		info.identity, completionHandler,
 		new BigInteger(1, info.sessionId));
-
-	    // TBD: this services at least one event, but need to ensure
-	    // that other events get serviced if serviceEventQueue
-	    // messages got missed while the session was relocating.
-	    // Also, the handler for this sessionId may not be stored yet
-	    // so this serviceEventQueue request will get dropped.  This
-	    // probably needs to be done when the client session handler
-	    // gets registered, and only if its associated session is
-	    // relocating. 
-	    serverImpl.serviceEventQueue(info.sessionId);
 	}
     }
     
@@ -903,6 +899,7 @@ public final class ClientSessionServiceImpl
 		    new RelocationInfo(identity, sessionId);
 		BigInteger key = new BigInteger(1, relocationKey);
 		relocatingSessions.put(key, info);
+		relocatingIdentities.add(identity);
 
 		// Modify ClientSession's state to indicate that it has been
 		// relocated to the local node.
@@ -1103,14 +1100,19 @@ public final class ClientSessionServiceImpl
      *
      * @param	identity the user identity
      * @param	handler the client session handler
+     * @param	loggingIn if {@code true} session with specified
+     *		identity is loggingIn; otherwise it is relocating
      * @return	{@code true} if the user is allowed to log in with the
      * specified {@code identity}, otherwise returns {@code false}
      */
-    boolean validateUserLogin(Identity identity, ClientSessionHandler handler) {
+    boolean validateUserLogin(Identity identity, ClientSessionHandler handler,
+			      boolean loggingIn) {
+	if (loggingIn && relocatingIdentities.contains(identity)) {
+	    return false;
+	}
+		
 	ClientSessionHandler previousHandler =
 	    loggedInIdentityMap.putIfAbsent(identity, handler);
-	System.err.println("validateUserLogin: identity:" + identity +
-			    ", previousHandler:" + previousHandler);
 	if (previousHandler == null) {
 	    // No user logged in with the same idenity; allow login.
 	    return true;
@@ -1148,12 +1150,26 @@ public final class ClientSessionServiceImpl
     
     /**
      * Adds the handler for the specified session to the internal
-     * session handler map.  This method is invoked by the handler once the
-     * client has successfully logged in.
+     * sessio n handler map.  This method is invoked by the handler
+     * once the client has successfully logged in or has
+     * successfully relocated.  If the client has relocated, the
+     * {@code identity} should be non-null, otherwise, the identity
+     * should be {@code null}.
+     *
+     * @param	sessionRefId the session ID, as a {@code BigInteger}
+     * @param	handler the client session handler to cache
+     * @param	identity if the session has been relocated, a non-null identity to
+     *		be removed from the relocatingIdentities cache
      */
-    void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
+    void addHandler(BigInteger sessionRefId,
+		    ClientSessionHandler handler,
+		    Identity identity)
+    {
         assert handler != null;
 	handlers.put(sessionRefId, handler);
+	if (identity != null) {
+	    relocatingIdentities.remove(identity);
+	}
     }
     
     /**
@@ -1467,18 +1483,19 @@ public final class ClientSessionServiceImpl
 	 * needs to be removed.
 	 */
 	public void run() {
-	    if (relocatingSessions.remove(relocationKey) == null) {
-		return;
+	    if (relocatingSessions.remove(relocationKey) != null) {
+		transactionScheduler.scheduleTask(
+ 		    new AbstractKernelRunnable("RemoveNonrelocatedSession") {
+			public void run() {
+			    ClientSessionImpl sessionImpl =
+				ClientSessionImpl.getSession(
+				    dataService,
+				    new BigInteger(1, info.sessionId));
+			    sessionImpl.notifyListenerAndRemoveSession(
+				dataService, false, true);
+			} }, info.identity);
 	    }
-	    transactionScheduler.scheduleTask(
- 		new AbstractKernelRunnable("RemoveNonrelocatedSession") {
-		    public void run() {
-			ClientSessionImpl sessionImpl =
-			    ClientSessionImpl.getSession(
- 				dataService, new BigInteger(1, info.sessionId));
-			sessionImpl.notifyListenerAndRemoveSession(
- 			    dataService, false, true);
-		    } }, info.identity);
+	    relocatingIdentities.remove(info.identity);
 	}
     }
 }

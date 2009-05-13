@@ -624,7 +624,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	     * validate that the user is allowed to log in (or relocate).
 	     */
 	    if (!sessionService.validateUserLogin(
-		    identity, ClientSessionHandler.this))
+		    identity, ClientSessionHandler.this, loggingIn))
 	    {
 		// This client session is not allowed to proceed.
 		notifySetupFailureAndDisconnect(
@@ -670,7 +670,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	     * complete.
 	     */
 	    sessionService.addHandler(
-		sessionRefId, ClientSessionHandler.this);
+		sessionRefId, ClientSessionHandler.this,
+		loggingIn ? null : identity);
 	    if (loggingIn) {
 		scheduleTask(new LoginTask());
 	    } else {

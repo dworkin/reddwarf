@@ -266,7 +266,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-    /*
+
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -417,7 +417,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient("success");
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	} finally {
             client.disconnect();
 	}
@@ -435,7 +435,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (String user : users) {
 		DummyClient client = new DummyClient(user);
 		client.connect(serverAppPort);
-		if (! client.login()) {
+		if (! client.login() && client.loginRedirect) {
 		    // login redirected
 		    redirectCount++;
                     int port = client.redirectPort;
@@ -504,7 +504,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    if (SimpleTestIdentityAuthenticator.allIdentities.
                     getNotifyLoggedIn(name)) {
 		System.err.println(
@@ -523,21 +523,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(NON_SERIALIZABLE);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    fail("expected login failure");
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-		if (SimpleTestIdentityAuthenticator.allIdentities.
-		        getNotifyLoggedIn(NON_SERIALIZABLE))
-		{
-		    fail("unexpected notifyLoggedIn invoked on identity: " +
-			 NON_SERIALIZABLE);
-		}
-		return;
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertFalse(client.login());
+	    assertFalse(SimpleTestIdentityAuthenticator.allIdentities.
+			getNotifyLoggedIn(NON_SERIALIZABLE));
 	} finally {
 	    client.disconnect();
 	}
@@ -549,21 +537,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(RETURN_NULL);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    fail("expected login failure");	
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-		if (SimpleTestIdentityAuthenticator.allIdentities.
-		        getNotifyLoggedIn(NON_SERIALIZABLE))
-		{
-		    fail("unexpected notifyLoggedIn invoked on identity: " +
-			 NON_SERIALIZABLE);
-		}
-		return;
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertFalse(client.login());
+	    assertFalse(SimpleTestIdentityAuthenticator.allIdentities.
+		        getNotifyLoggedIn(RETURN_NULL));
 	} finally {
 	    client.disconnect();
 	}
@@ -575,21 +551,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(THROW_RUNTIME_EXCEPTION);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    fail("expected login failure");	
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-		if (SimpleTestIdentityAuthenticator.allIdentities.
-		        getNotifyLoggedIn(NON_SERIALIZABLE))
-		{
-		    fail("unexpected notifyLoggedIn invoked on identity: " +
-			 NON_SERIALIZABLE);
-		}
-		return;
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertFalse(client.login());
+	    assertFalse(SimpleTestIdentityAuthenticator.allIdentities.
+			getNotifyLoggedIn(THROW_RUNTIME_EXCEPTION));
 	} finally {
 	    client.disconnect();
 	}
@@ -600,16 +564,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client1 = new DummyClient(name);
 	DummyClient client2 = new DummyClient(name);
 	int port = serverNode.getAppPort();
-	client1.connect(port).login();
 	try {
-	    client2.connect(port).login();
-	    fail("expected client2 login failure");
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertTrue(client1.connect(port).login());
+	    assertFalse(client2.connect(port).login());
 	} finally {
 	    client1.disconnect();
 	    client2.disconnect();
@@ -631,9 +588,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client2 = new DummyClient(name);
 	int port = serverNode.getAppPort();
 	try {
-	    client1.connect(port).login();
+	    assertTrue(client1.connect(port).login());
 	    Thread.sleep(100);
-	    client2.connect(port).login();
+	    assertTrue(client2.connect(port).login());
 	    client1.checkDisconnectedCallback(false);
 	    assertTrue(client2.isConnected());
 	    
@@ -648,7 +605,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    client.logout();
 	    assertTrue(client.isConnected());
 	    assertTrue(client.waitForDisconnect());
@@ -662,7 +619,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    checkBindings(1);
 	    client.logout();
 	    client.checkDisconnectedCallback(true);
@@ -694,7 +651,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    new DummyClient(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    checkBindings(1);
 	    client.logout();
 	    client.checkDisconnectedCallback(true);
@@ -710,7 +667,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	String name = "logout";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    client.logout();
 	    if (SimpleTestIdentityAuthenticator.allIdentities.
                     getNotifyLoggedIn(name)) {
@@ -753,7 +710,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		 // throws a non-retryable exception.
 		String name = (i % 2 == 0) ? "client" : "badClient";
 		DummyClient client = new DummyClient(name + String.valueOf(i));
-		client.connect(appPort).login();
+		assertTrue(client.connect(appPort).login());
 	    }
 	    checkBindings(numClients);
 
@@ -797,7 +754,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
@@ -826,7 +783,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
@@ -855,7 +812,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String name = "testClient";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		    public void run() {
 			ClientSession session = (ClientSession)
@@ -876,7 +833,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String name = "testClient";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    GetClientSessionTask task = new GetClientSessionTask(name);
 	    txnScheduler.runTask(task, taskOwner);
 	    try {
@@ -953,7 +910,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    final String counterName = "counter";
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    for (int i = 0; i < numAdditionalNodes; i++) {
 		addNodes(Integer.toString(i));
 	    }
@@ -1101,7 +1058,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    final int numMessages = 3;
 	    for (int i = 0; i < numMessages; i++) {
 		txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -1156,7 +1113,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    txnScheduler.runTask(
 		new TestAbstractKernelRunnable() {
 		    int tryCount = 0;
@@ -1201,7 +1158,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLocalSendPerformance() throws Exception {
 	final String user = "dummy";
 	DummyClient client = (new DummyClient(user)).connect(serverNode.getAppPort());
-	client.login();
+	assertTrue(client.login());
 
 	isPerformanceTest = true;
 	int numIterations = 1000;
@@ -1225,12 +1182,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testRemoveSessionWhileSessionDisconnects() throws Exception {
 	final String user = "foo";
 	DummyClient client = new DummyClient(user);
-	client.connect(serverNode.getAppPort()).login();
+	assertTrue(client.connect(serverNode.getAppPort()).login());
 	client.sendMessage(new byte[0]);
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
-    */
+
     public void testClientSessionReceiveRelocateNotification() throws Exception {
 	DummyClient client = createClientToRelocate("newNode");
 	client.disconnect();
@@ -1305,7 +1262,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testRelocateWithInterveningClientLoginBlockingRelocate()
+    public void testRelocateWithInterveningClientLoginRejected()
 	throws Exception
     {
 	String newNodeHost = "newNode";
@@ -1314,20 +1271,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	try {
 	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
-	    otherClient.connect(newPort).login();
-	    int objectCount = getObjectCount();
-	    client.relocate(newPort, true, false);
-	    waitForExpectedObjectCount(
-		objectCount - MANAGED_OBJECTS_PER_SESSION);
+	    assertFalse(otherClient.connect(newPort).login());
+	    client.relocate(newPort, true, true);
 	    checkBindings(1);
-	    assertTrue(client.receivedDisconnectedCallback);
-	    assertFalse(client.graceful);
+	    assertFalse(client.receivedDisconnectedCallback);
 	} finally {
 	    client.disconnect();
 	}
     }
 
-    public void testRelocateWithInterveningClientLoginPreempted()
+    public void testRelocateWithLoginPreemptedAfterRelocate()
 	throws Exception
     {
 	String newNodeHost = "newNode";
@@ -1337,14 +1290,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	try {
 	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
-	    otherClient.connect(newPort).login();
-	    int objectCount = getObjectCount();
 	    client.relocate(newPort, true, true);
-	    waitForExpectedObjectCount(
-		objectCount - MANAGED_OBJECTS_PER_SESSION);
+	    int objectCount = getObjectCount();
+	    assertTrue(otherClient.connect(newPort).login());
+	    //waitForExpectedObjectCount(objectCount);
 	    checkBindings(1);
-	    assertTrue(otherClient.receivedDisconnectedCallback);
-	    assertFalse(otherClient.graceful);
+	    assertTrue(client.receivedDisconnectedCallback);
+	    assertFalse(client.graceful);
 	} finally {
 	    client.disconnect();
 	}
@@ -1399,8 +1351,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = createClientToRelocate(newNodeHost);
 	checkBindings(1);
 	try {
-	    // Simulate oldNode crashing by having client not connect to
-	    // newNode by the timeout period.
+	    // Shutdown new node, and wait before checking if
+	    // session's persistent data has been cleaned up.
 	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	    newNode.shutdown(false);
 	    Thread.sleep(WAIT_TIME);
@@ -1430,7 +1382,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	addNodes(newNodeHost);
 	DummyClient client = new DummyClient(name);
-	client.connect(serverNode.getAppPort()).login();
+	assertTrue(client.connect(serverNode.getAppPort()).login());
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	System.err.println("reassigning identity:" + name +
 			   " from server node to host: " +
@@ -1536,7 +1488,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    client.sendMessagesInSequence(
 		numMessages, expectedMessages, exception);
 	} finally {
@@ -1768,9 +1720,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	/**
 	 * Waits for a login acknowledgement, and returns {@code true} if
-	 * login was successful, {@code false} if login was redirected,
-	 * otherwise a {@code RuntimeException} is thrown because the login
-	 * operation timed out before being acknowledged.
+	 * login was successful, {@code false} if login was redirected or
+	 * failed, otherwise a {@code RuntimeException} is thrown because
+	 * the login operation timed out before being acknowledged.
 	 */
 	boolean waitForLogin() {
 	    synchronized (lock) {
@@ -1785,15 +1737,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    if (loginRedirect == true) {
 			return false;
 		    }
-		    if (!loginSuccess) {
-			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
-		    }
+		    return loginSuccess;
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
 			toString() + " login timed out", e);
 		}
 	    }
-	    return true;
 	}
 
 	void relocate(int newPort, boolean useValidKey, boolean shouldSucceed) {
