@@ -1013,7 +1013,7 @@ public class TestDataServiceImpl{
     }
     @Test 
     public void testGetServiceBindingForUpdateAborting() throws Exception {
-	testAborting(getServiceBinding);
+	testAborting(getServiceBindingForUpdate);
     }
     @Test
     public void testGetBindingForUpdateAborted() throws Exception {
@@ -1021,7 +1021,7 @@ public class TestDataServiceImpl{
     }
     @Test 
     public void testGetServiceBindingForUpdateAborted() throws Exception {
-	testAborted(getServiceBinding);
+	testAborted(getServiceBindingForUpdate);
     }
     @Test
     public void testGetBindingForUpdateBeforeCompletion() throws Exception {
@@ -1031,7 +1031,7 @@ public class TestDataServiceImpl{
     public void testGetServiceBindingForUpdateBeforeCompletion()
 	throws Exception
     {
-	testBeforeCompletion(getServiceBinding);
+	testBeforeCompletion(getServiceBindingForUpdate);
     }
     @Test 
     public void testGetBindingForUpdatePreparing() throws Exception {
@@ -1039,7 +1039,7 @@ public class TestDataServiceImpl{
     }
     @Test 
     public void testGetServiceBindingForUpdatePreparing() throws Exception {
-	testPreparing(getServiceBinding);
+	testPreparing(getServiceBindingForUpdate);
     }
     @Test 
     public void testGetBindingForUpdateCommitting() throws Exception {
@@ -1047,7 +1047,7 @@ public class TestDataServiceImpl{
     }
     @Test 
     public void testGetServiceBindingForUpdateCommitting() throws Exception {
-	testCommitting(getServiceBinding);
+	testCommitting(getServiceBindingForUpdate);
     }
     @Test 
     public void testGetBindingForUpdateCommitted() throws Exception {
@@ -1055,7 +1055,7 @@ public class TestDataServiceImpl{
     }
     @Test 
     public void testGetServiceBindingForUpdateCommitted() throws Exception {
-	testCommitted(getServiceBinding);
+	testCommitted(getServiceBindingForUpdate);
     }
     @Test 
     public void testGetBindingForUpdateShuttingDownExistingTxn()
@@ -1067,7 +1067,7 @@ public class TestDataServiceImpl{
     public void testGetServiceBindingForUpdateShuttingDownExistingTxn()
 	throws Exception
     {
-	testShuttingDownExistingTxn(getServiceBinding);
+	testShuttingDownExistingTxn(getServiceBindingForUpdate);
     }
     @Test 
     public void testGetBindingForUpdateShuttingDownNewTxn() throws Exception {
@@ -1077,7 +1077,7 @@ public class TestDataServiceImpl{
     public void testGetServiceBindingForUpdateShuttingDownNewTxn()
 	throws Exception
     {
-	testShuttingDownNewTxn(getServiceBinding);
+	testShuttingDownNewTxn(getServiceBindingForUpdate);
     }
     @Test 
     public void testGetBindingForUpdateShutdown() throws Exception {
@@ -1085,7 +1085,7 @@ public class TestDataServiceImpl{
     }
     @Test 
     public void testGetServiceBindingForUpdateShutdown() throws Exception {
-        testShutdown(getServiceBinding);
+        testShutdown(getServiceBindingForUpdate);
     }
 
     @Test 
@@ -1162,8 +1162,8 @@ public class TestDataServiceImpl{
                 DummyManagedObject result =
                     (DummyManagedObject) service.getBindingForUpdate("dummy");
                 assertEquals(dummy, result);
-                result =
-                    (DummyManagedObject) service.getServiceBinding("dummy");
+                result = (DummyManagedObject)
+		    service.getServiceBindingForUpdate("dummy");
                 assertEquals(serviceDummy, result);
         }}, taskOwner);
     }
@@ -1218,20 +1218,17 @@ public class TestDataServiceImpl{
         properties.setProperty(DataStoreImplClassName + ".directory", dir);
 	properties.setProperty(getLockTimeoutPropertyName(properties), "500");
         properties.setProperty("com.sun.sgs.txn.timeout", "1000");
-	System.err.println("A");
         serverNodeRestart(properties, true);
-	System.err.println("B");
 
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = new DummyManagedObject();
-                dummy.setValue("a");
                 service.setBinding("dummy", dummy);
                 dummy.setNext(new DummyManagedObject());
         }}, taskOwner);
 
-        final Semaphore mainFlag = new Semaphore(0);
-        final Semaphore threadFlag = new Semaphore(0);
+        final Semaphore readFlag = new Semaphore(0);
+        final Semaphore writeFlag = new Semaphore(0);
 
         /* Semaphore to record when we are done -- both threads must release */
         final Semaphore doneFlag = new Semaphore(2); 
@@ -1247,10 +1244,10 @@ public class TestDataServiceImpl{
 		    /* Read lock bound object */
                     dummy = (DummyManagedObject) service.getBinding("dummy");
 		    /* Notify other thread */
-                    mainFlag.release();
+                    readFlag.release();
 		    /* Other thread should block */
                     assertFalse(
-			threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+			writeFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
                     doneFlag.release();
                 } catch (Throwable t) {
                     /* We don't expect any non-retryable exceptions */
@@ -1271,12 +1268,11 @@ public class TestDataServiceImpl{
             public void run() throws Exception {
                 try {
 		    /* Wait for other thread to read lock bound object */
-                    assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
+                    assertTrue(readFlag.tryAcquire(1, TimeUnit.SECONDS));
 		    /* Write lock bound object -- should block */
-                    DummyManagedObject dummy2 = (DummyManagedObject)
-			service.getBindingForUpdate("dummy");
+		    service.getBindingForUpdate("dummy");
 		    /* Notify other thread */
-                    threadFlag.release();
+                    writeFlag.release();
                     doneFlag.release();
                 } catch (Throwable t) {
                     /* We don't expect any non-retryable exceptions */
@@ -3062,6 +3058,10 @@ public class TestDataServiceImpl{
         }}, taskOwner);
     }
 
+    /**
+     * Test getting the object ID for a stale object that is considered
+     * transient because stale object detection is turned off.
+     */
     @Test 
     public void testGetObjectIdPreviousTxn() throws Exception {
 	final AtomicReference<BigInteger> id =
@@ -5801,9 +5801,6 @@ public class TestDataServiceImpl{
 	    }
 	    left = service.createReference(new ObjectWithRemoval(depth));
 	    right = service.createReference(new ObjectWithRemoval(depth));
-	}
-	ObjectWithRemoval getLeftChild() {
-	    return left != null ? left.get() : null;
 	}
 	public void removingObject() {
 	    removingCalled = true;
