@@ -75,7 +75,7 @@
           <artifactId>maven-license-plugin</artifactId>
 	  <executions>
 	    <execution>
-	      <id>check-NOTICE</id>
+	      <id>check-notice</id>
 	      <phase>compile</phase>
 	    </execution>
 	  </executions>
