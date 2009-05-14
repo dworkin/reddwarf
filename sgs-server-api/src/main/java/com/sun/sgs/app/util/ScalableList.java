@@ -1038,14 +1038,12 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	TreeNode(ScalableList<E> list, TreeNode<E> parent, boolean isSplit) {
 	    this(list);
 
-	    ListNode<E> n;
 	    if (!isSplit) {
-		n = new ListNode<E>(this, bucketSize);
+		ListNode<E> n = new ListNode<E>(this, bucketSize);
 		DataManager dm = AppContext.getDataManager();
 		size = n.size();
 		childRef = dm.createReference((Node<E>) n);
 	    } else {
-		n = null;
 		size = 0;
 		childRef = null;
 	    }
@@ -1628,7 +1626,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		entry = currentListNode.remove(null, 0);
 		if (--size == 0 && next != null) {
 		    currentListNode = next;
-		    next = next.next();
 		    size = currentListNode.size();
 		}
 

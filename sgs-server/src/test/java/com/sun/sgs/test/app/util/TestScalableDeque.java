@@ -109,7 +109,7 @@ public class TestScalableDeque extends Assert {
 		}
 	    }, taskOwner);
 	// removal is asynchronous, so wait
-	Thread.sleep(2000);
+	Thread.sleep(4000);
 	int countAfterRemove = getObjectCount();
 	System.err.println("countAfterRemove: " + countAfterRemove);
 	assertEquals(originalCount, countAfterRemove);
