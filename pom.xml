@@ -84,7 +84,7 @@
         <artifactId>maven-license-plugin</artifactId>
 	<executions>
 	  <execution>
-	    <id>check-LICENSE</id>
+	    <id>check-license</id>
 	    <phase>compile</phase>
 	  </execution>
 	</executions>
