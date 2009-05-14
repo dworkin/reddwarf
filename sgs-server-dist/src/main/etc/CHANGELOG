@@ -9,7 +9,7 @@ Version 0.9.10:
   protocols, and authenticators into a separate sgs-server-internal-api.jar
   file (issue #162)
 - Also fix issues #5, #44, #48, #73, #82, #89, #98, #130, #131, #136, #142,
-  #143, #144, #149, #151, #152, #153, #154, #155, #158, #160
+  #143, #144, #149, #151, #152, #153, #154, #155, #158, #160, #163
 
 Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)
