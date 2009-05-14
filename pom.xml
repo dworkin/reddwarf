@@ -146,7 +146,7 @@
           <version>${maven-license-plugin.version}</version>
 	  <executions>
 	    <execution>
-	      <id>check-NOTICE</id>
+	      <id>check-notice</id>
 	      <goals>
 		<goal>check</goal>
 	      </goals>
@@ -159,7 +159,7 @@
 	      </configuration>
 	    </execution>
 	    <execution>
-	      <id>check-LICENSE</id>
+	      <id>check-license</id>
 	      <goals>
 		<goal>check</goal>
 	      </goals>
