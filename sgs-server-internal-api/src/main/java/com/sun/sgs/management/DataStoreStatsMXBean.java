@@ -19,7 +19,7 @@
 
 package com.sun.sgs.management;
 
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.profile.AggregateProfileSample;
 
 /**
@@ -40,7 +40,7 @@ public interface DataStoreStatsMXBean
 
     /**
      * Returns the number of times 
-     * {@link DataStoreImpl#createObject(Transaction) createObject} 
+     * {@link DataStore#createObject(Transaction) createObject} 
      * has been called.
      * @return the number of times {@code createObject} has been called
      */
@@ -48,7 +48,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#getBinding(Transaction, String) getBinding} 
+     * {@link DataStore#getBinding(Transaction, String) getBinding} 
      * has been called.
      * 
      * @return the number of times {@code getBinding} has been called
@@ -57,7 +57,7 @@ public interface DataStoreStatsMXBean
         
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#getClassId(Transaction, byte[]) getClassId} 
+     * {@link DataStore#getClassId(Transaction, byte[]) getClassId} 
      * has been called.
      * 
      * @return the number of times {@code getClassId} has been called
@@ -66,7 +66,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#getClassInfo(Transaction, int) getClassInfo} 
+     * {@link DataStore#getClassInfo(Transaction, int) getClassInfo} 
      * has been called.
      * 
      * @return the number of times {@code getClassInfo} has been called
@@ -75,7 +75,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#getObject(Transaction, long, boolean) getObject} 
+     * {@link DataStore#getObject(Transaction, long, boolean) getObject} 
      * has been called with a {@code false} argument.
      * 
      * @return the number of times {@code getObject} has been called
@@ -84,7 +84,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#getObject(Transaction, long, boolean) getObject} 
+     * {@link DataStore#getObject(Transaction, long, boolean) getObject} 
      * has been called with a {@code true} argument.
      * 
      * @return the number of times {@code getObject} has been called
@@ -93,7 +93,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#markForUpdate(Transaction, long) markForUpdate} 
+     * {@link DataStore#markForUpdate(Transaction, long) markForUpdate} 
      * has been called.
      * 
      * @return the number of times {@code markForUpdate} has been called
@@ -102,7 +102,7 @@ public interface DataStoreStatsMXBean
 
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#nextBoundName(Transaction, String) nextBoundName} 
+     * {@link DataStore#nextBoundName(Transaction, String) nextBoundName} 
      * has been called.
      * 
      * @return the number of times {@code nextBoundName} has been called
@@ -111,7 +111,7 @@ public interface DataStoreStatsMXBean
 
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#nextObjectId(Transaction, long) nextObjectId} 
+     * {@link DataStore#nextObjectId(Transaction, long) nextObjectId} 
      * has been called.
      * 
      * @return the number of times {@code nextObjectId} has been called
@@ -120,7 +120,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#removeBinding(Transaction, String) removeBinding} 
+     * {@link DataStore#removeBinding(Transaction, String) removeBinding} 
      * has been called.
      * 
      * @return the number of times {@code removeBinding} has been called
@@ -129,7 +129,7 @@ public interface DataStoreStatsMXBean
 
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#removeObject(Transaction, long) removeObject}
+     * {@link DataStore#removeObject(Transaction, long) removeObject}
      * has been called.
      * 
      * @return the number of times {@code removeObject} has been called
@@ -138,7 +138,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#setBinding(Transaction, String, long) setBinding} 
+     * {@link DataStore#setBinding(Transaction, String, long) setBinding} 
      * has been called.
      * 
      * @return the number of times {@code setBinding} has been called
@@ -147,7 +147,7 @@ public interface DataStoreStatsMXBean
 
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#setObject(Transaction, long, byte[]) setObject} 
+     * {@link DataStore#setObject(Transaction, long, byte[]) setObject} 
      * has been called.
      * 
      * @return the number of times {@code setObject} has been called
@@ -156,7 +156,7 @@ public interface DataStoreStatsMXBean
     
     /**
      * Returns the number of times
-     * {@link DataStoreImpl#setObjects(Transaction, long[], byte[][]) 
+     * {@link DataStore#setObjects(Transaction, long[], byte[][]) 
      * setObjects} has been called.
      * 
      * @return the number of times {@code setObjects} has been called

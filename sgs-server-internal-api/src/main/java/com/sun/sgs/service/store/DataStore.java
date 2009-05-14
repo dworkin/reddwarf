@@ -17,20 +17,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store;
+package com.sun.sgs.service.store;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.kernel.AccessReporter;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
 import java.io.ObjectStreamClass;
 
 /**
- * Defines the interface to the underlying persistence mechanism that {@link
- * DataServiceImpl} uses to store byte data. <p>
+ * Defines the interface to the underlying persistence mechanism to 
+ * store byte data. <p>
  *
  * Objects are identified by object IDs, which are positive
  * <code>long</code>s.  Names are mapped to object IDs.

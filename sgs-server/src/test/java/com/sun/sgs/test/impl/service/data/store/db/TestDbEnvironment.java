@@ -19,11 +19,12 @@
 
 package com.sun.sgs.test.impl.service.data.store.db;
 
+import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.service.store.db.DbEnvironment;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutMicros;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -164,8 +165,14 @@ public class TestDbEnvironment extends TestCase {
 
     /** Creates an environment using the specified properties. */
     static DbEnvironment getEnvironment(Properties properties) {
-	return DbEnvironmentFactory.getEnvironment(
-	    dbDirectory, properties, dummyScheduler);
+        return (new PropertiesWrapper(properties)).getClassInstanceProperty(
+                DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY,
+                "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment",
+                DbEnvironment.class,
+                new Class<?>[]{
+                    String.class, Properties.class, Scheduler.class
+                },
+                dbDirectory, properties, dummyScheduler);
     }
 
     /** Insures an empty version of the directory exists. */

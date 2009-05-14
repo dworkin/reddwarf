@@ -214,18 +214,7 @@ effect on application nodes.
 <span class="default"><i>${com.sun.sgs.app.root}</i>/dsdb</span>
 <dd>The directory in which to store database files.  Each single node or
   core server node requires its own, unique directory.
-
-</dl>
-
-<a name="Db"></a>
-<h4>Database Properties</h4>
-
-These properties are the subset of the properties supported by
-the <code>DataService</code> that select the implementation of the
-underlying database.  Setting these properties has no effect on
-application nodes.
-<dl>
-
+  
 <a name="com.sun.sgs.impl.service.data.store.db.environment.class"></a>
 <dt>com.sun.sgs.impl.service.data.store.db.environment.class
 <span class="default">
@@ -239,10 +228,13 @@ application nodes.
   selects a database implementation based on
   <a href="http://www.oracle.com/database/berkeley-db/je/index.html">
   Berkeley DB Java Edition</a>.  Other values should specify the fully
-  qualified name of a class that satisfies the requirements specified by
-  the <code>
-  com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory.getEnvironment
-  </code> method. <p>
+  qualified name of a non-abstract class that implements
+  <code>com.sun.sgs.service.store.db.DbEnvironment</code>, and that has a 
+  public constructor with three parameters: a <code>java.util.String</code>,
+  which specifies the directory containing database files, a 
+  <code>java.util.Properties</code>, which specifies configuration options,
+  and a <code>com.sun.sgs.impl.service.data.store.Scheduler</code>,
+  which the implementation can use to run asynchronous, periodic tasks. <p>
 
   Note that persistent data created using Berkeley DB is incompatible
   with data created using Berkeley DB Java edition

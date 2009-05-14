@@ -37,7 +37,6 @@ import com.sun.sgs.nio.channels.Channels;
 import com.sun.sgs.nio.channels.ManagedChannelFactory;
 import com.sun.sgs.nio.channels.ProtocolFamily;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
-import com.sun.sgs.impl.nio.DefaultAsyncChannelProvider;
 
 /**
  * Service-provider class for asynchronous channels.
@@ -68,10 +67,18 @@ import com.sun.sgs.impl.nio.DefaultAsyncChannelProvider;
  * NOT IMPLEMENTED: {@code openAsynchronousFileChannel}
  */
 public abstract class AsynchronousChannelProvider {
+    
+    /** Name of the system property to use to get the provider class. */
+    private static final String PROVIDER_PROPERTY = 
+            "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider";
+    
+    /** Name of the default provider class to use. */
+    private static final String DEFAULT_PROVIDER = 
+            "com.sun.sgs.impl.nio.ReactiveAsyncChannelProvider";
 
     /** Mutex held while accessing the provider instance. */
     private static final Object lock = new Object();
-
+    
     /** The system-wide provider singleton instance. */
     private static AsynchronousChannelProvider provider = null;
 
@@ -95,17 +102,15 @@ public abstract class AsynchronousChannelProvider {
      * 
      * @return {@true} if the provider was loaded from the property
      */
-    private static boolean loadProviderFromProperty() {
-        String cn = System.getProperty(
-            "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider");
+    private static void loadProviderFromProperty() {
+        String cn = System.getProperty(PROVIDER_PROPERTY);
         if (cn == null) {
-            return false;
+            cn = DEFAULT_PROVIDER;
         }
         try {
             Class<?> c = Class.forName(cn, true,
                 ClassLoader.getSystemClassLoader());
             provider = (AsynchronousChannelProvider) c.newInstance();
-            return true;
         } catch (ClassNotFoundException x) {
             throw new ExceptionInInitializerError(x);
         } catch (IllegalAccessException x) {
@@ -158,10 +163,7 @@ public abstract class AsynchronousChannelProvider {
             return AccessController.doPrivileged(
                 new PrivilegedAction<AsynchronousChannelProvider>() {
                     public AsynchronousChannelProvider run() {
-                        if (loadProviderFromProperty()) {
-                            return provider;
-                        }
-                        provider = DefaultAsyncChannelProvider.create();
+                        loadProviderFromProperty();
                         return provider;
                     }
                 });

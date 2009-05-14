@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db;
+package com.sun.sgs.service.store.db;
 
 /** Thrown when an unexpected database problem occurs. */
 public class DbDatabaseException extends RuntimeException {
