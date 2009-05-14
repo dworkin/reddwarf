@@ -18,7 +18,7 @@ extern "C" {
 
 static fd_set g_master_readset, g_master_writeset, g_master_exceptset;
 static int g_maxfd;
-static char* loginName;
+static char  loginName[] = "smokeTest";
 
 /* A set of flags for the callback function tests-- the flag will
  * be set before a call that should trigger a callback, and then will

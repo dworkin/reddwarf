@@ -1,6 +1,6 @@
 CC=gcc
 AR=ar cru
-DBG = -W -Wall -std=c99 -pedantic
+DBG = -g -W -Wall -std=c99 -pedantic
 OPT = -O
 DEFS = -D__EXTENSIONS__
 INCS = -I. 

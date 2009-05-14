@@ -18,6 +18,7 @@ void channel_joined_cb(sgs_connection *conn,
     *buf = '\0';
     buf = strncat(buf, prefix, strlen(prefix));
     channelName = (char*)sgs_channel_name(channel);
+    printf("channel name = %s\n", channelName);
     buf = strncat(buf, channelName, strlen(channelName));
     if (sgs_session_direct_send(sgs_connection_get_session(conn),
             messageBuffer, strlen(buf))== -1){
@@ -60,6 +61,7 @@ void channel_recv_msg_cb(sgs_connection *conn,
     channelName = (char*)sgs_channel_name(channel);
     buf = strncat(buf, prefix, strlen(prefix));
     buf = strncat(buf, channelName, strlen(channelName));
+    buf = strncat(buf, " ", 1);
     len = strlen(buf);
     copyBuf = buf + len;
     copyBuf = memcpy(copyBuf, msg, msglen);
@@ -87,7 +89,7 @@ void logged_in_cb(sgs_connection *conn,
 
     buf = (char*) messageBuffer;
     *buf = '\0';
-    buf = strncat(buf, "loggedIn:", strlen("loggedIn"));
+    buf = strncat(buf, "loggedIn:", strlen("loggedIn:"));
     buf  = strncat(buf, loginName, strlen(loginName));
     if (sgs_session_direct_send(session, messageBuffer, strlen(messageBuffer) ) == -1){
         printf("error in sending login response to server\n");
@@ -123,7 +125,29 @@ void reconnected_cb(sgs_connection *conn) {
 }
 
 void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
-    inputReceived--;
+    char *buf;
+    char prefix[] = "receivedMessage:";
+    char logoutCmd[] = "logout";
+    int i;
+
+    if (strncmp(logoutCmd, (char*)msg, strlen(logoutCmd)) == 0){
+        if (sgs_connection_logout(conn, 0) == 1){
+            printf("received instructions to logout\n");
+            return;
+        }
+    }
+    
+    buf = (char*)messageBuffer;
+    *buf = '\0';
+    i = strlen(prefix);
+    buf = strncat(buf, prefix, i);
+    buf = memcpy(buf+i, msg, msglen);
+
+    if (sgs_session_direct_send(sgs_connection_get_session(conn),
+            messageBuffer, i+msglen) == -1){
+        printf("error sending receive message ack\n");
+        return;
+    }
     printf("received message callback\n");
 }
 

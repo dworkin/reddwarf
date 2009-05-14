@@ -25,10 +25,10 @@ LIBS += -lsgsclient
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
 
 smokeTestClient : smokeTestClient.c testCallbacks.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<  testCallbacks.o $(LIBS) $(LDLIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -g -o $@ $<  testCallbacks.o $(LIBS) $(LDLIBS)
 
 testCallbacks.o : testCallbacks.c testCallbacks.h
-		$(CC) $(CFLAGS) -c testCallbacks.c 
+		$(CC) $(CFLAGS) -g  -c testCallbacks.c 
 clean:
 	-/bin/rm -rf $(OBJDIR)/*.o
 

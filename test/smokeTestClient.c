@@ -160,7 +160,6 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    loginName = "smokeTest";
     sgs_connection_login(connection, loginName, loginName);
 
     waitForInput(connection);
