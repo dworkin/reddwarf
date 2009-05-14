@@ -18,44 +18,37 @@
  */
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import com.sun.sgs.auth.Identity;
-
 /**
- * Edges in our affinity graph.  Edges are between two vertices, and
+ * Weighted edges in our affinity graph.  Edges are between two vertices, and
  * contain a weight for the number of times both vertices (identities)
  * have accessed the object this edge represents since the edge was
  * first created.
  */
-public class AffinityEdge {
+public class AffinityEdge extends WeightedEdge {
     // the object this edge represents
     private final Object objId;
-    // the number of times this object has been accessed by the two vertices
-    private long weight = 1;
-    
-    // one of the vertices, used to track which vertex has accessed the object
-    private final Identity v1Ident;
-    // the number of times v1Ident accessed the object
-    private long v1Count;
-    // the number of times the other vertex (not v1Ident) accessed the object
-    private long v2Count;
     
     /**
-     * Create a new edge.
+     * Create a new edge with initial weight {@code 1}.
      * 
      * @param id  the object id of the object this edge represents
-     * @param vertex one of the vertices, used to track the number of times
-     *               each vertex accesses the object
      */
-    AffinityEdge(Object id, Identity vertex) {
-        super();
+    AffinityEdge(Object id) {
+        this(id, 1);
+    }
+    
+    /**
+     * Create a new edge with the given initial weight.
+     * 
+     * @param id  the object id of the object this edge represents
+     * @param value the initial weight value
+     */
+    AffinityEdge(Object id, long value) {
+        super(value);
         if (id == null) {
             throw new NullPointerException("id must not be null");
         }
-        if (vertex == null) {
-            throw new NullPointerException("vertex must not be null");
-        }
         objId = id;
-        v1Ident = vertex;
     }
 
     /**
@@ -67,41 +60,8 @@ public class AffinityEdge {
         return objId;
     }
 
-    /**
-     * Returns the weight of this edge, which is the number of times both
-     * vertices accessed the object since this edge was created.
-     * 
-     * @return the weight of this edge
-     */
-    public long getWeight() {
-        return weight;
-    }
-
     /** {@inheritDoc} */
     public String toString() {
-        return "E:" + objId + ":" + weight;
-    }
-    
-    /*  Package private methods */
-    
-    /**
-     * Perform bookkeeping for an object access.
-     * 
-     * We want the edge weight to be updated only when both vertices have
-     * accessed the object, so we track their accesses individually.  
-     * 
-     * @param id  the identity which accessed the object
-     */
-    synchronized void noteObjectAccess(Identity id) {
-        if (id.equals(v1Ident)) {
-            v1Count++;
-        } else {
-            v2Count++;
-        }
-        if (v1Count > 0 && v2Count > 0) {
-            v1Count--;
-            v2Count--;
-            weight++;
-        }
+        return "E:" + objId + ":" + getWeight();
     }
 }

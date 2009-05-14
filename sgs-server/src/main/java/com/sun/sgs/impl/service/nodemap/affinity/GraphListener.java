@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.SystemIdentity;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
@@ -32,17 +33,35 @@ import java.util.Properties;
  * A listener which detects object uses by Identities within tasks.
  */
 public class GraphListener implements ProfileListener {
-    // the affinity graph builder used by the system
+    // the base name for properties
+    private static final String PROP_BASE = GraphListener.class.getName();
+    
+    /**
+     * The public property for specifying the graph builder class.
+     */
+    public static final String GRAPH_CLASS_PROPERTY =
+	PROP_BASE + ".graphbuilder.class";
+    
+    // the affinity graph builder
     private final GraphBuilder builder;
 
     /**
      * Constructs a new listener instance.  This listener is constructed
-     * by the kernel, and always used.
+     * and registered by the kernel.
      * 
      * @param properties application properties
      */
     public GraphListener(Properties properties) {
-        builder = new GraphBuilder(properties);
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        String builderClass = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
+        if (builderClass != null) {
+            builder = wrappedProps.getClassInstanceProperty(
+                        GRAPH_CLASS_PROPERTY, GraphBuilder.class,
+                        new Class[] { Properties.class },
+                        properties);
+        } else {
+            builder = new WeightedGraphBuilder(properties);
+        }
     }
     
     /** {@inheritDoc} */
@@ -67,15 +86,13 @@ public class GraphListener implements ProfileListener {
 	if (detail == null) {
             return;
         }
-        
-        // TODO want to make this call in a separate thread, so 
-        // we don't hold up other listeners?
+
         builder.buildGraph(owner, detail);
     }
     
     /**
      * Returns the current graph, with identities as vertices, and 
-     * weighted edges representing each object accessed by both identity
+     * edges representing each object accessed by both identity
      * endpoints.
      * 
      * @return the folded graph of accesses

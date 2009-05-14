@@ -24,17 +24,20 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityEdge;
+import com.sun.sgs.impl.service.nodemap.affinity.BipartiteGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.WeightedGraphBuilder;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.test.util.UtilReflection;
-import com.sun.sgs.tools.test.FilteredNameRunner;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,14 +46,23 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  *  Tests for the graph listener
  *
  */
-@RunWith(FilteredNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestGraphListener {
 
+   @Parameterized.Parameters
+    public static Collection data() {
+        return Arrays.asList(
+                new Object[][] {{"default"}, 
+                                {WeightedGraphBuilder.class.getName()},
+                                {BipartiteGraphBuilder.class.getName()}});
+    }
+   
     private static Class<?> profileReportImplClass;
     private static Constructor<?> profileReportImplConstructor;
     private static Method setAccessedObjectsDetailMethod;
@@ -73,9 +85,27 @@ public class TestGraphListener {
     // The listener created for each test
     GraphListener listener;
 
+    private final String builderName;
+    /**
+     * Create this test class.
+     * @param testType the type of profile data to create
+     */
+    public TestGraphListener(String builderName) {
+        if (builderName.equals("default")) {
+            this.builderName = null;
+        } else {
+            this.builderName = builderName;
+        }
+        System.err.println("Graph builder used is: " + builderName);
+    }
+    
     @Before
     public void beforeEachTest() throws Exception {
-        listener = new GraphListener(new Properties());
+        Properties p = new Properties();
+        if (builderName != null) {
+            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+        }
+        listener = new GraphListener(p);
     }
     
     @Test
@@ -158,9 +188,8 @@ public class TestGraphListener {
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        Collection<AffinityEdge> edges = graph.getEdges();
-        for (AffinityEdge edge : edges) {
-            Assert.assertEquals(1, edge.getWeight());
+        for (AffinityEdge e : graph.getEdges()) {
+            Assert.assertEquals(1, e.getWeight()); 
         }
     }
     
@@ -184,9 +213,8 @@ public class TestGraphListener {
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        Collection<AffinityEdge> edges = graph.getEdges();
-        for (AffinityEdge edge : edges) {
-            Assert.assertEquals(1, edge.getWeight());
+        for (AffinityEdge e : graph.getEdges()) {
+            Assert.assertEquals(1, e.getWeight());
         }
         
         report = makeReport(new IdentityImpl("something"));     
@@ -200,9 +228,8 @@ public class TestGraphListener {
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        edges = graph.getEdges();
-        for (AffinityEdge edge : edges) {
-            Assert.assertEquals(2, edge.getWeight());
+        for (AffinityEdge e : graph.getEdges()) {
+            Assert.assertEquals(2, e.getWeight()); 
         }
         
         report = makeReport(new IdentityImpl("something"));     
@@ -215,12 +242,12 @@ public class TestGraphListener {
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        edges = graph.getEdges();
-        // don't expect edge weight to have been updated
-        for (AffinityEdge edge : edges) {
-            Assert.assertEquals(2, edge.getWeight());
+        for (AffinityEdge e : graph.getEdges()) {
+            // don't expect edge weight to have been updated
+            Assert.assertEquals(2, e.getWeight());
         }
     }
+    
     @Test
     public void testIgnoreSystem() throws Exception {
         ProfileReport report = makeReport(new SystemIdentity("system"));
@@ -288,6 +315,51 @@ public class TestGraphListener {
         System.out.println("New Graph: " + graph);
         Assert.assertEquals(6, graph.getEdgeCount());
         Assert.assertEquals(4, graph.getVertexCount());
+    }
+    
+    @Test
+    public void testThreeIdentMultOneObject() throws Exception {
+        Identity identA = new IdentityImpl("A");
+        Identity identB = new IdentityImpl("B");
+        Identity identC = new IdentityImpl("C");
+        ProfileReport report = makeReport(identA);
+        AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+        report = makeReport(identA);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+        
+        report = makeReport(identB);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        detail.addAccess(new String("obj1"));
+        detail.addAccess(new String("obj1"));   
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+             
+        report = makeReport(identC);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        detail.addAccess(new String("obj1"));  
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+        
+        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        System.out.println(graph);
+        Assert.assertEquals(3, graph.getEdgeCount());
+        Assert.assertEquals(3, graph.getVertexCount());
+        
+        System.out.println("Graph is : ");
+        System.out.println(graph);
+        
+        for (AffinityEdge e : graph.getEdges()) {
+            // don't expect edge weight to have been updated
+            Assert.assertEquals(2, e.getWeight());
+        }
     }
 
     /* Utility methods and classes. */
