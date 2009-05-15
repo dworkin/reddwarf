@@ -1,16 +1,18 @@
 Version 0.9.10:
-- Add a locking AccessCoordinator and add a configuration option for
-  specifying the access coordinator (issue #138)
+- Add DataManager.getObjectId (issue #99) and
+  DataManager.getBindingForUpdate (issue #120)
 - AppListener no longer extends ManagedObject (issue #108)
-- Service startup is modified so a guaranteed set of services is always
-  started, allowing services to use services that are started after them
-  (issue #145)
 - Split internal API classes used to write custom services, transports,
   protocols, and authenticators into a separate sgs-server-internal-api.jar
   file (issue #162)
-- Also fix issues #5, #44, #48, #73, #82, #89, #98, #113, #126, 130, #131, 
-  #136, #142, #143, #144, #149, #151, #152, #153, #154, #155, #158, #160,
-  #163
+- Service startup is modified so a guaranteed set of services is always
+  started, allowing services to use services that are started after them
+  (issue #145)
+- Add a locking AccessCoordinator and add a configuration option for
+  specifying the access coordinator (issue #138)
+- Also fix issues #5, #44, #48, #61, #73, #82, #89, #98, #109, #113,
+  #115, #126, #130, #131, #136, #142, #143, #144, #149, #151, #152,
+  #153, #154, #155, #158, #160, #163
 
 Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)

@@ -69,7 +69,7 @@ final class Context extends TransactionContext implements TransactionListener {
      * Stores information about managed references.  This field is logically
      * part of the ManagedReferenceImpl class.
      */
-    final ReferenceTable refs = new ReferenceTable();
+    final ReferenceTable refs;
 
     /**
      * A map that records all managed objects that are currently having
@@ -85,7 +85,8 @@ final class Context extends TransactionContext implements TransactionListener {
 	    Transaction txn,
 	    int debugCheckInterval,
 	    boolean detectModifications,
-	    ClassesTable classesTable)
+	    ClassesTable classesTable,
+	    boolean trackStaleObjects)
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
@@ -95,6 +96,7 @@ final class Context extends TransactionContext implements TransactionListener {
 	this.txn = txn;
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	refs = new ReferenceTable(trackStaleObjects);
 	classSerial = classesTable.createClassSerialization(this.txn);
 	txn.registerListener(this);
 	if (logger.isLoggable(Level.FINER)) {
@@ -135,10 +137,15 @@ final class Context extends TransactionContext implements TransactionListener {
     /* -- Methods for bindings -- */
 
     /** Obtains the object associated with the specified internal name. */
-    ManagedObject getBinding(String internalName) {
+    ManagedObject getBinding(String internalName, boolean forUpdate) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	ManagedObject result = (ManagedObject) getReference(id).get(false);
+	ManagedObject result;
+	if (forUpdate) {
+	    result = (ManagedObject) getReference(id).getForUpdate(false);
+	} else {
+	    result = (ManagedObject) getReference(id).get(false);
+	}
 	store.setBindingDescription(txn, internalName, result);
 	return result;
     }

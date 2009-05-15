@@ -36,6 +36,8 @@ class DataServiceStats implements DataServiceMXBean {
     // the profiled operations
     final ProfileOperation createRefOp;
     final ProfileOperation getBindingOp;
+    final ProfileOperation getBindingForUpdateOp;
+    final ProfileOperation getObjectIdOp;
     final ProfileOperation markForUpdateOp;
     final ProfileOperation nextBoundNameOp;
     final ProfileOperation removeBindingOp;
@@ -43,6 +45,7 @@ class DataServiceStats implements DataServiceMXBean {
     final ProfileOperation setBindingOp;
     final ProfileOperation createRefForIdOp;
     final ProfileOperation getServiceBindingOp;
+    final ProfileOperation getServiceBindingForUpdateOp;
     final ProfileOperation nextObjIdOp;
     final ProfileOperation nextServiceBoundNameOp;
     final ProfileOperation removeServiceBindingOp;
@@ -60,6 +63,10 @@ class DataServiceStats implements DataServiceMXBean {
             consumer.createOperation("createReference", type, level);
         getBindingOp =
             consumer.createOperation("getBinding", type, level);
+        getBindingForUpdateOp =
+            consumer.createOperation("getBindingForUpdate", type, level);
+        getObjectIdOp =
+	    consumer.createOperation("getObjectId", type, level);
         markForUpdateOp =
             consumer.createOperation("markForUpdate", type, level);
         nextBoundNameOp =
@@ -75,6 +82,8 @@ class DataServiceStats implements DataServiceMXBean {
             consumer.createOperation("createReferenceForId", type, level);
         getServiceBindingOp =
             consumer.createOperation("getServiceBinding", type, level);
+        getServiceBindingForUpdateOp = consumer.createOperation(
+	    "getServiceBindingForUpdate", type, level);
         nextObjIdOp =
             consumer.createOperation("nextObjectId", type, level);
         nextServiceBoundNameOp = 
@@ -101,8 +110,24 @@ class DataServiceStats implements DataServiceMXBean {
     }
 
     /** {@inheritDoc} */
+    public long getGetBindingForUpdateCalls() {
+        return ((AggregateProfileOperation) getBindingForUpdateOp).getCount();
+    }
+
+    /** {@inheritDoc} */
+    public long getGetObjectIdCalls() {
+        return ((AggregateProfileOperation) getObjectIdOp).getCount();
+    }
+
+    /** {@inheritDoc} */
     public long getGetServiceBindingCalls() {
         return ((AggregateProfileOperation) getServiceBindingOp).getCount();
+    }
+
+    /** {@inheritDoc} */
+    public long getGetServiceBindingForUpdateCalls() {
+        return ((AggregateProfileOperation)
+		getServiceBindingForUpdateOp).getCount();
     }
 
     /** {@inheritDoc} */
