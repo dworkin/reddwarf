@@ -1511,7 +1511,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
             curElement = null;
             this.isReverse = isReverse;
 
-            nextElementWasNullOnCreation = nextElement == null;
+            nextElement = null;
+            nextElementWasNullOnCreation = true;
             dequeRef = AppContext.getDataManager().createReference(deque);
             checkForNextElementUpdates();
         }

@@ -23,10 +23,12 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.Delivery;
 
 /**
- * Represents a reliable channel.  Instances of this class handle message
- * delivery details for reliable channel messages.
+ * Represents a channel with ordered message delivery.  The delivery
+ * guarantee may be {@link Delivery#RELIABLE RELIABLE} or {@link
+ * Delivery#ORDERED_UNRELIABLE ORDERED_UNRELIABLE}.  Instances of this 
+ * class handle message delivery details for ordered channel messages.
  */
-class ReliableChannel extends ChannelImpl {
+class OrderedChannel extends ChannelImpl {
     
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
@@ -35,8 +37,8 @@ class ReliableChannel extends ChannelImpl {
      * Constructs an instance with the specified {@code name}, {@code listener},
      * {@code delivery} guarantee, write capacity.
      */
-    ReliableChannel(String name, ChannelListener listener,
-		    Delivery delivery, int writeBufferCapacity)
+    OrderedChannel(String name, ChannelListener listener,
+		   Delivery delivery, int writeBufferCapacity)
     {
 	super(name, listener, delivery, writeBufferCapacity);
     }

@@ -194,33 +194,31 @@ public final class TransactionAwareLogManager extends LogManager {
 	// The root logger will have a 0-length name, in which case we should
 	// return null and let the default LogManager code create the
 	// RootLogger instance correctly.
-	if (name.length() == 0) {
+	if (name == null || name.length() == 0) {
 	    return null;
         }
 	
 	Logger result = super.getLogger(name);
 
-	if (result == null) {
-	    
+	if (result == null) {	    
+            boolean configured = (txnProxy != null);
 	    // if no current Logger associated with that name, create the
 	    // appropriate type of Logger.  If the transactionProxy is null, we
 	    // haven't been configured yet, so create a TransactionalLogger but
 	    // mark it non-transactional.
 	    //
-	    // If we have been configured (txnProxy and name will be non-null),
-	    // see if the requested Logger's name is in the application's
-	    // namespace
-	    result = (txnProxy == null ||
-		      (name != null && name.startsWith(appNamespace))) 
+	    // If we have been configured, see if the requested Logger's name 
+            // is in the application's namespace.
+	    result = (!configured || name.startsWith(appNamespace)) 
 		? new TransactionalLogger(name, null, txnProxy)
 		: new SimpleLogger(name, null);
-	    	    
-	    // there is a change that an application may demand a Logger prior
+
+	    // there is a chance that an application may demand a Logger prior
 	    // to the TxnAwareLogManager being configured with the
 	    // TransactionProxy and the application's namespace.  Therefore, we
 	    // add any such Loggers to a list of unconfigured ones and revisit
 	    // them upon the manager's configuration.
-	    if (txnProxy == null) {
+	    if (!configured && (result instanceof TransactionalLogger)) {
                 unconfiguredLoggers.add((TransactionalLogger) result);
             } else {
 		result.config("This logger now has transactional semantics");

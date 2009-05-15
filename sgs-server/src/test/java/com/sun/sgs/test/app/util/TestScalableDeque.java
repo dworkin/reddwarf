@@ -84,6 +84,8 @@ public class TestScalableDeque extends Assert {
      * Test remove deque.
      */
     @Test public void testRemoveScalableDeque() throws Exception {
+        // wait to avoid side effects from previous tests
+        Thread.sleep(2000);
 	int originalCount = getObjectCount();
 	System.err.println("originalCount: " + originalCount);
 	final String name = "queue";

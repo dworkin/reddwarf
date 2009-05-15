@@ -341,6 +341,15 @@
 
   <!-- Package com.sun.sgs.impl.service.watchdog -->
 
+  <!-- Access to abortCause is safe due to checking current thread at beginning of method -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.transaction.TransactionImpl"/>
+    <Field name="abortCause"/>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.watchdog -->
+
   <!-- Thread is not created with a default empty run method. -->
   <Match>
     <Or>
@@ -376,8 +385,15 @@
   <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->
   <Match>
     <Class name="com.sun.sgs.impl.util.BindingKeyedCollectionsImpl"/>
-    <Feild name="txnProxy"/>
+    <Field name="txnProxy"/>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+  </Match>
+
+  <!-- Default value is ok for transient field -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
+    <Field name="expiration"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
   </Match>
   
 </FindBugsFilter>
