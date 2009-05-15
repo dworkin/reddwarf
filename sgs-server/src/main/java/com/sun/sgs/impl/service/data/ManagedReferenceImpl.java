@@ -336,8 +336,9 @@ final class ManagedReferenceImpl<T>
     }
 
     /**
-     * Like get, but with optional checking of the context.  Suppress the check
-     * if the reference was just obtained from the context.
+     * Like get, but with optional checking of the context.  Checking the
+     * context should only be suppressed if the reference was just obtained
+     * from the context.
      */
     @SuppressWarnings("fallthrough")
     T get(boolean checkContext) {
@@ -414,8 +415,9 @@ final class ManagedReferenceImpl<T>
     }
 
     /**
-     * Like getForUpdate, but with optional checking of the context.  Suppress
-     * the check if the reference was just obtained from the context.
+     * Like getForUpdate, but with optional checking of the context.  Checking
+     * the context should only be suppressed if the reference was just obtained
+     * from the context.
      */
     @SuppressWarnings("fallthrough")
     T getForUpdate(boolean checkContext) {

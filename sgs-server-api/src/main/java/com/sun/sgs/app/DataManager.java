@@ -44,11 +44,11 @@ import java.math.BigInteger;
  * Managed objects are in one of the following states with respect to the data
  * manager: <ul>
  *
- * <li><a name="transient"><b>Transient</b></a> - A managed object that has not
- *     been supplied in a call to {@link #setBinding setBinding}, {@code
- *     createReference}, or {@link #getObjectId getObjectId}.  Transient
- *     objects are not known to the data manager and are not stored
- *     persistently. <p>
+ * <li><a name="transient"><b>Transient</b></a> - A managed object that has
+ *     been created directly by the application and has not been supplied in a
+ *     call to {@link #setBinding setBinding}, {@code createReference}, or
+ *     {@link #getObjectId getObjectId}.  Transient objects are not known to
+ *     the data manager and are not stored persistently. <p>
  *
  *     Passing a transient object to {@code setBinding}, {@code
  *     createReference}, or {@code getObjectId} creates a new entry for the
@@ -72,8 +72,8 @@ import java.math.BigInteger;
  *     create a new entry for that object in the data manager, but rather
  *     reuses the existing one.  Calling {@code removeObject} on a persistent
  *     object removes it from the data manager, meaning it will no longer be
- *     stored persistently, and changes its state to removed.  Note that a
- *     managed object made persistent in the current transaction is
+ *     stored persistently, and changes its state to <i>removed</i>.  Note that
+ *     a managed object made persistent in the current transaction is
  *     automatically marked for update, so there is no need to call {@code
  *     markForUpdate} for such objects, in particular in their
  *     constructors. <p>
@@ -84,7 +84,7 @@ import java.math.BigInteger;
  *     makes an effort to track which managed objects have been removed. <p>
  *
  *     Only persistent managed objects can become removed; calling {@code
- *     removeObject} on a transient managed objects leaves it as a transient
+ *     removeObject} on a transient managed object leaves it as a transient
  *     object.  Passing a removed managed object to {@code setBinding}, {@code
  *     removeObject}, {@code markForUpdate}, {@code createReference}, or {@code
  *     getObjectId}, as well as calling {@code ManagedReference.get} or {@code
@@ -112,16 +112,10 @@ import java.math.BigInteger;
  * Because storing a managed object in a name binding or creating a managed
  * reference to it causes the object to be stored in data manager, applications
  * should insure that they remove such objects if they end up not referring to
- * them persistently.  For example, if an application stores a transient object
- * as the value of a name binding, but replaces that object with another object
- * before the end of the task, it should make sure to remove the unused object
- * from the data manager.  Otherwise, the object will remain stored in the data
- * manager but will not be referenced.  The {@code removeObject} method is
- * designed to thrown no exceptions when called on a transient object so that
- * applications can safely remove such objects even if they are uncertain if
- * the objects have become persistent.  That uncertainty could result from
- * calling methods whose precise usage of managed references or name bindings
- * is not documented. <p>
+ * them persistently.  The {@code removeObject} method does not throw
+ * exceptions when called on a transient object, so applications should call
+ * {@code removeObject} whenever there is an object that may have become
+ * persistent and they are sure is no longer used. <p>
  *
  * Some implementations may need to be notified when managed objects and the
  * objects they refer to are modified, while other implementations may be
