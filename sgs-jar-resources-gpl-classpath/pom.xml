@@ -4,6 +4,13 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <!-- Inherit from the global SGS super POM -->
+  <parent>
+    <groupId>com.projectdarkstar</groupId>
+    <artifactId>sgs</artifactId>
+    <version>14</version>
+  </parent>
+
   <groupId>com.projectdarkstar.tools.build</groupId>
   <artifactId>sgs-jar-resources-gpl-classpath</artifactId>
   <name>Project Darkstar Server GPL Classpath Exception License Bundle</name>
