@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>13</version>
+  <version>14</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -108,6 +108,18 @@
 	      </configuration>
 	    </execution>
 	    <execution>
+	      <id>include-gpl-classpath-license</id>
+	      <goals>
+		<goal>process</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<resourceBundles>
+		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl-classpath:${sgs-jar-resources-gpl-classpath.version}</resourceBundle>
+		</resourceBundles>
+	      </configuration>
+	    </execution>
+	    <execution>
 	      <id>include-bsd-license</id>
 	      <goals>
 		<goal>process</goal>
@@ -122,6 +134,46 @@
 	  </executions>
 	</plugin>
 
+	<!-- The license plugin should be activated in modules that
+	     wish to verify correct headers are included in every source file.
+	     This should be used in conjunction with the remote-resources
+	     plugin above as it checks that the header for each source
+	     file is equal to either the LICENSE or NOTICE file pulled
+	     over by the remote-resources plugin -->
+	<plugin>
+	  <groupId>com.google.code.maven-license-plugin</groupId>
+          <artifactId>maven-license-plugin</artifactId>
+          <version>${maven-license-plugin.version}</version>
+	  <executions>
+	    <execution>
+	      <id>check-notice</id>
+	      <goals>
+		<goal>check</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<header>${basedir}/target/classes/META-INF/NOTICE</header>
+		<includes>
+		  <include>**/*.java</include>
+		</includes>
+	      </configuration>
+	    </execution>
+	    <execution>
+	      <id>check-license</id>
+	      <goals>
+		<goal>check</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<header>${basedir}/target/classes/META-INF/LICENSE</header>
+		<includes>
+		  <include>**/*.java</include>
+		</includes>
+	      </configuration>
+	    </execution>
+	  </executions>
+	</plugin>
+	
       </plugins>
       
     </pluginManagement>
@@ -297,9 +349,11 @@
     
     <projectYear>2009</projectYear>
     
-    <sgs-build-utilities.version>1.0</sgs-build-utilities.version>
-    <sgs-jar-resources-gpl.version>1.0</sgs-jar-resources-gpl.version>
-    <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
+    <sgs-build-utilities.version>1.1</sgs-build-utilities.version>
+    <sgs-jar-resources-gpl.version>1.1</sgs-jar-resources-gpl.version>
+    <sgs-jar-resources-gpl-classpath.version>1.0</sgs-jar-resources-gpl-classpath.version>
+    <sgs-jar-resources-bsd.version>1.1</sgs-jar-resources-bsd.version>
+    <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
 
     <junit.version>4.5</junit.version>
     <easymock.version>2.4</easymock.version>

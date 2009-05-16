@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>5</version>
+    <version>14</version>
   </parent>
 
   <groupId>com.projectdarkstar.tools.build</groupId>
   <artifactId>sgs-build-utilities</artifactId>
   <name>Project Darkstar Build Utilities</name>
   <packaging>jar</packaging>
-  <version>1.0</version>
+  <version>1.1</version>
   <description>
     Build utilities used by the Project Darkstar build process.
     Includes custom checkstyle classes and configuration files.

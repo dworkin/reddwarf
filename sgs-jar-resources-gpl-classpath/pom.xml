@@ -5,14 +5,16 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.projectdarkstar.tools.build</groupId>
-  <artifactId>sgs-jar-resources-bsd</artifactId>
-  <name>Project Darkstar BSD License Bundle</name>
+  <artifactId>sgs-jar-resources-gpl-classpath</artifactId>
+  <name>Project Darkstar Server GPL Classpath Exception License Bundle</name>
   <packaging>jar</packaging>
-  <version>1.1</version>
+  <version>1.0</version>
   <description>
-    Resource bundle of BSD License files for Project Darkstar.
+    Resource bundle of GPL + Classpath Exception License files 
+    for Project Darkstar.
     This package should be included using the remote-resources
-    plugin to bundle a BSD license file into a jar.
+    plugin to bundle a GPL + Classpath Exception license file 
+    into a jar.
   </description>
 
   <build>
