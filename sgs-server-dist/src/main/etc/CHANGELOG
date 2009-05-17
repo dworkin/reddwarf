@@ -10,6 +10,10 @@ Version 0.9.10:
   (issue #145)
 - Add a locking AccessCoordinator and add a configuration option for
   specifying the access coordinator (issue #138)
+- Update license to GPLv2 + classpath exception.  The classpath exception
+  has been applied to all classes in the sgs-server-api and
+  sgs-server-internal-api modules.  The other modules remain as pure
+  GPLv2 (issue #164)
 - Also fix issues #5, #44, #48, #61, #73, #82, #89, #98, #109, #113,
   #115, #126, #130, #131, #136, #142, #143, #144, #149, #151, #152,
   #153, #154, #155, #158, #160, #163
