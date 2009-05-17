@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>13</version>
+    <version>14</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-shared</artifactId>
   <name>Project Darkstar Shared</name>
   <packaging>jar</packaging>
-  <version>1.6</version>
+  <version>1.7</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
@@ -74,6 +74,18 @@
 	  <execution>
 	    <id>include-bsd-license</id>
 	    <phase>generate-resources</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Verify correct license headers in each source code file -->
+      <plugin>
+	<groupId>com.google.code.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>check-license</id>
+	    <phase>compile</phase>
 	  </execution>
 	</executions>
       </plugin>
