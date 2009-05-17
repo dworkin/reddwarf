@@ -249,12 +249,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
+	<version>${maven-checkstyle-plugin.version}</version>
 	<configuration>
 	  <linkXRef>false</linkXRef>
 	  <consoleOutput>true</consoleOutput>
 	  <enableRulesSummary>false</enableRulesSummary>
 	  <configLocation>${checkstyle.config}</configLocation>
-	  <headerLocation>${checkstyle.header.file}</headerLocation>
 	  <packageNamesLocation>
 	    ${checkstyle.packageNames}
 	  </packageNamesLocation>
@@ -354,6 +354,7 @@
     <sgs-jar-resources-gpl-classpath.version>1.0</sgs-jar-resources-gpl-classpath.version>
     <sgs-jar-resources-bsd.version>1.1</sgs-jar-resources-bsd.version>
     <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
+    <maven-checkstyle-plugin.version>2.2</maven-checkstyle-plugin.version>
 
     <junit.version>4.5</junit.version>
     <easymock.version>2.4</easymock.version>
@@ -365,15 +366,6 @@
     <checkstyle.config>
       com/sun/sgs/tools/checkstyle/darkstar_checks.xml
     </checkstyle.config>
-    <checkstyle.header.bsd>
-      com/sun/sgs/tools/checkstyle/BSD.txt
-    </checkstyle.header.bsd>
-    <checkstyle.header.gpl>
-      com/sun/sgs/tools/checkstyle/GPLv2.txt
-    </checkstyle.header.gpl>
-    <checkstyle.header.file>
-      ${checkstyle.header.gpl}
-    </checkstyle.header.file>
     <checkstyle.packageNames>
       com/sun/sgs/tools/checkstyle/packageNames.xml
     </checkstyle.packageNames>
