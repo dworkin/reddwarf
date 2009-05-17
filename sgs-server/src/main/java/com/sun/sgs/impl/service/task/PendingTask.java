@@ -70,6 +70,7 @@ class PendingTask implements ManagedObject, Serializable {
      * @param identity the {@code Identity} of the owner of the task
      */
     PendingTask(Identity identity) {
+        this.taskRef = null;
         this.identity = identity;
 
         this.reusable = true;
