@@ -460,7 +460,7 @@
     <sgs-client.version>0.9.9</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
-    <jung.version>2.0.1-SNAPSHOT</jung.version>
+    <jung.version>2.0</jung.version>
     <sgs-test-ext.version>1.0</sgs-test-ext.version>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
