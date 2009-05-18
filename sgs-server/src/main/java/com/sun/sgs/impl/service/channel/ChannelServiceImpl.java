@@ -733,7 +733,9 @@ public final class ChannelServiceImpl
 	 * TBD: (optimization) this method should handle sending multiple
 	 * messages to a given channel.
 	 */
-	public void send(BigInteger channelRefId, byte[] message) {
+	public void send(BigInteger channelRefId, byte[] message,
+			 byte deliveryOrdinal)
+	{
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -757,6 +759,7 @@ public final class ChannelServiceImpl
 		    return;
 		}
 
+		Delivery delivery = Delivery.values()[deliveryOrdinal];
 		for (BigInteger sessionRefId : localMembers) {
 		    SessionProtocol protocol =
 			sessionService.getSessionProtocol(sessionRefId);
@@ -764,7 +767,7 @@ public final class ChannelServiceImpl
                         try {
                             protocol.channelMessage(channelRefId,
                                                     ByteBuffer.wrap(message),
-                                                    Delivery.RELIABLE);
+                                                    delivery);
                         } catch (IOException ioe) {
                             logger.logThrow(Level.WARNING, ioe,
                                             "channelMessage throws");

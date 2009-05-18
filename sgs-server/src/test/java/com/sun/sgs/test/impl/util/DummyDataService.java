@@ -49,6 +49,9 @@ class DummyDataService
     public ManagedObject getBinding(String name) {
 	throw new UnsupportedOperationException();
     }
+    public ManagedObject getBindingForUpdate(String name) {
+	throw new UnsupportedOperationException();
+    }
     public void setBinding(String name, Object object) {
 	throw new UnsupportedOperationException();
     }
@@ -76,6 +79,9 @@ class DummyDataService
     public <T> ManagedReference<T> createReference(T object) {
 	throw new UnsupportedOperationException();
     }
+    public BigInteger getObjectId(Object object) {
+	throw new UnsupportedOperationException();
+    }
 	
     /* -- Implement DataService -- */
     public ManagedObject getServiceBinding(String name) {
@@ -86,6 +92,9 @@ class DummyDataService
 	    throw new ObjectNotFoundException(obj.toString());
 	}
 	return obj;
+    }
+    public ManagedObject getServiceBindingForUpdate(String name) {
+	throw new UnsupportedOperationException();
     }
     public void setServiceBinding(String name, Object object) {
 	if (removedObjectsContains(object)) {

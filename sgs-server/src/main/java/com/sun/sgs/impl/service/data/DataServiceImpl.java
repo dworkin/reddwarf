@@ -25,6 +25,7 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -116,6 +117,16 @@ import javax.management.JMException;
  *	typically when there is low contention.  Note that setting this flag to
  *	<code>true</code> does not delay write locks when removing objects.<p>
  *
+ * <dt> <i>Property:</i> <code><b>{@value #TRACK_STALE_OBJECTS_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to track references to stale managed
+ *	objects.  If <code>true</code>, the <code>DataService</code> keeps
+ *	track of persistent or removed objects from completed transactions and
+ *	throws {@link TransactionNotActiveException} if the application refers
+ *	to those objects from another transaction. <p>
+ *
  * </dl> <p>
  *
  * The constructor also passes the properties to the {@link DataStoreImpl}
@@ -183,6 +194,10 @@ public final class DataServiceImpl implements DataService {
     public static final String OPTIMISTIC_WRITE_LOCKS =
 	CLASSNAME + ".optimistic.write.locks";
 
+    /** The property that specifies whether to track stale objects. */
+    public static final String TRACK_STALE_OBJECTS_PROPERTY =
+	CLASSNAME + ".track.stale.objects";
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -216,6 +231,9 @@ public final class DataServiceImpl implements DataService {
 
     /** Whether to delay obtaining write locks. */
     final boolean optimisticWriteLocks;
+
+    /** Whether to track stale objects. */
+    private final boolean trackStaleObjects;
 
     /** The data service profiling information. */
     private final DataServiceStats serviceStats;
@@ -299,7 +317,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    return new Context(
 		DataServiceImpl.this, store, txn, debugCheckInterval,
-		detectModifications, classesTable);
+		detectModifications, classesTable, trackStaleObjects);
 	}
     }
 
@@ -408,6 +426,8 @@ public final class DataServiceImpl implements DataService {
 		DATA_STORE_CLASS_PROPERTY);
 	    optimisticWriteLocks = wrappedProps.getBooleanProperty(
 		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
+	    trackStaleObjects = wrappedProps.getBooleanProperty(
+		TRACK_STALE_OBJECTS_PROPERTY, Boolean.FALSE);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
@@ -507,7 +527,13 @@ public final class DataServiceImpl implements DataService {
     /** {@inheritDoc} */
     public ManagedObject getBinding(String name) {
         serviceStats.getBindingOp.report();
-	return getBindingInternal(name, false);
+	return getBindingInternal(name, false, false, "getBinding");
+    }
+
+    /** {@inheritDoc} */
+    public ManagedObject getBindingForUpdate(String name) {
+	serviceStats.getBindingForUpdateOp.report();
+	return getBindingInternal(name, false, true, "getBindingForUpdate");
     }
 
     /** {@inheritDoc} */
@@ -537,15 +563,15 @@ public final class DataServiceImpl implements DataService {
 	    checkManagedObject(object);
 	    context = getContext();
 	    ref = context.findReference(object);
+	    if (object instanceof ManagedObjectRemoval) {
+		context.removingObject((ManagedObjectRemoval) object);
+		/*
+		 * Get the context again in case something changed as a
+		 * result of the call to removingObject.
+		 */
+		getContext();
+	    }
 	    if (ref != null) {
-		if (object instanceof ManagedObjectRemoval) {
-		    context.removingObject((ManagedObjectRemoval) object);
-		    /*
-		     * Get the context again in case something changed as a
-		     * result of the call to removingObject.
-		     */
-		    getContext();
-		}
 		ref.removeObject();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -628,12 +654,46 @@ public final class DataServiceImpl implements DataService {
 	}
     }
 
+    /** {@inheritDoc} */
+    public BigInteger getObjectId(Object object) {
+	serviceStats.getObjectIdOp.report();
+	Context context = null;
+	try {
+	    checkManagedObject(object);
+	    context = getContext();
+	    BigInteger result = context.getReference(object).getId();
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "getObjectId tid:{0,number,#}, type:{1}" +
+			   " returns oid:{2,number,#}",
+			   contextTxnId(context), typeName(object), result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
+		    Level.FINEST, e,
+		    "getObjectId tid:{0,number,#}, type:{1} throws",
+		    contextTxnId(context), typeName(object));
+	    }
+	    throw e;
+	}
+    }
+
     /* -- Implement DataService -- */
 
     /** {@inheritDoc} */
     public ManagedObject getServiceBinding(String name) {
         serviceStats.getServiceBindingOp.report();
-	return getBindingInternal(name, true);
+	return getBindingInternal(name, true, false, "getServiceBinding");
+    }
+
+    /** {@inheritDoc} */
+    public ManagedObject getServiceBindingForUpdate(String name) {
+        serviceStats.getServiceBindingForUpdateOp.report();
+	return getBindingInternal(
+	    name, true, true, "getServiceBindingForUpdate");
     }
 
     /** {@inheritDoc} */
@@ -705,9 +765,14 @@ public final class DataServiceImpl implements DataService {
 
     /* -- Generic binding methods -- */
 
-    /** Implement getBinding and getServiceBinding. */
-    private ManagedObject getBindingInternal(
-	String name, boolean serviceBinding)
+    /**
+     * Implement getBinding, getBindingForUpdate, getServiceBinding, and
+     * getServiceBindingForUpdate.
+     */
+    private ManagedObject getBindingInternal(String name,
+					     boolean serviceBinding,
+					     boolean forUpdate,
+					     String methodName)
     {
 	Context context = null;
 	try {
@@ -718,7 +783,7 @@ public final class DataServiceImpl implements DataService {
 	    ManagedObject result;
 	    try {
 		result = context.getBinding(
-		    getInternalName(name, serviceBinding));
+		    getInternalName(name, serviceBinding), forUpdate);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -728,8 +793,7 @@ public final class DataServiceImpl implements DataService {
 		    Level.FINEST,
 		    "{0} tid:{1,number,#}, name:{2} returns type:{3}," +
 		    " oid:{4,number,#}",
-		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, typeName(result),
+		    methodName, contextTxnId(context), name, typeName(result),
 		    objectId(context, result));
 	    }
 	    return result;
@@ -739,8 +803,7 @@ public final class DataServiceImpl implements DataService {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "{0} tid:{1,number,#}, name:{2} throws",
-		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name);
+		    methodName, contextTxnId(context), name);
 	    }
 	    throw e;
 	}

@@ -15,6 +15,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
 package com.sun.sgs.service;
@@ -46,6 +50,14 @@ public interface TransactionProxy {
      */
     Transaction getCurrentTransaction();
 
+    /**
+     * Returns {@code true} if there is a current transaction, even if the 
+     * transaction has been aborted.
+     * 
+     * @return {@code true} if there is a current transaction
+     */
+    boolean inTransaction();
+    
     /**
      * Returns the owner of the task that is executing the current
      * transaction.
