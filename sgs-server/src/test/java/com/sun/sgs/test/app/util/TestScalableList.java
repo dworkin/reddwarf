@@ -3408,7 +3408,7 @@ public class TestScalableList extends Assert {
 		    list.add(Integer.toString(i));
 		}
                 
-                // place iterators at the end
+                // place iterators at the beginning
 		ListIterator<String> shadowIter =
 			shadow.listIterator();
 		ListIterator<String> listIter =
