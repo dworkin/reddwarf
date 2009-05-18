@@ -3344,6 +3344,92 @@ public class TestScalableList extends Assert {
 	}, taskOwner);
 
     }
+    
+    /**
+     * Test removing an object with an iterator that is at the end of
+     * the list.
+     * 
+     * @throws java.lang.Exception
+     */
+    @Test
+    public void testRemoveFromEndOfList() throws Exception {
+        // create the list
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() throws Exception {
+		List<String> shadow = new ArrayList<String>();
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+                
+                // Populate the lists
+		for (int i = 0; i < 5; i++) {
+		    shadow.add(Integer.toString(i));
+		    list.add(Integer.toString(i));
+		}
+                
+                // place iterators at the end
+		ListIterator<String> shadowIter =
+			shadow.listIterator(5);
+		ListIterator<String> listIter =
+			list.listIterator(5);
+                
+                //get previous item for each list
+                String shadowPrev = shadowIter.previous();
+                String listPrev = listIter.previous();
+                Assert.assertEquals(shadowPrev, listPrev);
+                
+                //remove item from each iterator
+                shadowIter.remove();
+                listIter.remove();
+                
+                //get previous index from each iterator
+                int shadowIndex = shadowIter.previousIndex();
+                int listIndex = listIter.previousIndex();
+                Assert.assertEquals(shadowIndex, listIndex);
+            }
+        }, taskOwner);
+    }
+    
+    /**
+     * Test removing an object with an iterator that is at the beginning of
+     * the list.
+     * 
+     * @throws java.lang.Exception
+     */
+    @Test
+    public void testRemoveFromBeginningOfList() throws Exception {
+        // create the list
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() throws Exception {
+		List<String> shadow = new ArrayList<String>();
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+                
+                // Populate the lists
+		for (int i = 0; i < 5; i++) {
+		    shadow.add(Integer.toString(i));
+		    list.add(Integer.toString(i));
+		}
+                
+                // place iterators at the end
+		ListIterator<String> shadowIter =
+			shadow.listIterator();
+		ListIterator<String> listIter =
+			list.listIterator();
+                
+                //get next item for each list
+                String shadowNext = shadowIter.next();
+                String listNext = listIter.next();
+                Assert.assertEquals(shadowNext, listNext);
+                
+                //remove item from each iterator
+                shadowIter.remove();
+                listIter.remove();
+                
+                //get next index from each iterator
+                int shadowIndex = shadowIter.nextIndex();
+                int listIndex = listIter.nextIndex();
+                Assert.assertEquals(shadowIndex, listIndex);
+            }
+        }, taskOwner);
+    }
 
     /**
      * An object to return both the iterator and the result from the

@@ -2092,7 +2092,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		if (prev != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(prev);
-		    cursor = currentNode.get().size() - 1;
+		    cursor = currentNode.get().size();
 		} else if (next != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(next);
@@ -2374,7 +2374,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		} else if (prev != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(prev);
-		    cursor = currentNode.get().size() - 1;
+		    cursor = currentNode.get().size();
 		} else {
 		    cursor = 0;
 		}
