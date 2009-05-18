@@ -23,6 +23,7 @@ import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -477,15 +478,15 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
 	checkState();
-	if (listener == null) {
-	    throw new NullPointerException("null listener");
-	}
+	checkNonTransactionalContext();
+	checkNull("listener", listener);
         serviceStats.addNodeListenerOp.report();
 	nodeListeners.putIfAbsent(listener, listener);
     }
 
     /** {@inheritDoc} */
     public Node getBackup(long nodeId) {
+	checkState();
         serviceStats.getBackupOp.report();
 	NodeImpl node = (NodeImpl) getNode(nodeId);
 	return
@@ -497,9 +498,8 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public void addRecoveryListener(RecoveryListener listener) {
 	checkState();
-	if (listener == null) {
-	    throw new NullPointerException("null listener");
-	}
+	checkNonTransactionalContext();
+	checkNull("listener", listener);
         serviceStats.addRecoveryListenerOp.report();
 	recoveryListeners.putIfAbsent(listener, listener);
     }
@@ -509,6 +509,8 @@ public final class WatchdogServiceImpl
      */
     public synchronized void reportFailure(long nodeId, String className)
     {
+	checkNull("className", className);
+	checkNonTransactionalContext();
         if (shuttingDown() || !getIsAlive()) {
             return;
         }

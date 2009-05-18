@@ -463,6 +463,14 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @Test public void testGetLocalNodeIdInTxn() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		assertTrue(watchdogService.getLocalNodeId() > 0);
+            }
+        }, taskOwner);
+    }
+
     @Test public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(
@@ -605,14 +613,17 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
-    @Test public void testIsLocalNodeAliveNonTransactionalNoTransaction()
+    @Test public void testIsLocalNodeAliveNonTransactionalNoTransaction() {
+	assertTrue(watchdogService.isLocalNodeAliveNonTransactional());
+    }
+    
+    public void testIsLocalNodeAliveNonTransactionalInTransaction()
 	throws Exception
     {
-	try {
-	    watchdogService.isLocalNodeAliveNonTransactional();
-	} catch (TransactionNotActiveException e) {
-	    fail("caught TransactionNotActiveException!");
-	}
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		watchdogService.isLocalNodeAliveNonTransactional();
+	    }}, taskOwner);
     }
 
     /* -- Test getNodes -- */
@@ -646,7 +657,6 @@ public class TestWatchdogServiceImpl extends Assert {
             }
         }
     }
-
 
     @Test public void testGetNodesServiceShuttingDown() throws Exception {
 	final WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
@@ -772,6 +782,14 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @Test(expected = IllegalStateException.class)
+    public void TestAddNodeListenerInTransaction() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		watchdogService.addNodeListener(new DummyNodeListener());
+            } }, taskOwner);
+    }
+    
     @Test public void testAddNodeListenerNodeStarted() throws Exception {
         DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
@@ -916,6 +934,15 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @Test(expected = IllegalStateException.class)
+    public void TestAddRecoveryListenerInTransaction() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		watchdogService.
+		    addRecoveryListener(new DummyRecoveryListener());
+            } }, taskOwner);
+    }
+    
     /* -- test recovery -- */
 
     @Test public void testRecovery() throws Exception {
@@ -1302,6 +1329,19 @@ public class TestWatchdogServiceImpl extends Assert {
     }
 
     /* --- test shutdown procedures --- */
+
+    @Test(expected = NullPointerException.class)
+    public void testReportFailureNullClassName() {
+	watchdogService.reportFailure(watchdogService.getLocalNodeId(), null);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testReportFailureInTransaction() throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		watchdogService.reportFailure(1, getClass().getName());
+	    }}, taskOwner);
+    }
     
     /** 
      * Check that a node can report a failure and shutdown itself down by
@@ -1357,10 +1397,9 @@ public class TestWatchdogServiceImpl extends Assert {
 
         try {
             // The node should be shut down
-            node.getWatchdogService().isLocalNodeAliveNonTransactional();
-            fail("Expecting an IllegalStateException");
+            assertFalse(node.getWatchdogService().isLocalNodeAliveNonTransactional());
         } catch (IllegalStateException ise) {
-            // Expected
+            // May happen if service is shutting down.
         } catch (Exception e) {
             fail ("Not expecting an Exception");
         }
