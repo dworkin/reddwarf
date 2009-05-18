@@ -15,6 +15,20 @@ Version 0.9.10
   This addresses issue #48, allowing an application to start tasks
   that are owned by new identities.
 
+- Add a method for getting a name binding for update
+
+  The method DataManager.getBindingForUpdate(String) has been added.
+
+- Add a convenience method for getting the object ID of an object
+  directly, rather than from the associated ManagedReference
+
+  The method DataManager.getObjectId() has been added.
+
+- Clarify the states of managed objects
+
+  The DataManager class documentation has been updated to explain the
+  various states of managed objects.
+
 Version 0.9.9
 
 - Add support for specifying a delivery guarantee on session messages

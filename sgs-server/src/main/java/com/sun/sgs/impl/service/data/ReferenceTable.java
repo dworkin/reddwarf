@@ -20,6 +20,8 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.util.WeakIdentityMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -32,6 +34,12 @@ import java.util.TreeMap;
  */
 final class ReferenceTable {
 
+    /**
+     * A map whose keys are stale managed objects, if tracking stale objects.
+     */
+    private static final WeakIdentityMap<Object, Boolean>
+	staleObjects = new WeakIdentityMap<Object, Boolean>();
+
     /** Maps object IDs to managed references. */
     private final SortedMap<Long, ManagedReferenceImpl<?>> oids =
 	new TreeMap<Long, ManagedReferenceImpl<?>>();
@@ -43,8 +51,17 @@ final class ReferenceTable {
     private final Map<ManagedObject, ManagedReferenceImpl<?>> objects =
 	new IdentityHashMap<ManagedObject, ManagedReferenceImpl<?>>();
 
-    /** Creates an instance of this class. */
-    ReferenceTable() { }
+    /** Whether to track stale objects. */
+    private final boolean trackStaleObjects;
+
+    /**
+     * Creates an instance of this class.
+     *
+     * @param	trackStaleObjects whether to track stale objects
+     */
+    ReferenceTable(boolean trackStaleObjects) {
+	this.trackStaleObjects = trackStaleObjects;
+    }
 
     /**
      * Finds the managed reference associated with a managed object, returning
@@ -52,7 +69,17 @@ final class ReferenceTable {
      */
     ManagedReferenceImpl<?> find(Object object) {
 	assert object != null : "Object is null";
-	return objects.get(object);
+	ManagedReferenceImpl<?> result = objects.get(object);
+	if (result == null &&
+	    trackStaleObjects &&
+	    staleObjects.containsKey(object))
+	{
+	    throw new TransactionNotActiveException(
+		"Attempt to access an object of type " +
+		DataServiceImpl.typeName(object) +
+		" whose transaction is no longer active");
+	}
+	return result;
     }
 
     /**
@@ -97,6 +124,9 @@ final class ReferenceTable {
     void unregisterObject(ManagedObject object) {
 	assert objects.containsKey(object) : "Object was not found";
 	objects.remove(object);
+	if (trackStaleObjects) {
+	    staleObjects.put(object, Boolean.TRUE);
+	}
     }
 
     /** Removes a managed reference from this table. */

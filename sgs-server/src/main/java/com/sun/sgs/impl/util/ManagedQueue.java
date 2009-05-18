@@ -25,6 +25,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.Serializable;
 import java.util.AbstractQueue;
 import java.util.Iterator;
@@ -176,6 +177,18 @@ public class ManagedQueue<E>
     public int hashCode() {
 	DataManager dataManager = AppContext.getDataManager();
 	return dataManager.createReference(this).getId().hashCode();
+    }
+    
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || !(o instanceof ManagedQueue)) {
+            return false;
+        }
+        ManagedQueue<E> d = Objects.uncheckedCast(o);
+        DataManager dm = AppContext.getDataManager();
+        return dm.createReference(this).getId().equals(
+                dm.createReference(d).getId());
     }
 
     /** {@inheritDoc} */
