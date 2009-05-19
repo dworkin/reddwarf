@@ -51,5 +51,4 @@ public interface GraphBuilder {
      * @return the graph of access information
      */
     Graph<Identity, AffinityEdge> getAffinityGraph();
-
 }

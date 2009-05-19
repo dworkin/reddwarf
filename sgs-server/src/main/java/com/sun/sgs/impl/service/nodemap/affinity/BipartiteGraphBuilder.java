@@ -27,9 +27,10 @@ import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Set;
 
 /**
  * A graph builder which builds a bipartite graph of identities and
@@ -53,11 +54,9 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     private static final long DEFAULT_PERIOD = 1000 * 60 * 5;
     
     // Our graph of object accesses
-    private final Graph<Object, Long> bipartiteGraph = 
-        new UndirectedSparseMultigraph<Object, Long>();
-    
-    // Edge counter
-    private final AtomicLong edgeCount = new AtomicLong();
+    private final CopyableUndirectedSparseMultigraph<Object, WeightedEdge> 
+        bipartiteGraph = 
+            new CopyableUndirectedSparseMultigraph<Object, WeightedEdge>();
     
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -92,10 +91,13 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             for (AccessedObject obj : detail.getAccessedObjects()) {    
                 Object objId = obj.getObjectId();
                 bipartiteGraph.addVertex(objId);
-                // Would it be easier to use Weighed Edges, rather than
-                // parallel ones?
-                bipartiteGraph.addEdge(edgeCount.incrementAndGet(), 
-                                       owner, objId);
+                // We use weighted edges to reduce the total number of edges
+                WeightedEdge ae = bipartiteGraph.findEdge(owner, objId);
+                if (ae == null) {
+                    bipartiteGraph.addEdge(new WeightedEdge(), owner, objId);
+                } else {
+                    ae.incrementWeight();
+                }
             }
         }
         totalTime += System.currentTimeMillis() - startTime;
@@ -111,6 +113,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                                bipartiteGraph.getEdgeCount());
             System.out.printf("  mean graph processing time: %.2fms %n", 
                               totalTime / (double) updateCount);
+            getAffinityGraph();
         }
     }
 
@@ -118,32 +121,23 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     public Graph<Identity, AffinityEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
 
+        // our folded graph
         Graph<Identity, AffinityEdge> newGraph = 
                 new UndirectedSparseMultigraph<Identity, AffinityEdge>();
 
-        // Copy our input graph, collapsing parallel edges into weighted
-        // edges as we go.
-        Graph<Object, WeightedEdge> graphCopy = 
-                new UndirectedSparseMultigraph<Object, WeightedEdge>();
-        synchronized (bipartiteGraph) {
-            for (Object v : bipartiteGraph.getVertices()) {
-                graphCopy.addVertex(v);
-            }
-            for (Long e : bipartiteGraph.getEdges()) {
-                Pair<Object> endpoints = bipartiteGraph.getEndpoints(e);
-                Object v1 = endpoints.getFirst();
-                Object v2 = endpoints.getSecond();
-                WeightedEdge ae = graphCopy.findEdge(v1, v2);
-                if (ae == null) {
-                    graphCopy.addEdge(new WeightedEdge(), v1, v2);
-                } else {
-                    ae.incrementWeight();
-                }
-            }
-        }
-    
-        // get vertices for the specified partition, copy into new graph
+        // vertices in our folded graph
         Collection<Identity> vertices = new HashSet<Identity>();
+        
+        // Copy our input graph, reducing the amount of time we need to
+        // worry about synchronized data
+        Graph<Object, WeightedEdge> graphCopy = 
+                new CopyableUndirectedSparseMultigraph<Object, WeightedEdge>
+                    (bipartiteGraph);
+        
+        System.out.println("Time for graph copy is : " +
+                (System.currentTimeMillis() - startTime) + 
+                "msec");
+
         for (Object vert : graphCopy.getVertices()) {
             // This should work, because the types haven't been erased.
             // Testing for String or Long would probably be an issue with
@@ -160,12 +154,11 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         for (Identity v1 : vertices) {
             for (Object intermediate : graphCopy.getSuccessors(v1)) {
                 for (Object v2 : graphCopy.getSuccessors(intermediate)) {
-                    if (!vertices.contains(v2) || v2.equals(v1)) {
+                    if (v2.equals(v1)) {
                         continue;
                     }
                     Identity v2Ident = (Identity) v2;
-
-                    
+                  
                     boolean addEdge = true;
                     Collection<AffinityEdge> edges = 
                             newGraph.findEdgeSet(v1, v2Ident);
@@ -189,13 +182,30 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 }
             } 
         }
- 
 
         System.out.println("Time for graph folding is : " +
                 (System.currentTimeMillis() - startTime) + 
                 "msec");
 
         return newGraph;
+    }
+    
+    
+    public class CopyableUndirectedSparseMultigraph<V,E> 
+        extends UndirectedSparseMultigraph<V,E> 
+    {
+        public CopyableUndirectedSparseMultigraph() {
+            super();
+        }
+        public CopyableUndirectedSparseMultigraph(
+                CopyableUndirectedSparseMultigraph<V,E> other) 
+        {
+            super();
+            synchronized(other) {
+                vertices = new HashMap<V, Set<E>>(other.vertices);
+                edges = new HashMap<E, Pair<V>>(other.edges);
+            }
+        }
     }
 }
 

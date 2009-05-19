@@ -25,6 +25,7 @@ import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
+import edu.uci.ics.jung.graph.util.Pair;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,9 +47,8 @@ import java.util.Properties;
  * and has an associated weight, indicating the number of times both identities
  * have accessed the object.
  * <p>
- * This class is currently assumed to be single threaded.  I'm not sure of JUNGs
- * multithreaded guarantees but we'll have to deal with them with time
- * sensitive graphs.
+ * This class is currently assumed to be single threaded. JUNG provides a
+ * way to wrap graphs so they are synchronized;  we might need to use that.
  * <p>
  * TODO:  drop old data after some time window.  Initial thought:  do this
  *   periodicially, either by number of tasks or time.  Keep track of accesses
@@ -68,7 +68,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // graphs
     private static final long DEFAULT_PERIOD = 1000 * 60 * 5;
     
-    // Map for tracking object->identity list
+    // Map for tracking object-> map of identity-> number accesses
+    // (thus we keep track of the number of accesses each identity has made
+    // for an object, to aid maintaining weighted edges)
     private final Map<Object, Map<Identity, Long>> objectMap = 
             new HashMap<Object, Map<Identity, Long>>();
     
@@ -136,6 +138,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
                             // Only update the edge weight if ident has 
                             // accessed the object at least as many times
                             // as owner.
+                            // Do we need to worry about values wrapping?
+                            // Probably not, if we're removing old data.
                             if (value <= otherValue) {
                                 e.incrementWeight();
                             }
@@ -173,6 +177,25 @@ public class WeightedGraphBuilder implements GraphBuilder {
     
     /** {@inheritDoc} */
     public Graph<Identity, AffinityEdge> getAffinityGraph() {
-        return affinityGraph;
+        Graph<Identity, AffinityEdge> graphCopy = 
+            new UndirectedSparseMultigraph<Identity, AffinityEdge>();
+        
+        // Return a copy of the graph, for safety's sake.
+        // Is this really necessary?  Copying takes some time.
+        // Perhaps use a subclass with a copy constructor?
+        // Then we're a little more closely tied to the underlying
+        // graph implementation, but it'll be faster.
+        synchronized (affinityGraph) {
+            for (Identity id : affinityGraph.getVertices()) {
+                graphCopy.addVertex(id);
+            }
+            for (AffinityEdge e : affinityGraph.getEdges()) {
+                Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
+                graphCopy.addEdge(new AffinityEdge(e.getId(), e.getWeight()), 
+                                  endpoints.getFirst(),
+                                  endpoints.getSecond());
+            }
+        }
+        return graphCopy;
     }
 }
