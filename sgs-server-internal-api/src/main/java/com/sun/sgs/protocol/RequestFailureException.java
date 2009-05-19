@@ -45,9 +45,9 @@ public class RequestFailureException extends Exception {
      * Reasons why a request fails.
      */
     public enum FailureReason {
-	/** The associated client session is not completed login. */
+	/** The associated client session has not completed login. */
 	LOGIN_PENDING,
-	/** The client sessin is relocating to another node. */
+	/** The client session is relocating to another node. */
 	RELOCATE_PENDING,
 	/** The client session is disconnecting from the local node. */
 	DISCONNECT_PENDING,
