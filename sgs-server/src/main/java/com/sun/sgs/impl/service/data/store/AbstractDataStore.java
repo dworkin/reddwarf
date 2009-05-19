@@ -32,6 +32,8 @@ import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.DataStore;
 import java.util.Arrays;
 import java.util.logging.Level;
 import static java.util.logging.Level.FINER;

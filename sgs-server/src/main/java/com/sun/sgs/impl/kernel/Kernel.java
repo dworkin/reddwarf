@@ -148,7 +148,7 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
-
+    
     // default timeout the kernel's shutdown method (15 minutes)
     private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 600000;
     
@@ -200,7 +200,6 @@ class Kernel {
         
         // check the standard properties
         checkProperties(appProperties);
-        
         this.appProperties = appProperties;
 
         try {
@@ -237,7 +236,11 @@ class Kernel {
                 profileCollector.registerMBean(config, 
                                                ConfigManager.MXBEAN_NAME);
             } catch (JMException e) {
-                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+                logger.logThrow(Level.WARNING, e, "Could not register MBean");
+                // Stop bringing up the kernel - the ConfigManager is used
+                // by other parts of the system, who rely on it being 
+                // successfully registered.
+                throw e;
             }
 
             // create the authenticators and identity coordinator

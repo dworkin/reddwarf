@@ -19,11 +19,10 @@
 
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
-import com.sun.sgs.test.util.UtilReflection;
+import com.sun.sgs.service.store.db.DbEnvironment;
 import java.lang.reflect.Method;
 import java.util.Properties;
 
@@ -48,7 +47,7 @@ public final class UtilDataStoreDb {
      */
     public static EnvironmentType getEnvironmentType(Properties properties) {
 	String className = properties.getProperty(
-	    DbEnvironmentFactory.ENVIRONMENT_CLASS_PROPERTY);
+	    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY);
 	if (className == null ||
 	    className.equals(
 		"com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment"))

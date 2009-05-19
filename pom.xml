@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>13</version>
+    <version>14</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
@@ -45,6 +45,7 @@
     <module>sgs-server-api</module>
     <module>sgs-server-dist</module>
     <module>sgs-server-javadoc</module>
+    <module>sgs-server-internal-api</module>
     <module>sgs-tutorial-server</module>
     <module>sgs-tutorial-server-dist</module>
   </modules>
@@ -59,15 +60,23 @@
 	<plugin>
 	  <groupId>org.apache.maven.plugins</groupId>
 	  <artifactId>maven-remote-resources-plugin</artifactId>
+	  <configuration>
+	    <properties>
+	      <projectName>Project Darkstar Server</projectName>
+	    </properties>
+	  </configuration>
+	</plugin>
+
+	<!-- The license plugin should be activated in modules that
+	     contain source code and thus need to verify correct license
+	     headers in each source code file -->
+	<plugin>
+	  <groupId>com.google.code.maven-license-plugin</groupId>
+          <artifactId>maven-license-plugin</artifactId>
 	  <executions>
 	    <execution>
-	      <id>include-gpl-license</id>
-	      <phase>generate-resources</phase>
-	      <configuration>
-		<properties>
-		  <projectName>Project Darkstar Server</projectName>
-		</properties>
-	      </configuration>
+	      <id>check-notice</id>
+	      <phase>compile</phase>
 	    </execution>
 	  </executions>
 	</plugin>
@@ -171,6 +180,17 @@
       <dependency>
 	<groupId>com.projectdarkstar.server</groupId>
 	<artifactId>sgs-server-api</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-internal-api</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-internal-api</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs.version}</version>
       </dependency>
