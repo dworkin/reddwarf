@@ -22,10 +22,12 @@ package com.sun.sgs.test.impl.service.nodemap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.SystemIdentity;
-import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.BipartiteGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
+import com.sun.sgs.impl.service.nodemap.affinity.BipartiteParallelGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.WeightedParallelGraphBuilder;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -58,9 +60,11 @@ public class TestGraphListener {
    @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(
-                new Object[][] {{"default"}, 
-                                {WeightedGraphBuilder.class.getName()},
-                                {BipartiteGraphBuilder.class.getName()}});
+            new Object[][] {{"default", true}, 
+                        {WeightedParallelGraphBuilder.class.getName(), true},
+                        {BipartiteParallelGraphBuilder.class.getName(), true},
+                        {WeightedGraphBuilder.class.getName(), false},
+                        {BipartiteGraphBuilder.class.getName(), false}});
     }
    
     private static Class<?> profileReportImplClass;
@@ -86,17 +90,21 @@ public class TestGraphListener {
     GraphListener listener;
 
     private final String builderName;
+    private boolean parallelEdges;
+    
     /**
      * Create this test class.
      * @param testType the type of profile data to create
      */
-    public TestGraphListener(String builderName) {
+    public TestGraphListener(String builderName, boolean parallelEdges) {
         if (builderName.equals("default")) {
             this.builderName = null;
         } else {
             this.builderName = builderName;
         }
+        this.parallelEdges = parallelEdges;
         System.err.println("Graph builder used is: " + builderName);
+        
     }
     
     @Before
@@ -110,7 +118,7 @@ public class TestGraphListener {
     
     @Test
     public void testConstructor() {
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         Assert.assertNotNull(graph);
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
@@ -121,7 +129,7 @@ public class TestGraphListener {
         ProfileReport report = makeReport(new IdentityImpl("something"));
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         // no accessed objects
         Assert.assertEquals(0, graph.getVertexCount());
@@ -135,7 +143,7 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(1, graph.getVertexCount());
     }
@@ -157,7 +165,7 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
@@ -183,12 +191,12 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        for (AffinityEdge e : graph.getEdges()) {
+        for (WeightedEdge e : graph.getEdges()) {
             Assert.assertEquals(1, e.getWeight()); 
         }
     }
@@ -208,12 +216,12 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        for (AffinityEdge e : graph.getEdges()) {
+        for (WeightedEdge e : graph.getEdges()) {
             Assert.assertEquals(1, e.getWeight());
         }
         
@@ -228,7 +236,7 @@ public class TestGraphListener {
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        for (AffinityEdge e : graph.getEdges()) {
+        for (WeightedEdge e : graph.getEdges()) {
             Assert.assertEquals(2, e.getWeight()); 
         }
         
@@ -242,7 +250,7 @@ public class TestGraphListener {
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
         
-        for (AffinityEdge e : graph.getEdges()) {
+        for (WeightedEdge e : graph.getEdges()) {
             // don't expect edge weight to have been updated
             Assert.assertEquals(2, e.getWeight());
         }
@@ -263,7 +271,7 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(1, graph.getVertexCount());
@@ -271,21 +279,25 @@ public class TestGraphListener {
     
     @Test
     public void testFourReports() throws Exception {
-        ProfileReport report = makeReport(new IdentityImpl("A"));
+        Identity identA = new IdentityImpl("A");
+        Identity identB = new IdentityImpl("B");
+        Identity identC = new IdentityImpl("C");
+        Identity identD = new IdentityImpl("D");
+        ProfileReport report = makeReport(identA);
         AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         detail.addAccess(new String("obj2"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        report = makeReport(new IdentityImpl("B"));
+        report = makeReport(identB);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         detail.addAccess(new String("obj3"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        report = makeReport(new IdentityImpl("C"));
+        report = makeReport(identC);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj4"));
         detail.addAccess(new String("obj2"));
@@ -293,19 +305,19 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        report = makeReport(new IdentityImpl("D"));
+        report = makeReport(identD);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj4"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(4, graph.getEdgeCount());
         Assert.assertEquals(4, graph.getVertexCount());
         
         // Identity A will now use obj3, so get links with B and C
-        report = makeReport(new IdentityImpl("A"));
+        report = makeReport(identA);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj3"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
@@ -313,8 +325,16 @@ public class TestGraphListener {
         
         graph = listener.getAffinityGraph();
         System.out.println("New Graph: " + graph);
-        Assert.assertEquals(6, graph.getEdgeCount());
         Assert.assertEquals(4, graph.getVertexCount());
+        if (parallelEdges) {
+            Assert.assertEquals(6, graph.getEdgeCount());
+        } else {
+            Assert.assertEquals(4, graph.getEdgeCount());
+            Assert.assertEquals(2, graph.findEdge(identA, identB).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identA, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identB, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identC, identD).getWeight());
+        }
     }
     
     @Test
@@ -348,7 +368,7 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, AffinityEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(3, graph.getEdgeCount());
         Assert.assertEquals(3, graph.getVertexCount());
@@ -356,7 +376,7 @@ public class TestGraphListener {
         System.out.println("Graph is : ");
         System.out.println(graph);
         
-        for (AffinityEdge e : graph.getEdges()) {
+        for (WeightedEdge e : graph.getEdges()) {
             // don't expect edge weight to have been updated
             Assert.assertEquals(2, e.getWeight());
         }

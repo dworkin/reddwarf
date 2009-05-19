@@ -60,7 +60,7 @@ public class GraphListener implements ProfileListener {
                         new Class[] { Properties.class },
                         properties);
         } else {
-            builder = new WeightedGraphBuilder(properties);
+            builder = new WeightedParallelGraphBuilder(properties);
         }
     }
     
@@ -87,7 +87,7 @@ public class GraphListener implements ProfileListener {
             return;
         }
 
-        builder.buildGraph(owner, detail);
+        builder.updateGraph(owner, detail);
     }
     
     /**
@@ -97,7 +97,7 @@ public class GraphListener implements ProfileListener {
      * 
      * @return the folded graph of accesses
      */
-    public Graph<Identity, AffinityEdge> getAffinityGraph() {
+    public Graph<Identity, WeightedEdge> getAffinityGraph() {
         return builder.getAffinityGraph();
     }
 }

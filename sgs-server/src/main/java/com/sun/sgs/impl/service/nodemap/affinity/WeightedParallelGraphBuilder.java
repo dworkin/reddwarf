@@ -26,14 +26,15 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
 /**
- * A graph builder which builds an affinity graph consisting of identities 
- * as vertices and a single weighted edges for each object used by both 
- * identities. 
+ * A graph builder which builds an affinity graph consisting of identities as
+ * vertices and weighted edges for each object used by both identities (a 
+ * parallel edge representing each object).
  * <p>
  * The data access information naturally forms a bipartite graph, with
  * verticies being either identities or objects, and an edge connecting each
@@ -56,7 +57,7 @@ import java.util.Properties;
  *   accesses in that bin and start keeping track of the new accesses in a new
  *   bin.
  */
-public class WeightedGraphBuilder implements GraphBuilder {
+public class WeightedParallelGraphBuilder implements GraphBuilder {
     // the base name for properties
     private static final String PROP_BASE = GraphBuilder.class.getName();
     
@@ -75,8 +76,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
             new HashMap<Object, Map<Identity, Long>>();
     
     // Our graph of object accesses
-    private final Graph<Identity, WeightedEdge> affinityGraph = 
-            new UndirectedSparseMultigraph<Identity, WeightedEdge>();
+    private final Graph<Identity, AffinityEdge> affinityGraph = 
+            new UndirectedSparseMultigraph<Identity, AffinityEdge>();
     
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -88,10 +89,10 @@ public class WeightedGraphBuilder implements GraphBuilder {
     private long totalTime = 0;
     
     /**
-     * Creates a weighted graph builder.
+     * Creates a weighted parallel edge graph builder.
      * @param properties  application properties
      */
-    public WeightedGraphBuilder(Properties properties) {
+    public WeightedParallelGraphBuilder(Properties properties) {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         snapshot = 
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
@@ -128,15 +129,29 @@ public class WeightedGraphBuilder implements GraphBuilder {
                     long otherValue = entry.getValue();
                 
                     // Check to see if we already have an edge between
-                    // the two vertices.  If so, update its weight.
-                    
-                    WeightedEdge edge = affinityGraph.findEdge(owner, ident);
-                    if (edge == null) {
-                        affinityGraph.addEdge(new WeightedEdge(), owner, ident);
-                    } else {
-                        if (value <= otherValue) {
-                            edge.incrementWeight();
+                    // owner and ident for this object.  If so, update
+                    // the edge weight rather than adding a new edge.
+                    boolean edgeFound = false;
+                    Collection<AffinityEdge> edges = 
+                            affinityGraph.findEdgeSet(owner, ident);
+                    for (AffinityEdge e : edges) {
+                        if (e.getId().equals(objId)) {
+                            // Only update the edge weight if ident has 
+                            // accessed the object at least as many times
+                            // as owner.
+                            // Do we need to worry about values wrapping?
+                            // Probably not, if we're removing old data.
+                            if (value <= otherValue) {
+                                e.incrementWeight();
+                            }
+                            edgeFound = true;
+                            break;
                         }
+                    }
+
+                    if (!edgeFound) {
+                        affinityGraph.addEdge(new AffinityEdge(objId), 
+                                              owner, ident);                   
                     }
                 }
 
@@ -175,9 +190,11 @@ public class WeightedGraphBuilder implements GraphBuilder {
             for (Identity id : affinityGraph.getVertices()) {
                 graphCopy.addVertex(id);
             }
-            for (WeightedEdge e : affinityGraph.getEdges()) {
+            for (AffinityEdge e : affinityGraph.getEdges()) {
                 Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
-                graphCopy.addEdge(new WeightedEdge(e.getWeight()), endpoints);
+                graphCopy.addEdge(new AffinityEdge(e.getId(), e.getWeight()), 
+                                  endpoints.getFirst(),
+                                  endpoints.getSecond());
             }
         }
         return graphCopy;

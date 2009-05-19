@@ -41,7 +41,7 @@ public interface GraphBuilder {
      * @param detail detailed information about the object accesses, including
      * a list of the accessed objects
      */
-    void buildGraph(Identity owner, AccessedObjectsDetail detail);
+    void updateGraph(Identity owner, AccessedObjectsDetail detail);
 
     /**
      * Returns the current graph, with identities as vertices, and
@@ -50,5 +50,5 @@ public interface GraphBuilder {
      *
      * @return the graph of access information
      */
-    Graph<Identity, AffinityEdge> getAffinityGraph();
+    Graph<Identity, WeightedEdge> getAffinityGraph();
 }

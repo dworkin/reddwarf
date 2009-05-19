@@ -62,4 +62,8 @@ public class WeightedEdge {
     void incrementWeight() {
         weight.incrementAndGet();
     }
+    
+    void addWeight(long value) {
+        weight.addAndGet(value);
+    }
 }

@@ -27,19 +27,20 @@ import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * A graph builder which builds a bipartite graph of identities and
  * object ids, with edges between them.  Identities never are never
  * liked with other edges, nor are object ids linked to other object ids.
  * <p>
- * This graph builder folds the graph upon request.  The folded graph
- * does not contain parallel edges.
+ * This graph builder folds the graph upon request.
  * 
  */
-public class BipartiteGraphBuilder implements GraphBuilder {
+public class BipartiteParallelGraphBuilder implements GraphBuilder {
     // the base name for properties
     private static final String PROP_BASE = GraphBuilder.class.getName();
     
@@ -70,7 +71,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
      * Constructs a new bipartite graph builder.
      * @param props application properties
      */
-    public BipartiteGraphBuilder(Properties props) {
+    public BipartiteParallelGraphBuilder(Properties props) {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
         snapshot = 
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
@@ -118,40 +119,35 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     public Graph<Identity, WeightedEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
 
-        // Copy our input graph
-        CopyableGraph<Object, WeightedEdge> graphCopy = 
+        // our folded graph
+        Graph<Identity, WeightedEdge> newGraph = 
+                new UndirectedSparseMultigraph<Identity, WeightedEdge>();
+
+        // vertices in our folded graph
+        Collection<Identity> vertices = new HashSet<Identity>();
+        
+        // Copy our input graph, reducing the amount of time we need to
+        // worry about synchronized data
+        Graph<Object, WeightedEdge> graphCopy = 
             new CopyableGraph<Object, WeightedEdge>(bipartiteGraph);
+        
         System.out.println("Time for graph copy is : " +
                 (System.currentTimeMillis() - startTime) + 
                 "msec");
-       
-        // An intermediate graph, used to track which object paths have
-        // been seen.  It contains parallel edges between Identity vertices,
-        // with each edge representing a different object.
-        Graph<Identity, AffinityEdge> affinityGraph = 
-            new UndirectedSparseMultigraph<Identity, AffinityEdge>();
 
-        // vertices in the affinity graph
-        Collection<Identity> vertices = new HashSet<Identity>();
-        
-        // Our final, folded graph.
-        Graph<Identity, WeightedEdge> foldedGraph = 
-            new UndirectedSparseMultigraph<Identity, WeightedEdge>();
-        
-        // Separate out the vertex set for our new folded graph.
         for (Object vert : graphCopy.getVertices()) {
             // This should work, because the types haven't been erased.
             // Testing for String or Long would probably be an issue with
             // the current AccessedObjects, I think -- would need to check
             // again.
             if (vert instanceof Identity) {
-                Identity ivert = (Identity) vert;
-                vertices.add(ivert);
-                affinityGraph.addVertex(ivert);
-                foldedGraph.addVertex(ivert);
+                vertices.add((Identity) vert);
+                newGraph.addVertex((Identity) vert);
             }
         }
         
+        // would it be better to just use the new graph vertices? 
+        // or is this more efficient?
         for (Identity v1 : vertices) {
             for (Object intermediate : graphCopy.getSuccessors(v1)) {
                 for (Object v2 : graphCopy.getSuccessors(intermediate)) {
@@ -159,14 +155,18 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                         continue;
                     }
                     Identity v2Ident = (Identity) v2;
+                  
                     boolean addEdge = true;
-                    for (AffinityEdge e : 
-                         affinityGraph.findEdgeSet(v1, v2Ident)) 
-                    {
-                        if (e.getId().equals(intermediate)) {
-                            // ignore; we've already processed this path
-                            addEdge = false;
-                            break;
+                    Collection<WeightedEdge> edges = 
+                            newGraph.findEdgeSet(v1, v2Ident);
+
+                    for (WeightedEdge e : edges) {
+                        if (e instanceof AffinityEdge) {
+                            if (((AffinityEdge) e).getId().equals(intermediate))
+                            {
+                                addEdge = false;
+                                break;
+                            }
                         }
                     }
                     if (addEdge) {                     
@@ -175,7 +175,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                         long e2Weight = 
                             graphCopy.findEdge(intermediate, v2).getWeight();
                         long minWeight = Math.min(e1Weight, e2Weight);
-                        affinityGraph.addEdge(
+                        newGraph.addEdge(
                             new AffinityEdge(intermediate, minWeight), 
                             v1, v2Ident);
                     }
@@ -183,26 +183,15 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             } 
         }
 
-        // Now collapse the parallel edges in the affinity graph
-        for (AffinityEdge e : affinityGraph.getEdges()) {
-            Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
-            WeightedEdge edge = foldedGraph.findEdge(endpoints.getFirst(), 
-                                                     endpoints.getSecond());
-            if (edge == null) {
-                foldedGraph.addEdge(new WeightedEdge(e.getWeight()), endpoints);
-            } else {
-                edge.addWeight(e.getWeight());
-            }
-        }
-        
-        System.out.println(" Folded graph vertex count: " + 
-                               foldedGraph.getVertexCount());
+       System.out.println(" Folded graph vertex count: " + 
+                               newGraph.getVertexCount());
         System.out.println(" Folded graph edge count: " + 
-                               foldedGraph.getEdgeCount());
+                               newGraph.getEdgeCount());
         System.out.println("Time for graph folding is : " +
                 (System.currentTimeMillis() - startTime) + 
                 "msec");
 
-        return foldedGraph;
+        return newGraph;
     }
 }
+
