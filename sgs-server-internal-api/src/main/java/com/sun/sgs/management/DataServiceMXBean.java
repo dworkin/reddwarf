@@ -15,6 +15,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
 package com.sun.sgs.management;
@@ -42,6 +46,7 @@ public interface DataServiceMXBean {
      * @return the number of times {@code createReference} has been called
      */
     long getCreateReferenceCalls();
+
     /**
      * Returns the number of times 
      * {@link DataService#getBinding getBinding} 
@@ -49,6 +54,22 @@ public interface DataServiceMXBean {
      * @return the number of times {@code getBinding} has been called
      */
     long getGetBindingCalls();
+        
+    /**
+     * Returns the number of times 
+     * {@link DataService#getBindingForUpdate getBindingForUpdate} 
+     * has been called.
+     * @return the number of times {@code getBindingForUpdate} has been called
+     */
+    long getGetBindingForUpdateCalls();
+        
+    /**
+     * Returns the number of times 
+     * {@link DataService#getObjectId getObjectId} 
+     * has been called.
+     * @return the number of times {@code getObjectId} has been called
+     */
+    long getGetObjectIdCalls();
         
     /**
      * Returns the number of times 
@@ -105,6 +126,15 @@ public interface DataServiceMXBean {
      * @return the number of times {@code getServiceBinding} has been called
      */
     long getGetServiceBindingCalls();
+            
+    /**
+     * Returns the number of times {@link
+     * DataService#getServiceBindingForUpdate getServiceBindingForUpdate} has
+     * been called.
+     * @return the number of times {@code getServiceBindingForUpdate} has been
+     * called
+     */
+    long getGetServiceBindingForUpdateCalls();
             
     /**
      * Returns the number of times 
