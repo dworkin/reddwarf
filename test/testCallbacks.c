@@ -31,12 +31,13 @@ void channel_joined_cb(sgs_connection *conn,
 
 void channel_left_cb(sgs_connection *conn,
         sgs_channel *channel) {
-    char prefix[] = "lefChannel:";
+    char prefix[] = "leftChannel:";
     char* buf;
     char* channelName;
 
     buf = (char*)messageBuffer;
     *buf = '\0';
+    buf = strncat(buf, prefix, strlen(prefix));
     channelName = (char*) sgs_channel_name(channel);
     buf = strncat(buf, channelName, strlen(channelName));
     if (sgs_session_direct_send(sgs_connection_get_session(conn),
@@ -52,22 +53,22 @@ void channel_recv_msg_cb(sgs_connection *conn,
         sgs_channel *channel, const uint8_t *msg, size_t msglen) {
     char prefix[] = "receivedChannelMessage:";
     char* buf;
-    char* channelName;
+    char* channelName = (char*) sgs_channel_name(channel);
     uint8_t* copyBuf;
     int len;
     
     buf = (char*)messageBuffer;
     *buf = '\0';
-    channelName = (char*)sgs_channel_name(channel);
+   /* channelName = (char*)sgs_channel_name(channel);*/
     buf = strncat(buf, prefix, strlen(prefix));
     buf = strncat(buf, channelName, strlen(channelName));
     buf = strncat(buf, " ", 1);
     len = strlen(buf);
     copyBuf = buf + len;
-    copyBuf = memcpy(copyBuf, msg, msglen);
-
+     memcpy(copyBuf, msg, msglen);
+     printf("about to send message %s of length %d\n", messageBuffer, len+msglen);
     if (sgs_session_direct_send(sgs_connection_get_session(conn),
-            messageBuffer, len + msglen) == -1){
+            messageBuffer,( len + msglen)-1) == -1){
         printf("error in sending channel receive ack to server\n");
         return;
     }
