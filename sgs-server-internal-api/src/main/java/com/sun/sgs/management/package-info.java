@@ -37,8 +37,8 @@
  * MBeans in this package is the field {@code MXBEAN_NAME} within each MBean.
  * <p>
  * Each node in a Project Darkstar cluster may be monitored locally or 
- * remotely.  See 
- * <a href="../impl/kernel/doc-files/config-properties.html#MonitoringProperties">
+ * remotely.  See <a
+ * href="../impl/kernel/doc-files/config-properties.html#MonitoringProperties">
  * this document</a> for information on enabling remote monitoring and 
  * management.
  * <p>
