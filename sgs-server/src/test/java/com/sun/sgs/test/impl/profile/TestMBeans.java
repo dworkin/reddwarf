@@ -850,7 +850,7 @@ public class TestMBeans {
         ClientSessionServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, ClientSessionServiceMXBean.class);
         
-        assertTrue(reg <= proxy.getRegisterSessionDisconnectListenerCalls());
+        assertTrue(reg <= proxy.getAddSessionStatusListenerCalls());
         assertTrue(get <= proxy.getGetSessionProtocolCalls());
         
         serverNode.getClientSessionService().

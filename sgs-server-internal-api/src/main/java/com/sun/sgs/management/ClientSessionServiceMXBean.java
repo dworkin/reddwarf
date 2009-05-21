@@ -46,13 +46,13 @@ public interface ClientSessionServiceMXBean {
     
     /**
      * Returns the number of times {@link 
-     * ClientSessionService#registerSessionDisconnectListener 
-     * registerSessionDisconnectListener} has been called.
+     * ClientSessionService#addSessionStatusListener
+     * addSessionStatusListener} has been called.
      * 
-     * @return the number of times {@code registerSessionDisconnectListener} 
+     * @return the number of times {@code addSessionStatusListener} 
      *         has been called
      */
-    long getRegisterSessionDisconnectListenerCalls();
+    long getAddSessionStatusListenerCalls();
     
     /**
      * Returns the number of times {@link 

@@ -23,24 +23,30 @@
 
 package com.sun.sgs.service;
 
-import java.math.BigInteger;
-
-import com.sun.sgs.app.ClientSession;
-
 /**
- * A listener that services may register with the {@link ClientSessionService}
- * to receive notification of session disconnect.
- * 
- * @see ClientSessionService#registerSessionDisconnectListener
+ * A future to be notified when  operations for an associated
+ * request are complete.
+ *
+ * <p>TBD: merge with {@link RecoveryCompleteFuture}?
+ *
+ * @see ClientSessionStatusListener#prepareToRelocate(
+ *		BigInteger,long,CompletionFuture)
  */
-public interface ClientSessionDisconnectListener {
+public interface CompletionFuture {
 
     /**
-     * Notifies this listener that the session with the given
-     * {@code sessionRefId} has disconnected.
-     * 
-     * @param sessionRefId the ID of the {@code ManagedReference} to the
-     *        {@link ClientSession} that disconnected
+     * Notifies this future that the operations initiated by the
+     * listener associated with this future are complete.  This
+     * method is idempotent and can be called multiple times.
      */
-    void disconnected(BigInteger sessionRefId);
+    void done();
+
+    /**
+     * Returns {@code true} if the {@link #done done} method of this
+     * future has been invoked, and {@code false} otherwise.
+     *
+     * @return	{@code true} if {@code done} has been invoked, and
+     *		{@code false} otherwise 
+     */
+    boolean isDone();
 }

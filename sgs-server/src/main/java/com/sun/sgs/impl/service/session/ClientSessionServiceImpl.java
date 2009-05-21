@@ -54,7 +54,7 @@ import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.service.ClientSessionDisconnectListener;
+import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -175,10 +175,10 @@ public final class ClientSessionServiceImpl
     private final long localNodeId;
 
     /** The registered session disconnect listeners. */
-    private final Set<ClientSessionDisconnectListener>
-	sessionDisconnectListeners =
+    private final Set<ClientSessionStatusListener>
+	sessionStatusListeners =
 	    Collections.synchronizedSet(
-		new HashSet<ClientSessionDisconnectListener>());
+		new HashSet<ClientSessionStatusListener>());
 
     /** A map of local session handlers, keyed by session ID . */
     private final Map<BigInteger, ClientSessionHandler> handlers =
@@ -489,14 +489,14 @@ public final class ClientSessionServiceImpl
     /* -- Implement ClientSessionService -- */
 
     /** {@inheritDoc} */
-    public void registerSessionDisconnectListener(
-        ClientSessionDisconnectListener listener)
+    public void addSessionStatusListener(
+        ClientSessionStatusListener listener)
     {
         if (listener == null) {
             throw new NullPointerException("null listener");
         }
-        serviceStats.registerSessionDisconnectListenerOp.report();
-        sessionDisconnectListeners.add(listener);
+        serviceStats.addSessionStatusListenerOp.report();
+        sessionStatusListeners.add(listener);
     }
     
     /** {@inheritDoc} */
@@ -1183,10 +1183,10 @@ public final class ClientSessionServiceImpl
 	}
 	// Notify session listeners of disconnection
 	if (!relocating) {
-	    for (ClientSessionDisconnectListener disconnectListener :
-		     sessionDisconnectListeners)
+	    for (ClientSessionStatusListener statusListener :
+		     sessionStatusListeners)
 	    {
-		disconnectListener.disconnected(sessionRefId);
+		statusListener.disconnected(sessionRefId);
 	    }
 	}
 	handlers.remove(sessionRefId);

@@ -43,8 +43,9 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.SessionProtocol;
-import com.sun.sgs.service.ClientSessionDisconnectListener;
+import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.CompletionFuture;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -318,8 +319,8 @@ public final class ChannelServiceImpl
 
 	    watchdogService.addNodeListener(new ChannelServiceNodeListener());
 
-            sessionService.registerSessionDisconnectListener(
-                new ChannelSessionDisconnectListener());
+            sessionService.addSessionStatusListener(
+                new SessionStatusListener());
 
             /* Create our service profiling info and register our MBean. */
             ProfileCollector collector = 
@@ -1006,10 +1007,10 @@ public final class ChannelServiceImpl
 	    channelTaskQueues.remove(channelRefId);
 	}
     }
-    /* -- Implement ClientSessionDisconnectListener -- */
+    /* -- Implement ClientSessionStatusListener -- */
 
-    private final class ChannelSessionDisconnectListener
-	implements ClientSessionDisconnectListener
+    private final class SessionStatusListener
+	implements ClientSessionStatusListener
     {
         /**
          * {@inheritDoc}
@@ -1036,6 +1037,15 @@ public final class ChannelServiceImpl
 		}
 	    }
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
+				      CompletionFuture future)
+	{
+	}
+	    
     }
 
     /* -- Other methods and classes -- */
