@@ -197,16 +197,20 @@ they must be set to the same value on each application node.
 <a name="DataService"></a>
 <h3>DataService Properties</h3>
 
-These properties control the implementation of the
-<code>DataService</code>.
+These properties control the implementation of the default
+<a href="../../service/DataService.html"><code>DataService</code></a>.  See the
+<a href="../../impl/service/data/DataServiceImpl.html"><code>DataServiceImpl</code></a> for a complete
+description and further configuration options.
 
 <a name="DataStore"></a>
 <h4>DataStore Properties</h4>
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
-underlying <code>DataStore</code>.  Setting these properties has no
-effect on application nodes.
+underlying <a href="../../service/store/DataStore.html"><code>DataStore</code></a>.
+See the <a href="../../impl/service/data/store/DataStoreImpl.html"><code>DataStoreImpl</code></a>
+for a complete description and further configuration options.
+Setting these properties has no effect on application nodes.
 
 <dl>
 
@@ -218,22 +222,29 @@ effect on application nodes.
 <a name="com.sun.sgs.impl.service.data.store.db.environment.class"></a>
 <dt>com.sun.sgs.impl.service.data.store.db.environment.class
 <span class="default">
-  com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+  <a href="../../impl/service/data/store/db/bdb/BdbEnvironment.html">
+    com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+  </a>
 </span>
 <dd>The name of the class that implements the underlying database.  The
   default value selects a database implementation based
   on <a href="http://www.oracle.com/database/berkeley-db/db/index.html">
   Berkeley DB</a>.  Specifying
-  <code>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</code>
+  <a href="../../impl/service/data/store/db/je/JeEnvironment.html">
+    <code>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</code>
+  </a>
   selects a database implementation based on
   <a href="http://www.oracle.com/database/berkeley-db/je/index.html">
   Berkeley DB Java Edition</a>.  Other values should specify the fully
   qualified name of a non-abstract class that implements
-  <code>com.sun.sgs.service.store.db.DbEnvironment</code>, and that has a 
+  <a href="../../service/store/db/DbEnvironment.html">
+    <code>com.sun.sgs.service.store.db.DbEnvironment</code>
+  </a>, and that has a 
   public constructor with three parameters: a <code>java.util.String</code>,
   which specifies the directory containing database files, a 
   <code>java.util.Properties</code>, which specifies configuration options,
-  and a <code>com.sun.sgs.impl.service.data.store.Scheduler</code>,
+  and a <a href="../../impl/service/data/store/Scheduler.html">
+    <code>com.sun.sgs.impl.service.data.store.Scheduler</code></a>,
   which the implementation can use to run asynchronous, periodic tasks. <p>
 
   Note that persistent data created using Berkeley DB is incompatible
@@ -269,7 +280,10 @@ property. Setting these properties has no effect on application nodes.
 
 <a name="Watchdog"></a>
 <h3>Watchdog Service Properties</h3>
-These properties control the implementation of the <code>WatchdogService</code>.
+These properties control the implementation of the default
+<a href="../../service/WatchdogService.html"><code>WatchdogService</code></a>.
+See the <a href="../../impl/service/watchdog/WatchdogServiceImpl.html"><code>WatchdogServiceImpl</code></a>
+for a complete description and further configuration options.
 Setting these properties has no effect on application nodes.
 <dl>
 
@@ -290,8 +304,11 @@ Integer.MAX_VALUE (for a single node configuration) </span>
 
 <a name="ClientSessionService"></a>
 <h3>ClientSessionService Properties</h3>
-These properties control the implementation of the
-<code>ClientSessionService</code>.
+These properties control the implementation of the default
+<a href="../../service/ClientSessionService.html"><code>ClientSessionService</code></a>.
+See the <a href="../../impl/service/session/ClientSessionServiceImpl.html">
+  <code>ClientSessionServiceImpl</code></a>
+for a complete description and further configuration options.
 <dl>
 
 <dt>com.sun.sgs.impl.service.session.allow.new.login
@@ -407,10 +424,113 @@ the runtime configuration of the Project Darkstar Server.  However, this is
 not an exhaustive list, and many components of the system contain additional
 configuration properties and pluggability points.  This index is a complete
 list of components that can be customized.  General convention is to include
-any customizable configuration properties in the class level javadocs:
+any customizable configuration properties in the javadoc description of the
+class:
 
 <ul>
-
+  <li>
+    <b><a href="../../impl/kernel/Kernel.html"><code>com.sun.sgs.impl.kernel.Kernel</code></a></b>
+    <ul>
+      <li>Most <a href="../../impl/kernel/StandardProperties.html"><code>StandardProperties</code></a>
+	  are picked up by the kernel when it boots.</li>
+      <li>Includes customizing service classes</li>
+      <li>Includes customizing authenticators</li>
+      <li>Profiling configuration</li>
+      <li>Pluggable <a href="../../kernel/AccessCoordinator.html"><code>com.sun.sgs.kernel.AccessCoordinator</code>s</a>.</li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/kernel/LockingAccessCoordinator.html"><code>com.sun.sgs.impl.kernel.LockingAccessCoordinator</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/kernel/TrackingAccessCoordinator.html"><code>com.sun.sgs.impl.kernel.TrackingAccessCoordinator</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/kernel/logging/TransactionAwareLogManager.html"><code>com.sun.sgs.impl.kernel.logging.TransactionAwareLogManager</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/profile/ProfileCollectorImpl.html"><code>com.sun.sgs.impl.profile.ProfileCollectorImpl</code></a></b>
+    <ul>
+      <li>Configuration of the profile collector.  There are a number of 
+	<a href="../../profile/ProfileListener.html"><code>ProfileListener</code></a>s available to consume this data.</li>
+      <li>See the <a href="../../impl/profile/listener/package-summary.html">profile listener package</a> for
+	a complete listing of listeners, each of which can be customized with their own configuration
+	properties.</li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/protocol/simple/SimpleSgsProtocolAcceptor.html"><code>com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor</code></a></b>
+    <ul>
+      <li>The default protocol acceptor for connections using the 
+	<a href="../../protocol/simple/SimpleSgsProtocol.html"><code>SimpleSgsProtocol</code></a>.</li>
+      <li>Configuration point for pluggable transports</li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/service/channel/ChannelServiceImpl.html"><code>com.sun.sgs.impl.service.channel.ChannelServiceImpl</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/service/data/DataServiceImpl.html"><code>com.sun.sgs.impl.service.data.DataServiceImpl</code></a></b>
+    <ul>
+      <li>Data service configuration</li>
+      <li>Includes option for pluggable <a href="../../service/store/DataStore.html"><code>DataStore</code></a></li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/service/data/store/DataStoreImpl.html"><code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code></a></b>
+    <ul>
+      <li>Default data store implementation</li>
+      <li>Includes option for pluggable <a href="../../service/store/db/DbEnvironment.html"><code>DbEnvironment</code></a></li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/service/data/store/net/DataStoreServerImpl.html"><code>com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl</code></a></b>
+    <ul>
+      <li>Default multi-node data store implementation</li>
+      <li>Includes same configuration options as 
+	<a href="../../impl/service/data/store/DataStoreImpl.html"><code>DataStoreImpl</code></a> as well as
+	additional network related customizable properties.</li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/service/nodemap/NodeMappingServerImpl.html"><code>com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/service/nodemap/NodeMappingServiceImpl.html"><code>com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/service/nodemap/RoundRobinPolicy.html"><code>com.sun.sgs.impl.service.nodemap.RoundRobinPolicy</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/service/session/ClientSessionServiceImpl.html"><code>com.sun.sgs.impl.service.session.ClientSessionServiceImpl</code></a></b>
+    <ul>
+      <li>Client session service configuration</li>
+      <li>Supports pluggable protocols using a custom <a href="../../protocol/ProtocolAcceptor.html"><code>ProtocolAcceptor</code></a></li>
+      <li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/service/task/TaskServiceImpl.html"><code>com.sun.sgs.impl.service.task.TaskServiceImpl</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/service/transaction/TransactionCoordinatorImpl.html"><code>com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl</code></a></b>
+    <ul>
+      <li>Includes option for modifying the transaction timeout value</li>
+    </ul>
+  </li>
+  <li>
+    <b><a href="../../impl/service/watchdog/WatchdogServerImpl.html"><code>com.sun.sgs.impl.service.watchdog.WatchdogServerImpl</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/service/watchdog/WatchdogServiceImpl.html"><code>com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl</code></a></b>
+  </li>
+  <li>
+    <b><a href="../../impl/transport/tcp/TcpTransport.html"><code>com.sun.sgs.impl.transport.tcp.TcpTransport</code></a></b>
+    <ul>
+      <li>Customization of TCP network interfaces and port to listen on</li>
+      <li>Customizable acceptor backlog</li>
+    </ul>
+  </li>
 </ul>
 
 

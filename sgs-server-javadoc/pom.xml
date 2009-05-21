@@ -114,7 +114,7 @@
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
-	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/all-overview.html</overview>
 	      <windowtitle>Project Darkstar Server ${project.version} API</windowtitle>
 	      <doctitle>Project Darkstar Server ${project.version} API</doctitle>
 	      <footer>
@@ -160,7 +160,7 @@
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
-	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/api-overview.html</overview>
 	      <windowtitle>Project Darkstar Server ${project.version} Internal API</windowtitle>
 	      <doctitle>Project Darkstar Server ${project.version} Internal API</doctitle>
 	      <footer>
@@ -202,7 +202,7 @@
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
-	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/api-overview.html</overview>
 	      <windowtitle>Project Darkstar Server ${project.version} External API</windowtitle>
 	      <doctitle>Project Darkstar Server ${project.version} External API</doctitle>
 	      <footer>
