@@ -88,12 +88,12 @@ import javax.management.JMException;
  * Manages client sessions. <p>
  *
  * The {@link #ClientSessionServiceImpl constructor} requires the <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * href="../../../impl/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> and <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.impl.service.session.transports">
+ * href="../../../impl/doc-files/config-properties.html#com.sun.sgs.impl.service.session.transports">
  * <code>com.sun.sgs.impl.service.session.transports</code></a> configuration
  * properties and supports these public configuration <a
- * href="../../../app/doc-files/config-properties.html#ClientSessionService">
+ * href="../../../impl/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
  */
 public final class ClientSessionServiceImpl

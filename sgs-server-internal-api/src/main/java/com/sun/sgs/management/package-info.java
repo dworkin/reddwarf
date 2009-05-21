@@ -38,7 +38,7 @@
  * <p>
  * Each node in a Project Darkstar cluster may be monitored locally or 
  * remotely.  See 
- * <a href="../app/doc-files/config-properties.html#MonitoringProperties">
+ * <a href="../impl/doc-files/config-properties.html#MonitoringProperties">
  * this document</a> for information on enabling remote monitoring and 
  * management.
  * <p>
