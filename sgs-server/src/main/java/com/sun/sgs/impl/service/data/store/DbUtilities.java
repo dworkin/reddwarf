@@ -181,6 +181,7 @@ public final class DbUtilities {
      * @param	infoDb the info database
      * @param	dbTxn the transaction
      * @param	blockSize the number of items to allocate
+     * @return	the next object ID
      */
     public static long getNextObjectId(
 	DbDatabase infoDb, DbTransaction dbTxn, int blockSize)

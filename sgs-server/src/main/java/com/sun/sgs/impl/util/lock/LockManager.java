@@ -25,33 +25,22 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
+import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.FINEST;
 import java.util.logging.Logger;
 
 /**
  * A class for managing lock conflicts. <p>
  *
- * This class supports checking for deadlock whenever an access request is
- * blocked due to a conflict.  It selects the youngest transaction as the
- * deadlock victim, determining the age using the originally requested start
- * time for the task associated with the transaction.  The implementation does
- * not deny requests that would not result in deadlock.  When requests block,
- * it services the requests in the order that they arrive, except for upgrade
- * requests, which it puts ahead of non-upgrade requests.  The justification
- * for special treatment of upgrade requests is that an upgrade request is
- * useless if a conflicting request goes first and causes the waiter to lose
- * its read lock. <p>
- *
- * This class uses the {@link Logger} named {@code
- * com.sun.sgs.impl.util.LockManager} to log information at the following
- * logging levels: <p>
+ * This class uses the {@link Logger} named {@code com.sun.sgs.impl.util.lock}
+ * to log information at the following logging levels: <p>
  *
  * <ul>
- * <li> {@link Level#FINER FINER} - Releasing and downgrading locks;
- *	requesting, waiting for, and returning from lock requests; deadlocks
- * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
+ * <li> {@link #FINER FINER} - Releasing locks; requesting, waiting for, and
+ *	returning from lock requests
+ * <li> {@link #FINEST FINEST} - Notifying new lock owners, results of
  *	requesting locks before waiting, releasing locks, results of attempting
- *	to assign locks to waiters, details of checking deadlocks
+ *	to assign locks to waiters
  * </ul> <p>
  *
  * The implementation of this class uses the following thread synchronization
@@ -77,8 +66,8 @@ import java.util.logging.Logger;
  *     Callers of non-{@code Object} methods on the {@code Lock} class should
  *     make sure that they are synchronized on the associated key map.
  *
- * <li>The {@link Locker} class only uses synchronization for getter and setter
- *     methods
+ * <li>The {@link Locker} class and its subclasses only use synchronization for
+ *     getter and setter methods
  *
  * <li>Blocks synchronized on a {@code Lock} should not synchronize on anything
  *     else <p>
@@ -94,9 +83,7 @@ import java.util.logging.Logger;
  *     {@code Lock} -- the {@link #waitForLockInternal waitForLockInternal}
  *     method.  That method also makes sure that the only synchronized {@code
  *     Locker} methods that it calls are on the locker it has already
- *     synchronized on.  The {@code DeadlockChecker} class also synchronizes on
- *     key maps and lockers, but is called outside of synchronized blocks and
- *     only synchronizes on one thing at a time.
+ *     synchronized on.
  *
  * <li>Use assertions to check adherence to the scheme
  *
@@ -105,11 +92,11 @@ import java.util.logging.Logger;
  * @param	<K> the type of key
  * @param	<L> the type of locker
  */
-public final class LockManager<K, L extends Locker<K, L>> {
+public abstract class LockManager<K, L extends Locker<K, L>> {
 
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(LockManager.class.getName()));
+	Logger.getLogger("com.sun.sgs.impl.util.lock"));
 
     /**
      * The maximum number of milliseconds to spend attempting to acquire a
@@ -122,9 +109,6 @@ public final class LockManager<K, L extends Locker<K, L>> {
      * concurrent access.
      */
     private final int numKeyMaps;
-
-    /** Whether to detect deadlocks. */
-    private final boolean detectDeadlocks;
 
     /**
      * An array of maps from key to lock.  The map to use is chosen by using
@@ -148,7 +132,7 @@ public final class LockManager<K, L extends Locker<K, L>> {
      */
     final ThreadLocal<K> currentKeySync = new ThreadLocal<K>();
 
-    /* -- Public constructor -- */
+    /* -- Constructor -- */
 
     /**
      * Creates an instance of this class.
@@ -156,13 +140,10 @@ public final class LockManager<K, L extends Locker<K, L>> {
      * @param	lockTimeout the maximum number of milliseconds to acquire a
      *		lock
      * @param	numKeyMaps the number of separate maps to use for storing keys
-     * @param	detectDeadlocks whether to detect deadlocks
      * @throws	IllegalArgumentException if {@code lockTimeout} or {@code
      *		numKeyMaps} is less than {@code 1}
      */
-    public LockManager(
-	long lockTimeout, int numKeyMaps, boolean detectDeadlocks)
-    {
+    LockManager(long lockTimeout, int numKeyMaps) {
 	if (lockTimeout < 1) {
 	    throw new IllegalArgumentException(
 		"The lockTimeout must not be less than 1");
@@ -172,7 +153,6 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	}
 	this.lockTimeout = lockTimeout;
 	this.numKeyMaps = numKeyMaps;
-	this.detectDeadlocks = detectDeadlocks;
 	keyMaps = uncheckedCast(new Map[numKeyMaps]);
 	for (int i = 0; i < numKeyMaps; i++) {
 	    keyMaps[i] = new HashMap<K, Lock<K, L>>();
@@ -180,127 +160,6 @@ public final class LockManager<K, L extends Locker<K, L>> {
     }
 
     /* -- Public methods -- */
-
-    /**
-     * Attempts to acquire a lock, waiting if needed.  Returns information
-     * about conflicts that occurred while attempting to acquire the lock that
-     * prevented the lock from being acquired, or else {@code null} if the lock
-     * was acquired.  If the {@code type} field of the return value is {@link
-     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    public LockConflict<K, L> lock(L locker, K key, boolean forWrite) {
-	return lock(locker, key, forWrite, -1);
-    }
-
-    /**
-     * Attempts to acquire a lock, waiting if needed, and supplying an optional
-     * timestamp.  Returns information about conflicts that occurred while
-     * attempting to acquire the lock that prevented the lock from being
-     * acquired, or else {@code null} if the lock was acquired.  If the {@code
-     * type} field of the return value is {@link LockConflictType#DEADLOCK
-     * DEADLOCK}, then the caller should abort the transaction, and any
-     * subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.  If the {@code requestedStartTime} is not {@code
-     * -1}, then it specifies the time when the operation that is requesting
-     * the lock was originally requested to start.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @param	requestedStartTime the time in milliseconds that the operation
-     *		associated with this request was originally requested to start,
-     *		or {@code -1} if not specified
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager, or if {@code requestedStartTime} is less than {@code
-     *		-1}
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    public LockConflict<K, L> lock(
-	L locker, K key, boolean forWrite, long requestedStartTime)
-    {
-	checkLockManager(locker);
-	checkLockerNotAborted(locker);
-	LockConflict<K, L> conflict =
-	    lockNoWaitInternal(locker, key, forWrite, requestedStartTime);
-	return (conflict == null) ? null : waitForLockInternal(locker);
-    }
-
-    /**
-     * Attempts to acquire a lock, returning immediately.  Returns information
-     * about any conflict that occurred while attempting to acquire the lock,
-     * or else {@code null} if the lock was acquired.  If the attempt to
-     * acquire the lock was blocked, returns a value with a {@code type} field
-     * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
-     * {@code type} field of the return value is {@link
-     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    public LockConflict<K, L> lockNoWait(L locker, K key, boolean forWrite) {
-	return lockNoWait(locker, key, forWrite, -1);
-    }
-
-    /**
-     * Attempts to acquire a lock, returning immediately, and supplying an
-     * optional timestamp.  Returns information about any conflict that
-     * occurred while attempting to acquire the lock, or else {@code null} if
-     * the lock was acquired.  If the attempt to acquire the lock was blocked,
-     * returns a value with a {@code type} field of {@link
-     * LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the {@code
-     * type} field of the return value is {@link LockConflictType#DEADLOCK
-     * DEADLOCK}, then the caller should abort the transaction, and any
-     * subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @param	requestedStartTime the time in milliseconds that the operation
-     *		associated with this request was originally requested to start,
-     *		or {@code -1} if not specified
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    public LockConflict<K, L> lockNoWait(
-	L locker, K key, boolean forWrite, long requestedStartTime)
-    {
-	checkLockManager(locker);
-	checkLockerNotAborted(locker);
-	return lockNoWaitInternal(locker, key, forWrite, requestedStartTime);
-    }
 
     /**
      * Waits for a previous attempt to obtain a lock that blocked.  Returns
@@ -335,28 +194,10 @@ public final class LockManager<K, L extends Locker<K, L>> {
      *		manager 
      */
     public void releaseLock(L locker, K key) {
-	checkLockManager(locker);
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER, "release {0} {1}", locker, key);
+	if (logger.isLoggable(FINER)) {
+	    logger.log(FINER, "release {0} {1}", locker, key);
 	}
 	releaseLockInternal(locker, key, false);
-    }
-
-    /**
-     * Downgrades a lock held by a locker from write to read access.  This
-     * method does nothing if the lock is not held for write.
-     *
-     * @param	locker the locker holding the lock
-     * @param	key the key identifying the lock
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     */
-    public void downgradeLock(L locker, K key) {
-	checkLockManager(locker);
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER, "downgrade {0} {1}", locker, key);
-	}
-	releaseLockInternal(locker, key, true);
     }
 
     /**
@@ -411,7 +252,78 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	return (result >= 0) ? result : Long.MAX_VALUE;
     }
 
-    /* -- Other methods -- */
+    /* -- Package access methods -- */
+
+    /**
+     * Attempts to acquire a lock, waiting if needed, and supplying an optional
+     * timestamp.  Returns information about conflicts that occurred while
+     * attempting to acquire the lock that prevented the lock from being
+     * acquired, or else {@code null} if the lock was acquired.  If the {@code
+     * type} field of the return value is {@link LockConflictType#DEADLOCK
+     * DEADLOCK}, then the caller should abort the transaction, and any
+     * subsequent lock or wait requests will throw {@code
+     * IllegalStateException}.  If the {@code requestedStartTime} is not {@code
+     * -1}, then it specifies the time when the operation that is requesting
+     * the lock was originally requested to start.
+     *
+     * @param	locker the locker requesting the lock
+     * @param	key the key identifying the lock
+     * @param	forWrite whether to request a write lock
+     * @param	requestedStartTime the time in milliseconds that the operation
+     *		associated with this request was originally requested to start,
+     *		or {@code -1} if not specified
+     * @return	lock conflict information, or {@code null} if there was no
+     *		conflict
+     * @throws	IllegalArgumentException if {@code locker} has a different lock
+     *		manager, or if {@code requestedStartTime} is less than {@code
+     *		-1}
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
+     */
+    LockConflict<K, L> lock(
+	L locker, K key, boolean forWrite, long requestedStartTime)
+    {
+	checkLockManager(locker);
+	checkLockerNotAborted(locker);
+	LockConflict<K, L> conflict =
+	    lockNoWaitInternal(locker, key, forWrite, requestedStartTime);
+	return (conflict == null) ? null : waitForLockInternal(locker);
+    }
+
+    /**
+     * Attempts to acquire a lock, returning immediately, and supplying an
+     * optional timestamp.  Returns information about any conflict that
+     * occurred while attempting to acquire the lock, or else {@code null} if
+     * the lock was acquired.  If the attempt to acquire the lock was blocked,
+     * returns a value with a {@code type} field of {@link
+     * LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the {@code
+     * type} field of the return value is {@link LockConflictType#DEADLOCK
+     * DEADLOCK}, then the caller should abort the transaction, and any
+     * subsequent lock or wait requests will throw {@code
+     * IllegalStateException}.
+     *
+     * @param	locker the locker requesting the lock
+     * @param	key the key identifying the lock
+     * @param	forWrite whether to request a write lock
+     * @param	requestedStartTime the time in milliseconds that the operation
+     *		associated with this request was originally requested to start,
+     *		or {@code -1} if not specified
+     * @return	lock conflict information, or {@code null} if there was no
+     *		conflict
+     * @throws	IllegalArgumentException if {@code locker} has a different lock
+     *		manager 
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
+     */
+    LockConflict<K, L> lockNoWait(
+	L locker, K key, boolean forWrite, long requestedStartTime)
+    {
+	checkLockManager(locker);
+	checkLockerNotAborted(locker);
+	return lockNoWaitInternal(locker, key, forWrite, requestedStartTime);
+    }
 
     /**
      * Returns the key map to use for the specified key.
@@ -444,21 +356,8 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	return lock;
     }
 
-    /** Checks if the locker has been requested to abort. */
-    private static <K, L extends Locker<K, L>> void checkLockerNotAborted(
-	L locker)
-    {
-	LockConflict<K, L> lockConflict = locker.getConflict();
-	if (lockConflict != null &&
-	    lockConflict.type == LockConflictType.DEADLOCK)
-	{
-	    throw new IllegalStateException(
-		"Transaction must abort: " + locker);
-	}
-    }
-
     /** Attempts to acquire a lock, returning immediately. */
-    private LockConflict<K, L> lockNoWaitInternal(
+    LockConflict<K, L> lockNoWaitInternal(
 	L locker, K key, boolean forWrite, long requestedStartTime)
     {
 	if (locker.getWaitingFor() != null) {
@@ -488,8 +387,8 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	    assert Lock.noteUnsync(this, key);
 	}
 	if (result == null) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER,
+	    if (logger.isLoggable(FINER)) {
+		logger.log(FINER,
 			   "lock {0}, {1}, forWrite:{2}" +
 			   "\n  returns null (already granted)",
 			   locker, key, forWrite);
@@ -497,34 +396,77 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	    return null;
 	}
 	if (result.conflict == null) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER,
+	    if (logger.isLoggable(FINER)) {
+		logger.log(FINER,
 			   "lock {0}, {1}, forWrite:{2}" +
 			   "\n  returns null (granted)",
 			   locker, key, forWrite);
 	    }
 	    return null;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST,
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST,
 		       "lock attempt {0}, {1}, forWrite:{2}" +
 		       "\n  returns blocked",
 		       locker, key, forWrite);
 	}
 	locker.setWaitingFor(result);
-	if (detectDeadlocks) {
-	    conflict = new DeadlockChecker(result.request).check();
-	}
-	if (conflict == null) {
-	    conflict = new LockConflict<K, L>(
-		result.request, LockConflictType.BLOCKED, result.conflict);
-	}
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER,
+	conflict = new LockConflict<K, L>(
+	    result.request, LockConflictType.BLOCKED, result.conflict);
+	if (logger.isLoggable(FINER)) {
+	    logger.log(FINER,
 		       "lock {0}, {1}, forWrite:{2}\n  returns {3}",
 			locker, key, forWrite, conflict);
 	}
 	return conflict;
+    }
+
+    /** Releases a lock, only downgrading it if downgrade is true. */
+    void releaseLockInternal(L locker, K key, boolean downgrade) {
+	checkLockManager(locker);
+	List<L> newOwners = Collections.emptyList();
+	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+	assert Lock.noteSync(this, key);
+	try {
+	    synchronized (keyMap) {
+		/* Don't create the lock if it isn't present */
+		Lock<K, L> lock = keyMap.get(key);
+		if (lock != null) {
+		    newOwners = lock.release(locker, downgrade);
+		    if (!lock.inUse(locker.lockManager)) {
+			keyMap.remove(key);
+		    }
+		}
+	    }
+	} finally {
+	    assert Lock.noteUnsync(this, key);
+	}
+	for (L newOwner : newOwners) {
+	    logger.log(FINEST, "notify new owner {0}", newOwner);
+	    assert newOwner.noteSync();
+	    try {
+		synchronized (newOwner) {
+		    newOwner.notify();
+		}
+	    } finally {
+		assert newOwner.noteUnsync();
+	    }
+	}
+    }
+
+    /* -- Private methods -- */
+
+    /** Checks if the locker has been requested to abort. */
+    private static <K, L extends Locker<K, L>> void checkLockerNotAborted(
+	L locker)
+    {
+	LockConflict<K, L> lockConflict = locker.getConflict();
+	if (lockConflict != null &&
+	    lockConflict.type == LockConflictType.DEADLOCK)
+	{
+	    throw new IllegalStateException(
+		"Transaction must abort: " + locker);
+	}
     }
 
     /** Attempts to acquire a lock, waiting if needed. */
@@ -535,7 +477,7 @@ public final class LockManager<K, L extends Locker<K, L>> {
 		LockAttemptResult<K, L> result = locker.getWaitingFor();
 		if (result == null) {
 		    logger.log(
-			Level.FINER,
+			FINER,
 			"lock {0}\n  returns null (not waiting)", locker);
 		    return null;
 		}
@@ -575,17 +517,17 @@ public final class LockManager<K, L extends Locker<K, L>> {
 		    }
 		    if (isOwner) {
 			locker.setWaitingFor(null);
-			if (logger.isLoggable(Level.FINER)) {
+			if (logger.isLoggable(FINER)) {
 			    logger.log(
-				Level.FINER,
+				FINER,
 				"lock {0}, {1}, forWrite:{2}" +
 				"\n  returns null (granted)",
 				locker, key, result.request.getForWrite());
 			}
 			return null;
 		    }
-		    if (logger.isLoggable(Level.FINER)) {
-			logger.log(Level.FINER,
+		    if (logger.isLoggable(FINER)) {
+			logger.log(FINER,
 				   "wait for lock {0}, {1}, forWrite:{2}" +
 				   ", wait:{3,number,#}",
 				   locker, key, result.request.getForWrite(),
@@ -612,8 +554,8 @@ public final class LockManager<K, L extends Locker<K, L>> {
 		    assert Lock.noteUnsync(this, key);
 		}
 		locker.setWaitingFor(null);
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER,
+		if (logger.isLoggable(FINER)) {
+		    logger.log(FINER,
 			       "lock {0}, {1}, forWrite:{2}\n  returns {3}",
 			       locker, key, result.request.getForWrite(),
 			       conflict);
@@ -625,280 +567,11 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	}
     }
 
-    /** Releases a lock, only downgrading it if downgrade is true. */
-    private void releaseLockInternal(L locker, K key, boolean downgrade) {
-	List<L> newOwners = Collections.emptyList();
-	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
-	try {
-	    synchronized (keyMap) {
-		/* Don't create the lock if it isn't present */
-		Lock<K, L> lock = keyMap.get(key);
-		if (lock != null) {
-		    newOwners = lock.release(locker, downgrade);
-		    if (!lock.inUse(locker.lockManager)) {
-			keyMap.remove(key);
-		    }
-		}
-	    }
-	} finally {
-	    assert Lock.noteUnsync(this, key);
-	}
-	for (L newOwner : newOwners) {
-	    logger.log(Level.FINEST, "notify new owner {0}", newOwner);
-	    assert newOwner.noteSync();
-	    try {
-		synchronized (newOwner) {
-		    newOwner.notify();
-		}
-	    } finally {
-		assert newOwner.noteUnsync();
-	    }
-	}
-    }
-
     /** Checks that the locker has this lock manager. */
     private void checkLockManager(L locker) {
 	if (locker.getLockManager() != this) {
 	    throw new IllegalArgumentException(
 		"The locker has a different lock manager");
-	}
-    }
-
-    /* -- Other classes -- */
-
-    /** Utility class for detecting deadlocks. */
-    private class DeadlockChecker {
-
-	/**
-	 * Maps lockers to information about requests they are waiting for.
-	 * This map serves as a cache for information about lock owners, to
-	 * avoid the synchronization needed to retrieve it again when checking
-	 * for multiple deadlocks.
-	 */
-	private final Map<L, WaiterInfo<K, L>> waiterMap =
-	    new HashMap<L, WaiterInfo<K, L>>();
-
-	/** The top level request we are checking for deadlocks. */
-	private final LockRequest<K, L> rootRequest;
-
-	/**
-	 * The pass number of the current deadlock check.  There could be
-	 * multiple deadlocks active simultaneously, so deadlock checking is
-	 * repeated until no deadlocks are found.
-	 */
-	private int pass;
-
-	/** The request that was found in a circular reference. */
-	private LockRequest<K, L> cycleBoundary;
-
-	/** The current choice of a request to abort. */
-	private LockRequest<K, L> victim;
-
-	/** Another request in the deadlock. */
-	private LockRequest<K, L> conflict;
-
-	/**
-	 * Creates an instance of this class.
-	 *
-	 * @param	request the request to check
-	 */
-	DeadlockChecker(LockRequest<K, L> request) {
-	    assert request != null;
-	    rootRequest = request;
-	}
-
-	/**
-	 * Checks for a deadlock starting with the root locker.
-	 *
-	 * @return	a lock conflict if a deadlock was found, else {@code
-	 *		null}
-	 */
-	LockConflict<K, L> check() {
-	    LockConflict<K, L> result = null;
-	    for (pass = 1; true; pass++) {
-		if (!checkInternal(
-			rootRequest, getWaiterInfo(rootRequest.getLocker())))
-		{
-		    if (result == null) {
-			logger.log(Level.FINEST,
-				   "check deadlock {0}: no deadlock",
-				   rootRequest);
-			return null;
-		    } else {
-			return result;
-		    }
-		}
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER, "check deadlock {0}: victim {1}",
-			       rootRequest, victim);
-		}
-		LockConflict<K, L> deadlock = new LockConflict<K, L>(
-		    rootRequest, LockConflictType.DEADLOCK,
-		    conflict.getLocker());
-		getWaiterInfo(victim.getLocker()).waitingFor = null;
-		victim.getLocker().setConflict(deadlock);
-		if (victim.getLocker() == rootRequest.getLocker()) {
-		    return deadlock;
-		} else {
-		    result = new LockConflict<K, L>(
-			rootRequest, LockConflictType.BLOCKED,
-			conflict.getLocker());
-		}
-	    }
-	}
-
-	/**
-	 * Checks for deadlock starting with the specified request and
-	 * information about its waiters.  Returns whether a deadlock was
-	 * found.
-	 */
-	private boolean checkInternal(
-	    LockRequest<K, L> request, WaiterInfo<K, L> waiterInfo)
-	{
-	    L locker = request.getLocker();
-	    waiterInfo.pass = pass;
-	    for (LockRequest<K, L> ownerRequest : waiterInfo.waitingFor) {
-		L owner = ownerRequest.locker;
-		if (owner == locker) {
-		    if (logger.isLoggable(Level.FINEST)) {
-			logger.log(Level.FINEST,
-				   "checking deadlock {0}, pass {1}:" +
-				   " locker {2}, waiting for {3}:" +
-				   " ignore self-reference",
-				   rootRequest, pass, locker, ownerRequest);
-		    }
-		} else {
-		    WaiterInfo<K, L> ownerInfo = getWaiterInfo(owner);
-		    if (ownerInfo.waitingFor == null) {
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.log(Level.FINEST,
-				       "checking deadlock {0}, pass {1}:" +
-				       " locker {2}, waiting for {3}:" +
-				       " ignore not waiting",
-				       rootRequest, pass, locker,
-				       ownerRequest);
-			}
-		    } else if (ownerInfo.pass == pass) {
-			/* Found a deadlock! */
-			cycleBoundary = ownerRequest;
-			victim = ownerRequest;
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.log(Level.FINEST,
-				       "checking deadlock {0}, pass {1}:" +
-				       " locker {2}, waiting for {3}:" +
-				       " deadlock",
-				       rootRequest, pass, locker,
-				       ownerRequest);
-			}
-			return true;
-		    } else {
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.log(Level.FINEST,
-				       "checking deadlock {0}, pass {1}:" +
-				       " locker {2}, waiting for {3}:" +
-				       " recurse",
-				       rootRequest, pass, locker,
-				       ownerRequest);
-			}
-			if (checkInternal(ownerRequest, ownerInfo)) {
-			    maybeUpdateVictim(ownerRequest);
-			    return true;
-			}
-		    }
-		}
-	    }
-	    return false;
-	}
-
-	/**
-	 * Returns information about the lockers that the specified locker is
-	 * waiting for.
-	 */
-	private WaiterInfo<K, L> getWaiterInfo(L locker) {
-	    WaiterInfo<K, L> waiterInfo = waiterMap.get(locker);
-	    if (waiterInfo == null) {
-		List<LockRequest<K, L>> waitingFor;
-		LockAttemptResult<K, L> result = locker.getWaitingFor();
-		if (result == null || locker.getConflict() != null) {
-		    waitingFor = null;
-		} else {
-		    K key = result.request.key;
-		    Map<K, Lock<K, L>> keyMap = getKeyMap(key);
-		    assert Lock.noteSync(LockManager.this, key);
-		    try {
-			synchronized (keyMap) {
-			    waitingFor = getLock(key, keyMap).copyOwners(
-				LockManager.this);
-			}
-		    } finally {
-			assert Lock.noteUnsync(LockManager.this, key);
-		    }
-		}
-		waiterInfo = new WaiterInfo<K, L>(waitingFor);
-		waiterMap.put(locker, waiterInfo);
-	    }
-	    return waiterInfo;
-	}
-
-	/**
-	 * Updates the victim and conflict fields to reflect an additional
-	 * request in the deadlock chain.  Use the argument as the victim if it
-	 * has a newer requested start time than the previously selected
-	 * victim.
-	 */
-	private void maybeUpdateVictim(LockRequest<K, L> request) {
-	    assert request != null;
-	    if (conflict == null) {
-		conflict = request;
-	    }
-	    if (request == cycleBoundary) {
-		/* We've gone all the way around the circle, so we're done */
-		cycleBoundary = null;
-	    } else if (cycleBoundary != null &&
-		       (request.getRequestedStartTime() >
-			victim.getRequestedStartTime()))
-	    {
-		/*
-		 * We're still within the cycle and this request started later
-		 * than the current victim, so use it instead.
-		 */
-		if (conflict == request) {
-		    conflict = victim;
-		}
-		victim = request;
-		logger.log(Level.FINEST,
-			   "checking deadlock {0}, pass {1}: new victim: {2}",
-			   rootRequest, pass, victim);
-	    }
-	}
-    }
-
-    /**
-     * Provides information about the requests a locker is waiting for.  Used
-     * in deadlock detection.
-     */
-    private static class WaiterInfo<K, L extends Locker<K, L>> {
-
-	/**
-	 * The requests the locker is waiting for, or {@code null} if not
-	 * waiting.
-	 */
-	List<LockRequest<K, L>> waitingFor;
-
-	/**
-	 * The pass in which the locker was checked.  If we encounter an
-	 * instance with the current pass number, then we've found a cycle.
-	 */
-	int pass = 0;
-
-	/**
-	 * Creates an instance of this class.
-	 *
-	 * @param	waitingFor the requests the locker is waiting for
-	 */
-	WaiterInfo(List<LockRequest<K, L>> waitingFor) {
-	    this.waitingFor = waitingFor;
 	}
     }
 }

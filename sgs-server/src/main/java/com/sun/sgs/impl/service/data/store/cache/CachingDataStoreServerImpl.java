@@ -23,9 +23,9 @@ import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
-import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
 import static com.sun.sgs.impl.service.data.store.db.DataEncoding.decodeLong;
 import static com.sun.sgs.impl.service.data.store.db.DataEncoding.decodeString;
@@ -46,9 +46,9 @@ import static com.sun.sgs.impl.util.lock.LockConflictType.DEADLOCK;
 import static com.sun.sgs.impl.util.lock.LockConflictType.DENIED;
 import static com.sun.sgs.impl.util.lock.LockConflictType.INTERRUPTED;
 import static com.sun.sgs.impl.util.lock.LockConflictType.TIMEOUT;
-import com.sun.sgs.impl.util.lock.LockManager;
 import com.sun.sgs.impl.util.lock.LockRequest;
-import com.sun.sgs.impl.util.lock.Locker;
+import com.sun.sgs.impl.util.lock.MultiLockManager;
+import com.sun.sgs.impl.util.lock.MultiLocker;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TransactionInterruptedException;
@@ -126,28 +126,28 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private final Map<Long, NodeInfo> nodeInfoMap =
 	new HashMap<Long, NodeInfo>();
 
-    private final LockManager<Object, NodeInfo> lockManager =
-	new LockManager<Object, NodeInfo>(100, 8, false);
+    private final MultiLockManager<Object, NodeInfo> lockManager =
+	new MultiLockManager<Object, NodeInfo>(100, 8);
 
     final BlockingQueue<NodeRequest> callbackRequests =
 	new LinkedBlockingQueue<NodeRequest>();
 
-    private final long txnTimeout = -1;
+    private final long txnTimeout = -1;  //FIXME: from config
 
     private boolean shuttingDown = false;
 
     /* -- Nested classes -- */
 
-    static class NodeInfo extends Locker<Object, NodeInfo> {
+    static class NodeInfo extends MultiLocker<Object, NodeInfo> {
 	final long nodeId;
 	final CallbackServer callbackServer;
 	final Map<Object, NodeRequest> locks =
 	    new HashMap<Object, NodeRequest>();
-	NodeInfo(LockManager<Object, NodeInfo> lockManager,
+	NodeInfo(MultiLockManager<Object, NodeInfo> lockManager,
 		 long nodeId,
 		 CallbackServer callbackServer)
 	{
-	    super(lockManager, -1);
+	    super(lockManager);
 	    this.nodeId = nodeId;
 	    this.callbackServer = callbackServer;
 	}

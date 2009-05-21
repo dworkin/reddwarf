@@ -32,7 +32,8 @@ import com.sun.sgs.impl.util.lock.LockConflict;
 import com.sun.sgs.impl.util.lock.LockConflictType;
 import com.sun.sgs.impl.util.lock.LockManager;
 import com.sun.sgs.impl.util.lock.LockRequest;
-import com.sun.sgs.impl.util.lock.Locker;
+import com.sun.sgs.impl.util.lock.TxnLockManager;
+import com.sun.sgs.impl.util.lock.TxnLocker;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
@@ -147,11 +148,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	Logger.getLogger(LockingAccessCoordinator.class.getName()));
 
     /** Maps transactions to lockers. */
-    private final ConcurrentMap<Transaction, TxnLocker> txnMap =
-	new ConcurrentHashMap<Transaction, TxnLocker>();
+    private final ConcurrentMap<Transaction, LockerImpl> txnMap =
+	new ConcurrentHashMap<Transaction, LockerImpl>();
 
     /** The lock manager. */
-    private final LockManager<Key, TxnLocker> lockManager;
+    private final TxnLockManager<Key, LockerImpl> lockManager;
 
     /* -- Public constructor -- */
 
@@ -180,7 +181,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	int numKeyMaps = wrappedProps.getIntProperty(
 	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
 	lockManager =
-	    new LockManager<Key, TxnLocker>(lockTimeout, numKeyMaps, true);
+	    new TxnLockManager<Key, LockerImpl>(lockTimeout, numKeyMaps);
     }
 
     /* -- Implement AccessCoordinator -- */
@@ -214,8 +215,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	    throw new IllegalArgumentException(
 		"The tryCount must not be less than 1");
 	}
-	TxnLocker locker = new TxnLocker(lockManager, txn, requestedStartTime);
-	TxnLocker existing = txnMap.putIfAbsent(txn, locker);
+	LockerImpl locker =
+	    new LockerImpl(lockManager, txn, requestedStartTime);
+	LockerImpl existing = txnMap.putIfAbsent(txn, locker);
 	if (existing != null) {
 	    throw new IllegalStateException("Transaction already started");
 	}
@@ -252,13 +254,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
      *		transaction produced a deadlock, or if still waiting for an
      *		earlier attempt to complete
      */
-    public LockConflict<Key, TxnLocker> lock(Transaction txn,
-					     String source,
-					     Object objectId,
-					     boolean forWrite,
-					     Object description)
+    public LockConflict<Key, LockerImpl> lock(Transaction txn,
+					      String source,
+					      Object objectId,
+					      boolean forWrite,
+					      Object description)
     {
-	TxnLocker locker = getLocker(txn);
+	LockerImpl locker = getLocker(txn);
 	Key key = new Key(source, objectId);
 	if (description != null) {
 	    locker.setDescription(key, description);
@@ -291,13 +293,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
      *		transaction produced a deadlock, or if still waiting for an
      *		earlier attempt to complete
      */
-    public LockConflict<Key, TxnLocker> lockNoWait(Transaction txn,
-						   String source,
-						   Object objectId,
-						   boolean forWrite,
-						   Object description)
+    public LockConflict<Key, LockerImpl> lockNoWait(Transaction txn,
+						    String source,
+						    Object objectId,
+						    boolean forWrite,
+						    Object description)
     {
-	TxnLocker locker = getLocker(txn);
+	LockerImpl locker = getLocker(txn);
 	Key key = new Key(source, objectId);
 	if (description != null) {
 	    locker.setDescription(key, description);
@@ -322,7 +324,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
      * @throws	IllegalStateException if an earlier lock attempt for this
      *		transaction produced a deadlock
      */
-    public LockConflict<Key, TxnLocker> waitForLock(Transaction txn) {
+    public LockConflict<Key, LockerImpl> waitForLock(Transaction txn) {
 	return lockManager.waitForLock(getLocker(txn));
     }
 
@@ -335,9 +337,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
      * @return	the locker
      * @throws	IllegalArgumentException if the transaction is not active
      */
-    TxnLocker getLocker(Transaction txn) {
+    LockerImpl getLocker(Transaction txn) {
 	checkNull("txn", txn);
-	TxnLocker locker = txnMap.get(txn);
+	LockerImpl locker = txnMap.get(txn);
 	if (locker == null) {
 	    throw new IllegalArgumentException(
 		"Transaction not active: " + txn);
@@ -352,7 +354,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
      * @param	txn the finished transaction
      */
     private void endTransaction(Transaction txn) {
-	TxnLocker locker = getLocker(txn);
+	LockerImpl locker = getLocker(txn);
 	logger.log(Level.FINER, "end {0}", locker);
 	locker.releaseAll();
 	txnMap.remove(txn);
@@ -378,7 +380,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
      * Define a locker that records information about the transaction
      * requesting locks, and descriptions.
      */
-    public static class TxnLocker extends Locker<Key, TxnLocker>
+    public static class LockerImpl extends TxnLocker<Key, LockerImpl>
 	implements AccessedObjectsDetail
     {
 	/** The associated transaction. */
@@ -401,27 +403,37 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	 * @throws	IllegalArgumentException if {@code requestedStartTime}
 	 *		is less than {@code 0}
 	 */
-	TxnLocker(LockManager<Key, TxnLocker> lockManager,
-		  Transaction txn,
-		  long requestedStartTime)
+	LockerImpl(TxnLockManager<Key, LockerImpl> lockManager,
+		   Transaction txn,
+		   long requestedStartTime)
 	{
 	    super(lockManager, requestedStartTime);
 	    checkNull("txn", txn);
 	    this.txn = txn;
 	}
 
-	/** Stop the lock attempt when the transaction ends. */
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation stops the lock attempt when the transaction
+	 * ends.
+	 */
 	@Override
 	protected long getLockTimeoutTime(long now, long lockTimeoutTime) {
 	    return Math.min(
-		LockManager.addCheckOverflow(now, lockTimeoutTime),
-		LockManager.addCheckOverflow(
+		TxnLockManager.addCheckOverflow(now, lockTimeoutTime),
+		TxnLockManager.addCheckOverflow(
 		    txn.getCreationTime(), txn.getTimeout()));
 	}
 
-	/** Record the new request and use a local class. */
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation records the new request and uses a local
+	 * class.
+	 */
 	@Override
-	protected LockRequest<Key, TxnLocker> newLockRequest(
+	protected LockRequest<Key, LockerImpl> newLockRequest(
 	    Key key,
 	    boolean forWrite,
 	    boolean upgrade,
@@ -435,13 +447,18 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 
 	/** Release all locks. */
 	void releaseAll() {
-	    LockManager<Key, TxnLocker> lockManager = getLockManager();
-	    for (LockRequest<Key, TxnLocker> request : requests) {
+	    LockManager<Key, LockerImpl> lockManager = getLockManager();
+	    for (LockRequest<Key, LockerImpl> request : requests) {
 		lockManager.releaseLock(this, request.getKey());
 	    }
 	}
 
-	/** Print the associated transaction, for debugging. */
+	/**
+	 * Returns a string representation of this object.  This implementation
+	 * prints the associated transaction, for debugging.
+	 *
+	 * @return	a string representation of this object
+	 */
 	@Override
 	public String toString() {
 	    return txn.toString();
@@ -465,7 +482,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 
 	/** {@inheritDoc} */
 	public ConflictType getConflictType() {
-	    LockConflict<Key, TxnLocker> conflict = getConflict();
+	    LockConflict<Key, LockerImpl> conflict = getConflict();
 	    if (conflict == null) {
 		return ConflictType.NONE;
 	    } else if (conflict.getType() == LockConflictType.DEADLOCK) {
@@ -477,7 +494,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 
 	/** {@inheritDoc} */
 	public byte[] getConflictingId() {
-	    LockConflict<Key, TxnLocker> conflict = getConflict();
+	    LockConflict<Key, LockerImpl> conflict = getConflict();
 	    return (conflict != null)
 		? conflict.getConflictingLocker().getTransaction().getId()
 		: null;
@@ -517,7 +534,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
     }
 
     /** Implement {@code AccessedObject}. */
-    private static class AccessedObjectImpl extends LockRequest<Key, TxnLocker>
+    private static class AccessedObjectImpl
+	extends LockRequest<Key, LockerImpl>
 	implements AccessedObject
     {
 	/**
@@ -525,7 +543,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	 *
 	 * @param	lockRequest the underlying lock request
 	 */
-	AccessedObjectImpl(TxnLocker locker,
+	AccessedObjectImpl(LockerImpl locker,
 			   Key key,
 			   boolean forWrite,
 			   boolean upgrade)
@@ -661,7 +679,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	    Transaction txn, T objectId, AccessType type, Object description)
 	{
 	    checkNull("type", type);
-	    LockConflict<Key, TxnLocker> conflict = lock(
+	    LockConflict<Key, LockerImpl> conflict = lock(
 		txn, source, objectId, type == AccessType.WRITE, description);
 	    if (conflict != null) {
 		String descriptionMsg = "";
@@ -710,7 +728,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	public void setObjectDescription(
 	    Transaction txn, T objectId, Object description)
 	{
-	    TxnLocker locker = getLocker(txn);
+	    LockerImpl locker = getLocker(txn);
 	    if (description == null) {
 		checkNull("objectId", objectId);
 	    } else {

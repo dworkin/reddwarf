@@ -22,7 +22,7 @@ package com.sun.sgs.impl.util.lock;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 
 /**
- * Records information about an entity that requests locks of a {@link
+ * Records information about an entity that requests locks from a {@link
  * LockManager}.
  *
  * @param	<K> the type of key
@@ -33,46 +33,19 @@ public abstract class Locker<K, L extends Locker<K, L>> {
     /** The lock manager for this locker. */
     final LockManager<K, L> lockManager;
 
-    /**
-     * The time in milliseconds when the task associated with this
-     * transaction was originally requested to start.
-     */
-    final long requestedStartTime;
-
-    /**
-     * The result of the lock request that this transaction is waiting for,
-     * or {@code null} if it is not waiting.  Synchronize on this locker
-     * when accessing this field.
-     */
-    private LockAttemptResult<K, L> waitingFor;
-
-    /**
-     * A conflict that should cause this transaction's request to be
-     * denied, or {@code null}.  This value is cleared after the conflict
-     * has been reported unless the conflict is a deadlock.  Synchronize on
-     * this locker when accessing this field.
-     */
-    private LockConflict<K, L> conflict;
+    /* -- Constructor -- */
 
     /**
      * Creates an instance of this class.
      *
      * @param	lockManager the lock manager for this locker
-     * @param	requestedStartTime the time milliseconds that the task
-     *		associated with the transaction was originally
-     *		requested to start
-     * @throws	IllegalArgumentException if {@code requestedStartTime}
-     *		is less than {@code 0}
      */
-    public Locker(LockManager<K, L> lockManager, long requestedStartTime) {
+    protected Locker(LockManager<K, L> lockManager) {
 	checkNull("lockManager", lockManager);
-	if (requestedStartTime < 0) {
-	    throw new IllegalArgumentException(
-		"The requestedStartTime must not be less than 0");
-	}
 	this.lockManager = lockManager;
-	this.requestedStartTime = requestedStartTime;
     }
+
+    /* -- Public methods -- */
 
     /**
      * Returns the lock manager for this locker.
@@ -82,6 +55,18 @@ public abstract class Locker<K, L extends Locker<K, L>> {
     public LockManager<K, L> getLockManager() {
 	return lockManager;
     }
+
+    /**
+     * The time in milliseconds when the operation associated with this locker
+     * was originally requested to start, or {@code -1} if not specified.
+     *
+     * @return	the time when requested to start, or {@code -1}
+     */
+    public long getRequestedStartTime() {
+	return -1;
+    }
+
+    /* -- Protected methods -- */
 
     /**
      * Returns the time when a lock attempt should stop, given the current time
@@ -95,16 +80,6 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      */
     protected long getLockTimeoutTime(long now, long lockTimeoutTime) {
 	return lockTimeoutTime;
-    }
-
-    /**
-     * The time in milliseconds when the operation associated with this locker
-     * was originally requested to start, or {@code -1} if not specified.
-     *
-     * @return	the time when requested to start, or {@code -1}
-     */
-    public long getRequestedStartTime() {
-	return requestedStartTime;
     }
 
     /**
@@ -128,20 +103,15 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      *
      * @return	the conflicting request or {@code null}
      */
-    protected synchronized LockConflict<K, L> getConflict() {
-	assert checkAllowSync();
-	return conflict;
-    }
+    protected abstract LockConflict<K, L> getConflict();
+
+    /* -- Package access methods -- */
 
     /**
      * Requests that this locker request be denied because of a conflict
      * with the specified request.
      */
-    synchronized void setConflict(LockConflict<K, L> conflict) {
-	assert checkAllowSync();
-	this.conflict = conflict;
-	notify();
-    }
+    abstract void setConflict(LockConflict<K, L> conflict);
 
     /**
      * Checks if this locker is waiting for a lock.
@@ -149,10 +119,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      * @return	the result of the lock request this locker is waiting
      *		for or {@code null} if it is not waiting
      */
-    synchronized LockAttemptResult<K, L> getWaitingFor() {
-	assert checkAllowSync();
-	return waitingFor;
-    }
+    abstract LockAttemptResult<K, L> getWaitingFor();
 
     /**
      * Sets the lock that this locker is waiting for, or marks that it is
@@ -162,11 +129,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      *
      * @param	waitingFor the lock or {@code null}
      */
-    synchronized void setWaitingFor(LockAttemptResult<K, L> waitingFor) {
-	assert checkAllowSync();
-	assert waitingFor == null || waitingFor.conflict != null;
-	this.waitingFor = waitingFor;
-    }
+    abstract void setWaitingFor(LockAttemptResult<K, L> waitingFor);
 
     /**
      * Checks that the current thread is permitted to synchronize on this
