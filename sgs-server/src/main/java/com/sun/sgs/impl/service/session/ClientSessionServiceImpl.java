@@ -514,6 +514,7 @@ public final class ClientSessionServiceImpl
         if (listener == null) {
             throw new NullPointerException("null listener");
         }
+	checkNonTransactionalContext();
         serviceStats.registerSessionDisconnectListenerOp.report();
         sessionDisconnectListeners.add(listener);
     }
@@ -523,6 +524,7 @@ public final class ClientSessionServiceImpl
 	if (sessionRefId == null) {
 	    throw new NullPointerException("null sessionRefId");
 	}
+	checkNonTransactionalContext();
         serviceStats.getSessionProtocolOp.report();
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	
