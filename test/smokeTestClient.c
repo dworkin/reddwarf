@@ -103,6 +103,45 @@ int testLogin(sgs_connection *connection)
     }
 }
 
+void printResults(){
+    int failed = 0;
+
+    if (loginFailFail){
+        printf ("Login failure test failed\n");
+        failed++;
+    }
+    if (loginDisconnectFail){
+        printf("Login disconnect test failed\n");
+        failed++;
+    }
+    if (loginFail){
+        printf("Login test failed\n");
+        failed++;
+    }
+    if (channelJoinFail){
+        printf("Channel join test failed\n");
+        failed++;
+    }
+    if (channelMessageFail){
+        printf("Channel message test failed\n");
+        failed++;
+    }
+    if (channelLeaveFail){
+        printf("Channel leave test failed\n");
+        failed++;
+    }
+    if (sessionMessageFail){
+        printf("Session message test failed\n");
+        failed++;
+    }
+    if (failed){
+        printf("Client smoketest failed with %d failures\n", failed);
+    } else {
+        printf("Client smoketest passed\n");
+    }
+
+}
+
 int main(int argc, char** argv) {
     sgs_context *context;
     sgs_connection *connection;
@@ -164,6 +203,7 @@ int main(int argc, char** argv) {
 
     waitForInput(connection);
 
+    printResults();
 
     
     return (EXIT_SUCCESS);

@@ -7,7 +7,10 @@
 
 static uint8_t messageBuffer[256] ;
 
-
+/* Called when a request to join a channel has been received.
+ *  This requires sending back to the server a message of the
+ *  form "joinedChannel:" with the channel name.
+ */
 void channel_joined_cb(sgs_connection *conn,
         sgs_channel *channel) {
     char* channelName;
@@ -18,17 +21,22 @@ void channel_joined_cb(sgs_connection *conn,
     *buf = '\0';
     buf = strncat(buf, prefix, strlen(prefix));
     channelName = (char*)sgs_channel_name(channel);
-    printf("channel name = %s\n", channelName);
     buf = strncat(buf, channelName, strlen(channelName));
-    if (sgs_session_direct_send(sgs_connection_get_session(conn),
-            messageBuffer, strlen(buf))== -1){
+    if (sgs_channel_send(channel, messageBuffer, strlen(buf)) == -1){
+   /* if (sgs_session_direct_send(sgs_connection_get_session(conn),
+            messageBuffer, strlen(buf))== -1){*/
         printf("error in sending response to channel join message\n");
         return;
     }
     channelJoinFail = 0;
-    printf("received channel join callback\n");
 }
-
+/* Called when a request to leave a channel is made. This requires
+ *  sending back a message to the smoke-test server of the form "leftChannel:"
+ *  followed by the name of the channel that has been left. For internal purposes,
+ *  successful completion of the functional also sets the channelLeaveFail flag
+ *  to 0, indicating that the channel leave test has been successfully completed
+ *  from the client's point of view.
+ */
 void channel_left_cb(sgs_connection *conn,
         sgs_channel *channel) {
     char prefix[] = "leftChannel:";
@@ -46,9 +54,19 @@ void channel_left_cb(sgs_connection *conn,
         return;
     }
     channelLeaveFail = 0;
-    printf("received channel left callback\n");
 }
-
+/*
+ *  Called when a channel message is received. When such
+ *  a message is received, we need to send back a message
+ *  of the form "receivedChannelMessage:" with the channel name,
+ *  followed by a space and then the contents of the channel message.
+ * This message should be sent back on the channel from which it was
+ * received. 
+ *  For internal purposes, we also set the channelMessageFail flag to 0
+ *  when this function has successfully completed; this means that the
+ *  channel receive smoke test has been called and passed (from the
+ *  client's point of view)
+ */
 void channel_recv_msg_cb(sgs_connection *conn,
         sgs_channel *channel, const uint8_t *msg, size_t msglen) {
     char prefix[] = "receivedChannelMessage:";
@@ -59,16 +77,13 @@ void channel_recv_msg_cb(sgs_connection *conn,
     
     buf = (char*)messageBuffer;
     *buf = '\0';
-   /* channelName = (char*)sgs_channel_name(channel);*/
     buf = strncat(buf, prefix, strlen(prefix));
     buf = strncat(buf, channelName, strlen(channelName));
     buf = strncat(buf, " ", 1);
     len = strlen(buf);
     copyBuf = buf + len;
-     memcpy(copyBuf, msg, msglen);
-     printf("about to send message %s of length %d\n", messageBuffer, len+msglen);
-    if (sgs_session_direct_send(sgs_connection_get_session(conn),
-            messageBuffer,( len + msglen)-1) == -1){
+    memcpy(copyBuf, msg, msglen);
+    if (sgs_channel_send(channel, messageBuffer, len+msglen) == -1){
         printf("error in sending channel receive ack to server\n");
         return;
     }
@@ -77,13 +92,23 @@ void channel_recv_msg_cb(sgs_connection *conn,
 
 }
 
+/* This funciton is called when the server disconnects the
+ *  client. This is one of the tests run early in the smoketest.
+ *  All this function does is indicate that the disconnect function
+ * has been properly called, and sets the loginDisconnectFail flag
+ * to 0. It also sets the inputReceived flag to zero so that control
+ * will be passed back to the client program.
+ */
 void disconnected_cb(sgs_connection *conn) {
     loginDisconnectFail = 0;
     inputReceived = 0;
-    printf("received disconnected callback\n");
-
 }
 
+/*This callback is called upon successful login. It responds to the
+ * server by sending a direct message made up of "loggedIn;", and the
+ * login name used. The function also sets the loginFail flag to 0, indicating
+ * that the login callback was successfully called.
+ */
 void logged_in_cb(sgs_connection *conn,
         sgs_session *session) {
     char* buf;
@@ -96,16 +121,22 @@ void logged_in_cb(sgs_connection *conn,
         printf("error in sending login response to server\n");
     }
     loginFail = 0;
-    printf("received logged in callback\n");
-
 }
-
+/* Callback for failed login, which is tested early in the smoke test.
+ * When called, this will change the value of loginFailFail to 0, which indicates
+ * that the loginFail test has been passed, and will set the global variable
+ * inputeReceived to 0, allowing control to be passed back to the main
+ * part of the client program.
+ */
 void login_failed_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
     inputReceived = 0;
-    printf("received login failed callback\n");
     loginFailFail = 0;
 }
 
+/*Callback indicating that a reconnected message has been received. This
+ * will send back to the smoketest server the message "reconnected:". Note
+ * that this test is currently unimplemented in the server.
+ */
 void reconnected_cb(sgs_connection *conn) {
     char* buf;
     char prefix[] = "reconnected";
@@ -120,11 +151,16 @@ void reconnected_cb(sgs_connection *conn) {
         printf("error in sending reconnected ack\n");
         return;
     }
-
-    printf("received reconnected callback \n");
     return;
 }
-
+/* Callback indicating that a session message has been received from the
+ * smoketest server. The response to such a message is to send a direct message
+ * to the server consisting of "receivedMessage:" along with the content of the
+ * message. The exception to this is if the message is "logout", in which case
+ * the correct response for the client is to logout. On correctly performing
+ * logout, the function will set inputReceived to 0, returning control to the
+ * main function of the client.
+ */
 void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
     char *buf;
     char prefix[] = "receivedMessage:";
@@ -132,8 +168,8 @@ void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
     int i;
 
     if (strncmp(logoutCmd, (char*)msg, strlen(logoutCmd)) == 0){
-        if (sgs_connection_logout(conn, 0) == 1){
-            printf("received instructions to logout\n");
+        if (sgs_connection_logout(conn, 0) == 0){
+            inputReceived = 0;
             return;
         }
     }
@@ -149,7 +185,7 @@ void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
         printf("error sending receive message ack\n");
         return;
     }
-    printf("received message callback\n");
+    sessionMessageFail = 0;
 }
 
 /*

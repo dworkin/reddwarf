@@ -31,6 +31,11 @@ int loginFailFail, loginDisconnectFail,
         channelMessageFail, sessionMessageFail;
 int inputReceived;
 
+/* Declarations of the callback functions associated with the
+ * context of a C client session. These are declared in this file to
+ * allow them to be implemented in a separate file from the driver
+ * of the client smoketest.
+ */
 void channel_joined_cb(sgs_connection *conn,
             sgs_channel *channel);
 
