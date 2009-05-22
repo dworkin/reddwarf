@@ -67,9 +67,11 @@ public class SmokeTestListener implements Serializable,
     private State curState = State.INIT;
 
     /** Test messages */
-    private static final String TEST_SESSION_MSG = " session msg1\\! ";
-    private static final String TEST_CHANNEL_MSG = " channel 2msg/! ";
+    private static final String TEST_SESSION_MSG = " session msg1\\!";
+    private static final String TEST_CHANNEL_MSG = " channel 2msg/!";
     private static final String LOGOUT_MSG = "logout";
+    /* The number of tests that have failed*/
+    private static int testsFailed = 0;
 
     /**
      * Session listener that handles this single session. A channel is created
@@ -111,6 +113,9 @@ public class SmokeTestListener implements Serializable,
     {
         if (curState == State.DONE)
             return;
+
+        if (curState == State.INIT)
+            testsFailed = 0;
         
         curState = curState.next();
         ClientSession session = getSession();
@@ -151,9 +156,14 @@ public class SmokeTestListener implements Serializable,
 
         case DONE:
             if (logger.isLoggable(Level.INFO)) {
-                logger.log(Level.INFO, 
+                if (testsFailed == 0){
+                    logger.log(Level.INFO,
                         "\n\n[[Client \"{0}\" Passed Smoke Test Successfully]]\n",
                         sessionName);
+                } else {
+                    logger.log(Level.INFO,
+                            "\n\n[[Client \"{0}\" Failed " + testsFailed + " tests\n", sessionName);
+                }
             }
             break;
 
@@ -187,9 +197,10 @@ public class SmokeTestListener implements Serializable,
     private void validateMsg(ByteBuffer message, String expectedMsg)
     {
         String msg = bufferToString(message);
-        if (!msg.equals(expectedMsg))
+        if (!msg.equals(expectedMsg)){
             fail("\n*** Expected: " + expectedMsg + 
                  "\n*** Received: " + msg + "\n");
+        }
     }
 
     /**
@@ -204,7 +215,7 @@ public class SmokeTestListener implements Serializable,
         logger.log(Level.WARNING, "\n\n[[Client " + sessionName
                 + " Failed Smoke Test]]: {0}\n", errorMsg);
 
-        curState = State.DONE;
+        testsFailed++;
     }
 
     /**

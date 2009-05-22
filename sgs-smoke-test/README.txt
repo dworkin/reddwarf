@@ -37,12 +37,15 @@ Test clients should initialize and perform the following actions:
 Then, the listeners need to be implemented to send messages to the server 
 whenever a callback is triggered:
 * ChannelListener:
-  - receivedMessage: "receivedChannelMessage:" + channel.getName() + " " + message.tostring()
-  - leftChannel: "leftChannel:" + channel.getName()
+  - receivedMessage: "receivedChannelMessage:" + channel.getName() + " " + message.tostring(); this
+  should be sent on the channel on which it was received.
+  - leftChannel: "leftChannel:" + channel.getName() ; this should be sent directly to the server (since the
+  client is no longer a member of the channel)
 
 * SimpleClientListener:
   - loggedIn: "loggedIn:" + username
-  - joinedChannel: "joinedChannel:" + channel.getName() (Channel message)
+  - joinedChannel: "joinedChannel:" + channel.getName(); This should be sent on the channel that
+  was joined
   - receivedMessage: 
     - if the message is "logout" then a graceful client-side logout should be initiated
     - otherwise, reply to the server with "receivedMessage:" + message.tostring()
