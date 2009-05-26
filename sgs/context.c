@@ -53,6 +53,35 @@ void sgs_ctx_destroy(sgs_context_impl *ctx) {
 }
 
 /*
+ * sgs_ctx_create_empty()
+ * Note that this function assumes that the first argument, hostname,
+ * points to a null-terminated character array
+ */
+sgs_context_impl *sgs_cts_create(const char* hostname, const int port){
+    int name_len;
+
+    sgs_context_impl *ctx = NULL;
+
+    ctx = malloc(sizeof (struct sgs_context_impl));
+    if (ctx == NULL) return NULL;
+
+    //Get the length of the string, then add one for the null terminator
+    name_len = strlen(hostname) + 1;
+    ctx->hostname = malloc(name_len);
+    if (ctx->hostname == NULL) {
+        free(ctx);
+        return NULL;
+    }
+
+    strncpy(ctx->hostname, hostname, name_len);
+    ctx->port = port;
+
+    /* initialize all callback functions to NULL */
+    sgs_ctx_unset_all_cbs(ctx);
+    return ctx;
+}
+
+/*
  * sgs_ctx_create()
  * Note that this function assumes that the first argument, hostname, points
  * to a null-terminated character array. 
