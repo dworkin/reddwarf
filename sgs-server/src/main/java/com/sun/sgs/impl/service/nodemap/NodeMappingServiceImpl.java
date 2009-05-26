@@ -41,6 +41,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.PrepareMoveListener;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
@@ -747,6 +748,12 @@ public class NodeMappingServiceImpl
         public void remove() {
             throw new UnsupportedOperationException("remove is not supported");
         }
+    }
+    
+    
+    /** {@inheritDoc} */
+    public void addPrepareMoveListener(PrepareMoveListener listener) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
     
     /** {@inheritDoc} */
