@@ -21,10 +21,6 @@
 #include "testCallbacks.h"
 
 
-/*
- * 
- */
-
 /* The default server connections; these can be
  * over-ridden on the command line
  */
@@ -103,7 +99,7 @@ int testLogin(sgs_connection *connection)
     }
 }
 
-void printResults(){
+int printResults(){
     int failed = 0;
 
     if (loginFailFail){
@@ -139,7 +135,7 @@ void printResults(){
     } else {
         printf("Client smoketest passed\n");
     }
-
+    return failed;
 }
 
 int main(int argc, char** argv) {
@@ -203,8 +199,5 @@ int main(int argc, char** argv) {
 
     waitForInput(connection);
 
-    printResults();
-
-    
-    return (EXIT_SUCCESS);
+    return(printResults());
 }

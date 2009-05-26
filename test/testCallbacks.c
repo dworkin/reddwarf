@@ -92,7 +92,7 @@ void channel_recv_msg_cb(sgs_connection *conn,
 
 }
 
-/* This funciton is called when the server disconnects the
+/* This function is called when the server disconnects the
  *  client. This is one of the tests run early in the smoketest.
  *  All this function does is indicate that the disconnect function
  * has been properly called, and sets the loginDisconnectFail flag
