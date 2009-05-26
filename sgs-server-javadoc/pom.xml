@@ -155,7 +155,7 @@
 	      <links>
 		<link>http://java.sun.com/javase/6/docs/api/</link>
               </links>
-	      <show>package</show>
+	      <show>public</show>
 	      <author>false</author>
 	      <quiet>true</quiet>
 	      <attach>false</attach>

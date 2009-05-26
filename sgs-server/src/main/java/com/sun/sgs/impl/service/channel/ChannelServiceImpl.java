@@ -76,10 +76,7 @@ import javax.management.JMException;
  * 
  * <p>The {@link #ChannelServiceImpl constructor} requires the <a
  * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> property and supports
- * these public configuration <a
- * href="../../../impl/kernel/doc-files/config-properties.html#ChannelService">
- * properties</a>. <p>
+ * <code>com.sun.sgs.app.name</code></a> property.
  *
  * <p>TBD: add summary comment about how the implementation works.
  */

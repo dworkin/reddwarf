@@ -91,7 +91,10 @@ import javax.management.JMException;
  * The {@link #ClientSessionServiceImpl constructor} requires the <a
  * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> configuration
- * property.  It also supports the following additional properties: <p>
+ * property and supports these
+ * public configuration <a
+ * href="../../../impl/kernel/doc-files/config-properties.html#ClientSessionService">
+ * properties</a>.  It also supports the following additional properties: <p>
  * 
  * <dl style="margin-left: 1em">
  *
