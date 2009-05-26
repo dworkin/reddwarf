@@ -105,7 +105,7 @@ final class TransactionSchedulerImpl
         "com.sun.sgs.impl.kernel.scheduler.queue";
 
     /**
-     * the default scheduler
+     * The default scheduler.
      */
     public static final String DEFAULT_SCHEDULER_QUEUE =
         "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
@@ -118,7 +118,7 @@ final class TransactionSchedulerImpl
         "com.sun.sgs.impl.kernel.transaction.threads";
 
     /**
-     * the default number of initial consumer threads
+     * The default number of initial consumer threads.
      */
     public static final String DEFAULT_CONSUMER_THREADS = "4";
 

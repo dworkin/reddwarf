@@ -87,22 +87,13 @@ import javax.management.JMException;
  * for creating and initializing all components of the system and the
  * applications configured to run in this system.
  * <p>
- * The kernel can be configured using any of the properties specified in
- * the {@link StandardProperties} class.  These properties include:
- * <ul>
- * <li>Required properties for specifying the name and location of the
- * application to boot.  See the <a
- * href="../../../impl/kernel/doc-files/config-properties.html#RequiredProperties">
- * public configuration guide</a> for more details.</li>
- * <li>Configuration properties for plugging in a replacement implementation of
- * any of the {@link StandardProperties.StandardService Standard}
- * {@link Service} classes and
- * their associated {@code Manager} classes.</li>
- * <li>Enabling custom {@code Service} classes and their associated
- * {@code Manager} classes.</li>
- * </ul>
- * <p>
- * The kernel also supports the following additional configuration properties:
+ * The kernel must be configured with certain <a
+ * href="../../impl/kernel/doc-files/config-properties.html#RequiredProperties">
+ * required properties</a> and supports other <a
+ * href="../../impl/kernel/doc-files/config-properties.html#System">public
+ * properties</a>.  It can also be configured with any of the properties
+ * specified in the {@link StandardProperties} class, and supports
+ * the following additional configuration properties:
  * 
  * <dl style="margin-left: 1em">
  *
@@ -122,7 +113,9 @@ import javax.management.JMException;
  * <dd style="padding-top: .5em">By default, no profile listeners are enabled.
  *      To enable a set of listeners, set this property to a colon-separated
  *      list of fully-qualified class 
- *      names, each of which implements {@link ProfileListener}.<p>
+ *      names, each of which implements {@link ProfileListener}.  A number
+ *      of listeners are provided with the system in the
+ *      {@link com.sun.sgs.impl.profile.listener} package.<p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #ACCESS_COORDINATOR_PROPERTY}
  *	</b></code> <br>
