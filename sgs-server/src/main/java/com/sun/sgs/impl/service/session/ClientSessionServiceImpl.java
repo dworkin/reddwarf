@@ -103,22 +103,24 @@ import javax.management.JMException;
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_SERVER_PORT}
  *
- * <dd style="padding-top: .5em">Specifies the server port.<p>
+ * <dd style="padding-top: .5em">Specifies the port for the 
+ *      <code>ClientSessionService</code>'s internal server.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
  *	{@value #WRITE_BUFFER_SIZE_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_WRITE_BUFFER_SIZE}
  *
- * <dd style="padding-top: .5em">Specifies the write buffer size.<p>
+ * <dd style="padding-top: .5em">Specifies the approximate write buffer capacity
+ *      per client session.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
  *	{@value #EVENTS_PER_TXN_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_EVENTS_PER_TXN}
  *
- * <dd style="padding-top: .5em">Specifies the number of events per 
- * transaction.<p>
+ * <dd style="padding-top: .5em">Specifies the number of client session events
+ *      to process per transaction.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
  *	{@value #ALLOW_NEW_LOGIN_PROPERTY}
