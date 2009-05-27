@@ -34,9 +34,6 @@ import com.sun.sgs.kernel.NodeType;
  * <p>
  * Default values can be provided for all applications by using any of the
  * properties specified in this class as a system property.
- * <p>
- * A deprecated property is <code>CONFIG_FILE</code>, which, if present,
- * will be combined with the application property file.
  */
 public final class StandardProperties {
     

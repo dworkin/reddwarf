@@ -23,7 +23,7 @@
       <outputDirectory></outputDirectory>
       <excludes>
 	<exclude>src/main/resources/com/sun/sgs/sgs.version</exclude>
-	<exclude>src/main/resources/com/sun/sgs/app/doc-files/config-properties.html</exclude>
+	<exclude>src/main/resources/com/sun/sgs/impl/kernel/doc-files/config-properties.html</exclude>
       </excludes>
     </fileSet>
 
@@ -40,8 +40,8 @@
       <fileMode>644</fileMode>
     </file>
     <file>
-      <source>src/main/resources/com/sun/sgs/app/doc-files/config-properties.html</source>
-      <outputDirectory>com/sun/sgs/app/doc-files</outputDirectory>
+      <source>src/main/resources/com/sun/sgs/impl/kernel/doc-files/config-properties.html</source>
+      <outputDirectory>com/sun/sgs/impl/kernel/doc-files</outputDirectory>
       <filtered>true</filtered>
       <fileMode>644</fileMode>
     </file>

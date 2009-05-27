@@ -87,7 +87,7 @@ import java.util.logging.Logger;
  *
  * The {@link #DataStoreImpl(Properties, AccessCoordinator) constructor}
  * supports these public <a
- * href="../../../../app/doc-files/config-properties.html#DataStore">
+ * href="../../../../impl/kernel/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
  * 
  * The constructor also passes the properties to the constructor of

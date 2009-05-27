@@ -114,7 +114,7 @@
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
-	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/all-overview.html</overview>
 	      <windowtitle>Project Darkstar Server ${project.version} API</windowtitle>
 	      <doctitle>Project Darkstar Server ${project.version} API</doctitle>
 	      <footer>
@@ -147,6 +147,48 @@
 	  </execution>
 
 	  <execution>
+	    <id>internal-api-javadoc</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <links>
+		<link>http://java.sun.com/javase/6/docs/api/</link>
+              </links>
+	      <show>public</show>
+	      <author>false</author>
+	      <quiet>true</quiet>
+	      <attach>false</attach>
+	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/api-overview.html</overview>
+	      <windowtitle>Project Darkstar Server ${project.version} Internal API</windowtitle>
+	      <doctitle>Project Darkstar Server ${project.version} Internal API</doctitle>
+	      <footer>
+		<![CDATA[<font size="-1">Project Darkstar, Version
+                ${project.version}<br/>${buildNumber}</font>]]>
+	      </footer>
+	      <bottom>
+		<![CDATA[<font size="-1">Copyright &copy; 
+                {inceptionYear}-{currentYear} Sun Microsystems,
+                Inc. All rights reserved</font>]]>
+	      </bottom>
+	      <finalName>internal-api</finalName>
+	      <subpackages>com.sun.sgs.app:com.sun.sgs.internal:com.sun.sgs.protocol.simple:com.sun.sgs.auth:com.sun.sgs.kernel:com.sun.sgs.management:com.sun.sgs.nio:com.sun.sgs.profile:com.sun.sgs.protocol:com.sun.sgs.service:com.sun.sgs.transport</subpackages>
+	      <groups>
+		<group>
+		  <title>External API</title>
+		  <packages>com.sun.sgs.app*:com.sun.sgs.internal*:com.sun.sgs.protocol.simple*</packages>
+		</group>
+		<group>
+		  <title>Internal API</title>
+		  <packages>com.sun.sgs.auth*:com.sun.sgs.kernel*:com.sun.sgs.management*:com.sun.sgs.nio*:com.sun.sgs.profile*:com.sun.sgs.protocol*:com.sun.sgs.service*:com.sun.sgs.transport*</packages>
+		</group>
+	      </groups>
+	      <outputDirectory>${project.build.directory}/internal-api-docs</outputDirectory>
+	    </configuration>
+	  </execution>
+
+	  <execution>
 	    <id>api-javadoc</id>
 	    <goals>
               <goal>jar</goal>
@@ -160,7 +202,7 @@
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
-	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/api-overview.html</overview>
 	      <windowtitle>Project Darkstar Server ${project.version} External API</windowtitle>
 	      <doctitle>Project Darkstar Server ${project.version} External API</doctitle>
 	      <footer>
@@ -200,6 +242,11 @@
                   <file>${project.build.directory}/all-javadoc.jar</file>
                   <type>jar</type>
                   <classifier>all</classifier>
+                </artifact>
+		<artifact>
+                  <file>${project.build.directory}/internal-api-javadoc.jar</file>
+                  <type>jar</type>
+                  <classifier>internal-api</classifier>
                 </artifact>
 		<artifact>
                   <file>${project.build.directory}/api-javadoc.jar</file>

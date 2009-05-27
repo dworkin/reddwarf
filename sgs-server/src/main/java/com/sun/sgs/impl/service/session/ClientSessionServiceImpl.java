@@ -52,6 +52,7 @@ import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -88,13 +89,61 @@ import javax.management.JMException;
  * Manages client sessions. <p>
  *
  * The {@link #ClientSessionServiceImpl constructor} requires the <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> and <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.impl.service.session.transports">
- * <code>com.sun.sgs.impl.service.session.transports</code></a> configuration
- * properties and supports these public configuration <a
- * href="../../../app/doc-files/config-properties.html#ClientSessionService">
- * properties</a>. <p>
+ * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * <code>com.sun.sgs.app.name</code></a> configuration
+ * property and supports these
+ * public configuration <a
+ * href="../../../impl/kernel/doc-files/config-properties.html#ClientSessionService">
+ * properties</a>.  It also supports the following additional properties: <p>
+ * 
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #SERVER_PORT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_SERVER_PORT}
+ *
+ * <dd style="padding-top: .5em">Specifies the port for the 
+ *      <code>ClientSessionService</code>'s internal server.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #WRITE_BUFFER_SIZE_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_WRITE_BUFFER_SIZE}
+ *
+ * <dd style="padding-top: .5em">Specifies the approximate write buffer capacity
+ *      per client session.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #EVENTS_PER_TXN_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_EVENTS_PER_TXN}
+ *
+ * <dd style="padding-top: .5em">Specifies the number of client session events
+ *      to process per transaction.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #ALLOW_NEW_LOGIN_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@code false}
+ *
+ * <dd style="padding-top: .5em">If {@code false}, any connecting client with 
+ * the same username as an already connected client will not be permitted
+ * to login.  If {@code true}, the user's existing session will be
+ * disconnected and the new login is allowed to proceed.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #PROTOCOL_ACCEPTOR_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_PROTOCOL_ACCEPTOR}
+ *
+ * <dd style="padding-top: .5em">Specifies the name of the class
+ * which will be used as the protocol acceptor.  The default value uses
+ * an acceptor based on the {@link SimpleSgsProtocol}.  Other values should
+ * specify the fully qualified name of a non-abstract class that implements
+ * {@link ProtocolAcceptor}.<p>
+ * 
+ * </dl> <p>
  */
 public final class ClientSessionServiceImpl
     extends AbstractService
@@ -125,36 +174,36 @@ public final class ClientSessionServiceImpl
     private static final int MINOR_VERSION = 0;
     
     /** The name of the server port property. */
-    private static final String SERVER_PORT_PROPERTY =
+    static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
 
     /** The default server port. */
-    private static final int DEFAULT_SERVER_PORT = 0;
+    static final int DEFAULT_SERVER_PORT = 0;
 
     /** The name of the write buffer size property. */
-    private static final String WRITE_BUFFER_SIZE_PROPERTY =
+    static final String WRITE_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".buffer.write.max";
 
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
-    private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+    static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
     /** The events per transaction property. */
-    private static final String EVENTS_PER_TXN_PROPERTY =
+    static final String EVENTS_PER_TXN_PROPERTY =
 	PKG_NAME + ".events.per.txn";
 
     /** The default events per transaction. */
-    private static final int DEFAULT_EVENTS_PER_TXN = 1;
+    static final int DEFAULT_EVENTS_PER_TXN = 1;
 
     /** The name of the allow new login property. */
-    private static final String ALLOW_NEW_LOGIN_PROPERTY =
+    static final String ALLOW_NEW_LOGIN_PROPERTY =
 	PKG_NAME + ".allow.new.login";
 
     /** The protocol acceptor property name. */
-    private static final String PROTOCOL_ACCEPTOR_PROPERTY =
+    static final String PROTOCOL_ACCEPTOR_PROPERTY =
 	PKG_NAME + ".protocol.acceptor";
 
     /** The default protocol acceptor class. */
-    private static final String DEFAULT_PROTOCOL_ACCEPTOR =
+    static final String DEFAULT_PROTOCOL_ACCEPTOR =
 	"com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor";
 
     /** The write buffer size for new connections. */

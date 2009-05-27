@@ -69,7 +69,7 @@ import java.util.logging.Logger;
  * resolve prepared transactions should have no effect at present. <p>
  *
  * The {@link #BdbEnvironment constructor} supports these public <a
- * href="../../../../../../app/doc-files/config-properties.html#Bdb">
+ * href="../../../../../../impl/kernel/doc-files/config-properties.html#Bdb">
  * properties</a> and the following additional properties: <p>
  *
  * <dl style="margin-left: 1em">
