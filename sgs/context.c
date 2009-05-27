@@ -53,13 +53,11 @@ void sgs_ctx_destroy(sgs_context_impl *ctx) {
 }
 
 /*
- * sgs_ctx_create()
- * Note that this function assumes that the first argument, hostname, points
- * to a null-terminated character array. 
+ * sgs_ctx_create_empty()
+ * Note that this function assumes that the first argument, hostname,
+ * points to a null-terminated character array
  */
-sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
-        void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
-        void (*unreg_fd)(sgs_connection*, sgs_socket_t, short)) {
+sgs_context_impl *sgs_ctx_create_empty(const char* hostname, const int port){
     int name_len;
 
     sgs_context_impl *ctx = NULL;
@@ -76,14 +74,28 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     }
 
     strncpy(ctx->hostname, hostname, name_len);
-
     ctx->port = port;
 
     /* initialize all callback functions to NULL */
     sgs_ctx_unset_all_cbs(ctx);
+    return ctx;
+}
 
-    ctx->reg_fd_cb = reg_fd;
-    ctx->unreg_fd_cb = unreg_fd;
+/*
+ * sgs_ctx_create()
+ * Note that this function assumes that the first argument, hostname, points
+ * to a null-terminated character array. 
+ */
+sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
+        void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
+        void (*unreg_fd)(sgs_connection*, sgs_socket_t, short)) {
+    sgs_context_impl *ctx = NULL;
+
+    ctx = sgs_ctx_create_empty(hostname, port);
+    if (ctx != NULL){
+        ctx->reg_fd_cb = reg_fd;
+        ctx->unreg_fd_cb = unreg_fd;
+    }
     return ctx;
 }
 

@@ -46,6 +46,7 @@ typedef struct sgs_connection_impl sgs_connection;
 
 #include "sgs/config.h"
 #include "sgs/context.h"
+#include "sgs/session.h"
 
 /*
  * function: sgs_connection_create()
@@ -95,6 +96,23 @@ int sgs_connection_login(sgs_connection* connection, const char* login,
  * success and -1 on failure, with errno set to the specific error code.
  */
 int sgs_connection_logout(sgs_connection* connection, int force);
+
+/*
+ * function sgs_connection_get_context()
+ *
+ * returns the context associated with this connection
+ *
+ */
+
+sgs_context* sgs_connection_get_context(sgs_connection* connection);
+
+/*
+ *  function sgs_connection_get_session
+ *
+ *  returns the session associated with this connection
+ */
+sgs_session* sgs_connection_get_session(sgs_connection* connection);
+
 
 #ifdef __cplusplus
 }

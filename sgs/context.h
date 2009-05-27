@@ -59,14 +59,33 @@ typedef struct sgs_context_impl sgs_context;
 void sgs_ctx_destroy(sgs_context* ctx);
 
 /*
+ * function sgs_ctx_create_empty()
+ *
+ *Creates a new login context, without filling in any callbacks.
+ * Returns null on failure, and a pointer to the new context on
+ * success.
+ *
+ * args:
+ *  hostname: the hostname of the server to connect to. Note that the
+ *      function assumes that this argument points to a null-terminated
+ *      character array.
+ *  port: the network port to connect to
+ *
+ */
+sgs_context* sgs_ctx_create_empty(const char*hostname,
+                            const int port);
+
+/*
  * function: sgs_ctx_create()
  *
  * Creates a new login context.  Returns null on failure.
  *
  * args:
- *  hostname: the hostname of the server to connect to
- *      port: the network port of the server to connect to
- *    reg_fd: a callback function used by a sgs_connection (when created with
+ *  hostname: the hostname of the server to connect to. Note that the
+ *      function assumes that this argument points to a null-terminated
+ *      character array.
+ *  port: the network port of the server to connect to
+ *  reg_fd: a callback function used by a sgs_connection (when created with
  *            this sgs_context) to register interest in a file descriptor
  *  unreg_fd: a callback function used by a sgs_connection (when created with
  *            this sgs_context) to unregister interest in a file descriptor 

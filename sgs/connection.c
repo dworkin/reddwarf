@@ -47,6 +47,7 @@
 #include "sgs/error_codes.h"
 #include "sgs/protocol.h"
 #include "sgs/private/connection_impl.h"
+#include "sgs/private/session_impl.h"
 #include "sgs/private/io_utils.h"
 
 #ifndef WIN32
@@ -317,7 +318,19 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx) {
     return connection;
 }
 
+/*
+ *  sgs_connection_get_context
+ */
+sgs_context* sgs_connection_get_context(sgs_connection_impl *connection){
+    return connection->ctx;
+}
 
+/*
+ * sgs_connection_get_session
+ */
+sgs_session* sgs_connection_get_session(sgs_connection_impl* connection){
+    return connection->session;
+}
 /*
  * PRIVATE IMPL FUNCTIONS
  */
