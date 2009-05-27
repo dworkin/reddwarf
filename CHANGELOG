@@ -5,6 +5,14 @@ Version 0.9.10
     use h_addr_list[] rather than the deprecated hostent; this fixes
     the root cause of issue 12.
  - Added the chat client example; this partially addresses issue 14
+ - Added a smoke test client, which can be run against a server to test
+   all of the protocol messages that flow between the client and the server
+ - Added functions sgs_connection_get_context() and sgs_connection_get_session()
+   which remove the requirement that the client keep shadow copies of the
+   context and session objects in order to access those objects
+ - Added function sgs_ctx_create_empty(), which creates a context with no
+   callbacks filled in. This removes the special nature of reg_fd_cb and
+   unreg_fd_cb.
 
 Version 0.9.9
 - Bug fix in session.c; repairs a problem with names and fixes a memory leak
