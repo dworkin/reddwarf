@@ -168,7 +168,7 @@ public interface NodeMappingService extends Service {
      
     /**
      * Adds a {@code listener} to be notified when an identity has been selected
-     * to be moved off the local node.
+     * to be relocated off the local node.
      * <p>
      * If a {@code Service} needs to take actions before an identity is moved,
      * it should register one (or more) {@code listener} objects when 
@@ -182,7 +182,7 @@ public interface NodeMappingService extends Service {
      * @param listener a listener to be notified prior to an identity moving
      *                 from the local node
      */
-    void addPrepareMoveListener(PrepareMoveListener listener);
+    void addIdentityRelocationListener(IdentityRelocationListener listener);
     
     /** 
      * Adds a {@code listener} to be notified when the identity
