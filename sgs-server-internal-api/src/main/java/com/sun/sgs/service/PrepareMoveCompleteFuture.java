@@ -25,14 +25,14 @@ package com.sun.sgs.service;
 
 /**
  * A future to be notified when recovery operations for an associated
- * {@link PrepareMoveListener} are complete.
+ * {@link IdentityRelocationListener} are complete.
  *
  * @see IdentityRelocationListener#prepareToRelocate
  */
 public interface PrepareMoveCompleteFuture {
     /**
      * Notifies this future that the prepare move operations initiated by
-     * the {@link PrepareMoveListener} associated with this future are
+     * the {@link IdentityRelocationListener} associated with this future are
      * complete.  This method is idempotent and can be called multiple times.
      * It may be called synchronously with the listener notification or
      * asynchronously.

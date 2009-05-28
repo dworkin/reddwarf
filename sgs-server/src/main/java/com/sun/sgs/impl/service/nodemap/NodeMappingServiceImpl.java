@@ -21,7 +21,6 @@ package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -42,6 +41,7 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.IdentityRelocationListener;
+import com.sun.sgs.service.PrepareMoveCompleteFuture;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
@@ -57,7 +57,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -352,6 +356,14 @@ public class NodeMappingServiceImpl
     /** Our service statistics */
     private final NodeMappingServiceStats serviceStats;
     
+    /** The set of identity relocation listeners for this node. */
+    private final Set<IdentityRelocationListener> idRelocationListeners =
+            new CopyOnWriteArraySet<IdentityRelocationListener>();
+
+    /** A map of identities to outstanding idRelocation futures. */
+    private final ConcurrentMap<Identity, Queue<PrepareMoveCompleteFuture>>
+        relocateFutures = 
+            new ConcurrentHashMap<Identity, Queue<PrepareMoveCompleteFuture>>();
     /**
      * Constructs an instance of this class with the specified properties.
      * <p>
@@ -753,9 +765,16 @@ public class NodeMappingServiceImpl
     
     /** {@inheritDoc} */
     public void addIdentityRelocationListener(
-                                    IdentityRelocationListener listener) 
+                                         IdentityRelocationListener listener) 
     {
-        throw new UnsupportedOperationException("Not supported yet.");
+        checkState();
+        if (listener == null) {
+            throw new NullPointerException("null listener");
+        }
+        serviceStats.addIdentityRelocationListenerOp.report();
+
+        idRelocationListeners.add(listener);
+        logger.log(Level.FINEST, "addIdentityRelocationListener successful");
     }
     
     /** {@inheritDoc} */
@@ -840,6 +859,57 @@ public class NodeMappingServiceImpl
                     new MapAddTask(listener, id, oldNode), taskOwner);
             }
         }
+        
+        public void prepareRelocate(Identity id, long newNode) {
+            if (idRelocationListeners.isEmpty()) {
+                // There's no work to do.
+                tellServerCanMove(id);
+            }
+            Queue<PrepareMoveCompleteFuture> futureQueue =
+                new ConcurrentLinkedQueue<PrepareMoveCompleteFuture>();
+            if (relocateFutures.putIfAbsent(id, futureQueue) != null) {
+                // this identity is already being moved somewhere!
+                return;
+            }
+            
+            // Check to see if we've been constructed but are not yet
+            // completely running.  We reserve tasks for the notifications
+            // in this case, and will use them when ready() has been called.
+            synchronized (lock) {
+                if (isInInitializedState()) {
+                    logger.log(Level.FINEST, 
+                               "Queuing added notification for " +
+                               "identity: {0}, " + "newNode: {1}}", 
+                               id, newNode);
+                    for (IdentityRelocationListener listener : 
+                         idRelocationListeners) 
+                    {
+                        final PrepareMoveCompleteFuture future =
+                            new PrepareMoveCompleteFutureImpl(id);
+                        futureQueue.add(future);
+                        TaskReservation res =
+                            taskScheduler.reserveTask(
+                                new MapRelocateTask(listener, id, newNode, 
+                                                    future),
+                                taskOwner);
+                        pendingNotifications.add(res);
+                    }
+                    return;
+                }
+            }
+            
+            // The normal case.
+            for (final IdentityRelocationListener listener : 
+                 idRelocationListeners) 
+            {
+                final PrepareMoveCompleteFuture future =
+                        new PrepareMoveCompleteFutureImpl(id);
+                futureQueue.add(future);
+                taskScheduler.scheduleTask(
+                    new MapRelocateTask(listener, id, newNode, future), 
+                    taskOwner);
+            }
+        }
     }
      
     /**
@@ -879,6 +949,30 @@ public class NodeMappingServiceImpl
         }
         public void run() {
             listener.mappingAdded(id, oldNode);
+        }
+    }
+    
+    /**
+     * Let a listener know that the an identity will be relocated from this
+     * node.
+     */
+    private static final class MapRelocateTask extends AbstractKernelRunnable {
+        final IdentityRelocationListener listener;
+        final Identity id;
+        final long newNode;
+        final PrepareMoveCompleteFuture future;
+        MapRelocateTask(IdentityRelocationListener listener, 
+                        Identity id, long newNode, 
+                        PrepareMoveCompleteFuture future) 
+        {
+	    super(null);
+            this.listener = listener;
+            this.id = id;
+            this.newNode = newNode;
+            this.future = future;
+        }
+        public void run() {
+            listener.prepareToRelocate(id, newNode, future);
         }
     }
     
@@ -962,6 +1056,76 @@ public class NodeMappingServiceImpl
         }  
     }
 
+        /**
+     * The {@code PrepareMoveCompleteFuture} implementation.  When {@code
+     * done} is invoked, the future instance is removed from the recovery
+     * future queue for the associated node.  If a given future is the
+     * last one to be removed from a node's queue, then recovery is
+     * complete for that node, and the data store is updated to clean
+     * up recovery information for that node.
+     */
+    private final class PrepareMoveCompleteFutureImpl
+	implements PrepareMoveCompleteFuture
+    {
+	/** The identity. */
+	private final Identity id;
+	/** Indicates whether recovery is done. */
+	private boolean isDone = false;
+
+	/**
+	 * Constructs an instance with the specified {@code node} and
+	 * recovery {@code listener}.
+	 */
+	PrepareMoveCompleteFutureImpl(Identity id) {
+	    this.id = id;
+	}
+
+	/** {@inheritDoc} */
+	public void done() {
+	    synchronized (this) {
+		if (isDone) {
+		    return;
+		}
+		isDone = true;
+	    }
+
+	    Queue<PrepareMoveCompleteFuture> futureQueue = 
+                relocateFutures.get(id);
+	    assert futureQueue != null;
+	    futureQueue.remove(this);
+	    if (futureQueue.isEmpty()) {
+                relocateFutures.remove(id);
+                // tell the server we're good to go.
+                tellServerCanMove(id);
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public synchronized boolean isDone() {
+	    return isDone;
+	}
+    }
+    
+    /**
+     * Tell the server that it's OK to move identity, all listeners
+     * have been notified and have finished.
+     * @param id the id to move
+     */
+    private void tellServerCanMove(Identity id) {
+        int tryCount = 0;
+        while (tryCount < MAX_RETRY) {
+            try {
+                server.canMove(id);
+                tryCount = MAX_RETRY;
+                logger.log(Level.FINEST, "can move identity {0}", id);
+            } catch (IOException ioe) {
+                tryCount++;
+                logger.logThrow(Level.FINEST, ioe, 
+                        "Exception encountered on try {0}: {1}",
+                        tryCount, ioe);
+            }
+        }
+    }
     /* -- For testing. -- */
     
     /**

@@ -51,4 +51,13 @@ interface NotifyClient extends Remote {
      * @throws IOException if there is a communication problem 
      */
     void removed(Identity id, Node newNode) throws IOException;
+    
+    /**
+     * An identity has been selected for relocation on from this node.
+     * 
+     * @param id the identity
+     * @param newNode the new node id the identity will be relocated to
+     * @throws IOException if there is a communication problem 
+     */
+    void prepareRelocate(Identity id, long newNode) throws IOException;
 }
