@@ -49,15 +49,15 @@ public interface ClientSessionStatusListener {
      * {@code sessionRefId} is relocating to the node with the
      * specified {@code nodeId}.  This notification gives the
      * service associated with this listener an opportunity to
-     * prepare for the relocation.  The associated service
-     * should invoke the {@link CompletionFuture#done done}
-     * method of the specified {@code future} when it has
-     * completed preparing for the relocation.
+     * prepare for the relocation.  The associated service should
+     * invoke the {@link SimpleCompletionHandler@completed
+     * completed} method of the specified {@code handler} when it
+     * has completed preparing for the relocation.
      * 
      * @param sessionRefId the client session ID
      * @param newNode the ID of the new node
-     * @param future a future to notify when 
+     * @param handler a handler to notify when preparation is complete
      */
     void prepareToRelocate(BigInteger sessionRefId, long newNode,
-			   CompletionFuture future);
+			   SimpleCompletionHandler handler);
 }

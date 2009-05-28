@@ -45,11 +45,11 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
-import com.sun.sgs.service.CompletionFuture;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -1042,8 +1042,9 @@ public final class ChannelServiceImpl
 	 * {@inheritDoc}
 	 */
 	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
-				      CompletionFuture future)
+				      SimpleCompletionHandler handler)
 	{
+	    handler.completed();
 	}
 	    
     }

@@ -43,6 +43,7 @@ import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -1017,7 +1018,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /**
      * This future is an abstract implementation for the futures
-     * returned by {@code ProtocolListener} and {@code SessionProtocolHandler}.
+     * passed to the {@code RequestCompletionHandler} used by the
+     * {@code ProtocolListener} and {@code SessionProtocolHandler}
+     * APIs.
      */
     private abstract static class AbstractCompletionFuture<T>
             implements Future<T>
@@ -1040,7 +1043,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
 	/** Constructs an instance. */
 	protected AbstractCompletionFuture(
-	RequestCompletionHandler<T> completionHandler)
+	    RequestCompletionHandler<T> completionHandler)
 	{
 	    checkNull("completionHandler", completionHandler);
 	    this.completionHandler = completionHandler;
@@ -1291,11 +1294,16 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * An action to move the associated client session from this node to
      * another node.
      */
-    class MoveAction implements Action {
+    class MoveAction implements Action, SimpleCompletionHandler {
 
+	/** The new node. */
 	private final Node newNode;
 
+	/** The client session server. */
 	private final ClientSessionServer server;
+
+	/** The relocation key. */
+	private volatile byte[] relocationKey;
 
 	/**
 	 * Constructs an instance with the specified {@code newNode}.
@@ -1319,7 +1327,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * Notify new node that session is being relocated there and
 		 * obtain relocation key.
 		 */
-		byte[] relocationKey =
+		relocationKey =
 		    server.relocatingSession(
  			identity, sessionRefId.toByteArray(),
 			sessionService.getLocalNodeId());
@@ -1328,10 +1336,30 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * specifying the relocation key.
 		 */
 		relocating = true;
+
+		sessionService.notifyPrepareToRelocate(
+		    sessionRefId, newNode.getId(), this);
+		
+	    } catch (Exception e) {
+		// If there is a problem contacting the destination node,
+		// then disconnect the client session immediately.
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"relocating client session:{0} throws", this);
+		}
+		handleDisconnect(false, true);
+	    }
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public void completed() {
+	    try {
 		Set<ProtocolDescriptor> descriptors =
 		    sessionService.getProtocolDescriptors(newNode.getId());
 		protocol.relocate(
-		    newNode, descriptors, ByteBuffer.wrap(relocationKey));
+			newNode, descriptors, ByteBuffer.wrap(relocationKey));
 
 		/*
 		 * Schedule a task to close the client session if it is not
@@ -1343,15 +1371,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 */
 		sessionService.getTaskScheduler().scheduleTask(
 		    new AbstractKernelRunnable("CloseMovedClientSession") {
-		    	public void run() {
+			public void run() {
 			    handleDisconnect(false, true);
 			} },
 		    identity,
 		    System.currentTimeMillis() + 1000L);
 		
-	    } catch (Exception e) {
-		// If there is a problem contacting the destination node
-		// or client, then disconnect the client session immediately.
+	    } catch (IOException e) {
+		// If there is a problem contacting the client,
+		// then disconnect the client session immediately.
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e,
@@ -1359,7 +1387,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		}
 		handleDisconnect(false, true);
 	    }
-	    return false;
 	}
     }
 
@@ -1373,4 +1400,5 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    return false;
 	}
     }
+
 }

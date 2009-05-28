@@ -62,6 +62,7 @@ import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -1019,7 +1020,7 @@ public final class ClientSessionServiceImpl
 
     /**
      * Returns the next relocation key.
-     *
+ *
      * @return the next relocation key
      */
     private static byte[] getNextRelocationKey() {
@@ -1086,7 +1087,8 @@ public final class ClientSessionServiceImpl
      * if one of the following conditions holds:
      *
      * <ul>
-     * <li>the {@code identity} is not currently logged in, or
+     * <li>the {@code identity} is not currently logged in and is not
+     * relocating to the current node, or
      * <li>the {@code identity} is logged in, and the {@code
      * com.sun.sgs.impl.service.session.allow.new.login} property is
      * set to {@code true}.
@@ -1220,6 +1222,19 @@ public final class ClientSessionServiceImpl
 		    }
 		    // TBD: or else what?
 		} }, taskOwner);
+    }
+
+    void notifyPrepareToRelocate(BigInteger sessionRefId, long newNode,
+				 SimpleCompletionHandler handler)
+    {
+	// TBD: Assume for now that there is only one
+	// ClientSessionStatusListener...
+	for (ClientSessionStatusListener statusListener :
+		 sessionStatusListeners)
+	{
+	    statusListener.prepareToRelocate(sessionRefId, newNode, handler);
+	    break;
+	}
     }
 
     /**

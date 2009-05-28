@@ -24,29 +24,19 @@
 package com.sun.sgs.service;
 
 /**
- * A future to be notified when  operations for an associated
+ * A handler to be notified when operations for an associated
  * request are complete.
  *
- * <p>TBD: merge with {@link RecoveryCompleteFuture}?
- *
  * @see ClientSessionStatusListener#prepareToRelocate(
- *		BigInteger,long,CompletionFuture)
+ *		BigInteger,long,SimpleCompletionHandler)
+ * @see RecoveryListener#recover(Node,SimpleCompletionHandler)
  */
-public interface CompletionFuture {
+public interface SimpleCompletionHandler {
 
     /**
-     * Notifies this future that the operations initiated by the
-     * listener associated with this future are complete.  This
+     * Notifies this handler that the operations initiated by the
+     * request associated with this future are complete.  This
      * method is idempotent and can be called multiple times.
      */
-    void done();
-
-    /**
-     * Returns {@code true} if the {@link #done done} method of this
-     * future has been invoked, and {@code false} otherwise.
-     *
-     * @return	{@code true} if {@code done} has been invoked, and
-     *		{@code false} otherwise 
-     */
-    boolean isDone();
+    void completed();
 }
