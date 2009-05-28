@@ -61,6 +61,13 @@ public class SmokeTestListener implements Serializable,
                 return DONE;
             return State.values()[this.ordinal() + 1];
         }
+
+        /** Get the previous state, but stop at INIT*/
+        public State previous(){
+            if (this == INIT)
+                return INIT;
+            return State.values()[this.ordinal() - 1];
+        }
     }
 
     /** The current state. */
@@ -250,6 +257,8 @@ public class SmokeTestListener implements Serializable,
              * so there is no reason to continue the tests
              */
             curState = State.DONE;
+            curState = curState.previous();
+            performNextStep();
         }
         String grace = graceful ? "graceful" : "forced";
         logger.log(Level.INFO, "User {0} has logged out {1}", new Object[] {
