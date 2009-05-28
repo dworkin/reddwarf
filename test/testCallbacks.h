@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 
+#include <sys/select.h>
 #include "sgs/connection.h"
 #include "sgs/channel.h"
 #include "sgs/session.h"
