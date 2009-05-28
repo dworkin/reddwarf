@@ -71,7 +71,7 @@ public class SmokeTestListener implements Serializable,
     private static final String TEST_CHANNEL_MSG = " channel 2msg/!";
     private static final String LOGOUT_MSG = "logout";
     /* The number of tests that have failed*/
-    private static int testsFailed = 0;
+    private  int testsFailed = 0;
 
     /**
      * Session listener that handles this single session. A channel is created
@@ -204,7 +204,8 @@ public class SmokeTestListener implements Serializable,
     }
 
     /**
-     * Log the smoke test failure and disconnect the client. A failure could
+     * Log the smoke test failure and increment the counter keeping track
+     * of the number of tests that have failed. A failure could
      * be due, among other cases, to an incorrect message being sent by the 
      * client, or a message arriving out of order.
      * 
@@ -214,7 +215,6 @@ public class SmokeTestListener implements Serializable,
     {
         logger.log(Level.WARNING, "\n\n[[Client " + sessionName
                 + " Failed Smoke Test]]: {0}\n", errorMsg);
-
         testsFailed++;
     }
 
@@ -241,15 +241,16 @@ public class SmokeTestListener implements Serializable,
         case LOGOUT:
             if (!graceful)
                 fail("Ungraceful logout");
-            else
-                performNextStep();
+            performNextStep();
             break;
 
         default:
             fail("Unexpected logout");
-        
+            /*just quit; if the client has logged out,
+             * so there is no reason to continue the tests
+             */
+            curState = State.DONE;
         }
-        
         String grace = graceful ? "graceful" : "forced";
         logger.log(Level.INFO, "User {0} has logged out {1}", new Object[] {
                 sessionName, grace });
