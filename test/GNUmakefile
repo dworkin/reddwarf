@@ -24,7 +24,7 @@ LIBS += -lsgsclient
 %_test: $(OBJDIR)/%_test.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
 
-smokeTestClient : smokeTestClient.c testCallbacks.c
+smokeTestClient : smokeTestClient.c testCallbacks.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -g -o $@ $<  testCallbacks.o $(LIBS) $(LDLIBS)
 
 testCallbacks.o : testCallbacks.c testCallbacks.h
