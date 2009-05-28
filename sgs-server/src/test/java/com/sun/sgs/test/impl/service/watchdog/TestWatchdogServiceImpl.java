@@ -894,7 +894,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	    listener.checkRecoveryNotifications(shutdownIds.size());
 	    checkNodesFailed(shutdownIds, true);
-	    listener.notifyCompletionHandlerss();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
 
@@ -952,7 +952,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	    Thread.sleep(4 * renewTime);
 	    listener.checkRecoveryNotifications(shutdownIds.size());
-	    listener.notifyCompletionHandlerss();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
 
@@ -1003,7 +1003,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 
 	    listener.checkRecoveryNotifications(shutdownIds.size());
-	    listener.notifyCompletionHandlerss();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
 
@@ -1038,7 +1038,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    newWatchdog = createWatchdog(listener);
 
 	    listener.checkRecoveryNotifications(totalWatchdogs + 1);
-	    listener.notifyCompletionHandlerss();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(watchdogs.keySet());
 
 	} finally {
@@ -1091,7 +1091,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 
 	    listener.checkRecoveryNotifications(shutdownIds.size() + 1);
-	    listener.notifyCompletionHandlerss();
+	    listener.notifyCompletionHandlers();
 
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
@@ -1672,7 +1672,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    }
 	}
 
-	void notifyCompletionHandlerss() {
+	void notifyCompletionHandlers() {
 	    for (SimpleCompletionHandler handler : nodes.values()) {
 		handler.completed();
 	    }
