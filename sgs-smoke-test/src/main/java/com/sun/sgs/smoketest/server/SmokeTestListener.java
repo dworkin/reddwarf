@@ -252,6 +252,7 @@ public class SmokeTestListener implements Serializable,
             break;
 
         default:
+            if (!sessionName.equals("discme")){
             fail("Unexpected logout");
             /* If the client has logged out, no more tests can
              * be done, so quit, making sure the results are
@@ -261,7 +262,7 @@ public class SmokeTestListener implements Serializable,
             curState = curState.previous();
             performNextStep();
         }
-        
+        }
         String grace = graceful ? "graceful" : "forced";
         logger.log(Level.INFO, "User {0} has logged out {1}", new Object[] {
                 sessionName, grace });
