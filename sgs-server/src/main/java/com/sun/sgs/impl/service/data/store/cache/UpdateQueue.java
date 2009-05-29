@@ -48,16 +48,16 @@ public interface UpdateQueue {
     /**
      * A object to be notified of the completion of an operation.
      *
-     * @param	<T> the type of the result of the operation
+     * @param	<T> the type of the item specified for the operation
      */
     public interface CompletionHandler<T> {
 
 	/**
 	 * Provides notification that the operation has been completed.
 	 *
-	 * @param	result the result of the operation
+	 * @param	item the item specified for the operation
 	 */
-	void completed(T result);
+	void completed(T item);
     }
 
     /**

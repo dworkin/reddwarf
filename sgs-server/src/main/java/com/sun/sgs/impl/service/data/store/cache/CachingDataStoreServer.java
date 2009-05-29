@@ -37,12 +37,12 @@ public interface CachingDataStoreServer extends Remote {
      *
      * @param	nodeId the ID of the node
      * @param	callbackServer the callback server
-     * @return	the network address
+     * @return	the socket port
      * @throws	IllegalArgumentException if {@code nodeId} has already been
      *		registered
      * @throws	IOException if a network problem occurs
      */
-    InetAddress registerNode(long nodeId, CallbackServer callbackServer)
+    int registerNode(long nodeId, CallbackServer callbackServer)
 	throws IOException;
 
     /* -- Object methods -- */

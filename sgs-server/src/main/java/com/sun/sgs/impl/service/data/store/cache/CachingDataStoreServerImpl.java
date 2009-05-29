@@ -134,6 +134,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     private final long txnTimeout = -1;  //FIXME: from config
 
+    private final int updateQueuePort = 0; //FIXME: from config
+
     private boolean shuttingDown = false;
 
     /* -- Nested classes -- */
@@ -143,13 +145,19 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	final CallbackServer callbackServer;
 	final Map<Object, NodeRequest> locks =
 	    new HashMap<Object, NodeRequest>();
-	NodeInfo(MultiLockManager<Object, NodeInfo> lockManager,
+	final RequestQueueServer<UpdateQueueRequest> updateQueue;
+
+	NodeInfo(CachingDataStoreServerImpl server,
+		 MultiLockManager<Object, NodeInfo> lockManager,
 		 long nodeId,
 		 CallbackServer callbackServer)
 	{
 	    super(lockManager);
 	    this.nodeId = nodeId;
 	    this.callbackServer = callbackServer;
+	    updateQueue = new RequestQueueServer<UpdateQueueRequest>(
+		new UpdateQueueRequest.UpdateQueueRequestHandler(
+		    server, nodeId));
 	}
 	@Override
 	protected LockRequest<Object, NodeInfo> newLockRequest(
@@ -290,6 +298,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    }
 	    specifiedDirectory = rootDir + File.separator + DEFAULT_DIRECTORY;
 	}
+	/* FIXME: Start update queue listener */
 	/*
 	 * Use an absolute path to avoid problems on Windows.
 	 * -tjb@sun.com (02/16/2007)
@@ -330,7 +339,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /* -- Implement CachingDataStoreServer -- */
 
-    public InetAddress registerNode(
+    public int registerNode(
 	long nodeId, CallbackServer callbackServer)
     {
 	checkNull("callbackServer", callbackServer);
@@ -340,10 +349,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    "Node " + nodeId + " has already been registered");
 	    } else {
 		nodeInfoMap.put(
-		    nodeId, new NodeInfo(lockManager, nodeId, callbackServer));
+		    nodeId,
+		    new NodeInfo(this, lockManager, nodeId, callbackServer));
 	    }
 	}
-	return null;
+	return updateQueuePort;
     }
 
     public long newObjectIds(int numIds) {
