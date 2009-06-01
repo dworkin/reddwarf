@@ -37,8 +37,8 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -894,7 +894,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	    listener.checkRecoveryNotifications(shutdownIds.size());
 	    checkNodesFailed(shutdownIds, true);
-	    listener.notifyFutures();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
 
@@ -952,7 +952,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	    Thread.sleep(4 * renewTime);
 	    listener.checkRecoveryNotifications(shutdownIds.size());
-	    listener.notifyFutures();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
 
@@ -1003,7 +1003,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 
 	    listener.checkRecoveryNotifications(shutdownIds.size());
-	    listener.notifyFutures();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
 
@@ -1038,7 +1038,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    newWatchdog = createWatchdog(listener);
 
 	    listener.checkRecoveryNotifications(totalWatchdogs + 1);
-	    listener.notifyFutures();
+	    listener.notifyCompletionHandlers();
 	    checkNodesRemoved(watchdogs.keySet());
 
 	} finally {
@@ -1091,7 +1091,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 
 	    listener.checkRecoveryNotifications(shutdownIds.size() + 1);
-	    listener.notifyFutures();
+	    listener.notifyCompletionHandlers();
 
 	    checkNodesRemoved(shutdownIds);
 	    checkNodesAlive(watchdogs.keySet());
@@ -1630,15 +1630,15 @@ public class TestWatchdogServiceImpl extends Assert {
 
     private static class DummyRecoveryListener implements RecoveryListener {
 
-	private final Map<Node, RecoveryCompleteFuture> nodes =
+	private final Map<Node, SimpleCompletionHandler> nodes =
 	    Collections.synchronizedMap(
-		new HashMap<Node, RecoveryCompleteFuture>());
+		new HashMap<Node, SimpleCompletionHandler>());
 
 	DummyRecoveryListener() {}
 
-	public void recover(Node node, RecoveryCompleteFuture future) {
+	public void recover(Node node, SimpleCompletionHandler handler) {
             assert(node != null);
-            assert(future != null);
+            assert(handler != null);
 
 	    synchronized (nodes) {
 		if (nodes.get(node) == null) {
@@ -1648,7 +1648,7 @@ public class TestWatchdogServiceImpl extends Assert {
 		    System.err.println(
 			"DummyRecoveryListener.recover: REPLACING node: " + node);
 		}
-		nodes.put(node, future);
+		nodes.put(node, handler);
 		nodes.notifyAll();
 	    }
 	    
@@ -1672,9 +1672,9 @@ public class TestWatchdogServiceImpl extends Assert {
 	    }
 	}
 
-	void notifyFutures() {
-	    for (RecoveryCompleteFuture future : nodes.values()) {
-		future.done();
+	void notifyCompletionHandlers() {
+	    for (SimpleCompletionHandler handler : nodes.values()) {
+		handler.completed();
 	    }
 	}
     }

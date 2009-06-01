@@ -142,9 +142,9 @@ public interface WatchdogService extends Service {
      * that fails, the specified {@code listener} will be notified
      * (outside of a transaction) by having its {@link
      * RecoveryListener#recover recover} method invoked, passing the
-     * failed node and a {@link RecoveryCompleteFuture} whose {@link
-     * RecoveryCompleteFuture#done done} method must be invoked when
-     * the recovery operations initiated by the {@code listener} are
+     * failed node and a {@link SimpleCompletionHandler} whose {@link
+     * SimpleCompletionHandler#completed completed} method must be invoked
+     * when the recovery operations initiated by the {@code listener} are
      * complete. <p>
      *
      * This method must be invoked outside of a transaction.
