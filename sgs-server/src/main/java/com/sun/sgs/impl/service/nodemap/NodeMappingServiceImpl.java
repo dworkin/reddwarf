@@ -41,7 +41,7 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.IdentityRelocationListener;
-import com.sun.sgs.service.PrepareMoveCompleteFuture;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
@@ -168,7 +168,7 @@ public class NodeMappingServiceImpl
     // an identity say they believe the identity is not active, the identity
     // is considered inactive on the node.  When an identity is inactive
     // on all nodes, it is eligible to be removed from the map.  The actual
-    // removal from the map occurs at some point in the future (controlled
+    // removal from the map occurs at some point in the handler (controlled
     // by a property), giving time for any service to say they are interested
     // in the identity again.
     // 
@@ -214,7 +214,7 @@ public class NodeMappingServiceImpl
     // removed at the same time.  When the .identity binding is removed, the
     // IdentityMO object is deleted.  These modifications are typically done
     // by the global server, although we may support locally creating them
-    // in the future (removes will always be at the server).
+    // in the handler (removes will always be at the server).
     //
     // The .status bindings are created and removed by the local services.
     // The global server is contacted only when we detect there are no more
@@ -360,10 +360,10 @@ public class NodeMappingServiceImpl
     private final Set<IdentityRelocationListener> idRelocationListeners =
             new CopyOnWriteArraySet<IdentityRelocationListener>();
 
-    /** A map of identities to outstanding idRelocation futures. */
-    private final ConcurrentMap<Identity, Queue<PrepareMoveCompleteFuture>>
-        relocateFutures = 
-            new ConcurrentHashMap<Identity, Queue<PrepareMoveCompleteFuture>>();
+    /** A map of identities to outstanding idRelocation handlers. */
+    private final ConcurrentMap<Identity, Queue<SimpleCompletionHandler>>
+        relocationHandlers =
+            new ConcurrentHashMap<Identity, Queue<SimpleCompletionHandler>>();
     /**
      * Constructs an instance of this class with the specified properties.
      * <p>
@@ -865,9 +865,9 @@ public class NodeMappingServiceImpl
                 // There's no work to do.
                 tellServerCanMove(id);
             }
-            Queue<PrepareMoveCompleteFuture> futureQueue =
-                new ConcurrentLinkedQueue<PrepareMoveCompleteFuture>();
-            if (relocateFutures.putIfAbsent(id, futureQueue) != null) {
+            Queue<SimpleCompletionHandler> handlerQueue =
+                new ConcurrentLinkedQueue<SimpleCompletionHandler>();
+            if (relocationHandlers.putIfAbsent(id, handlerQueue) != null) {
                 // this identity is already being moved somewhere!
                 return;
             }
@@ -884,13 +884,13 @@ public class NodeMappingServiceImpl
                     for (IdentityRelocationListener listener : 
                          idRelocationListeners) 
                     {
-                        final PrepareMoveCompleteFuture future =
-                            new PrepareMoveCompleteFutureImpl(id);
-                        futureQueue.add(future);
+                        final SimpleCompletionHandler handler =
+                            new PrepareMoveCompletionHandler(id);
+                        handlerQueue.add(handler);
                         TaskReservation res =
                             taskScheduler.reserveTask(
                                 new MapRelocateTask(listener, id, newNode, 
-                                                    future),
+                                                    handler),
                                 taskOwner);
                         pendingNotifications.add(res);
                     }
@@ -902,11 +902,11 @@ public class NodeMappingServiceImpl
             for (final IdentityRelocationListener listener : 
                  idRelocationListeners) 
             {
-                final PrepareMoveCompleteFuture future =
-                        new PrepareMoveCompleteFutureImpl(id);
-                futureQueue.add(future);
+                final SimpleCompletionHandler handler =
+                        new PrepareMoveCompletionHandler(id);
+                handlerQueue.add(handler);
                 taskScheduler.scheduleTask(
-                    new MapRelocateTask(listener, id, newNode, future), 
+                    new MapRelocateTask(listener, id, newNode, handler),
                     taskOwner);
             }
         }
@@ -960,19 +960,19 @@ public class NodeMappingServiceImpl
         final IdentityRelocationListener listener;
         final Identity id;
         final long newNode;
-        final PrepareMoveCompleteFuture future;
+        final SimpleCompletionHandler handler;
         MapRelocateTask(IdentityRelocationListener listener, 
                         Identity id, long newNode, 
-                        PrepareMoveCompleteFuture future) 
+                        SimpleCompletionHandler handler)
         {
 	    super(null);
             this.listener = listener;
             this.id = id;
             this.newNode = newNode;
-            this.future = future;
+            this.handler = handler;
         }
         public void run() {
-            listener.prepareToRelocate(id, newNode, future);
+            listener.prepareToRelocate(id, newNode, handler);
         }
     }
     
@@ -1056,16 +1056,17 @@ public class NodeMappingServiceImpl
         }  
     }
 
-        /**
-     * The {@code PrepareMoveCompleteFuture} implementation.  When {@code
-     * done} is invoked, the future instance is removed from the recovery
-     * future queue for the associated node.  If a given future is the
-     * last one to be removed from a node's queue, then recovery is
-     * complete for that node, and the data store is updated to clean
-     * up recovery information for that node.
+    /**
+     * A {@code SimpleCompletionHandler} implementation for identity
+     * relocation listeners.  When {@code completed} is invoked, the handler
+     * instance is removed from the relocation handler queue for the associated
+     * identity.  If a given handler is the last one to be removed from an
+     * identity's queue, then relocation preparations are complete for that
+     * identity, and the node mapping service can actually move the identity
+     * to its new node.
      */
-    private final class PrepareMoveCompleteFutureImpl
-	implements PrepareMoveCompleteFuture
+    private final class PrepareMoveCompletionHandler
+	implements SimpleCompletionHandler
     {
 	/** The identity. */
 	private final Identity id;
@@ -1076,12 +1077,12 @@ public class NodeMappingServiceImpl
 	 * Constructs an instance with the specified {@code node} and
 	 * recovery {@code listener}.
 	 */
-	PrepareMoveCompleteFutureImpl(Identity id) {
+	PrepareMoveCompletionHandler(Identity id) {
 	    this.id = id;
 	}
 
 	/** {@inheritDoc} */
-	public void done() {
+	public void completed() {
 	    synchronized (this) {
 		if (isDone) {
 		    return;
@@ -1089,20 +1090,15 @@ public class NodeMappingServiceImpl
 		isDone = true;
 	    }
 
-	    Queue<PrepareMoveCompleteFuture> futureQueue = 
-                relocateFutures.get(id);
-	    assert futureQueue != null;
-	    futureQueue.remove(this);
-	    if (futureQueue.isEmpty()) {
-                relocateFutures.remove(id);
+	    Queue<SimpleCompletionHandler> handlerQueue =
+                    relocationHandlers.get(id);
+	    assert handlerQueue != null;
+	    handlerQueue.remove(this);
+	    if (handlerQueue.isEmpty()) {
+                relocationHandlers.remove(id);
                 // tell the server we're good to go.
                 tellServerCanMove(id);
 	    }
-	}
-
-	/** {@inheritDoc} */
-	public synchronized boolean isDone() {
-	    return isDone;
 	}
     }
     
@@ -1126,6 +1122,7 @@ public class NodeMappingServiceImpl
             }
         }
     }
+    
     /* -- For testing. -- */
     
     /**

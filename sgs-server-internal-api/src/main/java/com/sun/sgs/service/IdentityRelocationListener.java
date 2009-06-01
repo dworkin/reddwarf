@@ -42,21 +42,22 @@ public interface IdentityRelocationListener {
      * a transaction.
      * <p>
      * When the listener has completed preparations for the identity relocation,
-     * the {@link PrepareMoveCompleteFuture#done done} method of the specified
-     * {@code future} must be invoked.  After all listeners have noted they
-     * are ready for the move, the identity will be relocated and the new node
-     * will be returned from {@link NodeMappingService#getNode(Identity)} calls.
+     * the {@link SimpleCompletionHandler#completed completed} method of the
+     * specified {@code handler} must be invoked.  After all listeners have
+     * noted they are ready for the move, the identity will be relocated and
+     * the new node will be returned from
+     * {@link NodeMappingService#getNode(Identity)} calls.
      * <p>
      * The implementation of this method should be idempotent
      * because it may be invoked multiple times.  If it is invoked multiple
-     * times, the {@link PrepareMoveCompleteFuture#done done} method must
-     * be called for each {@code future} provided.
+     * times, the {@link SimpleCompletionHandler#completed completed} method
+     * mustbe called for each {@code handler} provided.
      * 
-     * @param id the identity which has been selected for relocation
+     * @param id        the identity which has been selected for relocation
      * @param newNodeId the identity of the node that {@code id} will move to
-     * @param future  a future to notify when relocation preparations are 
-     *                complete
+     * @param handler   a handler to notify when relocation preparations are
+     *                  complete
      */
     void prepareToRelocate(Identity id, long newNodeId, 
-                           PrepareMoveCompleteFuture future);
+                           SimpleCompletionHandler handler);
 }
