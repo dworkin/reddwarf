@@ -34,8 +34,8 @@ import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -228,10 +228,11 @@ public final class WatchdogServiceImpl
 	recoveryListeners =
 	    new ConcurrentHashMap<RecoveryListener, RecoveryListener>();
 
-    /** The queues of RecoveryCompleteFutures, keyed by node being recovered. */
-    private final ConcurrentMap<Node, Queue<RecoveryCompleteFuture>>
-	recoveryFutures =
-	    new ConcurrentHashMap<Node, Queue<RecoveryCompleteFuture>>();
+    /** The queues of SimpleCompletionHandlers, keyed by node being
+     * recovered. */
+    private final ConcurrentMap<Node, Queue<SimpleCompletionHandler>>
+	recoveryQueues =
+	    new ConcurrentHashMap<Node, Queue<SimpleCompletionHandler>>();
 
     /** The lock for {@code isAlive} field. */
     private final Object lock = new Object();
@@ -731,18 +732,18 @@ public final class WatchdogServiceImpl
 	    logger.log(Level.INFO, "Node:{0} recovering for node:{1}",
 		       localNodeId, node.getId());
 	}
-	Queue<RecoveryCompleteFuture> futureQueue =
-	    new ConcurrentLinkedQueue<RecoveryCompleteFuture>();
-	if (recoveryFutures.putIfAbsent(node, futureQueue) != null) {
+	Queue<SimpleCompletionHandler> handlers =
+	    new ConcurrentLinkedQueue<SimpleCompletionHandler>();
+	if (recoveryQueues.putIfAbsent(node, handlers) != null) {
 	    // recovery for node already being handled
 	    return;
 	}
 	
 	for (RecoveryListener listener : recoveryListeners.keySet()) {
 	    final RecoveryListener recoveryListener = listener;
-	    final RecoveryCompleteFuture future =
-		new RecoveryCompleteFutureImpl(node, listener);
-	    futureQueue.add(future);
+	    final SimpleCompletionHandler handler =
+		new RecoveryCompletionHandler(node, listener);
+	    handlers.add(handler);
 	    taskScheduler.scheduleTask(
 		new AbstractKernelRunnable("NotifyRecoveryListeners") {
 		    public void run() {
@@ -750,14 +751,14 @@ public final class WatchdogServiceImpl
 			    if (!shuttingDown() &&
 				isLocalNodeAliveNonTransactional())
 			    {
-				recoveryListener.recover(node, future);
+				recoveryListener.recover(node, handler);
 			    }
 			} catch (Exception e) {
 			    logger.logThrow(
 			        Level.WARNING, e,
 				"Notifying recovery listener on node:{0} " +
-				"with node:{1}, future:{2} throws",
-				localNodeId, node, future);
+				"with node:{1}, handler:{2} throws",
+				localNodeId, node, handler);
 			}
 		    }
 		}, taskOwner);
@@ -827,23 +828,22 @@ public final class WatchdogServiceImpl
 	public void reportFailure(String className) {
 	    setFailedThenNotify(true);
 	}
-
     }
 
     /**
-     * The {@code RecoveryCompleteFuture} implementation.  When {@code
-     * done} is invoked, the future instance is removed from the recovery
-     * future queue for the associated node.  If a given future is the
-     * last one to be removed from a node's queue, then recovery is
-     * complete for that node, and the data store is updated to clean
-     * up recovery information for that node.
+     * The {@code SimpleCompletionHandler} implementation for recovery.
+     * When {@code completed} is invoked, the handler instance is removed
+     * from the recovery completion handler queue for the associated node.
+     * If a given handler is the last one to be removed from a node's
+     * queue, then recovery is complete for that node, and the data store
+     * is updated to clean up recovery information for that node.
      */
-    private final class RecoveryCompleteFutureImpl
-	implements RecoveryCompleteFuture
+    private final class RecoveryCompletionHandler
+	implements SimpleCompletionHandler
     {
 	/** The failed node. */
 	private final Node node;
-	/** The recovery listener for this future (currently unused). */
+	/** The recovery listener for this handler (currently unused). */
 	private final RecoveryListener listener;
 	/** Indicates whether recovery is done. */
 	private boolean isDone = false;
@@ -852,13 +852,13 @@ public final class WatchdogServiceImpl
 	 * Constructs an instance with the specified {@code node} and
 	 * recovery {@code listener}.
 	 */
-	RecoveryCompleteFutureImpl(Node node, RecoveryListener listener) {
+	RecoveryCompletionHandler(Node node, RecoveryListener listener) {
 	    this.node = node;
 	    this.listener = listener;
 	}
 
 	/** {@inheritDoc} */
-	public void done() {
+	public void completed() {
 	    synchronized (this) {
 		if (isDone) {
 		    return;
@@ -866,14 +866,14 @@ public final class WatchdogServiceImpl
 		isDone = true;
 	    }
 
-	    Queue<RecoveryCompleteFuture> futureQueue =
-		recoveryFutures.get(node);
-	    assert futureQueue != null;
-	    futureQueue.remove(this);
-	    if (futureQueue.isEmpty()) {
+	    Queue<SimpleCompletionHandler> handlers =
+		recoveryQueues.get(node);
+	    assert handlers != null;
+	    handlers.remove(this);
+	    if (handlers.isEmpty()) {
 		// recovery for the node is complete, so remove node
-		// from table of recovery futures
-		if (recoveryFutures.remove(node) != null) {
+		// from table of recovery queues.
+		if (recoveryQueues.remove(node) != null) {
 		    try {
 			if (isLocalNodeAliveNonTransactional()) {
 			    serverProxy.recoveredNode(
@@ -887,11 +887,6 @@ public final class WatchdogServiceImpl
 		    }
 		}
 	    }
-	}
-
-	/** {@inheritDoc} */
-	public synchronized boolean isDone() {
-	    return isDone;
 	}
     }
 }

@@ -24,26 +24,17 @@
 package com.sun.sgs.service;
 
 /**
- * A future to be notified when recovery operations for an associated
- * {@link RecoveryListener} are complete.
+ * A handler to be notified when operations for an associated
+ * request are complete.
  *
- * @see RecoveryListener#recover(Node,RecoveryCompleteFuture)
+ * @see RecoveryListener#recover(Node,SimpleCompletionHandler)
  */
-public interface RecoveryCompleteFuture {
+public interface SimpleCompletionHandler {
 
     /**
-     * Notifies this future that the recovery operations initiated by
-     * the {@link RecoveryListener} associated with this future are
-     * complete.  This method is idempotent and can be called multiple times.
+     * Notifies this handler that the operations initiated by the
+     * request associated with this future are complete.  This
+     * method is idempotent and can be called multiple times.
      */
-    void done();
-
-    /**
-     * Returns {@code true} if the {@link #done done} method of this
-     * future has been invoked, and {@code false} otherwise.
-     *
-     * @return	{@code true} if {@code done} has been invoked, and
-     *		{@code false} otherwise 
-     */
-    boolean isDone();
+    void completed();
 }
