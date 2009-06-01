@@ -62,10 +62,10 @@ import javax.management.JMException;
  * DataStoreImpl}. <p>
  *
  * The {@link #DataServiceImpl constructor} requires the <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> property, and supports both these
  * public configuration <a
- * href="../../../app/doc-files/config-properties.html#DataService">
+ * href="../../../impl/kernel/doc-files/config-properties.html#DataService">
  * properties</a> and the following additional properties: <p>
  *
  * <dl style="margin-left: 1em">

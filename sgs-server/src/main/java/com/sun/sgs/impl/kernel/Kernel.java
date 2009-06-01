@@ -40,8 +40,6 @@ import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
-import com.sun.sgs.impl.service.data.DataServiceImpl;
-
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -89,23 +87,49 @@ import javax.management.JMException;
  * for creating and initializing all components of the system and the
  * applications configured to run in this system.
  * <p>
- * By default, the minimal amount of profiling which is used internally by
- * the system is enabled.  To enable more profiling, the kernel property
- * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LEVEL_PROPERTY} must be set
- * to a valid level for {@link 
- * com.sun.sgs.profile.ProfileCollector#setDefaultProfileLevel(ProfileLevel)}.
- * By default, no profile listeners are enabled.  Set the 
- * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property with 
- * a colon-separated list of fully-qualified class names, each of which 
- * implements {@link ProfileListener}.
- * <p>
- * By default, creates an instance of {@link TrackingAccessCoordinator} to
- * track access to shared objects.  The {@value #ACCESS_COORDINATOR_PROPERTY}
- * configuration property can be used to specify another implementation.  The
- * value of the property should be the name of a public, non-abstract class
- * that implements the {@link AccessCoordinatorHandle} interface, and that
- * provides a public constructor with the three parameters {@link Properties},
- * {@link TransactionProxy}, and {@link ProfileCollectorHandle}.
+ * The kernel must be configured with certain <a
+ * href="../../impl/kernel/doc-files/config-properties.html#RequiredProperties">
+ * required properties</a> and supports other <a
+ * href="../../impl/kernel/doc-files/config-properties.html#System">public
+ * properties</a>.  It can also be configured with any of the properties
+ * specified in the {@link StandardProperties} class, and supports
+ * the following additional configuration properties:
+ * 
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #PROFILE_LEVEL_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>MIN</code>
+ *
+ * <dd style="padding-top: .5em">By default, the minimal amount of profiling 
+ *      which is used internally by the system is enabled.  To enable more 
+ *      profiling, this property must be set to a valid level for {@link 
+ *      ProfileCollector#setDefaultProfileLevel(ProfileLevel)}. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #PROFILE_LISTENERS}
+ *	</b></code> <br>
+ *	<i>Default:</i> No Default
+ *
+ * <dd style="padding-top: .5em">By default, no profile listeners are enabled.
+ *      To enable a set of listeners, set this property to a colon-separated
+ *      list of fully-qualified class 
+ *      names, each of which implements {@link ProfileListener}.  A number
+ *      of listeners are provided with the system in the
+ *      {@link com.sun.sgs.impl.profile.listener} package.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #ACCESS_COORDINATOR_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@link TrackingAccessCoordinator}</code>
+ *
+ * <dd style="padding-top: .5em">The implementation class used to track
+ *      access to shared objects.  The value of this property should be the
+ *      name of a public, non-abstract class that implements the
+ *      {@link AccessCoordinatorHandle} interface, and that provides a public
+ *      constructor with the three parameters {@link Properties},
+ *      {@link TransactionProxy}, and {@link ProfileCollectorHandle}.<p>
+ *
+ * 
+ * </dl>
  */
 class Kernel {
 

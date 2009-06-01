@@ -36,10 +36,13 @@ public interface WatchdogService extends Service {
 
     /**
      * Returns the node ID for the local node.  The node ID for a node
-     * remains fixed for the lifetime of the node (i.e., until it
-     * fails).
+     * remains fixed for the lifetime of the node (i.e., until it fails). <p>
      *
-     * @return the node ID for the local node
+     * This method may be invoked any time after this service is
+     * intialized, whether or not the calling context is inside or outside
+     * of a transaction.
+     *
+     * @return	the node ID for the local node
      */
     long getLocalNodeId();
 
@@ -60,7 +63,11 @@ public interface WatchdogService extends Service {
      * otherwise returns {@code false}.  This method returns the most
      * recent information known to this service and may not be
      * definitive.  For definitive information, use the {@link
-     * #isLocalNodeAlive isLocalNodeAlive} method.
+     * #isLocalNodeAlive isLocalNodeAlive} method. <p>
+     *
+     * This method may be invoked any time after this service is
+     * intialized, whether or not the calling context is inside or outside
+     * of a transaction.
      *
      * @return	{@code true} if the local node is considered alive, and
      * 		{@code false} otherwise
@@ -71,9 +78,9 @@ public interface WatchdogService extends Service {
      * Returns an iterator for the set of nodes that this service
      * monitors.  The {@code remove} operation of the returned
      * iterator is not supported and will throw {@code
-     * UnsupportedOperationException} if invoked.  This method should
-     * only be called within a transaction, and the returned iterator
-     * should only be used within that transaction.
+     * UnsupportedOperationException} if invoked.  This method must
+     * be called within a transaction, and the returned iterator
+     * must only be used within that transaction.
      *
      * @return	an iterator for the set of nodes that this service
      *		monitors
@@ -119,9 +126,13 @@ public interface WatchdogService extends Service {
     /**
      * Registers a {@code listener} to be notified when any node that
      * this service monitors starts or fails.  Registered listeners
-     * are notified outside of a transaction.
+     * are notified outside of a transaction. <p>
+     *
+     * This method must be invoked outside of a transaction.
      *
      * @param	listener a node listener
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
      */
     void addNodeListener(NodeListener listener);
 
@@ -134,11 +145,13 @@ public interface WatchdogService extends Service {
      * failed node and a {@link RecoveryCompleteFuture} whose {@link
      * RecoveryCompleteFuture#done done} method must be invoked when
      * the recovery operations initiated by the {@code listener} are
-     * complete.
+     * complete. <p>
      *
-     * <p>This method should be called outside of a transaction.
+     * This method must be invoked outside of a transaction.
      *
      * @param	listener a recovery listener
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
      */
     void addRecoveryListener(RecoveryListener listener);
 
@@ -146,10 +159,14 @@ public interface WatchdogService extends Service {
      * Informs the watchdog that a problem has occured in a service or
      * component. The watchdog will notify the server of the failure and
      * then proceeed to shutting down the node. The node specified as the
-     * {@code nodeId} can be a local node or a remote node.
+     * {@code nodeId} can be a local node or a remote node. <p>
+     *
+     * This method must be invoked outside of a transaction.
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
      */
     void reportFailure(long nodeId, String className);
 }
