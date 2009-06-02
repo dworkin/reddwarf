@@ -51,7 +51,7 @@ public interface IdentityRelocationListener {
      * The implementation of this method should be idempotent
      * because it may be invoked multiple times.  If it is invoked multiple
      * times, the {@link SimpleCompletionHandler#completed completed} method
-     * mustbe called for each {@code handler} provided.
+     * must be called for each {@code handler} provided.
      * 
      * @param id        the identity which has been selected for relocation
      * @param newNodeId the identity of the node that {@code id} will move to

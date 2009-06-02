@@ -713,7 +713,9 @@ public final class NodeMappingServerImpl
      * (which can take a while) and then update the map to reflect
      * the choice, cleaning up old mappings as appropriate.  If given
      * a {@code serviceName}, the status of the identity is set to active
-     * for that service on the new node.
+     * for that service on the new node.  The change in mappings might need
+     * to wait for an registered {@code IdentityRelocationListener}s to
+     * prepare for the move.
      *
      * @param id the identity to map to a new node
      * @param serviceName the name of the requesting service's class, or null
