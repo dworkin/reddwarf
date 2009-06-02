@@ -114,8 +114,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
 
-    /** Indicates whether a session is relocating to a new node. */
-    private volatile boolean relocating = false;
+    /** If non-null, contains the completion handler for
+     * relocating this session to a new node. */
+    private volatile SimpleCompletionHandler relocateCompletionHandler = null;
     
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
@@ -312,6 +313,24 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
+     * Returns {@code true} if this client session is relocating to another
+     * node.
+     */
+    private boolean isRelocating() {
+	return relocateCompletionHandler != null;
+    }
+
+    /**
+     * Indicates that all parties are done with relocation preparation, and
+     * notifies the client that it is relocating to another node.
+     */    
+    void relocatePreparationComplete() {
+	if (isRelocating()) {
+	    relocateCompletionHandler.completed();
+	}
+    }
+
+    /**
      * Returns {@code true} if the associated client session is ready for
      * requests (i.e., it has completed login and it is not relocating);
      * otherwise, sets the appropriate {@code RequestFailureException} on
@@ -336,7 +355,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    "session is not logged in",
 		    RequestFailureException.FailureReason.LOGIN_PENDING));
 	    return false;
-	} else if (relocating) {
+	} else if (isRelocating()) {
 	    logger.log(
 		Level.FINE,
 		"request received while session is relocating:{0}", this);
@@ -461,7 +480,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	if (sessionRefId != null) {
-	    sessionService.removeHandler(sessionRefId, relocating);
+	    sessionService.removeHandler(sessionRefId, isRelocating());
 	}
 	
 	// TBD: Due to the scheduler's behavior, this notification
@@ -469,7 +488,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	// 'notifyLoggedIn' callback.  Also, this notification may
 	// also happen even though 'notifyLoggedIn' was not invoked.
 	// Are these behaviors okay?  -- ann (3/19/07)
-	if (!relocating) {
+	if (!isRelocating()) {
 	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
 		    public void run() {
 			identity.notifyLoggedOut();
@@ -489,7 +508,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 	}
 
-	if (sessionRefId != null && !relocating) {
+	if (sessionRefId != null && !isRelocating()) {
 	    scheduleTask(
 	      new AbstractKernelRunnable("NotifyListenerAndRemoveSession") {
 	        public void run() {
@@ -1305,6 +1324,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	/** The relocation key. */
 	private volatile byte[] relocationKey;
 
+	private boolean completed = false;
+
 	/**
 	 * Constructs an instance with the specified {@code newNode}.
 	 *
@@ -1335,10 +1356,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * Notify client to relocate its session to the new node
 		 * specifying the relocation key.
 		 */
-		relocating = true;
+		relocateCompletionHandler = this;
 
 		sessionService.notifyPrepareToRelocate(
-		    sessionRefId, newNode.getId(), this);
+		    sessionRefId, newNode.getId());
 		
 	    } catch (Exception e) {
 		// If there is a problem contacting the destination node,
@@ -1355,6 +1376,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
 	/** {@inheritDoc} */
 	public void completed() {
+	    synchronized (this) {
+		if (completed) {
+		    return;
+		}
+		completed = true;
+	    }
+	    
 	    try {
 		Set<ProtocolDescriptor> descriptors =
 		    sessionService.getProtocolDescriptors(newNode.getId());

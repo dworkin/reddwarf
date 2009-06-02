@@ -237,6 +237,13 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
+    /** Queues of completion handlers for entities preparing for a session's
+     * relocation from this node, keyed by session ID.
+     */
+    private final ConcurrentHashMap<BigInteger, Queue<PrepareCompletionHandler>>
+	relocationPreparers =
+	    new ConcurrentHashMap<BigInteger, Queue<PrepareCompletionHandler>>();
+
     /** The map of relocation information for sessions relocating to
      * this node, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, RelocationInfo>
@@ -1224,16 +1231,55 @@ public final class ClientSessionServiceImpl
 		} }, taskOwner);
     }
 
-    void notifyPrepareToRelocate(BigInteger sessionRefId, long newNode,
-				 SimpleCompletionHandler handler)
+    /**
+     * Notifies each registered {@link ClientSessionStatusListener} that
+     * the session with the specified {@code sessionRefId} is moving to
+     * {@code newNode}.  The specified completion {@code handler} should
+     * be notified (via its {@code completed} method, when all listeners
+     * are finished preparing for relocation.
+     *
+     * @param	sessionRefId the ID for the relocating client session
+     * @param	newNode the new node for the client session
+     * @param	handler the completion handler to notify when preparation
+     *		is complete
+     */
+    void notifyPrepareToRelocate(final BigInteger sessionRefId,
+				 final long newNode)
     {
-	// TBD: Assume for now that there is only one
-	// ClientSessionStatusListener...
-	for (ClientSessionStatusListener statusListener :
-		 sessionStatusListeners)
+	if (logger.isLoggable(Level.INFO)) {
+	    logger.log(Level.INFO,
+		       "Preparing session:{0} to relocate to node:{1}",
+		       sessionRefId, newNode);
+	}
+	Queue<PrepareCompletionHandler> handlerQueue =
+	    new ConcurrentLinkedQueue<PrepareCompletionHandler>();
+	if (relocationPreparers.
+	        putIfAbsent(sessionRefId, handlerQueue) != null)
 	{
-	    statusListener.prepareToRelocate(sessionRefId, newNode, handler);
-	    break;
+	    // preparation for client session relocation already being handled
+	    return;
+	}
+	
+	for (ClientSessionStatusListener listener : sessionStatusListeners) {
+	    final ClientSessionStatusListener statusListener = listener;
+	    final PrepareCompletionHandler handler =
+		new PrepareCompletionHandler(sessionRefId);
+	    handlerQueue.add(handler);
+	    taskScheduler.scheduleTask(
+		new AbstractKernelRunnable("PrepareToRelocateSession") {
+		    public void run() {
+			try {
+			    statusListener.prepareToRelocate(
+				sessionRefId, newNode, handler);
+			} catch (Exception e) {
+			    logger.logThrow(
+			        Level.WARNING, e,
+				"Notifying listener:{0} to prepare session:{1} " +
+				"to relocate to node:{2} throws",
+				statusListener, sessionRefId, newNode);
+			}
+		    }
+		}, taskOwner);
 	}
     }
 
@@ -1511,6 +1557,55 @@ public final class ClientSessionServiceImpl
 			} }, info.identity);
 	    }
 	    relocatingIdentities.remove(info.identity);
+	}
+    }
+
+    private final class PrepareCompletionHandler
+	implements SimpleCompletionHandler
+    {
+	/** The session ID. */
+	private final BigInteger sessionRefId;
+	/** Indicates whether preparation is completed. */
+	private boolean completed = false;
+
+	/**
+	 * Constructs an instance with the specified {@code sessionRefId}.
+	 */
+	PrepareCompletionHandler(BigInteger sessionRefId) {
+	    this.sessionRefId = sessionRefId;
+	}
+
+	/** {@inheritDoc} */
+	public void completed() {
+	    synchronized (this) {
+		if (completed) {
+		    return;
+		}
+		completed = true;
+	    }
+
+	    Queue<PrepareCompletionHandler> handlerQueue =
+		relocationPreparers.get(sessionRefId);
+	    assert handlerQueue != null;
+	    handlerQueue.remove(this);
+	    if (handlerQueue.isEmpty()) {
+		// preparation for client session relocation is complete, so
+		// remove session from table of relocation preparers.
+		if (relocationPreparers.remove(sessionRefId) != null) {
+		    try {
+			ClientSessionHandler sessionHandler =
+				getHandler(sessionRefId);
+			if (sessionHandler != null) {
+			    sessionHandler.relocatePreparationComplete();
+			}
+		    } catch (Exception e) {
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "Problem completing reloction preparation for " +
+			    "session:{0} backup:{1}",  sessionRefId);
+		    }
+		}
+	    }
 	}
     }
 }

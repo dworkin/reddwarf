@@ -35,6 +35,8 @@ import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.RelocateFailureException;
+import com.sun.sgs.protocol.RequestFailureException;
+import com.sun.sgs.protocol.RequestFailureException.FailureReason;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -1037,7 +1039,27 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	public void completed(Future<Void> future) {
 	    try {
 		future.get();
+	    } catch (ExecutionException e) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.logThrow(
+			Level.FINE, e, "Obtaining request result throws ");
+		}
+
+		Throwable cause = e.getCause();
+		if (cause instanceof RequestFailureException) {
+		    FailureReason reason =
+			((RequestFailureException) cause).getReason();
+		    if (reason.equals(FailureReason.DISCONNECT_PENDING) ||
+			reason.equals(FailureReason.RELOCATE_PENDING)) {
+			// Don't read any more from client because session
+			// is either disconnecting or relocating.
+			return;
+		    }
+		    // Assume other failures are transient.
+		}
+
 	    } catch (Exception e) {
+		// TBD: Unknown exception: disconnect?
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e, "Obtaining request result throws ");

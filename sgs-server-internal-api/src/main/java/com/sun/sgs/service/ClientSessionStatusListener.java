@@ -50,7 +50,7 @@ public interface ClientSessionStatusListener {
      * specified {@code nodeId}.  This notification gives the
      * service associated with this listener an opportunity to
      * prepare for the relocation.  The associated service should
-     * invoke the {@link SimpleCompletionHandler@completed
+     * invoke the {@link SimpleCompletionHandler#completed
      * completed} method of the specified {@code handler} when it
      * has completed preparing for the relocation.
      * 
