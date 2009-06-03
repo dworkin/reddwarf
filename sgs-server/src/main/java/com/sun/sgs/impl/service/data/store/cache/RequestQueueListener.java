@@ -92,12 +92,10 @@ public abstract class RequestQueueListener extends Thread {
      * @param	serverSocket the server socket for accepting connections
      * @param	failureHandler the failure handler
      * @param	properties additional configuration properties
-     * @throws	IOException if there is a failure creating the server socket 
      */
     protected RequestQueueListener(ServerSocket serverSocket,
 				   Runnable failureHandler,
 				   Properties properties)
-	throws IOException
     {
 	checkNull("serverSocket", serverSocket);
 	checkNull("failureHandler", failureHandler);
@@ -123,10 +121,18 @@ public abstract class RequestQueueListener extends Thread {
 
     /** Shuts down the listener. */
     public void shutdown() {
+	boolean doShutdown = false;
 	synchronized (this) {
 	    if (!shutdown) {
 		shutdown = true;
-		interrupt();
+		doShutdown = true;
+	    }
+	}
+	if (doShutdown) {
+	    interrupt();
+	    try {
+		serverSocket.close();
+	    } catch (IOException e) {
 	    }
 	}
 	while (true) {
@@ -144,23 +150,34 @@ public abstract class RequestQueueListener extends Thread {
      * appropriate server, returning when the listener is shutdown.
      */
     @Override
-    public synchronized void run() {
+    public void run() {
 	try {
-	    while (!shutdown) {
+	    while (true) {
+		Socket socket = null;
 		try {
-		    Socket socket = serverSocket.accept();
+		    synchronized (this) {
+			if (shutdown) {
+			    break;
+			}
+		    }
+		    socket = serverSocket.accept();
 		    DataInputStream in =
 			new DataInputStream(socket.getInputStream());
 		    long nodeId = in.readLong();
 		    getServer(nodeId).handleConnection(socket);
 		    noteConnected();
-		} catch (IOException e) {
-		    if (!shutdown) {
-			noteConnectionException(e);
-		    }
 		} catch (Throwable t) {
-		    noteFailed(t);
-		    break;
+		    if (socket != null) {
+			try {
+			    socket.close();
+			} catch (IOException e) {
+			}
+		    }
+		    synchronized (this) {
+			if (!shutdown) {
+			    noteConnectionException(t);
+			}
+		    }
 		}
 	    }
 	} finally {
@@ -182,27 +199,22 @@ public abstract class RequestQueueListener extends Thread {
 		FINE, exception, "RequestQueueListener connection failed");
 	}
 	long now = System.currentTimeMillis();
-	if (failureStarted != -1) {
+	if (failureStarted == -1) {
 	    failureStarted = now;
 	}
 	if (now > failureStarted + maxRetry) {
-	    noteFailed(exception);
+	    shutdown = true;
+	    if (logger.isLoggable(WARNING)) {
+		logger.logThrow(
+		    WARNING, exception, "RequestQueueListener failed");
+	    }
+	    failureHandler.run();
 	} else {
 	    try {
 		wait(retryWait);
 	    } catch (InterruptedException e) {
 	    }
 	}
-    }
-
-    /** Notes that the listener has failed as a result of an exception. */
-    private void noteFailed(Throwable exception) {
-	assert Thread.holdsLock(this);
-	shutdown = true;
-	if (logger.isLoggable(WARNING)) {
-	    logger.logThrow(WARNING, exception, "RequestQueueListener failed");
-	}
-	failureHandler.run();
     }
 
     /** Notes that a connection was accepted successfully. */
