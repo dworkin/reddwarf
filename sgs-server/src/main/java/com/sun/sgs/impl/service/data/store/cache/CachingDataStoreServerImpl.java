@@ -157,7 +157,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    this.callbackServer = callbackServer;
 	    updateQueue = new RequestQueueServer<UpdateQueueRequest>(
 		new UpdateQueueRequest.UpdateQueueRequestHandler(
-		    server, nodeId));
+		    server, nodeId),
+		new Properties());
 	}
 	@Override
 	protected LockRequest<Object, NodeInfo> newLockRequest(

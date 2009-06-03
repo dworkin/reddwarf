@@ -24,8 +24,8 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 /**
- * A request added to a {@link RequestQueueClient} or serviced by a {@link
- * RequestQueueServer}.
+ * A request to add to a {@link RequestQueueClient} or to be serviced by a
+ * {@link RequestQueueServer}.
  */
 public interface Request {
 

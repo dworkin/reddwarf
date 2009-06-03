@@ -20,13 +20,21 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import java.io.IOException;
-import java.net.InetAddress;
+import java.util.Properties;
 
 class UpdateQueueClient implements UpdateQueue {
     private final RequestQueueClient queue;
 
-    UpdateQueueClient(String host, int port) throws IOException {
-	queue = new RequestQueueClient(host, port, 100, 100);
+    UpdateQueueClient(long nodeId, String host, int port) throws IOException {
+	queue = new RequestQueueClient(
+	    nodeId,
+	    new RequestQueueClient.BasicSocketFactory(host, port),
+	    new Runnable() {
+		public void run() { 
+		    /* FIXME: Handle connection failure */
+		}
+	    },
+	    new Properties());
 	queue.start();
     }
 

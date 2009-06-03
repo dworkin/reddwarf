@@ -19,7 +19,9 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeString;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -29,49 +31,63 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.Properties;
+import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.WARNING;
+import java.util.logging.Logger;
 
 /**
- * A thread that implements the server side of a queue of requests, ignoring
- * duplicate requests after a network failure.  Requests are numbered between
- * {@code 0} and {@value #MAX_REQUEST}.  To insure the correct handling of
- * duplicate requests, no more that {@value #MAX_OUTSTANDING} requests should
- * be allowed to be outstanding at one time.
+ * Implements the server side of a queue of requests, ignoring duplicate
+ * requests after a network failure.  Requests are numbered between {@code 0}
+ * and {@value #MAX_REQUEST}.  To insure the correct handling of duplicate
+ * requests, the client side should insure that no more than {@value
+ * #MAX_OUTSTANDING} requests are outstanding at one time.
  *
  * @param	<R> the type of request
  */
-public class RequestQueueServer<R extends Request> extends Thread {
+public class RequestQueueServer<R extends Request> {
 
     /**
-     * The largest supported request number, chosen so that it can be stored as
-     * a {@code short}.
+     * The property for specifying the largest request number, which must be at
+     * least {@code 2} and not larger than {@value Short#MAX_VALUE}.
      */
-    public static final int MAX_REQUEST = Short.MAX_VALUE;
+    public static final String MAX_REQUEST_PROPERTY = "max.request";
+
+    /** The default maximum request number. */
+    public static final int DEFAULT_MAX_REQUEST = Short.MAX_VALUE;
 
     /**
-     * The largest number of requests that should be outstanding, so we can
-     * determine which requests are newer when the request number rolls over.
+     * The property for specifying the largest number of requests that can be
+     * outstanding, which must be at least {@code 1} and less than the value
+     * specified for the largest request number.
      */
-    public static final int MAX_OUTSTANDING = 10000;
+    public static final String MAX_OUTSTANDING_PROPERTY = "max.outstanding";
+
+    /** The default maximum number of outstanding requests. */
+    public static final int DEFAULT_MAX_OUTSTANDING = 10000;
+
+    /** The logger for this class. */
+    static final LoggerWrapper logger = new LoggerWrapper(
+	Logger.getLogger(RequestQueueServer.class.getName()));
 
     /** Handler for reading and performing requests. */
     final Request.RequestHandler<R> requestHandler;
 
-    /**
-     * Whether the server has been told to shutdown.  Synchronize on this
-     * thread when accessing.
-     */
-    private boolean shutdown;
+    /** The largest request number. */
+    final int maxRequest;
+
+    /** The largest number of outstanding requests. */
+    final int maxOutstanding;
 
     /**
      * The current connection, or {@code null} if not currently connected.
-     * Synchronize on this thread when accessing.
+     * Synchronize on this object when accessing.
      */
-    private Connection connection;
+    private Connection connection = null;
 
     /**
-     * The number of the last request processed.  Access to this field does not
-     * need to be synchronized because it is only accessed by the {@code
-     * RequestQueueServer} thread.
+     * The number of the last request processed.  Synchronize on this object
+     * when accessing.
      */
     private int lastRequest;
 
@@ -80,27 +96,26 @@ public class RequestQueueServer<R extends Request> extends Thread {
      *
      * @param	requestHandler the handler for reading and performing requests
      */
-    public RequestQueueServer(Request.RequestHandler<R> requestHandler) {
+    public RequestQueueServer(
+	Request.RequestHandler<R> requestHandler, Properties properties)
+    {
 	checkNull("requestHandler", requestHandler);
 	this.requestHandler = requestHandler;
+	PropertiesWrapper wrappedProperties =
+	    new PropertiesWrapper(properties);
+	maxRequest = wrappedProperties.getIntProperty(
+	    MAX_REQUEST_PROPERTY, DEFAULT_MAX_REQUEST, 2, Short.MAX_VALUE);
+	maxOutstanding = wrappedProperties.getIntProperty(
+	    MAX_OUTSTANDING_PROPERTY, DEFAULT_MAX_OUTSTANDING, 1,
+	    maxRequest - 1);
+	lastRequest = maxRequest;
     }
 
     /** Shuts down the server. */
-    public void shutdown() {
-	synchronized (this) {
-	    if (!shutdown) {
-		shutdown = true;
-		if (connection != null) {
-		    connection.disconnect();
-		}
-		interrupt();
-	    }
-	}
-	while (true) {
-	    try {
-		join();
-	    } catch (InterruptedException e) {
-	    }
+    public synchronized void shutdown() {
+	if (connection != null) {
+	    connection.disconnect();
+	    connection = null;
 	}
     }
 
@@ -108,7 +123,6 @@ public class RequestQueueServer<R extends Request> extends Thread {
      * Handles requests from a newly connected socket.
      *
      * @param	socket the socket
-     * @throws	IllegalStateException if the server is shutdown
      * @throws	IOException if there is a problem accessing the socket's input
      *		or output streams
      */
@@ -116,53 +130,10 @@ public class RequestQueueServer<R extends Request> extends Thread {
 	throws IOException
     {
 	checkNull("socket", socket);
-	boolean first = true;
-	while (true) {
-	    if (shutdown) {
-		throw new IllegalStateException("Server is shutdown");
-	    } else if (connection == null) {
-		break;
-	    } else if (first) {
-		connection.disconnect();
-		interrupt();
-		first = false;
-	    }
-	    try {
-		wait();
-	    } catch (InterruptedException e) {
-	    }
+	if (connection != null) {
+	    connection.disconnect();
 	}
 	connection = new Connection(socket);
-	notifyAll();
-    }
-
-    /**
-     * Waits for new connections, handles requests on the connections, and
-     * returns when the server is shutdown.
-     */
-    @Override
-    public void run() {
-	while (true) {
-	    Connection c;
-	    synchronized (this) {
-		if (shutdown) {
-		    break;
-		} else if (connection == null) {
-		    try {
-			wait();
-		    } catch (InterruptedException e) {
-		    }
-		    continue;
-		} else {
-		    c = connection;
-		}
-	    }
-	    try {
-		c.handleConnection();
-	    } catch (IOException e) {
-		/* FIXME: Decide if node has failed */
-	    }
-	}
     }
 
     /**
@@ -173,23 +144,33 @@ public class RequestQueueServer<R extends Request> extends Thread {
      * @return	{@code true} if {@code request1} is earlier than {@code
      *		request2}, else {@code false}
      * @throws	IllegalArgumentException if either argument is negative or
-     *		greater than {@value #MAX_REQUEST}
+     *		greater than the maximum request size
      */
-    public static boolean earlierRequest(int request1, int request2) {
-	if (request1 < 0 || request1 > MAX_REQUEST) {
+    public boolean earlierRequest(int request1, int request2) {
+	if (request1 < 0 || request1 > maxRequest) {
 	    throw new IllegalArgumentException("Illegal request: " + request1);
-	} else if (request2 < 0 || request2 > MAX_REQUEST) {
+	} else if (request2 < 0 || request2 > maxRequest) {
 	    throw new IllegalArgumentException("Illegal request: " + request2);
 	}
-	int diff = (request1 - request2) % MAX_REQUEST;
+	int diff = (request1 - request2) % maxRequest;
 	if (diff < 0) {
-	    diff += MAX_REQUEST;
+	    diff += maxRequest;
 	}
-	return diff != 0 && diff > MAX_OUTSTANDING;
+	return diff != 0 && diff > maxOutstanding;
+    }
+
+    /** Returns the number of the last request processed. */
+    synchronized int getLastRequest() {
+	return lastRequest;
+    }
+
+    /** Sets the number of the last request processed. */
+    synchronized void setLastRequest(int lastRequest) {
+	this.lastRequest = lastRequest;
     }
 
     /** Handles a new socket connection. */
-    private class Connection {
+    private class Connection extends Thread {
 
 	/** The socket. */
 	private final Socket socket;
@@ -219,15 +200,28 @@ public class RequestQueueServer<R extends Request> extends Thread {
 	    out = new DataOutputStream(
 		new BufferedOutputStream(
 		    socket.getOutputStream()));
+	    start();
 	}
 
-	/** Requests that the connection be disconnected. */
-	synchronized void disconnect() {
-	    disconnect = true;
+	/** Disconnects this connection. */
+	void disconnect() {
+	    synchronized (this) {
+		if (!disconnect) {
+		    disconnect = true;
+		    interrupt();
+		}
+	    }
+	    while (true) {
+		try {
+		    join();
+		    break;
+		} catch (InterruptedException e) {
+		}
+	    }
 	}
 
 	/**
-	 * Checks if the connection should disconnect.
+	 * Checks whether the connection should disconnect.
 	 *
 	 * @return	whether the connection should disconnect
 	 */
@@ -238,39 +232,44 @@ public class RequestQueueServer<R extends Request> extends Thread {
 	/**
 	 * Handles requests on the socket, returning when the connection is
 	 * disconnected.
-	 *
-	 * @throws	IOException if a problem occurs reading requests from
-	 *		the socket input stream, or writing responses to the
-	 *		socket output stream
 	 */
-	void handleConnection() throws IOException {
+	public void run() {
+	    int last = getLastRequest();
 	    try {
 		while (!getDisconnectRequested()) {
 		    short requestNumber = in.readShort();
-		    if (earlierRequest(lastRequest, requestNumber)) {
+		    if (earlierRequest(last, requestNumber)) {
 			R request = requestHandler.readRequest(in);
 			try {
 			    requestHandler.performRequest(request);
 			    out.writeBoolean(true);
-			    lastRequest = requestNumber;
 			} catch (Throwable t) {
 			    out.writeBoolean(false);
 			    writeString(t.getClass().getName(), out);
 			    writeString(t.getMessage(), out);
-			    lastRequest = requestNumber;
 			}
+			last = requestNumber;
 		    }
 		}
-	    } finally {
-		close();
-	    }
-	}
-
-	/** Closes the connection's socket. */
-	void close() {
-	    try {
-		socket.close();
 	    } catch (IOException e) {
+		if (!getDisconnectRequested() && logger.isLoggable(WARNING)) {
+		    logger.logThrow(
+			FINE, e,
+			"RequestQueueServer connection closed on I/O failure");
+		}
+	    } catch (Throwable t) {
+		if (logger.isLoggable(WARNING)) {
+		    logger.logThrow(
+			WARNING, t,
+			"RequestQueueServer connection failed with" +
+			" unexpected exception");
+		}
+	    } finally {
+		setLastRequest(last);
+		try {
+		    socket.close();
+		} catch (IOException e) {
+		}
 	    }
 	}
     }
