@@ -1105,6 +1105,96 @@ public class TestNodeMappingServiceImpl {
         checkIdAdded(secondNodeListener, id, firstNode);
     }
 
+    @Test
+    public void testIdRelocNotificationTwice() throws Exception {
+        addNodes(null);
+
+        // Add id relocation listeners to each node, and keep a map of them.
+        Map<Long, TestRelocationListener> moveMap =
+                new HashMap<Long, TestRelocationListener>();
+        addRelocationListeners(true, moveMap);
+
+        Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        GetNodeTask task = new GetNodeTask(id);
+        txnScheduler.runTask(task, taskOwner);;
+        long firstNodeId = task.getNodeId();
+        Node firstNode = task.getNode();
+        TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+        NodeMappingServerImpl server =
+            (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
+
+        // clear out the listeners
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        // ... and invoke the method twice
+        Long newNode =
+            (Long) moveMethod.invoke(server, id, null,
+                                     task.getNode(), firstNodeId);
+        Long secondTryNode =
+            (Long) moveMethod.invoke(server, id, null,
+                                     task.getNode(), newNode);
+
+        assertEquals(newNode, secondTryNode);
+
+        // Give the id relocation listener a chance to finish.
+        long stopTime = System.currentTimeMillis() + 1000;
+        synchronized (idListener.notificationLock) {
+            while (!idListener.notified &&
+                   System.currentTimeMillis() < stopTime)
+            {
+                idListener.notificationLock.wait(100);
+            }
+        }
+
+        txnScheduler.runTask(task, taskOwner);
+        long secondNodeId = task.getNodeId();
+
+        // Make sure the node hasn't actually moved yet.
+        assertEquals(firstNodeId, secondNodeId);
+
+        // Check the id relocation listener
+        checkRelocationNotification(idListener, id, newNode);
+
+        // Make sure no other listeners were affected
+        for (TestRelocationListener listener : moveMap.values()) {
+            if (listener != idListener) {
+                assertTrue(listener.isClear());
+            }
+        }
+
+        // Ensure that the node mapping listeners haven't been called yet
+        for (TestListener listener : nodeListenerMap.values()) {
+            assertTrue(listener.isClear());
+        }
+
+        // Now, allow the movement to complete.
+        idListener.handler.completed();
+
+        // Wait for notification.  We expect to be notified on the
+        // newNode assigned above.
+        TestListener secondNodeListener = nodeListenerMap.get(newNode);
+
+        stopTime = System.currentTimeMillis() + 1000;
+        synchronized (secondNodeListener.notificationLock) {
+            while (!secondNodeListener.notified &&
+                   System.currentTimeMillis() < stopTime)
+            {
+                secondNodeListener.notificationLock.wait(100);
+            }
+        }
+        txnScheduler.runTask(task, taskOwner);
+        assertEquals((long) newNode, task.getNodeId());
+
+        checkIdAdded(secondNodeListener, id, firstNode);
+    }
+
     /* -- Tests to see what happens if the server isn't available --*/
     @Test
     public void testEvilServerAssignNode() throws Exception {
