@@ -11,9 +11,12 @@ import java.util.Properties;
 import com.sun.sgs.client.simple.SimpleClientListener;
 import com.sun.sgs.client.simple.SimpleClient;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 /**
  *
  * @author waldo
@@ -21,23 +24,39 @@ import java.nio.ByteBuffer;
 public class smokeTestClient implements SimpleClientListener{
 
     private SimpleClient client;
+    private boolean joinChannelPass, receiveMsgPass,
+            logOutPass;
+    private smokeTestChannelListener channel;
 
     private static String host = "localhost";
     private static int port = 1099;
     private static String loginName;
     private static Properties props;
 
-    private static void printUse(){
-        System.out.println("usage: java smokeTestClient " +
-                "[host = hostname] [port = portnum]" +
-                " -usage");
+    private static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(smokeTestClient.class.getName()));
+
+
+    public smokeTestClient(){
+        joinChannelPass = receiveMsgPass = logOutPass = false;
+        client = new SimpleClient(this);
     }
+
     public final static void main(String[] args){
 
         props = parseArgs(args);
+        smokeTestClient testClient = new smokeTestClient();
+        testClient.start();
+    }
 
-
-
+    public void start(){
+        loginName = "discme";
+        try {
+                    client.login(props);
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Exception generated on initial login");
+            System.exit(1);
+        }
     }
 
     public PasswordAuthentication getPasswordAuthentication() {
@@ -50,13 +69,26 @@ public class smokeTestClient implements SimpleClientListener{
         try {
             client.send(ByteBuffer.wrap(msg.getBytes()));
         } catch (Exception e) {
-            System.out.print("error sending reply to logged in message");
+            logger.log(Level.WARNING, "error sending reply to logged in message");
         }
 
     }
 
-    public void loginFailed(String reason){
-
+    public void loginFailed(String reason) {
+        if (loginName.equals("kickme")) {
+            logger.log(Level.WARNING, "Login failure test passed");
+        } else {
+            logger.log(Level.WARNING, "Unexpected login failure with client name " + loginName);
+            logger.log(Level.WARNING, "Failure reason reported " + reason);
+            System.exit(1);
+        }
+        loginName = "discme";
+        try {
+            client.login(props);
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Exception generated while logging in as " + loginName);
+            System.exit(1);
+        }
     }
 
     public ClientChannelListener joinedChannel(ClientChannel channel){
@@ -65,7 +97,7 @@ public class smokeTestClient implements SimpleClientListener{
         try{
          channel.send(ByteBuffer.wrap(toSend.getBytes()));
         } catch (IOException e){
-            System.out.println("unable to send on newly joined channel" + channel.getName());
+            logger.log(Level.WARNING, "unable to send on newly joined channel" + channel.getName());
         }
         return channelListener;
     }
@@ -81,7 +113,7 @@ public class smokeTestClient implements SimpleClientListener{
         try{
             client.send(ByteBuffer.wrap(msg.getBytes()));
         } catch (IOException e){
-            System.out.println("Unable to respoind to message");
+            logger.log(Level.WARNING, "Unable to respoind to message");
         }
     }
 
@@ -94,16 +126,35 @@ public class smokeTestClient implements SimpleClientListener{
     }
 
     public void disconnected(boolean graceful, String reason) {
-        if (!loginName.equals("discme")) {
-        }
-        System.out.println("Passed disconnection test");
+        if (loginName.equals("discme")) {
+        logger.log(Level.WARNING, "Passed disconnection test");
         loginName = "smokeTest";
         try {
             client.login(props);
         } catch (IOException e) {
-            System.out.println("unable to log in for main tests");
+            logger.log(Level.WARNING, "unable to log in for main tests");
         }
+        } else {
+            System.exit(printResults());
+        }
+    }
 
+    private int printResults(){
+        int failures = 0;
+
+        if (!receiveMsgPass){
+            logger.log(Level.WARNING, "Smoke test failed in receive message test");
+            failures++;
+        }
+        if (!joinChannelPass){
+            logger.log(Level.WARNING, "Smoke test failed in channel join test");
+            failures++;
+        }
+        if (!logOutPass){
+            logger.log(Level.WARNING, "Smoke test faled logout test");
+            failures++;
+        }
+        return failures;
     }
     /**
      *  Parse any command line arguments to determine the
@@ -140,4 +191,14 @@ public class smokeTestClient implements SimpleClientListener{
        return(returnProps);
     }
 
+    /**
+     * Print the usage message on the command line. Should
+     * only be called if the program is invoked incorrectly. Will
+     * print a standard usage message.
+     */
+    private static void printUse(){
+        System.out.println("usage: java smokeTestClient " +
+                "[host = hostname] [port = portnum]" +
+                "[ -usage]");
+    }
 }
