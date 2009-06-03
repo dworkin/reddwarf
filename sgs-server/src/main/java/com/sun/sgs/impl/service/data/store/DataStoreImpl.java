@@ -31,14 +31,8 @@ import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.PLACEHOLDER_OBJ_VALUE;
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.QUOTE_OBJ_VALUE;
+import com.sun.sgs.impl.service.data.store.DataEncoding;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
-import com.sun.sgs.impl.service.data.store.db.DataEncoding;
-import com.sun.sgs.impl.service.data.store.db.DbCursor;
-import com.sun.sgs.impl.service.data.store.db.DbDatabase;
-import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -136,7 +130,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	"com.sun.sgs.impl.service.data.store.db.environment.class";
     
     /** The default environment class. */
-    private static final String DEFAULT_ENVIRONMENT_CLASS =
+    public static final String DEFAULT_ENVIRONMENT_CLASS =
         "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
 
     /** The logger for this class. */

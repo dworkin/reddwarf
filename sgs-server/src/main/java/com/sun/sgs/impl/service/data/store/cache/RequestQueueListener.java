@@ -116,6 +116,8 @@ public abstract class RequestQueueListener extends Thread {
      *
      * @param	nodeId the node ID
      * @return	the server responsible for the node
+     * @throws	IllegalArgumentException if no server is found for the
+     *		specified node ID
      */
     abstract protected RequestQueueServer getServer(long nodeId);
 

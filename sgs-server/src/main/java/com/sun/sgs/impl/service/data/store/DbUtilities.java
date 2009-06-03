@@ -21,12 +21,12 @@ package com.sun.sgs.impl.service.data.store;
 
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.NEXT_OBJ_ID_KEY;
-import com.sun.sgs.impl.service.data.store.db.DataEncoding;
-import com.sun.sgs.impl.service.data.store.db.DbCursor;
-import com.sun.sgs.impl.service.data.store.db.DbDatabase;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.impl.service.data.store.DataEncoding;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.service.store.db.DbCursor;
+import com.sun.sgs.service.store.db.DbDatabase;
+import com.sun.sgs.service.store.db.DbEnvironment;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.io.FileNotFoundException;
 import java.io.ObjectStreamClass;
 import java.security.DigestException;

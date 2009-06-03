@@ -23,19 +23,16 @@ import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeLong;
+import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeString;
+import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeLong;
+import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeString;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
 import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
-import static com.sun.sgs.impl.service.data.store.db.DataEncoding.decodeLong;
-import static com.sun.sgs.impl.service.data.store.db.DataEncoding.decodeString;
-import static com.sun.sgs.impl.service.data.store.db.DataEncoding.encodeLong;
-import static com.sun.sgs.impl.service.data.store.db.DataEncoding.encodeString;
-import com.sun.sgs.impl.service.data.store.db.DbCursor;
-import com.sun.sgs.impl.service.data.store.db.DbDatabase;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -53,6 +50,10 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.store.db.DbCursor;
+import com.sun.sgs.service.store.db.DbDatabase;
+import com.sun.sgs.service.store.db.DbEnvironment;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -318,7 +319,12 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    directoryFile.getName());
 	    }
 	}
-	env = DbEnvironmentFactory.getEnvironment(
+	env = wrappedProps.getClassInstanceProperty(
+	    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY,
+	    DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS,
+	    DbEnvironment.class,
+	    new Class<?>[] {
+		String.class, Properties.class, Scheduler.class },
 	    directory, properties,
 	    new DelegatingScheduler(taskScheduler, taskOwner));
 	boolean done = false;
