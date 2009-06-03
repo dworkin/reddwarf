@@ -173,11 +173,7 @@ public abstract class RequestQueueListener extends Thread {
 			} catch (IOException e) {
 			}
 		    }
-		    synchronized (this) {
-			if (!shutdown) {
-			    noteConnectionException(t);
-			}
-		    }
+		    noteConnectionException(t);
 		}
 	    }
 	} finally {
@@ -192,8 +188,10 @@ public abstract class RequestQueueListener extends Thread {
      * Notes that an exception was thrown when attempting to handle a
      * connection.
      */
-    private void noteConnectionException(Throwable exception) {
-	assert Thread.holdsLock(this);
+    private synchronized void noteConnectionException(Throwable exception) {
+	if (shutdown) {
+	    return;
+	}
 	if (logger.isLoggable(FINE)) {
 	    logger.logThrow(
 		FINE, exception, "RequestQueueListener connection failed");
