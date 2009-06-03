@@ -1,7 +1,35 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2007-2009, Sun Microsystems, Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided with the
+ *       distribution.
+ *     * Neither the name of Sun Microsystems, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 package com.sun.sgs.test.client.simple;
 
@@ -21,38 +49,38 @@ import java.util.logging.Logger;
  *
  * @author waldo
  */
-public class smokeTestClient implements SimpleClientListener{
+public class SmokeTestClient implements SimpleClientListener{
 
-    private SimpleClient client;
+    private SimpleClient myclient;
     private boolean joinChannelPass, receiveMsgPass,
             logOutPass;
-    private smokeTestChannelListener channel;
+    private SmokeTestChannelListener mychannel;
 
     private static String host = "localhost";
-    private static int port = 1099;
+    private static String port = "1139";
     private static String loginName;
     private static Properties props;
 
     private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(smokeTestClient.class.getName()));
+            new LoggerWrapper(Logger.getLogger(SmokeTestClient.class.getName()));
 
 
-    public smokeTestClient(){
+    public SmokeTestClient(){
         joinChannelPass = receiveMsgPass = logOutPass = false;
-        client = new SimpleClient(this);
+        myclient = new SimpleClient(this);
     }
 
     public final static void main(String[] args){
 
         props = parseArgs(args);
-        smokeTestClient testClient = new smokeTestClient();
+        SmokeTestClient testClient = new SmokeTestClient();
         testClient.start();
     }
 
     public void start(){
         loginName = "discme";
         try {
-                    client.login(props);
+                    myclient.login(props);
         } catch (IOException e) {
             logger.log(Level.WARNING, "Exception generated on initial login");
             System.exit(1);
@@ -67,7 +95,7 @@ public class smokeTestClient implements SimpleClientListener{
     public void loggedIn(){
         String msg = "loggedIn:" + loginName;
         try {
-            client.send(ByteBuffer.wrap(msg.getBytes()));
+            myclient.send(ByteBuffer.wrap(msg.getBytes()));
         } catch (Exception e) {
             logger.log(Level.WARNING, "error sending reply to logged in message");
         }
@@ -84,7 +112,7 @@ public class smokeTestClient implements SimpleClientListener{
         }
         loginName = "discme";
         try {
-            client.login(props);
+            myclient.login(props);
         } catch (IOException e) {
             logger.log(Level.WARNING, "Exception generated while logging in as " + loginName);
             System.exit(1);
@@ -92,26 +120,26 @@ public class smokeTestClient implements SimpleClientListener{
     }
 
     public ClientChannelListener joinedChannel(ClientChannel channel){
-        ClientChannelListener channelListener = new smokeTestChannelListener (this.client);
+        mychannel = new SmokeTestChannelListener (this.myclient);
         String toSend = "joinedChannel" + channel.getName();
         try{
          channel.send(ByteBuffer.wrap(toSend.getBytes()));
         } catch (IOException e){
             logger.log(Level.WARNING, "unable to send on newly joined channel" + channel.getName());
         }
-        return channelListener;
+        return mychannel;
     }
 
     public void receivedMessage(ByteBuffer message){
         String msg = "receivedMessage:" + message.toString();
 
         if(message.toString().equals("logout")){
-            client.logout(false);
+            myclient.logout(false);
             return;
         }
 
         try{
-            client.send(ByteBuffer.wrap(msg.getBytes()));
+            myclient.send(ByteBuffer.wrap(msg.getBytes()));
         } catch (IOException e){
             logger.log(Level.WARNING, "Unable to respoind to message");
         }
@@ -130,7 +158,7 @@ public class smokeTestClient implements SimpleClientListener{
         logger.log(Level.WARNING, "Passed disconnection test");
         loginName = "smokeTest";
         try {
-            client.login(props);
+            myclient.login(props);
         } catch (IOException e) {
             logger.log(Level.WARNING, "unable to log in for main tests");
         }
@@ -183,7 +211,7 @@ public class smokeTestClient implements SimpleClientListener{
                 if (args[++i].equals("=")){
                     i++;
                 }
-                port = Integer.decode(args[i]).intValue();
+                port = args[i];
             }
         }
        returnProps.put("host", host);
