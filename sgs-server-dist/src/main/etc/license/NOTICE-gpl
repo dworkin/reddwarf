@@ -1,4 +1,4 @@
-Copyright ${projectYear} Sun Microsystems, Inc.
+Copyright ${project.inceptionYear}-${projectYear} Sun Microsystems, Inc.
 
 This file is part of Project Darkstar Server.
 

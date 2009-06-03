@@ -19,10 +19,10 @@
 
 package com.sun.sgs.test.impl.service.data.store;
 
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
+import com.sun.sgs.service.store.DataStore;
 import java.io.File;
 import java.util.Properties;
 import org.junit.BeforeClass;

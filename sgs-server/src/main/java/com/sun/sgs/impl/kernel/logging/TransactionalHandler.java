@@ -229,6 +229,12 @@ public class TransactionalHandler extends Handler
      *        upon transaction success.
      */
     public void publish(LogRecord record) {
+        // If we're not in a transaction at all, just publish the record.
+        // No need to buffer it.
+        if (!proxy.inTransaction()) {
+            handler.publish(record);
+            return;
+        }
 	Transaction txn = proxy.getCurrentTransaction();
 	if (txn == null) {
 	    // in the event that a TransactionalHandler is used

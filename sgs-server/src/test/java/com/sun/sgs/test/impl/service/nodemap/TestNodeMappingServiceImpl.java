@@ -570,9 +570,8 @@ public class TestNodeMappingServiceImpl {
 
      }
     
-    @Test
+    @Test (expected = IllegalStateException.class)
     public void testAssignNodeInTransaction() throws Exception {
-        // TODO should API specify a transaction exception will be thrown?
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 nodeMappingService.assignNode(NodeMappingService.class, 
@@ -751,6 +750,15 @@ public class TestNodeMappingServiceImpl {
     @Test(expected = NullPointerException.class)
     public void testSetStatusNullIdentity() throws Exception {
         nodeMappingService.setStatus(NodeMappingService.class, null, true);
+    }
+    @Test (expected = IllegalStateException.class)
+    public void testSetStatusInTransaction() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                nodeMappingService.setStatus(NodeMappingService.class, 
+                                              new IdentityImpl("first"), true);
+            }
+        }, taskOwner);
     }
     
     @Test

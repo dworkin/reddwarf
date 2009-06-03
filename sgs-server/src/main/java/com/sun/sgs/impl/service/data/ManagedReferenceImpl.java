@@ -336,8 +336,9 @@ final class ManagedReferenceImpl<T>
     }
 
     /**
-     * Like get, but with optional checking of the context.  Suppress the check
-     * if the reference was just obtained from the context.
+     * Like get, but with optional checking of the context.  Checking the
+     * context should only be suppressed if the reference was just obtained
+     * from the context.
      */
     @SuppressWarnings("fallthrough")
     T get(boolean checkContext) {
@@ -409,11 +410,22 @@ final class ManagedReferenceImpl<T>
     }
 
     /** {@inheritDoc} */
-    @SuppressWarnings("fallthrough")
     public T getForUpdate() {
+	return getForUpdate(true);
+    }
+
+    /**
+     * Like getForUpdate, but with optional checking of the context.  Checking
+     * the context should only be suppressed if the reference was just obtained
+     * from the context.
+     */
+    @SuppressWarnings("fallthrough")
+    T getForUpdate(boolean checkContext) {
 	RuntimeException exception = null;
 	try {
-	    DataServiceImpl.checkContext(context);
+	    if (checkContext) {
+		DataServiceImpl.checkContext(context);
+	    }
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(

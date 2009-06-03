@@ -23,17 +23,19 @@ import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -71,16 +73,6 @@ import javax.management.JMException;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.watchdog.server.start
- *	</b></code><br>
- *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
- *	property, if present, else {@code true} <br>
- *	Specifies whether the watchdog server should be started by this service.
- *	If {@code true}, the watchdog server is started.  If this property value
- *	is {@code true}, then the properties supported by the
- *	{@link WatchdogServerImpl} class should be specified.<p>
- *
- * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.host
  *	</b></code><br>
  *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
@@ -90,10 +82,9 @@ import javax.management.JMException;
  * <dd style="padding-top: .5em">
  *	Specifies the host name for the watchdog server that this service
  *	contacts.  If the {@code
- *	com.sun.sgs.impl.service.watchdog.server.start} property
- *	is {@code true}, then this property's default is used (since
- *	the watchdog server to contact will be the one started on
- *	the local host).
+ *	com.sun.sgs.node.type} property is not {@code appNode}, then this
+ *	property's default is used (since the watchdog server to contact will 
+ *      be the one started on the local host).
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.port
@@ -102,11 +93,11 @@ import javax.management.JMException;
  *
  * <dd style="padding-top: .5em">
  *	Specifies the network port for the watchdog server that this service
- *	contacts (and, optionally, starts).  If the {@code
- *	com.sun.sgs.impl.service.watchdog.server.start} property
- *	is {@code true}, then the value must be greater than or equal to
- *	{@code 0} and no greater than {@code 65535}, otherwise the value
- *	must be greater than {@code 0}, and no greater than {@code 65535}.<p>
+ *	contacts (and, optionally, starts).  If the {@code 
+ *      com.sun.sgs.node.type} property is not {@code singleNode}, then the
+ *      value must be greater than or equal to {@code 0} and no greater than 
+ *      {@code 65535}, otherwise the value must be greater than {@code 0}, 
+ *      and no greater than {@code 65535}.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.client.host
@@ -171,10 +162,6 @@ public final class WatchdogServiceImpl
 
     /** The prefix for client properties. */
     private static final String CLIENT_PROPERTY_PREFIX = PKG_NAME + ".client";
-
-    /** The property to specify that the watchdog server should be started. */
-    private static final String START_SERVER_PROPERTY =
-	SERVER_PROPERTY_PREFIX + ".start";
 
     /** The property name for the watchdog server host. */
     private static final String HOST_PROPERTY =
@@ -241,10 +228,11 @@ public final class WatchdogServiceImpl
 	recoveryListeners =
 	    new ConcurrentHashMap<RecoveryListener, RecoveryListener>();
 
-    /** The queues of RecoveryCompleteFutures, keyed by node being recovered. */
-    private final ConcurrentMap<Node, Queue<RecoveryCompleteFuture>>
-	recoveryFutures =
-	    new ConcurrentHashMap<Node, Queue<RecoveryCompleteFuture>>();
+    /** The queues of SimpleCompletionHandlers, keyed by node being
+     * recovered. */
+    private final ConcurrentMap<Node, Queue<SimpleCompletionHandler>>
+	recoveryQueues =
+	    new ConcurrentHashMap<Node, Queue<SimpleCompletionHandler>>();
 
     /** The lock for {@code isAlive} field. */
     private final Object lock = new Object();
@@ -286,23 +274,15 @@ public final class WatchdogServiceImpl
 	shutdownController = ctrl;
 	
 	try {
-	    boolean startServer = wrappedProps.getBooleanProperty(
- 		START_SERVER_PROPERTY,
-		wrappedProps.getBooleanProperty(
-		    StandardProperties.SERVER_START, true));
 	    localHost = InetAddress.getLocalHost().getHostName();
-           
-             String finalService =
-                properties.getProperty(StandardProperties.FINAL_SERVICE);
-             boolean isFullStack = true;
-             if (finalService == null) {
-                 isFullStack = true;
-             } else {
-                 isFullStack = 
-                    !(properties.getProperty(StandardProperties.APP_LISTENER)
-                     .equals(StandardProperties.APP_LISTENER_NONE));
-             }
-        
+                
+            NodeType nodeType = 
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
+            boolean startServer = nodeType != NodeType.appNode;
+            boolean isFullStack = nodeType != NodeType.coreServerNode;
+            
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
             
@@ -499,15 +479,15 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
 	checkState();
-	if (listener == null) {
-	    throw new NullPointerException("null listener");
-	}
+	checkNonTransactionalContext();
+	checkNull("listener", listener);
         serviceStats.addNodeListenerOp.report();
 	nodeListeners.putIfAbsent(listener, listener);
     }
 
     /** {@inheritDoc} */
     public Node getBackup(long nodeId) {
+	checkState();
         serviceStats.getBackupOp.report();
 	NodeImpl node = (NodeImpl) getNode(nodeId);
 	return
@@ -519,9 +499,8 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public void addRecoveryListener(RecoveryListener listener) {
 	checkState();
-	if (listener == null) {
-	    throw new NullPointerException("null listener");
-	}
+	checkNonTransactionalContext();
+	checkNull("listener", listener);
         serviceStats.addRecoveryListenerOp.report();
 	recoveryListeners.putIfAbsent(listener, listener);
     }
@@ -531,6 +510,8 @@ public final class WatchdogServiceImpl
      */
     public synchronized void reportFailure(long nodeId, String className)
     {
+	checkNull("className", className);
+	checkNonTransactionalContext();
         if (shuttingDown() || !getIsAlive()) {
             return;
         }
@@ -751,18 +732,18 @@ public final class WatchdogServiceImpl
 	    logger.log(Level.INFO, "Node:{0} recovering for node:{1}",
 		       localNodeId, node.getId());
 	}
-	Queue<RecoveryCompleteFuture> futureQueue =
-	    new ConcurrentLinkedQueue<RecoveryCompleteFuture>();
-	if (recoveryFutures.putIfAbsent(node, futureQueue) != null) {
+	Queue<SimpleCompletionHandler> handlers =
+	    new ConcurrentLinkedQueue<SimpleCompletionHandler>();
+	if (recoveryQueues.putIfAbsent(node, handlers) != null) {
 	    // recovery for node already being handled
 	    return;
 	}
 	
 	for (RecoveryListener listener : recoveryListeners.keySet()) {
 	    final RecoveryListener recoveryListener = listener;
-	    final RecoveryCompleteFuture future =
-		new RecoveryCompleteFutureImpl(node, listener);
-	    futureQueue.add(future);
+	    final SimpleCompletionHandler handler =
+		new RecoveryCompletionHandler(node, listener);
+	    handlers.add(handler);
 	    taskScheduler.scheduleTask(
 		new AbstractKernelRunnable("NotifyRecoveryListeners") {
 		    public void run() {
@@ -770,14 +751,14 @@ public final class WatchdogServiceImpl
 			    if (!shuttingDown() &&
 				isLocalNodeAliveNonTransactional())
 			    {
-				recoveryListener.recover(node, future);
+				recoveryListener.recover(node, handler);
 			    }
 			} catch (Exception e) {
 			    logger.logThrow(
 			        Level.WARNING, e,
 				"Notifying recovery listener on node:{0} " +
-				"with node:{1}, future:{2} throws",
-				localNodeId, node, future);
+				"with node:{1}, handler:{2} throws",
+				localNodeId, node, handler);
 			}
 		    }
 		}, taskOwner);
@@ -847,23 +828,22 @@ public final class WatchdogServiceImpl
 	public void reportFailure(String className) {
 	    setFailedThenNotify(true);
 	}
-
     }
 
     /**
-     * The {@code RecoveryCompleteFuture} implementation.  When {@code
-     * done} is invoked, the future instance is removed from the recovery
-     * future queue for the associated node.  If a given future is the
-     * last one to be removed from a node's queue, then recovery is
-     * complete for that node, and the data store is updated to clean
-     * up recovery information for that node.
+     * The {@code SimpleCompletionHandler} implementation for recovery.
+     * When {@code completed} is invoked, the handler instance is removed
+     * from the recovery completion handler queue for the associated node.
+     * If a given handler is the last one to be removed from a node's
+     * queue, then recovery is complete for that node, and the data store
+     * is updated to clean up recovery information for that node.
      */
-    private final class RecoveryCompleteFutureImpl
-	implements RecoveryCompleteFuture
+    private final class RecoveryCompletionHandler
+	implements SimpleCompletionHandler
     {
 	/** The failed node. */
 	private final Node node;
-	/** The recovery listener for this future (currently unused). */
+	/** The recovery listener for this handler (currently unused). */
 	private final RecoveryListener listener;
 	/** Indicates whether recovery is done. */
 	private boolean isDone = false;
@@ -872,13 +852,13 @@ public final class WatchdogServiceImpl
 	 * Constructs an instance with the specified {@code node} and
 	 * recovery {@code listener}.
 	 */
-	RecoveryCompleteFutureImpl(Node node, RecoveryListener listener) {
+	RecoveryCompletionHandler(Node node, RecoveryListener listener) {
 	    this.node = node;
 	    this.listener = listener;
 	}
 
 	/** {@inheritDoc} */
-	public void done() {
+	public void completed() {
 	    synchronized (this) {
 		if (isDone) {
 		    return;
@@ -886,14 +866,14 @@ public final class WatchdogServiceImpl
 		isDone = true;
 	    }
 
-	    Queue<RecoveryCompleteFuture> futureQueue =
-		recoveryFutures.get(node);
-	    assert futureQueue != null;
-	    futureQueue.remove(this);
-	    if (futureQueue.isEmpty()) {
+	    Queue<SimpleCompletionHandler> handlers =
+		recoveryQueues.get(node);
+	    assert handlers != null;
+	    handlers.remove(this);
+	    if (handlers.isEmpty()) {
 		// recovery for the node is complete, so remove node
-		// from table of recovery futures
-		if (recoveryFutures.remove(node) != null) {
+		// from table of recovery queues.
+		if (recoveryQueues.remove(node) != null) {
 		    try {
 			if (isLocalNodeAliveNonTransactional()) {
 			    serverProxy.recoveredNode(
@@ -907,11 +887,6 @@ public final class WatchdogServiceImpl
 		    }
 		}
 	    }
-	}
-
-	/** {@inheritDoc} */
-	public synchronized boolean isDone() {
-	    return isDone;
 	}
     }
 }

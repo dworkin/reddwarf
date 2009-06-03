@@ -19,7 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data.store;
 
-import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.util.InMemoryDataStore;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import org.junit.runner.RunWith;

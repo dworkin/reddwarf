@@ -48,6 +48,8 @@ import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.ClientSessionDisconnectListener;
+import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
@@ -375,6 +377,70 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
+    }
+
+    // -- Test registerSessionDisconnectListener --
+
+    public void testRegisterSessionDisconnectListenerNullArg() {
+	try {
+	    serverNode.getClientSessionService().
+		registerSessionDisconnectListener(null);
+	    fail("expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testRegisterSessionDisconnectListenerInTxn()
+	throws Exception
+    {
+	try {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    serverNode.getClientSessionService().
+			registerSessionDisconnectListener(
+			    new DummyDisconnectListener());
+		}}, taskOwner);
+	    fail("expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    public void testRegisterSessionDisconnectListenerNoTxn() {
+	serverNode.getClientSessionService().
+	    registerSessionDisconnectListener(new DummyDisconnectListener());
+    }
+
+    // -- Test getSessionProtocol --
+
+    public void testGetSessionProtocolNullArg() {
+	try {
+	    serverNode.getClientSessionService(). getSessionProtocol(null);
+	    fail("expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    public void testGetSessionProtocolInTxn()
+	throws Exception
+    {
+	try {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    serverNode.getClientSessionService().
+			getSessionProtocol(new BigInteger(1, new byte[] {0}));
+		}}, taskOwner);
+	    fail("expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetSessionProtocolNoTxn() {
+	assertNull(serverNode.getClientSessionService().
+		   getSessionProtocol(new BigInteger(1, new byte[] {0})));
     }
     
     // -- Test connecting, logging in, logging out with server -- 
@@ -2005,5 +2071,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 	}
+    }
+
+    private static class DummyDisconnectListener
+	implements ClientSessionDisconnectListener
+    {
+	public void disconnected(BigInteger sessionRefId) { }
     }
 }

@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>13</version>
+    <version>14</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-parent</artifactId>
   <name>Project Darkstar Server Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.9.10-SNAPSHOT</version>
+  <version>0.9.11-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
@@ -45,6 +45,7 @@
     <module>sgs-server-api</module>
     <module>sgs-server-dist</module>
     <module>sgs-server-javadoc</module>
+    <module>sgs-server-internal-api</module>
     <module>sgs-tutorial-server</module>
     <module>sgs-tutorial-server-dist</module>
   </modules>
@@ -59,15 +60,23 @@
 	<plugin>
 	  <groupId>org.apache.maven.plugins</groupId>
 	  <artifactId>maven-remote-resources-plugin</artifactId>
+	  <configuration>
+	    <properties>
+	      <projectName>Project Darkstar Server</projectName>
+	    </properties>
+	  </configuration>
+	</plugin>
+
+	<!-- The license plugin should be activated in modules that
+	     contain source code and thus need to verify correct license
+	     headers in each source code file -->
+	<plugin>
+	  <groupId>com.google.code.maven-license-plugin</groupId>
+          <artifactId>maven-license-plugin</artifactId>
 	  <executions>
 	    <execution>
-	      <id>include-gpl-license</id>
-	      <phase>generate-resources</phase>
-	      <configuration>
-		<properties>
-		  <projectName>Project Darkstar Server</projectName>
-		</properties>
-	      </configuration>
+	      <id>check-notice</id>
+	      <phase>compile</phase>
 	    </execution>
 	  </executions>
 	</plugin>
@@ -171,6 +180,17 @@
       <dependency>
 	<groupId>com.projectdarkstar.server</groupId>
 	<artifactId>sgs-server-api</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-internal-api</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-internal-api</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs.version}</version>
       </dependency>
@@ -405,7 +425,7 @@
 
   <properties>
     <sgs.version>${version}</sgs.version>
-    <sgs-shared.version>1.6</sgs-shared.version>
+    <sgs-shared.version>1.7</sgs-shared.version>
     <sgs-client.version>0.9.9</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>

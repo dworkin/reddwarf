@@ -33,6 +33,7 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
@@ -229,15 +230,6 @@ public class SgsTestNode {
         this.appName = appName;
 	this.serverNode = serverNode;
 	
-        // The node mapping service requires at least one full stack
-        // to run properly (it will not assign identities to a node
-        // without an app listener).   Most tests only require a single
-        // node, so we provide a simple app listener if the test doesn't
-        // care about one.
-        if (listenerClass == null) {
-            listenerClass = DummyAppListener.class;
-        }
-
         if (properties == null) {
 	    props = getDefaultProperties(appName, serverNode, listenerClass);
         } else {
@@ -411,8 +403,14 @@ public class SgsTestNode {
                                            Class<?> listenerClass) 
         throws Exception
     {
+        // The SgsTestNode currently starts single node (in a network config
+        // for the data store) or an app node.  If a core server node is
+        // desired, it's best to set the property explicitly.
         boolean isServerNode = serverNode == null;
-        String startServer = String.valueOf(isServerNode);
+        String nodeType = 
+            isServerNode ? 
+            NodeType.singleNode.toString() : 
+            NodeType.appNode.toString();
 
         int requestedDataPort =
             isServerNode ?
@@ -432,16 +430,27 @@ public class SgsTestNode {
 				 serverNode.getNodeMappingService());
 
         String dir = System.getProperty("java.io.tmpdir") +
-                                File.separator + appName + ".db";
+                                File.separator + appName;
 
+        // The node mapping service requires at least one full stack
+        // to run properly (it will not assign identities to a node
+        // without an app listener).   Most tests only require a single
+        // node, so we provide a simple app listener if the test doesn't
+        // care about one.
+        if (listenerClass == null) {
+            listenerClass = DummyAppListener.class;
+        }
+        
         Properties retProps = createProperties(
             StandardProperties.APP_NAME, appName,
-            StandardProperties.SERVER_START, startServer,
+            StandardProperties.APP_ROOT, dir,
+            StandardProperties.NODE_TYPE, nodeType,
             StandardProperties.SERVER_HOST, "localhost",
             com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 String.valueOf(getNextUniquePort()),
+            StandardProperties.APP_LISTENER, listenerClass.getName(),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-                dir,
+                dir + ".db",
             "com.sun.sgs.impl.service.data.store.net.server.port", 
                 String.valueOf(requestedDataPort),
             "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
@@ -459,12 +468,10 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.watchdog.server.renew.interval", "500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
-            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
-	    StandardProperties.APP_LISTENER,
-	        (listenerClass != null ?
-		 listenerClass.getName() :
-		 StandardProperties.APP_LISTENER_NONE)
+            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250"
         );
+        
+        
 
         return retProps;
     }

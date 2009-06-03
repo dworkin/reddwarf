@@ -22,7 +22,7 @@ package com.sun.sgs.impl.app.profile;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-
+import java.math.BigInteger;
 
 /**
  * This implementation of {@code DataManager} simply calls its 
@@ -47,6 +47,13 @@ public class ProfileDataManager implements DataManager {
      */
     public ManagedObject getBinding(String name) {
         return backingManager.getBinding(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public ManagedObject getBindingForUpdate(String name) {
+        return backingManager.getBindingForUpdate(name);
     }
 
     /**
@@ -91,4 +98,10 @@ public class ProfileDataManager implements DataManager {
         return backingManager.createReference(object);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public BigInteger getObjectId(Object object) {
+	return backingManager.getObjectId(object);
+    }
 }

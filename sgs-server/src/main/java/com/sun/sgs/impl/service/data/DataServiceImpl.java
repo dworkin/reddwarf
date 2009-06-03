@@ -25,9 +25,9 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
@@ -39,12 +39,16 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.NodeType;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.store.DataStore;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Properties;
@@ -57,10 +61,10 @@ import javax.management.JMException;
  * DataStoreImpl}. <p>
  *
  * The {@link #DataServiceImpl constructor} requires the <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> property, and supports both these
  * public configuration <a
- * href="../../../app/doc-files/config-properties.html#DataService">
+ * href="../../../impl/kernel/doc-files/config-properties.html#DataService">
  * properties</a> and the following additional properties: <p>
  *
  * <dl style="margin-left: 1em">
@@ -68,9 +72,10 @@ import javax.management.JMException;
  * <dt> <i>Property:</i> <code><b>{@value #DATA_STORE_CLASS_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i>
- *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
- *	the {@code com.sun.sgs.server.start} property is {@code false}, else
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
+ *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> 
+ *      unless the {@code com.sun.sgs.node.type} property is {@code singleNode},
+ *      which defaults to 
+ *      <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
  *	DataStore}.  The class should be public, not abstract, and should
@@ -110,6 +115,16 @@ import javax.management.JMException;
  *	locks until commit time, which may improve performance in some cases,
  *	typically when there is low contention.  Note that setting this flag to
  *	<code>true</code> does not delay write locks when removing objects.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #TRACK_STALE_OBJECTS_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to track references to stale managed
+ *	objects.  If <code>true</code>, the <code>DataService</code> keeps
+ *	track of persistent or removed objects from completed transactions and
+ *	throws {@link TransactionNotActiveException} if the application refers
+ *	to those objects from another transaction. <p>
  *
  * </dl> <p>
  *
@@ -178,6 +193,10 @@ public final class DataServiceImpl implements DataService {
     public static final String OPTIMISTIC_WRITE_LOCKS =
 	CLASSNAME + ".optimistic.write.locks";
 
+    /** The property that specifies whether to track stale objects. */
+    public static final String TRACK_STALE_OBJECTS_PROPERTY =
+	CLASSNAME + ".track.stale.objects";
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -208,6 +227,9 @@ public final class DataServiceImpl implements DataService {
 
     /** Whether to delay obtaining write locks. */
     final boolean optimisticWriteLocks;
+
+    /** Whether to track stale objects. */
+    private final boolean trackStaleObjects;
 
     /** The data service profiling information. */
     private final DataServiceStats serviceStats;
@@ -291,7 +313,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    return new Context(
 		DataServiceImpl.this, store, txn, debugCheckInterval,
-		detectModifications, classesTable);
+		detectModifications, classesTable, trackStaleObjects);
 	}
     }
 
@@ -344,13 +366,18 @@ public final class DataServiceImpl implements DataService {
 		DATA_STORE_CLASS_PROPERTY);
 	    optimisticWriteLocks = wrappedProps.getBooleanProperty(
 		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
+	    trackStaleObjects = wrappedProps.getBooleanProperty(
+		TRACK_STALE_OBJECTS_PROPERTY, Boolean.FALSE);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    DelegatingScheduler scheduler =
 		new DelegatingScheduler(taskScheduler, taskOwner);
-	    boolean serverStart = wrappedProps.getBooleanProperty(
-		StandardProperties.SERVER_START, true);
+            NodeType nodeType = 
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
+
 	    AccessCoordinator accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
 	    DataStore baseStore;
@@ -360,7 +387,7 @@ public final class DataServiceImpl implements DataService {
 		    new Class[] { Properties.class, AccessCoordinator.class },
 		    properties, accessCoordinator);
 		logger.log(Level.CONFIG, "Using data store {0}", baseStore);
-	    } else if (serverStart) {
+	    } else if (nodeType == NodeType.singleNode) {
 		baseStore = new DataStoreImpl(
 		    properties, accessCoordinator, scheduler);
 	    } else {
@@ -441,7 +468,13 @@ public final class DataServiceImpl implements DataService {
     /** {@inheritDoc} */
     public ManagedObject getBinding(String name) {
         serviceStats.getBindingOp.report();
-	return getBindingInternal(name, false);
+	return getBindingInternal(name, false, false, "getBinding");
+    }
+
+    /** {@inheritDoc} */
+    public ManagedObject getBindingForUpdate(String name) {
+	serviceStats.getBindingForUpdateOp.report();
+	return getBindingInternal(name, false, true, "getBindingForUpdate");
     }
 
     /** {@inheritDoc} */
@@ -471,15 +504,15 @@ public final class DataServiceImpl implements DataService {
 	    checkManagedObject(object);
 	    context = getContext();
 	    ref = context.findReference(object);
+	    if (object instanceof ManagedObjectRemoval) {
+		context.removingObject((ManagedObjectRemoval) object);
+		/*
+		 * Get the context again in case something changed as a
+		 * result of the call to removingObject.
+		 */
+		getContext();
+	    }
 	    if (ref != null) {
-		if (object instanceof ManagedObjectRemoval) {
-		    context.removingObject((ManagedObjectRemoval) object);
-		    /*
-		     * Get the context again in case something changed as a
-		     * result of the call to removingObject.
-		     */
-		    getContext();
-		}
 		ref.removeObject();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -562,12 +595,46 @@ public final class DataServiceImpl implements DataService {
 	}
     }
 
+    /** {@inheritDoc} */
+    public BigInteger getObjectId(Object object) {
+	serviceStats.getObjectIdOp.report();
+	Context context = null;
+	try {
+	    checkManagedObject(object);
+	    context = getContext();
+	    BigInteger result = context.getReference(object).getId();
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "getObjectId tid:{0,number,#}, type:{1}" +
+			   " returns oid:{2,number,#}",
+			   contextTxnId(context), typeName(object), result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
+		    Level.FINEST, e,
+		    "getObjectId tid:{0,number,#}, type:{1} throws",
+		    contextTxnId(context), typeName(object));
+	    }
+	    throw e;
+	}
+    }
+
     /* -- Implement DataService -- */
 
     /** {@inheritDoc} */
     public ManagedObject getServiceBinding(String name) {
         serviceStats.getServiceBindingOp.report();
-	return getBindingInternal(name, true);
+	return getBindingInternal(name, true, false, "getServiceBinding");
+    }
+
+    /** {@inheritDoc} */
+    public ManagedObject getServiceBindingForUpdate(String name) {
+        serviceStats.getServiceBindingForUpdateOp.report();
+	return getBindingInternal(
+	    name, true, true, "getServiceBindingForUpdate");
     }
 
     /** {@inheritDoc} */
@@ -639,9 +706,14 @@ public final class DataServiceImpl implements DataService {
 
     /* -- Generic binding methods -- */
 
-    /** Implement getBinding and getServiceBinding. */
-    private ManagedObject getBindingInternal(
-	String name, boolean serviceBinding)
+    /**
+     * Implement getBinding, getBindingForUpdate, getServiceBinding, and
+     * getServiceBindingForUpdate.
+     */
+    private ManagedObject getBindingInternal(String name,
+					     boolean serviceBinding,
+					     boolean forUpdate,
+					     String methodName)
     {
 	Context context = null;
 	try {
@@ -652,7 +724,7 @@ public final class DataServiceImpl implements DataService {
 	    ManagedObject result;
 	    try {
 		result = context.getBinding(
-		    getInternalName(name, serviceBinding));
+		    getInternalName(name, serviceBinding), forUpdate);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -662,8 +734,7 @@ public final class DataServiceImpl implements DataService {
 		    Level.FINEST,
 		    "{0} tid:{1,number,#}, name:{2} returns type:{3}," +
 		    " oid:{4,number,#}",
-		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, typeName(result),
+		    methodName, contextTxnId(context), name, typeName(result),
 		    objectId(context, result));
 	    }
 	    return result;
@@ -673,8 +744,7 @@ public final class DataServiceImpl implements DataService {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "{0} tid:{1,number,#}, name:{2} throws",
-		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name);
+		    methodName, contextTxnId(context), name);
 	    }
 	    throw e;
 	}
@@ -892,7 +962,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 	}
     }
-
+    
     /**
      * Checks that the specified context is currently active.  Throws
      * TransactionNotActiveException if there is no current transaction or if

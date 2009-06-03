@@ -34,14 +34,14 @@ import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
-import com.sun.sgs.impl.service.data.store.db.DbDatabase;
-import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.service.store.db.DbDatabase;
+import com.sun.sgs.service.store.db.DbDatabaseException;
+import com.sun.sgs.service.store.db.DbEnvironment;
+import com.sun.sgs.service.store.db.DbTransaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -69,7 +69,7 @@ import java.util.logging.Logger;
  * resolve prepared transactions should have no effect at present. <p>
  *
  * The {@link #BdbEnvironment constructor} supports these public <a
- * href="../../../../../../app/doc-files/config-properties.html#Bdb">
+ * href="../../../../../../impl/kernel/doc-files/config-properties.html#Bdb">
  * properties</a> and the following additional properties: <p>
  *
  * <dl style="margin-left: 1em">

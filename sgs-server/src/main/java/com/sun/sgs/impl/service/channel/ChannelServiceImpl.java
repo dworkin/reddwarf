@@ -47,8 +47,8 @@ import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -75,11 +75,8 @@ import javax.management.JMException;
  * ChannelService implementation. <p>
  * 
  * <p>The {@link #ChannelServiceImpl constructor} requires the <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> property and supports
- * these public configuration <a
- * href="../../../app/doc-files/config-properties.html#ChannelService">
- * properties</a>. <p>
+ * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * <code>com.sun.sgs.app.name</code></a> property.
  *
  * <p>TBD: add summary comment about how the implementation works.
  */
@@ -733,7 +730,9 @@ public final class ChannelServiceImpl
 	 * TBD: (optimization) this method should handle sending multiple
 	 * messages to a given channel.
 	 */
-	public void send(BigInteger channelRefId, byte[] message) {
+	public void send(BigInteger channelRefId, byte[] message,
+			 byte deliveryOrdinal)
+	{
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -757,6 +756,7 @@ public final class ChannelServiceImpl
 		    return;
 		}
 
+		Delivery delivery = Delivery.values()[deliveryOrdinal];
 		for (BigInteger sessionRefId : localMembers) {
 		    SessionProtocol protocol =
 			sessionService.getSessionProtocol(sessionRefId);
@@ -764,7 +764,7 @@ public final class ChannelServiceImpl
                         try {
                             protocol.channelMessage(channelRefId,
                                                     ByteBuffer.wrap(message),
-                                                    Delivery.RELIABLE);
+                                                    delivery);
                         } catch (IOException ioe) {
                             logger.logThrow(Level.WARNING, ioe,
                                             "channelMessage throws");
@@ -1121,7 +1121,7 @@ public final class ChannelServiceImpl
 	implements RecoveryListener
     {
 	/** {@inheritDoc} */
-	public void recover(Node node, RecoveryCompleteFuture future) {
+	public void recover(Node node, SimpleCompletionHandler handler) {
 	    final long nodeId = node.getId();
 	    final TaskService taskService = getTaskService();
 	    try {
@@ -1152,7 +1152,7 @@ public final class ChannelServiceImpl
 		    },
 		    taskOwner);
 		
-		future.done();
+		handler.completed();
 
 	    } catch (Exception e) {
 		logger.logThrow(

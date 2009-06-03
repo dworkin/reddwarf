@@ -45,6 +45,12 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.db.DbCursor;
+import com.sun.sgs.service.store.db.DbDatabase;
+import com.sun.sgs.service.store.db.DbDatabaseException;
+import com.sun.sgs.service.store.db.DbEnvironment;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
@@ -67,7 +73,7 @@ import java.util.logging.Logger;
 /**
  * Provides an implementation of <code>DataStore</code> based on the database
  * interface layer defined in the {@link
- * com.sun.sgs.impl.service.data.store.db} package. <p>
+ * com.sun.sgs.service.store.db} package. <p>
  *
  * Note that, although this class provides support for the {@link
  * TransactionParticipant#prepare TransactionParticipant.prepare} method, it
@@ -83,12 +89,14 @@ import java.util.logging.Logger;
  *
  * The {@link #DataStoreImpl(Properties, AccessCoordinator) constructor}
  * supports these public <a
- * href="../../../../app/doc-files/config-properties.html#DataStore">
+ * href="../../../../impl/kernel/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
- *
- * The constructor also passes the properties to {@link
- * DbEnvironmentFactory#getEnvironment DbEnvironmentFactory.getEnvironment},
- * which supports additional properties. <p>
+ * 
+ * The constructor also passes the properties to the constructor of
+ * the {@link DbEnvironment} class chosen at runtime with the
+ * {@code com.sun.sgs.impl.service.data.store.db.environment.class} property.
+ * Each implementation of {@code DbEnvironment} may support additional
+ * properties. <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> to log
@@ -122,6 +130,14 @@ public class DataStoreImpl extends AbstractDataStore {
 
     /** The default directory for database files from the app root. */
     private static final String DEFAULT_DIRECTORY = "dsdb";
+    
+    /** The property that specifies the environment class. */
+    public static final String ENVIRONMENT_CLASS_PROPERTY =
+	"com.sun.sgs.impl.service.data.store.db.environment.class";
+    
+    /** The default environment class. */
+    private static final String DEFAULT_ENVIRONMENT_CLASS =
+        "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -804,8 +820,14 @@ public class DataStoreImpl extends AbstractDataStore {
                                                  directoryFile.getName());
                 }
 	    }
-	    env = DbEnvironmentFactory.getEnvironment(
-		directory, properties, scheduler);
+            env = wrappedProps.getClassInstanceProperty(
+                    ENVIRONMENT_CLASS_PROPERTY,
+                    DEFAULT_ENVIRONMENT_CLASS,
+                    DbEnvironment.class,
+                    new Class<?>[]{
+                        String.class, Properties.class, Scheduler.class
+                    },
+                    directory, properties, scheduler);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
 	    Databases dbs = DbUtilities.getDatabases(env, dbTxn, logger);
 	    infoDb = dbs.info();
@@ -835,7 +857,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	    }
 	}
     }
-
+    
     /**
      * Removes any unused allocation block placeholders and updates the ID of
      * the first placeholder.
