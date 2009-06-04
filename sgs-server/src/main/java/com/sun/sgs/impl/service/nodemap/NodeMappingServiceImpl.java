@@ -1092,19 +1092,19 @@ public class NodeMappingServiceImpl
 	    Queue<SimpleCompletionHandler> handlerQueue =
                     relocationHandlers.get(id);
 	    assert handlerQueue != null;
-	    if (!handlerQueue.remove(this)) {
-                // If the queue did not change, this object wasn't on the queue.
-                // This could happen if the move preparation has failed
-                // previously (due to handlers not calling completed in a timely
-                // manner).
-                return;
-            };
-	    if (handlerQueue.isEmpty()) {
-                relocationHandlers.remove(id);
-                // tell the server we're good to go.
-                tellServerCanMove(id);
-	    }
-	}
+            
+            // If the queue did not change, this object wasn't on the queue.
+            // This could happen if the move preparation has failed
+            // previously (due to handlers not calling completed in a timely
+            // manner).
+            if (handlerQueue.remove(this)) {
+                if (handlerQueue.isEmpty()) {
+                    relocationHandlers.remove(id);
+                    // tell the server we're good to go.
+                    tellServerCanMove(id);
+                }
+            }
+        }
     }
     
     /**
