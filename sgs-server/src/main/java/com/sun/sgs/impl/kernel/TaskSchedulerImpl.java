@@ -56,6 +56,16 @@ import java.util.logging.Logger;
  * is better understanding of what (if any) custom scheduling behavior will
  * help these kinds of tasks.
  * <p>
+ * This class supports the following configuration properties:
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #CONSUMER_THREADS_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_CONSUMER_THREADS}</code>
+ *
+ * <dd style="padding-top: .5em">The number of initial threads used to process
+ *      non-transactional tasks.<p>
+ * </dl>
  * FIXME: the profiling code needs a way to learn about the thread count
  * from this scheduler separately from the transaction pool. When this gets
  * added, this class should start tracking thread counts.
@@ -74,8 +84,10 @@ final class TaskSchedulerImpl implements TaskScheduler {
     public static final String CONSUMER_THREADS_PROPERTY =
         "com.sun.sgs.impl.kernel.task.threads";
 
-    // the default number of initial consumer threads
-    private static final String DEFAULT_CONSUMER_THREADS = "4";
+    /**
+     * The default number of initial consumer threads.
+     */
+    public static final String DEFAULT_CONSUMER_THREADS = "4";
 
     // the executor used to run tasks
     private final ScheduledExecutorService executor;

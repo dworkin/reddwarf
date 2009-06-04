@@ -49,8 +49,8 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -414,7 +414,7 @@ public class TaskServiceImpl
     /**
      * {@inheritDoc}
      */
-    public void recover(Node node, RecoveryCompleteFuture future) {
+    public void recover(Node node, SimpleCompletionHandler handler) {
         final long failedNodeId =  node.getId();
         final String handoffSpace = DS_HANDOFF_SPACE + failedNodeId;
 
@@ -451,7 +451,7 @@ public class TaskServiceImpl
             }
         }
 
-        future.done();
+        handler.completed();
     }
 
     /**

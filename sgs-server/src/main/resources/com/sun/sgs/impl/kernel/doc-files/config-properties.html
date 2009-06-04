@@ -150,9 +150,9 @@ space available for Project Darkstar use.
 
 <dt><a name="app.listener">com.sun.sgs.app.listener</a>
 <span class="required"> for application and single nodes</span>
-<dd>The <a href="../AppListener.html"><code>AppListener</code></a> for
+<dd>The <a href="../../../app/AppListener.html"><code>AppListener</code></a> for
   the application, specified as a fully qualified class name.  See the
-  <a href="../AppListener.html">class javadoc</a> for requirements of
+  <a href="../../../app/AppListener.html">class javadoc</a> for requirements of
   valid class implementations.
 
 </dl>
@@ -165,14 +165,33 @@ Server, and can be used in any node configuration unless otherwise specified.
 
 <a name="AppServerPorts"></a>
 <h3>Application Server Port Properties</h3>
-By default, the application server uses a TCP transport for client communications. This property can be used by application nodes to specify 
+By default, the application server uses a TCP transport for client 
+communications. This property can be used by application nodes to specify 
 the port to be used for the client listeners. 
 
 <dl>
-<dt><a name="com.sun.sgs.impl.transport.tcp.listen.port">com.sun.sgs.impl.transport.tcp.listen.port</a>
+<dt><a name="com.sun.sgs.impl.transport.tcp.listen.port">
+    com.sun.sgs.impl.transport.tcp.listen.port</a>
 <span class="default">62964</span>
 <dd>The TCP port on which to listen for client connections when the TCP
 transport is configured.
+<dt><a name="com.sun.sgs.impl.protocol.simple.transport">
+    com.sun.sgs.impl.protocol.simple.transport</a>
+<span class="default">
+  <a href="../../../impl/transport/tcp/TcpTransport.html">
+    com.sun.sgs.impl.transport.tcp.TcpTransport
+  </a>
+</span>
+<dd>The name of the class that implements the transport used for client
+communications.  The default value implements the TCP transport.
+Other values should specify the fully
+qualified name of a non-abstract class that implements
+<a href="../../../transport/Transport.html">
+  <code>com.sun.sgs.transport.Transport</code>
+</a> and supports 
+<a href="../../../app/Delivery.html#RELIABLE">Delivery.RELIABLE</a>.
+See the <a href="../../../impl/protocol/simple/SimpleSgsProtocolAcceptor.html">
+  SimpleSgsProtocolAcceptor</a> class for more details.
 </dl>
 
 <a name="CoreServerPorts"></a>
@@ -197,16 +216,24 @@ they must be set to the same value on each application node.
 <a name="DataService"></a>
 <h3>DataService Properties</h3>
 
-These properties control the implementation of the
-<code>DataService</code>.
+These properties control the implementation of the default
+<a href="../../../service/DataService.html"><code>DataService</code></a>.  
+See the
+<a href="../../../impl/service/data/DataServiceImpl.html">
+  <code>DataServiceImpl</code></a> class for a complete
+description and further configuration options.
 
 <a name="DataStore"></a>
 <h4>DataStore Properties</h4>
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
-underlying <code>DataStore</code>.  Setting these properties has no
-effect on application nodes.
+underlying <a href="../../../service/store/DataStore.html">
+  <code>DataStore</code></a>.
+See the <a href="../../../impl/service/data/store/DataStoreImpl.html">
+  <code>DataStoreImpl</code></a> class
+for a complete description and further configuration options.
+Setting these properties has no effect on application nodes.
 
 <dl>
 
@@ -218,22 +245,29 @@ effect on application nodes.
 <a name="com.sun.sgs.impl.service.data.store.db.environment.class"></a>
 <dt>com.sun.sgs.impl.service.data.store.db.environment.class
 <span class="default">
-  com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+  <a href="../../../impl/service/data/store/db/bdb/BdbEnvironment.html">
+    com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+  </a>
 </span>
 <dd>The name of the class that implements the underlying database.  The
   default value selects a database implementation based
   on <a href="http://www.oracle.com/database/berkeley-db/db/index.html">
   Berkeley DB</a>.  Specifying
-  <code>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</code>
+  <a href="../../../impl/service/data/store/db/je/JeEnvironment.html">
+    <code>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</code>
+  </a>
   selects a database implementation based on
   <a href="http://www.oracle.com/database/berkeley-db/je/index.html">
   Berkeley DB Java Edition</a>.  Other values should specify the fully
   qualified name of a non-abstract class that implements
-  <code>com.sun.sgs.service.store.db.DbEnvironment</code>, and that has a 
+  <a href="../../../service/store/db/DbEnvironment.html">
+    <code>com.sun.sgs.service.store.db.DbEnvironment</code>
+  </a>, and that has a 
   public constructor with three parameters: a <code>java.util.String</code>,
   which specifies the directory containing database files, a 
   <code>java.util.Properties</code>, which specifies configuration options,
-  and a <code>com.sun.sgs.impl.service.data.store.Scheduler</code>,
+  and a <a href="../../../impl/service/data/store/Scheduler.html">
+    <code>com.sun.sgs.impl.service.data.store.Scheduler</code></a>,
   which the implementation can use to run asynchronous, periodic tasks. <p>
 
   Note that persistent data created using Berkeley DB is incompatible
@@ -269,7 +303,13 @@ property. Setting these properties has no effect on application nodes.
 
 <a name="Watchdog"></a>
 <h3>Watchdog Service Properties</h3>
-These properties control the implementation of the <code>WatchdogService</code>.
+These properties control the implementation of the default
+<a href="../../../service/WatchdogService.html">
+  <code>WatchdogService</code></a>.
+See the 
+<a href="../../../impl/service/watchdog/WatchdogServiceImpl.html">
+  <code>WatchdogServiceImpl</code></a> class
+for a complete description and further configuration options.
 Setting these properties has no effect on application nodes.
 <dl>
 
@@ -290,8 +330,12 @@ Integer.MAX_VALUE (for a single node configuration) </span>
 
 <a name="ClientSessionService"></a>
 <h3>ClientSessionService Properties</h3>
-These properties control the implementation of the
-<code>ClientSessionService</code>.
+These properties control the implementation of the default
+<a href="../../../service/ClientSessionService.html">
+  <code>ClientSessionService</code></a>.
+See the <a href="../../../impl/service/session/ClientSessionServiceImpl.html">
+  <code>ClientSessionServiceImpl</code></a> class
+for a complete description and further configuration options.
 <dl>
 
 <dt>com.sun.sgs.impl.service.session.allow.new.login
@@ -304,9 +348,23 @@ session is disconnected, and the new login is allowed to proceed.
 		
 <dt>com.sun.sgs.impl.service.session.disconnect.delay
 <span class="default">1000</span>
-<dd>The time, in milliseconds, in which a disconnecting client is allowed to close a
+<dd>The time, in milliseconds, in which a disconnecting client is allowed 
+to close a
 connection before it is closed by the server. The delay must be greater than or
 equal to <code>200</code> milliseconds.
+
+<dt>com.sun.sgs.impl.service.session.protocol.acceptor
+<span class="default">
+  <a href="../../../impl/protocol/simple/SimpleSgsProtocolAcceptor.html">
+    com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor
+  </a>
+</span>
+<dd>Specifies the name of the class which will be used as the protocol acceptor.
+The default value uses an acceptor based on the 
+<a href="../../../protocol/simple/SimpleSgsProtocol.html">SimpleSgsProtocol</a>.
+Other values should specify the fully qualified name of a non-abstract class
+that implements
+<a href="../../../protocol/ProtocolAcceptor.html">ProtocolAcceptor</a>.
 	
 </dl>
 
@@ -319,7 +377,7 @@ system including identity management, profiling, and task scheduling.
 <dl>
 <dt>com.sun.sgs.app.authenticators
 <span class="default">com.sun.sgs.impl.auth.NullAuthenticator</span>
-<dd>A colon separated list of <a href="../../auth/IdentityAuthenticator.html">
+<dd>A colon separated list of <a href="../../../auth/IdentityAuthenticator.html">
   <code>IdentityAuthenticator</code>s</a> to use for the application. The
   order defines the precedence when authenticating an identity. The default
   authenticator simply accepts any name-password pair.
@@ -340,13 +398,16 @@ system including identity management, profiling, and task scheduling.
 <span class="nodefault"/>
 <dd>A colon separated list of profile listeners, which consume profile output.
   To configure the available listeners, see the individual class javadoc for 
-  profile listener implementations.
+  profile listener implementations in the
+  <a href="../../../impl/profile/listener/package-summary.html">
+    com.sun.sgs.impl.profile.listener
+  </a> package.
 
 <dt>com.sun.sgs.impl.kernel.transaction.threads
 <span class="default">4</span>
 <dd>The number of initial threads used to process transactional tasks, such as 
   those started through the 
-  <a href="../TaskManager.html"><code>TaskManager</code></a>.
+  <a href="../../../app/TaskManager.html"><code>TaskManager</code></a>.
 
 <dt>com.sun.sgs.impl.kernel.task.threads
 <span class="default">4</span>
@@ -398,6 +459,171 @@ For more information, please refer to the <a
 href="http://java.sun.com/javase/6/docs/technotes/guides/management/toc.html">
 Java SE Monitoring and Management Guide</a>, especially Chapter 2, 
 Monitoring and Management Using JMX Technology.
+
+<a name="ConfigurationIndex"/>
+<h2>Configuration Index</h2>
+
+The properties listed above include the most common properties used to modify
+the runtime configuration of the Project Darkstar Server.  However, this is
+not an exhaustive list, and many components of the system contain additional
+configuration properties and pluggability points.  This index is a complete
+list of components that can be customized.  The general convention is to include
+any customizable configuration properties in the javadoc description of the
+class:
+
+<ul>
+  <li>
+    <a href="../../../impl/kernel/Kernel.html">
+      <b><code>com.sun.sgs.impl.kernel.Kernel</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/kernel/LockingAccessCoordinator.html">
+      <b><code>com.sun.sgs.impl.kernel.LockingAccessCoordinator</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/kernel/LoggerPropertiesInit.html">
+      <b><code>com.sun.sgs.impl.kernel.LoggerPropertiesInit</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/kernel/TaskSchedulerImpl.html">
+      <b><code>com.sun.sgs.impl.kernel.TaskSchedulerImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/kernel/TrackingAccessCoordinator.html">
+      <b><code>com.sun.sgs.impl.kernel.TrackingAccessCoordinator</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/kernel/TransactionSchedulerImpl.html">
+      <b><code>com.sun.sgs.impl.kernel.TaskSchedulerImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/kernel/logging/TransactionAwareLogManager.html">
+      <b>
+	<code>com.sun.sgs.impl.kernel.logging.TransactionAwareLogManager</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/profile/ProfileCollectorImpl.html">
+      <b><code>com.sun.sgs.impl.profile.ProfileCollectorImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/profile/listener/package-summary.html">
+      <b><code>com.sun.sgs.impl.profile.listener</code></b>
+    </a> (package)
+    <ul>
+      <li>Each profile listener in this package can be configured to consume
+	data from the
+	<a href="../../../impl/profile/ProfileCollectorImpl.html">
+	  <code>ProfileCollectorImpl</code>
+	</a>.  Each listener also may have its own set of configuration 
+	properties.
+      </li>
+    </a>
+    </ul>
+  </li>
+  <li>
+    <a href="../../../impl/protocol/simple/SimpleSgsProtocolAcceptor.html">
+      <b>
+	<code>com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/channel/ChannelServiceImpl.html">
+      <b><code>com.sun.sgs.impl.service.channel.ChannelServiceImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/data/DataServiceImpl.html">
+      <b><code>com.sun.sgs.impl.service.data.DataServiceImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/data/store/DataStoreImpl.html">
+      <b><code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/data/store/db/bdb/BdbEnvironment.html">
+      <b>
+	<code>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/data/store/db/je/JeEnvironment.html">
+      <b>
+	<code>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/data/store/net/DataStoreServerImpl.html">
+      <b>
+	<code>com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/nodemap/NodeMappingServerImpl.html">
+      <b>
+	<code>com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/nodemap/NodeMappingServiceImpl.html">
+      <b>
+	<code>com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/nodemap/RoundRobinPolicy.html">
+      <b><code>com.sun.sgs.impl.service.nodemap.RoundRobinPolicy</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/session/ClientSessionServiceImpl.html">
+      <b>
+	<code>com.sun.sgs.impl.service.session.ClientSessionServiceImpl</code>
+      </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/task/TaskServiceImpl.html">
+      <b><code>com.sun.sgs.impl.service.task.TaskServiceImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/transaction/TransactionCoordinatorImpl.html">
+      <b><code>com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/watchdog/WatchdogServerImpl.html">
+      <b><code>com.sun.sgs.impl.service.watchdog.WatchdogServerImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/watchdog/WatchdogServiceImpl.html">
+      <b><code>com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl</code></b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/transport/tcp/TcpTransport.html">
+      <b><code>com.sun.sgs.impl.transport.tcp.TcpTransport</code></b>
+    </a>
+  </li>
+</ul>
 
 
 

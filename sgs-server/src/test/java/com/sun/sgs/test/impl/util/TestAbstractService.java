@@ -253,27 +253,30 @@ public class TestAbstractService extends TestCase {
                 new DummyServiceFailureReporter(serviceProps,
                 serverNode.getSystemRegistry(), serverNode.getProxy(), logger);
         
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() {
-                // Report a failure on ourselves and check if we are alive
-                try {
-                    service.reportLocalFailure();
-                } catch (IOException ioe) {
-                    fail("Unexpected IOException");
-                }
-                try {
-                    Thread.sleep(400); // Let it shutdown
+	// Report a failure on ourselves and check if we are alive
+	try {
+	    service.reportLocalFailure();
+	} catch (IOException ioe) {
+	    fail("Unexpected IOException");
+	}
+		    
+	Thread.sleep(400); // Let it shutdown
+	
+	try {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
                     service.isAlive();
-                    fail("Expected IllegalStateException");
-                } catch (IllegalStateException e) {
-                    // Expected, and we do not want to shutdown the node 
-                    // a second time in tearDown()
-                    serverNode = null;
-                } catch (Exception e) {
-                    fail("Expected IllegalStateException");
-                }
-            }
-        }, taskOwner);
+		} }, taskOwner);
+	    
+	    fail("Expected IllegalStateException");
+	    
+	} catch (IllegalStateException e) {
+	    // Expected, and we do not want to shutdown the node 
+	    // a second time in tearDown()
+	    serverNode = null;
+	} catch (Exception e) {
+	    fail("Expected IllegalStateException");
+	}
     }
     
     private static class DummyServiceFailureReporter extends AbstractService {
