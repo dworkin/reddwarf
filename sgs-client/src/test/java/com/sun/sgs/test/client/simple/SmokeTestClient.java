@@ -75,10 +75,19 @@ public class SmokeTestClient implements SimpleClientListener{
         props = parseArgs(args);
         SmokeTestClient testClient = new SmokeTestClient();
         testClient.start();
+        while(true){
+       synchronized(testClient){
+        try {
+            testClient.wait();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+       }
+        }
     }
 
     public void start(){
-        loginName = "discme";
+        loginName = "kickme";
         try {
                     myclient.login(props);
         } catch (IOException e) {
@@ -96,7 +105,7 @@ public class SmokeTestClient implements SimpleClientListener{
         String msg = "loggedIn:" + loginName;
         try {
             myclient.send(ByteBuffer.wrap(msg.getBytes()));
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.log(Level.WARNING, "error sending reply to logged in message");
         }
 
@@ -121,7 +130,7 @@ public class SmokeTestClient implements SimpleClientListener{
 
     public ClientChannelListener joinedChannel(ClientChannel channel){
         mychannel = new SmokeTestChannelListener (this.myclient);
-        String toSend = "joinedChannel" + channel.getName();
+        String toSend = "joinedChannel:" + channel.getName();
         try{
          channel.send(ByteBuffer.wrap(toSend.getBytes()));
         } catch (IOException e){
@@ -131,15 +140,16 @@ public class SmokeTestClient implements SimpleClientListener{
     }
 
     public void receivedMessage(ByteBuffer message){
-        String msg = "receivedMessage:" + message.toString();
+        String prefix = "receivedMessage:";
+        String msg = message.asCharBuffer().toString();
 
-        if(message.toString().equals("logout")){
+        if(msg.equals("logout")){
             myclient.logout(false);
             return;
         }
 
         try{
-            myclient.send(ByteBuffer.wrap(msg.getBytes()));
+            myclient.send(ByteBuffer.wrap((prefix+msg).getBytes()));
         } catch (IOException e){
             logger.log(Level.WARNING, "Unable to respoind to message");
         }
@@ -155,18 +165,22 @@ public class SmokeTestClient implements SimpleClientListener{
 
     public void disconnected(boolean graceful, String reason) {
         if (loginName.equals("discme")) {
-        logger.log(Level.WARNING, "Passed disconnection test");
-        loginName = "smokeTest";
-        try {
-            myclient.login(props);
-        } catch (IOException e) {
-            logger.log(Level.WARNING, "unable to log in for main tests");
-        }
+            logger.log(Level.WARNING, "Passed disconnection test");
+            loginName = "smokeTest";
+            try {
+                myclient.login(props);
+            } catch (IOException e) {
+                logger.log(Level.WARNING, "unable to log in for main tests");
+            }
         } else {
             System.exit(printResults());
         }
     }
 
+    /**
+     * Print out any test failures to the log, and calculate the number of failures that
+     * have occurred. Return the number of failures.
+     */
     private int printResults(){
         int failures = 0;
 
@@ -179,7 +193,15 @@ public class SmokeTestClient implements SimpleClientListener{
             failures++;
         }
         if (!logOutPass){
-            logger.log(Level.WARNING, "Smoke test faled logout test");
+            logger.log(Level.WARNING, "Smoke test failed logout test");
+            failures++;
+        }
+        if (!mychannel.getReceiveStatus()){
+            logger.log(Level.WARNING, "Smoke test failed channel recieve message test");
+            failures++;
+        }
+        if (!mychannel.getChannelLeftStatus()){
+            logger.log(Level.WARNING, "Smoke test failed leaving channel test");
             failures++;
         }
         return failures;
