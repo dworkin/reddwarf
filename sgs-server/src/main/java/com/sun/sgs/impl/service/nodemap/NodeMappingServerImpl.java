@@ -100,6 +100,20 @@ import java.util.logging.Logger;
  *      calls;  longer expiration times will increase the chance that an 
  *      identity will become active again before it can be removed. <p>
  *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.relocation.expire.time
+ *	</b></code> <br>
+ *      <i>Default:</i> {@code 5000}
+ *
+ * <dd style="padding-top: .5em">
+ *      The time allowed, in milliseconds, for {@code IdRelocationListener}s
+ *      to call {@link SimpleCompletionHandler#complete complete} on the
+ *      handler they receive.  If this time has elapsed, this server disregards
+ *      the proposed identity relocation.  This value is used to guard against
+ *      listeners which never respond they are finished.  During this time
+ *      period, the identity is prohibited from moving elsewhere unless the
+ *      node has failed. <p>
+ *
  * </dl> <p>
  *
  * This class uses the {@link Logger} named
@@ -149,6 +163,17 @@ public final class NodeMappingServerImpl
     /** Default time to wait before removing an identity, in milliseconds. */
     private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
     
+    /** The property name for the amount of time allowed for IdRelocation
+     * listeners to respond that they have completed their work.
+     */
+    private static final String RELOCATION_EXPIRE_PROPERTY =
+            PKG_NAME + ".relocation.expire.time";
+
+    /** Default time allowed for IdRelocationListeners to respond that
+     * they hae completed preparations for an identity move, in milliseconds.
+     */
+    private static final int DEFAULT_RELOCATION_EXPIRE_TIME = 5000;
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".server"));
@@ -192,7 +217,15 @@ public final class NodeMappingServerImpl
      */
     private final Map<Long, NotifyClient> notifyMap =
                 new ConcurrentHashMap<Long, NotifyClient>();   
-    
+
+    /**
+     * The amount of time allowed for id relocation listeners to state they
+     * have completed their work.  If this time expires, the move is effectively
+     * cancelled, and the identity can be moved elsewhere.
+     */
+    private final long relocationExpireTime;
+
+    /** The set of identities that are in the process of moving. */
     private final Map<Identity, MoveIdTask> moveMap =
             new ConcurrentHashMap<Identity, MoveIdTask>();
     
@@ -260,6 +293,12 @@ public final class NodeMappingServerImpl
         removeThread = new RemoveThread(removeExpireTime);
         removeThread.start();
         
+        // Find how long we'll give listeners to say they've finished move
+        // preparations.
+        relocationExpireTime = wrappedProps.getLongProperty(
+                RELOCATION_EXPIRE_PROPERTY, DEFAULT_RELOCATION_EXPIRE_TIME,
+                1, Long.MAX_VALUE);
+
         // Register our node listener with the watchdog service.
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
@@ -719,28 +758,35 @@ public final class NodeMappingServerImpl
      *
      * @param id the identity to map to a new node
      * @param serviceName the name of the requesting service's class, or null
-     * @param old the last node the identity was mapped to, or null if there
+     * @param oldNode the last node the identity was mapped to, or null if there
      *        was no prior mapping
      * @param requestingNode the node making the mapping request
      *
      * @throws NoNodesAvailableException if there are no live nodes to map to
      */
-    long mapToNewNode(Identity id, String serviceName, Node old, 
+    long mapToNewNode(Identity id, String serviceName, Node oldNode,
                       long requestingNode) 
         throws NoNodesAvailableException
     {
         assert (id != null);
         
-        // First, check to see if we're already trying to move this identity.
+        // First, check to see if we're already trying to move this identity
+        // and we haven't gone past the expire time.
         // If so, just return the node we're trying to move it to.
         MoveIdTask moveTask = moveMap.get(id);
         if (moveTask != null) {
-            return moveTask.newNodeId;
+            if (System.currentTimeMillis() < moveTask.expireTime) {
+                return moveTask.newNodeId;
+            } else {
+                // We've expired.  Clean up our data structures.  The service
+                // side will know of the expiration because it will receive
+                // a second request to move of the same identity.
+                moveMap.remove(id);
+            }
         }
         
         // Choose the node.  This needs to occur outside of a transaction,
         // as it could take a while.  
-        final Node oldNode = old;
         final long newNodeId;
         try {
             newNodeId = assignPolicy.chooseNode(id, requestingNode);
@@ -750,7 +796,7 @@ public final class NodeMappingServerImpl
                     id, oldNode);
             throw ex;
         }
-
+        
         if (oldNode != null && newNodeId == oldNode.getId()) {
             // We picked the same node.  This might be OK - the system might
             // only have one node, or the current node might simply be the
@@ -769,15 +815,9 @@ public final class NodeMappingServerImpl
             // Tell the id's old node, so it can tell the id relocation
             // listeners.  We won't actually move the identity until the
             // listeners have all responded, can canMove is called.
-            // JANE
-            // need to handle if listeners don't respond.  Node failure
-            // case is handled in the node listener.  Perhaps we should
-            // have a queue of items, which are processed by a separate
-            // thread - if something has been on the queue longer than
-            // some period of time, remove it from the queue (AND DO WHAT?)
             moveMap.put(id, moveTask);
-            
-            NotifyClient oldClient = notifyMap.get(oldNode.getId());
+            long oldId = oldNode.getId();
+            NotifyClient oldClient = notifyMap.get(oldId);
             if (oldClient != null) {
                 int retries = maxIoAttempts; // retry a few times
                 while (retries-- > 0) {
@@ -790,9 +830,9 @@ public final class NodeMappingServerImpl
                             logger.logThrow(Level.WARNING, ex,
                                     "A communication error occured while " +
                                     "notifying node {0} that {1} will " +
-                                    "be relocated", oldClient, id);
+                                    "be relocated", oldId, id);
                             // shutdown the node corresponding to oldClient
-                            watchdogService.reportFailure(oldNode.getId(),
+                            watchdogService.reportFailure(oldId,
                                     this.getClass().toString());
                         }
                     }
@@ -836,6 +876,7 @@ public final class NodeMappingServerImpl
         final Identity id;
         final Node oldNode;
         final long newNodeId;
+        final long expireTime;
         // Calculate the lookup keys for both the old and new nodes.
         // The id key is the same for both old and new.
         private final String idkey;
@@ -855,6 +896,7 @@ public final class NodeMappingServerImpl
             this.id = id;
             this.oldNode = oldNode;
             this.newNodeId = newNodeId;
+            expireTime = System.currentTimeMillis() + relocationExpireTime;
             // Calculate the lookup keys for both the old and new nodes.
             // The id key is the same for both old and new.
             idkey = NodeMapUtil.getIdentityKey(id);
@@ -1105,18 +1147,6 @@ public final class NodeMappingServerImpl
     
     
     /* -- Methods to assist in testing and verification -- */
-    
-    /**
-     * Add a node.  This is useful for server testing, when we
-     * haven't instantiated a service.
-     * <p>
-     * XXX:  remove this, using a NodeAssignPolicy instead?
-     *
-     * @param nodeId the node id of the fake node
-     */
-    void addDummyNode(long nodeId)  {
-        assignPolicy.nodeStarted(nodeId);
-    }
     
     /**
      * Get the node an identity is mapped to.

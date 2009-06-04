@@ -867,10 +867,9 @@ public class NodeMappingServiceImpl
             }
             Queue<SimpleCompletionHandler> handlerQueue =
                 new ConcurrentLinkedQueue<SimpleCompletionHandler>();
-            if (relocationHandlers.putIfAbsent(id, handlerQueue) != null) {
-                // this identity is already being moved somewhere!
-                return;
-            }
+            // If there is already an entry for this id, it means that attempt
+            // to move has expired and the server is trying again.
+            relocationHandlers.put(id, handlerQueue);
             
             // Check to see if we've been constructed but are not yet
             // completely running.  We reserve tasks for the notifications
@@ -1093,7 +1092,13 @@ public class NodeMappingServiceImpl
 	    Queue<SimpleCompletionHandler> handlerQueue =
                     relocationHandlers.get(id);
 	    assert handlerQueue != null;
-	    handlerQueue.remove(this);
+	    if (!handlerQueue.remove(this)) {
+                // If the queue did not change, this object wasn't on the queue.
+                // This could happen if the move preparation has failed
+                // previously (due to handlers not calling completed in a timely
+                // manner).
+                return;
+            };
 	    if (handlerQueue.isEmpty()) {
                 relocationHandlers.remove(id);
                 // tell the server we're good to go.

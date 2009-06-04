@@ -335,14 +335,7 @@ public class TestNodeMappingServiceImpl {
 
             nodemap.ready();
             // Listener should be notified.
-            long stopTime = System.currentTimeMillis() + 1000;
-            synchronized (listener.notificationLock) {
-                while (!listener.notified &&
-                       System.currentTimeMillis() < stopTime)
-                {
-                    listener.notificationLock.wait(100);
-                }
-            }
+            listener.waitForNotification();
             
             // no old node
             checkIdAdded(listener, id, null);
@@ -754,14 +747,7 @@ public class TestNodeMappingServiceImpl {
         TestListener listener = nodeListenerMap.get(node.getId());
         listener.clear();
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
-        long stopTime = System.currentTimeMillis() + (removeTime * 4);
-        synchronized (listener.notificationLock) {
-            while (!listener.notified &&
-                   System.currentTimeMillis() < stopTime)
-            {
-                listener.notificationLock.wait(100);
-            }
-        }
+        listener.waitForNotification(removeTime * 4);
         
         try {
             txnScheduler.runTask(task, taskOwner);
@@ -791,14 +777,7 @@ public class TestNodeMappingServiceImpl {
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
 
-        long stopTime = System.currentTimeMillis() + (removeTime * 4);
-        synchronized (listener.notificationLock) {
-            while (!listener.notified &&
-                   System.currentTimeMillis() < stopTime)
-            {
-                listener.notificationLock.wait(100);
-            }
-        }
+        listener.waitForNotification(removeTime * 4);
         
         try {
             txnScheduler.runTask(task, taskOwner);
@@ -984,14 +963,7 @@ public class TestNodeMappingServiceImpl {
 
         // Give the id relocation listener a chance to finish, and the
         // actual node assignment to complete.
-        long stopTime = System.currentTimeMillis() + 1000;
-        synchronized (idListener.notificationLock) {
-            while (!idListener.notified &&
-                   System.currentTimeMillis() < stopTime)
-            {
-                idListener.notificationLock.wait(100);
-            }
-        }
+        idListener.waitForNotification();
 
         txnScheduler.runTask(task, taskOwner);
         Node secondNode = task.getNode();
@@ -1014,7 +986,7 @@ public class TestNodeMappingServiceImpl {
     }
 
     @Test
-    public void testIdRelocNotificationNodeFailed() throws Exception {
+    public void testIdRelocNotificationOldNodeFailed() throws Exception {
         addNodes(null);
 
         // Add id relocation listeners to each node, and keep a map of them.
@@ -1047,14 +1019,7 @@ public class TestNodeMappingServiceImpl {
                                      task.getNode(), firstNodeId);
 
         // Give the id relocation listener a chance to finish.
-        long stopTime = System.currentTimeMillis() + 1000;
-        synchronized (idListener.notificationLock) {
-            while (!idListener.notified &&
-                   System.currentTimeMillis() < stopTime)
-            {
-                idListener.notificationLock.wait(100);
-            }
-        }
+        idListener.waitForNotification();
 
         txnScheduler.runTask(task, taskOwner);
         long secondNodeId = task.getNodeId();
@@ -1090,15 +1055,8 @@ public class TestNodeMappingServiceImpl {
         // Wait for notification.  We expect to be notified on the 
         // newNode assigned above.
         TestListener secondNodeListener = nodeListenerMap.get(newNode);
+        secondNodeListener.waitForNotification();
 
-        stopTime = System.currentTimeMillis() + 1000;
-        synchronized (secondNodeListener.notificationLock) {
-            while (!secondNodeListener.notified &&
-                   System.currentTimeMillis() < stopTime)
-            {
-                secondNodeListener.notificationLock.wait(100);
-            }
-        }
         txnScheduler.runTask(task, taskOwner);
         assertEquals((long) newNode, task.getNodeId());
 
@@ -1144,14 +1102,7 @@ public class TestNodeMappingServiceImpl {
         assertEquals(newNode, secondTryNode);
 
         // Give the id relocation listener a chance to finish.
-        long stopTime = System.currentTimeMillis() + 1000;
-        synchronized (idListener.notificationLock) {
-            while (!idListener.notified &&
-                   System.currentTimeMillis() < stopTime)
-            {
-                idListener.notificationLock.wait(100);
-            }
-        }
+        idListener.waitForNotification();
 
         txnScheduler.runTask(task, taskOwner);
         long secondNodeId = task.getNodeId();
@@ -1180,17 +1131,90 @@ public class TestNodeMappingServiceImpl {
         // Wait for notification.  We expect to be notified on the
         // newNode assigned above.
         TestListener secondNodeListener = nodeListenerMap.get(newNode);
-
-        stopTime = System.currentTimeMillis() + 1000;
-        synchronized (secondNodeListener.notificationLock) {
-            while (!secondNodeListener.notified &&
-                   System.currentTimeMillis() < stopTime)
-            {
-                secondNodeListener.notificationLock.wait(100);
-            }
-        }
+        secondNodeListener.waitForNotification();
         txnScheduler.runTask(task, taskOwner);
         assertEquals((long) newNode, task.getNodeId());
+
+        checkIdAdded(secondNodeListener, id, firstNode);
+    }
+
+    @Test
+    public void testIdRelocNotificationNoResponse() throws Exception {
+        // Set up using our properties
+        tearDown();
+	serviceProps = SgsTestNode.getDefaultProperties(
+	    "TestNodeMappingServiceImpl", null, null);
+
+        final int RELOCATION_TIME = 20;
+        // Create a new nodeMappingServer with a very short timeout for
+        // relocation expiration.
+        serviceProps.setProperty(
+                "com.sun.sgs.impl.service.nodemap.relocation.expire.time",
+                String.valueOf(RELOCATION_TIME));
+
+        setUp(serviceProps);
+        addNodes(null);
+
+        // Add id relocation listeners to each node, and keep a map of them.
+        Map<Long, TestRelocationListener> moveMap =
+                new HashMap<Long, TestRelocationListener>();
+        addRelocationListeners(true, moveMap);
+
+        Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        GetNodeTask task = new GetNodeTask(id);
+        txnScheduler.runTask(task, taskOwner);;
+        long firstNodeId = task.getNodeId();
+        Node firstNode = task.getNode();
+        TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+        NodeMappingServerImpl server =
+            (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
+
+        // clear out the listeners
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        // ... and invoke the method
+        moveMethod.invoke(server, id, null, firstNode, firstNodeId);
+
+        // Ensure that the idListener has been notified.
+        idListener.waitForNotification();
+
+        // ... and wait for the id relocation to expire.
+        Thread.sleep(RELOCATION_TIME);
+
+        // The identity should not have moved.
+        txnScheduler.runTask(task, taskOwner);
+        assertEquals(firstNodeId, task.getNodeId());
+
+        // Try another move
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        Long secondTryNode =
+            (Long) moveMethod.invoke(server, id, null,
+                                     firstNode, firstNodeId);
+
+        // Give the id relocation listener a chance to finish.
+        idListener.waitForNotification();
+        // This time, allow the movement to complete.
+        idListener.handler.completed();
+
+        // Wait for notification.  We expect to be notified on the
+        // secondTryNode assigned above.
+        TestListener secondNodeListener = nodeListenerMap.get(secondTryNode);
+        secondNodeListener.waitForNotification();
+
+        txnScheduler.runTask(task, taskOwner);
+        assertEquals((long) secondTryNode, task.getNodeId());
 
         checkIdAdded(secondNodeListener, id, firstNode);
     }
@@ -1342,8 +1366,8 @@ public class TestNodeMappingServiceImpl {
         private final List<Node> removedNodes = new ArrayList<Node>();
 
         // A notificationLock to let us know when the listener has been called.
-        final Object notificationLock = new Object();
-        boolean notified;
+        private final Object notificationLock = new Object();
+        private boolean notified;
         public void mappingAdded(Identity identity, Node node) {
             addedIds.add(identity);
             addedNodes.add(node);
@@ -1374,6 +1398,21 @@ public class TestNodeMappingServiceImpl {
             return (addedIds.size() == 0) && (addedNodes.size() == 0) &&
                    (removedIds.size() == 0) && (removedNodes.size() == 0);
         }
+
+        public void waitForNotification(long stop) throws InterruptedException {
+            long stopTime = System.currentTimeMillis() + stop;
+            synchronized (notificationLock) {
+                while (!notified &&
+                       System.currentTimeMillis() < stopTime)
+                {
+                    notificationLock.wait(100);
+                }
+            }
+        }
+        public void waitForNotification() throws InterruptedException {
+            waitForNotification(1000);
+        }
+
         public List<Identity> getAddedIds()   { return addedIds; }
         public List<Node> getAddedNodes()     { return addedNodes; }
         public List<Identity> getRemovedIds() { return removedIds; }
@@ -1461,8 +1500,8 @@ public class TestNodeMappingServiceImpl {
         // complete method is called.
         SimpleCompletionHandler handler;
         // A notificationLock to let us know when the listener has been called.
-        final Object notificationLock = new Object();
-        boolean notified;
+        private final Object notificationLock = new Object();
+        private boolean notified;
 
         TestRelocationListener(TestListener lis, boolean asynch) {
             nodeMapListener = lis;
@@ -1500,6 +1539,18 @@ public class TestNodeMappingServiceImpl {
             return (movingIds.size() == 0) && (movingNodes.size() == 0) &&
                    (handler == null);
         }
+
+        public void waitForNotification() throws InterruptedException {
+            long stopTime = System.currentTimeMillis() + 1000;
+            synchronized (notificationLock) {
+                while (!notified &&
+                       System.currentTimeMillis() < stopTime)
+                {
+                    notificationLock.wait(100);
+                }
+            }
+        }
+
         public List<Identity> getIds()  { return movingIds; }
         public List<Long> getNodes()    { return movingNodes; }
         public boolean isOK()           { return ok; }
