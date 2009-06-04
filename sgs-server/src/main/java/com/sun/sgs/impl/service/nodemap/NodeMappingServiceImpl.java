@@ -168,7 +168,7 @@ public class NodeMappingServiceImpl
     // an identity say they believe the identity is not active, the identity
     // is considered inactive on the node.  When an identity is inactive
     // on all nodes, it is eligible to be removed from the map.  The actual
-    // removal from the map occurs at some point in the handler (controlled
+    // removal from the map occurs at some point in the future (controlled
     // by a property), giving time for any service to say they are interested
     // in the identity again.
     // 
@@ -214,7 +214,7 @@ public class NodeMappingServiceImpl
     // removed at the same time.  When the .identity binding is removed, the
     // IdentityMO object is deleted.  These modifications are typically done
     // by the global server, although we may support locally creating them
-    // in the handler (removes will always be at the server).
+    // in the future (removes will always be at the server).
     //
     // The .status bindings are created and removed by the local services.
     // The global server is contacted only when we detect there are no more
