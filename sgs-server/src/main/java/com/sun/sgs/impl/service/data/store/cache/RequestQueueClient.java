@@ -133,11 +133,6 @@ public class RequestQueueClient extends Thread {
     private long failureStarted = -1;
 
     /**
-     * The exception that caused the listener to be shutdown, or {@code null}.
-     */
-    private Throwable failureException;
-
-    /**
      * The current connection, or {@code null} if not currently connected.
      * Synchronize on this thread when accessing.
      */
@@ -150,12 +145,14 @@ public class RequestQueueClient extends Thread {
     private int nextRequest;
 
     /**
-     * Creates an instance of this class.
+     * Creates an instance of this class.  The {@link Runnable#run run} method
+     * of {@code failureHandler} will be called if the listener is shutdown due
+     * to repeated failures when attempting to accept connections.
      *
      * @param	nodeId the node ID associated with this request queue
      * @param	socketFactory the factory for creating sockets that connect to
      *		the request queue server
-     * @param	port the server port
+     * @param	failureHandler the failure handler
      * @param	properties additional configuration properties
      */
     public RequestQueueClient(long nodeId,
@@ -187,6 +184,7 @@ public class RequestQueueClient extends Thread {
      * Adds a request to the queue, returning {@code true} if successful and
      * {@code false} if the queue is full.
      *
+     * @param	request the request to add
      * @return	{@code true} if successful and {@code false} if the queue is
      *		full 
      * @throws	IllegalStateException if the client has been requested to
@@ -311,9 +309,11 @@ public class RequestQueueClient extends Thread {
 	if (now > failureStarted + maxRetry) {
 	    noteFailed(exception);
 	} else {
-	    try {
-		wait(retryWait);
-	    } catch (InterruptedException e) {
+	    while (System.currentTimeMillis() < now + retryWait) {
+		try {
+		    wait(retryWait);
+		} catch (InterruptedException e) {
+		}
 	    }
 	}
     }
@@ -349,7 +349,7 @@ public class RequestQueueClient extends Thread {
     }
 
     /** Stores a request and the associated request number. */
-    private class RequestHolder {
+    private static class RequestHolder {
 
 	/** The request. */
 	final Request request;

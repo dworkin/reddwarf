@@ -36,7 +36,7 @@ public final class DataStreamUtil {
      * Reads the number of bytes and the byte data from a data input stream and
      * returns the resulting array.
      *
-     * @param	the data input stream
+     * @param	in the data input stream
      * @return	the byte array
      * @throws	IOException if an I/O error occurs
      */
@@ -131,7 +131,7 @@ public final class DataStreamUtil {
     /**
      * Reads an array of {@code long}s from a data input stream.
      *
-     * @param	int the data input stream
+     * @param	in the data input stream
      * @return	the array
      * @throws	IOException if an I/O error occurs
      */
@@ -164,7 +164,7 @@ public final class DataStreamUtil {
     /**
      * Reads an array of byte arrays from a data input stream.
      *
-     * @param	the data input stream
+     * @param	in the data input stream
      * @return	the array of {@code byte} arrays
      * @throws	IOException if an I/O error occurs
      */
@@ -178,7 +178,7 @@ public final class DataStreamUtil {
     }
 
     /**
-     * Writes an array of byte arrays to a data output stream
+     * Writes an array of byte arrays to a data output stream.
      *
      * @param	array the array of {@code byte} arrays
      * @param	out the data output stream

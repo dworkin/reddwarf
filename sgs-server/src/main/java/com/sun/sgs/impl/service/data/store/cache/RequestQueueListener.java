@@ -86,11 +86,6 @@ public abstract class RequestQueueListener extends Thread {
     private long failureStarted = -1;
 
     /**
-     * The exception that caused the listener to be shutdown, or {@code null}.
-     */
-    private Throwable failureException;
-
-    /**
      * Creates an instance of this class.  The {@link Runnable#run run} method
      * of {@code failureHandler} will be called if the listener is shutdown due
      * to repeated failures when attempting to accept connections.  The server
@@ -125,7 +120,7 @@ public abstract class RequestQueueListener extends Thread {
      * @throws	IllegalArgumentException if no server is found for the
      *		specified node ID
      */
-    abstract protected RequestQueueServer getServer(long nodeId);
+    protected abstract RequestQueueServer getServer(long nodeId);
 
     /** Shuts down the listener. */
     public void shutdown() {
@@ -216,16 +211,17 @@ public abstract class RequestQueueListener extends Thread {
 	    }
 	    failureHandler.run();
 	} else {
-	    try {
-		wait(retryWait);
-	    } catch (InterruptedException e) {
+	    while (System.currentTimeMillis() < now + retryWait) {
+		try {
+		    wait(retryWait);
+		} catch (InterruptedException e) {
+		}
 	    }
 	}
     }
 
     /** Notes that a connection was accepted successfully. */
-    private void noteConnected() {
-	assert Thread.holdsLock(this);
+    private synchronized void noteConnected() {
 	failureStarted = -1;
     }
 }

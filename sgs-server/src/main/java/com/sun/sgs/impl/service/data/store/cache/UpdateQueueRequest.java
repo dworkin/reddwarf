@@ -132,7 +132,7 @@ abstract class UpdateQueueRequest implements Request {
      *
      * @param	<T> the type value associated with this request
      */
-    static abstract class UpdateQueueRequestWithCompletion<T>
+    abstract static class UpdateQueueRequestWithCompletion<T>
 	extends UpdateQueueRequest
     {
 	/** The value associated with the request. */

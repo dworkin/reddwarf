@@ -36,8 +36,8 @@ import java.util.logging.Level;
 
 /**
  * Utility methods for database operations needed to implement a {@code
- * DataStore} using the {@link com.sun.sgs.impl.service.data.store.db}
- * package.  This class should not be instantiated.
+ * DataStore} using the {@link com.sun.sgs.service.store.db} package.  This
+ * class should not be instantiated.
  */
 public final class DbUtilities {
 

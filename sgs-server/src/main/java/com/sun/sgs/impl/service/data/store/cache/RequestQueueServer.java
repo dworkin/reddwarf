@@ -39,9 +39,9 @@ import java.util.logging.Logger;
 /**
  * Implements the server side of a queue of requests, ignoring duplicate
  * requests after a network failure.  Requests are numbered between {@code 0}
- * and {@value #MAX_REQUEST}.  To insure the correct handling of duplicate
- * requests, the client side should insure that no more than {@value
- * #MAX_OUTSTANDING} requests are outstanding at one time.
+ * and the configured maximum request value.  To insure the correct handling of
+ * duplicate requests, the client side should insure that no more than the
+ * configured maximum outstanding requests are outstanding at one time.
  *
  * @param	<R> the type of request
  */
@@ -49,7 +49,7 @@ public class RequestQueueServer<R extends Request> {
 
     /**
      * The property for specifying the largest request number, which must be at
-     * least {@code 2} and not larger than {@value Short#MAX_VALUE}.
+     * least {@code 2} and not larger than {@value java.lang.Short#MAX_VALUE}.
      */
     public static final String MAX_REQUEST_PROPERTY = "max.request";
 
@@ -95,6 +95,7 @@ public class RequestQueueServer<R extends Request> {
      * Creates an instance of this class.
      *
      * @param	requestHandler the handler for reading and performing requests
+     * @param	properties additional configuration properties
      */
     public RequestQueueServer(
 	Request.RequestHandler<R> requestHandler, Properties properties)
@@ -141,6 +142,8 @@ public class RequestQueueServer<R extends Request> {
      * given the constraints on the maximum request number and the number of
      * requests that can be outstanding.
      *
+     * @param	request1 the first request to compare
+     * @param	request2 the second request to compare
      * @return	{@code true} if {@code request1} is earlier than {@code
      *		request2}, else {@code false}
      * @throws	IllegalArgumentException if either argument is negative or

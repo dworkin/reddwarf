@@ -33,7 +33,7 @@ public interface Request {
      * Writes the request to the data output stream.  Used by the client to
      * send the request to the server.
      *
-     * @param	the data output stream
+     * @param	out the data output stream
      * @throws	IOException if an I/O error occurs
      */
     void writeRequest(DataOutput out) throws IOException;

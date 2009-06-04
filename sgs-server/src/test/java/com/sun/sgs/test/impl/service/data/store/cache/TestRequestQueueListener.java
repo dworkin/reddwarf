@@ -178,15 +178,17 @@ public class TestRequestQueueListener extends Assert {
 	    serverSocket, failureHandler, emptyProperties);
 	connect = new InterruptableThread() {
 	    void runOnce() {
+		Socket socket = null;
 		try {
-		    Socket socket = new Socket("localhost", PORT);
+		    socket = new Socket("localhost", PORT);
 		    DataOutputStream out = 
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(33);
 		    Thread.sleep(1);
-		    socket.close();
 		} catch (IOException e) {
 		} catch (InterruptedException e) {
+		} finally {
+		    forceClose(socket);
 		}
 	    }
 	};
@@ -207,14 +209,16 @@ public class TestRequestQueueListener extends Assert {
 	    serverSocket, failureHandler, emptyProperties);
 	connect = new InterruptableThread() {
 	    void runOnce() {
+		Socket socket = null;
 		try {
-		    Socket socket = new Socket("localhost", PORT);
+		    socket = new Socket("localhost", PORT);
 		    OutputStream out = socket.getOutputStream();
 		    out.write(new byte[] { 1, 2, 3, 4 });
 		    Thread.sleep(1);
-		    socket.close();
 		} catch (IOException e) {
 		} catch (InterruptedException e) {
+		} finally {
+		    forceClose(socket);
 		}
 	    }
 	};
@@ -240,15 +244,17 @@ public class TestRequestQueueListener extends Assert {
 	};
 	connect = new InterruptableThread() {
 	    void runOnce() {
+		Socket socket = null;
 		try {
-		    Socket socket = new Socket("localhost", PORT);
+		    socket = new Socket("localhost", PORT);
 		    DataOutputStream out = 
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(33);
 		    Thread.sleep(1);
-		    socket.close();
 		} catch (IOException e) {
 		} catch (InterruptedException e) {
+		} finally {
+		    forceClose(socket);
 		}
 	    }
 	};
@@ -273,15 +279,17 @@ public class TestRequestQueueListener extends Assert {
 	    private long n = 0;
 	    private long getNodeId() { return n++ % 2; }
 	    void runOnce() throws Exception {
+		Socket socket = null;
 		try {
-		    Socket socket = new Socket("localhost", PORT);
+		    socket = new Socket("localhost", PORT);
 		    DataOutputStream out = 
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(getNodeId());
 		    Thread.sleep(1);
-		    socket.close();
 		} catch (ConnectException e) {
 		} catch (InterruptedException e) {
+		} finally {
+		    forceClose(socket);
 		}
 	    }
 	};
@@ -308,25 +316,29 @@ public class TestRequestQueueListener extends Assert {
 	DummyRequestQueueServer server999 = new DummyRequestQueueServer();
 	listener.servers.put(999L, server999);
 	Socket socket = null;
-	while (true) {
-	    try {
-		socket = new Socket("localhost", PORT);
-		break;
-	    } catch (ConnectException e) {
+	try {
+	    while (true) {
+		try {
+		    socket = new Socket("localhost", PORT);
+		    break;
+		} catch (ConnectException e) {
+		}
 	    }
+	    new DataOutputStream(socket.getOutputStream()).writeLong(33);
+	    Thread.sleep(EXTRA_WAIT);
+	    assertEquals(1, server33.connectionCount.get());
+	    assertEquals(0, server999.connectionCount.get());
+	    socket.close();
+	    socket = new Socket("localhost", PORT);
+	    new DataOutputStream(socket.getOutputStream()).writeLong(999);	
+	    Thread.sleep(EXTRA_WAIT);
+	    assertEquals(1, server33.connectionCount.get());
+	    assertEquals(1, server999.connectionCount.get());
+	    failureHandler.checkNotRun();
+	    listener.shutdown();
+	} finally {
+	    forceClose(socket);
 	}
-	new DataOutputStream(socket.getOutputStream()).writeLong(33);
-	Thread.sleep(EXTRA_WAIT);
-	assertEquals(1, server33.connectionCount.get());
-	assertEquals(0, server999.connectionCount.get());
-	socket.close();
-	socket = new Socket("localhost", PORT);
-	new DataOutputStream(socket.getOutputStream()).writeLong(999);	
-	Thread.sleep(EXTRA_WAIT);
-	assertEquals(1, server33.connectionCount.get());
-	assertEquals(1, server999.connectionCount.get());
-	failureHandler.checkNotRun();
-	listener.shutdown();
     }
 
     /* Test shutdown */
@@ -348,12 +360,10 @@ public class TestRequestQueueListener extends Assert {
 	Socket socket = null;
 	try {
 	    socket = new Socket("localhost", PORT);
-	    try {
-		socket.close();
-	    } catch (IOException e) {
-	    }
 	    fail("Expected ConnectException");
 	} catch (ConnectException e) {
+	} finally {
+	    forceClose(socket);
 	}
 	failureHandler.checkNotRun();
     }
@@ -370,15 +380,17 @@ public class TestRequestQueueListener extends Assert {
 	    serverSocket, failureHandler, emptyProperties);
 	connect = new InterruptableThread() {
 	    void runOnce() {
+		Socket socket = null;
 		try {
-		    Socket socket = new Socket("localhost", PORT);
+		    socket = new Socket("localhost", PORT);
 		    DataOutputStream out = 
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(33);
 		    Thread.sleep(1);
-		    socket.close();
 		} catch (IOException e) {
 		} catch (InterruptedException e) {
+		} finally {
+		    forceClose(socket);
 		}
 	    }
 	};
@@ -387,16 +399,15 @@ public class TestRequestQueueListener extends Assert {
 	Thread.sleep(EXTRA_WAIT);
 	listener.shutdown();
 	Thread.sleep(EXTRA_WAIT);
+	connect.shutdown();
 	/* Make sure the server socket has been shutdown */
 	Socket socket = null;
 	try {
 	    socket = new Socket("localhost", PORT);
-	    try {
-		socket.close();
-	    } catch (IOException e) {
-	    }
 	    fail("Expected ConnectException");
 	} catch (ConnectException e) {
+	} finally {
+	    forceClose(socket);
 	}
 	failureHandler.checkNotRun();
     }
@@ -437,10 +448,7 @@ public class TestRequestQueueListener extends Assert {
 	@Override
 	public void handleConnection(Socket socket) {
 	    connectionCount.incrementAndGet();
-	    try {
-		socket.close();
-	    } catch (IOException e) {
-	    }
+	    forceClose(socket);
 	}
     }   
 
@@ -537,6 +545,16 @@ public class TestRequestQueueListener extends Assert {
 		} else {
 		    assertNull(exception);
 		}
+	    }
+	}
+    }
+
+    /** Close a socket, ignoring I/O exceptions and null sockets. */
+    static void forceClose(Socket socket) {
+	if (socket != null) {
+	    try {
+		socket.close();
+	    } catch (IOException e) {
 	    }
 	}
     }
