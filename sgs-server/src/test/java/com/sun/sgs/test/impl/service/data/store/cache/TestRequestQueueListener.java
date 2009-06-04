@@ -40,10 +40,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+/** Tests for {@link RequestQueueListener}. */
 @RunWith(FilteredNameRunner.class)
 public class TestRequestQueueListener extends Assert {
 
@@ -62,7 +64,9 @@ public class TestRequestQueueListener extends Assert {
 
     /** A no-op runnable. */
     private static final Runnable noopRunnable =
-	new Runnable() { public void run() { } };
+	new Runnable() {
+	    public void run() { }
+	};
 
     /** Empty properties. */
     private static final Properties emptyProperties = new Properties();
@@ -81,6 +85,26 @@ public class TestRequestQueueListener extends Assert {
     static {
 	props.setProperty(MAX_RETRY_PROPERTY, String.valueOf(MAX_RETRY));
 	props.setProperty(RETRY_WAIT_PROPERTY, String.valueOf(RETRY_WAIT));
+    }
+
+    /** The server socket or {@code null}. */
+    ServerSocket serverSocket;
+
+    /** The client-side connection thread or {@code null}. */
+    InterruptableThread connect;
+
+    /** Close the server socket and shutdown the connect thread, if present. */
+    @After
+    public void afterTest() throws Exception {
+	if (serverSocket != null) {
+	    try {
+		serverSocket.close();
+	    } catch (IOException e) {
+	    }
+	}
+	if (connect != null) {
+	    connect.shutdown();
+	}
     }
 
     /* -- Tests -- */
@@ -116,7 +140,6 @@ public class TestRequestQueueListener extends Assert {
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
 	    unboundServerSocket, failureHandler, props);
 	listener.start();
-	long start = System.currentTimeMillis();
 	failureHandler.checkRun(MAX_RETRY);
     }
 
@@ -126,33 +149,21 @@ public class TestRequestQueueListener extends Assert {
      */
     @Test
     public void testAcceptNoInput() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
-	InterruptableThread connect = null;
-	try {
-	    NoteRun failureHandler = new NoteRun();
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties);
-	    connect = new InterruptableThread() {
-		void runOnce() {
-		    try {
-			new Socket("localhost", PORT).close();
-		    } catch (IOException e) {
-		    }
+	serverSocket = new ServerSocket(PORT);
+	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, emptyProperties);
+	connect = new InterruptableThread() {
+	    void runOnce() {
+		try {
+		    new Socket("localhost", PORT).close();
+		} catch (IOException e) {
 		}
-	    };
-	    listener.start();
-	    connect.start();
-	    failureHandler.checkRun(MAX_RETRY);
-	} finally {
-	    try {
-		serverSocket.close();
-	    } catch (IOException e) {
 	    }
-	    if (connect != null) {
-		connect.shutdown();
-	    }
-	}
+	};
+	listener.start();
+	connect.start();
+	failureHandler.checkRun(MAX_RETRY);
     }
 
     /**
@@ -161,79 +172,55 @@ public class TestRequestQueueListener extends Assert {
      */
     @Test
     public void testAcceptUnknownNodeId() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
-	InterruptableThread connect = null;
-	try {
-	    NoteRun failureHandler = new NoteRun();
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties);
-	    connect = new InterruptableThread() {
-		void runOnce() {
-		    try {
-			Socket socket = new Socket("localhost", PORT);
-			DataOutputStream out = 
-			    new DataOutputStream(socket.getOutputStream());
-			out.writeLong(0);
-			Thread.sleep(1);
-			socket.close();
-		    } catch (IOException e) {
-		    } catch (InterruptedException e) {
-		    }
+	serverSocket = new ServerSocket(PORT);
+	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, emptyProperties);
+	connect = new InterruptableThread() {
+	    void runOnce() {
+		try {
+		    Socket socket = new Socket("localhost", PORT);
+		    DataOutputStream out = 
+			new DataOutputStream(socket.getOutputStream());
+		    out.writeLong(33);
+		    Thread.sleep(1);
+		    socket.close();
+		} catch (IOException e) {
+		} catch (InterruptedException e) {
 		}
-	    };
-	    listener.start();
-	    connect.start();
-	    failureHandler.checkRun(MAX_RETRY);
-	} finally {
-	    try {
-		serverSocket.close();
-	    } catch (IOException e) {
 	    }
-	    if (connect != null) {
-		connect.shutdown();
-	    }
-	}
+	};
+	listener.start();
+	connect.start();
+	failureHandler.checkRun(MAX_RETRY);
     }
 
     /**
      * Test that the listener fails after the right delay if a connection
-     * supplies a partial node ID before disconnecting.
+     * supplies an incomplete node ID before disconnecting.
      */
     @Test
-    public void testAcceptPartialNodeId() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
-	InterruptableThread connect = null;
-	try {
-	    NoteRun failureHandler = new NoteRun();
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties);
-	    connect = new InterruptableThread() {
-		void runOnce() {
-		    try {
-			Socket socket = new Socket("localhost", PORT);
-			OutputStream out = socket.getOutputStream();
-			out.write(new byte[] { 1, 2, 3 });
-			Thread.sleep(1);
-			socket.close();
-		    } catch (IOException e) {
-		    } catch (InterruptedException e) {
-		    }
+    public void testAcceptIncompleteNodeId() throws Exception {
+	serverSocket = new ServerSocket(PORT);
+	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, emptyProperties);
+	connect = new InterruptableThread() {
+	    void runOnce() {
+		try {
+		    Socket socket = new Socket("localhost", PORT);
+		    OutputStream out = socket.getOutputStream();
+		    out.write(new byte[] { 1, 2, 3, 4 });
+		    Thread.sleep(1);
+		    socket.close();
+		} catch (IOException e) {
+		} catch (InterruptedException e) {
 		}
-	    };
-	    listener.start();
-	    connect.start();
-	    failureHandler.checkRun(MAX_RETRY);
-	} finally {
-	    try {
-		serverSocket.close();
-	    } catch (IOException e) {
 	    }
-	    if (connect != null) {
-		connect.shutdown();
-	    }
-	}
+	};
+	listener.start();
+	connect.start();
+	failureHandler.checkRun(MAX_RETRY);
     }
 
     /**
@@ -242,44 +229,32 @@ public class TestRequestQueueListener extends Assert {
      */
     @Test
     public void testAcceptUnexpectedException() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
-	InterruptableThread connect = null;
-	try {
-	    NoteRun failureHandler = new NoteRun();
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties)
-		{
-		    protected RequestQueueServer getServer(long nodeId) {
-			throw new NullPointerException("Whoa!");
-		    }
-		};
-	    connect = new InterruptableThread() {
-		void runOnce() {
-		    try {
-			Socket socket = new Socket("localhost", PORT);
-			DataOutputStream out = 
-			    new DataOutputStream(socket.getOutputStream());
-			out.writeLong(0);
-			Thread.sleep(1);
-			socket.close();
-		    } catch (IOException e) {
-		    } catch (InterruptedException e) {
-		    }
+	serverSocket = new ServerSocket(PORT);
+	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, emptyProperties)
+	{
+	    protected RequestQueueServer getServer(long nodeId) {
+		throw new NullPointerException("Whoa!");
+	    }
+	};
+	connect = new InterruptableThread() {
+	    void runOnce() {
+		try {
+		    Socket socket = new Socket("localhost", PORT);
+		    DataOutputStream out = 
+			new DataOutputStream(socket.getOutputStream());
+		    out.writeLong(33);
+		    Thread.sleep(1);
+		    socket.close();
+		} catch (IOException e) {
+		} catch (InterruptedException e) {
 		}
-	    };
-	    listener.start();
-	    connect.start();
-	    failureHandler.checkRun(MAX_RETRY);
-	} finally {
-	    try {
-		serverSocket.close();
-	    } catch (IOException e) {
 	    }
-	    if (connect != null) {
-		connect.shutdown();
-	    }
-	}
+	};
+	listener.start();
+	connect.start();
+	failureHandler.checkRun(MAX_RETRY);
     }
 
     /**
@@ -288,91 +263,70 @@ public class TestRequestQueueListener extends Assert {
      */
     @Test
     public void testAcceptAlternatingFailures() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
-	InterruptableThread connect = null;
-	try {
-	    NoteRun failureHandler = new NoteRun();
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties);
-	    DummyRequestQueueServer server = new DummyRequestQueueServer();
-	    listener.servers.put(0L, server);
-	    connect = new InterruptableThread() {
-		private long n = 0;
-		private long getNodeId() { return n++ % 2; }
-		void runOnce() throws Exception {
-		    try {
-			Socket socket = new Socket("localhost", PORT);
-			DataOutputStream out = 
-			    new DataOutputStream(socket.getOutputStream());
-			out.writeLong(getNodeId());
-			Thread.sleep(1);
-			socket.close();
-		    } catch (ConnectException e) {
-		    } catch (InterruptedException e) {
-		    }
+	serverSocket = new ServerSocket(PORT);
+	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, emptyProperties);
+	DummyRequestQueueServer server = new DummyRequestQueueServer();
+	listener.servers.put(1L, server);
+	connect = new InterruptableThread() {
+	    private long n = 0;
+	    private long getNodeId() { return n++ % 2; }
+	    void runOnce() throws Exception {
+		try {
+		    Socket socket = new Socket("localhost", PORT);
+		    DataOutputStream out = 
+			new DataOutputStream(socket.getOutputStream());
+		    out.writeLong(getNodeId());
+		    Thread.sleep(1);
+		    socket.close();
+		} catch (ConnectException e) {
+		} catch (InterruptedException e) {
 		}
-	    };
-	    listener.start();
-	    connect.start();
-	    Thread.sleep(MAX_RETRY + EXTRA_WAIT);
-	    assertTrue("Expected a non-zero number of connections",
-		       server.connectionCount.get() > 0);
-	    failureHandler.checkNotRun();
-	    listener.shutdown();
-	} finally {
-	    try {
-		serverSocket.close();
-	    } catch (IOException e) {
 	    }
-	    if (connect != null) {
-		connect.shutdown();
-	    }
-	}
+	};
+	listener.start();
+	connect.start();
+	Thread.sleep(MAX_RETRY + EXTRA_WAIT);
+	assertTrue("Expected a non-zero number of connections",
+		   server.connectionCount.get() > 0);
+	failureHandler.checkNotRun();
+	listener.shutdown();
     }
 
     /** Test the listener accepting connections successfully. */
     @Test
     public void testAcceptSuccess() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
-	InterruptableThread connect = null;
-	try {
-	    NoteRun failureHandler = new NoteRun();
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties);
-	    DummyRequestQueueServer server = new DummyRequestQueueServer();
-	    listener.servers.put(0L, server);
-	    connect = new InterruptableThread() {
-		void runOnce() throws Exception {
-		    try {
-			Socket socket = new Socket("localhost", PORT);
-			DataOutputStream out = 
-			    new DataOutputStream(socket.getOutputStream());
-			out.writeLong(0);
-			Thread.sleep(1);
-			socket.close();
-		    } catch (ConnectException e) {
-		    } catch (InterruptedException e) {
-		    }
-		}
-	    };
-	    listener.start();
-	    connect.start();
-	    Thread.sleep(MAX_RETRY + EXTRA_WAIT);
-	    assertTrue("Expected a non-zero number of connections",
-		       server.connectionCount.get() > 0);
-	    failureHandler.checkNotRun();
-	    listener.shutdown();
-	} finally {
+	serverSocket = new ServerSocket(PORT);
+	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener =
+	    new SimpleRequestQueueListener(
+		serverSocket, failureHandler, emptyProperties);
+	listener.start();
+	DummyRequestQueueServer server33 = new DummyRequestQueueServer();
+	listener.servers.put(33L, server33);
+	DummyRequestQueueServer server999 = new DummyRequestQueueServer();
+	listener.servers.put(999L, server999);
+	Socket socket = null;
+	while (true) {
 	    try {
-		serverSocket.close();
-	    } catch (IOException e) {
-	    }
-	    if (connect != null) {
-		connect.shutdown();
+		socket = new Socket("localhost", PORT);
+		break;
+	    } catch (ConnectException e) {
 	    }
 	}
+	new DataOutputStream(socket.getOutputStream()).writeLong(33);
+	Thread.sleep(EXTRA_WAIT);
+	assertEquals(1, server33.connectionCount.get());
+	assertEquals(0, server999.connectionCount.get());
+	socket.close();
+	socket = new Socket("localhost", PORT);
+	new DataOutputStream(socket.getOutputStream()).writeLong(999);	
+	Thread.sleep(EXTRA_WAIT);
+	assertEquals(1, server33.connectionCount.get());
+	assertEquals(1, server999.connectionCount.get());
+	failureHandler.checkNotRun();
+	listener.shutdown();
     }
 
     /* Test shutdown */
@@ -383,36 +337,25 @@ public class TestRequestQueueListener extends Assert {
      */
     @Test
     public void testShutdownNoConnections() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
+	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, emptyProperties);
+	listener.start();
+	Thread.sleep(EXTRA_WAIT);
+	listener.shutdown();
+	/* Make sure the server socket has been shutdown */
+	Socket socket = null;
 	try {
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties);
-	    listener.start();
-	    Thread.sleep(EXTRA_WAIT);
-	    listener.shutdown();
-	    /* Make sure the server socket has been shutdown */
-	    Socket socket = null;
+	    socket = new Socket("localhost", PORT);
 	    try {
-		socket = new Socket("localhost", PORT);
-		fail("Expected ConnectException");
-	    } catch (ConnectException e) {
-	    } finally {
-		if (socket != null) {
-		    try {
-			socket.close();
-		    } catch (IOException e) {
-		    }
-		}
-	    }
-	} finally {
-	    try {
-		serverSocket.close();
+		socket.close();
 	    } catch (IOException e) {
 	    }
-	    failureHandler.checkNotRun();
+	    fail("Expected ConnectException");
+	} catch (ConnectException e) {
 	}
+	failureHandler.checkNotRun();
     }
 
     /**
@@ -421,56 +364,41 @@ public class TestRequestQueueListener extends Assert {
      */
     @Test
     public void testShutdownWithConnections() throws Exception {
-	ServerSocket serverSocket = new ServerSocket(PORT);
-	InterruptableThread connect = null;
-	try {
-	    NoteRun failureHandler = new NoteRun();
-	    SimpleRequestQueueListener listener =
-		new SimpleRequestQueueListener(
-		    serverSocket, failureHandler, emptyProperties);
-	    connect = new InterruptableThread() {
-		void runOnce() {
-		    try {
-			Socket socket = new Socket("localhost", PORT);
-			DataOutputStream out = 
-			    new DataOutputStream(socket.getOutputStream());
-			out.writeLong(0);
-			Thread.sleep(1);
-			socket.close();
-		    } catch (IOException e) {
-		    } catch (InterruptedException e) {
-		    }
-		}
-	    };
-	    listener.start();
-	    connect.start();
-	    Thread.sleep(EXTRA_WAIT);
-	    listener.shutdown();
-	    Thread.sleep(EXTRA_WAIT);
-	    /* Make sure the server socket has been shutdown */
-	    Socket socket = null;
-	    try {
-		socket = new Socket("localhost", PORT);
-		fail("Expected ConnectException");
-	    } catch (ConnectException e) {
-	    } finally {
-		if (socket != null) {
-		    try {
-			socket.close();
-		    } catch (IOException e) {
-		    }
-		    if (connect != null) {
-			connect.shutdown();
-		    }
+	serverSocket = new ServerSocket(PORT);
+	NoteRun failureHandler = new NoteRun();
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, emptyProperties);
+	connect = new InterruptableThread() {
+	    void runOnce() {
+		try {
+		    Socket socket = new Socket("localhost", PORT);
+		    DataOutputStream out = 
+			new DataOutputStream(socket.getOutputStream());
+		    out.writeLong(33);
+		    Thread.sleep(1);
+		    socket.close();
+		} catch (IOException e) {
+		} catch (InterruptedException e) {
 		}
 	    }
-	    failureHandler.checkNotRun();
-	} finally {
+	};
+	listener.start();
+	connect.start();
+	Thread.sleep(EXTRA_WAIT);
+	listener.shutdown();
+	Thread.sleep(EXTRA_WAIT);
+	/* Make sure the server socket has been shutdown */
+	Socket socket = null;
+	try {
+	    socket = new Socket("localhost", PORT);
 	    try {
-		serverSocket.close();
+		socket.close();
 	    } catch (IOException e) {
 	    }
+	    fail("Expected ConnectException");
+	} catch (ConnectException e) {
 	}
+	failureHandler.checkNotRun();
     }
 
     /* -- Other classes and methods -- */
@@ -554,6 +482,8 @@ public class TestRequestQueueListener extends Assert {
 		"Expected time to be at least " + minTimeout + ": " + time,
 		time >= minTimeout); 
 	}
+
+	/** Check that the run method has not been called. */
 	synchronized void checkNotRun() {
 	    assertFalse(run);
 	}
@@ -583,8 +513,16 @@ public class TestRequestQueueListener extends Assert {
 	    }
 	}
 
+	/**
+	 * The operation to run repeatedly, throwing an exception if the
+	 * operation failed.
+	 */
 	abstract void runOnce() throws Exception;
 
+	/**
+	 * Shuts down this thread, throwing the failure exception thrown by
+	 * runOnce, if any.
+	 */
 	public void shutdown() throws Exception {
 	    synchronized (this) {
 		shutdown = true;

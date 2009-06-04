@@ -31,7 +31,13 @@ import static java.util.logging.Level.FINE;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
-/** A thread for managing a socket server that handles incoming connections. */
+/**
+ * A thread for managing a socket server that handles incoming connections for
+ * {@link RequestQueueServer}s.  When a connection is accepted, the listener
+ * will read a {@code long} from the socket's input stream to determine the
+ * node ID of the server that should handle the connection, passing the ID to
+ * the {@link #getServer getServer} method to find the server.
+ */
 public abstract class RequestQueueListener extends Thread {
 
     /**
@@ -60,7 +66,7 @@ public abstract class RequestQueueListener extends Thread {
     /** The socket server. */
     private final ServerSocket serverSocket;
 
-    /** A runnable to call if the listener fails. */ 
+    /** The runnable to call if the listener fails. */ 
     private final Runnable failureHandler;
 
     /** The maximum retry time in milliseconds. */
@@ -87,7 +93,9 @@ public abstract class RequestQueueListener extends Thread {
     /**
      * Creates an instance of this class.  The {@link Runnable#run run} method
      * of {@code failureHandler} will be called if the listener is shutdown due
-     * to repeated failures when attempting to accept connections.
+     * to repeated failures when attempting to accept connections.  The server
+     * socket should already be connected, and will be closed before the {@code
+     * run} method returns.
      *
      * @param	serverSocket the server socket for accepting connections
      * @param	failureHandler the failure handler
