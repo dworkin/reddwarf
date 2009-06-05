@@ -120,6 +120,7 @@ public class SmokeTestClient implements SimpleClientListener{
             System.exit(1);
         }
         loginName = "discme";
+        myclient = new SimpleClient(this);
         try {
             myclient.login(props);
         } catch (IOException e) {
@@ -167,6 +168,7 @@ public class SmokeTestClient implements SimpleClientListener{
         if (loginName.equals("discme")) {
             logger.log(Level.WARNING, "Passed disconnection test");
             loginName = "smokeTest";
+            myclient = new SimpleClient(this);
             try {
                 myclient.login(props);
             } catch (IOException e) {
