@@ -29,7 +29,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.sun.sgs.test.client.simple;
 
 import com.sun.sgs.client.ClientChannel;
@@ -42,47 +41,81 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *
- * @author waldo
+ * An implementation of the channel client listener for the smoke test client.
+ * This class contains implementations of the <code>receivedMessage</code> and
+ * <code>leftChannel</code> callbacks. The class also keeps track of whether or
+ * not those callbacks have been tested, and supplied methods that allow the
+ * {@link SmokeTestClient} object to determine if the tests have been made. The
+ * actual results of the test are printed out as part of the smoketest server.
  */
-public class SmokeTestChannelListener implements ClientChannelListener{
+public class SmokeTestChannelListener implements ClientChannelListener {
+
     private SimpleClient client;
     private boolean receiveMsgPass, leftChannelPass;
-
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(SmokeTestChannelListener.class.getName()));
-    
-    public SmokeTestChannelListener(SimpleClient withClient){
+
+    public SmokeTestChannelListener(SimpleClient withClient) {
         client = withClient;
         receiveMsgPass = leftChannelPass = false;
     }
 
-    public void receivedMessage(ClientChannel channel, ByteBuffer message){
-        String sendMsg = "receivedChannelMessage" + channel.getName() + "" + message.toString();
+    /**
+     * Callback for when a message is received over a channel. The callback will
+     * construct a message made up of "receivedChannelMessage:", the name of the
+     * channel, and the message content that was sent, and send this back on the
+     * channel itself. It will also set the receiveMsgPass flag to true, showing that
+     * this part of the test has been triggered.
+     * @param channel The channel on which the message was received, and on
+     *      which the reply will be sent
+     * @param message the message sent over the channel
+     */
+    public void receivedMessage(ClientChannel channel, ByteBuffer message) {
+        String sendMsg = "receivedChannelMessage:" + channel.getName() + " ";
+        String msg = SmokeTestClient.bufferToString(message);
+        sendMsg = sendMsg + msg;
         receiveMsgPass = true;
         try {
-                    channel.send(ByteBuffer.wrap(sendMsg.getBytes()));
-        } catch (IOException e){
-            logger.log(Level.WARNING, "Unable to send response to received channel message on channel "
-                    + channel.getName());
+            channel.send(ByteBuffer.wrap(sendMsg.getBytes()));
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Unable to send response to received channel message on channel " + channel.getName());
         }
     }
 
-    public void leftChannel(ClientChannel channel){
+    /**
+     * Callback triggered when the client leaves a channel. The client will respond
+     * by sending a message of the form "leftChannel:" with the name of the channel
+     * back to the server, on the client session for this client. Calling this will set the
+     * leftChannel flag to true, showing that this part of the smoke test has been
+     * triggered.
+     *
+     * @param channel The channel that the client has left.
+     */
+    public void leftChannel(ClientChannel channel) {
         String msg = "leftChannel:" + channel.getName();
         leftChannelPass = true;
         try {
             client.send(ByteBuffer.wrap(msg.getBytes()));
-        } catch (IOException e){
+        } catch (IOException e) {
             logger.log(Level.WARNING, "unable to send channel leave confirmation");
         }
     }
 
-    boolean getReceiveStatus(){
+    /**
+     * Returns a boolean indicating whether or not the {@link receivedMessage} callback
+     * has been called.
+     * @return true if the callback has been called; false otherwise.
+     */
+    boolean getReceiveStatus() {
         return receiveMsgPass;
     }
 
-    boolean getChannelLeftStatus(){
+    /**
+     * Returns a boolean indicating whether or not the {@link leftChannel} callback has
+     * been called.
+     * @return true if the callback has been called; false otherwise.
+     */
+    boolean getChannelLeftStatus() {
         return leftChannelPass;
     }
 }
