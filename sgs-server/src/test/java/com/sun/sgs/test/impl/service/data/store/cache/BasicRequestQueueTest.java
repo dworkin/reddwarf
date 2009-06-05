@@ -21,16 +21,53 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
+import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
+import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import java.io.DataInput;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import org.junit.Assert;
 
 class BasicRequestQueueTest extends Assert {
 
     /** Slop time when waiting. */
     static final long EXTRA_WAIT = 50;
+
+    /** Empty properties. */
+    static final Properties emptyProperties = new Properties();
+
+    /** A no-op runnable. */
+    static final Runnable noopRunnable =
+	new Runnable() {
+	    public void run() { }
+	};
+
+    /** A request queue listener that gets servers from a map. */
+    static class SimpleRequestQueueListener extends RequestQueueListener {
+	final Map<Long, RequestQueueServer<? extends Request>>
+	    servers = Collections.synchronizedMap(
+		new HashMap<Long, RequestQueueServer<? extends Request>>());
+	SimpleRequestQueueListener(ServerSocket serverSocket,
+				   Runnable failureHandler,
+				   Properties properties)
+	{
+	    super(serverSocket, failureHandler, properties);
+	}
+	protected RequestQueueServer getServer(long nodeId) {
+	    RequestQueueServer server = servers.get(nodeId);
+	    if (server != null) {
+		return server;
+	    } else {
+		throw new IllegalArgumentException(
+		    "Server not found: " + nodeId);
+	    }
+	}
+    }
 
     /** A request handler that fails. */
     static class DummyRequestHandler implements RequestHandler<Request> {
@@ -61,14 +98,18 @@ class BasicRequestQueueTest extends Assert {
 	    throws InterruptedException
 	{
 	    long start = System.currentTimeMillis();
+	    long wait = minTimeout + EXTRA_WAIT;
 	    while (!run) {
-		wait(minTimeout + EXTRA_WAIT);
+		wait(wait);
+		if (System.currentTimeMillis() > start + wait) {
+		    fail("Expected to wait no more than " + wait + " ms");
+		}
 	    }
 	    long time = System.currentTimeMillis() - start;
 	    assertTrue(run);
-	    assertTrue(
-		"Expected time to be at least " + minTimeout + ": " + time,
-		time >= minTimeout); 
+	    assertTrue("Expected to wait at least " + minTimeout +
+		       " ms, but was " + time + " ms",
+		       time >= minTimeout); 
 	}
 
 	/** Check that the run method has not been called. */

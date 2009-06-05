@@ -21,10 +21,10 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener
-    .MAX_RETRY_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener
-    .RETRY_WAIT_PROPERTY;
+import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
+    MAX_RETRY_PROPERTY;
+import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
+    RETRY_WAIT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.DataOutputStream;
@@ -33,9 +33,6 @@ import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
@@ -58,15 +55,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    throw new ExceptionInInitializerError(e);
 	}
     }
-
-    /** A no-op runnable. */
-    private static final Runnable noopRunnable =
-	new Runnable() {
-	    public void run() { }
-	};
-
-    /** Empty properties. */
-    private static final Properties emptyProperties = new Properties();
 
     /** The shorter maximum retry to use for tests. */
     private static final long MAX_RETRY = 100;
@@ -141,7 +129,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, emptyProperties);
+	    serverSocket, failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		try {
@@ -165,7 +153,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, emptyProperties);
+	    serverSocket, failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -197,7 +185,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, emptyProperties);
+	    serverSocket, failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -228,7 +216,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, emptyProperties)
+	    serverSocket, failureHandler, props)
 	{
 	    protected RequestQueueServer getServer(long nodeId) {
 		throw new NullPointerException("Whoa!");
@@ -265,7 +253,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, emptyProperties);
+	    serverSocket, failureHandler, props);
 	DummyRequestQueueServer server = new DummyRequestQueueServer();
 	listener.servers.put(1L, server);
 	connect = new InterruptableThread() {
@@ -301,9 +289,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptSuccess() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener =
-	    new SimpleRequestQueueListener(
-		serverSocket, failureHandler, emptyProperties);
+	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
+	    serverSocket, failureHandler, props);
 	listener.start();
 	DummyRequestQueueServer server33 = new DummyRequestQueueServer();
 	listener.servers.put(33L, server33);
@@ -346,7 +333,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, emptyProperties);
+	    serverSocket, failureHandler, props);
 	listener.start();
 	Thread.sleep(EXTRA_WAIT);
 	listener.shutdown();
@@ -371,7 +358,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, emptyProperties);
+	    serverSocket, failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -408,28 +395,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     }
 
     /* -- Other classes and methods -- */
-
-    /** A request queue listener that gets servers from a map. */
-    static class SimpleRequestQueueListener extends RequestQueueListener {
-	final Map<Long, RequestQueueServer<? extends Request>>
-	    servers = Collections.synchronizedMap(
-		new HashMap<Long, RequestQueueServer<? extends Request>>());
-	SimpleRequestQueueListener(ServerSocket serverSocket,
-				   Runnable failureHandler,
-				   Properties properties)
-	{
-	    super(serverSocket, failureHandler, properties);
-	}
-	protected RequestQueueServer getServer(long nodeId) {
-	    RequestQueueServer server = servers.get(nodeId);
-	    if (server != null) {
-		return server;
-	    } else {
-		throw new IllegalArgumentException(
-		    "Server not found: " + nodeId);
-	    }
-	}
-    }
 
     /**
      * A request queue server that counts the number of connections it

@@ -242,6 +242,7 @@ public abstract class RequestQueueListener extends Thread {
 
     /** Notes that a connection was accepted successfully. */
     private synchronized void noteConnected() {
+	logger.log(FINER, "RequestQueueListener connected successfully");
 	failureStarted = -1;
     }
 }

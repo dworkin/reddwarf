@@ -29,7 +29,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Test;
@@ -45,9 +44,6 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     /** Dummy request handler. */
     private static final DummyRequestHandler dummyRequestHandler =
 	new DummyRequestHandler();
-
-    /** Empty properties. */
-    private static final Properties emptyProperties = new Properties();
 
     /** The server socket or {@code null}. */
     ServerSocket serverSocket;

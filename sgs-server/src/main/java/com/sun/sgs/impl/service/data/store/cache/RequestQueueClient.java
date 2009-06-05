@@ -27,7 +27,6 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -39,6 +38,8 @@ import java.util.Properties;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
@@ -178,6 +179,12 @@ public class RequestQueueClient extends Thread {
 	    Integer.MAX_VALUE);
 	requests = new LinkedBlockingDeque<Request>(requestQueueSize);
 	sentRequests = new LinkedBlockingDeque<RequestHolder>(sentQueueSize);
+	if (logger.isLoggable(FINE)) {
+	    logger.log(FINE,
+		       "Created RequestQueueClient maxRetry:" + maxRetry +
+		       ", retryWait:" + retryWait + ", requestQueueSize:" +
+		       requestQueueSize + ", sentQueueSize:" + sentQueueSize);
+	}
     }
 
     /**
@@ -196,12 +203,19 @@ public class RequestQueueClient extends Thread {
 		throw new IllegalStateException(
 		    "The client has been requested to shutdown");
 	    }
-	    return requests.offerLast(request);
+	    boolean result = requests.offerLast(request);
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(FINEST,
+			   "RequestQueueClient.addRequest " + request +
+			   (result ? "succeeds" : "fails"));
+	    }
+	    return result;
 	}
     }
 
     /** Shuts down the client. */
     public void shutdown() {
+	logger.log(FINEST, "Shutting down RequestQueueClient");	
 	synchronized (this) {
 	    if (!shutdown) {
 		shutdown = true;
@@ -217,6 +231,7 @@ public class RequestQueueClient extends Thread {
 	    } catch (InterruptedException e) {
 	    }
 	}
+	logger.log(FINE, "Shutdown RequestQueueClient");
     }
 
     /**
@@ -238,14 +253,14 @@ public class RequestQueueClient extends Thread {
 		}
 		c.handleConnection();
 	    } catch (IOException e) {
-		if (!shutdown) {
-		    noteConnectionException(e);
-		}
+		noteConnectionException(e);
 	    } catch (Throwable t) {
 		if (c != null) {
 		    c.disconnect(true);
 		}
-		noteFailed(t);
+		synchronized (this) {
+		    noteFailed(t);
+		}
 	    }
 	}
     }
@@ -296,14 +311,20 @@ public class RequestQueueClient extends Thread {
      * Notes that an exception was thrown when attempting to handle a
      * connection.
      */
-    private void noteConnectionException(Throwable exception) {
-	assert Thread.holdsLock(this);
-	if (logger.isLoggable(FINE)) {
+    private synchronized void noteConnectionException(Throwable exception) {
+	if (shutdown) {
+	    return;
+	}
+	if (exception instanceof IOException && logger.isLoggable(FINER)) {
+	    logger.logThrow(FINER, exception,
+			    "RequestQueueClient connection got I/O exception");
+	} else if (logger.isLoggable(WARNING)) {
 	    logger.logThrow(
-		FINE, exception, "RequestQueueClient connection failed");
+		WARNING, exception,
+		"RequestQueueClient connection got unexpected exception");
 	}
 	long now = System.currentTimeMillis();
-	if (failureStarted != -1) {
+	if (failureStarted == -1) {
 	    failureStarted = now;
 	}
 	if (now > failureStarted + maxRetry) {
@@ -331,6 +352,7 @@ public class RequestQueueClient extends Thread {
     /** Notes that a connection was accepted successfully. */
     private void noteConnected() {
 	assert Thread.holdsLock(this);
+	logger.log(FINER, "RequestQueueClient connected successfully");
 	failureStarted = -1;
     }
 
@@ -411,6 +433,7 @@ public class RequestQueueClient extends Thread {
 		new DataInputStream(
 		    new BufferedInputStream(
 			socket.getInputStream())));
+	    logger.log(FINER, "Created RequestQueueClient connection");
 	}
 
 	/**
@@ -476,6 +499,12 @@ public class RequestQueueClient extends Thread {
 			    request = requests.takeFirst();
 			    requestNumber = getNextRequestNumber();
 			}
+			if (logger.isLoggable(FINEST)) {
+			    logger.log(FINEST,
+				       "RequestQueueClient sending request" +
+				       " number:" + requestNumber + ", " +
+				       request);
+			}
 			out.writeShort(requestNumber);
 			sentRequests.putLast(
 			    new RequestHolder(request, requestNumber));
@@ -535,6 +564,15 @@ public class RequestQueueClient extends Thread {
 		    while (!getDisconnectRequested()) {
 			Throwable requestException = readResponse();
 			RequestHolder holder = sentRequests.removeFirst();
+			if (logger.isLoggable(FINEST)) {
+			    logger.log(
+				FINEST,
+				"RequestQueueClient received reply for" +
+				" request number:" + holder.requestNumber +
+				", result:" +
+				(requestException == null ? "succeeded"
+				 : requestException.toString()));
+			}
 			holder.request.completed(requestException);
 		    }
 		    return;
