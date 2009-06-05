@@ -192,7 +192,7 @@ public class RequestQueueServer<R extends Request> {
 	private final DataInput in;
 
 	/** The data output stream. */
-	private final DataOutput out;
+	private final DataOutputStream out;
 
 	/** Whether the connection has been told to disconnect. */
 	private volatile boolean disconnect;
@@ -251,6 +251,7 @@ public class RequestQueueServer<R extends Request> {
 			try {
 			    requestHandler.performRequest(request);
 			    out.writeBoolean(true);
+			    out.flush();
 			    if (logger.isLoggable(FINEST)) {
 				logger.log(FINEST,
 					   "RequestQueueServer request" +
@@ -261,6 +262,7 @@ public class RequestQueueServer<R extends Request> {
 			    out.writeBoolean(false);
 			    writeString(t.getClass().getName(), out);
 			    writeString(t.getMessage(), out);
+			    out.flush();
 			    if (logger.isLoggable(FINEST)) {
 				logger.logThrow(FINEST, t,
 						"RequestQueueServer request" +

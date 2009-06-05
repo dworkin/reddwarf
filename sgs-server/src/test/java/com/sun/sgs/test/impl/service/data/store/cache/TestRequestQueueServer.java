@@ -22,11 +22,15 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -242,7 +246,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     /* Test requests */
 
     @Test
-    public void testRequestThrowsIOException() throws Exception {
+    public void testRequestReadThrowsIOException() throws Exception {
 	server = new RequestQueueServer<Request>(
 	    dummyRequestHandler, emptyProperties);
 	serverSocket = new ServerSocket(PORT);
@@ -262,5 +266,206 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	out.flush();
 	Thread.sleep(EXTRA_WAIT);
 	assertTrue("Socket should be closed", socket.isClosed());
+    }
+
+    @Test
+    public void testRequestReadThrowsOtherException() throws Exception {
+	server = new RequestQueueServer<Request>(
+	    new DummyRequestHandler() {
+		public Request readRequest(DataInput in) throws IOException {
+		    throw new RuntimeException("Yow!");
+		}
+	    },
+	    emptyProperties);
+	serverSocket = new ServerSocket(PORT);
+	connect = new InterruptableThread() {
+	    boolean runOnce() throws IOException {
+		clientSocket = new Socket("localhost", PORT);
+		return true;
+	    }
+	};
+	connect.start();
+	socket = serverSocket.accept();
+	server.handleConnection(socket);
+	DataOutputStream out =
+	    new DataOutputStream(clientSocket.getOutputStream());
+	/* Write request number */
+	out.writeShort(0);
+	out.flush();
+	Thread.sleep(EXTRA_WAIT);
+	assertTrue("Socket should be closed", socket.isClosed());
+    }
+
+    @Test
+    public void testRequestPerformThrowsException() throws Exception {
+	server = new RequestQueueServer<Request>(
+	    new DummyRequestHandler() {
+		public Request readRequest(DataInput in) throws IOException {
+		    return new DummyRequest();
+		}
+	    },
+	    emptyProperties);
+	serverSocket = new ServerSocket(PORT);
+	connect = new InterruptableThread() {
+	    boolean runOnce() throws IOException {
+		clientSocket = new Socket("localhost", PORT);
+		return true;
+	    }
+	};
+	connect.start();
+	socket = serverSocket.accept();
+	server.handleConnection(socket);
+	DataOutputStream out =
+	    new DataOutputStream(clientSocket.getOutputStream());
+	/* Write request number */
+	out.writeShort(0);
+	out.flush();
+	DataInputStream in =
+	    new DataInputStream(clientSocket.getInputStream());
+	assertFalse(in.readBoolean());
+	assertFalse("Socket should not be closed", socket.isClosed());
+    }
+
+    @Test
+    public void testRequestPerformSuccess() throws Exception {
+	server = new RequestQueueServer<Request>(
+	    new DummyRequestHandler() {
+		public Request readRequest(DataInput in) throws IOException {
+		    assertEquals("Hello", in.readUTF());
+		    return new DummyRequest();
+		}
+		public void performRequest(Request request) { }
+	    },
+	    emptyProperties);
+	serverSocket = new ServerSocket(PORT);
+	connect = new InterruptableThread() {
+	    boolean runOnce() throws IOException {
+		clientSocket = new Socket("localhost", PORT);
+		return true;
+	    }
+	};
+	connect.start();
+	socket = serverSocket.accept();
+	server.handleConnection(socket);
+	DataOutputStream out =
+	    new DataOutputStream(clientSocket.getOutputStream());
+	/* Write request number and data */
+	out.writeShort(0);
+	out.writeUTF("Hello");
+	out.flush();
+	DataInputStream in =
+	    new DataInputStream(clientSocket.getInputStream());
+	assertTrue(in.readBoolean());
+	assertFalse("Socket should not be closed", socket.isClosed());
+    }
+
+    @Test
+    public void testRequestPerformIgnoreDuplicates() throws Exception {
+	final AtomicInteger requests = new AtomicInteger();
+	server = new RequestQueueServer<Request>(
+	    new DummyRequestHandler() {
+		public Request readRequest(DataInput in) throws IOException {
+		    requests.incrementAndGet();
+		    return new DummyRequest();
+		}
+		public void performRequest(Request request) { }
+	    },
+	    emptyProperties);
+	serverSocket = new ServerSocket(PORT);
+	connect = new InterruptableThread() {
+	    boolean runOnce() throws IOException {
+		clientSocket = new Socket("localhost", PORT);
+		DataOutputStream out =
+		    new DataOutputStream(clientSocket.getOutputStream());
+		out.writeShort(0);
+		out.writeShort(0);
+		out.writeShort(1);
+		out.writeShort(1);
+		out.writeShort(2);
+		out.flush();
+		return true;
+	    }
+	};
+	connect.start();
+	socket = serverSocket.accept();
+	server.handleConnection(socket);
+	DataInputStream in =
+	    new DataInputStream(clientSocket.getInputStream());
+	assertTrue(in.readBoolean());
+	assertTrue(in.readBoolean());
+	assertTrue(in.readBoolean());
+	assertFalse("Socket should not be closed", socket.isClosed());
+	assertEquals(3, requests.get());
+    }
+
+    @Test
+    public void testRequestPerformIgnoreDuplicatesAcrossConnections()
+	throws Exception
+    {
+	final AtomicInteger requests = new AtomicInteger();
+	server = new RequestQueueServer<Request>(
+	    new DummyRequestHandler() {
+		public Request readRequest(DataInput in) throws IOException {
+		    requests.incrementAndGet();
+		    return new DummyRequest();
+		}
+		public void performRequest(Request request) { }
+	    },
+	    emptyProperties);
+	serverSocket = new ServerSocket(PORT);
+	connect = new InterruptableThread() {
+	    boolean runOnce() throws IOException {
+		clientSocket = new Socket("localhost", PORT);
+		DataOutputStream out =
+		    new DataOutputStream(clientSocket.getOutputStream());
+		out.writeShort(0);
+		out.writeShort(1);
+		out.writeShort(2);
+		out.flush();
+		return true;
+	    }
+	};
+	connect.start();
+	socket = serverSocket.accept();
+	server.handleConnection(socket);
+	DataInputStream in =
+	    new DataInputStream(clientSocket.getInputStream());
+	assertTrue(in.readBoolean());
+	assertTrue(in.readBoolean());
+	assertTrue(in.readBoolean());
+	assertEquals(3, requests.get());
+	/* Close the socket and connect again */
+	clientSocket.close();
+	Thread.sleep(EXTRA_WAIT);
+	assertTrue("Socket should be closed", socket.isClosed());
+	connect = new InterruptableThread() {
+	    boolean runOnce() throws IOException {
+		clientSocket = new Socket("localhost", PORT);
+		DataOutputStream out =
+		    new DataOutputStream(clientSocket.getOutputStream());
+		out.writeShort(1);
+		out.writeShort(2);
+		out.writeShort(3);
+		out.writeShort(4);
+		out.flush();
+		return true;
+	    }
+	};
+	connect.start();
+	socket = serverSocket.accept();
+	server.handleConnection(socket);
+	in = new DataInputStream(clientSocket.getInputStream());
+	assertTrue(in.readBoolean());
+	assertTrue(in.readBoolean());
+	assertEquals(5, requests.get());
+	assertFalse("Socket should not be closed", socket.isClosed());
+    }
+
+    /* -- Other classes and methods -- */
+
+    /** A request that does nothing. */
+    private static class DummyRequest implements Request {
+	public void writeRequest(DataOutput out) { }
+	public void completed(Throwable exception) { }
     }
 }

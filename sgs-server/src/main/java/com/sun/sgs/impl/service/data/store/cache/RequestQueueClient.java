@@ -376,7 +376,7 @@ public class RequestQueueClient extends Thread {
 	private final Socket socket;
 
 	/** The data output stream. */
-	private final DataOutput out;
+	private final DataOutputStream out;
 
 	/** The thread processing responses from the server. */
 	private final ReceiveThread receiveThread;
@@ -462,6 +462,7 @@ public class RequestQueueClient extends Thread {
 		while (!getDisconnectRequested()) {
 		    if (first) {
 			out.writeLong(nodeId);
+			out.flush();
 			first = false;
 		    }
 		    try {
@@ -479,6 +480,7 @@ public class RequestQueueClient extends Thread {
 			sentRequests.putLast(
 			    new RequestHolder(request, requestNumber));
 			request.writeRequest(out);
+			out.flush();
 		    } catch (InterruptedException e) {
 			break;
 		    }
