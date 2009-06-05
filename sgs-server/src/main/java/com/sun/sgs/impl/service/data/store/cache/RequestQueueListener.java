@@ -28,6 +28,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Properties;
 import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
@@ -109,6 +111,12 @@ public abstract class RequestQueueListener extends Thread {
 	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 1, Long.MAX_VALUE);
 	retryWait = wrappedProps.getLongProperty(
 	    RETRY_WAIT_PROPERTY, DEFAULT_RETRY_WAIT, 1, Long.MAX_VALUE);
+	if (logger.isLoggable(FINE)) {
+	    logger.log(FINE,
+		       "Created RequestQueueListener serverSocket:" +
+		       serverSocket + ", maxRetry:" + maxRetry + 
+		       ", retryWait:" + retryWait);
+	}
     }
 
     /**
@@ -124,6 +132,7 @@ public abstract class RequestQueueListener extends Thread {
 
     /** Shuts down the listener. */
     public void shutdown() {
+	logger.log(FINEST, "Shutting down RequestQueueListener");
 	boolean doShutdown = false;
 	synchronized (this) {
 	    if (!shutdown) {
@@ -145,6 +154,7 @@ public abstract class RequestQueueListener extends Thread {
 	    } catch (InterruptedException e) {
 	    }
 	}
+	logger.log(FINE, "Shutdown RequestQueueListener");
     }
 
     /**
@@ -167,6 +177,11 @@ public abstract class RequestQueueListener extends Thread {
 		    DataInputStream in =
 			new DataInputStream(socket.getInputStream());
 		    long nodeId = in.readLong();
+		    if (logger.isLoggable(FINER)) {
+			logger.log(FINER,
+				   "RequestQueueListener got connection" +
+				   " request for nodeId:" + nodeId);
+		    }
 		    getServer(nodeId).handleConnection(socket);
 		    noteConnected();
 		} catch (Throwable t) {
@@ -195,9 +210,14 @@ public abstract class RequestQueueListener extends Thread {
 	if (shutdown) {
 	    return;
 	}
-	if (logger.isLoggable(FINE)) {
+	if (exception instanceof IOException && logger.isLoggable(FINER)) {
 	    logger.logThrow(
-		FINE, exception, "RequestQueueListener connection failed");
+		FINER, exception,
+		"RequestQueueListener connection got I/O exception");
+	} else if (logger.isLoggable(WARNING)) {
+	    logger.logThrow(
+		WARNING, exception,
+		"RequestQueueListener connection got unexpected exception");
 	}
 	long now = System.currentTimeMillis();
 	if (failureStarted == -1) {

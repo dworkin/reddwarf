@@ -32,7 +32,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Properties;
-import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
@@ -86,10 +87,11 @@ public class RequestQueueServer<R extends Request> {
     private Connection connection = null;
 
     /**
-     * The number of the last request processed.  Synchronize on this object
-     * when accessing.
+     * The number of the last request processed.  This field is only set by the
+     * {@link Connection#run} method, but making it volatile insures that its
+     * value is propagated from one connection to the next.
      */
-    private int lastRequest;
+    private volatile int lastRequest;
 
     /**
      * Creates an instance of this class.
@@ -110,10 +112,15 @@ public class RequestQueueServer<R extends Request> {
 	    MAX_OUTSTANDING_PROPERTY, DEFAULT_MAX_OUTSTANDING, 1,
 	    maxRequest - 1);
 	lastRequest = maxRequest;
+	if (logger.isLoggable(FINER)) {
+	    logger.log(FINER,
+		       "Created RequestQueueServer maxRequest:" + maxRequest +
+		       ", maxOutstanding:" + maxOutstanding);
+	}
     }
 
-    /** Shuts down the server. */
-    public synchronized void shutdown() {
+    /** Disconnects the current connection, if any. */
+    public synchronized void disconnect() {
 	if (connection != null) {
 	    connection.disconnect();
 	    connection = null;
@@ -121,7 +128,8 @@ public class RequestQueueServer<R extends Request> {
     }
 
     /**
-     * Handles requests from a newly connected socket.
+     * Handles requests from a newly connected socket, disconnecting the
+     * current connection if one is present.
      *
      * @param	socket the socket
      * @throws	IOException if there is a problem accessing the socket's input
@@ -142,34 +150,36 @@ public class RequestQueueServer<R extends Request> {
      * given the constraints on the maximum request number and the number of
      * requests that can be outstanding.
      *
-     * @param	request1 the first request to compare
-     * @param	request2 the second request to compare
+     * @param	x the first request to compare
+     * @param	y the second request to compare
      * @return	{@code true} if {@code request1} is earlier than {@code
      *		request2}, else {@code false}
-     * @throws	IllegalArgumentException if either argument is negative or
-     *		greater than the maximum request size
+     * @throws	IllegalArgumentException if either argument is negative, if
+     *		either argument is greater than the maximum request size, or if
+     *		the values of the arguments imply that there are more than the
+     *		maximum permitted number of requests outstanding
      */
-    public boolean earlierRequest(int request1, int request2) {
-	if (request1 < 0 || request1 > maxRequest) {
-	    throw new IllegalArgumentException("Illegal request: " + request1);
-	} else if (request2 < 0 || request2 > maxRequest) {
-	    throw new IllegalArgumentException("Illegal request: " + request2);
+    public boolean earlierRequest(int x, int y) {
+	if (x < 0 || x > maxRequest) {
+	    throw new IllegalArgumentException("Illegal request: " + x);
+	} else if (y < 0 || y > maxRequest) {
+	    throw new IllegalArgumentException("Illegal request: " + y);
 	}
-	int diff = (request1 - request2) % maxRequest;
+	int diff = (y - x) % (maxRequest + 1);
 	if (diff < 0) {
-	    diff += maxRequest;
+	    diff += (maxRequest + 1);
 	}
-	return diff != 0 && diff > maxOutstanding;
-    }
-
-    /** Returns the number of the last request processed. */
-    synchronized int getLastRequest() {
-	return lastRequest;
-    }
-
-    /** Sets the number of the last request processed. */
-    synchronized void setLastRequest(int lastRequest) {
-	this.lastRequest = lastRequest;
+	if (diff == 0) {
+	    return false;
+	} else if (diff < maxOutstanding) {
+	    return true;
+	} else if (diff > (maxRequest - maxOutstanding)) {
+	    return false;
+	} else {
+	    throw new IllegalArgumentException(
+		"Too many requests outstanding: " +
+		(maxRequest - maxOutstanding));
+	}
     }
 
     /** Handles a new socket connection. */
@@ -184,11 +194,8 @@ public class RequestQueueServer<R extends Request> {
 	/** The data output stream. */
 	private final DataOutput out;
 
-	/**
-	 * Whether the connection has been told to disconnect.  Synchronize on
-	 * this connection when accessing.
-	 */
-	private boolean disconnect;
+	/** Whether the connection has been told to disconnect. */
+	private volatile boolean disconnect;
 	
 	/**
 	 * Creates an instance of this class.
@@ -208,10 +215,12 @@ public class RequestQueueServer<R extends Request> {
 
 	/** Disconnects this connection. */
 	void disconnect() {
-	    synchronized (this) {
-		if (!disconnect) {
-		    disconnect = true;
-		    interrupt();
+	    if (!disconnect) {
+		disconnect = true;
+		interrupt();
+		try {
+		    socket.close();
+		} catch (IOException e) {
 		}
 	    }
 	    while (true) {
@@ -224,40 +233,48 @@ public class RequestQueueServer<R extends Request> {
 	}
 
 	/**
-	 * Checks whether the connection should disconnect.
-	 *
-	 * @return	whether the connection should disconnect
-	 */
-	private synchronized boolean getDisconnectRequested() {
-	    return disconnect;
-	}
-
-	/**
 	 * Handles requests on the socket, returning when the connection is
 	 * disconnected.
 	 */
 	public void run() {
-	    int last = getLastRequest();
 	    try {
-		while (!getDisconnectRequested()) {
+		while (!disconnect) {
 		    short requestNumber = in.readShort();
-		    if (earlierRequest(last, requestNumber)) {
+		    if (earlierRequest(lastRequest, requestNumber)) {
 			R request = requestHandler.readRequest(in);
+			if (logger.isLoggable(FINEST)) {
+			    logger.log(FINEST,
+				       "RequestQueueServer received request" +
+				       " number:" + requestNumber +
+				       ", " + request);
+			}
 			try {
 			    requestHandler.performRequest(request);
 			    out.writeBoolean(true);
+			    if (logger.isLoggable(FINEST)) {
+				logger.log(FINEST,
+					   "RequestQueueServer request" +
+					   " number:" + requestNumber +
+					   " succeeded");
+			    }
 			} catch (Throwable t) {
 			    out.writeBoolean(false);
 			    writeString(t.getClass().getName(), out);
 			    writeString(t.getMessage(), out);
+			    if (logger.isLoggable(FINEST)) {
+				logger.logThrow(FINEST, t,
+						"RequestQueueServer request" +
+						" number:" + requestNumber +
+						" throws");
+			    }
 			}
-			last = requestNumber;
+			lastRequest = requestNumber;
 		    }
 		}
 	    } catch (IOException e) {
-		if (!getDisconnectRequested() && logger.isLoggable(WARNING)) {
+		if (!disconnect && logger.isLoggable(FINER)) {
 		    logger.logThrow(
-			FINE, e,
+			FINER, e,
 			"RequestQueueServer connection closed on I/O failure");
 		}
 	    } catch (Throwable t) {
@@ -268,7 +285,6 @@ public class RequestQueueServer<R extends Request> {
 			" unexpected exception");
 		}
 	    } finally {
-		setLastRequest(last);
 		try {
 		    socket.close();
 		} catch (IOException e) {

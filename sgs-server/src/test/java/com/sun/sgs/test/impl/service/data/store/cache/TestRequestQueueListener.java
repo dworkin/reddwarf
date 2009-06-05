@@ -20,7 +20,6 @@
 package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.service.data.store.cache.Request;
-import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
 import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener
     .MAX_RETRY_PROPERTY;
@@ -28,7 +27,6 @@ import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener
     .RETRY_WAIT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
-import java.io.DataInput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -41,13 +39,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /** Tests for {@link RequestQueueListener}. */
 @RunWith(FilteredNameRunner.class)
-public class TestRequestQueueListener extends Assert {
+public class TestRequestQueueListener extends BasicRequestQueueTest {
 
     /** The server socket port. */
     private static final int PORT = 30000;
@@ -77,9 +74,6 @@ public class TestRequestQueueListener extends Assert {
     /** The shorter retry wait to use for tests. */
     private static final long RETRY_WAIT = 10;
 
-    /** Slop time when waiting. */
-    private static final long EXTRA_WAIT = 50;
-
     /** Properties specifying the shorter maximum retry and retry waits. */
     private static final Properties props = new Properties();
     static {
@@ -96,12 +90,7 @@ public class TestRequestQueueListener extends Assert {
     /** Close the server socket and shutdown the connect thread, if present. */
     @After
     public void afterTest() throws Exception {
-	if (serverSocket != null) {
-	    try {
-		serverSocket.close();
-	    } catch (IOException e) {
-	    }
-	}
+	forceClose(serverSocket);
 	if (connect != null) {
 	    connect.shutdown();
 	}
@@ -154,11 +143,12 @@ public class TestRequestQueueListener extends Assert {
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
 	    serverSocket, failureHandler, emptyProperties);
 	connect = new InterruptableThread() {
-	    void runOnce() {
+	    boolean runOnce() {
 		try {
 		    new Socket("localhost", PORT).close();
 		} catch (IOException e) {
 		}
+		return false;
 	    }
 	};
 	listener.start();
@@ -177,7 +167,7 @@ public class TestRequestQueueListener extends Assert {
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
 	    serverSocket, failureHandler, emptyProperties);
 	connect = new InterruptableThread() {
-	    void runOnce() {
+	    boolean runOnce() {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
@@ -190,6 +180,7 @@ public class TestRequestQueueListener extends Assert {
 		} finally {
 		    forceClose(socket);
 		}
+		return false;
 	    }
 	};
 	listener.start();
@@ -208,7 +199,7 @@ public class TestRequestQueueListener extends Assert {
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
 	    serverSocket, failureHandler, emptyProperties);
 	connect = new InterruptableThread() {
-	    void runOnce() {
+	    boolean runOnce() {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
@@ -220,6 +211,7 @@ public class TestRequestQueueListener extends Assert {
 		} finally {
 		    forceClose(socket);
 		}
+		return false;
 	    }
 	};
 	listener.start();
@@ -243,7 +235,7 @@ public class TestRequestQueueListener extends Assert {
 	    }
 	};
 	connect = new InterruptableThread() {
-	    void runOnce() {
+	    boolean runOnce() {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
@@ -256,6 +248,7 @@ public class TestRequestQueueListener extends Assert {
 		} finally {
 		    forceClose(socket);
 		}
+		return false;
 	    }
 	};
 	listener.start();
@@ -278,7 +271,7 @@ public class TestRequestQueueListener extends Assert {
 	connect = new InterruptableThread() {
 	    private long n = 0;
 	    private long getNodeId() { return n++ % 2; }
-	    void runOnce() throws Exception {
+	    boolean runOnce() throws Exception {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
@@ -291,6 +284,7 @@ public class TestRequestQueueListener extends Assert {
 		} finally {
 		    forceClose(socket);
 		}
+		return false;
 	    }
 	};
 	listener.start();
@@ -379,7 +373,7 @@ public class TestRequestQueueListener extends Assert {
 	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
 	    serverSocket, failureHandler, emptyProperties);
 	connect = new InterruptableThread() {
-	    void runOnce() {
+	    boolean runOnce() {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
@@ -392,6 +386,7 @@ public class TestRequestQueueListener extends Assert {
 		} finally {
 		    forceClose(socket);
 		}
+		return false;
 	    }
 	};
 	listener.start();
@@ -451,111 +446,4 @@ public class TestRequestQueueListener extends Assert {
 	    forceClose(socket);
 	}
     }   
-
-    /** A request handler that fails. */
-    static class DummyRequestHandler implements RequestHandler<Request> {
-	public Request readRequest(DataInput in) throws IOException {
-	    throw new IOException();
-	}
-	public void performRequest(Request request) {
-	    throw new UnsupportedOperationException();
-	}
-    }
-
-    /**
-     * A runnable that keeps track of whether its run method has been called.
-     */
-    static class NoteRun implements Runnable {
-	private boolean run;
-
-	public synchronized void run() {
-	    run = true;
-	    notifyAll();
-	}
-
-	/**
-	 * Check that the run method is called no sooner than minTimeout
-	 * milliseconds and no more than EXTRA_WAIT milliseconds after that.
-	 */
-	synchronized void checkRun(long minTimeout)
-	    throws InterruptedException
-	{
-	    long start = System.currentTimeMillis();
-	    while (!run) {
-		wait(minTimeout + EXTRA_WAIT);
-	    }
-	    long time = System.currentTimeMillis() - start;
-	    assertTrue(run);
-	    assertTrue(
-		"Expected time to be at least " + minTimeout + ": " + time,
-		time >= minTimeout); 
-	}
-
-	/** Check that the run method has not been called. */
-	synchronized void checkNotRun() {
-	    assertFalse(run);
-	}
-    }
-
-    /**
-     * A thread subclass that runs an operation repeatedly, checking if it has
-     * been asked to shutdown, and exiting if an exception is thrown, keeping
-     * track of the exception.
-     */
-    abstract static class InterruptableThread extends Thread {
-	private boolean shutdown;
-	private Throwable exception;
-
-	public void run() {
-	    try {
-		while (true) {
-		    synchronized (this) {
-			if (shutdown) {
-			    break;
-			}
-		    }
-		    runOnce();
-		}
-	    } catch (Throwable t) {
-		exception = t;
-	    }
-	}
-
-	/**
-	 * The operation to run repeatedly, throwing an exception if the
-	 * operation failed.
-	 */
-	abstract void runOnce() throws Exception;
-
-	/**
-	 * Shuts down this thread, throwing the failure exception thrown by
-	 * runOnce, if any.
-	 */
-	public void shutdown() throws Exception {
-	    synchronized (this) {
-		shutdown = true;
-	    }
-	    interrupt();
-	    join();
-	    synchronized (this) {
-		if (exception instanceof Exception) {
-		    throw (Exception) exception;
-		} else if (exception instanceof Error) {
-		    throw (Error) exception;
-		} else {
-		    assertNull(exception);
-		}
-	    }
-	}
-    }
-
-    /** Close a socket, ignoring I/O exceptions and null sockets. */
-    static void forceClose(Socket socket) {
-	if (socket != null) {
-	    try {
-		socket.close();
-	    } catch (IOException e) {
-	    }
-	}
-    }
 }
