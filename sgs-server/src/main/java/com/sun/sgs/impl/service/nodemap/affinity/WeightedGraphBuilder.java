@@ -27,8 +27,12 @@ import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * A graph builder which builds an affinity graph consisting of identities 
@@ -57,17 +61,6 @@ import java.util.Properties;
  *   bin.
  */
 public class WeightedGraphBuilder implements GraphBuilder {
-    // the base name for properties
-    private static final String PROP_BASE = GraphBuilder.class.getName();
-    
-    // property controlling our time snapshots, in milliseconds
-    private static final String PERIOD_PROPERTY = 
-        PROP_BASE + ".snapshot.period";
-    // default:  5 minutes
-    // a longer snapshot gives us more history but also potentially bigger
-    // graphs
-    private static final long DEFAULT_PERIOD = 1000 * 60 * 5;
-    
     // Map for tracking object-> map of identity-> number accesses
     // (thus we keep track of the number of accesses each identity has made
     // for an object, to aid maintaining weighted edges)
@@ -86,7 +79,15 @@ public class WeightedGraphBuilder implements GraphBuilder {
     private long updateCount = 0;
     // part of the statistics for early testing
     private long totalTime = 0;
-    
+
+    private final PruneTask pruneTask;
+
+    private final Queue<Map<Object, Map<Identity, Long>>> periodObjectQueue =
+        new LinkedList<Map<Object, Map<Identity, Long>>>();
+    private final Queue<Map<WeightedEdge, Long>> periodEdgeIncrementsQueue =
+        new LinkedList<Map<WeightedEdge, Long>>();
+    private Map<Object, Map<Identity, Long>> currentPeriodObject;
+    private Map<WeightedEdge, Long> currentPeriodEdgeIncrements;
     /**
      * Creates a weighted graph builder.
      * @param properties  application properties
@@ -95,6 +96,13 @@ public class WeightedGraphBuilder implements GraphBuilder {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         snapshot = 
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        int periodCount = wrappedProps.getIntProperty(
+                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
+                0, Integer.MAX_VALUE);
+
+        pruneTask = new PruneTask(periodCount);
+        Timer pruneTimer = new Timer("AffinityGraphPruner", true);
+        pruneTimer.schedule(pruneTask, snapshot, snapshot);
     }
     
     /** {@inheritDoc} */
@@ -132,10 +140,18 @@ public class WeightedGraphBuilder implements GraphBuilder {
                     
                     WeightedEdge edge = affinityGraph.findEdge(owner, ident);
                     if (edge == null) {
-                        affinityGraph.addEdge(new WeightedEdge(), owner, ident);
+                        WeightedEdge newEdge = new WeightedEdge();
+                        affinityGraph.addEdge(newEdge, owner, ident);
+                        // period info
+                        currentPeriodEdgeIncrements.put(newEdge, 1L);
                     } else {
                         if (value <= otherValue) {
                             edge.incrementWeight();
+                            // period info
+                            long v = currentPeriodEdgeIncrements.containsKey(edge) ?
+                                     currentPeriodEdgeIncrements.get(edge): 0;
+                            v++;
+                            currentPeriodEdgeIncrements.put(edge, v);
                         }
                     }
                 }
@@ -143,6 +159,17 @@ public class WeightedGraphBuilder implements GraphBuilder {
             }
             idMap.put(owner, value);
             objectMap.put(objId, idMap);
+
+            // period info
+            Map<Identity, Long> periodIdMap = currentPeriodObject.get(objId);
+            if (periodIdMap == null) {
+                periodIdMap = new HashMap<Identity, Long>();
+            }
+            long periodValue = periodIdMap.containsKey(owner) ?
+                               periodIdMap.get(owner) : 0;
+            periodValue++;
+            periodIdMap.put(owner, periodValue);
+            currentPeriodObject.put(objId, periodIdMap);
         }
         
         totalTime += System.currentTimeMillis() - startTime;
@@ -160,7 +187,12 @@ public class WeightedGraphBuilder implements GraphBuilder {
                               totalTime / (double) updateCount);
         }
     }
-    
+
+    /** {@inheritDoc} */
+    public Runnable getPruneTask() {
+        return pruneTask;
+    }
+
     /** {@inheritDoc} */
     public Graph<Identity, WeightedEdge> getAffinityGraph() {
         Graph<Identity, WeightedEdge> graphCopy = 
@@ -181,5 +213,79 @@ public class WeightedGraphBuilder implements GraphBuilder {
             }
         }
         return graphCopy;
+    }
+
+
+    private class PruneTask extends TimerTask {
+        // JANE what would happen if we made this non-final?
+        private final int count;
+
+        private int current = 1;
+
+        public PruneTask(int count) {
+            this.count = count;
+            addPeriodStructures();
+        }
+        public synchronized void run() {
+            // Update the data structures for this snapshot
+            addPeriodStructures();
+            if (current <= count) {
+                current++;
+                return;
+            }
+
+            // take care of everything.  JANE will need to lock everything?
+            Map<Object, Map<Identity, Long>> periodObject =
+                    periodObjectQueue.remove();
+            Map<WeightedEdge, Long> periodEdgeIncrements =
+                    periodEdgeIncrementsQueue.remove();
+
+            // For each object, remove the added access counts
+            for (Map.Entry<Object, Map<Identity, Long>> entry :
+                 periodObject.entrySet())
+            {
+                Map<Identity, Long> idMap = objectMap.get(entry.getKey());
+                for (Map.Entry<Identity, Long> updateEntry :
+                     entry.getValue().entrySet())
+                {
+                    Identity idUpdate = updateEntry.getKey();
+                    long newVal = idMap.get(idUpdate) - updateEntry.getValue();
+                    if (newVal == 0) {
+                        idMap.remove(idUpdate);
+                    } else {
+                        idMap.put(idUpdate, newVal);
+                    }
+                }
+                if (idMap.isEmpty()) {
+                    objectMap.remove(entry.getKey());
+                }
+            }
+
+            // For each modified edge in the graph, update weights
+            for (Map.Entry<WeightedEdge, Long> entry :
+                 periodEdgeIncrements.entrySet())
+            {
+                WeightedEdge edge = entry.getKey();
+                long weight = entry.getValue();
+                if (edge.getWeight() == weight) {
+                    Pair<Identity> endpts = affinityGraph.getEndpoints(edge);
+                    affinityGraph.removeEdge(edge);
+                    for (Identity end : endpts) {
+                        if (affinityGraph.degree(end) == 0) {
+                            affinityGraph.removeVertex(end);
+                        }
+                    }
+                } else {
+                    edge.addWeight(-weight);
+                }
+            }
+        }
+
+        public synchronized void addPeriodStructures() {
+            currentPeriodObject = new HashMap<Object, Map<Identity, Long>>();
+            periodObjectQueue.add(currentPeriodObject);
+            currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Long>();
+            periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
+        }
     }
 }

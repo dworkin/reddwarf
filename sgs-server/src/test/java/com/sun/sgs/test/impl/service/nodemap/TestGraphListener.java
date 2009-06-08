@@ -25,6 +25,7 @@ import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.affinity.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.BipartiteParallelGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedParallelGraphBuilder;
@@ -380,6 +381,190 @@ public class TestGraphListener {
             // don't expect edge weight to have been updated
             Assert.assertEquals(2, e.getWeight());
         }
+    }
+
+    @Test
+    public void testGraphPruner() throws Exception {
+
+        // First period
+        testFourReports();
+        listener.getGraphBuilder().getPruneTask().run();
+        // Second period - nothing added to graph, so expect it to empty out
+        listener.getGraphBuilder().getPruneTask().run();
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Assert.assertEquals(0, graph.getEdgeCount());
+        Assert.assertEquals(0, graph.getVertexCount());
+    }
+
+    @Test
+    public void testGraphPrunerCountTwo() throws Exception {
+        Properties p = new Properties();
+        if (builderName != null) {
+            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+        }
+        p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
+        listener = new GraphListener(p);
+
+        Identity identA = new IdentityImpl("A");
+        Identity identB = new IdentityImpl("B");
+        Identity identC = new IdentityImpl("C");
+        Identity identD = new IdentityImpl("D");
+
+        // Each update to the graph is followed by a pruning task run,
+        // to simulate a pruning time period.
+        testFourReports();
+        listener.getGraphBuilder().getPruneTask().run();
+        // 2nd period
+
+        // Graph should still be intact:  not enough periods to clean up yet.
+        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Assert.assertEquals(4, graph.getVertexCount());
+        if (parallelEdges) {
+            Assert.assertEquals(6, graph.getEdgeCount());
+        } else {
+            Assert.assertEquals(4, graph.getEdgeCount());
+            Assert.assertEquals(2, graph.findEdge(identA, identB).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identA, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identB, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identC, identD).getWeight());
+        }
+
+        addFourReports();
+
+        // 3rd period - no additions
+        listener.getGraphBuilder().getPruneTask().run();
+        graph = listener.getAffinityGraph();
+        Assert.assertEquals(4, graph.getVertexCount());
+        if (parallelEdges) {
+            Assert.assertEquals(6, graph.getEdgeCount());
+        } else {
+
+            Assert.assertEquals(4, graph.getEdgeCount());
+            // Weights are doubled from testFourReports
+            Assert.assertEquals(4, graph.findEdge(identA, identB).getWeight());
+            Assert.assertEquals(4, graph.findEdge(identA, identC).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identB, identC).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identC, identD).getWeight());
+        }
+
+        // 4th period - no additions, back to single weights
+        listener.getGraphBuilder().getPruneTask().run();
+        graph = listener.getAffinityGraph();
+        Assert.assertEquals(4, graph.getVertexCount());
+        if (parallelEdges) {
+            Assert.assertEquals(6, graph.getEdgeCount());
+        } else {
+            Assert.assertEquals(4, graph.getEdgeCount());
+            Assert.assertEquals(2, graph.findEdge(identA, identB).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identA, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identB, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identC, identD).getWeight());
+        }
+
+        // 5th period - no additions, back to empty graph
+        listener.getGraphBuilder().getPruneTask().run();
+        graph = listener.getAffinityGraph();
+        Assert.assertEquals(0, graph.getEdgeCount());
+        Assert.assertEquals(0, graph.getVertexCount());
+  
+        testFourReports();
+        // 6th period
+        listener.getGraphBuilder().getPruneTask().run();
+        addFourReports();
+
+        // 7th period
+        listener.getGraphBuilder().getPruneTask().run();
+        graph = listener.getAffinityGraph();
+        Assert.assertEquals(4, graph.getVertexCount());
+        if (parallelEdges) {
+            Assert.assertEquals(6, graph.getEdgeCount());
+        } else {
+            
+            Assert.assertEquals(4, graph.getEdgeCount());
+            // Weights are doubled from testFourReports
+            Assert.assertEquals(4, graph.findEdge(identA, identB).getWeight());
+            Assert.assertEquals(4, graph.findEdge(identA, identC).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identB, identC).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identC, identD).getWeight());
+        }
+        addFourReports();
+
+        // 8th period - no addition
+        listener.getGraphBuilder().getPruneTask().run();
+        graph = listener.getAffinityGraph();
+        Assert.assertEquals(4, graph.getVertexCount());
+        if (parallelEdges) {
+            Assert.assertEquals(6, graph.getEdgeCount());
+        } else {
+            Assert.assertEquals(4, graph.getEdgeCount());
+            Assert.assertEquals(4, graph.findEdge(identA, identB).getWeight());
+            Assert.assertEquals(4, graph.findEdge(identA, identC).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identB, identC).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identC, identD).getWeight());
+        }
+
+
+        // 9th period
+        listener.getGraphBuilder().getPruneTask().run();
+        graph = listener.getAffinityGraph();
+        Assert.assertEquals(4, graph.getVertexCount());
+        if (parallelEdges) {
+            Assert.assertEquals(6, graph.getEdgeCount());
+        } else {
+            Assert.assertEquals(4, graph.getEdgeCount());
+            Assert.assertEquals(2, graph.findEdge(identA, identB).getWeight());
+            Assert.assertEquals(2, graph.findEdge(identA, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identB, identC).getWeight());
+            Assert.assertEquals(1, graph.findEdge(identC, identD).getWeight());
+        }
+
+        // 10th period
+        listener.getGraphBuilder().getPruneTask().run();
+        graph = listener.getAffinityGraph();
+        Assert.assertEquals(0, graph.getEdgeCount());
+        Assert.assertEquals(0, graph.getVertexCount());
+    }
+
+    // The reports added in testFourReports, without the assertions.
+    private void addFourReports() throws Exception {
+        Identity identA = new IdentityImpl("A");
+        Identity identB = new IdentityImpl("B");
+        Identity identC = new IdentityImpl("C");
+        Identity identD = new IdentityImpl("D");
+        ProfileReport report = makeReport(identA);
+        AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        detail.addAccess(new String("obj2"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        report = makeReport(identB);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        detail.addAccess(new String("obj3"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        report = makeReport(identC);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj4"));
+        detail.addAccess(new String("obj2"));
+        detail.addAccess(new String("obj3"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        report = makeReport(identD);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj4"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        // Identity A will now use obj3, so get links with B and C
+        report = makeReport(identA);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj3"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
     }
 
     /* Utility methods and classes. */

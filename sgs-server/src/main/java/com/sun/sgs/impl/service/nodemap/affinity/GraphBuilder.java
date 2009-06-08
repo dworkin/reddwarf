@@ -34,6 +34,24 @@ import edu.uci.ics.jung.graph.Graph;
  */
 public interface GraphBuilder {
 
+    // the base name for properties
+    static final String PROP_BASE = GraphBuilder.class.getName();
+
+    // property controlling our time snapshots, in milliseconds
+    static final String PERIOD_PROPERTY = PROP_BASE + ".snapshot.period";
+
+    // default:  5 minutes
+    // a longer snapshot gives us more history but also potentially bigger
+    // graphs
+    static final long DEFAULT_PERIOD = 1000 * 60 * 5;
+
+    // property controlling how many past time periods we should retain
+    static final String PERIOD_COUNT_PROPERTY = PROP_BASE + ".snapshot.count";
+
+    // default:  1
+    // a greater number holds more data, perhaps increasing value of data?
+    // a smaller number purges older data quickly, making graphs smaller
+    static final int DEFAULT_PERIOD_COUNT = 1;
     /**
      * Update the graph based on the objects accessed in a task.
      *
@@ -42,6 +60,13 @@ public interface GraphBuilder {
      * a list of the accessed objects
      */
     void updateGraph(Identity owner, AccessedObjectsDetail detail);
+
+    /**
+     * Get the task which prunes the graph.
+     * 
+     * @return the runnable which prunes the graph.
+     */
+    Runnable getPruneTask();
 
     /**
      * Returns the current graph, with identities as vertices, and

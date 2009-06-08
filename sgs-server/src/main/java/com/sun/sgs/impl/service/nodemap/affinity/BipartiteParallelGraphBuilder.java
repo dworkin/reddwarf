@@ -116,6 +116,11 @@ public class BipartiteParallelGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
+    public Runnable getPruneTask() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+    
+    /** {@inheritDoc} */
     public Graph<Identity, WeightedEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
 

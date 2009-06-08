@@ -100,4 +100,8 @@ public class GraphListener implements ProfileListener {
     public Graph<Identity, WeightedEdge> getAffinityGraph() {
         return builder.getAffinityGraph();
     }
+
+    public GraphBuilder getGraphBuilder() {
+        return builder;
+    }
 }
