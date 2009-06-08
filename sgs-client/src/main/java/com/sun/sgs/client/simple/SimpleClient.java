@@ -419,9 +419,11 @@ public class SimpleClient implements ServerSession {
             // TBI implement graceful disconnect.
             // For now, look at the boolean we set when expecting
             // disconnect
-            if (!suppressDisconnectedCallback) {
-		clientListener.disconnected(expectingDisconnect, reason);
-	    }
+            if (suppressDisconnectedCallback) {
+                clientListener.loginFailed(loginFailureMsg);
+	    } else {
+                clientListener.disconnected(expectingDisconnect, reason);
+            }
 	    suppressDisconnectedCallback = false;
             expectingDisconnect = false;
         }
@@ -525,6 +527,7 @@ public class SimpleClient implements ServerSession {
             clientListener.loggedIn();
         }
         
+        private String loginFailureMsg;
         /**
          * Process a login failure message
          * 
@@ -544,7 +547,8 @@ public class SimpleClient implements ServerSession {
                                     "Disconnecting after login failure throws");
                 }
             }
-            clientListener.loginFailed(reason);
+            //clientListener.loginFailed(reason);
+            loginFailureMsg = reason;
         }
         
         /**

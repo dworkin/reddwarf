@@ -47,7 +47,7 @@ import java.util.logging.Logger;
 
 /**
  *An implementation of the client smoketest for the java client. This program,
- * run in conjuntion with the smoketest server, will run a set of basic tests on all
+ * run in conjunction with the smoketest server, will run a set of basic tests on all
  * of the protocol messages that pass between a client and a server. 
  */
 public class SmokeTestClient implements SimpleClientListener {
@@ -159,7 +159,7 @@ public class SmokeTestClient implements SimpleClientListener {
             System.exit(1);
         }
         loginName = "discme";
-        myclient = new SimpleClient(this);
+        //myclient = new SimpleClient(this);
         try {
             myclient.login(props);
         } catch (IOException e) {
@@ -252,7 +252,7 @@ public class SmokeTestClient implements SimpleClientListener {
         if (loginName.equals("discme")) {
             logger.log(Level.INFO, "Passed disconnection test");
             loginName = "smokeTest";
-            myclient = new SimpleClient(this);
+            //myclient = new SimpleClient(this);
             try {
                 myclient.login(props);
             } catch (IOException e) {
