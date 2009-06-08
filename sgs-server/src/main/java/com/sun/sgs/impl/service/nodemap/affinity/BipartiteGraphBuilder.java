@@ -27,8 +27,14 @@ import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * A graph builder which builds a bipartite graph of identities and
@@ -40,20 +46,8 @@ import java.util.Properties;
  * 
  */
 public class BipartiteGraphBuilder implements GraphBuilder {
-    // the base name for properties
-    private static final String PROP_BASE = GraphBuilder.class.getName();
-    
-    // property controlling our time snapshots, in milliseconds
-    private static final String PERIOD_PROPERTY = 
-        PROP_BASE + ".snapshot.period";
-   
-    // default:  5 minutes
-    // a longer snapshot gives us more history but also potentially bigger
-    // graphs
-    private static final long DEFAULT_PERIOD = 1000 * 60 * 5;
-    
     // Our graph of object accesses
-    private final CopyableGraph<Object, WeightedEdge> 
+    protected final CopyableGraph<Object, WeightedEdge>
         bipartiteGraph = 
             new CopyableGraph<Object, WeightedEdge>();
     
@@ -65,7 +59,12 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     private long updateCount = 0;
     // part of the statistics for early testing
     private long totalTime = 0;
-    
+
+    private final PruneTask pruneTask;
+
+    private final Queue<Map<WeightedEdge, Long>> periodEdgeIncrementsQueue =
+        new LinkedList<Map<WeightedEdge, Long>>();
+    private Map<WeightedEdge, Long> currentPeriodEdgeIncrements;
     /**
      * Constructs a new bipartite graph builder.
      * @param props application properties
@@ -74,10 +73,17 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
         snapshot = 
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        int periodCount = wrappedProps.getIntProperty(
+                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
+                0, Integer.MAX_VALUE);
+
+        pruneTask = new PruneTask(periodCount);
+        Timer pruneTimer = new Timer("AffinityGraphPruner", true);
+        pruneTimer.schedule(pruneTask, snapshot, snapshot);
     }
     
     /** {@inheritDoc} */
-    public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+    public synchronized void updateGraph(Identity owner, AccessedObjectsDetail detail) {
         long startTime = System.currentTimeMillis();
         updateCount++;
         
@@ -91,9 +97,17 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 // We use weighted edges to reduce the total number of edges
                 WeightedEdge ae = bipartiteGraph.findEdge(owner, objId);
                 if (ae == null) {
-                    bipartiteGraph.addEdge(new WeightedEdge(), owner, objId);
+                    WeightedEdge newEdge = new WeightedEdge();
+                    bipartiteGraph.addEdge(newEdge, owner, objId);
+                    // period info
+                    currentPeriodEdgeIncrements.put(newEdge, 1L);
                 } else {
                     ae.incrementWeight();
+                    // period info
+                    long v = currentPeriodEdgeIncrements.containsKey(ae) ?
+                             currentPeriodEdgeIncrements.get(ae): 0;
+                    v++;
+                    currentPeriodEdgeIncrements.put(ae, v);
                 }
             }
         }
@@ -116,7 +130,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
 
     /** {@inheritDoc} */
     public Runnable getPruneTask() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return pruneTask;
     }
 
     /** {@inheritDoc} */
@@ -209,5 +223,54 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 "msec");
 
         return foldedGraph;
+    }
+
+    private class PruneTask extends TimerTask {
+        // JANE what would happen if we made this non-final?
+        private final int count;
+
+        private int current = 1;
+
+        public PruneTask(int count) {
+            this.count = count;
+            addPeriodStructures();
+        }
+        public synchronized void run() {
+            // Update the data structures for this snapshot
+            addPeriodStructures();
+            if (current <= count) {
+                current++;
+                return;
+            }
+
+            // take care of everything.  JANE will need to lock everything?
+            Map<WeightedEdge, Long> periodEdgeIncrements =
+                    periodEdgeIncrementsQueue.remove();
+
+
+            // For each modified edge in the graph, update weights
+            for (Map.Entry<WeightedEdge, Long> entry :
+                 periodEdgeIncrements.entrySet())
+            {
+                WeightedEdge edge = entry.getKey();
+                long weight = entry.getValue();
+                if (edge.getWeight() == weight) {
+                    Pair<Object> endpts = bipartiteGraph.getEndpoints(edge);
+                    bipartiteGraph.removeEdge(edge);
+                    for (Object end : endpts) {
+                        if (bipartiteGraph.degree(end) == 0) {
+                            bipartiteGraph.removeVertex(end);
+                        }
+                    }
+                } else {
+                    edge.addWeight(-weight);
+                }
+            }
+        }
+
+        public synchronized void addPeriodStructures() {
+            currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Long>();
+            periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
+        }
     }
 }

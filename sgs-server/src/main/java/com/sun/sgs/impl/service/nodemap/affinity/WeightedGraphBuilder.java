@@ -106,7 +106,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
     
     /** {@inheritDoc} */
-    public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+    public synchronized void updateGraph(Identity owner, AccessedObjectsDetail detail) {
         long startTime = System.currentTimeMillis();
         updateCount++;
         

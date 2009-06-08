@@ -20,17 +20,11 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.kernel.AccessedObject;
-import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
-import edu.uci.ics.jung.graph.util.Pair;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
-import java.util.Set;
 
 /**
  * A graph builder which builds a bipartite graph of identities and
@@ -40,84 +34,13 @@ import java.util.Set;
  * This graph builder folds the graph upon request.
  * 
  */
-public class BipartiteParallelGraphBuilder implements GraphBuilder {
-    // the base name for properties
-    private static final String PROP_BASE = GraphBuilder.class.getName();
-    
-    // property controlling our time snapshots, in milliseconds
-    private static final String PERIOD_PROPERTY = 
-        PROP_BASE + ".snapshot.period";
-   
-    // default:  5 minutes
-    // a longer snapshot gives us more history but also potentially bigger
-    // graphs
-    private static final long DEFAULT_PERIOD = 1000 * 60 * 5;
-    
-    // Our graph of object accesses
-    private final CopyableGraph<Object, WeightedEdge> 
-        bipartiteGraph = 
-            new CopyableGraph<Object, WeightedEdge>();
-    
-    // The length of time for our snapshots, in milliseconds
-    private final long snapshot;
-    
-    // number of calls to report, used for printing results every so often
-    // this is an aid for early testing
-    private long updateCount = 0;
-    // part of the statistics for early testing
-    private long totalTime = 0;
-    
+public class BipartiteParallelGraphBuilder extends BipartiteGraphBuilder {
     /**
      * Constructs a new bipartite graph builder.
      * @param props application properties
      */
     public BipartiteParallelGraphBuilder(Properties props) {
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
-        snapshot = 
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
-    }
-    
-    /** {@inheritDoc} */
-    public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
-        long startTime = System.currentTimeMillis();
-        updateCount++;
-        
-        synchronized (bipartiteGraph) {
-            bipartiteGraph.addVertex(owner);
-
-            // For each object accessed in this task...
-            for (AccessedObject obj : detail.getAccessedObjects()) {    
-                Object objId = obj.getObjectId();
-                bipartiteGraph.addVertex(objId);
-                // We use weighted edges to reduce the total number of edges
-                WeightedEdge ae = bipartiteGraph.findEdge(owner, objId);
-                if (ae == null) {
-                    bipartiteGraph.addEdge(new WeightedEdge(), owner, objId);
-                } else {
-                    ae.incrementWeight();
-                }
-            }
-        }
-        totalTime += System.currentTimeMillis() - startTime;
-        
-        // Print out some data, just for helping look at the algorithms
-        // for now
-        if (updateCount % 500 == 0) {
-            System.out.println("Bipartite Graph Builder results after " + 
-                               updateCount + " updates: ");
-            System.out.println("  graph vertex count: " + 
-                               bipartiteGraph.getVertexCount());
-            System.out.println("  graph edge count: " + 
-                               bipartiteGraph.getEdgeCount());
-            System.out.printf("  mean graph processing time: %.2fms %n", 
-                              totalTime / (double) updateCount);
-            getAffinityGraph();
-        }
-    }
-
-    /** {@inheritDoc} */
-    public Runnable getPruneTask() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        super(props);
     }
     
     /** {@inheritDoc} */
@@ -125,7 +48,7 @@ public class BipartiteParallelGraphBuilder implements GraphBuilder {
         long startTime = System.currentTimeMillis();
 
         // our folded graph
-        Graph<Identity, WeightedEdge> newGraph = 
+        Graph<Identity, WeightedEdge> newGraph =
                 new UndirectedSparseMultigraph<Identity, WeightedEdge>();
 
         // vertices in our folded graph
@@ -162,7 +85,7 @@ public class BipartiteParallelGraphBuilder implements GraphBuilder {
                     Identity v2Ident = (Identity) v2;
                   
                     boolean addEdge = true;
-                    Collection<WeightedEdge> edges = 
+                    Collection<WeightedEdge> edges =
                             newGraph.findEdgeSet(v1, v2Ident);
 
                     for (WeightedEdge e : edges) {
