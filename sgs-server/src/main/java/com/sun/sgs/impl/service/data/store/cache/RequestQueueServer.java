@@ -27,7 +27,6 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
@@ -87,9 +86,10 @@ public class RequestQueueServer<R extends Request> {
     private Connection connection = null;
 
     /**
-     * The number of the last request processed.  This field is only set by the
-     * {@link Connection#run} method, but making it volatile insures that its
-     * value is propagated from one connection to the next.
+     * The number of the last request processed.  After initialization, this
+     * field is only accessed by the {@link Connection#run} method, but making
+     * it volatile insures that its value is propagated from one connection to
+     * the next.
      */
     private volatile int lastRequest;
 
@@ -114,7 +114,8 @@ public class RequestQueueServer<R extends Request> {
 	lastRequest = maxRequest;
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER,
-		       "Created RequestQueueServer maxRequest:" + maxRequest +
+		       "Created RequestQueueServer" +
+		       " maxRequest:" + maxRequest +
 		       ", maxOutstanding:" + maxOutstanding);
 	}
     }
@@ -244,19 +245,20 @@ public class RequestQueueServer<R extends Request> {
 			R request = requestHandler.readRequest(in);
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(FINEST,
-				       "RequestQueueServer received request" +
-				       " number:" + requestNumber +
-				       ", " + request);
+				       "RequestQueueServer received" +
+				       " requestNumber:" + requestNumber +
+				       ", request:" + request);
 			}
 			try {
 			    requestHandler.performRequest(request);
 			    out.writeBoolean(true);
 			    out.flush();
 			    if (logger.isLoggable(FINEST)) {
-				logger.log(FINEST,
-					   "RequestQueueServer request" +
-					   " number:" + requestNumber +
-					   " succeeded");
+				logger.log(
+				    FINEST,
+				    "RequestQueueServer request succeeded" +
+				    " requestNumber:" + requestNumber);
+
 			    }
 			} catch (Throwable t) {
 			    out.writeBoolean(false);
@@ -264,10 +266,10 @@ public class RequestQueueServer<R extends Request> {
 			    writeString(t.getMessage(), out);
 			    out.flush();
 			    if (logger.isLoggable(FINEST)) {
-				logger.logThrow(FINEST, t,
-						"RequestQueueServer request" +
-						" number:" + requestNumber +
-						" throws");
+				logger.logThrow(
+				    FINEST, t,
+				    "RequestQueueServer request throws" +
+				    " requestNumber:" + requestNumber);
 			    }
 			}
 			lastRequest = requestNumber;
@@ -275,16 +277,15 @@ public class RequestQueueServer<R extends Request> {
 		}
 	    } catch (IOException e) {
 		if (!disconnect && logger.isLoggable(FINER)) {
-		    logger.logThrow(
-			FINER, e,
-			"RequestQueueServer connection closed on I/O failure");
+		    logger.logThrow(FINER, e,
+				    "RequestQueueServer connection closed" +
+				    " for I/O failure");
 		}
 	    } catch (Throwable t) {
 		if (logger.isLoggable(WARNING)) {
-		    logger.logThrow(
-			WARNING, t,
-			"RequestQueueServer connection failed with" +
-			" unexpected exception");
+		    logger.logThrow(WARNING, t,
+				    "RequestQueueServer connection closed" +
+				    " for unexpected exception");
 		}
 	    } finally {
 		try {

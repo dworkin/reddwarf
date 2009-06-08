@@ -24,7 +24,6 @@ import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -455,13 +454,5 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	assertTrue(in.readBoolean());
 	assertEquals(5, requests.get());
 	assertFalse("Socket should not be closed", socket.isClosed());
-    }
-
-    /* -- Other classes and methods -- */
-
-    /** A request that does nothing. */
-    private static class DummyRequest implements Request {
-	public void writeRequest(DataOutput out) { }
-	public void completed(Throwable exception) { }
     }
 }

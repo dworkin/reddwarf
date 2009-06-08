@@ -38,9 +38,10 @@ import java.util.logging.Logger;
  * {@link RequestQueueServer}s.  When a connection is accepted, the listener
  * will read a {@code long} from the socket's input stream to determine the
  * node ID of the server that should handle the connection, passing the ID to
- * the {@link #getServer getServer} method to find the server.
+ * the {@link ServerDispatcher} instance supplied to the constructor to find
+ * the server.
  */
-public abstract class RequestQueueListener extends Thread {
+public final class RequestQueueListener extends Thread {
 
     /**
      * The property for specifying the maximum time in milliseconds to continue
@@ -68,6 +69,9 @@ public abstract class RequestQueueListener extends Thread {
     /** The socket server. */
     private final ServerSocket serverSocket;
 
+    /** The object find finding the {@link RequestQueueServer}. */
+    private final ServerDispatcher serverDispatcher;
+
     /** The runnable to call if the listener fails. */ 
     private final Runnable failureHandler;
 
@@ -88,51 +92,46 @@ public abstract class RequestQueueListener extends Thread {
     private long failureStarted = -1;
 
     /**
-     * Creates an instance of this class.  The {@link Runnable#run run} method
-     * of {@code failureHandler} will be called if the listener is shutdown due
-     * to repeated failures when attempting to accept connections.  The server
-     * socket should already be connected, and will be closed before the {@code
-     * run} method returns.
+     * Creates an instance of this class and starts the thread.  The {@link
+     * Runnable#run run} method of {@code failureHandler} will be called if the
+     * listener is shutdown due to repeated failures when attempting to accept
+     * connections.  The server socket should already be connected, and will be
+     * closed before the {@code run} method returns.
      *
      * @param	serverSocket the server socket for accepting connections
      * @param	failureHandler the failure handler
      * @param	properties additional configuration properties
      */
-    protected RequestQueueListener(ServerSocket serverSocket,
-				   Runnable failureHandler,
-				   Properties properties)
+    public RequestQueueListener(ServerSocket serverSocket,
+				ServerDispatcher serverDispatcher,
+				Runnable failureHandler,
+				Properties properties)
     {
+	super("RequestQueueListener");
 	checkNull("serverSocket", serverSocket);
+	checkNull("serverDispatcher", serverDispatcher);
 	checkNull("failureHandler", failureHandler);
 	this.serverSocket = serverSocket;
+	this.serverDispatcher = serverDispatcher;
 	this.failureHandler = failureHandler;
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	maxRetry = wrappedProps.getLongProperty(
 	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 1, Long.MAX_VALUE);
 	retryWait = wrappedProps.getLongProperty(
 	    RETRY_WAIT_PROPERTY, DEFAULT_RETRY_WAIT, 1, Long.MAX_VALUE);
+	start();
 	if (logger.isLoggable(FINE)) {
 	    logger.log(FINE,
-		       "Created RequestQueueListener serverSocket:" +
-		       serverSocket + ", maxRetry:" + maxRetry + 
+		       "Created RequestQueueListener" +
+		       " serverSocket:" + serverSocket +
+		       ", maxRetry:" + maxRetry + 
 		       ", retryWait:" + retryWait);
 	}
     }
 
-    /**
-     * Returns the server responsible for handling connections from the
-     * node with the specified node ID.
-     *
-     * @param	nodeId the node ID
-     * @return	the server responsible for the node
-     * @throws	IllegalArgumentException if no server is found for the
-     *		specified node ID
-     */
-    protected abstract RequestQueueServer getServer(long nodeId);
-
     /** Shuts down the listener. */
     public void shutdown() {
-	logger.log(FINEST, "Shutting down RequestQueueListener");
+	logger.log(FINEST, "RequestQueueListener shutdown requested");
 	boolean doShutdown = false;
 	synchronized (this) {
 	    if (!shutdown) {
@@ -154,7 +153,6 @@ public abstract class RequestQueueListener extends Thread {
 	    } catch (InterruptedException e) {
 	    }
 	}
-	logger.log(FINE, "Shutdown RequestQueueListener");
     }
 
     /**
@@ -179,10 +177,12 @@ public abstract class RequestQueueListener extends Thread {
 		    long nodeId = in.readLong();
 		    if (logger.isLoggable(FINER)) {
 			logger.log(FINER,
-				   "RequestQueueListener got connection" +
-				   " request for nodeId:" + nodeId);
+				   "RequestQueueListener connection" +
+				   " request nodeId:" + nodeId);
 		    }
-		    getServer(nodeId).handleConnection(socket);
+		    RequestQueueServer server =
+			serverDispatcher.getServer(nodeId);
+		    server.handleConnection(socket);
 		    noteConnected();
 		} catch (Throwable t) {
 		    if (socket != null) {
@@ -199,7 +199,26 @@ public abstract class RequestQueueListener extends Thread {
 		serverSocket.close();
 	    } catch (IOException e) {
 	    }
+	    logger.log(FINE, "RequestQueueListener shut down");
 	}
+    }
+
+    /**
+     * The interface for finding the server responsible for handling
+     * connections for a particular node.
+     */
+    public interface ServerDispatcher {
+
+	/**
+	 * Returns the server responsible for handling connections from the
+	 * node with the specified node ID.
+	 *
+	 * @param	nodeId the node ID
+	 * @return	the server responsible for the node
+	 * @throws	IllegalArgumentException if no server is found for the
+	 *		specified node ID
+	 */
+	RequestQueueServer getServer(long nodeId);
     }
 
     /**
@@ -210,14 +229,16 @@ public abstract class RequestQueueListener extends Thread {
 	if (shutdown) {
 	    return;
 	}
-	if (exception instanceof IOException && logger.isLoggable(FINER)) {
-	    logger.logThrow(
-		FINER, exception,
-		"RequestQueueListener connection got I/O exception");
+	if (exception instanceof IOException) {
+	    if (logger.isLoggable(FINER)) {
+		logger.logThrow(FINER, exception,
+				"RequestQueueListener connection closed" +
+				" for I/O exception");
+	    }
 	} else if (logger.isLoggable(WARNING)) {
-	    logger.logThrow(
-		WARNING, exception,
-		"RequestQueueListener connection got unexpected exception");
+	    logger.logThrow(WARNING, exception,
+			    "RequestQueueListener connection closed" +
+			    " for unexpected exception");
 	}
 	long now = System.currentTimeMillis();
 	if (failureStarted == -1) {
@@ -226,8 +247,9 @@ public abstract class RequestQueueListener extends Thread {
 	if (now > failureStarted + maxRetry) {
 	    shutdown = true;
 	    if (logger.isLoggable(WARNING)) {
-		logger.logThrow(
-		    WARNING, exception, "RequestQueueListener failed");
+		logger.logThrow(WARNING, exception,
+				"RequestQueueListener shutting down for" +
+				" repeated failures");
 	    }
 	    failureHandler.run();
 	} else {

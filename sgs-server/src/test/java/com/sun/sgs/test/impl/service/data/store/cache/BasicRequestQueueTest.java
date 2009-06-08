@@ -22,12 +22,14 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
+import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
+    ServerDispatcher;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -36,7 +38,7 @@ import org.junit.Assert;
 class BasicRequestQueueTest extends Assert {
 
     /** Slop time when waiting. */
-    static final long EXTRA_WAIT = 50;
+    static final long EXTRA_WAIT = 200;
 
     /** Empty properties. */
     static final Properties emptyProperties = new Properties();
@@ -48,17 +50,10 @@ class BasicRequestQueueTest extends Assert {
 	};
 
     /** A request queue listener that gets servers from a map. */
-    static class SimpleRequestQueueListener extends RequestQueueListener {
-	final Map<Long, RequestQueueServer<? extends Request>>
-	    servers = Collections.synchronizedMap(
-		new HashMap<Long, RequestQueueServer<? extends Request>>());
-	SimpleRequestQueueListener(ServerSocket serverSocket,
-				   Runnable failureHandler,
-				   Properties properties)
-	{
-	    super(serverSocket, failureHandler, properties);
-	}
-	protected RequestQueueServer getServer(long nodeId) {
+    static class SimpleServerDispatcher implements ServerDispatcher {
+	private final Map<Long, RequestQueueServer>
+	    servers = new HashMap<Long, RequestQueueServer>();
+	public synchronized RequestQueueServer getServer(long nodeId) {
 	    RequestQueueServer server = servers.get(nodeId);
 	    if (server != null) {
 		return server;
@@ -66,6 +61,9 @@ class BasicRequestQueueTest extends Assert {
 		throw new IllegalArgumentException(
 		    "Server not found: " + nodeId);
 	    }
+	}
+	synchronized void setServer(long nodeId, RequestQueueServer server) {
+	    servers.put(nodeId, server);
 	}
     }
 
@@ -76,6 +74,22 @@ class BasicRequestQueueTest extends Assert {
 	}
 	public void performRequest(Request request) {
 	    throw new UnsupportedOperationException();
+	}
+    }
+
+    /** A request that does nothing. */
+    static class DummyRequest implements Request {
+	private static int next = 0;
+	private final int n;
+	DummyRequest() {
+	    synchronized (DummyRequest.class) {
+		n = next++;
+	    }
+	}
+	public void writeRequest(DataOutput out) { }
+	public void completed(Throwable exception) { }
+	public String toString() {
+	    return "DummyRequest[n:" + n + "]";
 	}
     }
 
@@ -102,19 +116,19 @@ class BasicRequestQueueTest extends Assert {
 	    while (!run) {
 		wait(wait);
 		if (System.currentTimeMillis() > start + wait) {
-		    fail("Expected to wait no more than " + wait + " ms");
+		    fail("Failed to call run in " + wait + " ms");
 		}
 	    }
 	    long time = System.currentTimeMillis() - start;
 	    assertTrue(run);
-	    assertTrue("Expected to wait at least " + minTimeout +
-		       " ms, but was " + time + " ms",
+	    assertTrue("Called run earlier than " + minTimeout + " ms: " +
+		       time + " ms",
 		       time >= minTimeout); 
 	}
 
 	/** Check that the run method has not been called. */
 	synchronized void checkNotRun() {
-	    assertFalse(run);
+	    assertFalse("Failure handler should not be run", run);
 	}
     }
 
@@ -139,6 +153,7 @@ class BasicRequestQueueTest extends Assert {
 			break;
 		    }
 		}
+	    } catch (InterruptedException e) {
 	    } catch (Throwable t) {
 		exception = t;
 	    }

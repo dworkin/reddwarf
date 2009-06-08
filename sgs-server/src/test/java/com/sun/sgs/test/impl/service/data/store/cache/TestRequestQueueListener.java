@@ -21,6 +21,8 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
+import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
+    ServerDispatcher;
 import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
     MAX_RETRY_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
@@ -36,6 +38,7 @@ import java.net.Socket;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -72,13 +75,28 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     /** The server socket or {@code null}. */
     ServerSocket serverSocket;
 
+    /** The request queue listener server dispatcher. */
+    SimpleServerDispatcher serverDispatcher;
+
+    /** The request queue listener or {@code null}. */
+    RequestQueueListener listener;
+
     /** The client-side connection thread or {@code null}. */
     InterruptableThread connect;
+
+    /** Create the server dispatcher. */
+    @Before
+    public void beforeTest() {
+	serverDispatcher = new SimpleServerDispatcher();
+    }
 
     /** Close the server socket and shutdown the connect thread, if present. */
     @After
     public void afterTest() throws Exception {
 	forceClose(serverSocket);
+	if (listener != null) {
+	    listener.shutdown();
+	}
 	if (connect != null) {
 	    connect.shutdown();
 	}
@@ -90,19 +108,26 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocket() {
-	new SimpleRequestQueueListener(null, noopRunnable, emptyProperties);
+	new RequestQueueListener(
+	    null, serverDispatcher, noopRunnable, emptyProperties);
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void testConstructorNullServerDispatcher() {
+	new RequestQueueListener(
+	    unboundServerSocket, null, noopRunnable, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullFailureHandler() {
-	new SimpleRequestQueueListener(
-	    unboundServerSocket, null, emptyProperties);
+	new RequestQueueListener(
+	    unboundServerSocket, serverDispatcher, null, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullProperties() {
-	new SimpleRequestQueueListener(
-	    unboundServerSocket, noopRunnable, null);
+	new RequestQueueListener(
+	    unboundServerSocket, serverDispatcher, noopRunnable, null);
     }
 
     /* Test socket accept */
@@ -114,9 +139,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testAcceptFails() throws Exception {
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    unboundServerSocket, failureHandler, props);
-	listener.start();
+	listener = new RequestQueueListener(
+	    unboundServerSocket, serverDispatcher, failureHandler, props);
 	failureHandler.checkRun(MAX_RETRY);
     }
 
@@ -128,8 +152,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptNoInput() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props);
+	listener = new RequestQueueListener(
+	    serverSocket, serverDispatcher, failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		try {
@@ -139,7 +163,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		return false;
 	    }
 	};
-	listener.start();
 	connect.start();
 	failureHandler.checkRun(MAX_RETRY);
     }
@@ -152,8 +175,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptUnknownNodeId() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props);
+	listener = new RequestQueueListener(
+	    serverSocket, serverDispatcher, failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -171,7 +194,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		return false;
 	    }
 	};
-	listener.start();
 	connect.start();
 	failureHandler.checkRun(MAX_RETRY);
     }
@@ -184,8 +206,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptIncompleteNodeId() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props);
+	listener = new RequestQueueListener(
+	    serverSocket, serverDispatcher, failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -202,7 +224,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		return false;
 	    }
 	};
-	listener.start();
 	connect.start();
 	failureHandler.checkRun(MAX_RETRY);
     }
@@ -215,13 +236,14 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptUnexpectedException() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props)
-	{
-	    protected RequestQueueServer getServer(long nodeId) {
-		throw new NullPointerException("Whoa!");
-	    }
-	};
+	listener = new RequestQueueListener(
+	    serverSocket, 
+	    new ServerDispatcher() {
+		public RequestQueueServer getServer(long nodeId) {
+		    throw new NullPointerException("Whoa!");
+		}
+	    },
+	    failureHandler, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -239,7 +261,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		return false;
 	    }
 	};
-	listener.start();
 	connect.start();
 	failureHandler.checkRun(MAX_RETRY);
     }
@@ -252,10 +273,10 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptAlternatingFailures() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props);
+	listener = new RequestQueueListener(
+	    serverSocket, serverDispatcher, failureHandler, props);
 	DummyRequestQueueServer server = new DummyRequestQueueServer();
-	listener.servers.put(1L, server);
+	serverDispatcher.setServer(1, server);
 	connect = new InterruptableThread() {
 	    private long n = 0;
 	    private long getNodeId() { return n++ % 2; }
@@ -275,7 +296,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		return false;
 	    }
 	};
-	listener.start();
 	connect.start();
 	Thread.sleep(MAX_RETRY + EXTRA_WAIT);
 	assertTrue("Expected a non-zero number of connections",
@@ -289,13 +309,12 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptSuccess() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props);
-	listener.start();
+	listener = new RequestQueueListener(
+	    serverSocket, serverDispatcher, failureHandler, props);
 	DummyRequestQueueServer server33 = new DummyRequestQueueServer();
-	listener.servers.put(33L, server33);
+	serverDispatcher.setServer(33, server33);
 	DummyRequestQueueServer server999 = new DummyRequestQueueServer();
-	listener.servers.put(999L, server999);
+	serverDispatcher.setServer(999, server999);
 	Socket socket = null;
 	try {
 	    while (true) {
@@ -332,9 +351,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testShutdownNoConnections() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props);
-	listener.start();
+	listener = new RequestQueueListener(
+	    serverSocket, serverDispatcher, failureHandler, props);
 	Thread.sleep(EXTRA_WAIT);
 	listener.shutdown();
 	/* Make sure the server socket has been shutdown */
@@ -357,8 +375,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testShutdownWithConnections() throws Exception {
 	serverSocket = new ServerSocket(PORT);
 	NoteRun failureHandler = new NoteRun();
-	SimpleRequestQueueListener listener = new SimpleRequestQueueListener(
-	    serverSocket, failureHandler, props);
+	listener = new RequestQueueListener(
+	    serverSocket, serverDispatcher, failureHandler, props);
+	serverDispatcher.setServer(33, new DummyRequestQueueServer());
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -376,7 +395,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		return false;
 	    }
 	};
-	listener.start();
 	connect.start();
 	Thread.sleep(EXTRA_WAIT);
 	listener.shutdown();
