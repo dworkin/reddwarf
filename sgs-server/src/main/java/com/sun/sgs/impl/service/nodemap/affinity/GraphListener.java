@@ -30,7 +30,21 @@ import java.beans.PropertyChangeEvent;
 import java.util.Properties;
 
 /**
- * A listener which detects object uses by Identities within tasks.
+ * A listener which detects object uses by Identities within tasks and builds
+ * a graph based on that information.
+ * <p>
+ * The following property is supported:
+ * <p>
+ * <dl style="margin-left: 1em">
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *   com.sun.sgs.impl.service.nodemap.affinity.GraphListener.graphbuilder.class
+ *	</b></code><br>
+ *	<i>Default:</i>
+ *   {@code com.sun.sgs.impl.service.nodemap.affinity.WeightedGraphBuilder} <br>
+ *
+ * <dd style="padding-top: .5em">The graph builder to use.<p>
+ * </dl>
  */
 public class GraphListener implements ProfileListener {
     // the base name for properties
@@ -97,10 +111,14 @@ public class GraphListener implements ProfileListener {
      * 
      * @return the folded graph of accesses
      */
-    public Graph<Identity, WeightedEdge> getAffinityGraph() {
+    public Graph<Identity, ? extends WeightedEdge> getAffinityGraph() {
         return builder.getAffinityGraph();
     }
 
+    /**
+     * Returns the graph builder used by this listener.
+     * @return the graph builder
+     */
     public GraphBuilder getGraphBuilder() {
         return builder;
     }

@@ -24,7 +24,6 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
-import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -53,12 +52,6 @@ import java.util.TimerTask;
  * <p>
  * This class is currently assumed to be single threaded. JUNG provides a
  * way to wrap graphs so they are synchronized;  we might need to use that.
- * <p>
- * TODO:  drop old data after some time window.  Initial thought:  do this
- *   periodicially, either by number of tasks or time.  Keep track of accesses
- *   in a separate bin, so after the time period is up we can subtract out
- *   accesses in that bin and start keeping track of the new accesses in a new
- *   bin.
  */
 public class WeightedGraphBuilder implements GraphBuilder {
     // Map for tracking object-> map of identity-> number accesses
@@ -68,8 +61,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
             new HashMap<Object, Map<Identity, Long>>();
     
     // Our graph of object accesses
-    private final Graph<Identity, WeightedEdge> affinityGraph = 
-            new UndirectedSparseMultigraph<Identity, WeightedEdge>();
+    private final CopyableGraph<Identity, WeightedEdge> affinityGraph =
+            new CopyableGraph<Identity, WeightedEdge>();
     
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -82,12 +75,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
 
     private final PruneTask pruneTask;
 
-    private final Queue<Map<Object, Map<Identity, Long>>> periodObjectQueue =
-        new LinkedList<Map<Object, Map<Identity, Long>>>();
-    private final Queue<Map<WeightedEdge, Long>> periodEdgeIncrementsQueue =
-        new LinkedList<Map<WeightedEdge, Long>>();
-    private Map<Object, Map<Identity, Long>> currentPeriodObject;
-    private Map<WeightedEdge, Long> currentPeriodEdgeIncrements;
+
     /**
      * Creates a weighted graph builder.
      * @param properties  application properties
@@ -106,7 +94,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
     
     /** {@inheritDoc} */
-    public synchronized void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+    public synchronized void updateGraph(Identity owner, 
+                                         AccessedObjectsDetail detail)
+    {
         long startTime = System.currentTimeMillis();
         updateCount++;
         
@@ -143,15 +133,12 @@ public class WeightedGraphBuilder implements GraphBuilder {
                         WeightedEdge newEdge = new WeightedEdge();
                         affinityGraph.addEdge(newEdge, owner, ident);
                         // period info
-                        currentPeriodEdgeIncrements.put(newEdge, 1L);
+                        pruneTask.incrementEdge(newEdge);
                     } else {
                         if (value <= otherValue) {
                             edge.incrementWeight();
                             // period info
-                            long v = currentPeriodEdgeIncrements.containsKey(edge) ?
-                                     currentPeriodEdgeIncrements.get(edge): 0;
-                            v++;
-                            currentPeriodEdgeIncrements.put(edge, v);
+                            pruneTask.incrementEdge(edge);
                         }
                     }
                 }
@@ -161,15 +148,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
             objectMap.put(objId, idMap);
 
             // period info
-            Map<Identity, Long> periodIdMap = currentPeriodObject.get(objId);
-            if (periodIdMap == null) {
-                periodIdMap = new HashMap<Identity, Long>();
-            }
-            long periodValue = periodIdMap.containsKey(owner) ?
-                               periodIdMap.get(owner) : 0;
-            periodValue++;
-            periodIdMap.put(owner, periodValue);
-            currentPeriodObject.put(objId, periodIdMap);
+            pruneTask.updateObjectAccess(objId, owner);
         }
         
         totalTime += System.currentTimeMillis() - startTime;
@@ -195,23 +174,12 @@ public class WeightedGraphBuilder implements GraphBuilder {
 
     /** {@inheritDoc} */
     public Graph<Identity, WeightedEdge> getAffinityGraph() {
-        Graph<Identity, WeightedEdge> graphCopy = 
-            new UndirectedSparseMultigraph<Identity, WeightedEdge>();
-        
-        // Return a copy of the graph, for safety's sake.
-        // Is this really necessary?  Copying takes some time.
-        // Perhaps use a subclass with a copy constructor?
-        // Then we're a little more closely tied to the underlying
-        // graph implementation, but it'll be faster.
-        synchronized (affinityGraph) {
-            for (Identity id : affinityGraph.getVertices()) {
-                graphCopy.addVertex(id);
-            }
-            for (WeightedEdge e : affinityGraph.getEdges()) {
-                Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
-                graphCopy.addEdge(new WeightedEdge(e.getWeight()), endpoints);
-            }
-        }
+        long startTime = System.currentTimeMillis();
+        CopyableGraph<Identity, WeightedEdge> graphCopy =
+            new CopyableGraph<Identity, WeightedEdge>(affinityGraph);
+        System.out.println("Time for graph copy is : " +
+                (System.currentTimeMillis() - startTime) +
+                "msec");
         return graphCopy;
     }
 
@@ -222,10 +190,19 @@ public class WeightedGraphBuilder implements GraphBuilder {
 
         private int current = 1;
 
+        private final Queue<Map<Object, Map<Identity, Long>>> periodObjectQueue;
+        private final Queue<Map<WeightedEdge, Long>> periodEdgeIncrementsQueue;
+        private Map<Object, Map<Identity, Long>> currentPeriodObject;
+        private Map<WeightedEdge, Long> currentPeriodEdgeIncrements;
         public PruneTask(int count) {
             this.count = count;
+            periodObjectQueue = 
+                new LinkedList<Map<Object, Map<Identity, Long>>>();
+            periodEdgeIncrementsQueue = 
+                new LinkedList<Map<WeightedEdge, Long>>();
             addPeriodStructures();
         }
+
         public synchronized void run() {
             // Update the data structures for this snapshot
             addPeriodStructures();
@@ -234,7 +211,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 return;
             }
 
-            // take care of everything.  JANE will need to lock everything?
+            // take care of everything.
             Map<Object, Map<Identity, Long>> periodObject =
                     periodObjectQueue.remove();
             Map<WeightedEdge, Long> periodEdgeIncrements =
@@ -281,7 +258,28 @@ public class WeightedGraphBuilder implements GraphBuilder {
             }
         }
 
-        public synchronized void addPeriodStructures() {
+        public synchronized void incrementEdge(WeightedEdge edge) {
+            long v = currentPeriodEdgeIncrements.containsKey(edge) ?
+                     currentPeriodEdgeIncrements.get(edge) : 0;
+            v++;
+            currentPeriodEdgeIncrements.put(edge, v);
+        }
+
+        public synchronized void updateObjectAccess(Object objId,
+                                                    Identity owner)
+        {
+            Map<Identity, Long> periodIdMap = currentPeriodObject.get(objId);
+            if (periodIdMap == null) {
+                periodIdMap = new HashMap<Identity, Long>();
+            }
+            long periodValue = periodIdMap.containsKey(owner) ?
+                               periodIdMap.get(owner) : 0;
+            periodValue++;
+            periodIdMap.put(owner, periodValue);
+            currentPeriodObject.put(objId, periodIdMap);
+        }
+
+        private synchronized void addPeriodStructures() {
             currentPeriodObject = new HashMap<Object, Map<Identity, Long>>();
             periodObjectQueue.add(currentPeriodObject);
             currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Long>();

@@ -119,7 +119,8 @@ public class TestGraphListener {
     
     @Test
     public void testConstructor() {
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         Assert.assertNotNull(graph);
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
@@ -130,7 +131,8 @@ public class TestGraphListener {
         ProfileReport report = makeReport(new IdentityImpl("something"));
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         // no accessed objects
         Assert.assertEquals(0, graph.getVertexCount());
@@ -144,7 +146,8 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(1, graph.getVertexCount());
     }
@@ -166,7 +169,8 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
@@ -192,7 +196,8 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
@@ -217,7 +222,8 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
@@ -272,7 +278,8 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(1, graph.getVertexCount());
@@ -312,7 +319,8 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(4, graph.getEdgeCount());
         Assert.assertEquals(4, graph.getVertexCount());
@@ -369,7 +377,8 @@ public class TestGraphListener {
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
         
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(3, graph.getEdgeCount());
         Assert.assertEquals(3, graph.getVertexCount());
@@ -391,7 +400,8 @@ public class TestGraphListener {
         listener.getGraphBuilder().getPruneTask().run();
         // Second period - nothing added to graph, so expect it to empty out
         listener.getGraphBuilder().getPruneTask().run();
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
     }
@@ -417,7 +427,8 @@ public class TestGraphListener {
         // 2nd period
 
         // Graph should still be intact:  not enough periods to clean up yet.
-        Graph<Identity, WeightedEdge> graph = listener.getAffinityGraph();
+        Graph<Identity, ? extends WeightedEdge> graph =
+                listener.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
         if (parallelEdges) {
             Assert.assertEquals(6, graph.getEdgeCount());

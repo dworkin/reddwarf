@@ -46,7 +46,7 @@ import java.util.TimerTask;
  * 
  */
 public class BipartiteGraphBuilder implements GraphBuilder {
-    // Our graph of object accesses
+    /** The graph of object accesses. */
     protected final CopyableGraph<Object, WeightedEdge>
         bipartiteGraph = 
             new CopyableGraph<Object, WeightedEdge>();
@@ -62,9 +62,6 @@ public class BipartiteGraphBuilder implements GraphBuilder {
 
     private final PruneTask pruneTask;
 
-    private final Queue<Map<WeightedEdge, Long>> periodEdgeIncrementsQueue =
-        new LinkedList<Map<WeightedEdge, Long>>();
-    private Map<WeightedEdge, Long> currentPeriodEdgeIncrements;
     /**
      * Constructs a new bipartite graph builder.
      * @param props application properties
@@ -83,7 +80,9 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
     
     /** {@inheritDoc} */
-    public synchronized void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+    public synchronized void updateGraph(Identity owner, 
+                                         AccessedObjectsDetail detail)
+    {
         long startTime = System.currentTimeMillis();
         updateCount++;
         
@@ -100,14 +99,11 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                     WeightedEdge newEdge = new WeightedEdge();
                     bipartiteGraph.addEdge(newEdge, owner, objId);
                     // period info
-                    currentPeriodEdgeIncrements.put(newEdge, 1L);
+                    pruneTask.incrementEdge(newEdge);
                 } else {
                     ae.incrementWeight();
                     // period info
-                    long v = currentPeriodEdgeIncrements.containsKey(ae) ?
-                             currentPeriodEdgeIncrements.get(ae): 0;
-                    v++;
-                    currentPeriodEdgeIncrements.put(ae, v);
+                    pruneTask.incrementEdge(ae);
                 }
             }
         }
@@ -231,8 +227,12 @@ public class BipartiteGraphBuilder implements GraphBuilder {
 
         private int current = 1;
 
+        private final Queue<Map<WeightedEdge, Long>> periodEdgeIncrementsQueue;
+        private Map<WeightedEdge, Long> currentPeriodEdgeIncrements;
         public PruneTask(int count) {
             this.count = count;
+            periodEdgeIncrementsQueue =
+                new LinkedList<Map<WeightedEdge, Long>>();
             addPeriodStructures();
         }
         public synchronized void run() {
@@ -243,7 +243,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 return;
             }
 
-            // take care of everything.  JANE will need to lock everything?
+            // take care of everything.
             Map<WeightedEdge, Long> periodEdgeIncrements =
                     periodEdgeIncrementsQueue.remove();
 
@@ -268,7 +268,14 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             }
         }
 
-        public synchronized void addPeriodStructures() {
+        public synchronized void incrementEdge(WeightedEdge edge) {
+            long v = currentPeriodEdgeIncrements.containsKey(edge) ?
+                     currentPeriodEdgeIncrements.get(edge) : 0;
+            v++;
+            currentPeriodEdgeIncrements.put(edge, v);
+        }
+
+        private synchronized void addPeriodStructures() {
             currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Long>();
             periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
         }

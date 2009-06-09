@@ -24,34 +24,56 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
 
 /**
- *
  * Graph builder interface.  Graph builder objects take task access information
  * and create a graph from it, and can return the graph.
- * 
+ * <p>
  * The returned graph vertices are identities, and the edges are the 
  * object references the vertices have in common.  The edges can be either
  * weighted or parallel (both are being used for experiments).
+ * <p>
+ * All graph builders support the following properties:
+ * <p>
+ * <dl style="margin-left: 1em">
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder.snapshot.period
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 300000} (5 minutes)<br>
+ *
+ * <dd style="padding-top: .5em">The amount of time, in milliseconds, for
+ *      each snapshot of retained data.  Older snapshots are discarded as
+ *      time goes on. A longer snapshot period gives us more history, but
+ *      also longer compute times to use that history, as more data must
+ *      be processed.<p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder.snapshot.count
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 1}
+ *
+ * <dd style="padding-top: .5em">The number of snapshots to retain.  A
+ *       larger value means more history will be retained.  Using a smaller
+ *       snapshot period with a larger count means more total history will be
+ *       retained, with a smaller amount discarded at the start of each
+ *       new snapshot.<p>
+ * </dl>
  */
 public interface GraphBuilder {
 
-    // the base name for properties
-    static final String PROP_BASE = GraphBuilder.class.getName();
+    /** The base name for graph builder properties. */
+    String PROP_BASE = GraphBuilder.class.getName();
 
-    // property controlling our time snapshots, in milliseconds
-    static final String PERIOD_PROPERTY = PROP_BASE + ".snapshot.period";
+    /** The property controlling time snapshots, in milliseconds. */
+    String PERIOD_PROPERTY = PROP_BASE + ".snapshot.period";
 
-    // default:  5 minutes
-    // a longer snapshot gives us more history but also potentially bigger
-    // graphs
-    static final long DEFAULT_PERIOD = 1000 * 60 * 5;
+    /** The default time snapshot period. */
+    long DEFAULT_PERIOD = 1000 * 60 * 5;
 
-    // property controlling how many past time periods we should retain
-    static final String PERIOD_COUNT_PROPERTY = PROP_BASE + ".snapshot.count";
+    /** The property controlling how many past snapshots to retain. */
+    String PERIOD_COUNT_PROPERTY = PROP_BASE + ".snapshot.count";
 
-    // default:  1
-    // a greater number holds more data, perhaps increasing value of data?
-    // a smaller number purges older data quickly, making graphs smaller
-    static final int DEFAULT_PERIOD_COUNT = 1;
+    /** The default snapshot count. */
+    int DEFAULT_PERIOD_COUNT = 1;
     /**
      * Update the graph based on the objects accessed in a task.
      *
@@ -75,5 +97,5 @@ public interface GraphBuilder {
      *
      * @return the graph of access information
      */
-    Graph<Identity, WeightedEdge> getAffinityGraph();
+    Graph<Identity, ? extends WeightedEdge> getAffinityGraph();
 }
