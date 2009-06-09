@@ -24,6 +24,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.Collection;
 import java.util.HashMap;
@@ -188,13 +189,20 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Graph<Identity, AffinityEdge> getAffinityGraph() {
-        long startTime = System.currentTimeMillis();
-        CopyableGraph<Identity, AffinityEdge> graphCopy =
-            new CopyableGraph<Identity, AffinityEdge>(affinityGraph);
-        System.out.println("Time for graph copy is : " +
-                (System.currentTimeMillis() - startTime) +
-                "msec");
+    public Graph<Identity, WeightedEdge> getAffinityGraph() {
+        // Copy the graph, to get the edge types correct
+        Graph<Identity, WeightedEdge> graphCopy = 
+            new UndirectedSparseMultigraph<Identity, WeightedEdge>();
+        synchronized (affinityGraph) {
+
+            for (Identity id : affinityGraph.getVertices()) {
+                graphCopy.addVertex(id);
+            }
+            for (AffinityEdge e : affinityGraph.getEdges()) {
+                Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
+                graphCopy.addEdge(new WeightedEdge(e.getWeight()), endpoints);
+            }
+        }
         return graphCopy;
     }
 

@@ -111,7 +111,7 @@ public class GraphListener implements ProfileListener {
      * 
      * @return the folded graph of accesses
      */
-    public Graph<Identity, ? extends WeightedEdge> getAffinityGraph() {
+    public Graph<Identity, WeightedEdge> getAffinityGraph() {
         return builder.getAffinityGraph();
     }
 
