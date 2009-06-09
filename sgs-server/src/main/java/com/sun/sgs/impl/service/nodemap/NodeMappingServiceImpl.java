@@ -29,6 +29,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -290,11 +291,6 @@ public class NodeMappingServiceImpl
     /** The property name for the client port. */
     private static final String CLIENT_PORT_PROPERTY = 
             PKG_NAME + ".client.port";
-
-    /** The number of times we should try to contact the backend before
-     *  giving up. 
-     */
-    private static final int MAX_RETRY = 5;
     
     /** The default value of the server port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
@@ -566,7 +562,7 @@ public class NodeMappingServiceImpl
      *  an AI object), it will be assigned to the local node.  Otherwise,
      *  a remote call will be made to determine a node assignment.
      */
-    public void assignNode(Class service, final Identity identity) {
+    public void assignNode(final Class service, final Identity identity) {
         checkState();
         if (service == null) {
             throw new NullPointerException("null service");
@@ -584,20 +580,13 @@ public class NodeMappingServiceImpl
         // saving a remote call.  However, it makes the logic here
         // more complicated, and it means we duplicate some of the
         // server's work.  Best to always ask the server to handle it.
-        
-        int tryCount = 0;
-        while (tryCount < MAX_RETRY) {
-            try {
-                server.assignNode(service, identity, localNodeId);
-                tryCount = MAX_RETRY;
-                logger.log(Level.FINEST, "assign identity {0}", identity);
-            } catch (IOException ioe) {
-                tryCount++;
-                logger.logThrow(Level.FINEST, ioe, 
-                        "Exception encountered on try {0}: {1}",
-                        tryCount, ioe);
-            }
-        } 
+        runIoTask(
+            new IoRunnable() {
+                public void run() throws IOException {
+                    server.assignNode(service, identity, localNodeId);       
+                }
+            }, localNodeId);
+        logger.log(Level.FINEST, "assign identity {0}", identity);
     }
     
     /** 
@@ -608,7 +597,8 @@ public class NodeMappingServiceImpl
      * might be ready for garbage collection, it tells the server, which
      * will perform the deletion.
      */
-    public void setStatus(Class service, Identity identity, boolean active) 
+    public void setStatus(Class service, final Identity identity,
+                          boolean active)
         throws UnknownIdentityException
     {
         checkState();
@@ -635,17 +625,12 @@ public class NodeMappingServiceImpl
         }
 
         if (stask.canRemove()) {
-            int tryCount = 0;
-            while (tryCount < MAX_RETRY) {
-                try {
-                    server.canRemove(identity);
-                    tryCount = MAX_RETRY;
-                } catch (IOException ioe) {
-                    tryCount++;
-                    logger.logThrow(Level.WARNING, ioe, 
-                           "Could not tell server OK to delete {0}", identity);
-                }
-            }
+            runIoTask(
+                new IoRunnable() {
+                    public void run() throws IOException {
+                        server.canRemove(identity);
+                    }
+                }, localNodeId);
         }
         logger.log(Level.FINEST, "setStatus key: {0} , active: {1}", 
                 stask.statusKey(), active);
@@ -1099,9 +1084,11 @@ public class NodeMappingServiceImpl
             // manner).
             if (handlerQueue.remove(this)) {
                 if (handlerQueue.isEmpty()) {
-                    relocationHandlers.remove(id);
-                    // tell the server we're good to go.
-                    tellServerCanMove(id);
+                    if (relocationHandlers.remove(id) != null) {
+                        // Tell the server we're good to go if someone else
+                        // hasn't already done so.
+                        tellServerCanMove(id);
+                    }
                 }
             }
         }
@@ -1112,20 +1099,14 @@ public class NodeMappingServiceImpl
      * have been notified and have finished.
      * @param id the id to move
      */
-    private void tellServerCanMove(Identity id) {
-        int tryCount = 0;
-        while (tryCount < MAX_RETRY) {
-            try {
-                server.canMove(id);
-                tryCount = MAX_RETRY;
-                logger.log(Level.FINEST, "can move identity {0}", id);
-            } catch (IOException ioe) {
-                tryCount++;
-                logger.logThrow(Level.FINEST, ioe, 
-                        "Exception encountered on try {0}: {1}",
-                        tryCount, ioe);
-            }
-        }
+    private void tellServerCanMove(final Identity id) {
+        runIoTask(
+            new IoRunnable() {
+                public void run() throws IOException {
+                    server.canMove(id);   
+                }
+            }, localNodeId);
+        logger.log(Level.FINEST, "can move identity {0}", id);
     }
     
     /* -- For testing. -- */

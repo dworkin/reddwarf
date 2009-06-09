@@ -26,7 +26,7 @@ package com.sun.sgs.service;
 import com.sun.sgs.auth.Identity;
 
 /**
- * A service can register a {@code IdentityRelocationListener} to be notified
+ * A service can register an {@code IdentityRelocationListener} to be notified
  * when an identity is about to be relocated from the local node if it needs
  * to perform any work in advance of the identity relocation.
  *
@@ -37,7 +37,7 @@ public interface IdentityRelocationListener {
 
     /**
      * Notifies this listener that the specified {@code id} has been
-     * selected for relocation to {@code nodeNodeId} and that this listener
+     * selected for relocation to {@code newNodeId} and that this listener
      * needs to prepare for that move. This method is invoked outside of 
      * a transaction.
      * <p>

@@ -64,6 +64,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -1226,10 +1227,15 @@ public class TestNodeMappingServiceImpl {
         Object oldServer = swapToEvilServer(nodeMappingService);
         
         Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
 
-        // Nothing much will happen. Eventually, we'll cause the
-        // stack to shut down.
-        nodeMappingService.assignNode(NodeMappingService.class, id);   
+        Thread.sleep(100);
+        try {
+            assertFalse(serverNode.getWatchdogService().
+                        isLocalNodeAliveNonTransactional());
+        } catch (IllegalStateException e) {
+            // All OK, the server is probably shutting down
+        }
         swapToNormalServer(nodeMappingService, oldServer);
     }
     
@@ -1279,24 +1285,13 @@ public class TestNodeMappingServiceImpl {
         Object oldServer = swapToEvilServer(nodeMappingService);
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         
-        Thread.sleep(removeTime * 4);
-
-        // Identity should now be gone... this is a hole in the
-        // implementation, currently.  It won't be removed because
-        // the server is responsible for removing objects, and our
-        // server is effectively disconnnected.
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() {
-                try {
-                    Node node = nodeMappingService.getNode(id);
-                    // This line should be uncommented if we want to support
-                    // disconnected servers.
-//                  fail("Expected UnknownIdentityException");
-                } catch (UnknownIdentityException e) {
-                    
-                }
-            }
-        }, taskOwner);
+        Thread.sleep(100);
+        try {
+            assertFalse(serverNode.getWatchdogService().
+                        isLocalNodeAliveNonTransactional());
+        } catch (IllegalStateException e) {
+            // All OK, the server is probably shutting down
+        }
         swapToNormalServer(nodeMappingService, oldServer);
     }
     

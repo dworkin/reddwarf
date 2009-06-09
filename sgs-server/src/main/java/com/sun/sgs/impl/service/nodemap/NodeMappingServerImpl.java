@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -28,12 +29,14 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -103,11 +106,12 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.relocation.expire.time
  *	</b></code> <br>
- *      <i>Default:</i> {@code 5000}
+ *      <i>Default:</i> {@code 10000}
  *
  * <dd style="padding-top: .5em">
- *      The time allowed, in milliseconds, for {@code IdRelocationListener}s
- *      to call {@link SimpleCompletionHandler#complete complete} on the
+ *      The time allowed, in milliseconds, for {@code 
+ *      IdentityRelocationListener}s to call
+ *      {@link SimpleCompletionHandler#completed complete} on the
  *      handler they receive.  If this time has elapsed, this server disregards
  *      the proposed identity relocation.  This value is used to guard against
  *      listeners which never respond they are finished.  During this time
@@ -163,16 +167,19 @@ public final class NodeMappingServerImpl
     /** Default time to wait before removing an identity, in milliseconds. */
     private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
     
-    /** The property name for the amount of time allowed for IdRelocation
+    /** The property name for the amount of time allowed for IdentityRelocation
      * listeners to respond that they have completed their work.
      */
     private static final String RELOCATION_EXPIRE_PROPERTY =
             PKG_NAME + ".relocation.expire.time";
 
-    /** Default time allowed for IdRelocationListeners to respond that
-     * they hae completed preparations for an identity move, in milliseconds.
+    /** Default time allowed for IdentityRelocationListeners to respond that
+     * they have completed preparations for an identity move, in milliseconds.
      */
-    private static final int DEFAULT_RELOCATION_EXPIRE_TIME = 5000;
+    // TODO:  This expiration must be longer than the timeout for moving
+    //        client sessions.  We need that timeout in a common location
+    //        (StandardProperties?) so we can ensure this one is larger.
+    private static final int DEFAULT_RELOCATION_EXPIRE_TIME = 10000;
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -662,55 +669,33 @@ public final class NodeMappingServerImpl
     
     // TODO Perhaps need to have a separate thread do this work.
     // TODO Perhaps will want to batch notifications.
-    private void notifyListeners(Node oldNode, Node newNode, Identity id) {
+    private void notifyListeners(final Node oldNode, final Node newNode,
+                                 final Identity id)
+    {
         logger.log(Level.FINEST, "In notifyListeners, identity: {0}, " +
                                "oldNode: {1}, newNode: {2}", 
                                id, oldNode, newNode);
         if (oldNode != null) {
-            NotifyClient oldClient = notifyMap.get(oldNode.getId());
+            final NotifyClient oldClient = notifyMap.get(oldNode.getId());
             if (oldClient != null) {
-                int retries = maxIoAttempts; // retry a few times
-                while (retries-- > 0) {
-                    try {
-                        oldClient.removed(id, newNode);
-                        break;
-                    } catch (IOException ex) {
-                        // report failure if we run out of retries
-                        if (retries == 0) {
-                            logger.logThrow(Level.WARNING, ex,
-                                    "A communication error occured while " +
-                                    "notifying node {0} that {1} has " +
-                                    "been removed", oldClient, id);
-                            // shutdown the node corresponding to oldClient
-                            watchdogService.reportFailure(oldNode.getId(),
-                                    this.getClass().toString());
+                runIoTask(
+                    new IoRunnable() {
+                        public void run() throws IOException {
+                            oldClient.removed(id, newNode);
                         }
-                    }
-                }
+                    }, oldNode.getId());
             }
         }
         
         if (newNode != null) {
-            NotifyClient newClient = notifyMap.get(newNode.getId());
+            final NotifyClient newClient = notifyMap.get(newNode.getId());
             if (newClient != null) {
-                int retries = maxIoAttempts; // retry a few times
-                while (retries-- > 0) {
-                    try {
-                        newClient.added(id, oldNode);
-                        break;
-                    } catch (IOException ex) {
-                        // report failure if we run out of retries
-                        if (retries == 0) {
-                            logger.logThrow(Level.WARNING, ex,
-                                    "A communication error occured while " +
-                                    "notifying node {0} that {1} has " +
-                                    "been removed", newClient, id);
-                            // shutdown the node corresponding to newClient
-                            watchdogService.reportFailure(newNode.getId(),
-                                    this.getClass().toString());
+                runIoTask(
+                    new IoRunnable() {
+                        public void run() throws IOException {
+                            newClient.added(id, oldNode);
                         }
-                    }
-                }
+                    }, newNode.getId());
             }
         }
     }
@@ -753,7 +738,7 @@ public final class NodeMappingServerImpl
      * the choice, cleaning up old mappings as appropriate.  If given
      * a {@code serviceName}, the status of the identity is set to active
      * for that service on the new node.  The change in mappings might need
-     * to wait for an registered {@code IdentityRelocationListener}s to
+     * to wait for registered {@code IdentityRelocationListener}s to
      * prepare for the move.
      *
      * @param id the identity to map to a new node
@@ -764,7 +749,7 @@ public final class NodeMappingServerImpl
      *
      * @throws NoNodesAvailableException if there are no live nodes to map to
      */
-    long mapToNewNode(Identity id, String serviceName, Node oldNode,
+    long mapToNewNode(final Identity id, String serviceName, Node oldNode,
                       long requestingNode) 
         throws NoNodesAvailableException
     {
@@ -817,26 +802,14 @@ public final class NodeMappingServerImpl
             // listeners have all responded, can canMove is called.
             moveMap.put(id, moveTask);
             long oldId = oldNode.getId();
-            NotifyClient oldClient = notifyMap.get(oldId);
+            final NotifyClient oldClient = notifyMap.get(oldId);
             if (oldClient != null) {
-                int retries = maxIoAttempts; // retry a few times
-                while (retries-- > 0) {
-                    try {
-                        oldClient.prepareRelocate(id, newNodeId);
-                        break;
-                    } catch (IOException ex) {
-                        // report failure if we run out of retries
-                        if (retries == 0) {
-                            logger.logThrow(Level.WARNING, ex,
-                                    "A communication error occured while " +
-                                    "notifying node {0} that {1} will " +
-                                    "be relocated", oldId, id);
-                            // shutdown the node corresponding to oldClient
-                            watchdogService.reportFailure(oldId,
-                                    this.getClass().toString());
+                runIoTask(
+                    new IoRunnable() {
+                        public void run() throws IOException {
+                            oldClient.prepareRelocate(id, newNodeId);
                         }
-                    }
-                }
+                    }, oldId);
             }
         } else {
             // Go ahead and make the move now.
@@ -868,7 +841,7 @@ public final class NodeMappingServerImpl
             // The most likely problem is one in our own code.
             logger.logThrow(Level.FINE, e, 
                             "Move {0} mappings from {1} to {2} failed", 
-                            id, oldNode.getId(), newNodeId);
+                            id, oldNode, newNodeId);
         }
     }
     
