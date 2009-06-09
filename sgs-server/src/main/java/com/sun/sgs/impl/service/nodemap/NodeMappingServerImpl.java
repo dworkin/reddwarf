@@ -111,7 +111,7 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">
  *      The time allowed, in milliseconds, for {@code 
  *      IdentityRelocationListener}s to call
- *      {@link SimpleCompletionHandler#completed complete} on the
+ *      {@link SimpleCompletionHandler#completed completed} on the
  *      handler they receive.  If this time has elapsed, this server disregards
  *      the proposed identity relocation.  This value is used to guard against
  *      listeners which never respond they are finished.  During this time
