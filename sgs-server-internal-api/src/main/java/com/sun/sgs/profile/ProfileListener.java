@@ -15,6 +15,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
 package com.sun.sgs.profile;
@@ -34,8 +38,7 @@ import java.beans.PropertyChangeEvent;
  * <p>
  *
  * In order to create listeners with all of the facilities that they need,
- * all implementations of <code>ProfileListener</code> specified with
- * the {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property must
+ * all implementations of <code>ProfileListener</code> must
  * implement a constructor of the form (<code>java.util.Properties</code>,
  * <code>com.sun.sgs.kernel.TaskOwner</code>,
  * <code>com.sun.sgs.kernel.ComponentRegistry</code>).

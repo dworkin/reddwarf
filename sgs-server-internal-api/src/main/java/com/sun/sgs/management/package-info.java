@@ -15,6 +15,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
 /**
@@ -31,12 +35,6 @@
  * By convention, only one of each of these objects will be registered with the 
  * platform MBean server.  The {@code ObjectName} for uniquely identifying 
  * MBeans in this package is the field {@code MXBEAN_NAME} within each MBean.
- * <p>
- * Each node in a Project Darkstar cluster may be monitored locally or 
- * remotely.  See 
- * <a href="../app/doc-files/config-properties.html#MonitoringProperties">
- * this document</a> for information on enabling remote monitoring and 
- * management.
  * <p>
  * For more information, please refer to the <a href=
  * "http://java.sun.com/javase/6/docs/technotes/guides/management/toc.html">

@@ -66,6 +66,27 @@ import java.util.logging.Logger;
 /**
  * Package-private implementation of {@code TransactionScheduler} that is
  * used by the system for scheduling and running all transactional tasks.
+ * This class supports the following configuration properties:
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #CONSUMER_THREADS_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_CONSUMER_THREADS}</code>
+ *
+ * <dd style="padding-top: .5em">The number of initial threads used to process
+ *      transactional tasks.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>{@value #SCHEDULER_QUEUE_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_SCHEDULER_QUEUE}</code>
+ *
+ * <dd style="padding-top: .5em">The implementation class used to track
+ *      access to define which queue implementation should back this scheduler.
+ *      The value of this property should be the
+ *      name of a public, non-abstract class that implements the
+ *      {@link SchedulerQueue} interface, and that provides a public
+ *      constructor with the parameters {@link Properties}<p>
+ * </dl>
  */
 final class TransactionSchedulerImpl
     implements TransactionScheduler, PriorityScheduler, ProfileListener 
@@ -83,8 +104,10 @@ final class TransactionSchedulerImpl
     public static final String SCHEDULER_QUEUE_PROPERTY =
         "com.sun.sgs.impl.kernel.scheduler.queue";
 
-    // the default scheduler
-    private static final String DEFAULT_SCHEDULER_QUEUE =
+    /**
+     * The default scheduler.
+     */
+    public static final String DEFAULT_SCHEDULER_QUEUE =
         "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
 
     /**
@@ -94,8 +117,10 @@ final class TransactionSchedulerImpl
     public static final String CONSUMER_THREADS_PROPERTY =
         "com.sun.sgs.impl.kernel.transaction.threads";
 
-    // the default number of initial consumer threads
-    private static final String DEFAULT_CONSUMER_THREADS = "4";
+    /**
+     * The default number of initial consumer threads.
+     */
+    public static final String DEFAULT_CONSUMER_THREADS = "4";
 
     // the default priority for tasks
     private static final Priority defaultPriority =

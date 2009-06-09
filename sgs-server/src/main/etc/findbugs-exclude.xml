@@ -369,7 +369,7 @@
 
   <!-- Currently unused fields. -->
   <Match>
-    <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl$RecoveryCompleteFutureImpl"/>
+    <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl$RecoveryCompletionHandler"/>
     <Field name="listener"/>
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>

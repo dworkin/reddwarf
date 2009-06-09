@@ -15,6 +15,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
 package com.sun.sgs.app.util;
@@ -2088,7 +2092,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		if (prev != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(prev);
-		    cursor = currentNode.get().size() - 1;
+		    cursor = currentNode.get().size();
 		} else if (next != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(next);
@@ -2370,7 +2374,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		} else if (prev != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(prev);
-		    cursor = currentNode.get().size() - 1;
+		    cursor = currentNode.get().size();
 		} else {
 		    cursor = 0;
 		}

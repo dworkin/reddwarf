@@ -1,0 +1,64 @@
+<html>
+<body>
+
+Provides the interface to the Project Darkstar Server. <p>
+
+<h3>API conventions</h3>
+
+Interfaces in this API do not extend {@link java.io.Serializable} even
+if classes that implement those interfaces are required to implement
+it. <p>
+
+The API uses this approach to avoid an issue involving
+the <code>serialVersionUID</code> field.  To guard
+against <code>serialVersionUID</code> mismatches, as well as to improve
+performance, any class or interface that
+extends <code>Serializable</code> should declare a
+<code>serialVersionUID</code> field.  Since public interfaces can only
+declare public members, a public interface that
+extends <code>Serializable</code> would need to have a
+public <code>serialVersionUID</code> field, meaning that any classes
+implementing the interface would inherit
+its <code>serialVersionUID</code>, and so would be prevented from
+controlling their versioning separately.  This issue does not crop up
+for interfaces that do not extend Serializable, since they by
+definition have a <code>serialVersionUID</code> of <code>0</code>.
+
+<h3>Documentation conventions</h3>
+
+Unless explicitly specified otherwise, all documentation for these APIs
+uses the following conventions:
+
+<ul>
+<li> If <code>null</code> is not explicitly specified as an acceptable
+     value for a method parameter, then the method does not
+     permit <code>null</code> to be passed as a value for that
+     parameter, and will throw a {@link java.lang.NullPointerException}
+     if <code>null</code> is passed (though it is left unspecified
+     whether or not <code>NullPointerException</code> takes precedence
+     over other types of exceptions that could also be thrown).
+
+<li> If <code>null</code> is not explicitly specified as an acceptable
+     value for a method to return, then the method is not permitted to
+     return <code>null</code>.
+
+<li> If <code>null</code> is not explicitly specified as an acceptable
+     value for a given collection (e.g. {@link java.util.Collection},
+     {@link java.util.List}, or {@link java.util.Set}) to contain, then
+     the collection is not permitted to contain <code>null</code>
+     elements.
+</ul>
+
+Methods that can accept or return <code>null</code> values generally
+specify this at least in their parameter-level (i.e. <code>@param</code>
+tag) or return value-level (i.e. <code>@return</code> tag)
+documentation.
+
+<h3>License</h3>
+
+All classes available in the above packages are released under the GNU GPLv2
+with Classpath exception license.  Their use is subject to the terms of
+this license.
+
+</body>
+</html>

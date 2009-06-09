@@ -94,7 +94,6 @@ public class SwordWorld
      */
     public void setRoom(SwordWorldRoom room) {
         DataManager dataManager = AppContext.getDataManager();
-        dataManager.markForUpdate(this);
 
         if (room == null) {
             roomRef = null;

@@ -47,8 +47,8 @@ import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -75,11 +75,8 @@ import javax.management.JMException;
  * ChannelService implementation. <p>
  * 
  * <p>The {@link #ChannelServiceImpl constructor} requires the <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> property and supports
- * these public configuration <a
- * href="../../../app/doc-files/config-properties.html#ChannelService">
- * properties</a>. <p>
+ * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * <code>com.sun.sgs.app.name</code></a> property.
  *
  * <p>TBD: add summary comment about how the implementation works.
  */
@@ -1124,7 +1121,7 @@ public final class ChannelServiceImpl
 	implements RecoveryListener
     {
 	/** {@inheritDoc} */
-	public void recover(Node node, RecoveryCompleteFuture future) {
+	public void recover(Node node, SimpleCompletionHandler handler) {
 	    final long nodeId = node.getId();
 	    final TaskService taskService = getTaskService();
 	    try {
@@ -1155,7 +1152,7 @@ public final class ChannelServiceImpl
 		    },
 		    taskOwner);
 		
-		future.done();
+		handler.completed();
 
 	    } catch (Exception e) {
 		logger.logThrow(

@@ -17,6 +17,12 @@
       <outputDirectory></outputDirectory>
     </fileSet>
 
+    <!-- Include the top level resources directory --> 
+    <fileSet>
+      <directory>src/main/resources</directory>
+      <outputDirectory></outputDirectory>
+    </fileSet>
+
   </fileSets>
 
 </assembly>

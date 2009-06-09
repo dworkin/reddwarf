@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.10-SNAPSHOT</version>
+    <version>0.9.11-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-internal-api</artifactId>
@@ -61,6 +61,18 @@
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-remote-resources-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>include-gpl-classpath-license</id>
+	    <phase>generate-resources</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Activate the license plugin to check for license headers -->
+      <plugin>
+	<groupId>com.google.code.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
       </plugin>
 
     </plugins>
