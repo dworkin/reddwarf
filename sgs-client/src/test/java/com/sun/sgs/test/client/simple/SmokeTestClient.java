@@ -98,7 +98,10 @@ public class SmokeTestClient implements SimpleClientListener {
     /**
      * Starts the test. The first test is to attempt to login with the user
      * name "kickme"; this login attempt will be refused, which should
-     * cause a call to the [@link loginFailed] callback method.
+     * cause a call to the {@link #loginFailed] callback method. If the
+     * login fails because of an exception in contacting the server, an
+     * error message is logged and the program exits with a status of 1,
+     * indicating test failure.
      */
     public void start() {
         loginName = "kickme";
@@ -117,7 +120,7 @@ public class SmokeTestClient implements SimpleClientListener {
      * global variable <code>loginName</code>, and the password is the same as
      * the login name.
      * @return a {@link PasswordAuthentication} authentication object with
-     *   a login name and password identical to the contents fo <code>loginName</code>
+     *   a login name and password identical to the contents of <code>loginName</code>
      */
     public PasswordAuthentication getPasswordAuthentication() {
         PasswordAuthentication auth = new PasswordAuthentication(loginName, loginName.toCharArray());
@@ -128,8 +131,8 @@ public class SmokeTestClient implements SimpleClientListener {
      * An implementation of the function called when a client is seen by the server to
      * log in. The response for the test is to send a message consisting of "loggedIn:" along with
      * the name of the player who logged in. If this fails, a warning is logged. Calling this
-     * will change the value of the flag logInPass from false to true, and this will be reflected
-     * in the results that are logged at the end of the test.
+     * will change the value of the flag logInPass from <cde>false</code> to <code>true</code>,
+     * and this will be reflected  in the results that are logged at the end of the test.
      */
     public void loggedIn() {
         String msg = "loggedIn:" + loginName;
@@ -148,7 +151,8 @@ public class SmokeTestClient implements SimpleClientListener {
      * This is expected to happen if the user name is "kickme", in which case we log
      * that the login failure case has passed. Otherwise, there is a problem with the test,
      * and an error message is logged, and the program ends.
-     * @param reason
+     * @param reason A {@link String} returned from the server giving the reason that
+     * the login failed
      */
     public void loginFailed(String reason) {
         if (loginName.equals("kickme")) {
@@ -159,7 +163,6 @@ public class SmokeTestClient implements SimpleClientListener {
             System.exit(1);
         }
         loginName = "discme";
-        //myclient = new SimpleClient(this);
         try {
             myclient.login(props);
         } catch (IOException e) {
@@ -175,7 +178,7 @@ public class SmokeTestClient implements SimpleClientListener {
      * by the name of the channel. The method will create a channel listener for this
      * channel, and will set the joinChannelPass flag to true.
      * @param channel the channel joined
-     * @return A [@link ClientChannelListern} object that will be called to deal with
+     * @return A {@link ClientChannelListern} object that will be called to deal with
      * channel messages.
      */
     public ClientChannelListener joinedChannel(ClientChannel channel) {
@@ -191,7 +194,7 @@ public class SmokeTestClient implements SimpleClientListener {
     }
 
     /**
-     * An implementatino of the <code>reeivedMessage</code> callback, called when
+     * An implementation of the <code>receivedMessage</code> callback, called when
      * a message is received on the client session. The response depends on the contents
      * of the message. If the message is "logout", the logOutPass flag is set to true, and
      * the {@link SimpleClient#logout} method is called. Otherwise, a message of the
@@ -242,7 +245,7 @@ public class SmokeTestClient implements SimpleClientListener {
      *
      * Any other call indicates that the test is over (either because everything has
      * passed or because something has gone wrong); in that case the method calls
-     * the [@link printResults} method and exits, with an exit status that indicates the
+     * the {@link printResults} method and exits, with an exit status that indicates the
      * number of tests that have failed.
      *
      * @param graceful boolean indicating if the disconnect is graceful or forced
@@ -252,7 +255,6 @@ public class SmokeTestClient implements SimpleClientListener {
         if (loginName.equals("discme")) {
             logger.log(Level.INFO, "Passed disconnection test");
             loginName = "smokeTest";
-            //myclient = new SimpleClient(this);
             try {
                 myclient.login(props);
             } catch (IOException e) {
@@ -348,7 +350,7 @@ public class SmokeTestClient implements SimpleClientListener {
 
     /**
      * Converts a byte buffer into a string using UTF-8 encoding. Used
-     * by both this class and the [@link SmokeTestChannelListener} 
+     * by both this class and the {@link SmokeTestChannelListener}
      */
     static String bufferToString(ByteBuffer buffer) {
         byte[] bytes = new byte[buffer.remaining()];
@@ -360,4 +362,79 @@ public class SmokeTestClient implements SimpleClientListener {
             throw new AssertionError(e);
         }
     }
+    /**
+     * Channel listener for the smoke test client
+     */
+   private class SmokeTestChannelListener implements ClientChannelListener {
+
+    private SimpleClient client;
+    private boolean receiveMsgPass, leftChannelPass;
+   /* private static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(SmokeTestChannelListener.class.getName()));*/
+
+    public SmokeTestChannelListener(SimpleClient withClient) {
+        client = withClient;
+        receiveMsgPass = leftChannelPass = false;
+    }
+
+    /**
+     * Callback for when a message is received over a channel. The callback will
+     * construct a message made up of "receivedChannelMessage:", the name of the
+     * channel, and the message content that was sent, and send this back on the
+     * channel itself. It will also set the receiveMsgPass flag to true, showing that
+     * this part of the test has been triggered.
+     * @param channel The channel on which the message was received, and on
+     *      which the reply will be sent
+     * @param message the message sent over the channel
+     */
+    public void receivedMessage(ClientChannel channel, ByteBuffer message) {
+        String sendMsg = "receivedChannelMessage:" + channel.getName() + " ";
+        String msg = SmokeTestClient.bufferToString(message);
+        sendMsg = sendMsg + msg;
+        receiveMsgPass = true;
+        try {
+            channel.send(ByteBuffer.wrap(sendMsg.getBytes()));
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Unable to send response to received channel message on channel " + channel.getName());
+        }
+    }
+
+    /**
+     * Callback triggered when the client leaves a channel. The client will respond
+     * by sending a message of the form "leftChannel:" with the name of the channel
+     * back to the server, on the client session for this client. Calling this will set the
+     * leftChannel flag to true, showing that this part of the smoke test has been
+     * triggered.
+     *
+     * @param channel The channel that the client has left.
+     */
+    public void leftChannel(ClientChannel channel) {
+        String msg = "leftChannel:" + channel.getName();
+        leftChannelPass = true;
+        try {
+            client.send(ByteBuffer.wrap(msg.getBytes()));
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "unable to send channel leave confirmation");
+        }
+    }
+
+    /**
+     * Returns a boolean indicating whether or not the {@link receivedMessage} callback
+     * has been called.
+     * @return true if the callback has been called; false otherwise.
+     */
+    boolean getReceiveStatus() {
+        return receiveMsgPass;
+    }
+
+    /**
+     * Returns a boolean indicating whether or not the {@link leftChannel} callback has
+     * been called.
+     * @return true if the callback has been called; false otherwise.
+     */
+    boolean getChannelLeftStatus() {
+        return leftChannelPass;
+    }
+    }
+
 }
