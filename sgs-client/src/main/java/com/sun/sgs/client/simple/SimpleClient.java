@@ -430,10 +430,10 @@ public class SimpleClient implements ServerSession {
             // disconnect
             if (suppressDisconnectedCallback) {
                 clientListener.loginFailed(loginFailureMsg);
+                suppressDisconnectedCallback = false;
 	    } else {
                 clientListener.disconnected(expectingDisconnect, reason);
             }
-	    suppressDisconnectedCallback = false;
             expectingDisconnect = false;
         }
 
