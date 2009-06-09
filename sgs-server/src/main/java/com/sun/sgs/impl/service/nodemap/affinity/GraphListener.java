@@ -74,7 +74,7 @@ public class GraphListener implements ProfileListener {
                         new Class[] { Properties.class },
                         properties);
         } else {
-            builder = new WeightedParallelGraphBuilder(properties);
+            builder = new WeightedGraphBuilder(properties);
         }
     }
     

@@ -61,7 +61,7 @@ public class TestGraphListener {
    @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(
-            new Object[][] {{"default", true}, 
+            new Object[][] {{"default", false},
                         {WeightedParallelGraphBuilder.class.getName(), true},
                         {BipartiteParallelGraphBuilder.class.getName(), true},
                         {WeightedGraphBuilder.class.getName(), false},
