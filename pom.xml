@@ -76,7 +76,7 @@
 	  <executions>
 	    <execution>
 	      <id>check-notice</id>
-	      <phase>compile</phase>
+	      <phase>package</phase>
 	    </execution>
 	  </executions>
 	</plugin>

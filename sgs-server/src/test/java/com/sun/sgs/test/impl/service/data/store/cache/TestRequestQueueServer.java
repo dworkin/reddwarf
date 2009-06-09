@@ -259,7 +259,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	/* Write request number */
 	out.writeShort(0);
 	out.flush();
-	Thread.sleep(EXTRA_WAIT);
+	Thread.sleep(extraWait);
 	assertTrue("Socket should be closed", socket.isClosed());
     }
 
@@ -287,7 +287,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	/* Write request number */
 	out.writeShort(0);
 	out.flush();
-	Thread.sleep(EXTRA_WAIT);
+	Thread.sleep(extraWait);
 	assertTrue("Socket should be closed", socket.isClosed());
     }
 
@@ -431,7 +431,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	assertEquals(3, requests.get());
 	/* Close the socket and connect again */
 	clientSocket.close();
-	Thread.sleep(EXTRA_WAIT);
+	Thread.sleep(extraWait);
 	assertTrue("Socket should be closed", socket.isClosed());
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {

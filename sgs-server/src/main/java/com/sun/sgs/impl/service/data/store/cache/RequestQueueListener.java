@@ -69,7 +69,7 @@ public final class RequestQueueListener extends Thread {
     /** The socket server. */
     private final ServerSocket serverSocket;
 
-    /** The object find finding the {@link RequestQueueServer}. */
+    /** The object for finding the {@link RequestQueueServer}. */
     private final ServerDispatcher serverDispatcher;
 
     /** The runnable to call if the listener fails. */ 
@@ -99,6 +99,8 @@ public final class RequestQueueListener extends Thread {
      * closed before the {@code run} method returns.
      *
      * @param	serverSocket the server socket for accepting connections
+     * @param	serverDispatcher the object for finding the {@link
+     *		RequestQueueServer} 
      * @param	failureHandler the failure handler
      * @param	properties additional configuration properties
      */

@@ -297,7 +297,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	Thread.sleep(MAX_RETRY + EXTRA_WAIT);
+	Thread.sleep(MAX_RETRY + extraWait);
 	assertTrue("Expected a non-zero number of connections",
 		   server.connectionCount.get() > 0);
 	failureHandler.checkNotRun();
@@ -325,13 +325,13 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		}
 	    }
 	    new DataOutputStream(socket.getOutputStream()).writeLong(33);
-	    Thread.sleep(EXTRA_WAIT);
+	    Thread.sleep(extraWait);
 	    assertEquals(1, server33.connectionCount.get());
 	    assertEquals(0, server999.connectionCount.get());
 	    socket.close();
 	    socket = new Socket("localhost", PORT);
 	    new DataOutputStream(socket.getOutputStream()).writeLong(999);	
-	    Thread.sleep(EXTRA_WAIT);
+	    Thread.sleep(extraWait);
 	    assertEquals(1, server33.connectionCount.get());
 	    assertEquals(1, server999.connectionCount.get());
 	    failureHandler.checkNotRun();
@@ -353,7 +353,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	NoteRun failureHandler = new NoteRun();
 	listener = new RequestQueueListener(
 	    serverSocket, serverDispatcher, failureHandler, props);
-	Thread.sleep(EXTRA_WAIT);
+	Thread.sleep(extraWait);
 	listener.shutdown();
 	/* Make sure the server socket has been shutdown */
 	Socket socket = null;
@@ -396,9 +396,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	Thread.sleep(EXTRA_WAIT);
+	Thread.sleep(extraWait);
 	listener.shutdown();
-	Thread.sleep(EXTRA_WAIT);
+	Thread.sleep(extraWait);
 	connect.shutdown();
 	/* Make sure the server socket has been shutdown */
 	Socket socket = null;

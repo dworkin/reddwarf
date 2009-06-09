@@ -37,9 +37,6 @@ import org.junit.Assert;
 
 class BasicRequestQueueTest extends Assert {
 
-    /** Slop time when waiting. */
-    static final long EXTRA_WAIT = 200;
-
     /** Empty properties. */
     static final Properties emptyProperties = new Properties();
 
@@ -48,6 +45,9 @@ class BasicRequestQueueTest extends Assert {
 	new Runnable() {
 	    public void run() { }
 	};
+
+    /** Slop time when waiting. */
+    final long extraWait = Long.getLong("test.extra.wait", 200);
 
     /** A request queue listener that gets servers from a map. */
     static class SimpleServerDispatcher implements ServerDispatcher {
@@ -96,7 +96,7 @@ class BasicRequestQueueTest extends Assert {
     /**
      * A runnable that keeps track of whether its run method has been called.
      */
-    static class NoteRun implements Runnable {
+    class NoteRun implements Runnable {
 	private boolean run;
 
 	public synchronized void run() {
@@ -106,13 +106,13 @@ class BasicRequestQueueTest extends Assert {
 
 	/**
 	 * Check that the run method is called no sooner than minTimeout
-	 * milliseconds and no more than EXTRA_WAIT milliseconds after that.
+	 * milliseconds and no more than extraWait milliseconds after that.
 	 */
 	synchronized void checkRun(long minTimeout)
 	    throws InterruptedException
 	{
 	    long start = System.currentTimeMillis();
-	    long wait = minTimeout + EXTRA_WAIT;
+	    long wait = minTimeout + extraWait;
 	    while (!run) {
 		wait(wait);
 		if (System.currentTimeMillis() > start + wait) {

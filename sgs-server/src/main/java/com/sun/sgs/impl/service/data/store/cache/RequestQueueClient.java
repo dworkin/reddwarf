@@ -162,6 +162,7 @@ public final class RequestQueueClient extends Thread {
 			      Runnable failureHandler,
 			      Properties properties)
     {
+	super("RequestQueueClient");
 	checkNull("socketFactory", socketFactory);
 	checkNull("failureHandler", failureHandler);
 	this.nodeId = nodeId;
@@ -194,28 +195,32 @@ public final class RequestQueueClient extends Thread {
     }
 
     /**
-     * Adds a request to the queue, returning {@code true} if successful and
-     * {@code false} if the queue is full.
+     * Adds a request to the queue, waiting until the queue has space if it is
+     * full.
      *
      * @param	request the request to add
-     * @return	{@code true} if successful and {@code false} if the queue is
-     *		full 
      * @throws	IllegalStateException if the client has been requested to
      *		shutdown 
      */
-    public boolean addRequest(Request request) {
-	synchronized (this) {
-	    if (shutdown) {
-		throw new IllegalStateException(
-		    "The client has been requested to shutdown");
+    public void addRequest(Request request) {
+	logger.log(
+	    FINEST, "RequestQueueClient addRequest request:{0}", request);
+	boolean done = false;
+	while (true) {
+	    synchronized (this) {
+		if (shutdown) {
+		    throw new IllegalStateException(
+			"The client is shutting down");
+		}
 	    }
-	    boolean result = requests.offerLast(request);
-	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "RequestQueueClient addRequest request:" + request +
-			   (result ? " succeeds" : " fails"));
+	    if (done) {
+		break;
 	    }
-	    return result;
+	    try {
+		requests.putLast(request);
+		done = true;
+	    } catch (InterruptedException e) {
+	    }
 	}
     }
 
@@ -409,11 +414,8 @@ public final class RequestQueueClient extends Thread {
 	/** The thread processing responses from the server. */
 	private final ReceiveThread receiveThread;
 
-	/**
-	 * Whether this connection has been told to disconnect.  Synchronize on
-	 * this connection when accessing.
-	 */
-	private boolean disconnect;
+	/** Whether this connection has been told to disconnect. */
+	private volatile boolean disconnect;
 
 	/**
 	 * Creates an instance of this class.
@@ -452,9 +454,7 @@ public final class RequestQueueClient extends Thread {
 	 *		thread to complete
 	 */
 	synchronized void disconnect(boolean waitForReceiveThread) {
-	    synchronized (this) {
-		disconnect = true;
-	    }
+	    disconnect = true;
 	    receiveThread.interrupt();
 	    RequestQueueClient.this.interrupt();
 	    if (waitForReceiveThread) {
@@ -469,15 +469,6 @@ public final class RequestQueueClient extends Thread {
 	}
 
 	/**
-	 * Checks if the connection should disconnect.
-	 *
-	 * @return	whether the connection should disconnect
-	 */
-	synchronized boolean getDisconnectRequested() {
-	    return disconnect;
-	}
-
-	/**
 	 * Sends requests to the server, returning when the connection is
 	 * disconnected, and checking for failures in the {@link
 	 * ReceiveThread}.
@@ -489,7 +480,7 @@ public final class RequestQueueClient extends Thread {
 	void handleConnection() throws Exception {
 	    try {
 		boolean first = true;
-		while (!getDisconnectRequested()) {
+		while (!disconnect) {
 		    if (first) {
 			out.writeLong(nodeId);
 			out.flush();
@@ -561,6 +552,7 @@ public final class RequestQueueClient extends Thread {
 	     * @param	in the data input stream
 	     */
 	    ReceiveThread(DataInput in) {
+		super("RequestQueueClient.ReceiveThread");
 		this.in = in;
 	    }
 
@@ -573,7 +565,7 @@ public final class RequestQueueClient extends Thread {
 	    @Override
 	    public void run() {
 		try {
-		    while (!getDisconnectRequested()) {
+		    while (!disconnect) {
 			Throwable requestException = readResponse();
 			noteConnected();
 			RequestHolder holder = sentRequests.removeFirst();

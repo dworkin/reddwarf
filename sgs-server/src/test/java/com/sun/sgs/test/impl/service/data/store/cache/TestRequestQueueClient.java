@@ -154,11 +154,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1, socketFactory, failureHandler, props);
 	clientThread = new InterruptableThread() {
 	    boolean runOnce() throws Exception {
-		if (!client.addRequest(new DummyRequest())) {
-		    System.err.println("Queue full -- waiting");
-		    Thread.sleep(10);
+		try {
+		    client.addRequest(new DummyRequest());
+		} catch (IllegalStateException e) {
 		}
-		return false;
+		return true;
 	    }
 	};
 	clientThread.start();
@@ -201,7 +201,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1, socketFactory, noopRunnable, emptyProperties);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
-	Throwable exception = request.awaitCompleted(20000/*EXTRA_WAIT*/);
+	Throwable exception = request.awaitCompleted(extraWait);
 	if (exception == null) {
 	    fail("Expected non-null result");
 	}

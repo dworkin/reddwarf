@@ -204,6 +204,7 @@ public class RequestQueueServer<R extends Request> {
 	 * @param	socket the new socket
 	 */
 	Connection(Socket socket) throws IOException {
+	    super("RequestQueueServer.Connection");
 	    this.socket = socket;
 	    in = new DataInputStream(
 		new BufferedInputStream(
