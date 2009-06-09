@@ -319,6 +319,15 @@ public class SimpleClient implements ServerSession {
          */
         private volatile boolean redirect = false;
 
+        /**
+         *  Store the login failure message sent by the server. This will be
+         * held until the disconnection from the server is confirmed by a call
+         * to disconnected, at which point the application's loginFailure callback
+         * will be called with this string as the reason.
+         */
+         private String loginFailureMsg;
+
+
 	/** Constructs an instance. */
 	SimpleClientConnectionListener() {
 	}
@@ -527,7 +536,6 @@ public class SimpleClient implements ServerSession {
             clientListener.loggedIn();
         }
         
-        private String loginFailureMsg;
         /**
          * Process a login failure message
          * 
@@ -547,7 +555,6 @@ public class SimpleClient implements ServerSession {
                                     "Disconnecting after login failure throws");
                 }
             }
-            //clientListener.loginFailed(reason);
             loginFailureMsg = reason;
         }
         
