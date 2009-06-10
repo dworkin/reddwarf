@@ -16,6 +16,16 @@
       <artifactId>sgs-server-api</artifactId>
       <version>${sgs-server.version}</version>
     </dependency>
+    <dependency>
+        <groupId>com.projectdarkstar.server</groupId>
+        <artifactId>sgs-shared</artifactId>
+        <version>$sgs-server.version</version>
+    </dependency>
+    <dependency>
+        <groupId>com.projectdarkstar.client</groupId>
+        <artifactId>sgs-client</artifactId>
+        <version>${sgs-client.version}</version>
+    </dependency>
   </dependencies>
   <description>Validate client API by iterating through all protocol messages.</description>
 
