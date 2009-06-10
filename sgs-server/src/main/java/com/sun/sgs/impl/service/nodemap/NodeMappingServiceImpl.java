@@ -580,6 +580,15 @@ public class NodeMappingServiceImpl
         // saving a remote call.  However, it makes the logic here
         // more complicated, and it means we duplicate some of the
         // server's work.  Best to always ask the server to handle it.
+        //
+        // Note for all uses of runIoTask in this class:  if we cannot
+        // contact the server, we ask that the local node be shut down.
+        // This is because "server" is the core server, which contains
+        // the data store.  If it is shutdown, the entire cluster is
+        // shut down.  If we have a loss of connectivity with the server,
+        // we assume the problem is with the local node.  If the core server
+        // is disconnected from all nodes, the watchdog server will eventually
+        // detect that and declare all nodes dead.
         runIoTask(
             new IoRunnable() {
                 public void run() throws IOException {
@@ -845,7 +854,7 @@ public class NodeMappingServiceImpl
             }
         }
         
-        public void prepareRelocate(Identity id, long newNode) {
+        public void prepareRelocate(Identity id, long newNodeId) {
             if (idRelocationListeners.isEmpty()) {
                 // There's no work to do.
                 tellServerCanMove(id);
@@ -864,7 +873,7 @@ public class NodeMappingServiceImpl
                     logger.log(Level.FINEST, 
                                "Queuing added notification for " +
                                "identity: {0}, " + "newNode: {1}}", 
-                               id, newNode);
+                               id, newNodeId);
                     for (IdentityRelocationListener listener : 
                          idRelocationListeners) 
                     {
@@ -873,7 +882,7 @@ public class NodeMappingServiceImpl
                         handlerQueue.add(handler);
                         TaskReservation res =
                             taskScheduler.reserveTask(
-                                new MapRelocateTask(listener, id, newNode, 
+                                new MapRelocateTask(listener, id, newNodeId,
                                                     handler),
                                 taskOwner);
                         pendingNotifications.add(res);
@@ -890,7 +899,7 @@ public class NodeMappingServiceImpl
                         new PrepareMoveCompletionHandler(id);
                 handlerQueue.add(handler);
                 taskScheduler.scheduleTask(
-                    new MapRelocateTask(listener, id, newNode, handler),
+                    new MapRelocateTask(listener, id, newNodeId, handler),
                     taskOwner);
             }
         }
@@ -943,20 +952,20 @@ public class NodeMappingServiceImpl
     private static final class MapRelocateTask extends AbstractKernelRunnable {
         final IdentityRelocationListener listener;
         final Identity id;
-        final long newNode;
+        final long newNodeId;
         final SimpleCompletionHandler handler;
         MapRelocateTask(IdentityRelocationListener listener, 
-                        Identity id, long newNode, 
+                        Identity id, long newNodeId,
                         SimpleCompletionHandler handler)
         {
 	    super(null);
             this.listener = listener;
             this.id = id;
-            this.newNode = newNode;
+            this.newNodeId = newNodeId;
             this.handler = handler;
         }
         public void run() {
-            listener.prepareToRelocate(id, newNode, handler);
+            listener.prepareToRelocate(id, newNodeId, handler);
         }
     }
     
@@ -1054,7 +1063,7 @@ public class NodeMappingServiceImpl
     {
 	/** The identity. */
 	private final Identity id;
-	/** Indicates whether recovery is done. */
+	/** Indicates whether relocation preparation is done for {@code id}. */
 	private boolean isDone = false;
 
 	/**

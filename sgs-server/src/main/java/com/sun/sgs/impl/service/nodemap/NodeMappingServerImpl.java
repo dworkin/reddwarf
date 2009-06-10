@@ -95,7 +95,7 @@ import java.util.logging.Logger;
  *      <i>Default:</i> {@code 5000} 
  *
  * <dd style="padding-top: .5em">
- *      The mimimum time, in milliseconds, that this server will wait before
+ *      The minimum time, in milliseconds, that this server will wait before
  *      removing a potentially inactive identity from the map.   This value
  *      must be greater than {@code 0}.   Shorter expiration times cause the
  *      map to be cleaned up more frequently, potentially causing more
@@ -667,7 +667,6 @@ public final class NodeMappingServerImpl
         }
     }    
     
-    // TODO Perhaps need to have a separate thread do this work.
     // TODO Perhaps will want to batch notifications.
     private void notifyListeners(final Node oldNode, final Node newNode,
                                  final Identity id)
@@ -1000,20 +999,17 @@ public final class NodeMappingServerImpl
             GetIdOnNodeTask task = 
                     new GetIdOnNodeTask(dataService, nodekey, logger);
             
-            boolean done = false;
-            while (!done) {
+            while (true) {
                 // Break out of the loop if we're shutting down.
                 if (shuttingDown()) {
-                    done = true;
                     break;
                 }
                 try {
                     // Find an identity on the node
                     runTransactionally(task);
-                    done = task.done();
                 
                     // Move it, removing old mapping
-                    if (!done) {
+                    if (!task.done()) {
                         Identity id = task.getId().getIdentity();
                         try {
                             // If we're already trying to move the identity,
@@ -1036,15 +1032,14 @@ public final class NodeMappingServerImpl
                             // somewhere of failed nodes, and have a background
                             // thread that tries to move them.
                             removeQueue.add(new RemoveInfo(id));
-                            done = true;
+                            break;
                         }
-                    }
-                
+                    }                
                 } catch (Exception ex) {
-                    done = true;
                     logger.logThrow(Level.WARNING, ex, 
                         "Failed to move identity {0} from failed node {1}", 
                         task.getId(), node);
+                    break;
                 }
             }
         }
