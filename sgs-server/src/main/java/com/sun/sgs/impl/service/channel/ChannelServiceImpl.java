@@ -24,6 +24,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -66,6 +67,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -181,6 +183,12 @@ public final class ChannelServiceImpl
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
 	localPerSessionChannelsMap =
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
+
+    /** Map of completion handlers for relocating client sessions, keyed by
+     * session ID. */
+    private final ConcurrentHashMap<BigInteger, SimpleCompletionHandler>
+	relocatingSessions =
+	    new ConcurrentHashMap<BigInteger, SimpleCompletionHandler>();
 
     /** The map of channel coordinator task queues, keyed by channel ID.
      * A coordinator task queue orders the delivery of incoming
@@ -597,18 +605,7 @@ public final class ChannelServiceImpl
 		}
 
 		// Update local channel membership cache.
-		Set<BigInteger> localMembers =
-		    localChannelMembersMap.get(channelRefId);
-		if (localMembers == null) {
-		    Set<BigInteger> newLocalMembers =
-			Collections.synchronizedSet(new HashSet<BigInteger>());
-		    localMembers = localChannelMembersMap.
-			putIfAbsent(channelRefId, newLocalMembers);
-		    if (localMembers == null) {
-			localMembers = newLocalMembers;
-		    }
-		}
-		localMembers.add(sessionRefId);
+		addLocalChannelMember(channelRefId, sessionRefId);
 
 		// Update per-session channel set cache.
 		Set<BigInteger> channelSet =
@@ -780,6 +777,64 @@ public final class ChannelServiceImpl
 		callFinished();
 	    }
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void relocateChannelMemberships(
+	    BigInteger sessionRefId, long oldNode, BigInteger[] channelRefIds)
+	{
+	    Set<BigInteger> channelSet =
+		Collections.synchronizedSet(new HashSet<BigInteger>());
+	    localPerSessionChannelsMap.put(sessionRefId, channelSet);
+	    
+	    for (BigInteger channelRefId : channelRefIds) {
+		// Update local channel membership cache.
+		addLocalChannelMember(channelRefId, sessionRefId);
+		// Update per-session channel set cache.
+		channelSet.add(channelRefId);
+	    }
+
+	    taskScheduler.scheduleTask(
+ 		new AddRelocatingSessionToChannels(sessionRefId, oldNode, channelSet),
+		taskOwner);
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	public void channelMembershipsUpdated(
+	    BigInteger sessionRefId, long newNode)
+	{
+	    // Remove session's channel membership set.
+	    Set<BigInteger> channelSet =
+		localPerSessionChannelsMap.remove(sessionRefId);
+	    // Remove session from locally cached channel membership lists
+	    // TBD: Are channel caches updated before channel membership cache
+	    // is xferred to new node?  Or should this be done here?
+	    for (BigInteger channelRefId : channelSet) {
+		Set<BigInteger> localMembers =
+		    localChannelMembersMap.get(channelRefId);
+		if (localMembers != null) {
+		    localMembers.remove(sessionRefId);
+		}
+	    }
+	    
+	    // Notify completion handler that relocation preparation is done.
+	    SimpleCompletionHandler handler =
+		relocatingSessions.get(sessionRefId);
+	    if (handler != null) {
+		handler.completed();
+	    }
+	    
+	    // Schedule task to remove channel memberships.
+	    if (channelSet != null) {
+		taskScheduler.scheduleTask(
+		    new RemoveRelocatingSessionFromChannels(
+			sessionRefId, channelSet),
+		    taskOwner);
+	    }
+	}
 	
 	/** {@inheritDoc}
 	 *
@@ -796,6 +851,24 @@ public final class ChannelServiceImpl
 	    }
 	}
     }
+
+    private void addLocalChannelMember(BigInteger channelRefId,
+				       BigInteger sessionRefId)
+    {
+	Set<BigInteger> localMembers =
+	    localChannelMembersMap.get(channelRefId);
+	if (localMembers == null) {
+	    Set<BigInteger> newLocalMembers =
+		Collections.synchronizedSet(new HashSet<BigInteger>());
+	    localMembers = localChannelMembersMap.
+		putIfAbsent(channelRefId, newLocalMembers);
+	    if (localMembers == null) {
+		localMembers = newLocalMembers;
+	    }
+	}
+	localMembers.add(sessionRefId);
+    }
+
 
     /* -- Implement TransactionContextFactory -- */
        
@@ -1034,6 +1107,13 @@ public final class ChannelServiceImpl
 				    localNodeId, sessionRefId, channelRefId);
 			    }
 			}, taskOwner);
+		    // Remove session from channel membership cache
+		    // NOTE: THIS FIXES A MEMORY LEAK!
+		    Set<BigInteger> localMembers =
+			localChannelMembersMap.get(channelRefId);
+		    if (localMembers != null) {
+			localMembers.remove(sessionRefId);
+		    }
 		}
 	    }
 	}
@@ -1044,9 +1124,28 @@ public final class ChannelServiceImpl
 	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
 				      SimpleCompletionHandler handler)
 	{
-	    handler.completed();
+	    Set<BigInteger> channelSet =
+		localPerSessionChannelsMap.get(sessionRefId);		
+	    if (channelSet == null) {
+		// The session is not a member of any channel.
+		handler.completed();
+	    } else {
+		// Transfer the session's channel membership cache to new node.
+		relocatingSessions.put(sessionRefId, handler);
+		try {
+		    // TBD:IoTask?
+		    getChannelServer(newNode).
+			relocateChannelMemberships(
+			    sessionRefId, localNodeId,
+			    channelSet.toArray(new BigInteger[0]));
+		    // TBD: Schedule task to disconnect session if the
+		    // channel memberships updated message hasn't been received
+		    // by a certain period of time.
+		} catch (IOException e) {
+		    // TBD: probably want to disconnect the session...
+		}
+	    }
 	}
-	    
     }
 
     /* -- Other methods and classes -- */
@@ -1287,5 +1386,142 @@ public final class ChannelServiceImpl
 	public void run() {
 	    channelServer = getChannelServerMap().get(Long.toString(nodeId));
 	}
+    }
+
+    private static Object getObjectForId(BigInteger refId) {
+	try {
+	    return getDataService().createReferenceForId(refId).get();
+	} catch (ObjectNotFoundException e) {
+	    return null;
+	}
+    }
+
+    /**
+     * A task that adds a relocating session to the next channel in the
+     * channel membership set (specified during construction) and then
+     * reschedules itself to handle the next channel.  If there are no
+     * more channels to handle, this task notifies the old node that the
+     * relocating session's channel memberships have been updated.
+     */
+    private class AddRelocatingSessionToChannels
+	extends AbstractKernelRunnable
+    {
+	private final BigInteger sessionRefId;
+	private final long oldNode;
+	private final Queue<BigInteger> channels =
+	    new LinkedList<BigInteger>();
+
+	/** Constructs an instance. */
+	AddRelocatingSessionToChannels(
+	    BigInteger sessionRefId, long oldNode, Set<BigInteger> channelSet)
+	{
+	    super(null);
+	    this.sessionRefId = sessionRefId;
+	    this.oldNode = oldNode;
+	    this.channels.addAll(channelSet);
+	}
+
+	/**
+	 * Adds the session to the next channel (if any) in the queue, or
+	 * if the queue is empty, notifies the old node's server that the
+	 * channel memberships have been updated.
+	 */
+	public void run() {
+	    final BigInteger channelRefId = channels.poll();
+	    if (channelRefId != null) {
+		try {
+		    // Add relocating client session to channel
+		    transactionScheduler.runTask(
+		      new AbstractKernelRunnable(
+			    "addRelocatingSessionToChannel")
+		      {
+			public void run() {
+			    ChannelImpl channelImpl = (ChannelImpl)
+				getObjectForId(channelRefId);
+			    if (channelImpl != null) {
+				channelImpl.addSessionRelocatingToLocalNode(
+				    sessionRefId);
+			    } else {
+				// TBD: throw Exception to indicate that
+				// channel has been closed so session
+				// should be notified (when relocated)
+				// via "leave" message?
+			    }
+			}
+		    }, taskOwner);
+		} catch (Exception e) {
+		    // TBD: exception handling...
+		}
+		taskScheduler.scheduleTask(this, taskOwner);
+		
+	    } else {
+		// Finished adding relocating session to channels, so notify
+		// old node that we are done.
+		ChannelServer server = getChannelServer(oldNode);
+		// TBD: ioTask?
+		try {
+		    server.channelMembershipsUpdated(sessionRefId, localNodeId);
+		} catch (IOException e) {
+		    // TBD: exception handling...
+		}
+	    }
+	}	
+    }
+
+    /**
+     * A task that removes a relocating session from the next channel
+     * in the channel membership set (specified during construction)
+     * and then reschedules itself to handle the next channel (if
+     * any).
+     */
+    private class RemoveRelocatingSessionFromChannels
+	extends AbstractKernelRunnable
+    {
+	private final BigInteger sessionRefId;
+	private final Queue<BigInteger> channels =
+	    new LinkedList<BigInteger>();
+
+	/** Constructs an instance. */
+	RemoveRelocatingSessionFromChannels(
+	    BigInteger sessionRefId, Set<BigInteger> channelSet)
+	{
+	    super(null);
+	    this.sessionRefId = sessionRefId;
+	    this.channels.addAll(channelSet);
+	}
+
+	/**
+	 * Removes the session from the next channel (if any) in the
+	 * queue.
+	 */
+	public void run() {
+	    final BigInteger channelRefId = channels.poll();
+	    if (channelRefId != null) {
+		try {
+		    // Remove relocating client session from channel
+		    transactionScheduler.runTask(
+		      new AbstractKernelRunnable(
+			    "removeRelocatingSessionFromChannel")
+		      {
+			public void run() {
+			    ChannelImpl channelImpl = (ChannelImpl)
+				getObjectForId(channelRefId);
+			    if (channelImpl != null) {
+				channelImpl.
+				    removeSessionRelocatingFromLocalNode(
+				        sessionRefId);
+			    }
+			}
+		    }, taskOwner);
+		} catch (Exception e) {
+		    // TBD: exception handling...
+		}
+	    }
+	    if (!channels.isEmpty()) {
+		taskScheduler.scheduleTask(this, taskOwner);
+	    } else {
+		relocatingSessions.remove(sessionRefId);
+	    }
+	}	
     }
 }

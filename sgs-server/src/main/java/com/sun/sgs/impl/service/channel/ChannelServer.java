@@ -116,6 +116,47 @@ public interface ChannelServer extends Remote {
 	throws IOException;
 
     /**
+     * Notifies this server that the client session with the specified {@code
+     * sessionRefId} is relocating from {@code oldNode} and that its channel
+     * memberships should be updated accordingly.  The {@code channelRefIds}
+     * array contains the channel ID of each channel that the client session
+     * belongs to.  This server must update its local channel membership
+     * cache for the specified session and add persistent membership
+     * information to indicate that the specified session on the local node
+     * is now joined to each channel.  When the cache and persistent
+     * membership information is updated, the {@link
+     * #ChannelMembershipsUpdated channelMembershipsUpdated} method should be
+     * invoked on the {@code oldNode}'s {@code ChannelServer} with the
+     * specified {@code sessionRefId} and the local node's ID.
+     *
+     * @param	sessionRefId the ID of a client session relocating to the
+     *		local node
+     * @param	oldNode the node the session is relocating from
+     * @param	channelRefIds an array that contains the channel ID of each
+     *		channel that the client session is a member of
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
+    void relocateChannelMemberships(BigInteger sessionRefId, long oldNode,
+				    BigInteger[] channelRefIds)
+	throws IOException;
+
+    /**
+     * Notifies this server that the client session with the specified {@code
+     * sessionRefId} has been relocated to {@code newNode} as previously
+     * requested by an invocation to {@link #relocateSession
+     * relocateSession}.
+     *
+     * @param	sessionRefId the ID of a client session relocating to {@code
+     *		newNode}
+     * @param	newNode the node the session is relocating to
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
+    void channelMembershipsUpdated(BigInteger sessionRefId, long newNode)
+	throws IOException;
+			 
+    /**
      * Notifies this server that the channel with the specified {@code
      * channelRefId} is closed.
      *

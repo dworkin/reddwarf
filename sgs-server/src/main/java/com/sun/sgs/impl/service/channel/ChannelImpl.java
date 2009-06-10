@@ -829,6 +829,22 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
+     * Adds the specified session (relocating to the local node) to
+     * this channel.
+     */
+    void addSessionRelocatingToLocalNode(BigInteger sessionRefId) {
+	getOrCreateSessionSet(getLocalNodeId()).add(sessionRefId);
+    }
+
+    /**
+     * Removes the specified session (relocating from the local
+     * node) to this channel.
+     */
+    void removeSessionRelocatingFromLocalNode(BigInteger sessionRefId) {
+	removeSession(getLocalNodeId(), sessionRefId, false);
+    }
+
+    /**
      * Removes from this channel the member session with the specified
      * {@code sessionRefId} that is connected to the node with the
      * specified {@code nodeId}, notifies the session's server that the
@@ -838,12 +854,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * action is taken and {@code false} is returned.
      */
     private boolean removeSession(
-	final long nodeId, final BigInteger sessionRefId)
+	long nodeId, BigInteger sessionRefId, boolean sendLeaveNotification)
     {
 	Set<BigInteger> sessionSet = getSessionSet(nodeId);
 	if (sessionSet != null) {
 	    if (sessionSet.remove(sessionRefId)) {
-		sendLeaveNotification(nodeId, sessionRefId);
+		if (sendLeaveNotification) {
+		    sendLeaveNotification(nodeId, sessionRefId);
+		}
 		if (sessionSet.isEmpty()) {
 		    removeSessionSet(nodeId);
 		}
@@ -956,7 +974,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     {
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
-	    channel.removeSession(nodeId, sessionRefId);
+	    channel.removeSession(nodeId, sessionRefId, true);
 	} else {
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "channel already removed:{0}",
@@ -1500,7 +1518,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    "unable to obtain client session for ID:{0}", this);
 		return;
 	    }
-	    if (!channel.removeSession(getNodeId(session), sessionRefId)) {
+	    if (!channel.removeSession(getNodeId(session), sessionRefId, true)) {
 		return;
 	    }
 	}
