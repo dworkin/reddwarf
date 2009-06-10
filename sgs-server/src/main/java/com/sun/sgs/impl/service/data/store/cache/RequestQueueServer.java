@@ -242,35 +242,52 @@ public class RequestQueueServer<R extends Request> {
 	    try {
 		while (!disconnect) {
 		    short requestNumber = in.readShort();
-		    if (earlierRequest(lastRequest, requestNumber)) {
-			R request = requestHandler.readRequest(in);
+		    R request = requestHandler.readRequest(in);
+		    if (logger.isLoggable(FINEST)) {
+			logger.log(FINEST,
+				   "RequestQueueServer received request" +
+				   " requestNumber:" + requestNumber +
+				   ", request:" + request);
+		    }
+		    if (!earlierRequest(lastRequest, requestNumber)) {
+			out.writeBoolean(true);
+			out.flush();
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(FINEST,
-				       "RequestQueueServer received" +
+				       "RequestQueueServer request already" +
+				       " handled: " +
 				       " requestNumber:" + requestNumber +
 				       ", request:" + request);
 			}
+		    } else {
+			Throwable result;
 			try {
 			    requestHandler.performRequest(request);
+			    result = null;
+			} catch (Throwable t) {
+			    result = t;
+			}
+			if (result == null) {
 			    out.writeBoolean(true);
 			    out.flush();
 			    if (logger.isLoggable(FINEST)) {
 				logger.log(
 				    FINEST,
 				    "RequestQueueServer request succeeded" +
-				    " requestNumber:" + requestNumber);
-
+				    " requestNumber:" + requestNumber +
+				    ", request:" + request);
 			    }
-			} catch (Throwable t) {
+			} else {
 			    out.writeBoolean(false);
-			    writeString(t.getClass().getName(), out);
-			    writeString(t.getMessage(), out);
+			    writeString(result.getClass().getName(), out);
+			    writeString(result.getMessage(), out);
 			    out.flush();
 			    if (logger.isLoggable(FINEST)) {
 				logger.logThrow(
-				    FINEST, t,
+				    FINEST, result,
 				    "RequestQueueServer request throws" +
-				    " requestNumber:" + requestNumber);
+				    " requestNumber:" + requestNumber +
+				    ", request:" + request);
 			    }
 			}
 			lastRequest = requestNumber;

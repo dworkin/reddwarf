@@ -39,9 +39,17 @@ import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.FilterInputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Properties;
+import java.util.Random;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -208,6 +216,101 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	System.err.println(exception);
     }
 
+    @Test
+    public void testAddRequestStream() throws Exception {
+	final int total = Integer.getInteger("test.message.count", 1000);
+	final BlockingDeque<SimpleRequest> requests =
+	    new LinkedBlockingDeque<SimpleRequest>();
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		new SimpleRequestHandler(), emptyProperties));
+	client = new RequestQueueClient(
+	    1, socketFactory, noopRunnable, emptyProperties);
+	clientThread = new InterruptableThread() {
+	    private int count = 0;
+	    boolean runOnce() throws Exception {
+		SimpleRequest request = new SimpleRequest(++count);
+		client.addRequest(request);
+		requests.putLast(request);
+		return count > total;
+	    }
+	};
+	long start = System.currentTimeMillis();
+	clientThread.start();
+	InterruptableThread receiveThread = new InterruptableThread() {
+	    private int count = 0;
+	    boolean runOnce() throws Exception {
+		SimpleRequest request = requests.takeFirst();
+		Throwable exception = request.awaitCompleted(extraWait);
+		int n = Integer.parseInt(exception.getMessage());
+		++count;
+		assertEquals(count, n);
+		return count > total;
+	    }
+	};
+	try {
+	    receiveThread.start();
+	    receiveThread.join();
+	    long elapsed = System.currentTimeMillis() - start;
+	    System.err.println(total + " messages in " + elapsed + " ms: " +
+			       (((double) elapsed) / total) + " ms/message");
+	} finally {
+	    receiveThread.shutdown();
+	}
+    }
+
+    @Test
+    public void testAddRequestStreamWithFailures() throws Exception {
+	final int total = Integer.getInteger("test.message.count", 1000);
+	final long seed = Long.getLong(
+	    "test.seed", System.currentTimeMillis());
+	System.err.println("test.seed=" + seed);
+	final BlockingDeque<SimpleRequest> requests =
+	    new LinkedBlockingDeque<SimpleRequest>();
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		new FailingRequestHandler(new Random(seed)), emptyProperties));
+	client = new RequestQueueClient(
+	    1, new FailingSocketFactory(new Random(seed + 1)), noopRunnable,
+	    emptyProperties);
+	clientThread = new InterruptableThread() {
+	    private int count = 0;
+	    boolean runOnce() throws Exception {
+		SimpleRequest request = new SimpleRequest(++count);
+		client.addRequest(request);
+		requests.putLast(request);
+		return count > total;
+	    }
+	};
+	clientThread.start();
+	InterruptableThread receiveThread = new InterruptableThread() {
+	    private int count = 0;
+	    boolean runOnce() throws Exception {
+		SimpleRequest request = requests.takeFirst();
+		Throwable exception = request.awaitCompleted(2000);
+		int n;
+		if (exception == null) {
+		    n = -1;
+		} else {
+		    n = Integer.parseInt(exception.getMessage());
+		}
+		++count;
+		if (n != -1) {
+		    assertEquals(count, n);
+		}
+		return count > total;
+	    }
+	};
+	try {
+	    receiveThread.start();
+	    receiveThread.join();
+	} finally {
+	    receiveThread.shutdown();
+	}
+    }
+
     /* -- Other classes and methods -- */
 
     private static class SimpleRequestHandler
@@ -232,7 +335,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    n = in.readInt();
 	}
 	void perform() {
-	    throw new RuntimeException("Exception for request " + n);
+	    throw new RuntimeException(String.valueOf(n));
 	}
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.writeInt(n);
@@ -261,6 +364,89 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	}
 	public String toString() {
 	    return "SimpleRequest[n:" + n + "]";
+	}
+    }
+
+    private static class FailingRequestHandler extends SimpleRequestHandler {
+	private final Random random;
+	private int count;
+	FailingRequestHandler(Random random) {
+	    this.random = random;
+	}
+	public SimpleRequest readRequest(DataInput in) throws IOException {
+	    if ((count++ % 20) >= 10 && random.nextInt(10) == 0) {
+		throw new IOException("Random server request I/O failure");
+	    }
+	    return new SimpleRequest(in);
+	}
+    }   
+
+    private static class FailingSocketFactory implements SocketFactory {
+	private final Random random;
+	FailingSocketFactory(Random random) {
+	    this.random = random;
+	}
+	public Socket createSocket() throws IOException {
+	    return new RandomFailingSocket();
+	}
+	private class RandomFailingSocket extends Socket {
+	    RandomFailingSocket() throws IOException {
+		super("localhost", PORT);
+	    }
+	    public InputStream getInputStream() throws IOException {
+		return new WrappedInputStream(super.getInputStream());
+	    }
+	    public OutputStream getOutputStream() throws IOException {
+		return new WrappedOutputStream(super.getOutputStream());
+	    }
+	}
+	private class WrappedInputStream extends FilterInputStream {
+	    private int count;
+	    WrappedInputStream(InputStream in) {
+		super(in);
+	    }
+	    private int maybeFail(int n) throws IOException {
+		int c = Math.max(1, n);
+		count += c;
+		if ((count % 1000) < 500 && random.nextInt(100) == 0) {
+		    throw new IOException("Random client receive I/O failure");
+		}
+		return n;
+	    }
+	    public int read() throws IOException {
+		return maybeFail(super.read());
+	    }
+	    public int read(byte b[]) throws IOException {
+		return maybeFail(super.read(b));
+	    }
+	    public int read(byte b[], int off, int len) throws IOException {
+		return maybeFail(super.read(b, off, len));
+	    }
+	}
+	private class WrappedOutputStream extends FilterOutputStream {
+	    private int count;
+	    private void maybeFail(int n) throws IOException {
+		int c = Math.max(1, n);
+		count += c;
+		if ((count % 1000) > 500 && random.nextInt(100) == 0) {
+		    throw new IOException("Random client send I/O failure");
+		}
+	    }
+	    WrappedOutputStream(OutputStream out) {
+		super(out);
+	    }
+	    public void write(int b) throws IOException {
+		maybeFail(1);
+		super.write(b);
+	    }
+	    public void write(byte b[]) throws IOException {
+		maybeFail(b.length);
+		super.write(b);
+	    }
+	    public void write(byte b[], int off, int len) throws IOException {
+		maybeFail(len);
+		super.write(b, off, len);
+	    }
 	}
     }
 }

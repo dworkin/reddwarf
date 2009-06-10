@@ -540,6 +540,9 @@ public final class RequestQueueClient extends Thread {
 	    /** The data input stream. */
 	    private final DataInput in;
 
+	    /** Whether any input has been received from the input stream. */
+	    private boolean inputReceived;
+
 	    /**
 	     * The exception thrown when reading server input or {@code null}.
 	     * Synchronize on this thread when accessing this field.
@@ -567,7 +570,10 @@ public final class RequestQueueClient extends Thread {
 		try {
 		    while (!disconnect) {
 			Throwable requestException = readResponse();
-			noteConnected();
+			if (!inputReceived) {
+			    noteConnected();
+			    inputReceived = true;
+			}
 			RequestHolder holder = sentRequests.removeFirst();
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(

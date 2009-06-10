@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.service.data.store.cache.Request;
+import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.DataInput;
@@ -358,12 +359,13 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     public void testRequestPerformIgnoreDuplicates() throws Exception {
 	final AtomicInteger requests = new AtomicInteger();
 	server = new RequestQueueServer<Request>(
-	    new DummyRequestHandler() {
+	    new RequestHandler<Request>() {
 		public Request readRequest(DataInput in) throws IOException {
-		    requests.incrementAndGet();
 		    return new DummyRequest();
 		}
-		public void performRequest(Request request) { }
+		public void performRequest(Request request) {
+		    requests.incrementAndGet();
+		}
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
@@ -399,12 +401,13 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     {
 	final AtomicInteger requests = new AtomicInteger();
 	server = new RequestQueueServer<Request>(
-	    new DummyRequestHandler() {
+	    new RequestHandler<Request>() {
 		public Request readRequest(DataInput in) throws IOException {
-		    requests.incrementAndGet();
 		    return new DummyRequest();
 		}
-		public void performRequest(Request request) { }
+		public void performRequest(Request request) {
+		    requests.incrementAndGet();
+		}
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
