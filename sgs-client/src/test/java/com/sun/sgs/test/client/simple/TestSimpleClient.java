@@ -347,6 +347,8 @@ public class TestSimpleClient extends TestCase {
 		client.wait(TIMEOUT);
 	    }
 	    assertTrue(listener.loginFailed);
+            assertFalse(listener.loggedIn);
+            listener.loginFailed = false;
             listener.setAuthentication(
                     new PasswordAuthentication("guest", password));
             client.login(props);
@@ -354,6 +356,7 @@ public class TestSimpleClient extends TestCase {
                 client.wait(TIMEOUT);
             }
             assertTrue(listener.loggedIn);
+            assertFalse(listener.loginFailed);
         } finally {
             server.shutdown();
         }
