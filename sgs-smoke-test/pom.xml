@@ -19,7 +19,8 @@
     <dependency>
         <groupId>com.projectdarkstar.server</groupId>
         <artifactId>sgs-shared</artifactId>
-        <version>$sgs-server.version</version>
+        <classifier>sources</classifier>
+        <version>${sgs-shared.version}</version>
     </dependency>
     <dependency>
         <groupId>com.projectdarkstar.client</groupId>
@@ -171,6 +172,8 @@ A
     <node.type>single</node.type>
     <shutdown.port>1138</shutdown.port>
     <app.port>1139</app.port>
+    <sgs-shared.version>1.7</sgs-shared.version>
+    <sgs-client.version>0.9.11-SNAPSHOT</sgs-client.version>
   </properties>
 
   <repositories>

@@ -58,7 +58,7 @@ public class SmokeTestClient implements SimpleClientListener {
      */
     public final static void main(String[] args) {
 
-        props = parseArgs(args);
+        props = buildProperties();
         SmokeTestClient testClient = new SmokeTestClient();
         testClient.start();
         synchronized (testClient) {
@@ -286,30 +286,14 @@ public class SmokeTestClient implements SimpleClientListener {
      * @return a property object that can be passed in to the
      * {@link SimpleClient.login} method of the {@link SimpleClient}.
      */
-    private static Properties parseArgs(String[] args) {
-        Properties returnProps = new Properties();
-        boolean error = false;
-
-        for (int i = 0; i < args.length; i++) {
-            if (args[i].equals("-usage")) {
-                printUse();
-            }
-            if (args[i].equals("host") || args[i].equals("host=")) {
-                if (args[++i].equals("=")) {
-                    i++;
-                }
-                host = args[i];
-            }
-            if (args[i].equals("port") || args[i].equals("port=")) {
-                if (args[++i].equals("=")) {
-                    i++;
-                }
-                port = args[i];
-            }
+    private static Properties buildProperties() {
+        if (System.getProperty("host") == null){
+            System.setProperty("host", host);
         }
-        returnProps.put("host", host);
-        returnProps.put("port", port);
-        return (returnProps);
+        if (System.getProperty("port") == null){
+            System.setProperty("port", port);
+        }
+        return (System.getProperties());
     }
 
     /**
