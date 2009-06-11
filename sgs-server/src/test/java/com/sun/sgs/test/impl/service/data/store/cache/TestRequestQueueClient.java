@@ -128,6 +128,12 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 
     /* Test constructor */
 
+    @Test(expected=IllegalArgumentException.class)
+    public void testConstructorNegativeNodeId() {
+	new RequestQueueClient(
+	    -1, socketFactory, noopRunnable, emptyProperties);
+    }
+
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocketFactory() {
 	new RequestQueueClient(1, null, noopRunnable, emptyProperties);
@@ -146,9 +152,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     /* Test connection handling */
 
     @Test
-    public void testConnectionFails() throws Exception {
+    public void testConnectionServerSocketClosed() throws Exception {
 	listener.shutdown();
-	listener = null;
 	NoteRun failureHandler = new NoteRun();
 	client = new RequestQueueClient(
 	    1, socketFactory, failureHandler, props);
@@ -160,16 +165,6 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	NoteRun failureHandler = new NoteRun();
 	client = new RequestQueueClient(
 	    1, socketFactory, failureHandler, props);
-	clientThread = new InterruptableThread() {
-	    boolean runOnce() throws Exception {
-		try {
-		    client.addRequest(new DummyRequest());
-		} catch (IllegalStateException e) {
-		}
-		return true;
-	    }
-	};
-	clientThread.start();
 	failureHandler.checkRun(MAX_RETRY);
     }	
 
@@ -204,27 +199,88 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		new SimpleRequestHandler(), emptyProperties));
+		1, new SimpleRequestHandler(), emptyProperties));
 	client = new RequestQueueClient(
 	    1, socketFactory, noopRunnable, emptyProperties);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
-	Throwable exception = request.awaitCompleted(extraWait);
-	if (exception == null) {
-	    fail("Expected non-null result");
-	}
-	System.err.println(exception);
+	assertEquals(null, request.awaitCompleted(extraWait));
+    }
+
+    /* Test shutdown */
+
+    @Test
+    public void testShutdownNoRequests() {
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		1, new SimpleRequestHandler(), emptyProperties));
+	NoteRun failureHandler = new NoteRun();
+	client = new RequestQueueClient(
+	    1, socketFactory, failureHandler, emptyProperties);
+	client.shutdown();
+	client.shutdown();
+	failureHandler.checkNotRun();
     }
 
     @Test
-    public void testAddRequestStream() throws Exception {
+    public void testShutdownAfterRequest() throws Exception {
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		1, new SimpleRequestHandler(), emptyProperties));
+	NoteRun failureHandler = new NoteRun();
+	client = new RequestQueueClient(
+	    1, socketFactory, failureHandler, emptyProperties);
+	SimpleRequest request = new SimpleRequest(1);
+	client.addRequest(request);
+	assertEquals(null, request.awaitCompleted(extraWait));
+	client.shutdown();
+	client.shutdown();
+	failureHandler.checkNotRun();
+    }
+
+    @Test
+    public void testShutdownDuringRequests() throws Exception {
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		1, new SimpleRequestHandler(), emptyProperties));
+	NoteRun failureHandler = new NoteRun();
+	client = new RequestQueueClient(
+	    1, socketFactory, failureHandler, emptyProperties);
+	final SimpleRequest firstRequest = new SimpleRequest(1);
+	clientThread = new InterruptableThread() {
+	    private int next = 1;
+	    boolean runOnce() {
+		try {
+		    client.addRequest(
+			(next == 1 ? firstRequest : new SimpleRequest(next)));
+		    next++;
+		    return false;
+		} catch (IllegalStateException e) {
+		    return true;
+		}
+	    }
+	};
+	clientThread.start();
+	assertEquals(null, firstRequest.awaitCompleted(100000));
+	client.shutdown();
+	client.shutdown();
+	failureHandler.checkNotRun();
+    }
+
+    /* Test sending requests */
+
+    @Test
+    public void testSendRequests() throws Exception {
 	final int total = Integer.getInteger("test.message.count", 1000);
 	final BlockingDeque<SimpleRequest> requests =
 	    new LinkedBlockingDeque<SimpleRequest>();
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		new SimpleRequestHandler(), emptyProperties));
+		1, new SimpleRequestHandler(), emptyProperties));
 	client = new RequestQueueClient(
 	    1, socketFactory, noopRunnable, emptyProperties);
 	clientThread = new InterruptableThread() {
@@ -242,15 +298,12 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    private int count = 0;
 	    boolean runOnce() throws Exception {
 		SimpleRequest request = requests.takeFirst();
-		Throwable exception = request.awaitCompleted(extraWait);
-		int n = Integer.parseInt(exception.getMessage());
-		++count;
-		assertEquals(count, n);
-		return count > total;
+		assertEquals(null, request.awaitCompleted(extraWait));
+		return ++count > total;
 	    }
 	};
+	receiveThread.start();
 	try {
-	    receiveThread.start();
 	    receiveThread.join();
 	    long elapsed = System.currentTimeMillis() - start;
 	    System.err.println(total + " messages in " + elapsed + " ms: " +
@@ -260,18 +313,27 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	}
     }
 
+    /**
+     * Test sending a stream of requests while there are random failures on the
+     * client and the server.  Also test having the last 50 requests throw a
+     * different exception, and make sure that only the first of those requests
+     * gets performed.
+     */
     @Test
-    public void testAddRequestStreamWithFailures() throws Exception {
-	final int total = Integer.getInteger("test.message.count", 1000);
-	final long seed = Long.getLong(
-	    "test.seed", System.currentTimeMillis());
+    public void testSendRequestsWithIOFailures() throws Exception {
+	final int total =
+	    Math.max(100, Integer.getInteger("test.message.count", 1000));
+	final long seed =
+	    Long.getLong("test.seed", System.currentTimeMillis());
 	System.err.println("test.seed=" + seed);
 	final BlockingDeque<SimpleRequest> requests =
 	    new LinkedBlockingDeque<SimpleRequest>();
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		new FailingRequestHandler(new Random(seed)), emptyProperties));
+		1,
+		new FailingRequestHandler(new Random(seed), total - 50),
+		emptyProperties));
 	client = new RequestQueueClient(
 	    1, new FailingSocketFactory(new Random(seed + 1)), noopRunnable,
 	    emptyProperties);
@@ -287,35 +349,62 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	clientThread.start();
 	InterruptableThread receiveThread = new InterruptableThread() {
 	    private int count = 0;
+	    private String lastMessage;
 	    boolean runOnce() throws Exception {
 		SimpleRequest request = requests.takeFirst();
-		Throwable exception = request.awaitCompleted(2000);
-		int n;
-		if (exception == null) {
-		    n = -1;
-		} else {
-		    n = Integer.parseInt(exception.getMessage());
-		}
+		Throwable result = request.awaitCompleted(10000);
 		++count;
-		if (n != -1) {
-		    assertEquals(count, n);
+		if (count < total - 50) {
+		    assertEquals(null, result);
+		} else {
+		    assertEquals(RuntimeException.class, result.getClass());
+		    if (lastMessage == null) {
+			lastMessage = result.getMessage();
+		    } else {
+			assertEquals(lastMessage, result.getMessage());
+		    }
 		}
 		return count > total;
 	    }
 	};
+	receiveThread.start();
 	try {
-	    receiveThread.start();
 	    receiveThread.join();
 	} finally {
 	    receiveThread.shutdown();
 	}
     }
 
+    @Test
+    public void testSendRequestNoResponse() throws Exception {
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		1, 
+		new SimpleRequestHandler() {
+		    public void performRequest(SimpleRequest request)
+			throws Exception
+		    {
+			Thread.sleep(4 * MAX_RETRY);
+		    }
+		},
+		props));
+	NoteRun failureHandler = new NoteRun();
+	client = new RequestQueueClient(
+	    1, socketFactory, failureHandler, props);
+	client.addRequest(new SimpleRequest(1));
+	failureHandler.checkRun(2 * MAX_RETRY);
+    }
+
     /* -- Other classes and methods -- */
 
+    /** A request handler for {@link SimpleRequest}. */
     private static class SimpleRequestHandler
 	implements RequestHandler<SimpleRequest>
     {
+	SimpleRequestHandler() {
+	    SimpleRequest.resetLastPerformed();
+	}
 	public SimpleRequest readRequest(DataInput in) throws IOException {
 	    return new SimpleRequest(in);
 	}
@@ -324,31 +413,88 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	}
     }
 
+    /** Numbered requests that checks that they are performed in order. */
     private static class SimpleRequest implements Request {
+
+	/** The last request performed or {@code 0}. */
+	private static int lastPerformed = 0;
+
+	/** The number of this request. */
 	private final int n;
+
+	/** Whether this request has been completed. */
 	private boolean completed;
+
+	/**
+	 * If this request has been completed, the exception thrown or {@code
+	 * null}.
+	 */
 	private Throwable exception;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	n the number of this request
+	 */
 	SimpleRequest(int n) {
 	    this.n = n;
 	}
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	in the data input stream for reading the number of this
+	 *		request
+	 * @throws	IOException if an I/O failure occurs
+	 */
+
 	SimpleRequest(DataInput in) throws IOException {
 	    n = in.readInt();
 	}
-	void perform() {
-	    throw new RuntimeException(String.valueOf(n));
+
+	/** Resets the number of the last request performed. */
+	static synchronized void resetLastPerformed() {
+	    lastPerformed = 0;
 	}
+
+	/** Performs this request. */
+	void perform() {
+	    synchronized (SimpleRequest.class) {
+		if (n != lastPerformed + 1) {
+		    throw new RuntimeException(
+			"Performing request " + n + ", but expected " +
+			(lastPerformed + 1));
+		}
+		lastPerformed = n;
+	    }
+	}
+
+	/** {@inheritDoc} */
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.writeInt(n);
 	}
+
+	/** {@inheritDoc} */
 	public synchronized void completed(Throwable exception) {
 	    completed = true;
 	    this.exception = exception;
 	    notifyAll();
 	}
-	public synchronized Throwable awaitCompleted(long timeout)
+
+	/**
+	 * Waits for the request to be completed.
+	 *
+	 * @param	timeout the number of milliseconds to wait
+	 * @return	the exception thrown when performing the request or
+	 *		{@code null}
+	 * @throws	InterruptedException if the current thread is
+	 *		interrupted 
+	 */
+	synchronized Throwable awaitCompleted(long timeout)
 	    throws InterruptedException
 	{
-	    long stop = System.currentTimeMillis() + timeout;
+	    long start = System.currentTimeMillis();
+	    long stop = start + timeout;
 	    while (!completed) {
 		long wait = stop - System.currentTimeMillis();
 		if (wait <= 0) {
@@ -360,27 +506,51 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    if (!completed) {
 		fail("Not completed");
 	    }
+	    System.err.println("SimpleRequest.awaitCompleted actual wait: " +
+			       (System.currentTimeMillis() - start));
 	    return exception;
 	}
+
+	@Override
 	public String toString() {
 	    return "SimpleRequest[n:" + n + "]";
 	}
     }
 
+    /**
+     * Defines a request handler which gets I/O failures randomly in the second
+     * half of each group of 20 requests read, and which fails when performing
+     * requests starting with the specified request number.
+     */
     private static class FailingRequestHandler extends SimpleRequestHandler {
 	private final Random random;
-	private int count;
-	FailingRequestHandler(Random random) {
+	private final int requestFails;
+	private int readCount;
+	private int performCount;
+	FailingRequestHandler(Random random, int requestFails) {
 	    this.random = random;
+	    this.requestFails = requestFails;
 	}
 	public SimpleRequest readRequest(DataInput in) throws IOException {
-	    if ((count++ % 20) >= 10 && random.nextInt(10) == 0) {
+	    if ((readCount++ % 20) >= 10 && random.nextInt(10) == 0) {
 		throw new IOException("Random server request I/O failure");
 	    }
 	    return new SimpleRequest(in);
 	}
+	public void performRequest(SimpleRequest request) throws Exception {
+	    if (++performCount >= requestFails) {
+		throw new RuntimeException("Request fails: " + performCount);
+	    } else {
+		super.performRequest(request);
+	    }
+	}
     }   
 
+    /**
+     * Defines a socket factory that generates sockets whose input stream fails
+     * randomly in the first half of each 1000 bytes of input and whose output
+     * stream fails randomly in the second half of each 1000 bytes of output.
+     */
     private static class FailingSocketFactory implements SocketFactory {
 	private final Random random;
 	FailingSocketFactory(Random random) {
@@ -401,14 +571,14 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    }
 	}
 	private class WrappedInputStream extends FilterInputStream {
-	    private int count;
+	    private int byteCount;
 	    WrappedInputStream(InputStream in) {
 		super(in);
 	    }
 	    private int maybeFail(int n) throws IOException {
-		int c = Math.max(1, n);
-		count += c;
-		if ((count % 1000) < 500 && random.nextInt(100) == 0) {
+		int numBytes = Math.max(1, n);
+		byteCount += numBytes;
+		if ((byteCount % 1000) < 500 && random.nextInt(100) == 0) {
 		    throw new IOException("Random client receive I/O failure");
 		}
 		return n;
@@ -424,11 +594,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    }
 	}
 	private class WrappedOutputStream extends FilterOutputStream {
-	    private int count;
+	    private int byteCount;
 	    private void maybeFail(int n) throws IOException {
-		int c = Math.max(1, n);
-		count += c;
-		if ((count % 1000) > 500 && random.nextInt(100) == 0) {
+		int numBytes = Math.max(1, n);
+		byteCount += numBytes;
+		if ((byteCount % 1000) > 500 && random.nextInt(100) == 0) {
 		    throw new IOException("Random client send I/O failure");
 		}
 	    }

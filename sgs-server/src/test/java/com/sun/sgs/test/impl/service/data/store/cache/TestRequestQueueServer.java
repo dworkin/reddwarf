@@ -22,10 +22,12 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
+import static com.sun.sgs.impl.util.DataStreamUtil.readString;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -75,14 +77,20 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     /* Test constructor */
 
+    @Test(expected=IllegalArgumentException.class)
+    public void testConstructorNegativeNodeId() {
+	new RequestQueueServer<Request>(
+	    -1, dummyRequestHandler, emptyProperties);
+    }
+
     @Test(expected=NullPointerException.class)
     public void testConstructorNullRequestHandler() {
-	new RequestQueueServer<Request>(null, emptyProperties);
+	new RequestQueueServer<Request>(1, null, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullProperties() {
-	new RequestQueueServer<Request>(dummyRequestHandler, null);
+	new RequestQueueServer<Request>(1, dummyRequestHandler, null);
     }
 
     /* Test handleConnection */
@@ -90,7 +98,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testHandleConnectionNullSocket() throws Exception {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	try {
 	    server.handleConnection(null);
 	    fail("Expected NullPointerException");
@@ -101,7 +109,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testHandleConnectionUnboundSocket() throws Exception {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	Socket socket = new Socket();
 	try {
 	    server.handleConnection(socket);
@@ -115,7 +123,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testHandleConnectionWithExistingConnection() throws Exception {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	serverSocket = new ServerSocket(PORT);
 	for (int i = 0; i < 2; i++) {
 	    connect = new InterruptableThread() {
@@ -136,7 +144,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testDisconnectNotConnected() throws Exception {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	server.disconnect();
 	server.disconnect();
     }
@@ -144,7 +152,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testDisconnectConnected() throws Exception {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	serverSocket = new ServerSocket(PORT);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
@@ -165,7 +173,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testEarlierRequestNegativeRequests() {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	try {
 	    server.earlierRequest(-1, 0);
 	    fail("Expected IllegalArgumentException");
@@ -183,7 +191,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testEarlierRequestTooLargeRequests() {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	try {
 	    server.earlierRequest(32768, 0);
 	    fail("Expected IllegalArgumentException");
@@ -201,7 +209,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testEarlierRequestMisc() {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	assertFalse(server.earlierRequest(0, 0));
 	assertTrue(server.earlierRequest(0, 1));
 	assertTrue(server.earlierRequest(0, 9999));
@@ -244,7 +252,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testRequestReadThrowsIOException() throws Exception {
 	server = new RequestQueueServer<Request>(
-	    dummyRequestHandler, emptyProperties);
+	    1, dummyRequestHandler, emptyProperties);
 	serverSocket = new ServerSocket(PORT);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
@@ -267,6 +275,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testRequestReadThrowsOtherException() throws Exception {
 	server = new RequestQueueServer<Request>(
+	    1, 
 	    new DummyRequestHandler() {
 		public Request readRequest(DataInput in) throws IOException {
 		    throw new RuntimeException("Yow!");
@@ -294,10 +303,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test
     public void testRequestPerformThrowsException() throws Exception {
+	final AtomicInteger performed = new AtomicInteger();
 	server = new RequestQueueServer<Request>(
-	    new DummyRequestHandler() {
+	    1,
+	    new RequestHandler<Request>() {
+		private int i;
 		public Request readRequest(DataInput in) throws IOException {
 		    return new DummyRequest();
+		}
+		public void performRequest(Request request) {
+		    performed.incrementAndGet();
+		    throw new RuntimeException(String.valueOf(++i));
 		}
 	    },
 	    emptyProperties);
@@ -313,18 +329,27 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	server.handleConnection(socket);
 	DataOutputStream out =
 	    new DataOutputStream(clientSocket.getOutputStream());
-	/* Write request number */
-	out.writeShort(0);
-	out.flush();
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
+	/* First request */
+	out.writeShort(0);
+	out.flush();
 	assertFalse(in.readBoolean());
-	assertFalse("Socket should not be closed", socket.isClosed());
+	assertEquals("java.lang.RuntimeException", readString(in));
+	String exceptionMessage = readString(in);
+	/* Second request -- should get same result */
+	out.writeShort(1);
+	out.flush();
+	assertFalse(in.readBoolean());
+	assertEquals("java.lang.RuntimeException", readString(in));
+	assertEquals(exceptionMessage, readString(in));
+	assertEquals(1, performed.get());
     }
 
     @Test
     public void testRequestPerformSuccess() throws Exception {
 	server = new RequestQueueServer<Request>(
+	    1,
 	    new DummyRequestHandler() {
 		public Request readRequest(DataInput in) throws IOException {
 		    assertEquals("Hello", in.readUTF());
@@ -359,6 +384,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     public void testRequestPerformIgnoreDuplicates() throws Exception {
 	final AtomicInteger requests = new AtomicInteger();
 	server = new RequestQueueServer<Request>(
+	    1,
 	    new RequestHandler<Request>() {
 		public Request readRequest(DataInput in) throws IOException {
 		    return new DummyRequest();
@@ -388,9 +414,9 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	server.handleConnection(socket);
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
-	assertTrue(in.readBoolean());
-	assertTrue(in.readBoolean());
-	assertTrue(in.readBoolean());
+	for (int i = 0; i < 5; i++) {
+	    assertTrue("Read response " + i, in.readBoolean());
+	}
 	assertFalse("Socket should not be closed", socket.isClosed());
 	assertEquals(3, requests.get());
     }
@@ -401,6 +427,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     {
 	final AtomicInteger requests = new AtomicInteger();
 	server = new RequestQueueServer<Request>(
+	    1,
 	    new RequestHandler<Request>() {
 		public Request readRequest(DataInput in) throws IOException {
 		    return new DummyRequest();
@@ -428,9 +455,9 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	server.handleConnection(socket);
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
-	assertTrue(in.readBoolean());
-	assertTrue(in.readBoolean());
-	assertTrue(in.readBoolean());
+	for (int i = 0; i < 3; i++) {
+	    assertTrue("Read response " + i, in.readBoolean());
+	}
 	assertEquals(3, requests.get());
 	/* Close the socket and connect again */
 	clientSocket.close();
@@ -453,9 +480,49 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	socket = serverSocket.accept();
 	server.handleConnection(socket);
 	in = new DataInputStream(clientSocket.getInputStream());
-	assertTrue(in.readBoolean());
-	assertTrue(in.readBoolean());
+	for (int i = 0; i < 4; i++) {
+	    assertTrue("Read response " + i, in.readBoolean());
+	}
 	assertEquals(5, requests.get());
 	assertFalse("Socket should not be closed", socket.isClosed());
+    }
+
+    @Test
+    public void testRequestPerformTooManyOutstanding() throws Exception {
+	server = new RequestQueueServer<Request>(
+	    1,
+	    new RequestHandler<Request>() {
+		public Request readRequest(DataInput in) throws IOException {
+		    return new DummyRequest();
+		}
+		public void performRequest(Request request) { }
+	    },
+	    emptyProperties);
+	serverSocket = new ServerSocket(PORT);
+	connect = new InterruptableThread() {
+	    boolean runOnce() throws IOException {
+		clientSocket = new Socket("localhost", PORT);
+		return true;
+	    }
+	};
+	connect.start();
+	socket = serverSocket.accept();
+	server.handleConnection(socket);
+	DataOutputStream out =
+	    new DataOutputStream(clientSocket.getOutputStream());
+	DataInputStream in =
+	    new DataInputStream(clientSocket.getInputStream());
+	/* First request */
+	out.writeShort(0);
+	out.flush();
+	assertTrue(in.readBoolean());
+	/* Second request -- should cause connection to be closed */
+	out.writeShort(20000);
+	out.flush();
+	try {
+	    in.readBoolean();
+	    fail("Expected EOFException");
+	} catch (EOFException e) {
+	}
     }
 }

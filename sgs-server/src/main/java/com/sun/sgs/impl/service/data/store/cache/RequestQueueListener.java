@@ -34,19 +34,23 @@ import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /**
- * A thread for managing a socket server that handles incoming connections for
- * {@link RequestQueueServer}s.  When a connection is accepted, the listener
- * will read a {@code long} from the socket's input stream to determine the
- * node ID of the server that should handle the connection, passing the ID to
- * the {@link ServerDispatcher} instance supplied to the constructor to find
- * the server.
+ * A thread for accepting and dispatching server connections of a request
+ * queue.  When a socket connection is accepted, the listener will read a
+ * {@code long}, which should not be negative, from the socket's input stream
+ * to determine the node ID of the server that should handle the connection.
+ * It passes the ID to the {@link ServerDispatcher} instance supplied to the
+ * constructor to find the {@link RequestQueueServer}, and then passes the
+ * socket to the server's {@link RequestQueueServer#handleConnection} method.
+ * If attempts to accept sockets, read the node ID from the socket input
+ * stream, or pass the socket to the server continue to fail, the listener will
+ * shut down.
  */
 public final class RequestQueueListener extends Thread {
 
     /**
      * The property for specifying the maximum time in milliseconds to continue
      * trying to accept and dispatch connections in the presence of failures
-     * without any successful connections.
+     * without any successfully dispatched connections.
      */
     public static final String MAX_RETRY_PROPERTY = "max.retry";
 
@@ -94,9 +98,11 @@ public final class RequestQueueListener extends Thread {
     /**
      * Creates an instance of this class and starts the thread.  The {@link
      * Runnable#run run} method of {@code failureHandler} will be called if the
-     * listener is shutdown due to repeated failures when attempting to accept
-     * connections.  The server socket should already be connected, and will be
-     * closed before the {@code run} method returns.
+     * listener shuts itself down due to repeated failures when attempting to
+     * accept connections.  The failure handler will not be called if a
+     * shutdown is requested explicitly by a call to the {@link #shutdown}
+     * method.  The server socket should already be connected, and will be
+     * closed when the listener shuts down.
      *
      * @param	serverSocket the server socket for accepting connections
      * @param	serverDispatcher the object for finding the {@link
@@ -160,13 +166,14 @@ public final class RequestQueueListener extends Thread {
     /**
      * Accepts connections to the server socket, reads the node ID from the
      * socket input stream, and dispatches handling the socket to the
-     * appropriate server, returning when the listener is shutdown.
+     * appropriate server, returning when the listener shuts down.
      */
     @Override
     public void run() {
 	try {
 	    while (true) {
 		Socket socket = null;
+		long nodeId = -1;
 		try {
 		    synchronized (this) {
 			if (shutdown) {
@@ -174,18 +181,28 @@ public final class RequestQueueListener extends Thread {
 			}
 		    }
 		    socket = serverSocket.accept();
+		    if (logger.isLoggable(FINEST)) {
+			logger.log(
+			    FINEST,
+			    "RequestQueueListener accepted connection" +
+			    " socket:" + socket);
+		    }
+		    /* Configure the socket's input stream to timeout */
+		    socket.setSoTimeout((int) maxRetry);
 		    DataInputStream in =
 			new DataInputStream(socket.getInputStream());
-		    long nodeId = in.readLong();
+		    nodeId = in.readLong();
 		    if (logger.isLoggable(FINER)) {
-			logger.log(FINER,
-				   "RequestQueueListener connection" +
-				   " request nodeId:" + nodeId);
+			logger.log(
+			    FINER,
+			    "RequestQueueListener received init connection" +
+			    " nodeId:" + nodeId +
+			    ", socket:" + socket);
 		    }
 		    RequestQueueServer server =
 			serverDispatcher.getServer(nodeId);
 		    server.handleConnection(socket);
-		    noteConnected();
+		    noteConnected(nodeId);
 		} catch (Throwable t) {
 		    if (socket != null) {
 			try {
@@ -193,7 +210,7 @@ public final class RequestQueueListener extends Thread {
 			} catch (IOException e) {
 			}
 		    }
-		    noteConnectionException(t);
+		    noteConnectionException(nodeId, t);
 		}
 	    }
 	} finally {
@@ -220,27 +237,32 @@ public final class RequestQueueListener extends Thread {
 	 * @throws	IllegalArgumentException if no server is found for the
 	 *		specified node ID
 	 */
-	RequestQueueServer getServer(long nodeId);
+	RequestQueueServer<? extends Request> getServer(long nodeId);
     }
 
     /**
      * Notes that an exception was thrown when attempting to handle a
-     * connection.
+     * connection for the specified node, if known.
      */
-    private synchronized void noteConnectionException(Throwable exception) {
+    private synchronized void noteConnectionException(
+	long nodeId, Throwable exception)
+    {
 	if (shutdown) {
 	    return;
 	}
 	if (exception instanceof IOException) {
 	    if (logger.isLoggable(FINER)) {
-		logger.logThrow(FINER, exception,
-				"RequestQueueListener connection closed" +
-				" for I/O exception");
+		logger.logThrow(
+		    FINER, exception,
+		    "RequestQueueListener nodeId:" +
+		    (nodeId < 0 ? "unknown" : String.valueOf(nodeId)) +
+		    " connection closed for I/O exception");
 	    }
 	} else if (logger.isLoggable(WARNING)) {
 	    logger.logThrow(WARNING, exception,
-			    "RequestQueueListener connection closed" +
-			    " for unexpected exception");
+			    "RequestQueueListener nodeId:" +
+			    (nodeId < 0 ? "unknown" : String.valueOf(nodeId)) +
+			    " connection closed for unexpected exception");
 	}
 	long now = System.currentTimeMillis();
 	if (failureStarted == -1) {
@@ -250,8 +272,8 @@ public final class RequestQueueListener extends Thread {
 	    shutdown = true;
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, exception,
-				"RequestQueueListener shutting down for" +
-				" repeated failures");
+				"RequestQueueListener shutting down due" +
+				" to failure");
 	    }
 	    failureHandler.run();
 	} else {
@@ -264,9 +286,14 @@ public final class RequestQueueListener extends Thread {
 	}
     }
 
-    /** Notes that a connection was accepted successfully. */
-    private synchronized void noteConnected() {
-	logger.log(FINER, "RequestQueueListener connected successfully");
+    /**
+     * Notes that a connection was accepted successfully for the specified
+     * node.
+     */
+    private synchronized void noteConnected(long nodeId) {
+	logger.log(FINER,
+		   "RequestQueueListener nodeId:" + nodeId +
+		   " connected successfully");
 	failureStarted = -1;
     }
 }

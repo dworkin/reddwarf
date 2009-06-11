@@ -157,6 +157,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    this.nodeId = nodeId;
 	    this.callbackServer = callbackServer;
 	    updateQueue = new RequestQueueServer<UpdateQueueRequest>(
+		nodeId,
 		new UpdateQueueRequest.UpdateQueueRequestHandler(
 		    server, nodeId),
 		new Properties());

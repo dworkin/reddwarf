@@ -51,10 +51,13 @@ class BasicRequestQueueTest extends Assert {
 
     /** A request queue listener that gets servers from a map. */
     static class SimpleServerDispatcher implements ServerDispatcher {
-	private final Map<Long, RequestQueueServer>
-	    servers = new HashMap<Long, RequestQueueServer>();
-	public synchronized RequestQueueServer getServer(long nodeId) {
-	    RequestQueueServer server = servers.get(nodeId);
+	private final Map<Long, RequestQueueServer<? extends Request>>
+	    servers = new HashMap<
+		Long, RequestQueueServer<? extends Request>>();
+	public synchronized RequestQueueServer<? extends Request>
+	    getServer(long nodeId)
+	{
+	    RequestQueueServer<? extends Request> server = servers.get(nodeId);
 	    if (server != null) {
 		return server;
 	    } else {
@@ -62,7 +65,9 @@ class BasicRequestQueueTest extends Assert {
 		    "Server not found: " + nodeId);
 	    }
 	}
-	synchronized void setServer(long nodeId, RequestQueueServer server) {
+	synchronized void setServer(
+	    long nodeId, RequestQueueServer<? extends Request> server)
+	{
 	    servers.put(nodeId, server);
 	}
     }
@@ -123,7 +128,9 @@ class BasicRequestQueueTest extends Assert {
 	    assertTrue(run);
 	    assertTrue("Called run earlier than " + minTimeout + " ms: " +
 		       time + " ms",
-		       time >= minTimeout); 
+		       time >= minTimeout);
+	    System.err.println("NoteRun.checkRun extra wait: " +
+			       (time - minTimeout));
 	}
 
 	/** Check that the run method has not been called. */
@@ -155,6 +162,7 @@ class BasicRequestQueueTest extends Assert {
 		}
 	    } catch (InterruptedException e) {
 	    } catch (Throwable t) {
+		t.printStackTrace();
 		exception = t;
 	    }
 	}

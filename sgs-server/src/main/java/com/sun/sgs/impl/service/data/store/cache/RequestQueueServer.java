@@ -37,11 +37,35 @@ import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /**
- * Implements the server side of a queue of requests, ignoring duplicate
- * requests after a network failure.  Requests are numbered between {@code 0}
- * and the configured maximum request value.  To insure the correct handling of
- * duplicate requests, the client side should insure that no more than the
- * configured maximum outstanding requests are outstanding at one time.
+ * Implements the server side of a request queue, using a {@link
+ * Request.RequestHandler} to manage requests.  Requests are read from socket
+ * input using a {@link DataInputStream}, their operations performed, and the
+ * result written to socket output using a {@link DataOutputStream}. <p>
+ * 
+ * The request number is read as a {@code short} from the input stream, with
+ * the stream then supplied to the request handler's {@link
+ * Request.RequestHandler#readRequest} method to read any additional data and
+ * return the request.  If the request number is newer than that of the last
+ * request performed by the server, then the request handler's {@link
+ * Request.RequestHandler#performRequest} method will be called to perform the
+ * operation associated with the request.  If that method completes normally,
+ * then {@code true} will be written to the output stream to tell the client
+ * that the operation succeeded.  If the {@code performRequest} method throws
+ * an exception, then {@code false} will be written to the output stream,
+ * followed by the name of the exception class and the exception message.  Both
+ * of these values are written by writing {@code false} if the value is {@code
+ * null}, although the class name should never be {@code}, or else {@code true}
+ * followed by the UTF8 encoding of the string. <p>
+ *
+ * Requests are numbered between {@code 0} and the configured maximum request
+ * value.  To insure the correct handling of duplicate requests, the client
+ * side should insure that no more than the configured maximum outstanding
+ * requests are outstanding at one time. <p>
+ *
+ * Note that duplicate requests received after a network failure are read, and
+ * have a response written back, but are not performed.  Also, once performing
+ * a request results in an exception, then that request and all future requests
+ * will continue produce the same exception.
  *
  * @param	<R> the type of request
  */
@@ -70,6 +94,9 @@ public class RequestQueueServer<R extends Request> {
     static final LoggerWrapper logger = new LoggerWrapper(
 	Logger.getLogger(RequestQueueServer.class.getName()));
 
+    /** The node ID for this server. */
+    final long nodeId;
+
     /** Handler for reading and performing requests. */
     final Request.RequestHandler<R> requestHandler;
 
@@ -94,14 +121,30 @@ public class RequestQueueServer<R extends Request> {
     private volatile int lastRequest;
 
     /**
+     * The exception thrown by the last request if there was one, else {@code
+     * null}.  After initialization, this field is only accessed by the {@link
+     * Connection#run} method, but making it volatile insures that its value is
+     * propagated from one connection to the next.
+     */
+    private volatile Throwable lastRequestException = null;
+
+    /**
      * Creates an instance of this class.
      *
+     * @param	nodeId the node ID for this server
      * @param	requestHandler the handler for reading and performing requests
      * @param	properties additional configuration properties
+     * @throws	IllegalArgumentException if {@code nodeId} is negative
      */
-    public RequestQueueServer(
-	Request.RequestHandler<R> requestHandler, Properties properties)
+    public RequestQueueServer(long nodeId,
+			      Request.RequestHandler<R> requestHandler,
+			      Properties properties)
     {
+	if (nodeId < 0) {
+	    throw new IllegalArgumentException(
+		"The nodeId must not be negative: " + nodeId);
+	}
+	this.nodeId = nodeId;
 	checkNull("requestHandler", requestHandler);
 	this.requestHandler = requestHandler;
 	PropertiesWrapper wrappedProperties =
@@ -115,6 +158,7 @@ public class RequestQueueServer<R extends Request> {
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER,
 		       "Created RequestQueueServer" +
+		       " nodeId:" + nodeId +
 		       " maxRequest:" + maxRequest +
 		       ", maxOutstanding:" + maxOutstanding);
 	}
@@ -122,6 +166,11 @@ public class RequestQueueServer<R extends Request> {
 
     /** Disconnects the current connection, if any. */
     public synchronized void disconnect() {
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST,
+		       "RequestQueueServer nodeId:" + nodeId +
+		       " disconnect requested");
+	}
 	if (connection != null) {
 	    connection.disconnect();
 	    connection = null;
@@ -243,72 +292,79 @@ public class RequestQueueServer<R extends Request> {
 		while (!disconnect) {
 		    short requestNumber = in.readShort();
 		    R request = requestHandler.readRequest(in);
+		    boolean newRequest =
+			earlierRequest(lastRequest, requestNumber);
 		    if (logger.isLoggable(FINEST)) {
 			logger.log(FINEST,
-				   "RequestQueueServer received request" +
+				   "RequestQueueServer nodeId:" + nodeId +
+				   " received request" +
 				   " requestNumber:" + requestNumber +
-				   ", request:" + request);
+				   ", request:" + request +
+				   ", newRequest:" + newRequest);
 		    }
-		    if (!earlierRequest(lastRequest, requestNumber)) {
+		    /*
+		     * Only perform newer requests and only if the last request
+		     * did not fail.
+		     */
+		    if (newRequest && lastRequestException == null) {
+			try {
+			    requestHandler.performRequest(request);
+			} catch (Throwable t) {
+			    lastRequestException = t;
+			}
+			lastRequest = requestNumber;
+		    }
+		    if (lastRequestException == null) {
 			out.writeBoolean(true);
 			out.flush();
 			if (logger.isLoggable(FINEST)) {
-			    logger.log(FINEST,
-				       "RequestQueueServer request already" +
-				       " handled: " +
-				       " requestNumber:" + requestNumber +
-				       ", request:" + request);
+			    logger.log(
+				FINEST,
+				"RequestQueueServer nodeId:" + nodeId +
+				" request succeeded" +
+				" requestNumber:" + requestNumber +
+				", request:" + request);
 			}
 		    } else {
-			Throwable result;
-			try {
-			    requestHandler.performRequest(request);
-			    result = null;
-			} catch (Throwable t) {
-			    result = t;
+			out.writeBoolean(false);
+			writeString(
+			    lastRequestException.getClass().getName(), out);
+			writeString(
+			    lastRequestException.getMessage(), out);
+			out.flush();
+			if (logger.isLoggable(FINEST)) {
+			    logger.logThrow(
+				FINEST, lastRequestException,
+				"RequestQueueServer nodeId:" + nodeId +
+				" request throws" +
+				" requestNumber:" + requestNumber +
+				", request:" + request);
 			}
-			if (result == null) {
-			    out.writeBoolean(true);
-			    out.flush();
-			    if (logger.isLoggable(FINEST)) {
-				logger.log(
-				    FINEST,
-				    "RequestQueueServer request succeeded" +
-				    " requestNumber:" + requestNumber +
-				    ", request:" + request);
-			    }
-			} else {
-			    out.writeBoolean(false);
-			    writeString(result.getClass().getName(), out);
-			    writeString(result.getMessage(), out);
-			    out.flush();
-			    if (logger.isLoggable(FINEST)) {
-				logger.logThrow(
-				    FINEST, result,
-				    "RequestQueueServer request throws" +
-				    " requestNumber:" + requestNumber +
-				    ", request:" + request);
-			    }
-			}
-			lastRequest = requestNumber;
 		    }
 		}
 	    } catch (IOException e) {
 		if (!disconnect && logger.isLoggable(FINER)) {
 		    logger.logThrow(FINER, e,
-				    "RequestQueueServer connection closed" +
+				    "RequestQueueServer nodeId:" + nodeId +
+				    " connection closed" +
 				    " for I/O failure");
 		}
 	    } catch (Throwable t) {
 		if (logger.isLoggable(WARNING)) {
 		    logger.logThrow(WARNING, t,
-				    "RequestQueueServer connection closed" +
+				    "RequestQueueServer nodeId:" + nodeId +
+				    " connection closed" +
 				    " for unexpected exception");
 		}
 	    } finally {
 		try {
 		    socket.close();
 		} catch (IOException e) {
+		}
+		if (logger.isLoggable(FINER)) {
+		    logger.log(FINER,
+			       "RequestQueueServer nodeId:" + nodeId +
+			       " disconnected");
 		}
 	    }
 	}

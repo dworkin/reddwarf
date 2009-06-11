@@ -49,7 +49,7 @@ public interface Request {
 
     /**
      * A object for reading and performing requests.  Used by the server to
-     * read and perform requests sent by the client.
+     * handle requests sent by the client.
      *
      * @param	<R> the type of request
      */

@@ -107,14 +107,6 @@ abstract class UpdateQueueRequest implements Request {
 	}
     }
 
-    /** {@inheritDoc} */
-    public void failed(Throwable exception) {
-	/*
-	 * Shutdown node?  This shouldn't happen for IOExceptions, which should
-	 * get retried.
-	 */
-    }
-
     /**
      * Performs a request using the specified server and node ID.
      *
@@ -165,6 +157,7 @@ abstract class UpdateQueueRequest implements Request {
 	}
 
 	public void completed(Throwable exception) {
+	    /* FIXME: Need to handle exception */
 	    if (handler != null) {
 		handler.completed(value);
 	    }
@@ -210,7 +203,7 @@ abstract class UpdateQueueRequest implements Request {
 	}
 
 	public void completed(Throwable exception) {
-	    /* Nothing to do */
+	    /* FIXME: Need to handle exception */
 	}
     }
 

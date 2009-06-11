@@ -44,15 +44,19 @@ import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /**
- * A thread that implements the client side of the request queue, retrying
- * pending requests after a network failure.
+ * A thread that implements the client side of a request queue.  The {@link
+ * #addRequest} method adds requests, which are transmitted to the server side
+ * and run there exactly once.  Requests for which no response has been
+ * received are retransmitted to the server as needed after a network failure.
+ * Once a request has been performed, its {@link Request#completed} method will
+ * be called.
  */
 public final class RequestQueueClient extends Thread {
 
     /**
      * The property for specifying the maximum time in milliseconds to continue
-     * trying to accept and dispatch connections in the presence of failures
-     * without any successful connections.
+     * attempting to make new connections and send requests when failures have
+     * prevented any successful responses.
      */
     public static final String MAX_RETRY_PROPERTY = "max.retry";
 
@@ -61,7 +65,7 @@ public final class RequestQueueClient extends Thread {
 
     /**
      * The property for specifying the time in milliseconds to wait after a
-     * connection failure before attempting to accept connections again.
+     * connection failure before attempting to make a new connection.
      */
     public static final String RETRY_WAIT_PROPERTY = "retry.wait";
 
@@ -79,10 +83,9 @@ public final class RequestQueueClient extends Thread {
     public static final int DEFAULT_REQUEST_QUEUE_SIZE = 100;
 
     /**
-     * The property for specifying the size of the queue that holds requests
-     * that have been sent to the server but have not received responses.
+     * The property for specifying the size of the queue of requests that have
+     * been sent to the server but have not received responses.
      */
-
     public static final String SENT_QUEUE_SIZE_PROPERTY =
 	"sent.queue.size";
 
@@ -148,14 +151,17 @@ public final class RequestQueueClient extends Thread {
     /**
      * Creates an instance of this class and starts the thread.  The {@link
      * Runnable#run run} method of {@code failureHandler} will be called if the
-     * listener is shutdown due to repeated failures when attempting to accept
-     * connections.
+     * listener shuts itself down due to repeated failures when attempting to
+     * connect to the request queue server.  The failure handler will not be
+     * called if a shutdown is requested explicitly by a call to the {@link
+     * #shutdown} method.
      *
      * @param	nodeId the node ID associated with this request queue
      * @param	socketFactory the factory for creating sockets that connect to
-     *		the request queue server
+     *		the server
      * @param	failureHandler the failure handler
      * @param	properties additional configuration properties
+     * @throws	IllegalArgumentException if {@code nodeId} is negative
      */
     public RequestQueueClient(long nodeId,
 			      SocketFactory socketFactory,
@@ -163,6 +169,10 @@ public final class RequestQueueClient extends Thread {
 			      Properties properties)
     {
 	super("RequestQueueClient");
+	if (nodeId < 0) {
+	    throw new IllegalArgumentException(
+		"The nodeId must not be negative: " + nodeId);
+	}
 	checkNull("socketFactory", socketFactory);
 	checkNull("failureHandler", failureHandler);
 	this.nodeId = nodeId;
@@ -199,18 +209,18 @@ public final class RequestQueueClient extends Thread {
      * full.
      *
      * @param	request the request to add
-     * @throws	IllegalStateException if the client has been requested to
-     *		shutdown 
+     * @throws	IllegalStateException if the client has begun to shut down
      */
     public void addRequest(Request request) {
+	checkNull("request", request);
 	logger.log(
-	    FINEST, "RequestQueueClient addRequest request:{0}", request);
+	    FINEST, "RequestQueueClient adding request request:{0}", request);
 	boolean done = false;
 	while (true) {
 	    synchronized (this) {
 		if (shutdown) {
 		    throw new IllegalStateException(
-			"The client is shutting down");
+			"The client has begun to shut down");
 		}
 	    }
 	    if (done) {
@@ -224,7 +234,7 @@ public final class RequestQueueClient extends Thread {
 	}
     }
 
-    /** Shuts down the client. */
+    /** Shuts down the client, closing the existing connection, if any. */
     public void shutdown() {
 	logger.log(FINEST, "RequestQueueClient shutdown requested");	
 	synchronized (this) {
@@ -246,7 +256,7 @@ public final class RequestQueueClient extends Thread {
 
     /**
      * Creates connections to the server, sends requests, handles responses,
-     * and returns when the client is shut down.
+     * and returns when the client shuts down.
      */
     @Override
     public void run() {
@@ -282,7 +292,8 @@ public final class RequestQueueClient extends Thread {
     }
 
     /**
-     * A basic implementation of {@code SocketFactory}.
+     * A basic implementation of {@code SocketFactory} that creates sockets
+     * using a host name and port.
      */
     public static class BasicSocketFactory implements SocketFactory {
 
@@ -293,7 +304,7 @@ public final class RequestQueueClient extends Thread {
 	private final int port;
 
 	/**
-	 * Creates an instance of this class that creates the connected socket
+	 * Creates an instance of this class that creates a connected socket
 	 * using the specified server host and port.
 	 *
 	 * @param	host the server host
@@ -347,8 +358,8 @@ public final class RequestQueueClient extends Thread {
 	    shutdown = true;
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, exception,
-				"RequestQueueClient shutting down for" +
-				" repeated failures");
+				"RequestQueueClient shutting down due" +
+				" to failure");
 	    }
 	    failureHandler.run();
 	} else {
@@ -420,20 +431,22 @@ public final class RequestQueueClient extends Thread {
 	/**
 	 * Creates an instance of this class.
 	 *
-	 * @throws	IOException if there is an error creating the socket or
-	 *		its input and output streams
+	 * @throws	IOException if there is an error creating the socket, or
+	 *		its input or output streams
 	 */
 	Connection() throws IOException {
 	    /*
-	     * Resend any already sent requests that have not been
-	     * acknowledged.  Put these requests in front of any already
-	     * present since they should be sent first, and maintain their
-	     * order.
+	     * Resend any requests sent earlier that have not yet been
+	     * acknowledged.  Put these requests in front of ones already
+	     * present since they should be sent first, making sure to maintain
+	     * their order.
 	     */
 	    while (!sentRequests.isEmpty()) {
 		resendRequests.add(0, sentRequests.removeLast());
 	    }
 	    socket = socketFactory.createSocket();
+	    /* Configure the socket's input stream to timeout */
+	    socket.setSoTimeout((int) maxRetry);
 	    out = new DataOutputStream(
 		new BufferedOutputStream(
 		    socket.getOutputStream()));
@@ -442,7 +455,8 @@ public final class RequestQueueClient extends Thread {
 		    new BufferedInputStream(
 			socket.getInputStream())));
 	    receiveThread.start();
-	    logger.log(FINER, "RequestQueueClient created connection");
+	    logger.log(FINER, "RequestQueueClient created connection: {0}",
+		       socket);
 	}
 
 	/**
@@ -486,9 +500,10 @@ public final class RequestQueueClient extends Thread {
 			out.flush();
 			first = false;
 			if (logger.isLoggable(FINEST)) {
-			    logger.log(FINEST,
-				       "RequestQueueClient sent nodeId:" +
-				       nodeId);
+			    logger.log(
+				FINEST,
+				"RequestQueueClient sent init connection" +
+				" nodeId:" + nodeId);
 			}
 		    }
 		    try {
@@ -587,16 +602,9 @@ public final class RequestQueueClient extends Thread {
 			holder.request.completed(requestException);
 		    }
 		    return;
-		} catch (IOException e) {
-		    if (!disconnect) {
-			setReceiveException(e);
-		    } else {
-			return;
-		    }
 		} catch (Throwable t) {
 		    setReceiveException(t);
 		}
-		disconnect(false);
 	    }
 
 	    /**
@@ -644,7 +652,10 @@ public final class RequestQueueClient extends Thread {
 	    private synchronized void setReceiveException(
 		Throwable exception)
 	    {
-		receiveException = exception;
+		if (!disconnect) {
+		    receiveException = exception;
+		    disconnect(false);
+		}
 	    }
 	}
     }
