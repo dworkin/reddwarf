@@ -29,15 +29,18 @@ import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -61,6 +64,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -72,20 +76,21 @@ public class TestNodeMappingServiceImpl {
     
     /** Reflective stuff */
     private static Method assertValidMethod;
-    private static Field localNodeIdField;
+    private static Method moveMethod;
+    private static Field serverImplField;
     private static String VERSION_KEY;
     private static int MAJOR_VERSION;
     private static int MINOR_VERSION;
     static {
         try {
-            localNodeIdField = 
-                NodeMappingServiceImpl.class.getDeclaredField("localNodeId");
-            localNodeIdField.setAccessible(true);
-
-            assertValidMethod =
-                    NodeMappingServiceImpl.class.getDeclaredMethod(
-                        "assertValid", Identity.class);
-            assertValidMethod.setAccessible(true);
+            Class nmsImpl = NodeMappingServiceImpl.class;
+            moveMethod = UtilReflection.getMethod(NodeMappingServerImpl.class,
+                    "mapToNewNode", Identity.class, String.class,
+                     Node.class, long.class);
+            assertValidMethod = 
+                UtilReflection.getMethod(nmsImpl,
+                                         "assertValid", Identity.class);
+            serverImplField = UtilReflection.getField(nmsImpl, "serverImpl");
             
             Class nodeMapUtilClass = 
                 Class.forName("com.sun.sgs.impl.service.nodemap.NodeMapUtil");
@@ -125,11 +130,9 @@ public class TestNodeMappingServiceImpl {
     private Map<Long, TestListener> nodeListenerMap;
  
     private static Field getField(Class cl, String name) throws Exception {
-	Field field = cl.getDeclaredField(name);
-	field.setAccessible(true);
-	return field;
+        return UtilReflection.getField(cl, name);
     }
-    
+
     @Before
     public void setUp() throws Exception {
         setUp(null);
@@ -153,11 +156,9 @@ public class TestNodeMappingServiceImpl {
         
         // Add to our test data structures, so we can find these nodes
         // and listeners.
-        Long id = (Long) localNodeIdField.get(nodeMappingService);
-
         TestListener listener = new TestListener();        
         nodeMappingService.addNodeMappingListener(listener);
-        nodeListenerMap.put(id, listener);
+        nodeListenerMap.put(serverNode.getNodeId(), listener);
     }
     
    
@@ -179,11 +180,9 @@ public class TestNodeMappingServiceImpl {
 
             // Add to our test data structures, so we can find these nodes
             // and listeners.
-            Long id = (Long) localNodeIdField.get(nmap);
-
             TestListener listener = new TestListener();        
             nmap.addNodeMappingListener(listener);
-            nodeListenerMap.put(id, listener);
+            nodeListenerMap.put(node.getNodeId(), listener);
         }
     }
         
@@ -332,30 +331,15 @@ public class TestNodeMappingServiceImpl {
                     }
                 }, taskOwner);
             
-            // Ensure the listeners have not been called yet.
-            List<Identity> addedIds = listener.getAddedIds();
-            List<Node> addedNodes = listener.getAddedNodes();
-            assertEquals(0, addedIds.size());
-            assertEquals(0, addedNodes.size());
-            assertEquals(0, listener.getRemovedIds().size());
-            assertEquals(0, listener.getRemovedNodes().size());
-            
-            nodemap.ready();
-            
-            // Listeners should be notified.
-            Thread.sleep(500);
-            
-            addedIds = listener.getAddedIds();
-            addedNodes = listener.getAddedNodes();
-            assertEquals(1, addedIds.size());
-            assertEquals(1, addedNodes.size());
-            assertTrue(addedIds.contains(id));
-            // no old node
-            assertTrue(addedNodes.contains(null));
+            // Ensure the listener has not been called yet.
+            assertTrue(listener.isClear());
 
-            assertEquals(0, listener.getRemovedIds().size());
-            assertEquals(0, listener.getRemovedNodes().size());
+            nodemap.ready();
+            // Listener should be notified.
+            listener.waitForNotification();
             
+            // no old node
+            checkIdAdded(listener, id, null);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
         }
@@ -381,18 +365,9 @@ public class TestNodeMappingServiceImpl {
             new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id);
-                    // Make sure we got a notification
+                    // Make sure we got a notification, no old node
                     TestListener listener = nodeListenerMap.get(node.getId());
-                    List<Identity> addedIds = listener.getAddedIds();
-                    List<Node> addedNodes = listener.getAddedNodes();
-                    assertEquals(1, addedIds.size());
-                    assertEquals(1, addedNodes.size());
-                    assertTrue(addedIds.contains(id));
-                    // no old node
-                    assertTrue(addedNodes.contains(null));
-
-                    assertEquals(0, listener.getRemovedIds().size());
-                    assertEquals(0, listener.getRemovedNodes().size());
+                    checkIdAdded(listener, id, null);
                 }
         }, taskOwner);
     }
@@ -773,23 +748,14 @@ public class TestNodeMappingServiceImpl {
         TestListener listener = nodeListenerMap.get(node.getId());
         listener.clear();
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
-        Thread.sleep(removeTime * 4);
+        listener.waitForNotification(removeTime * 4);
         
         try {
             txnScheduler.runTask(task, taskOwner);
             fail("Expected UnknownIdentityException");
         } catch (UnknownIdentityException e) {
             // Make sure we got a notification
-            assertEquals(0, listener.getAddedIds().size());
-            assertEquals(0, listener.getAddedNodes().size());
-            
-            List<Identity> removedIds = listener.getRemovedIds();
-            List<Node> removedNodes = listener.getRemovedNodes();
-            assertEquals(1, removedIds.size());
-            assertEquals(1, removedNodes.size());
-            assertTrue(removedIds.contains(id));
-            // no new node
-            assertTrue(removedNodes.contains(null));
+            checkIdRemoved(listener, id, null);
         }
     }
     
@@ -811,23 +777,15 @@ public class TestNodeMappingServiceImpl {
         // Likewise, it should be OK to make multiple "false" calls.
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
-        Thread.sleep(removeTime * 4);
+
+        listener.waitForNotification(removeTime * 4);
         
         try {
             txnScheduler.runTask(task, taskOwner);
             fail("Expected UnknownIdentityException");
         } catch (UnknownIdentityException e) {
             // Make sure we got a notification
-            assertEquals(0, listener.getAddedIds().size());
-            assertEquals(0, listener.getAddedNodes().size());
-            
-            List<Identity> removedIds = listener.getRemovedIds();
-            List<Node> removedNodes = listener.getRemovedNodes();
-            assertEquals(1, removedIds.size());
-            assertEquals(1, removedNodes.size());
-            assertTrue(removedIds.contains(id));
-            // no new node
-            assertTrue(removedNodes.contains(null));
+            checkIdRemoved(listener, id, null);
         }
     }
     
@@ -905,16 +863,7 @@ public class TestNodeMappingServiceImpl {
             fail("Expected UnknownIdentityException");
         } catch (UnknownIdentityException e) {
             // Make sure we got a notification
-            assertEquals(0, listener.getAddedIds().size());
-            assertEquals(0, listener.getAddedNodes().size());
-            
-            List<Identity> removedIds = listener.getRemovedIds();
-            List<Node> removedNodes = listener.getRemovedNodes();
-            assertEquals(1, removedIds.size());
-            assertEquals(1, removedNodes.size());
-            assertTrue(removedIds.contains(id));
-            // no new node
-            assertTrue(removedNodes.contains(null));
+            checkIdRemoved(listener, id, null);
         }
     }
         
@@ -954,20 +903,9 @@ public class TestNodeMappingServiceImpl {
         Node firstNode = task.getNode();
         long firstNodeId = task.getNodeId();
         TestListener firstNodeListener = nodeListenerMap.get(firstNodeId);
-        
-        // Get the method, as it's not public
-        Field serverImplField = 
-            NodeMappingServiceImpl.class.getDeclaredField("serverImpl");
-        serverImplField.setAccessible(true);
 
         NodeMappingServerImpl server = 
             (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
-
-        Method moveMethod =      
-            (NodeMappingServerImpl.class).getDeclaredMethod("mapToNewNode", 
-                new Class[]{Identity.class, String.class, 
-                            Node.class, long.class});
-        moveMethod.setAccessible(true);
         
         // clear out the listeners
         for (TestListener lis : nodeListenerMap.values()) {
@@ -980,44 +918,308 @@ public class TestNodeMappingServiceImpl {
         Node secondNode = task.getNode();
         TestListener secondNodeListener = 
                 nodeListenerMap.get(secondNode.getId());
-        
-        // The id was removed from the first node
-        assertEquals(0, firstNodeListener.getAddedIds().size());
-        assertEquals(0, firstNodeListener.getAddedNodes().size());
 
-        List<Identity> removedIds = firstNodeListener.getRemovedIds();
-        List<Node> removedNodes = firstNodeListener.getRemovedNodes();
-        assertEquals(1, removedIds.size());
-        assertEquals(1, removedNodes.size());
-        assertTrue(removedIds.contains(id));
-        // It moved to secondNode
-        assertTrue(removedNodes.contains(secondNode));
-        
-        // Check the other node's listener
-        assertEquals(0, secondNodeListener.getRemovedIds().size());
-        assertEquals(0, secondNodeListener.getRemovedNodes().size());
-        
-        List<Identity> addedIds = secondNodeListener.getAddedIds();
-        List<Node> addedNodes = secondNodeListener.getAddedNodes();
-        assertEquals(1, addedIds.size());
-        assertEquals(1, addedNodes.size());
-        assertTrue(addedIds.contains(id));
-        // firstNode was old node
-        assertTrue(addedNodes.contains(firstNode));
-        
+        checkIdMoved(firstNodeListener, firstNode,
+                     secondNodeListener, secondNode, id);
+    }
+
+
+    /* -- Test identity relocation listeners -- */
+    @Test(expected = NullPointerException.class)
+    public void testAddNullIdentityRelocationListener() throws Exception {
+        nodeMappingService.addIdentityRelocationListener(null);
+    }
+
+    @Test
+    public void testIdRelocationListenerNotification() throws Exception {
+        addNodes(null);
+
+        // Add id relocation listeners to each node, and keep a map of them.
+        Map<Long, TestRelocationListener> moveMap =
+                new HashMap<Long, TestRelocationListener>();
+        addRelocationListeners(false, moveMap);
+
+        Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        GetNodeTask task = new GetNodeTask(id);
+        txnScheduler.runTask(task, taskOwner);
+        Node firstNode = task.getNode();
+        long firstNodeId = task.getNodeId();
+        TestListener firstNodeListener = nodeListenerMap.get(firstNodeId);
+        TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+        NodeMappingServerImpl server =
+            (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
+
+        // clear out the listeners
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        // ... and invoke the method
+        moveMethod.invoke(server, id, null, firstNode, firstNodeId);
+
+        // Give the id relocation listener a chance to finish, and the
+        // actual node assignment to complete.
+        idListener.waitForNotification();
+
+        txnScheduler.runTask(task, taskOwner);
+        Node secondNode = task.getNode();
+        long secondNodeId = task.getNodeId();
+        TestListener secondNodeListener =
+                nodeListenerMap.get(secondNodeId);
+
+        checkRelocationNotification(idListener, id, secondNodeId);
+
         // Make sure no other listeners were affected
-        for (TestListener listener : nodeListenerMap.values()) {
-            if (listener != firstNodeListener && 
-                listener != secondNodeListener) 
-            {
-                assertEquals(0, listener.getAddedIds().size());
-                assertEquals(0, listener.getAddedNodes().size());
-                assertEquals(0, listener.getRemovedIds().size());
-                assertEquals(0, listener.getRemovedNodes().size());
+        for (TestRelocationListener listener : moveMap.values()) {
+            if (listener != idListener) {
+                assertTrue(listener.isClear());
             }
         }
+
+        // Make sure the node mapping listeners were correctly updated
+        checkIdMoved(firstNodeListener, firstNode,
+                     secondNodeListener, secondNode, id);
     }
-    
+
+    @Test
+    public void testIdRelocNotificationOldNodeFailed() throws Exception {
+        addNodes(null);
+
+        // Add id relocation listeners to each node, and keep a map of them.
+        Map<Long, TestRelocationListener> moveMap =
+                new HashMap<Long, TestRelocationListener>();
+        addRelocationListeners(true, moveMap);
+
+        Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        GetNodeTask task = new GetNodeTask(id);
+        txnScheduler.runTask(task, taskOwner);;
+        long firstNodeId = task.getNodeId();
+        Node firstNode = task.getNode();
+        TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+        NodeMappingServerImpl server =
+            (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
+
+        // clear out the listeners
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        // ... and invoke the method
+        Long newNode =
+            (Long) moveMethod.invoke(server, id, null, 
+                                     task.getNode(), firstNodeId);
+
+        // Give the id relocation listener a chance to finish.
+        idListener.waitForNotification();
+
+        txnScheduler.runTask(task, taskOwner);
+        long secondNodeId = task.getNodeId();
+
+        // Make sure the node hasn't actually moved yet.
+        assertEquals(firstNodeId, secondNodeId);
+
+        // Check the id relocation listener
+        checkRelocationNotification(idListener, id, newNode);
+
+        // Make sure no other listeners were affected
+        for (TestRelocationListener listener : moveMap.values()) {
+            if (listener != idListener) {
+                assertTrue(listener.isClear());
+            }
+        }
+
+        // Ensure that the node mapping listeners haven't been called yet
+        for (TestListener listener : nodeListenerMap.values()) {
+            assertTrue(listener.isClear());
+        }
+
+        // Now, cause the old node to fail.  First we have to find the
+        // correct test node.
+        for (SgsTestNode sgs : additionalNodes) {
+            if (sgs.getNodeId() == firstNodeId) {
+                System.out.println("Shutting down node " + firstNodeId);
+                sgs.shutdown(false);
+                break;
+            }
+        }
+
+        // Wait for notification.  We expect to be notified on the 
+        // newNode assigned above.
+        TestListener secondNodeListener = nodeListenerMap.get(newNode);
+        secondNodeListener.waitForNotification();
+
+        txnScheduler.runTask(task, taskOwner);
+        assertEquals((long) newNode, task.getNodeId());
+
+        checkIdAdded(secondNodeListener, id, firstNode);
+    }
+
+    @Test
+    public void testIdRelocNotificationTwice() throws Exception {
+        addNodes(null);
+
+        // Add id relocation listeners to each node, and keep a map of them.
+        Map<Long, TestRelocationListener> moveMap =
+                new HashMap<Long, TestRelocationListener>();
+        addRelocationListeners(true, moveMap);
+
+        Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        GetNodeTask task = new GetNodeTask(id);
+        txnScheduler.runTask(task, taskOwner);;
+        long firstNodeId = task.getNodeId();
+        Node firstNode = task.getNode();
+        TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+        NodeMappingServerImpl server =
+            (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
+
+        // clear out the listeners
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        // ... and invoke the method twice
+        Long newNode =
+            (Long) moveMethod.invoke(server, id, null,
+                                     task.getNode(), firstNodeId);
+        Long secondTryNode =
+            (Long) moveMethod.invoke(server, id, null,
+                                     task.getNode(), newNode);
+
+        assertEquals(newNode, secondTryNode);
+
+        // Give the id relocation listener a chance to finish.
+        idListener.waitForNotification();
+
+        txnScheduler.runTask(task, taskOwner);
+        long secondNodeId = task.getNodeId();
+
+        // Make sure the node hasn't actually moved yet.
+        assertEquals(firstNodeId, secondNodeId);
+
+        // Check the id relocation listener
+        checkRelocationNotification(idListener, id, newNode);
+
+        // Make sure no other listeners were affected
+        for (TestRelocationListener listener : moveMap.values()) {
+            if (listener != idListener) {
+                assertTrue(listener.isClear());
+            }
+        }
+
+        // Ensure that the node mapping listeners haven't been called yet
+        for (TestListener listener : nodeListenerMap.values()) {
+            assertTrue(listener.isClear());
+        }
+
+        // Now, allow the movement to complete.
+        idListener.handler.completed();
+
+        // Wait for notification.  We expect to be notified on the
+        // newNode assigned above.
+        TestListener secondNodeListener = nodeListenerMap.get(newNode);
+        secondNodeListener.waitForNotification();
+        txnScheduler.runTask(task, taskOwner);
+        assertEquals((long) newNode, task.getNodeId());
+
+        checkIdAdded(secondNodeListener, id, firstNode);
+    }
+
+    @Test
+    public void testIdRelocNotificationNoResponse() throws Exception {
+        // Set up using our properties
+        tearDown();
+	serviceProps = SgsTestNode.getDefaultProperties(
+	    "TestNodeMappingServiceImpl", null, null);
+
+        final int RELOCATION_TIME = 20;
+        // Create a new nodeMappingServer with a very short timeout for
+        // relocation expiration.
+        serviceProps.setProperty(
+                "com.sun.sgs.impl.service.nodemap.relocation.expire.time",
+                String.valueOf(RELOCATION_TIME));
+
+        setUp(serviceProps);
+        addNodes(null);
+
+        // Add id relocation listeners to each node, and keep a map of them.
+        Map<Long, TestRelocationListener> moveMap =
+                new HashMap<Long, TestRelocationListener>();
+        addRelocationListeners(true, moveMap);
+
+        Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        GetNodeTask task = new GetNodeTask(id);
+        txnScheduler.runTask(task, taskOwner);;
+        long firstNodeId = task.getNodeId();
+        Node firstNode = task.getNode();
+        TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+        NodeMappingServerImpl server =
+            (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
+
+        // clear out the listeners
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        // ... and invoke the method
+        moveMethod.invoke(server, id, null, firstNode, firstNodeId);
+
+        // Ensure that the idListener has been notified.
+        idListener.waitForNotification();
+
+        // ... and wait for the id relocation to expire.
+        Thread.sleep(RELOCATION_TIME);
+
+        // The identity should not have moved.
+        txnScheduler.runTask(task, taskOwner);
+        assertEquals(firstNodeId, task.getNodeId());
+
+        // Try another move
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        for (TestRelocationListener lis : moveMap.values()) {
+            lis.clear();
+        }
+        Long secondTryNode =
+            (Long) moveMethod.invoke(server, id, null,
+                                     firstNode, firstNodeId);
+
+        // Give the id relocation listener a chance to finish.
+        idListener.waitForNotification();
+        // This time, allow the movement to complete.
+        idListener.handler.completed();
+
+        // Wait for notification.  We expect to be notified on the
+        // secondTryNode assigned above.
+        TestListener secondNodeListener = nodeListenerMap.get(secondTryNode);
+        secondNodeListener.waitForNotification();
+
+        txnScheduler.runTask(task, taskOwner);
+        assertEquals((long) secondTryNode, task.getNodeId());
+
+        checkIdAdded(secondNodeListener, id, firstNode);
+    }
+
     /* -- Tests to see what happens if the server isn't available --*/
     @Test
     public void testEvilServerAssignNode() throws Exception {
@@ -1025,10 +1227,15 @@ public class TestNodeMappingServiceImpl {
         Object oldServer = swapToEvilServer(nodeMappingService);
         
         Identity id = new IdentityImpl("first");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
 
-        // Nothing much will happen. Eventually, we'll cause the
-        // stack to shut down.
-        nodeMappingService.assignNode(NodeMappingService.class, id);   
+        Thread.sleep(100);
+        try {
+            assertFalse(serverNode.getWatchdogService().
+                        isLocalNodeAliveNonTransactional());
+        } catch (IllegalStateException e) {
+            // All OK, the server is probably shutting down
+        }
         swapToNormalServer(nodeMappingService, oldServer);
     }
     
@@ -1078,22 +1285,13 @@ public class TestNodeMappingServiceImpl {
         Object oldServer = swapToEvilServer(nodeMappingService);
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         
-        Thread.sleep(removeTime * 4);
-
-        // Identity should now be gone... this is a hole in the
-        // implementation, currently.  It won't be removed.  
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() {
-                try {
-                    Node node = nodeMappingService.getNode(id);
-                    // This line should be uncommented if we want to support
-                    // disconnected servers.
-//                  fail("Expected UnknownIdentityException");
-                } catch (UnknownIdentityException e) {
-                    
-                }
-            }
-        }, taskOwner);
+        Thread.sleep(100);
+        try {
+            assertFalse(serverNode.getWatchdogService().
+                        isLocalNodeAliveNonTransactional());
+        } catch (IllegalStateException e) {
+            // All OK, the server is probably shutting down
+        }
         swapToNormalServer(nodeMappingService, oldServer);
     }
     
@@ -1161,15 +1359,26 @@ public class TestNodeMappingServiceImpl {
         private final List<Node> addedNodes = new ArrayList<Node>();
         private final List<Identity> removedIds = new ArrayList<Identity>();
         private final List<Node> removedNodes = new ArrayList<Node>();
-        
+
+        // A notificationLock to let us know when the listener has been called.
+        private final Object notificationLock = new Object();
+        private boolean notified;
         public void mappingAdded(Identity identity, Node node) {
             addedIds.add(identity);
             addedNodes.add(node);
+            synchronized (notificationLock) {
+                notified = true;
+                notificationLock.notifyAll();
+            }
         }
 
         public void mappingRemoved(Identity identity, Node node) {
             removedIds.add(identity);
             removedNodes.add(node);
+            synchronized (notificationLock) {
+                notified = true;
+                notificationLock.notifyAll();
+            }
         }
         
         public void clear() {
@@ -1177,12 +1386,33 @@ public class TestNodeMappingServiceImpl {
             addedNodes.clear();
             removedIds.clear();
             removedNodes.clear();
+            notified = false;
         }
-        
+
+        public boolean isClear() {
+            return (addedIds.size() == 0) && (addedNodes.size() == 0) &&
+                   (removedIds.size() == 0) && (removedNodes.size() == 0);
+        }
+
+        public void waitForNotification(long stop) throws InterruptedException {
+            long stopTime = System.currentTimeMillis() + stop;
+            synchronized (notificationLock) {
+                while (!notified &&
+                       System.currentTimeMillis() < stopTime)
+                {
+                    notificationLock.wait(100);
+                }
+            }
+        }
+        public void waitForNotification() throws InterruptedException {
+            waitForNotification(1000);
+        }
+
         public List<Identity> getAddedIds()   { return addedIds; }
         public List<Node> getAddedNodes()     { return addedNodes; }
         public List<Identity> getRemovedIds() { return removedIds; }
         public List<Node> getRemovedNodes()   { return removedNodes; }
+
         
         public String toString() {
             return "TestListener: AddedIds size: " + addedIds.size() +
@@ -1190,5 +1420,167 @@ public class TestNodeMappingServiceImpl {
                    " removedIds size: " + removedIds.size() +
                    " removedNodes size: " + removedNodes.size();
         }
+    }
+
+        /* Check that the listener was notified of id moving from this node,
+     * to node "to".
+     */
+    private void checkIdRemoved(TestListener listener, Identity id, Node to) {
+        // Make sure we got a notification
+        assertEquals(0, listener.getAddedIds().size());
+        assertEquals(0, listener.getAddedNodes().size());
+
+        List<Identity> removedIds = listener.getRemovedIds();
+        List<Node> removedNodes = listener.getRemovedNodes();
+        assertEquals(1, removedIds.size());
+        assertEquals(1, removedNodes.size());
+        assertTrue(removedIds.contains(id));
+        // no new node
+        assertTrue(removedNodes.contains(to));
+    }
+
+    /* Check that the listener was notified of id moving to this node,
+     * from node "from"
+     */
+    private void checkIdAdded(TestListener listener, Identity id, Node from) {
+        // Make sure we got a notification
+        assertEquals(0, listener.getRemovedIds().size());
+        assertEquals(0, listener.getRemovedNodes().size());
+
+        List<Identity> addedIds = listener.getAddedIds();
+        List<Node> addedNodes = listener.getAddedNodes();
+        assertEquals(1, addedIds.size());
+        assertEquals(1, addedNodes.size());
+        assertTrue(addedIds.contains(id));
+        // no new node
+        assertTrue(addedNodes.contains(from));
+    }
+
+    /* Check that the listeners on each node were correctly notified. */
+    private void checkIdMoved(TestListener firstNodeListener, Node firstNode,
+                              TestListener secondNodeListener, Node secondNode,
+                              Identity id)
+    {
+        // The id was removed from the first node
+        checkIdRemoved(firstNodeListener, id, secondNode);
+
+        // The id was added to the second node
+        checkIdAdded(secondNodeListener, id, firstNode);
+
+        // Make sure no other listeners were affected
+        for (TestListener listener : nodeListenerMap.values()) {
+            if (listener != firstNodeListener &&
+                listener != secondNodeListener)
+            {
+                assertTrue(listener.isClear());
+            }
+        }
+    }
+
+    /** A test identity relocation listener. */
+    private class TestRelocationListener implements IdentityRelocationListener {
+        private final List<Identity> movingIds = new ArrayList<Identity>();
+        private final List<Long> movingNodes = new ArrayList<Long>();
+
+        // The corresponding node mapping listener for this node.
+        private final TestListener nodeMapListener;
+
+        // If true, this listener won't call completed right away.
+        private final boolean asynch;
+
+        // Set to false if a problem is encountered
+        private boolean ok = true;
+
+        // The pending handler, which allows us to control when the
+        // complete method is called.
+        SimpleCompletionHandler handler;
+        // A notificationLock to let us know when the listener has been called.
+        private final Object notificationLock = new Object();
+        private boolean notified;
+
+        TestRelocationListener(TestListener lis, boolean asynch) {
+            nodeMapListener = lis;
+            this.asynch = asynch;
+        }
+        public void prepareToRelocate(Identity id, long newNodeId,
+                                      SimpleCompletionHandler handler)
+        {
+            movingIds.add(id);
+            movingNodes.add(newNodeId);
+
+            // Ensure that the nm listener has not been notified yet.
+            // This assumes the nm listener was cleared before the move.
+            ok = nodeMapListener.isClear();
+
+            if (asynch) {
+                this.handler = handler;
+            } else {
+                handler.completed();
+            }
+            synchronized (notificationLock) {
+                notified = true;
+                notificationLock.notifyAll();
+            }
+        }
+
+        public void clear() {
+            movingIds.clear();
+            movingNodes.clear();
+            handler = null;
+            notified = false;
+        }
+
+        public boolean isClear() {
+            return (movingIds.size() == 0) && (movingNodes.size() == 0) &&
+                   (handler == null);
+        }
+
+        public void waitForNotification() throws InterruptedException {
+            long stopTime = System.currentTimeMillis() + 1000;
+            synchronized (notificationLock) {
+                while (!notified &&
+                       System.currentTimeMillis() < stopTime)
+                {
+                    notificationLock.wait(100);
+                }
+            }
+        }
+
+        public List<Identity> getIds()  { return movingIds; }
+        public List<Long> getNodes()    { return movingNodes; }
+        public boolean isOK()           { return ok; }
+    }
+
+    /* Add id relocation listeners for each node, putting them in the given
+     * map.  If "asynch" is true, construct a listener which won't call
+     * the completed method.
+     */
+    private void addRelocationListeners(boolean asynch,
+                                    Map<Long, TestRelocationListener> moveMap)
+    {
+        long nodeId = serverNode.getNodeId();
+        TestRelocationListener idListener =
+                new TestRelocationListener(nodeListenerMap.get(nodeId), asynch);
+        nodeMappingService.addIdentityRelocationListener(idListener);
+        moveMap.put(nodeId, idListener);
+        for (SgsTestNode node : additionalNodes) {
+            nodeId = node.getNodeId();
+            idListener =
+                new TestRelocationListener(nodeListenerMap.get(nodeId), asynch);
+            node.getNodeMappingService().
+                    addIdentityRelocationListener(idListener);
+            moveMap.put(nodeId, idListener);
+        }
+    }
+    private void checkRelocationNotification(TestRelocationListener listener,
+            Identity id, long toNode)
+    {
+        // The id is moving from the first node to the second
+        assertEquals(1, listener.getIds().size());
+        assertTrue(listener.getIds().contains(id));
+        assertEquals(1, listener.getNodes().size());
+        assertTrue(listener.getNodes().contains(toNode));
+        // Make sure the node mapping listener hadn't been notified yet.
+        assertTrue(listener.isOK());
     }
 }

@@ -35,6 +35,7 @@ import com.sun.sgs.profile.ProfileOperation;
 class NodeMappingServiceStats implements NodeMappingServiceMXBean {
 
     final AggregateProfileOperation addNodeMappingListenerOp;
+    final AggregateProfileOperation addIdentityRelocationListenerOp;
     final ProfileOperation assignNodeOp;
     final ProfileOperation getIdentitiesOp;
     final ProfileOperation getNodeOp;
@@ -50,6 +51,9 @@ class NodeMappingServiceStats implements NodeMappingServiceMXBean {
 
         addNodeMappingListenerOp = (AggregateProfileOperation)
             consumer.createOperation("addNodeMappingListener", type, level);
+        addIdentityRelocationListenerOp = (AggregateProfileOperation)
+            consumer.createOperation("addIdentityRelocationListener", 
+                                     type, level);
         assignNodeOp =
             consumer.createOperation("assignNode", type, level);
         getIdentitiesOp = 
@@ -63,6 +67,11 @@ class NodeMappingServiceStats implements NodeMappingServiceMXBean {
     /** {@inheritDoc} */
     public long getAddNodeMappingListenerCalls() {
         return addNodeMappingListenerOp.getCount();
+    }
+    
+    /** {@inheritDoc} */
+    public long getAddIdentityRelocationListenerCalls() {
+        return addIdentityRelocationListenerOp.getCount();
     }
 
     /** {@inheritDoc} */

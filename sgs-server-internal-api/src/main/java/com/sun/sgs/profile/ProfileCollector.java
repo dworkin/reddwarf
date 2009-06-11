@@ -142,8 +142,7 @@ public interface ProfileCollector {
      * <p>
      * Note that the name must be unique for a new {@code ProfileConsumer} to 
      * be created. Consumers created by the core server packages have a prefix
-     * of {@value 
-     * com.sun.sgs.impl.profile.ProfileCollectorImpl#CORE_CONSUMER_PREFIX}
+     * of {@code com.sun.sgs.}
      * to distinguish their namespace. Consumers created by code outside of the
      * core server packages should create their own unique namespace.
      * <p>

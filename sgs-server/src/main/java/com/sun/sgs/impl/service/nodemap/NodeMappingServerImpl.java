@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -28,12 +29,14 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -92,13 +95,28 @@ import java.util.logging.Logger;
  *      <i>Default:</i> {@code 5000} 
  *
  * <dd style="padding-top: .5em">
- *      The mimimum time, in milliseconds, that this server will wait before
+ *      The minimum time, in milliseconds, that this server will wait before
  *      removing a potentially inactive identity from the map.   This value
  *      must be greater than {@code 0}.   Shorter expiration times cause the
  *      map to be cleaned up more frequently, potentially causing more
  *      {@link NodeMappingService#assignNode(Class, Identity) assignNode} 
  *      calls;  longer expiration times will increase the chance that an 
  *      identity will become active again before it can be removed. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.relocation.expire.time
+ *	</b></code> <br>
+ *      <i>Default:</i> {@code 10000}
+ *
+ * <dd style="padding-top: .5em">
+ *      The time allowed, in milliseconds, for {@code 
+ *      IdentityRelocationListener}s to call
+ *      {@link SimpleCompletionHandler#completed completed} on the
+ *      handler they receive.  If this time has elapsed, this server disregards
+ *      the proposed identity relocation.  This value is used to guard against
+ *      listeners which never respond they are finished.  During this time
+ *      period, the identity is prohibited from moving elsewhere unless the
+ *      node has failed. <p>
  *
  * </dl> <p>
  *
@@ -149,6 +167,20 @@ public final class NodeMappingServerImpl
     /** Default time to wait before removing an identity, in milliseconds. */
     private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
     
+    /** The property name for the amount of time allowed for IdentityRelocation
+     * listeners to respond that they have completed their work.
+     */
+    private static final String RELOCATION_EXPIRE_PROPERTY =
+            PKG_NAME + ".relocation.expire.time";
+
+    /** Default time allowed for IdentityRelocationListeners to respond that
+     * they have completed preparations for an identity move, in milliseconds.
+     */
+    // TODO:  This expiration must be longer than the timeout for moving
+    //        client sessions.  We need that timeout in a common location
+    //        (StandardProperties?) so we can ensure this one is larger.
+    private static final int DEFAULT_RELOCATION_EXPIRE_TIME = 10000;
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".server"));
@@ -192,6 +224,17 @@ public final class NodeMappingServerImpl
      */
     private final Map<Long, NotifyClient> notifyMap =
                 new ConcurrentHashMap<Long, NotifyClient>();   
+
+    /**
+     * The amount of time allowed for id relocation listeners to state they
+     * have completed their work.  If this time expires, the move is effectively
+     * cancelled, and the identity can be moved elsewhere.
+     */
+    private final long relocationExpireTime;
+
+    /** The set of identities that are in the process of moving. */
+    private final Map<Identity, MoveIdTask> moveMap =
+            new ConcurrentHashMap<Identity, MoveIdTask>();
     
     /**
      * Creates a new instance of NodeMappingServerImpl, called from the
@@ -257,6 +300,12 @@ public final class NodeMappingServerImpl
         removeThread = new RemoveThread(removeExpireTime);
         removeThread.start();
         
+        // Find how long we'll give listeners to say they've finished move
+        // preparations.
+        relocationExpireTime = wrappedProps.getLongProperty(
+                RELOCATION_EXPIRE_PROPERTY, DEFAULT_RELOCATION_EXPIRE_TIME,
+                1, Long.MAX_VALUE);
+
         // Register our node listener with the watchdog service.
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
@@ -423,6 +472,17 @@ public final class NodeMappingServerImpl
         public Node getNode()                   { return node;    }
     }
 
+    /** {@inheritDoc} */
+    public void canMove(Identity id) throws IOException {
+        callStarted();
+        try {
+            MoveIdTask moveTask = moveMap.remove(id);
+            moveIdAndNotifyListeners(moveTask);
+        } finally {
+            callFinished();
+        }
+    }
+    
     /** {@inheritDoc} */
     public void canRemove(Identity id) throws IOException {
         callStarted();
@@ -607,57 +667,34 @@ public final class NodeMappingServerImpl
         }
     }    
     
-    // TODO Perhaps need to have a separate thread do this work.
     // TODO Perhaps will want to batch notifications.
-    private void notifyListeners(Node oldNode, Node newNode, Identity id) {
+    private void notifyListeners(final Node oldNode, final Node newNode,
+                                 final Identity id)
+    {
         logger.log(Level.FINEST, "In notifyListeners, identity: {0}, " +
                                "oldNode: {1}, newNode: {2}", 
                                id, oldNode, newNode);
         if (oldNode != null) {
-            NotifyClient oldClient = notifyMap.get(oldNode.getId());
+            final NotifyClient oldClient = notifyMap.get(oldNode.getId());
             if (oldClient != null) {
-                int retries = maxIoAttempts; // retry a few times
-                while (retries-- > 0) {
-                    try {
-                        oldClient.removed(id, newNode);
-                        break;
-                    } catch (IOException ex) {
-                        // report failure if we run out of retries
-                        if (retries == 0) {
-                            logger.logThrow(Level.WARNING, ex,
-                                    "A communication error occured while " +
-                                    "notifying node {0} that {1} has " +
-                                    "been removed", oldClient, id);
-                            // shutdown the node corresponding to oldClient
-                            watchdogService.reportFailure(oldNode.getId(),
-                                    this.getClass().toString());
+                runIoTask(
+                    new IoRunnable() {
+                        public void run() throws IOException {
+                            oldClient.removed(id, newNode);
                         }
-                    }
-                }
+                    }, oldNode.getId());
             }
         }
         
         if (newNode != null) {
-            NotifyClient newClient = notifyMap.get(newNode.getId());
+            final NotifyClient newClient = notifyMap.get(newNode.getId());
             if (newClient != null) {
-                int retries = maxIoAttempts; // retry a few times
-                while (retries-- > 0) {
-                    try {
-                        newClient.added(id, oldNode);
-                        break;
-                    } catch (IOException ex) {
-                        // report failure if we run out of retries
-                        if (retries == 0) {
-                            logger.logThrow(Level.WARNING, ex,
-                                    "A communication error occured while " +
-                                    "notifying node {0} that {1} has " +
-                                    "been removed", newClient, id);
-                            // shutdown the node corresponding to newClient
-                            watchdogService.reportFailure(newNode.getId(),
-                                    this.getClass().toString());
+                runIoTask(
+                    new IoRunnable() {
+                        public void run() throws IOException {
+                            newClient.added(id, oldNode);
                         }
-                    }
-                }
+                    }, newNode.getId());
             }
         }
     }
@@ -699,25 +736,41 @@ public final class NodeMappingServerImpl
      * (which can take a while) and then update the map to reflect
      * the choice, cleaning up old mappings as appropriate.  If given
      * a {@code serviceName}, the status of the identity is set to active
-     * for that service on the new node.
+     * for that service on the new node.  The change in mappings might need
+     * to wait for registered {@code IdentityRelocationListener}s to
+     * prepare for the move.
      *
      * @param id the identity to map to a new node
      * @param serviceName the name of the requesting service's class, or null
-     * @param old the last node the identity was mapped to, or null if there
+     * @param oldNode the last node the identity was mapped to, or null if there
      *        was no prior mapping
      * @param requestingNode the node making the mapping request
      *
      * @throws NoNodesAvailableException if there are no live nodes to map to
      */
-    long mapToNewNode(Identity id, String serviceName, Node old, 
+    long mapToNewNode(final Identity id, String serviceName, Node oldNode,
                       long requestingNode) 
         throws NoNodesAvailableException
     {
         assert (id != null);
         
+        // First, check to see if we're already trying to move this identity
+        // and we haven't gone past the expire time.
+        // If so, just return the node we're trying to move it to.
+        MoveIdTask moveTask = moveMap.get(id);
+        if (moveTask != null) {
+            if (System.currentTimeMillis() < moveTask.expireTime) {
+                return moveTask.newNodeId;
+            } else {
+                // We've expired.  Clean up our data structures.  The service
+                // side will know of the expiration because it will receive
+                // a second request to move of the same identity.
+                moveMap.remove(id);
+            }
+        }
+        
         // Choose the node.  This needs to occur outside of a transaction,
         // as it could take a while.  
-        final Node oldNode = old;
         final long newNodeId;
         try {
             newNodeId = assignPolicy.chooseNode(id, requestingNode);
@@ -727,7 +780,7 @@ public final class NodeMappingServerImpl
                     id, oldNode);
             throw ex;
         }
-
+        
         if (oldNode != null && newNodeId == oldNode.getId()) {
             // We picked the same node.  This might be OK - the system might
             // only have one node, or the current node might simply be the
@@ -739,81 +792,41 @@ public final class NodeMappingServerImpl
             return newNodeId;
         }
         
-        // Calculate the lookup keys for both the old and new nodes.
-        // The id key is the same for both old and new.
-        final String idkey = NodeMapUtil.getIdentityKey(id);
+        // Create a new task with the move information.
+        moveTask = new MoveIdTask(id, oldNode, newNodeId, serviceName);
         
-        // The oldNode will be null if this is the first assignment.
-        final String oldNodeKey = (oldNode == null) ? null :
-            NodeMapUtil.getNodeKey(oldNode.getId(), id);
-        final String oldStatusKey = (oldNode == null) ? null :
-            NodeMapUtil.getPartialStatusKey(id, oldNode.getId());
-
-        final String newNodekey = NodeMapUtil.getNodeKey(newNodeId, id);
-        final String newStatuskey = (serviceName == null) ? null :
-                NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
-        
-        final IdentityMO newidmo = new IdentityMO(id, newNodeId);
-        
+        if (oldNode != null && oldNode.isAlive()) {
+            // Tell the id's old node, so it can tell the id relocation
+            // listeners.  We won't actually move the identity until the
+            // listeners have all responded, can canMove is called.
+            moveMap.put(id, moveTask);
+            long oldId = oldNode.getId();
+            final NotifyClient oldClient = notifyMap.get(oldId);
+            if (oldClient != null) {
+                runIoTask(
+                    new IoRunnable() {
+                        public void run() throws IOException {
+                            oldClient.prepareRelocate(id, newNodeId);
+                        }
+                    }, oldId);
+            }
+        } else {
+            // Go ahead and make the move now.
+            moveIdAndNotifyListeners(moveTask);
+        }
+        return newNodeId;
+    }
+    
+    private void moveIdAndNotifyListeners(MoveIdTask moveTask) {
+        if (moveTask == null) {
+            // There's nothing to do.
+            return;
+        }
+        Identity id = moveTask.id;
+        final Node oldNode = moveTask.oldNode;
+        final long newNodeId = moveTask.newNodeId;
         try {
-            runTransactionally(new AbstractKernelRunnable("MoveIdentity") {
-                public void run() {                   
-                    // First, we clean up any old mappings.
-                    if (oldNode != null) {
-                        try {
-                            // Find the old IdentityMO, with the old node info.
-                            IdentityMO oldidmo = (IdentityMO)
-				dataService.getServiceBinding(idkey);
-
-                            // Check once more for the assigned node - someone
-                            // else could have mapped it before we got here.
-                            // If so, just return.
-                            if (oldidmo.getNodeId() != oldNode.getId()) {
-                                return;
-                            }
-
-                            //Remove the old node->id key.
-                            dataService.removeServiceBinding(oldNodeKey);
-
-                            // Remove the old status information.  We don't 
-                            // retain any info about the old node's status.
-                            Iterator<String> iter =
-                                BoundNamesUtil.getServiceBoundNamesIterator(
-                                    dataService, oldStatusKey);
-                            while (iter.hasNext()) {
-                                iter.next();
-                                iter.remove();
-                            }
-                            // Remove the old IdentityMO with the old node info.
-                            dataService.removeObject(oldidmo);
-                        } catch (NameNotBoundException e) {
-                            // The identity was removed before we could
-                            // reassign it to a new node.
-                            // Simply make the new assignment, as if oldNode
-                            // was null to begin with.
-                        }
-                    }
-                    // Add (or update) the id->node mapping. 
-                    dataService.setServiceBinding(idkey, newidmo);
-                    // Add the node->id mapping
-                    dataService.setServiceBinding(newNodekey, newidmo);
-                    // Reference count
-                    if (newStatuskey != null) {
-                        dataService.setServiceBinding(newStatuskey, newidmo);
-                    } else {
-                        // This server has started the move, either through
-                        // a node failure or load balancing.  Add the identity
-                        // to the remove list so we will notice if the client
-                        // never logs back in.
-                        try {
-                            canRemove(newidmo.getIdentity());
-                        } catch (IOException ex) {
-                            // won't happen;  this is a local call
-                        }
-                    }
-                    
-                } });
-                
+            runTransactionally(moveTask); 
             GetNodeTask atask = new GetNodeTask(newNodeId);
             runTransactionally(atask);
 
@@ -827,10 +840,107 @@ public final class NodeMappingServerImpl
             // The most likely problem is one in our own code.
             logger.logThrow(Level.FINE, e, 
                             "Move {0} mappings from {1} to {2} failed", 
-                            id, oldNode.getId(), newNodeId);
+                            id, oldNode, newNodeId);
         }
+    }
+    
+    private class MoveIdTask extends AbstractKernelRunnable {
+        final Identity id;
+        final Node oldNode;
+        final long newNodeId;
+        final long expireTime;
+        // Calculate the lookup keys for both the old and new nodes.
+        // The id key is the same for both old and new.
+        private final String idkey;
+        
+        // The oldNode will be null if this is the first assignment.
+        private final String oldNodeKey;
+        private final String oldStatusKey;
 
-        return newNodeId;
+        private final String newNodekey;
+        private final String newStatuskey;
+        
+        private final IdentityMO newidmo;
+        MoveIdTask(Identity id, Node oldNode, long newNodeId, 
+                   String serviceName) 
+        {
+            super(null);
+            this.id = id;
+            this.oldNode = oldNode;
+            this.newNodeId = newNodeId;
+            expireTime = System.currentTimeMillis() + relocationExpireTime;
+            // Calculate the lookup keys for both the old and new nodes.
+            // The id key is the same for both old and new.
+            idkey = NodeMapUtil.getIdentityKey(id);
+
+            // The oldNode will be null if this is the first assignment.
+            oldNodeKey = (oldNode == null) ? null :
+                NodeMapUtil.getNodeKey(oldNode.getId(), id);
+            oldStatusKey = (oldNode == null) ? null :
+                NodeMapUtil.getPartialStatusKey(id, oldNode.getId());
+
+            newNodekey = NodeMapUtil.getNodeKey(newNodeId, id);
+            newStatuskey = (serviceName == null) ? null :
+                    NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
+
+            newidmo = new IdentityMO(id, newNodeId);
+        }
+        
+        public void run() {
+            // First, we clean up any old mappings.
+            if (oldNode != null) {
+                try {
+                    // Find the old IdentityMO, with the old node info.
+                    IdentityMO oldidmo = (IdentityMO)
+                        dataService.getServiceBinding(idkey);
+
+                    // Check once more for the assigned node - someone
+                    // else could have mapped it before we got here.
+                    // If so, just return.
+                    if (oldidmo.getNodeId() != oldNode.getId()) {
+                        return;
+                    }
+
+                    //Remove the old node->id key.
+                    dataService.removeServiceBinding(oldNodeKey);
+
+                    // Remove the old status information.  We don't 
+                    // retain any info about the old node's status.
+                    Iterator<String> iter =
+                        BoundNamesUtil.getServiceBoundNamesIterator(
+                            dataService, oldStatusKey);
+                    while (iter.hasNext()) {
+                        iter.next();
+                        iter.remove();
+                    }
+                    // Remove the old IdentityMO with the old node info.
+                    dataService.removeObject(oldidmo);
+                } catch (NameNotBoundException e) {
+                    // The identity was removed before we could
+                    // reassign it to a new node.
+                    // Simply make the new assignment, as if oldNode
+                    // was null to begin with.
+                }
+            }
+            // Add (or update) the id->node mapping. 
+            dataService.setServiceBinding(idkey, newidmo);
+            // Add the node->id mapping
+            dataService.setServiceBinding(newNodekey, newidmo);
+            // Reference count
+            if (newStatuskey != null) {
+                dataService.setServiceBinding(newStatuskey, newidmo);
+            } else {
+                // This server has started the move, either through
+                // a node failure or load balancing.  Add the identity
+                // to the remove list so we will notice if the client
+                // never logs back in.
+                try {
+                    canRemove(newidmo.getIdentity());
+                } catch (IOException ex) {
+                    // won't happen;  this is a local call
+                }
+            }
+        }
     }
     
     private class GetNodeTask extends AbstractKernelRunnable {
@@ -889,24 +999,29 @@ public final class NodeMappingServerImpl
             GetIdOnNodeTask task = 
                     new GetIdOnNodeTask(dataService, nodekey, logger);
             
-            boolean done = false;
-            while (!done) {
+            while (true) {
                 // Break out of the loop if we're shutting down.
                 if (shuttingDown()) {
-                    done = true;
                     break;
                 }
                 try {
                     // Find an identity on the node
                     runTransactionally(task);
-                    done = task.done();
                 
                     // Move it, removing old mapping
-                    if (!done) {
+                    if (!task.done()) {
                         Identity id = task.getId().getIdentity();
                         try {
-                            mapToNewNode(id, null, node, 
+                            // If we're already trying to move the identity,
+                            // but the old node failed before preparations are
+                            // complete, just make the move now.
+                            MoveIdTask moveTask = moveMap.remove(id);
+                            if (moveTask != null) {
+                                moveIdAndNotifyListeners(moveTask);
+                            } else {
+                                mapToNewNode(id, null, node, 
                                          NodeAssignPolicy.SERVER_NODE);
+                            }
                         } catch (NoNodesAvailableException e) {
                             // This can be thrown from mapToNewNode if there are
                             // no live nodes.  Stop our loop.
@@ -917,15 +1032,14 @@ public final class NodeMappingServerImpl
                             // somewhere of failed nodes, and have a background
                             // thread that tries to move them.
                             removeQueue.add(new RemoveInfo(id));
-                            done = true;
+                            break;
                         }
-                    }
-                
+                    }                
                 } catch (Exception ex) {
-                    done = true;
                     logger.logThrow(Level.WARNING, ex, 
                         "Failed to move identity {0} from failed node {1}", 
                         task.getId(), node);
+                    break;
                 }
             }
         }
@@ -1001,18 +1115,6 @@ public final class NodeMappingServerImpl
     
     
     /* -- Methods to assist in testing and verification -- */
-    
-    /**
-     * Add a node.  This is useful for server testing, when we
-     * haven't instantiated a service.
-     * <p>
-     * XXX:  remove this, using a NodeAssignPolicy instead?
-     *
-     * @param nodeId the node id of the fake node
-     */
-    void addDummyNode(long nodeId)  {
-        assignPolicy.nodeStarted(nodeId);
-    }
     
     /**
      * Get the node an identity is mapped to.

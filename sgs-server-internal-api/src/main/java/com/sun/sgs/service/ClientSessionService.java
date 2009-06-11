@@ -39,6 +39,8 @@ public interface ClientSessionService extends Service {
      *
      * @param   listener a listener to notify when a session disconnects or
      *		is being prepared to relocate
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
      */
     void addSessionStatusListener(ClientSessionStatusListener listener);
 
@@ -51,8 +53,13 @@ public interface ClientSessionService extends Service {
      * ManagedReference#getId getId} on a {@link ManagedReference} to the
      * associated {@code ClientSession}.
      *
+     * <p>This method is non-transactional and should be called
+     * outside of a transaction.
+     *
      * @param	sessionRefId a client session ID, as a {@code BigInteger}
      * @return	a protocol, or {@code null}
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
      */
     SessionProtocol getSessionProtocol(BigInteger sessionRefId);
 }
