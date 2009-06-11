@@ -339,6 +339,16 @@
     <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
 
+  <!-- Package com.sun.sgs.impl.service.nodemap -->
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$2"/>
+      <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$3"/>
+      <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$4"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
   <!-- Package com.sun.sgs.impl.service.watchdog -->
 
   <!-- Access to abortCause is safe due to checking current thread at beginning of method -->

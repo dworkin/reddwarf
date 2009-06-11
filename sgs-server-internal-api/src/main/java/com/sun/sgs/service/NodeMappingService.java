@@ -165,6 +165,25 @@ public interface NodeMappingService extends Service {
      *         a problem with the current transaction
      */
     Iterator<Identity> getIdentities(long nodeId) throws UnknownNodeException;
+     
+    /**
+     * Adds a {@code listener} to be notified when an identity has been selected
+     * to be relocated off the local node.  The listener will be invoked
+     * outside of a transaction.
+     * <p>
+     * If a {@code Service} needs to take actions before an identity is moved,
+     * it should register one (or more) {@code listener} objects when 
+     * constructed.  The order of callbacks to listener objects is not
+     * specified, and the callbacks will occur asynchronously.
+     * <p>
+     * The identity will be moved, and the mapping modified, when all 
+     * {@code listener} objects have completed their work, or after a time 
+     * delay in case a {@code listener} does not respond that it is finished.
+     * 
+     * @param listener a listener to be notified prior to an identity moving
+     *                 from the local node
+     */
+    void addIdentityRelocationListener(IdentityRelocationListener listener);
     
     /** 
      * Adds a {@code listener} to be notified when the identity
@@ -180,4 +199,5 @@ public interface NodeMappingService extends Service {
      * @param listener a listener to be notified of local changes to the map
      */
     void addNodeMappingListener(NodeMappingListener listener);
+ 
 }

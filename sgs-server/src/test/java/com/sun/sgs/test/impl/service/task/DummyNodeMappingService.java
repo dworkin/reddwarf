@@ -27,6 +27,7 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
@@ -167,6 +168,11 @@ public class DummyNodeMappingService implements NodeMappingService,
         
     }
 
+    /** {@inheritDoc} */
+    public void addIdentityRelocationListener(IdentityRelocationListener listener) { 
+        
+    }
+    
     /** Private helper to choose a mapping node. */
     private Node chooseNode(Identity identity) {
         return availableNodes.peek();

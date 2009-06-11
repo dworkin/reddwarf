@@ -21,7 +21,6 @@ package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -30,6 +29,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -41,6 +41,8 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.IdentityRelocationListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
@@ -56,7 +58,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -285,11 +291,6 @@ public class NodeMappingServiceImpl
     /** The property name for the client port. */
     private static final String CLIENT_PORT_PROPERTY = 
             PKG_NAME + ".client.port";
-
-    /** The number of times we should try to contact the backend before
-     *  giving up. 
-     */
-    private static final int MAX_RETRY = 5;
     
     /** The default value of the server port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
@@ -351,6 +352,14 @@ public class NodeMappingServiceImpl
     /** Our service statistics */
     private final NodeMappingServiceStats serviceStats;
     
+    /** The set of identity relocation listeners for this node. */
+    private final Set<IdentityRelocationListener> idRelocationListeners =
+            new CopyOnWriteArraySet<IdentityRelocationListener>();
+
+    /** A map of identities to outstanding idRelocation handlers. */
+    private final ConcurrentMap<Identity, Queue<SimpleCompletionHandler>>
+        relocationHandlers =
+            new ConcurrentHashMap<Identity, Queue<SimpleCompletionHandler>>();
     /**
      * Constructs an instance of this class with the specified properties.
      * <p>
@@ -553,7 +562,7 @@ public class NodeMappingServiceImpl
      *  an AI object), it will be assigned to the local node.  Otherwise,
      *  a remote call will be made to determine a node assignment.
      */
-    public void assignNode(Class service, final Identity identity) {
+    public void assignNode(final Class service, final Identity identity) {
         checkState();
         if (service == null) {
             throw new NullPointerException("null service");
@@ -571,20 +580,22 @@ public class NodeMappingServiceImpl
         // saving a remote call.  However, it makes the logic here
         // more complicated, and it means we duplicate some of the
         // server's work.  Best to always ask the server to handle it.
-        
-        int tryCount = 0;
-        while (tryCount < MAX_RETRY) {
-            try {
-                server.assignNode(service, identity, localNodeId);
-                tryCount = MAX_RETRY;
-                logger.log(Level.FINEST, "assign identity {0}", identity);
-            } catch (IOException ioe) {
-                tryCount++;
-                logger.logThrow(Level.FINEST, ioe, 
-                        "Exception encountered on try {0}: {1}",
-                        tryCount, ioe);
-            }
-        } 
+        //
+        // Note for all uses of runIoTask in this class:  if we cannot
+        // contact the server, we ask that the local node be shut down.
+        // This is because "server" is the core server, which contains
+        // the data store.  If it is shutdown, the entire cluster is
+        // shut down.  If we have a loss of connectivity with the server,
+        // we assume the problem is with the local node.  If the core server
+        // is disconnected from all nodes, the watchdog server will eventually
+        // detect that and declare all nodes dead.
+        runIoTask(
+            new IoRunnable() {
+                public void run() throws IOException {
+                    server.assignNode(service, identity, localNodeId);       
+                }
+            }, localNodeId);
+        logger.log(Level.FINEST, "assign identity {0}", identity);
     }
     
     /** 
@@ -595,7 +606,8 @@ public class NodeMappingServiceImpl
      * might be ready for garbage collection, it tells the server, which
      * will perform the deletion.
      */
-    public void setStatus(Class service, Identity identity, boolean active) 
+    public void setStatus(Class service, final Identity identity,
+                          boolean active)
         throws UnknownIdentityException
     {
         checkState();
@@ -622,17 +634,12 @@ public class NodeMappingServiceImpl
         }
 
         if (stask.canRemove()) {
-            int tryCount = 0;
-            while (tryCount < MAX_RETRY) {
-                try {
-                    server.canRemove(identity);
-                    tryCount = MAX_RETRY;
-                } catch (IOException ioe) {
-                    tryCount++;
-                    logger.logThrow(Level.WARNING, ioe, 
-                           "Could not tell server OK to delete {0}", identity);
-                }
-            }
+            runIoTask(
+                new IoRunnable() {
+                    public void run() throws IOException {
+                        server.canRemove(identity);
+                    }
+                }, localNodeId);
         }
         logger.log(Level.FINEST, "setStatus key: {0} , active: {1}", 
                 stask.statusKey(), active);
@@ -749,6 +756,21 @@ public class NodeMappingServiceImpl
         }
     }
     
+    
+    /** {@inheritDoc} */
+    public void addIdentityRelocationListener(
+                                         IdentityRelocationListener listener) 
+    {
+        checkState();
+        if (listener == null) {
+            throw new NullPointerException("null listener");
+        }
+        serviceStats.addIdentityRelocationListenerOp.report();
+
+        idRelocationListeners.add(listener);
+        logger.log(Level.FINEST, "addIdentityRelocationListener successful");
+    }
+    
     /** {@inheritDoc} */
     public void addNodeMappingListener(NodeMappingListener listener) {
         checkState();
@@ -831,6 +853,56 @@ public class NodeMappingServiceImpl
                     new MapAddTask(listener, id, oldNode), taskOwner);
             }
         }
+        
+        public void prepareRelocate(Identity id, long newNodeId) {
+            if (idRelocationListeners.isEmpty()) {
+                // There's no work to do.
+                tellServerCanMove(id);
+            }
+            Queue<SimpleCompletionHandler> handlerQueue =
+                new ConcurrentLinkedQueue<SimpleCompletionHandler>();
+            // If there is already an entry for this id, it means that attempt
+            // to move has expired and the server is trying again.
+            relocationHandlers.put(id, handlerQueue);
+            
+            // Check to see if we've been constructed but are not yet
+            // completely running.  We reserve tasks for the notifications
+            // in this case, and will use them when ready() has been called.
+            synchronized (lock) {
+                if (isInInitializedState()) {
+                    logger.log(Level.FINEST, 
+                               "Queuing added notification for " +
+                               "identity: {0}, " + "newNode: {1}}", 
+                               id, newNodeId);
+                    for (IdentityRelocationListener listener : 
+                         idRelocationListeners) 
+                    {
+                        final SimpleCompletionHandler handler =
+                            new PrepareMoveCompletionHandler(id);
+                        handlerQueue.add(handler);
+                        TaskReservation res =
+                            taskScheduler.reserveTask(
+                                new MapRelocateTask(listener, id, newNodeId,
+                                                    handler),
+                                taskOwner);
+                        pendingNotifications.add(res);
+                    }
+                    return;
+                }
+            }
+            
+            // The normal case.
+            for (final IdentityRelocationListener listener : 
+                 idRelocationListeners) 
+            {
+                final SimpleCompletionHandler handler =
+                        new PrepareMoveCompletionHandler(id);
+                handlerQueue.add(handler);
+                taskScheduler.scheduleTask(
+                    new MapRelocateTask(listener, id, newNodeId, handler),
+                    taskOwner);
+            }
+        }
     }
      
     /**
@@ -870,6 +942,30 @@ public class NodeMappingServiceImpl
         }
         public void run() {
             listener.mappingAdded(id, oldNode);
+        }
+    }
+    
+    /**
+     * Let a listener know that the an identity will be relocated from this
+     * node.
+     */
+    private static final class MapRelocateTask extends AbstractKernelRunnable {
+        final IdentityRelocationListener listener;
+        final Identity id;
+        final long newNodeId;
+        final SimpleCompletionHandler handler;
+        MapRelocateTask(IdentityRelocationListener listener, 
+                        Identity id, long newNodeId,
+                        SimpleCompletionHandler handler)
+        {
+	    super(null);
+            this.listener = listener;
+            this.id = id;
+            this.newNodeId = newNodeId;
+            this.handler = handler;
+        }
+        public void run() {
+            listener.prepareToRelocate(id, newNodeId, handler);
         }
     }
     
@@ -953,6 +1049,75 @@ public class NodeMappingServiceImpl
         }  
     }
 
+    /**
+     * A {@code SimpleCompletionHandler} implementation for identity
+     * relocation listeners.  When {@code completed} is invoked, the handler
+     * instance is removed from the relocation handler queue for the associated
+     * identity.  If a given handler is the last one to be removed from an
+     * identity's queue, then relocation preparations are complete for that
+     * identity, and the node mapping service can actually move the identity
+     * to its new node.
+     */
+    private final class PrepareMoveCompletionHandler
+	implements SimpleCompletionHandler
+    {
+	/** The identity. */
+	private final Identity id;
+	/** Indicates whether relocation preparation is done for {@code id}. */
+	private boolean isDone = false;
+
+	/**
+	 * Constructs an instance with the specified {@code node} and
+	 * recovery {@code listener}.
+	 */
+	PrepareMoveCompletionHandler(Identity id) {
+	    this.id = id;
+	}
+
+	/** {@inheritDoc} */
+	public void completed() {
+	    synchronized (this) {
+		if (isDone) {
+		    return;
+		}
+		isDone = true;
+	    }
+
+	    Queue<SimpleCompletionHandler> handlerQueue =
+                    relocationHandlers.get(id);
+	    assert handlerQueue != null;
+            
+            // If the queue did not change, this object wasn't on the queue.
+            // This could happen if the move preparation has failed
+            // previously (due to handlers not calling completed in a timely
+            // manner).
+            if (handlerQueue.remove(this)) {
+                if (handlerQueue.isEmpty()) {
+                    if (relocationHandlers.remove(id) != null) {
+                        // Tell the server we're good to go if someone else
+                        // hasn't already done so.
+                        tellServerCanMove(id);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Tell the server that it's OK to move identity, all listeners
+     * have been notified and have finished.
+     * @param id the id to move
+     */
+    private void tellServerCanMove(final Identity id) {
+        runIoTask(
+            new IoRunnable() {
+                public void run() throws IOException {
+                    server.canMove(id);   
+                }
+            }, localNodeId);
+        logger.log(Level.FINEST, "can move identity {0}", id);
+    }
+    
     /* -- For testing. -- */
     
     /**
