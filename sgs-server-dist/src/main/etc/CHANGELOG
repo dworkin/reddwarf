@@ -1,5 +1,5 @@
 Version 0.9.11:
-- Fix issue #169.
+- Fix issues #169, #171.
 
 Version 0.9.10:
 - Add DataManager.getObjectId (issue #99) and
