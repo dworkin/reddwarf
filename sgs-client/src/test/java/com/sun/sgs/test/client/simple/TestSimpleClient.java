@@ -321,6 +321,46 @@ public class TestSimpleClient extends TestCase {
 	    server.shutdown();
 	}
     }
+
+    /**
+     * Test that login (with a different authentication
+     * credential) can succeed after a login failure
+     * @throws Exception
+     */
+    public void testLoginAfterLoginFailure() throws Exception{
+ 	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+ 		new PasswordAuthentication("guest", new char[] {'!'}));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5382;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loginFailed);
+            assertFalse(listener.loggedIn);
+            listener.loginFailed = false;
+            listener.setAuthentication(
+                    new PasswordAuthentication("guest", password));
+            client.login(props);
+            synchronized (client){
+                client.wait(TIMEOUT);
+            }
+            assertTrue(listener.loggedIn);
+            assertFalse(listener.loginFailed);
+        } finally {
+            server.shutdown();
+        }
+    }
     
     private class DummySimpleClientListener implements SimpleClientListener {
 
@@ -389,6 +429,17 @@ public class TestSimpleClient extends TestCase {
 		notify();
 	    }
 	}
+
+        /**
+         * Set a new authentication credential for this client listener. This will allow the
+         * same listener to attempt to log in using different login name/
+         * password combinations
+         * @param newAuthentication an authentication object that will be used
+         * for login
+         */
+        void setAuthentication(PasswordAuthentication newAuthentication) {
+            auth = newAuthentication;
+        }
     }
 
     /** Creates a property list with the specified keys and values. */

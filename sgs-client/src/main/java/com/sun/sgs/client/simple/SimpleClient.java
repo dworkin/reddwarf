@@ -309,7 +309,7 @@ public class SimpleClient implements ServerSession {
 
 	/** Indicates whether the disconnected callback should not be
 	 * invoked. */
-	private volatile boolean suppressDisconnectedCallback = false;
+	private volatile boolean loginFailed = false;
 
         /** Indicates whether this listener has been disabled because
          *  of an automatic login redirect to another host and port.
@@ -318,6 +318,15 @@ public class SimpleClient implements ServerSession {
          *  when we're in this state.
          */
         private volatile boolean redirect = false;
+
+        /**
+         *  Store the login failure message sent by the server. This will be
+         * held until the disconnection from the server is confirmed by a call
+         * to disconnected, at which point the application's loginFailure callback
+         * will be called with this string as the reason.
+         */
+         private volatile String loginFailureMsg;
+
 
 	/** Constructs an instance. */
 	SimpleClientConnectionListener() {
@@ -419,10 +428,12 @@ public class SimpleClient implements ServerSession {
             // TBI implement graceful disconnect.
             // For now, look at the boolean we set when expecting
             // disconnect
-            if (!suppressDisconnectedCallback) {
-		clientListener.disconnected(expectingDisconnect, reason);
-	    }
-	    suppressDisconnectedCallback = false;
+            if (loginFailed) {
+                loginFailed = false;
+                clientListener.loginFailed(loginFailureMsg);
+	    } else {
+                clientListener.disconnected(expectingDisconnect, reason);
+            }
             expectingDisconnect = false;
         }
 
@@ -534,7 +545,7 @@ public class SimpleClient implements ServerSession {
         private void handleLoginFailure(MessageBuffer msg) {
             String reason = msg.getString();
             logger.log(Level.FINER, "Login failed: {0}", reason);
-            suppressDisconnectedCallback = true;
+            loginFailed = true;
             try {
                 clientConnection.disconnect();
             } catch (IOException e) {
@@ -544,7 +555,7 @@ public class SimpleClient implements ServerSession {
                                     "Disconnecting after login failure throws");
                 }
             }
-            clientListener.loginFailed(reason);
+            loginFailureMsg = reason;
         }
         
         /**
