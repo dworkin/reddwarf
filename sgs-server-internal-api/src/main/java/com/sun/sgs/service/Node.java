@@ -29,6 +29,24 @@ package com.sun.sgs.service;
  */
 public interface Node {
 
+    enum Status {
+
+        /**
+         *  The node has failed or its state is unknown
+         */
+        RED,
+
+        /**
+         * The node is operating normally
+         */
+        GREEN,
+
+        /**
+         * The node is operational, but is in need of attention
+         */
+        YELLOW,
+    }
+
     /**
      * Returns the node ID.
      *
@@ -52,4 +70,11 @@ public interface Node {
      * 		otherwise
      */
     boolean isAlive();
+
+    /**
+     * Returns the status of the node.
+     *
+     * @return	the node's status
+     */
+    Status getStatus();
 }

@@ -237,10 +237,11 @@ public final class WatchdogServiceImpl
     /** The lock for {@code isAlive} field. */
     private final Object lock = new Object();
     
-    /** If {@code true}, this node is alive; initially, the field is {@code
-     * true}. Accesses to this field should be protected by {@code lock}.
+    /** The local node's status. Initially, the field is {@code
+     * Node.Status.GREEN}. Accesses to this field should be protected
+     * by {@code lock}.
      */
-    private boolean isAlive = true;
+    private Node.Status status = Node.Status.GREEN;
     
     /** Our profiled data */
     private final WatchdogServiceStats serviceStats;
@@ -434,9 +435,27 @@ public final class WatchdogServiceImpl
     }
 
     /** {@inheritDoc} */
+    public Node.Status getLocalNodeStatus() {
+        checkState();
+        serviceStats.isLocalNodeAliveOp.report();
+	if (!getIsAlive()) {
+	    return Node.Status.RED;
+	} else {
+	    Node node = NodeImpl.getNode(dataService, localNodeId);
+	    if (node == null || !node.isAlive()) {
+		// this will call setFailedThenNotify(true)
+                reportFailure(localNodeId, CLASSNAME);
+		return Node.Status.RED;
+	    } else {
+		return node.getStatus();
+	    }
+	}
+    }
+
+    /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
 	checkState();
-        serviceStats.isLocalNodeAliveOp.report();
+        serviceStats.getLocalNodeStatusOp.report();
 	if (!getIsAlive()) {
 	    return false;
 	} else {
@@ -652,12 +671,21 @@ public final class WatchdogServiceImpl
      */
     private boolean getIsAlive() {
 	synchronized (lock) {
-	    return isAlive;
+	    return status != Node.Status.RED;
 	}
     }
 
     /**
-     * Sets the local alive status of this node to {@code false}, and
+     * Returns the local node status.
+     */
+    private Node.Status getStatus() {
+        synchronized (lock) {
+	    return status;
+	}
+    }
+
+    /**
+     * Sets the local status of this node to {@code RED}, and
      * if {@code notify} is {@code true}, notifies appropriate
      * registered node listeners of this node's failure.  This method
      * is called when this node is no longer considered alive.
@@ -670,14 +698,14 @@ public final class WatchdogServiceImpl
      */
     private void setFailedThenNotify(boolean notify) {
 	synchronized (lock) {
-	    if (!isAlive) {
+	    if (status == Node.Status.RED) {
 		return;
 	    }
-	    isAlive = false;
+	    status = Node.Status.RED;
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, false);
+	    Node node = new NodeImpl(localNodeId, localHost, Node.Status.RED);
 	    notifyNodeListeners(node);
 	}
 
@@ -800,7 +828,7 @@ public final class WatchdogServiceImpl
         @Override
 	public void nodeStatusChanges(long[] ids,
                                       String[] hosts,
-                                      boolean[] status,
+                                      Node.Status[] status,
                                       long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
@@ -809,14 +837,14 @@ public final class WatchdogServiceImpl
 		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
-		if (ids[i] == localNodeId && status[i]) {
+		if (ids[i] == localNodeId && (status[i] != Node.Status.RED)) {
 		    /* Don't notify the local node that it is alive. */
 		    continue;
 		}
 		Node node =
                         new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
 		notifyNodeListeners(node);
-		if (!status[i] && backups[i] == localNodeId) {
+		if ((status[i] == Node.Status.RED) && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
 		}
 	    }

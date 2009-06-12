@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -48,7 +49,7 @@ public interface WatchdogClient extends Remote {
      * 		invoking this method
      */
     void nodeStatusChanges(long[] ids, String[] hosts,
-			   boolean[] status, long[] backups)
+			   Node.Status[] status, long[] backups)
 	throws IOException;
 
     /**

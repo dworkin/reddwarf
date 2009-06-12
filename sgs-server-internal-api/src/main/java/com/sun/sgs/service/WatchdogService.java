@@ -47,6 +47,12 @@ public interface WatchdogService extends Service {
     long getLocalNodeId();
 
     /**
+     * Returns the node's status.
+     * @return the node's status
+     */
+    Node.Status getLocalNodeStatus();
+
+    /**
      * Returns {@code true} if the local node is considered alive,
      * otherwise returns {@code false}.  This method should only be
      * called from within a transaction.

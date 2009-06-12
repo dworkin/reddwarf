@@ -53,8 +53,8 @@ public class DummyWatchdogService implements WatchdogService {
 
     // a node-local copy of the node's identifier
     private final long localId;
-    // a node-local indicator of whether the node is alive
-    private boolean isAlive = true;
+    // a node-local indicator of the node status
+    private Node.Status status = Node.Status.GREEN;
 
     /** Creates an instance of the service. */
     public DummyWatchdogService(Properties p, ComponentRegistry cr,
@@ -81,7 +81,7 @@ public class DummyWatchdogService implements WatchdogService {
 
     /** {@inheritDoc} */
     public void shutdown() {
-        isAlive = false;
+        status = Node.Status.RED;
         nodeMap.remove(localId);
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
@@ -94,8 +94,13 @@ public class DummyWatchdogService implements WatchdogService {
     }
 
     /** {@inheritDoc} */
+    public Node.Status getLocalNodeStatus() {
+        return status;
+    }
+
+    /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
-        return isAlive;
+        return status != Node.Status.RED;
     }
 
     /** {@inheritDoc} */
@@ -155,6 +160,9 @@ public class DummyWatchdogService implements WatchdogService {
         }
         public boolean isAlive() {
             return isLocalNodeAlive();
+        }
+        public Status getStatus() {
+            return getLocalNodeStatus();
         }
     }
     public void reportFailure(long nodeId, String className) {

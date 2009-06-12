@@ -927,7 +927,7 @@ public final class WatchdogServerImpl
 	int size = changedNodes.size();
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
-	boolean[] status = new boolean[size];
+	Node.Status[] status = new Node.Status[size];
 	long[] backups = new long[size];
 
 	int i = 0;
@@ -935,7 +935,7 @@ public final class WatchdogServerImpl
 	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
-	    status[i] = changedNode.isAlive();
+	    status[i] = changedNode.getStatus();
 	    backups[i] = changedNode.getBackupId();
 	    i++;
 	}

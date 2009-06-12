@@ -69,8 +69,8 @@ class NodeImpl
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
     
-    /** If true, this node is considered alive. */
-    private boolean isAlive;
+    /** The node's status. */
+    private Node.Status status;
 
     /** The ID of the backup for this node. */
     private long backupId = INVALID_ID;
@@ -98,7 +98,7 @@ class NodeImpl
      * @param	client a watchdog client
      */
     NodeImpl(long nodeId, String hostName, int jmxPort, WatchdogClient client) {
-        this (nodeId, hostName, jmxPort, client, true, INVALID_ID);
+        this (nodeId, hostName, jmxPort, client, Node.Status.GREEN, INVALID_ID);
     }
 
     /**
@@ -111,8 +111,8 @@ class NodeImpl
      * @param 	hostName a host name, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive) {
-	this(nodeId, hostName, -1, null, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, Node.Status status) {
+	this(nodeId, hostName, -1, null, status, INVALID_ID);
     }
 	
     /**
@@ -123,34 +123,34 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	status the node's status
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
-        this(nodeId, hostName, -1, null, isAlive, backupId);
+    NodeImpl(long nodeId, String hostName, Node.Status status, long backupId) {
+        this(nodeId, hostName, -1, null, status, backupId);
     }
-    
+
     /**
      * Constructs an instance of this class with the given {@code
      * nodeId}, {@code hostName}, {@code jmxPort}, {@code client}, 
-     * {@code isAlive} status, and {@code backupId}.
+     * {@code status}, and {@code backupId}.
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
      * @param   jmxPort  the port JMX is listening on, or {@code -1}
      * @param	client   a watchdog client
-     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	status   the node's status
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
     private NodeImpl(long nodeId, String hostName, int jmxPort,
-                     WatchdogClient client, boolean isAlive, long backupId) 
+                     WatchdogClient client, Node.Status status, long backupId)
     {
         this.id = nodeId;
 	this.host = hostName;
         this.client = client;
-        this.isAlive = isAlive;
+        this.status = status;
         this.backupId = backupId;
         this.jmxPort = jmxPort;
     }
@@ -169,7 +169,12 @@ class NodeImpl
     
     /** {@inheritDoc} */
     public synchronized boolean isAlive() {
-	return isAlive;
+	return status != Node.Status.RED;
+    }
+
+    /** {@inheritDoc} */
+    public Node.Status getStatus() {
+        return status;
     }
 
     /* -- Implement Comparable -- */
@@ -278,8 +283,8 @@ class NodeImpl
      */
     synchronized void setFailed(DataService dataService, NodeImpl backup) {
 	NodeImpl nodeImpl = getForUpdate(dataService);
-	this.isAlive = false;
-	nodeImpl.isAlive = false;
+	this.status = Node.Status.RED;
+	nodeImpl.status = Node.Status.RED;
 	this.backupId = 
 	    (backup != null) ?
 	    backup.getId() :
