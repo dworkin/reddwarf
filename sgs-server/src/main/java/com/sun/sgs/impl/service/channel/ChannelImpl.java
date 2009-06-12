@@ -1518,7 +1518,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    "unable to obtain client session for ID:{0}", this);
 		return;
 	    }
-	    if (!channel.removeSession(getNodeId(session), sessionRefId, true)) {
+	    if (!channel.removeSession(
+		    getNodeId(session), sessionRefId, true))
+	    {
 		return;
 	    }
 	}

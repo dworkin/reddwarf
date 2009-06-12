@@ -290,7 +290,8 @@ public final class ClientSessionServiceImpl
      */
     private final ConcurrentHashMap<BigInteger, Queue<PrepareCompletionHandler>>
 	relocationPreparers =
-	    new ConcurrentHashMap<BigInteger, Queue<PrepareCompletionHandler>>();
+	    new ConcurrentHashMap
+		<BigInteger, Queue<PrepareCompletionHandler>>();
 
     /** The map of relocation information for sessions relocating to
      * this node, keyed by session ID. */
@@ -1217,8 +1218,8 @@ public final class ClientSessionServiceImpl
      *
      * @param	sessionRefId the session ID, as a {@code BigInteger}
      * @param	handler the client session handler to cache
-     * @param	identity if the session has been relocated, a non-null identity to
-     *		be removed from the relocatingIdentities cache
+     * @param	identity if the session has been relocated, a non-null
+     *		identity to be removed from the relocatingIdentities cache
      */
     void addHandler(BigInteger sessionRefId,
 		    ClientSessionHandler handler,
@@ -1324,8 +1325,8 @@ public final class ClientSessionServiceImpl
 			} catch (Exception e) {
 			    logger.logThrow(
 			        Level.WARNING, e,
-				"Notifying listener:{0} to prepare session:{1} " +
-				"to relocate to node:{2} throws",
+				"Notifying listener:{0} to prepare " +
+				"session:{1} to relocate to node:{2} throws",
 				statusListener, sessionRefId, newNode);
 			}
 		    }

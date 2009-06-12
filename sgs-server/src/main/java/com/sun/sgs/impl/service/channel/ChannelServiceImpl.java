@@ -792,7 +792,8 @@ public final class ChannelServiceImpl
 	    }
 
 	    taskScheduler.scheduleTask(
- 		new AddRelocatingSessionToChannels(sessionRefId, oldNode, channelSet),
+ 		new AddRelocatingSessionToChannels(
+		    sessionRefId, oldNode, channelSet),
 		taskOwner);
 	}
 	
@@ -803,16 +804,22 @@ public final class ChannelServiceImpl
 	    BigInteger sessionRefId, long newNode)
 	{
 	    // Remove session's channel membership set.
+	    // TBD: should this always return a non-null value?
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);
 	    // Remove session from locally cached channel membership lists
 	    // TBD: Are channel caches updated before channel membership cache
 	    // is xferred to new node?  Or should this be done here?
-	    for (BigInteger channelRefId : channelSet) {
-		Set<BigInteger> localMembers =
-		    localChannelMembersMap.get(channelRefId);
-		if (localMembers != null) {
-		    localMembers.remove(sessionRefId);
+	    if (channelSet != null) {
+		// TBD: This channelSet iteration may throw CME if an add
+		// or join attempts to modify the channel set.  Probably
+		// need to lock the channel set while iterating.
+		for (BigInteger channelRefId : channelSet) {
+		    Set<BigInteger> localMembers =
+			localChannelMembersMap.get(channelRefId);
+		    if (localMembers != null) {
+			localMembers.remove(sessionRefId);
+		    }
 		}
 	    }
 	    
@@ -1095,6 +1102,9 @@ public final class ChannelServiceImpl
 	     * currently a member of.
 	     */
 	    if (channelSet != null) {
+		// TBD: This channelSet iteration may throw CME if an add
+		// or join attempts to modify the channel set.  Probably
+		// need to lock the channel set while iterating.
 		for (final BigInteger channelRefId : channelSet) {
 		    transactionScheduler.scheduleTask(
 			new AbstractKernelRunnable("RemoveSessionFromChannel") {
@@ -1130,10 +1140,13 @@ public final class ChannelServiceImpl
 		relocatingSessions.put(sessionRefId, handler);
 		try {
 		    // TBD:IoTask?
+		    // TBD: Does the channelSet need to be locked for the
+		    // toArray call?
 		    getChannelServer(newNode).
 			relocateChannelMemberships(
 			    sessionRefId, localNodeId,
-			    channelSet.toArray(new BigInteger[0]));
+			    channelSet.toArray(
+				new BigInteger[channelSet.size()]));
 		    // TBD: Schedule task to disconnect session if the
 		    // channel memberships updated message hasn't been received
 		    // by a certain period of time.

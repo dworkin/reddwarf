@@ -1322,7 +1322,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	private final ClientSessionServer server;
 
 	/** The relocation key. */
-	private volatile byte[] relocationKey;
+	private byte[] relocationKey;
 
 	private boolean completed = false;
 
@@ -1348,10 +1348,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * Notify new node that session is being relocated there and
 		 * obtain relocation key.
 		 */
-		relocationKey =
+		byte[] relocationKey =
 		    server.relocatingSession(
  			identity, sessionRefId.toByteArray(),
 			sessionService.getLocalNodeId());
+		synchronized (this) {
+		    this.relocationKey = relocationKey;
+		}
+		
 		/*
 		 * Notify client to relocate its session to the new node
 		 * specifying the relocation key.
@@ -1376,6 +1380,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
 	/** {@inheritDoc} */
 	public void completed() {
+	    assert relocationKey != null;
 	    synchronized (this) {
 		if (completed) {
 		    return;
@@ -1386,6 +1391,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    try {
 		Set<ProtocolDescriptor> descriptors =
 		    sessionService.getProtocolDescriptors(newNode.getId());
+		byte[] relocationKey = null;
+		synchronized (this) {
+		    relocationKey = this.relocationKey;
+		}
 		protocol.relocate(
 			newNode, descriptors, ByteBuffer.wrap(relocationKey));
 
