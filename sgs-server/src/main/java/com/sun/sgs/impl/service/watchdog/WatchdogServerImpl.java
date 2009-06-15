@@ -32,6 +32,7 @@ import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.NodesMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Status;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -539,23 +540,35 @@ public final class WatchdogServerImpl
     /**
      * {@inheritDoc}
      */
-    public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
-            int maxNumberOfAttempts)
+    public void setNodeStatus(long nodeId, Status status, boolean isLocal,
+                              String className, int maxNumberOfAttempts)
     {
-        NodeImpl remoteNode = aliveNodes.get(nodeId);
-        if (remoteNode == null) {
+        NodeImpl node = aliveNodes.get(nodeId);
+        if (node == null) {
             logger.log(Level.FINEST, "Node with ID '" + nodeId +
-                    "' is already reported as failed");
+                       "' is already reported as failed");
             return;
         }
+        switch (status) {
+            case RED:
+                setNodeAsFailed(node, isLocal, className, maxNumberOfAttempts);
+                break;
 
+            case GREEN:
+            case YELLOW:
+        }
+    }
+
+    private void setNodeAsFailed(NodeImpl node, boolean isLocal,
+                                 String className, int maxNumberOfAttempts)
+    {
         if (!isLocal) {
             // Try to report the failure to the watchdog so that the node can 
             // be shutdown. Try a few times if we run into an IOException.
             int retries = maxNumberOfAttempts;
             while (retries-- > 0) {
                 try {
-                    remoteNode.getWatchdogClient().reportFailure(className);
+                    node.getWatchdogClient().reportFailure(className);
                     break;
                 } catch (IOException ioe) {
                     if (retries == 0) {
@@ -566,7 +579,7 @@ public final class WatchdogServerImpl
                 }
             }
         }
-        processNodeFailures(Arrays.asList(remoteNode));
+        processNodeFailures(Arrays.asList(node));
     }
 
     /* -- other methods -- */
@@ -927,7 +940,7 @@ public final class WatchdogServerImpl
 	int size = changedNodes.size();
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
-	Node.Status[] status = new Node.Status[size];
+	Status[] status = new Status[size];
 	long[] backups = new long[size];
 
 	int i = 0;

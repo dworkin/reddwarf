@@ -30,7 +30,9 @@ package com.sun.sgs.service;
  * transaction.
  *
  * <p>The implementations for the methods of this interface should be
- * idempotent because they may be invoked multiple times.  However,
+ * idempotent because they may be invoked multiple times.
+ *
+ * TODO-- However,
  * for any given node, the {@link #nodeStarted nodeStarted} method
  * will never be invoked after the {@link #nodeFailed nodeFailed}
  * method is invoked for that given node.
@@ -45,11 +47,12 @@ public interface NodeListener {
      * @param	node	node status information 
      */
     void nodeStarted(Node node);
-    
+
     /**
-     * Notifies this listener that the specified {@code node} failed.  
+     * Notifies this listener that the specified {@code node}'s status has
+     * changed.
      *
-     * @param	node	node status information 
+     * @param	node	node status information
      */
-    void nodeFailed(Node node);
+    void nodeStatusChange(Node node);
 }

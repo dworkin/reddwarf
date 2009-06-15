@@ -32,6 +32,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Status;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
@@ -581,7 +582,7 @@ public final class NodeMappingServerImpl
         
         try {
             notifyMap.put(nodeId, client);
-            assignPolicy.nodeStarted(nodeId);
+            assignPolicy.nodeAvailable(nodeId);
             logger.log(Level.FINEST, 
                        "Registered node listener for {0} ", nodeId);
         } finally {
@@ -598,7 +599,7 @@ public final class NodeMappingServerImpl
         
         try {
             // Tell the assign policy to stop assigning to the node
-            assignPolicy.nodeStopped(nodeId);
+            assignPolicy.nodeUnavailable(nodeId);
             notifyMap.remove(nodeId);
             logger.log(Level.FINEST, 
                        "Unregistered node listener for {0} ", nodeId);
@@ -872,7 +873,15 @@ public final class NodeMappingServerImpl
             // Do nothing.  We find out about nodes being available when
             // our client services register with us.     
         }
-        
+
+        public void nodeStatusChange(Node node) {
+            if (node.getStatus() == Status.GREEN) {
+                assignPolicy.nodeAvailable(node.getId());
+            } else {
+                assignPolicy.nodeUnavailable(node.getId());
+            }
+        }
+
         /** {@inheritDoc} */
         public void nodeFailed(Node node) {
             long nodeId = node.getId();          
@@ -1011,7 +1020,7 @@ public final class NodeMappingServerImpl
      * @param nodeId the node id of the fake node
      */
     void addDummyNode(long nodeId)  {
-        assignPolicy.nodeStarted(nodeId);
+        assignPolicy.nodeAvailable(nodeId);
     }
     
     /**

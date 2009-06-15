@@ -23,6 +23,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Status;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
@@ -85,7 +86,7 @@ public class DummyWatchdogService implements WatchdogService {
         nodeMap.remove(localId);
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
-            listener.nodeFailed(localNode);
+            listener.nodeStatusChange(localNode);
     }
 
     /** {@inheritDoc} */
@@ -142,6 +143,22 @@ public class DummyWatchdogService implements WatchdogService {
 	// Silently do nothing.
     }
 
+    /** {@inheritDoc}
+     * <p>
+     * This implementation does nothing.
+     */
+    public void reportFailure(long nodeId, String className) {
+        // Don't do anything for now
+    }
+
+    /** {@inheritDoc}
+     * <p>
+     * This implementation does nothing.
+     */
+    public void reportStatus(long nodeId, Status status, String className) {
+        // Don't do anything for now
+    }
+
     /** A basic, private implementation of Node. */
     private class NodeImpl implements Node {
         private final long nodeId;
@@ -164,8 +181,5 @@ public class DummyWatchdogService implements WatchdogService {
         public Status getStatus() {
             return getLocalNodeStatus();
         }
-    }
-    public void reportFailure(long nodeId, String className) {
-        // Don't do anything for now
     }
 }

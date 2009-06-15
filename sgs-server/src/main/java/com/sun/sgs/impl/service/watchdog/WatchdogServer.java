@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.service.Node.Status;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -96,6 +97,10 @@ public interface WatchdogServer extends Remote {
      */
     void recoveredNode(long nodeId, long backupId) throws IOException;
 
+    void setNodeStatus(long nodeId, Status status,boolean isLocal,
+                       String className, int maxNumberOfAttempts)
+	    throws IOException;
+
     /**
      * Notifies the node with the given ID that it has failed and should
      * shutdown. If the given node is a remote node, this notification is a 
@@ -112,7 +117,7 @@ public interface WatchdogServer extends Remote {
      * @throws IOException if a communication error occurs while trying to set
      * the node as failed
      */
-    void setNodeAsFailed(long nodeId, boolean isLocal, String className,
-            int maxNumberOfAttempts)
-	    throws IOException;
+//    void setNodeAsFailed(long nodeId, boolean isLocal, String className,
+//            int maxNumberOfAttempts)
+//	    throws IOException;
 }

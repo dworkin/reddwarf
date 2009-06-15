@@ -25,6 +25,7 @@ package com.sun.sgs.service;
 
 import java.util.Iterator;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.service.Node.Status;
 
 /**
  * The {@code WatchdogService} monitors the health of server nodes and
@@ -47,8 +48,9 @@ public interface WatchdogService extends Service {
     long getLocalNodeId();
 
     /**
-     * Returns the node's status.
-     * @return the node's status
+     * Returns the local node's status.
+     * 
+     * @return the local node's status
      */
     Node.Status getLocalNodeStatus();
 
@@ -160,6 +162,17 @@ public interface WatchdogService extends Service {
      *		transactional context
      */
     void addRecoveryListener(RecoveryListener listener);
+
+    /**
+     * Informs the watchdog of a node's status. Multiple components may report
+     * on a node's status. The watchdog will use these reports to determine the
+     * overall node's status which can be found on {@link Node#getStatus()}.
+     * 
+     * @param nodeId the id of the node
+     * @param status the node's status
+     * @param className the class name of the service reporting status
+     */
+    void reportStatus(long nodeId, Status status, String className);
 
     /**
      * Informs the watchdog that a problem has occured in a service or

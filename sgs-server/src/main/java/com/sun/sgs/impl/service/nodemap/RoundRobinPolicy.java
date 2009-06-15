@@ -26,8 +26,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.WatchdogService;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +56,7 @@ import java.util.logging.Logger;
  *
  * </dl> <p>
  */
-class RoundRobinPolicy implements NodeAssignPolicy {
+class RoundRobinPolicy extends AbstractNodePolicy {
     /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
      /** The logger for this class. */
@@ -69,7 +67,6 @@ class RoundRobinPolicy implements NodeAssignPolicy {
     private static final int DEFAULT_MOVE_COUNT = 0;
     
     private final NodeMappingServerImpl server;
-    private final List<Long> liveNodes = new ArrayList<Long>();
     private final AtomicInteger nextNode = new AtomicInteger();
     
     private final int moveCount;
@@ -80,6 +77,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
     
     /** Creates a new instance of RoundRobinPolicy */
     public RoundRobinPolicy(Properties props, NodeMappingServerImpl server) {
+        super();
         this.server = server;
         
         PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
@@ -91,35 +89,20 @@ class RoundRobinPolicy implements NodeAssignPolicy {
     public synchronized long chooseNode(Identity id, long requestingNode) 
         throws NoNodesAvailableException 
     {
-        if (liveNodes.size() < 1) {
+        if (availableNodes.size() < 1) {
             // We don't have any live nodes to assign to.
             // Let the caller figure it out.
             throw new NoNodesAvailableException("no live nodes available");
         }  
         
         long chosenNode =
-                liveNodes.get(nextNode.getAndIncrement() % liveNodes.size());
+         availableNodes.get(nextNode.getAndIncrement() % availableNodes.size());
         
         if (moveCount > 0) {
             maybeMoveIdentity(); 
         }
         
         return chosenNode;
-    }
-    
-    /** {@inheritDoc} */
-    public synchronized void nodeStarted(long nodeId) {
-        liveNodes.add(nodeId);
-    }
-
-    /** {@inheritDoc} */
-    public synchronized void nodeStopped(long nodeId) {
-        liveNodes.remove(nodeId);
-    }
-    
-    /** {@inheritDoc} */
-    public synchronized void reset() {
-        liveNodes.clear();
     }
     
     private synchronized void maybeMoveIdentity() {
@@ -140,8 +123,9 @@ class RoundRobinPolicy implements NodeAssignPolicy {
             // we've tried each of the list elements.
             int tryNode = nextMoveNode.nextInt(Integer.MAX_VALUE);
             boolean done = false;
-            for (int i = 0; i < liveNodes.size() && !done; i++) {
-                long nodeId = liveNodes.get((tryNode + i) % liveNodes.size());
+            for (int i = 0; i < availableNodes.size() && !done; i++) {
+                long nodeId =
+                      availableNodes.get((tryNode + i) % availableNodes.size());
                 // Find an identity on node.
                 GetIdOnNodeTask task =
                     new GetIdOnNodeTask(server.getDataService(), 

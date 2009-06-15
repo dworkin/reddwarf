@@ -70,7 +70,7 @@ class NodeImpl
     private final WatchdogClient client;
     
     /** The node's status. */
-    private Node.Status status;
+    private Status status;
 
     /** The ID of the backup for this node. */
     private long backupId = INVALID_ID;
@@ -98,7 +98,7 @@ class NodeImpl
      * @param	client a watchdog client
      */
     NodeImpl(long nodeId, String hostName, int jmxPort, WatchdogClient client) {
-        this (nodeId, hostName, jmxPort, client, Node.Status.GREEN, INVALID_ID);
+        this (nodeId, hostName, jmxPort, client, Status.GREEN, INVALID_ID);
     }
 
     /**
@@ -111,7 +111,7 @@ class NodeImpl
      * @param 	hostName a host name, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, Node.Status status) {
+    NodeImpl(long nodeId, String hostName, Status status) {
 	this(nodeId, hostName, -1, null, status, INVALID_ID);
     }
 	
@@ -127,7 +127,7 @@ class NodeImpl
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, Node.Status status, long backupId) {
+    NodeImpl(long nodeId, String hostName, Status status, long backupId) {
         this(nodeId, hostName, -1, null, status, backupId);
     }
 
@@ -145,7 +145,7 @@ class NodeImpl
      *		is assigned)
      */
     private NodeImpl(long nodeId, String hostName, int jmxPort,
-                     WatchdogClient client, Node.Status status, long backupId)
+                     WatchdogClient client, Status status, long backupId)
     {
         this.id = nodeId;
 	this.host = hostName;
@@ -169,11 +169,11 @@ class NodeImpl
     
     /** {@inheritDoc} */
     public synchronized boolean isAlive() {
-	return status != Node.Status.RED;
+	return status != Status.RED;
     }
 
     /** {@inheritDoc} */
-    public Node.Status getStatus() {
+    public Status getStatus() {
         return status;
     }
 
@@ -268,7 +268,7 @@ class NodeImpl
     }
     
     /**
-     * Sets the alive status of this node instance to {@code false},
+     * Sets the alive status of this node instance to {@code RED},
      * sets this node's backup to the specified {@code backup},
      * empties the set of primaries for which this node is recovering,
      * and updates the node's state in the specified {@code
@@ -283,8 +283,8 @@ class NodeImpl
      */
     synchronized void setFailed(DataService dataService, NodeImpl backup) {
 	NodeImpl nodeImpl = getForUpdate(dataService);
-	this.status = Node.Status.RED;
-	nodeImpl.status = Node.Status.RED;
+	this.status = Status.RED;
+	nodeImpl.status = Status.RED;
 	this.backupId = 
 	    (backup != null) ?
 	    backup.getId() :

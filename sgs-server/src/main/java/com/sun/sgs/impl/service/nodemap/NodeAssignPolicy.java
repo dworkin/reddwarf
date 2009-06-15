@@ -55,19 +55,19 @@ interface NodeAssignPolicy {
     /**
      * Inform the policy that a node is now available.
      *
-     * @param nodeId the started node
+     * @param nodeId the available node
      */
-    void nodeStarted(long nodeId);
+    void nodeAvailable(long nodeId);
     
     /**
-     * Inform the policy that a node has stopped.
-     * @param nodeId  the stopped node
+     * Inform the policy that a node is no longer available.
+     *
+     * @param nodeId  the unavailable node
      */
-    void nodeStopped(long nodeId);
+    void nodeUnavailable(long nodeId);
     
     /**
-     * Reset the policy, in particular its idea of what nodes have
-     * started and stopped.
+     * Reset the policy, in particular its idea of what nodes are available.
      */
     void reset();
 }

@@ -33,6 +33,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Status;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -238,10 +239,10 @@ public final class WatchdogServiceImpl
     private final Object lock = new Object();
     
     /** The local node's status. Initially, the field is {@code
-     * Node.Status.GREEN}. Accesses to this field should be protected
+     * Status.GREEN}. Accesses to this field should be protected
      * by {@code lock}.
      */
-    private Node.Status status = Node.Status.GREEN;
+    private Status status = Status.GREEN;
     
     /** Our profiled data */
     private final WatchdogServiceStats serviceStats;
@@ -435,17 +436,17 @@ public final class WatchdogServiceImpl
     }
 
     /** {@inheritDoc} */
-    public Node.Status getLocalNodeStatus() {
+    public Status getLocalNodeStatus() {
         checkState();
         serviceStats.isLocalNodeAliveOp.report();
 	if (!getIsAlive()) {
-	    return Node.Status.RED;
+	    return Status.RED;
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
                 reportFailure(localNodeId, CLASSNAME);
-		return Node.Status.RED;
+		return Status.RED;
 	    } else {
 		return node.getStatus();
 	    }
@@ -527,44 +528,56 @@ public final class WatchdogServiceImpl
     /**
      * {@inheritDoc}
      */
-    public synchronized void reportFailure(long nodeId, String className)
+    public synchronized void reportFailure(long nodeId, String className) {
+        reportStatus(nodeId, Status.RED, className);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public synchronized void reportStatus(long nodeId,
+                                          Status status,
+                                          String className)
     {
 	checkNull("className", className);
 	checkNonTransactionalContext();
+
+        boolean isLocal = (nodeId == localNodeId);
+
+        if (isLocal) {
+            logger.log(Level.WARNING, "{1} reported {2} status in local " +
+                       "node with id: {0}", nodeId, className, status);
+        } else {
+            logger.log(Level.WARNING, "{1} reported {2} status in remote" +
+                       " node with id {0}", nodeId, className, status);
+        }
+
         if (shuttingDown() || !getIsAlive()) {
             return;
         }
 
-        boolean isLocal = (nodeId == localNodeId);
-        if (isLocal) {
-            logger.log(Level.WARNING, "{1} reported failure in local " +
-                    "node with id: {0}", nodeId, className);
-        } else {
-            logger.log(Level.WARNING, "{1} reported failure in remote" +
-                    " node with id {0}", nodeId, className);
-        }
-
         /*
-         * Try to report the failure to the watchdog server. If we cannot 
-         * contact the Watchdog server while reporting a remote failure, then
-         * set the failure as local.
+         * Try to report the status to the watchdog server. If we cannot
+         * contact the Watchdog server while reporting, then set the failure
+         * as local.
          */
         int retries = maxIoAttempts;
         while (retries-- > 0) {
             try {
-                serverProxy.setNodeAsFailed(nodeId, isLocal, className,
-                        maxIoAttempts);
+                serverProxy.setNodeStatus(nodeId, status, isLocal, className,
+                                          maxIoAttempts);
                 break;
             } catch (IOException ioe) {
                 if (retries == 0) {
-                    logger.log(Level.SEVERE, "Cannot report failure to " +
-                            "Watchdog server");
-                    isLocal = true;
+                    logger.log(Level.SEVERE,
+                               "Cannot report status to Watchdog server");
+                    setFailedThenNotify(true);
+                    return;
                 }
             }
         }
         
-        if (isLocal) {
+        if ((status == Status.RED) && isLocal) {
             setFailedThenNotify(true);
         }
     }
@@ -671,14 +684,14 @@ public final class WatchdogServiceImpl
      */
     private boolean getIsAlive() {
 	synchronized (lock) {
-	    return status != Node.Status.RED;
+	    return status != Status.RED;
 	}
     }
 
     /**
      * Returns the local node status.
      */
-    private Node.Status getStatus() {
+    private Status getStatus() {
         synchronized (lock) {
 	    return status;
 	}
@@ -698,14 +711,14 @@ public final class WatchdogServiceImpl
      */
     private void setFailedThenNotify(boolean notify) {
 	synchronized (lock) {
-	    if (status == Node.Status.RED) {
+	    if (status == Status.RED) {
 		return;
 	    }
-	    status = Node.Status.RED;
+	    status = Status.RED;
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, Node.Status.RED);
+	    Node node = new NodeImpl(localNodeId, localHost, Status.RED);
 	    notifyNodeListeners(node);
 	}
 
@@ -741,7 +754,7 @@ public final class WatchdogServiceImpl
 			    if (node.isAlive()) {
 				nodeListener.nodeStarted(node);
 			    } else {
-				nodeListener.nodeFailed(node);
+				nodeListener.nodeStatusChange(node);
 			    }
 			}
 		    }
@@ -828,7 +841,7 @@ public final class WatchdogServiceImpl
         @Override
 	public void nodeStatusChanges(long[] ids,
                                       String[] hosts,
-                                      Node.Status[] status,
+                                      Status[] status,
                                       long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
@@ -837,14 +850,14 @@ public final class WatchdogServiceImpl
 		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
-		if (ids[i] == localNodeId && (status[i] != Node.Status.RED)) {
+		if (ids[i] == localNodeId && (status[i] != Status.RED)) {
 		    /* Don't notify the local node that it is alive. */
 		    continue;
 		}
 		Node node =
                         new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
 		notifyNodeListeners(node);
-		if ((status[i] == Node.Status.RED) && backups[i] == localNodeId) {
+		if ((status[i] == Status.RED) && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
 		}
 	    }

@@ -1180,8 +1180,11 @@ public final class ChannelServiceImpl
 	    // TBD: cache channel server for node?
 	}
 
-	/** {@inheritDoc} */
-	public void nodeFailed(Node node) {
+        @Override
+        public void nodeStatusChange(Node node) {
+            // Only worry about node failures
+            if (node.isAlive()) return;
+
 	    final long nodeId = node.getId();
 	    channelServerCache.remove(nodeId);
 	    final TaskService taskService = getTaskService();

@@ -20,8 +20,6 @@
 package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -30,10 +28,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  *  node.  Round robin assignment is used when the server is making the 
  *  request due to node failure.
  */
-public class LocalNodePolicy implements NodeAssignPolicy {
+public class LocalNodePolicy extends AbstractNodePolicy {
     
-    private final List<Long> liveNodes = new ArrayList<Long>();
     private final AtomicInteger nextNode = new AtomicInteger();
+
     /** 
      * Creates a new instance of the LocalNodePolicy, which always assigns
      * an identity to the node which requested an assignment be made.
@@ -41,7 +39,7 @@ public class LocalNodePolicy implements NodeAssignPolicy {
      * @param server node mapping server which is using this policy
      */
     public LocalNodePolicy(Properties props, NodeMappingServerImpl server) {
-               
+       super();
     }
     
     /** 
@@ -56,32 +54,17 @@ public class LocalNodePolicy implements NodeAssignPolicy {
     {
         if (requestingNode == NodeAssignPolicy.SERVER_NODE) {
             // A node has failed, we need to pick a new one from the live nodes.
-            synchronized (liveNodes) {  
-                if (liveNodes.size() < 1) {
+            synchronized (availableNodes) {
+                if (availableNodes.size() < 1) {
                     // We don't have any live nodes to assign to.
                     // Let the caller figure it out.
                     throw 
                       new NoNodesAvailableException("no live nodes available");
                 }  
-                return liveNodes.get(
-                        nextNode.getAndIncrement() % liveNodes.size());
+                return availableNodes.get(
+                        nextNode.getAndIncrement() % availableNodes.size());
             }
         }
         return requestingNode;
-    }
-
-    /** {@inheritDoc} */
-    public synchronized void nodeStarted(long nodeId) {
-        liveNodes.add(nodeId);
-    }
-
-    /** {@inheritDoc} */
-    public synchronized void nodeStopped(long nodeId) {
-        liveNodes.remove(nodeId);
-    }
-    
-    /** {@inheritDoc} */
-    public synchronized void reset() {
-        liveNodes.clear();
     }
 }

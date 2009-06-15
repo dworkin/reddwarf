@@ -163,8 +163,8 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** {@inheritDoc} */
-    public void nodeFailed(Node node) {
-        
+    public void nodeStatusChange(Node node) {
+
     }
 
     /** Private helper to choose a mapping node. */
@@ -264,5 +264,4 @@ public class DummyNodeMappingService implements NodeMappingService,
         for (NodeMappingListener listener : newService.listeners)
             listener.mappingAdded(identity, oldNode);
     }
-
 }
