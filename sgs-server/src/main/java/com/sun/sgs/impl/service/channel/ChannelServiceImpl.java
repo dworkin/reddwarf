@@ -1463,7 +1463,7 @@ public final class ChannelServiceImpl
 			    }
 			}
 		    }, taskOwner);
-		} catch (RuntimeException e) {
+		} catch (Exception e) {
 		    // TBD: exception handling...
 		}
 		taskScheduler.scheduleTask(this, taskOwner);
@@ -1527,7 +1527,7 @@ public final class ChannelServiceImpl
 			    }
 			}
 		    }, taskOwner);
-		} catch (RuntimeException e) {
+		} catch (Exception e) {
 		    // TBD: exception handling...
 		}
 	    }

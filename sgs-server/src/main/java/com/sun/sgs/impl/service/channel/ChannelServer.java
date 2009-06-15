@@ -132,7 +132,7 @@ public interface ChannelServer extends Remote {
      *
      * @param	sessionRefId the ID of a client session relocating to the
      *		local node
-     * @param	oldNodeId ID of the node the session is relocating from
+     * @param	oldNodeId the ID of the node the session is relocating from
      * @param	channelRefIds an array that contains the channel ID of each
      *		channel that the client session is a member of
      * @throws	IOException if a communication problem occurs while

@@ -70,7 +70,7 @@ public interface ClientSessionServer extends Remote {
      *
      * @param	identity an identity
      * @param	sessionId a session ID
-     * @param	oldNodeId ID of the node the session is relocating from
+     * @param	oldNodeId the ID of the node the session is relocating from
      * @return	a relocation key 
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method

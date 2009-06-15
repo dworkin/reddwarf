@@ -1290,7 +1290,7 @@ public final class ClientSessionServiceImpl
      * method), when all listeners are finished preparing for relocation.
      *
      * @param	sessionRefId the ID for the relocating client session
-     * @param	newNodeId ID of the new node for the client session
+     * @param	newNodeId the ID of the new node for the client session
      * @param	handler the completion handler to notify when preparation
      *		is complete
      */
