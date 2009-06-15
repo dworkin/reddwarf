@@ -60,20 +60,22 @@ public interface ClientSessionServer extends Remote {
     /**
      * Notifies this server that the client session with the specified
      * {@code identity} and {@code sessionId} is relocating to this
-     * server's node from {@code oldNode}.  This method returns a
-     * relocation key to be used to reesablish the session on this node.
-     * The returned relocation key should be supplied to the {@link
-     * ProtocolListener#relocatedSession relocatedSession} method of the
-     * appropriate {@link ProtocolListener} to reestablish the client
-     * session.
+     * server's node from the old node (specified by {@code oldNodeId}).
+     *
+     * <p>This method returns a relocation key to be used to reesablish
+     * the session on this node.  The returned relocation key should be
+     * supplied to the {@link ProtocolListener#relocatedSession
+     * relocatedSession} method of the appropriate {@link
+     * ProtocolListener} to reestablish the client session.
      *
      * @param	identity an identity
      * @param	sessionId a session ID
-     * @param	oldNode the node the session is relocating from
+     * @param	oldNodeId ID of the node the session is relocating from
      * @return	a relocation key 
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    byte[] relocatingSession(Identity identity, byte[] sessionId, long oldNode)
+    byte[] relocatingSession(
+	Identity identity, byte[] sessionId, long oldNodeId)
 	throws IOException;
 }

@@ -62,7 +62,7 @@ import java.util.concurrent.Future;
  * <li>{@code OTHER}: some other failure occurred, and invoking {@link
  * Throwable#getCause getCause} on the {@code RequestFailureException}
  * returns the exception that caused the failure
- * </li>
+ * </ul>
  */
 public interface SessionProtocolHandler {
 

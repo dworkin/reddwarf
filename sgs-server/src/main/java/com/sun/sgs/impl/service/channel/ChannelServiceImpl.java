@@ -617,6 +617,10 @@ public final class ChannelServiceImpl
 		}
 		channelSet.add(channelRefId);
 
+		// TBD: If the session is disconnecting, then session needs
+		// to be removed from channel's membership list, and the
+		// channel needs to be removed from the channelSet.
+
 		// Send channel join protocol message.
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
@@ -624,6 +628,7 @@ public final class ChannelServiceImpl
                     try {
                         protocol.channelJoin(name, channelRefId, delivery);
                     } catch (IOException ioe) {
+			// TBD: session disconnecting?
                         logger.logThrow(Level.WARNING, ioe,
                                         "channelJoin throws");
                     }
@@ -778,7 +783,7 @@ public final class ChannelServiceImpl
 	 * {@inheritDoc}
 	 */
 	public void relocateChannelMemberships(
-	    BigInteger sessionRefId, long oldNode, BigInteger[] channelRefIds)
+	    BigInteger sessionRefId, long oldNodeId, BigInteger[] channelRefIds)
 	{
 	    Set<BigInteger> channelSet =
 		Collections.synchronizedSet(new HashSet<BigInteger>());
@@ -793,7 +798,7 @@ public final class ChannelServiceImpl
 
 	    taskScheduler.scheduleTask(
  		new AddRelocatingSessionToChannels(
-		    sessionRefId, oldNode, channelSet),
+		    sessionRefId, oldNodeId, channelSet),
 		taskOwner);
 	}
 	
@@ -801,7 +806,7 @@ public final class ChannelServiceImpl
 	 * {@inheritDoc}
 	 */
 	public void channelMembershipsUpdated(
-	    BigInteger sessionRefId, long newNode)
+	    BigInteger sessionRefId, long newNodeId)
 	{
 	    // Remove session's channel membership set.
 	    // TBD: should this always return a non-null value?
@@ -811,14 +816,13 @@ public final class ChannelServiceImpl
 	    // TBD: Are channel caches updated before channel membership cache
 	    // is xferred to new node?  Or should this be done here?
 	    if (channelSet != null) {
-		// TBD: This channelSet iteration may throw CME if an add
-		// or join attempts to modify the channel set.  Probably
-		// need to lock the channel set while iterating.
-		for (BigInteger channelRefId : channelSet) {
-		    Set<BigInteger> localMembers =
-			localChannelMembersMap.get(channelRefId);
-		    if (localMembers != null) {
-			localMembers.remove(sessionRefId);
+		synchronized (channelSet) {
+		    for (BigInteger channelRefId : channelSet) {
+			Set<BigInteger> localMembers =
+			    localChannelMembersMap.get(channelRefId);
+			if (localMembers != null) {
+			    localMembers.remove(sessionRefId);
+			}
 		    }
 		}
 	    }
@@ -1102,23 +1106,24 @@ public final class ChannelServiceImpl
 	     * currently a member of.
 	     */
 	    if (channelSet != null) {
-		// TBD: This channelSet iteration may throw CME if an add
-		// or join attempts to modify the channel set.  Probably
-		// need to lock the channel set while iterating.
-		for (final BigInteger channelRefId : channelSet) {
-		    transactionScheduler.scheduleTask(
-			new AbstractKernelRunnable("RemoveSessionFromChannel") {
+		synchronized (channelSet) {
+		    for (final BigInteger channelRefId : channelSet) {
+			transactionScheduler.scheduleTask(
+			  new AbstractKernelRunnable(
+				"RemoveSessionFromChannel")
+			  {
 			    public void run() {
 				ChannelImpl.removeSessionFromChannel(
 				    localNodeId, sessionRefId, channelRefId);
 			    }
 			}, taskOwner);
-		    // Remove session from channel membership cache
-		    // NOTE: THIS FIXES A MEMORY LEAK!
-		    Set<BigInteger> localMembers =
-			localChannelMembersMap.get(channelRefId);
-		    if (localMembers != null) {
-			localMembers.remove(sessionRefId);
+			// Remove session from channel membership cache
+			// NOTE: THIS FIXES A MEMORY LEAK!
+			Set<BigInteger> localMembers =
+			    localChannelMembersMap.get(channelRefId);
+			if (localMembers != null) {
+			    localMembers.remove(sessionRefId);
+			}
 		    }
 		}
 	    }
@@ -1127,7 +1132,7 @@ public final class ChannelServiceImpl
 	/**
 	 * {@inheritDoc}
 	 */
-	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
+	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
 				      SimpleCompletionHandler handler)
 	{
 	    Set<BigInteger> channelSet =
@@ -1142,7 +1147,7 @@ public final class ChannelServiceImpl
 		    // TBD:IoTask?
 		    // TBD: Does the channelSet need to be locked for the
 		    // toArray call?
-		    getChannelServer(newNode).
+		    getChannelServer(newNodeId).
 			relocateChannelMemberships(
 			    sessionRefId, localNodeId,
 			    channelSet.toArray(
@@ -1416,17 +1421,17 @@ public final class ChannelServiceImpl
 	extends AbstractKernelRunnable
     {
 	private final BigInteger sessionRefId;
-	private final long oldNode;
+	private final long oldNodeId;
 	private final Queue<BigInteger> channels =
 	    new LinkedList<BigInteger>();
 
 	/** Constructs an instance. */
 	AddRelocatingSessionToChannels(
-	    BigInteger sessionRefId, long oldNode, Set<BigInteger> channelSet)
+	    BigInteger sessionRefId, long oldNodeId, Set<BigInteger> channelSet)
 	{
 	    super(null);
 	    this.sessionRefId = sessionRefId;
-	    this.oldNode = oldNode;
+	    this.oldNodeId = oldNodeId;
 	    this.channels.addAll(channelSet);
 	}
 
@@ -1458,7 +1463,7 @@ public final class ChannelServiceImpl
 			    }
 			}
 		    }, taskOwner);
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 		    // TBD: exception handling...
 		}
 		taskScheduler.scheduleTask(this, taskOwner);
@@ -1466,7 +1471,7 @@ public final class ChannelServiceImpl
 	    } else {
 		// Finished adding relocating session to channels, so notify
 		// old node that we are done.
-		ChannelServer server = getChannelServer(oldNode);
+		ChannelServer server = getChannelServer(oldNodeId);
 		// TBD: ioTask?
 		try {
 		    server.channelMembershipsUpdated(sessionRefId, localNodeId);
@@ -1522,7 +1527,7 @@ public final class ChannelServiceImpl
 			    }
 			}
 		    }, taskOwner);
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 		    // TBD: exception handling...
 		}
 	    }

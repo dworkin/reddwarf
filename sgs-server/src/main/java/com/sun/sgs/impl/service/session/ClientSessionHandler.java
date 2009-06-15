@@ -1380,8 +1380,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
 	/** {@inheritDoc} */
 	public void completed() {
-	    assert relocationKey != null;
 	    synchronized (this) {
+		assert relocationKey != null;
 		if (completed) {
 		    return;
 		}
@@ -1391,7 +1391,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    try {
 		Set<ProtocolDescriptor> descriptors =
 		    sessionService.getProtocolDescriptors(newNode.getId());
-		byte[] relocationKey = null;
+		byte[] relocationKey;
 		synchronized (this) {
 		    relocationKey = this.relocationKey;
 		}

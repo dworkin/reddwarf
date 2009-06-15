@@ -939,14 +939,14 @@ public final class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public byte[] relocatingSession(
-	    Identity identity, byte[] sessionId, long oldNode)
+	    Identity identity, byte[] sessionId, long oldNodeId)
 	// throws RelocationFailedException
 	{
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "sessionId:{0} oldNode:{1}",
-			       HexDumper.toHexString(sessionId), oldNode);
+		    logger.log(Level.FINEST, "sessionId:{0} oldNodeId:{1}",
+			       HexDumper.toHexString(sessionId), oldNodeId);
 		}
 		// TBD: do we need to double-check to make sure that the
 		// node mapping service has really assigned this session
@@ -1284,23 +1284,23 @@ public final class ClientSessionServiceImpl
 
     /**
      * Notifies each registered {@link ClientSessionStatusListener} that
-     * the session with the specified {@code sessionRefId} is moving to
-     * {@code newNode}.  The specified completion {@code handler} should
-     * be notified (via its {@code completed} method, when all listeners
-     * are finished preparing for relocation.
+     * the session with the specified {@code sessionRefId} is moving to a
+     * new node (specified by {@code newNodeId}).  The specified completion
+     * {@code handler} should be notified (via its {@code completed}
+     * method), when all listeners are finished preparing for relocation.
      *
      * @param	sessionRefId the ID for the relocating client session
-     * @param	newNode the new node for the client session
+     * @param	newNodeId ID of the new node for the client session
      * @param	handler the completion handler to notify when preparation
      *		is complete
      */
     void notifyPrepareToRelocate(final BigInteger sessionRefId,
-				 final long newNode)
+				 final long newNodeId)
     {
 	if (logger.isLoggable(Level.INFO)) {
 	    logger.log(Level.INFO,
 		       "Preparing session:{0} to relocate to node:{1}",
-		       sessionRefId, newNode);
+		       sessionRefId, newNodeId);
 	}
 	Queue<PrepareCompletionHandler> handlerQueue =
 	    new ConcurrentLinkedQueue<PrepareCompletionHandler>();
@@ -1321,13 +1321,13 @@ public final class ClientSessionServiceImpl
 		    public void run() {
 			try {
 			    statusListener.prepareToRelocate(
-				sessionRefId, newNode, handler);
+				sessionRefId, newNodeId, handler);
 			} catch (Exception e) {
 			    logger.logThrow(
 			        Level.WARNING, e,
 				"Notifying listener:{0} to prepare " +
 				"session:{1} to relocate to node:{2} throws",
-				statusListener, sessionRefId, newNode);
+				statusListener, sessionRefId, newNodeId);
 			}
 		    }
 		}, taskOwner);
