@@ -7,6 +7,7 @@
 
 static uint8_t messageBuffer[256] ;
 
+
 /* Called when a request to join a channel has been received.
  *  This requires sending back to the server a message of the
  *  form "joinedChannel:" with the channel name.
@@ -20,11 +21,9 @@ void channel_joined_cb(sgs_connection *conn,
     buf = (char*)messageBuffer;
     *buf = '\0';
     buf = strncat(buf, prefix, strlen(prefix));
-    channelName = (char*)sgs_channel_name(channel);
+    channelName = sgs_channel_name(channel);
     buf = strncat(buf, channelName, strlen(channelName));
     if (sgs_channel_send(channel, messageBuffer, strlen(buf)) == -1){
-   /* if (sgs_session_direct_send(sgs_connection_get_session(conn),
-            messageBuffer, strlen(buf))== -1){*/
         printf("error in sending response to channel join message\n");
         return;
     }
@@ -46,7 +45,8 @@ void channel_left_cb(sgs_connection *conn,
     buf = (char*)messageBuffer;
     *buf = '\0';
     buf = strncat(buf, prefix, strlen(prefix));
-    channelName = (char*) sgs_channel_name(channel);
+ 
+    channelName = sgs_channel_name(channel);
     buf = strncat(buf, channelName, strlen(channelName));
     if (sgs_session_direct_send(sgs_connection_get_session(conn),
             messageBuffer, strlen(buf)) == -1){
@@ -71,7 +71,7 @@ void channel_recv_msg_cb(sgs_connection *conn,
         sgs_channel *channel, const uint8_t *msg, size_t msglen) {
     char prefix[] = "receivedChannelMessage:";
     char* buf;
-    char* channelName = (char*) sgs_channel_name(channel);
+    char* channelName = sgs_channel_name(channel);
     uint8_t* copyBuf;
     int len;
     

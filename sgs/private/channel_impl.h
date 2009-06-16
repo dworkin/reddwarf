@@ -54,7 +54,7 @@ struct sgs_channel_impl {
     sgs_id* id;
     
     /* Name of this channel. */
-    wchar_t* name;
+    char* name;
 };
 
 /*

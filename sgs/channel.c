@@ -46,12 +46,11 @@
 #include "sgs/private/channel_impl.h"
 #include "sgs/private/session_impl.h"
 
-#include <wchar.h>
 
 /*
  * sgs_channel_name()
  */
-const wchar_t* sgs_channel_name(const sgs_channel_impl *channel) {
+const char* sgs_channel_name(const sgs_channel_impl *channel) {
     return channel->name;
 }
 
@@ -111,26 +110,25 @@ const sgs_id* sgs_channel_impl_get_id(sgs_channel_impl *channel) {
  * sgs_channel_impl_create()
  */
 sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
-    sgs_id* id, const char* namebytes, size_t namelen)
-{
+        sgs_id* id, const char* namebytes, size_t namelen) {
     sgs_channel_impl *channel;
-    channel = malloc(sizeof(struct sgs_channel_impl));
+
+    channel = malloc(sizeof (struct sgs_channel_impl));
     if (channel == NULL)
         return NULL;
 
     channel->session = session;
     channel->id = id;
-    channel->name = malloc(sizeof(wchar_t) * (namelen + 1));
-    
-    if (channel->name == NULL)
-    {
+    channel->name = malloc(namelen + 1);
+
+    if (channel->name == NULL) {
         sgs_channel_impl_destroy(channel);
         return NULL;
     }
 
-    strncpy((char*)(channel->name), namebytes, namelen);
+    strncpy((char*) (channel->name), namebytes, namelen);
     channel->name[namelen] = '\0';
-    
+
     return channel;
 }
 

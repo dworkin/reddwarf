@@ -59,7 +59,7 @@ typedef struct sgs_channel_impl sgs_channel;
  *
  * Returns the name of the specified channel.
  */
-const wchar_t* sgs_channel_name(const sgs_channel* channel);
+const char* sgs_channel_name(const sgs_channel* channel);
 
 /*
  * function: sgs_channel_send()
