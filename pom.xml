@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>14</version>
+    <version>15</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-shared</artifactId>
   <name>Project Darkstar Shared</name>
   <packaging>jar</packaging>
-  <version>1.7</version>
+  <version>1.8</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
