@@ -58,8 +58,8 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -285,13 +285,12 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
-    /** Queues of completion handlers for entities preparing for a session's
-     * relocation from this node, keyed by session ID.
+    /** Information for preparing a session to relocate from this node,
+     * keyed by session ID. 
      */
-    private final ConcurrentHashMap<BigInteger, Queue<PrepareCompletionHandler>>
-	relocationPreparers =
-	    new ConcurrentHashMap
-		<BigInteger, Queue<PrepareCompletionHandler>>();
+    private final ConcurrentHashMap<BigInteger, PrepareRelocationInfo>
+	prepareRelocationMap =
+	    new ConcurrentHashMap <BigInteger, PrepareRelocationInfo>();
 
     /** The map of relocation information for sessions relocating to
      * this node, keyed by session ID. */
@@ -398,8 +397,8 @@ public final class ClientSessionServiceImpl
 		taskOwner);
 
 	    /* Register the node mapping listener. */
-	    nodeMapService.addNodeMappingListener(
-		new NodeMappingListenerImpl());
+	    nodeMapService.addIdentityRelocationListener(
+		new IdentityRelocationListenerImpl());
 
 	    /*
 	     * Create the protocol listener and acceptor.
@@ -569,56 +568,78 @@ public final class ClientSessionServiceImpl
 	return handler != null ? handler.getSessionProtocol() : null;
     }
 
-    /* -- Implement NodeMappingListener -- */
+    /* -- Implement IdentityRelocationListener -- */
 
     /**
-     * This listener receives notifications of identities being added or
-     * removed from this node. <p>
+     * This listener receives notifications of identities that are going
+     * to be relocated from this node to give services a chance to
+     * prepare for the relocation. <p>
      *
-     * If an identity is removed from this node ({@link
-     * #mappingRemoved}), and the identity corresponds to a local client
-     * session, then the client session should be relocated to the new
-     * node.<p>
-     *
-     * If an identity is added to this node ({@link #mappingAdded})
-     * and the {@code oldNode} is non-{@code null}, then its
-     * corresponding client session (if any) may be moving to this
-     * node from the old node.  If the identity is moving to this node,
-     * there is no action to take because the old node initiates relocation
-     * to the new node.
+     * Before an identity is relocated from this node the {@link
+     * #prepareToRelocate} method is invoked on this listener.  If the
+     * identity corresponds to a local client session, then the client
+     * session should be relocated to the new node.<p>
      */
-    private class NodeMappingListenerImpl implements NodeMappingListener {
-
+    private class IdentityRelocationListenerImpl
+	implements IdentityRelocationListener
+    {
 	/** {@inheritDoc} */
-	public void mappingAdded(Identity id, Node oldNode) {
+	public void prepareToRelocate(Identity id, final long newNodeId,
+				      SimpleCompletionHandler handler)
+	{
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
-			   "identity:{0} localNode:{1} oldNode:{2}",
-			   id, localNodeId, oldNode);
+			   "identity:{0} localNode:{1} newNodeId:{2}",
+			   id, localNodeId, newNodeId);
 	    }
-	}
-
-	/** {@inheritDoc} */
-	public void mappingRemoved(Identity id, final Node newNode) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "identity:{0} localNode:{1} newNode:{2}",
-			   id, localNodeId, newNode);
-	    }
-	    final ClientSessionHandler handler = loggedInIdentityMap.get(id);
-	    if (handler != null) {
-		// This identity corresponds to a client session, so move it.
-		transactionScheduler.scheduleTask(
-		    new AbstractKernelRunnable("AddMoveEvent") {
+	    
+	    final ClientSessionHandler sessionHandler =
+		loggedInIdentityMap.get(id);
+	    
+	    if (sessionHandler != null) {
+		// The specified identity corresponds to a local client session,
+		// so prepare to move it.
+		final BigInteger sessionRefId = sessionHandler.sessionRefId;
+		PrepareRelocationInfo prepareInfo =
+		    new PrepareRelocationInfo(sessionRefId, newNodeId, handler);
+		PrepareRelocationInfo oldPrepareInfo =
+		    prepareRelocationMap.putIfAbsent(sessionRefId, prepareInfo);
+		if (oldPrepareInfo == null) {
+		    if (sessionHandler.isRelocating()) {
+			// Request to prepare identity for relocation is
+			// received after preparation has already been completed
+			// and session is in the process of relocating.
+			prepareRelocationMap.remove(sessionRefId);
+			handler.completed();
+			return;
+		    }
+			    
+		    transactionScheduler.scheduleTask(
+		      new AbstractKernelRunnable("AddMoveEvent") {
 			public void run() {
 			    ClientSessionImpl session =
 				ClientSessionImpl.getSession(
-				    dataService, handler.sessionRefId);
+				    dataService, sessionHandler.sessionRefId);
 			    if (session != null) {
-				session.addMoveEvent(newNode);
+				session.addMoveEvent(newNodeId);
 			    }
 			} },
-		    id);
+		      id);
+
+		    // TBD: add task to monitor preparation and disconnect
+		    // client session if preparation has not completed in
+		    // time.
+		    
+		} else {
+		    // Duplicate request to prepare for relocation;  add
+		    // completion handler to be notified
+		    oldPrepareInfo.addNmsCompletionHandler(handler);
+		}
+		
+	    } else {
+		// The specified identity does not correspond to a local
+		// client session.
+		handler.completed();
 	    }
 	}
     }
@@ -1302,35 +1323,11 @@ public final class ClientSessionServiceImpl
 		       "Preparing session:{0} to relocate to node:{1}",
 		       sessionRefId, newNodeId);
 	}
-	Queue<PrepareCompletionHandler> handlerQueue =
-	    new ConcurrentLinkedQueue<PrepareCompletionHandler>();
-	if (relocationPreparers.
-	        putIfAbsent(sessionRefId, handlerQueue) != null)
-	{
-	    // preparation for client session relocation already being handled
-	    return;
-	}
-	
-	for (ClientSessionStatusListener listener : sessionStatusListeners) {
-	    final ClientSessionStatusListener statusListener = listener;
-	    final PrepareCompletionHandler handler =
-		new PrepareCompletionHandler(sessionRefId);
-	    handlerQueue.add(handler);
-	    taskScheduler.scheduleTask(
-		new AbstractKernelRunnable("PrepareToRelocateSession") {
-		    public void run() {
-			try {
-			    statusListener.prepareToRelocate(
-				sessionRefId, newNodeId, handler);
-			} catch (Exception e) {
-			    logger.logThrow(
-			        Level.WARNING, e,
-				"Notifying listener:{0} to prepare " +
-				"session:{1} to relocate to node:{2} throws",
-				statusListener, sessionRefId, newNodeId);
-			}
-		    }
-		}, taskOwner);
+
+	PrepareRelocationInfo info = prepareRelocationMap.get(sessionRefId);
+	// TBD: assert info != null?
+	if (info != null) {
+	    info.prepareToRelocate();
 	}
     }
 
@@ -1611,38 +1608,102 @@ public final class ClientSessionServiceImpl
 	}
     }
 
-    private final class PrepareCompletionHandler
-	implements SimpleCompletionHandler
-    {
-	/** The session ID. */
+    private final class PrepareRelocationInfo {
+	
+	/** The session that is relocating. */
 	private final BigInteger sessionRefId;
+
+	/** The ID of the session's new node. */
+	private final long newNodeId;
+	
+	/** Completion handlers for the node mapping service. */
+	private final Set<SimpleCompletionHandler> nmsCompletionHandlers =
+	    new HashSet<SimpleCompletionHandler>();
+	
+	/** Completion handlers for {@code ClientSessionStatusListeners}
+	 * that need to prepare before the node mapping service completion
+	 * handler(s) are notified.
+	 */
+	private final Set<PrepareCompletionHandler> preparers =
+	    new HashSet<PrepareCompletionHandler>();
+
 	/** Indicates whether preparation is completed. */
 	private boolean completed = false;
 
-	/**
-	 * Constructs an instance with the specified {@code sessionRefId}.
-	 */
-	PrepareCompletionHandler(BigInteger sessionRefId) {
+	/** Constructs an instance. */
+	PrepareRelocationInfo(BigInteger sessionRefId, long newNodeId,
+			      SimpleCompletionHandler handler)
+	{
 	    this.sessionRefId = sessionRefId;
+	    this.newNodeId = newNodeId;
+	    nmsCompletionHandlers.add(handler);
 	}
 
-	/** {@inheritDoc} */
-	public void completed() {
-	    synchronized (this) {
-		if (completed) {
-		    return;
-		}
-		completed = true;
+	/**
+	 * Notifies all {@code ClientSessionStatusListeners} to prepare for
+	 * the client session (specified at construction) to relocate.
+	 */
+	synchronized void prepareToRelocate() {
+	    // TBD: check if already preparing?  Is this necessary?
+	
+	    for (ClientSessionStatusListener listener :
+		     sessionStatusListeners)
+	    {
+		final ClientSessionStatusListener statusListener = listener;
+		final PrepareCompletionHandler handler =
+		    new PrepareCompletionHandler();
+		preparers.add(handler);
+		taskScheduler.scheduleTask(
+		  new AbstractKernelRunnable("PrepareToRelocateSession") {
+		    public void run() {
+			try {
+			    statusListener.prepareToRelocate(
+				sessionRefId, newNodeId, handler);
+			} catch (Exception e) {
+			    logger.logThrow(
+			        Level.WARNING, e,
+				"Notifying listener:{0} to prepare " +
+				"session:{1} to relocate to node:{2} throws",
+				statusListener, sessionRefId, newNodeId);
+			}
+		    }
+		  }, taskOwner);
 	    }
+	}
 
-	    Queue<PrepareCompletionHandler> handlerQueue =
-		relocationPreparers.get(sessionRefId);
-	    assert handlerQueue != null;
-	    handlerQueue.remove(this);
-	    if (handlerQueue.isEmpty()) {
+	/**
+	 * Adds the specified completion {@code handler} from the {@code
+	 * NodeMappingService} to the set of completion handlers that need
+	 * to be notified when all {@code ClientSessionStatusListeners} are
+	 * finished preparing for relocation.
+	 */
+	synchronized void addNmsCompletionHandler(
+	    SimpleCompletionHandler handler)
+	{
+	    if (preparers.isEmpty()) {
+		handler.completed();
+	    } else {
+		nmsCompletionHandlers.add(handler);
+	    }
+	}
+
+	/**
+	 * Notifies this instance that the {@code ClientSessionStatusListener}
+	 * for the specified {@code handler} has completed preparing for
+	 * relocation.  If all listeners have completed preparation, then the
+	 * client is informed that it can start relocating its connection, and
+	 * all {@code NodeMappingService} completion handlers are notified
+	 * that preparation is complete.
+	 */
+	synchronized void preparationCompleted(
+	    PrepareCompletionHandler listenerCompletionHandler)
+	{
+	    preparers.remove(listenerCompletionHandler);
+	    if (preparers.isEmpty()) {
 		// preparation for client session relocation is complete, so
 		// remove session from table of relocation preparers.
-		if (relocationPreparers.remove(sessionRefId) != null) {
+		if (prepareRelocationMap.remove(sessionRefId) != null) {
+		    // Notify client to start relocating its connection.
 		    try {
 			ClientSessionHandler sessionHandler =
 				getHandler(sessionRefId);
@@ -1655,7 +1716,42 @@ public final class ClientSessionServiceImpl
 			    "Problem completing reloction preparation for " +
 			    "session:{0} backup:{1}",  sessionRefId);
 		    }
+		    // Notify NodeMappingService completion handlers that
+		    // preparation is complete.
+		    for (SimpleCompletionHandler nmsCompletionHandler:
+			     nmsCompletionHandlers)
+		    {
+			nmsCompletionHandler.completed();
+		    }
 		}
+	    }
+	}
+
+	/**
+	 * A completion handler for a {@code ClientSessionStatusListener}
+	 * preparing for relocation, specified as an argument to the {@link
+	 * ClientSessionStatusListener#prepareToRelocate prepareToRelocate}
+	 * method. 
+	 */
+	private final class PrepareCompletionHandler
+	    implements SimpleCompletionHandler
+	{
+	    /** Indicates whether preparation is completed. */
+	    private boolean completed = false;
+
+	    /** Constructs an instance. */
+	    PrepareCompletionHandler() {}
+
+	    /** {@inheritDoc} */
+	    public void completed() {
+		synchronized (this) {
+		    if (completed) {
+			return;
+		    }
+		    completed = true;
+		}
+
+		PrepareRelocationInfo.this.preparationCompleted(this);
 	    }
 	}
     }

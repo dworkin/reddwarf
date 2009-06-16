@@ -304,7 +304,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @return	{@code true} if this handler is connected
      */
-    private boolean isConnected() {
+    boolean isConnected() {
 
 	State currentState = getCurrentState();
 	return
@@ -316,7 +316,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * Returns {@code true} if this client session is relocating to another
      * node.
      */
-    private boolean isRelocating() {
+    boolean isRelocating() {
 	return relocateCompletionHandler != null;
     }
 

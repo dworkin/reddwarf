@@ -308,12 +308,12 @@ public class ClientSessionImpl
      * to {@code newNode}.  If the client session is no longer connected,
      * then this request is ignored.
      *
-     * @param	newNode the node this session is relocating to
+     * @param	newNodeId the ID of the node this session is relocating to
      */
-    void addMoveEvent(Node newNode) {
+    void addMoveEvent(long newNodeId) {
 	if (isConnected()) {
 	    // TBD: what if this session is already relocating?
-	    addEvent(new MoveEvent(newNode));
+	    addEvent(new MoveEvent(newNodeId));
 	}
     }
 
@@ -972,11 +972,11 @@ public class ClientSessionImpl
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	private final Node newNode;
+	private final long newNodeId;
 
 	/** Constructs a move event. */
-	MoveEvent(Node newNode) {
-	    this.newNode = newNode;
+	MoveEvent(long newNodeId) {
+	    this.newNodeId = newNodeId;
 	}
 
 	/** {@inheritDoc} */
@@ -985,11 +985,14 @@ public class ClientSessionImpl
 			  ClientSessionHandler handler)
 	{
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.setRelocatingToNode(newNode.getId());
-	    
-	    sessionService.checkContext().addCommitAction(
-		eventQueue.getSessionRefId(),
- 		handler.new MoveAction(newNode), false);
+	    sessionImpl.setRelocatingToNode(newNodeId);
+
+	    Node newNode = sessionService.watchdogService.getNode(newNodeId);
+	    if (newNode != null) {
+		sessionService.checkContext().addCommitAction(
+		    eventQueue.getSessionRefId(),
+		    handler.new MoveAction(newNode), false);
+	    }
 	}
     }
 
