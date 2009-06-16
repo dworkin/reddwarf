@@ -264,7 +264,7 @@
     </plugins>
   </build>
 
-  <reporting>
+   <reporting>
     <plugins>
       <!-- Disable the findbugs plugin by configuring an
 	   empty reportSet.  This is necessary because of a bug

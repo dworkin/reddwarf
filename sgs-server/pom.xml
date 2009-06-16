@@ -242,28 +242,6 @@
     </resources>
   </build>
 
-  <reporting>
-    <plugins>
-
-      <!-- Configure findbugs to run during site lifecycle -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>findbugs-maven-plugin</artifactId>
-	<configuration>
-	  <effort>Max</effort>
-	  <excludeFilterFile>
-	    ${basedir}/src/main/etc/findbugs-exclude.xml
-	  </excludeFilterFile>
-	  <threshold>Low</threshold>
-	  <xmlOutput>true</xmlOutput>
-	  <findbugsXmlOutput>true</findbugsXmlOutput>
-	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
-	</configuration>
-      </plugin>
-
-    </plugins>
-  </reporting>
-
   <properties>
     <!-- The directory to use as the temporary directory while running
 	 tests, for storing database files, etc.  The directory is
@@ -278,6 +256,10 @@
     </run.logging>
     <!-- The default transaction timeout -->
     <com.sun.sgs.txn.timeout>100</com.sun.sgs.txn.timeout>
+
+    <findbugs-exclude.filter>
+      ${basedir}/src/main/etc/findbugs-exclude.xml
+    </findbugs-exclude.filter>
   </properties>
 
 </project>
