@@ -104,28 +104,6 @@
 
   </build>
 
-  <reporting>
-    <plugins>
-
-      <!-- Configure findbugs to run during site lifecycle -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>findbugs-maven-plugin</artifactId>
-	<configuration>
-	  <effort>Max</effort>
-	  <excludeFilterFile>
-	    ${basedir}/src/main/etc/findbugs-exclude.xml
-	  </excludeFilterFile>
-	  <threshold>Low</threshold>
-	  <xmlOutput>true</xmlOutput>
-	  <findbugsXmlOutput>true</findbugsXmlOutput>
-	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
-	</configuration>
-      </plugin>
-
-    </plugins>
-  </reporting>
-
   <repositories>
     <repository>
       <id>java.net</id>
@@ -134,5 +112,11 @@
       <layout>default</layout>
     </repository>
   </repositories>
+
+  <properties>
+    <findbugs-exclude.filter>
+      ${basedir}/src/main/etc/findbugs-exclude.xml
+    </findbugs-exclude.filter>
+  </properties>
 
 </project>
