@@ -126,7 +126,7 @@ sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
         return NULL;
     }
 
-    strncpy((char*) (channel->name), namebytes, namelen);
+    strncpy( channel->name, namebytes, namelen);
     channel->name[namelen] = '\0';
 
     return channel;
