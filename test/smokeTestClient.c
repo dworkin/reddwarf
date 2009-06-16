@@ -168,7 +168,6 @@ int main(int argc, char** argv) {
     g_hostname = DEFAULT_HOST;
     g_port = DEFAULT_PORT;
     getCommandArgs(argc, argv);
-    printf("parsed command line; hostname = %s, port = %d\n", g_hostname, g_port);
 
     /* Create a context object, and load it up with the right set
      * of callbacks. The register_fd and unregister_fd callbacks
