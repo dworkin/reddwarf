@@ -69,7 +69,7 @@ final class ReferenceTable {
      */
     ManagedReferenceImpl<?> find(Object object) {
 	assert object != null : "Object is null";
-	ManagedReferenceImpl<?> result = objects.get(object);
+        ManagedReferenceImpl<?> result = objects.get((ManagedObject) object);
 	if (result == null &&
 	    trackStaleObjects &&
 	    staleObjects.containsKey(object))

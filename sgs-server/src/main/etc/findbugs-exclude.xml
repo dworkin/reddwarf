@@ -312,7 +312,7 @@
   <!-- OK to declare serializable field as non-serializable interface. -->
   <Match>
     <Class name="com.sun.sgs.impl.service.session.ClientSessionImpl"/>
-    <Field name="sessionServer"/>
+    <Field name="deliveries"/>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
 
@@ -373,7 +373,10 @@
   <!-- OK to declare serializable field as non-serializable interface. -->
   <Match>
     <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
-    <Field name="client"/>
+    <Or>
+      <Field name="client"/>
+      <Field name="primaryIds"/>
+    </Or>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
 
@@ -404,6 +407,24 @@
     <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
     <Field name="expiration"/>
     <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- Default value is ok for transient field -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
+    <Field name="expiration"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- Synchronization in setFailed method is ok, nodeImpl is retrieved from
+       the DataService -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
+    <Or>
+      <Field name="backupId"/>
+      <Field name="isAlive"/>
+    </Or>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
   
 </FindBugsFilter>
