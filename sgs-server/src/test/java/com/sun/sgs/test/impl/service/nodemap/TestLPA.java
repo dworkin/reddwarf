@@ -29,11 +29,13 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
+import edu.uci.ics.jung.graph.util.Graphs;
 import java.util.Arrays;
 import java.util.Collection;
 import org.junit.runner.RunWith;
 
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
 /**
@@ -47,10 +49,10 @@ public class TestLPA {
     @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(
-            new Object[][] {{false, false},
-                            {false, true},
-                            {true, false},
-                            {true, true}});
+            new Object[][] {{true, false},
+                            {true, true},
+                            {false, false},
+                            {false, true}});
 
     }
     private final boolean checkConverge;
@@ -65,31 +67,51 @@ public class TestLPA {
         this.includeSelf = includeSelf;
     }
 
+    @BeforeClass
+    public static void warmup() {
+        // Warm up the compilers
+        LabelPropagation lpa =
+                new LabelPropagation(new TestGraphBuilder(), true, false);
+
+        for (int i = 0; i < 100; i++) {
+            lpa.findCommunities();
+        }
+    }
+
     @Test
     public void testZachary() {
         GraphBuilder builder = new TestGraphBuilder();
         LabelPropagation lpa =
                 new LabelPropagation(builder, checkConverge, includeSelf);
         
-        for (int i = 0; i < 10; i++) {
+        final int RUNS = 100;
+        long avgTime = 0;
+        int avgIter = 0;
+        double avgMod  = 0.0;
+        for (int i = 0; i < RUNS; i++) {
             Collection<AffinityGroup> groups = lpa.findCommunities();
-            for (AffinityGroup group : groups) {
-                System.out.println("XXX " + group + " , members:");
-                for (Identity id : group.getIdentities()) {
-                    System.out.println(id);
-                }
-            }
+            avgTime = avgTime + lpa.getTime();
+            avgIter = avgIter + lpa.getIterations();
+            avgMod = avgMod + lpa.getModularity();
         }
+        String con = checkConverge ? "checkConverge" : "noChange";
+        String self = includeSelf ? "includeSelf" : "noSelf";
+        System.out.printf("XXX (%s, %s, %d runs): avg time : %4.2f ms, avg iters : %4.2f, " +
+                          " avg modularity: %.4f %n",
+                          con, self, RUNS,
+                          avgTime/(double) RUNS,
+                          avgIter/(double) RUNS,
+                          avgMod/(double) RUNS);
     }
 
     /**
      * A graph builder that returns a pre-made graph.
      */
-    private class TestGraphBuilder implements GraphBuilder {
-        /** {@inheritDoc} */
-        public Graph<Identity, WeightedEdge> getAffinityGraph() {
-            Graph<Identity, WeightedEdge> graph = new
-                    UndirectedSparseMultigraph<Identity, WeightedEdge> ();
+    private static class TestGraphBuilder implements GraphBuilder {
+        private final Graph<Identity, WeightedEdge> graph;
+
+        public TestGraphBuilder() {
+            graph = new UndirectedSparseMultigraph<Identity, WeightedEdge> ();
 
             // Create a graph for the Zachary network:
             // W. W. Zachary, An information flow model for conflict and
@@ -183,8 +205,11 @@ public class TestLPA {
 
             Assert.assertEquals(34, graph.getVertexCount());
             Assert.assertEquals(78, graph.getEdgeCount());
+        }
 
-            return graph;
+        /** {@inheritDoc} */
+        public Graph<Identity, WeightedEdge> getAffinityGraph() {
+            return Graphs.unmodifiableGraph(graph);
         }
         /** {@inheritDoc} */
         public Runnable getPruneTask() {
