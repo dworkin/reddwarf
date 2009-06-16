@@ -130,26 +130,12 @@ public class ServerSocketEndpoint extends AbstractSocketEndpoint
                     new org.apache.mina.transport.socket.nio.SocketAcceptor(
                     numProcessors, executor);
             
-            IoServiceConfig ioConfig = minaSocketAcceptor.getDefaultConfig();
-            
-            /**
-             * Note: I assume that this object will always be of type
-             * "SocketAcceptConfig," but the javadocs do not guarantee this so I
-             * will be cautious and test first before casting it...
-             */
-            if (ioConfig instanceof SocketAcceptorConfig) {
-                SocketAcceptorConfig socketConfig =
-                        (SocketAcceptorConfig) ioConfig;
+            SocketAcceptorConfig socketConfig =
+                                 minaSocketAcceptor.getDefaultConfig();
                 
-                socketConfig.setReuseAddress(Boolean.parseBoolean(
-                        System.getProperty(REUSE_ADDRESS_PROPERTY,
-                                           DEFAULT_REUSE_ADDRESS)));
-            } else {
-                logger.log(Level.WARNING,
-                    "IoServiceConfig object from mina SocketAcceptor object" +
-                    " was not a subclass of SocketAcceptorConfig as expected;" +
-                           " setReuseAddress() was not called.  {0}", ioConfig);
-            }
+            socketConfig.setReuseAddress(Boolean.parseBoolean(
+                    System.getProperty(REUSE_ADDRESS_PROPERTY,
+                                       DEFAULT_REUSE_ADDRESS)));
 	    
             minaAcceptor = minaSocketAcceptor;
         } else {

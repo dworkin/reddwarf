@@ -1,0 +1,34 @@
+<!-- This file specifies a findbugs filter for excluding reports that
+     should not be considered errors.
+
+     The format of this file is documented at:
+
+       http://findbugs.sourceforge.net/manual/filter.html
+
+     When possible, please specify the full names of the bug codes,
+     using the pattern attribute, to make it clearer what reports are
+     being suppressed.  You can find a listing of codes at:
+
+       http://findbugs.sourceforge.net/bugDescriptions.html
+  -->
+
+<FindBugsFilter>
+
+  <!-- This is a false positive
+       See findbugs bug #1969563 -->
+  <Match>
+    <Class name="com.sun.sgs.impl.client.simple.SimpleClientConnector$ConnectWatchdogThread"/>
+    <Bug pattern="DM_USELESS_THREAD"/>
+  </Match>
+
+  <!-- The synchronization is OK here -->
+  <Match>
+    <Class name="com.sun.sgs.impl.io.SocketConnector"/>
+    <Or>
+      <Field name="connListener"/>
+      <Field name="connectFuture"/>
+    </Or>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
+  </Match>
+
+</FindBugsFilter>
