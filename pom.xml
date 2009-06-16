@@ -389,6 +389,9 @@
 	<version>${findbugs-maven-plugin.version}</version>
 	<configuration>
 	  <effort>Max</effort>
+	  <excludeFilterFile>
+	    ${findbugs-exclude.filter}
+	  </excludeFilterFile>
 	  <threshold>Low</threshold>
 	  <xmlOutput>true</xmlOutput>
 	  <findbugsXmlOutput>true</findbugsXmlOutput>
@@ -519,6 +522,8 @@
 	 You can enable the unused imports check by setting the value
 	 to warning. -->
     <checkstyle.unusedImports>ignore</checkstyle.unusedImports>
+
+    <findbugs-exclude.filter></findbugs-exclude.filter>
 
     <test.assertions>-ea:com.sun.sgs...</test.assertions>
     <test.max.heap>-Xmx1g</test.max.heap>
