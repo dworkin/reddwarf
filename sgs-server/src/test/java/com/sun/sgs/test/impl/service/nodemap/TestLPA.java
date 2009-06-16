@@ -26,30 +26,58 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
-import com.sun.sgs.tools.test.FilteredNameRunner;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
+import java.util.Arrays;
 import java.util.Collection;
 import org.junit.runner.RunWith;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runners.Parameterized;
 /**
  *
  * 
  */
-@RunWith(FilteredNameRunner.class)
+//@RunWith(FilteredNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestLPA {
+
+    @Parameterized.Parameters
+    public static Collection data() {
+        return Arrays.asList(
+            new Object[][] {{false, false},
+                            {false, true},
+                            {true, false},
+                            {true, true}});
+
+    }
+    private final boolean checkConverge;
+    private final boolean includeSelf;
+
+    /**
+     * Create this test class.
+     * @param testType the type of profile data to create
+     */
+    public TestLPA(boolean checkConverge, boolean includeSelf) {
+        this.checkConverge = checkConverge;
+        this.includeSelf = includeSelf;
+    }
 
     @Test
     public void testZachary() {
         GraphBuilder builder = new TestGraphBuilder();
-        LabelPropagation lpa = new LabelPropagation(builder);
-        Collection<AffinityGroup> groups = lpa.findCommunities();
-        for (AffinityGroup group : groups) {
-            System.out.println("XXX " + group + " , members:");
-            for (Identity id : group.getIdentities()) {
-                System.out.println(id);
+        LabelPropagation lpa =
+                new LabelPropagation(builder, checkConverge, includeSelf);
+        
+        for (int i = 0; i < 10; i++) {
+            Collection<AffinityGroup> groups = lpa.findCommunities();
+            for (AffinityGroup group : groups) {
+                System.out.println("XXX " + group + " , members:");
+                for (Identity id : group.getIdentities()) {
+                    System.out.println(id);
+                }
             }
         }
     }
