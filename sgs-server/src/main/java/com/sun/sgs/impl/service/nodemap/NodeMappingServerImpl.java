@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
@@ -322,7 +323,7 @@ public final class NodeMappingServerImpl
     /** {@inheritDoc} */
     public void assignNode(Class service, Identity identity, 
                            long requestingNode)
-        throws IOException 
+        throws IOException
     {
         callStarted();    
         try {
@@ -358,11 +359,12 @@ public final class NodeMappingServerImpl
                 logger.log(Level.FINEST, 
                            "assignNode id:{0} to {1}", identity, newNodeId);
             } catch (NoNodesAvailableException ex) {
+                // TODO - can happen often now
                 // This should only occur if no nodes are available, which
                 // can only happen if our client shutdown and unregistered
                 // while we were in this call.
                 // Ignore the error.
-                logger.logThrow(Level.FINEST, ex, "Exception ignored");
+                logger.logThrow(Level.FINEST, ex, "Unable to assign node");
             }
             
         } finally {
@@ -722,6 +724,7 @@ public final class NodeMappingServerImpl
         final long newNodeId;
         try {
             newNodeId = assignPolicy.chooseNode(id, requestingNode);
+            System.out.println("**Assign policy returned");
         } catch (NoNodesAvailableException ex) {
             logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}" +
                     " failed because no live nodes are available", 
@@ -875,6 +878,7 @@ public final class NodeMappingServerImpl
         }
 
         public void nodeStatusChange(Node node) {
+            System.out.println("NMS.nsc " + node);
             if (node.getStatus() == Status.GREEN) {
                 assignPolicy.nodeAvailable(node.getId());
             } else {

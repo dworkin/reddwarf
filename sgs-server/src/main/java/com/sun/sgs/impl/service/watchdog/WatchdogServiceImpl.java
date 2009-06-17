@@ -44,9 +44,11 @@ import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -219,6 +221,9 @@ public final class WatchdogServiceImpl
 
     /** The interval for renewals with the watchdog server. */
     private final long renewInterval;
+
+    /** The set of yellow status reports */
+    private final Set<String> yellowReports = new HashSet<String>();
 
     /** The set of node listeners for all nodes. */
     private final ConcurrentMap<NodeListener, NodeListener> nodeListeners =
@@ -424,6 +429,7 @@ public final class WatchdogServiceImpl
 	if (serverImpl != null) {
 	    serverImpl.shutdown();
 	}
+        yellowReports.clear();
     }
 	
     /* -- Implement WatchdogService -- */
@@ -528,7 +534,7 @@ public final class WatchdogServiceImpl
     /**
      * {@inheritDoc}
      */
-    public synchronized void reportFailure(long nodeId, String className) {
+    public void reportFailure(long nodeId, String className) {
         reportStatus(nodeId, Status.RED, className);
     }
 
@@ -536,7 +542,7 @@ public final class WatchdogServiceImpl
      * {@inheritDoc}
      */
     public synchronized void reportStatus(long nodeId,
-                                          Status status,
+                                          Status newStatus,
                                           String className)
     {
 	checkNull("className", className);
@@ -546,14 +552,26 @@ public final class WatchdogServiceImpl
 
         if (isLocal) {
             logger.log(Level.WARNING, "{1} reported {2} status in local " +
-                       "node with id: {0}", nodeId, className, status);
+                       "node with id: {0}", nodeId, className, newStatus);
         } else {
             logger.log(Level.WARNING, "{1} reported {2} status in remote" +
-                       " node with id {0}", nodeId, className, status);
+                       " node with id {0}", nodeId, className, newStatus);
         }
 
         if (shuttingDown() || !getIsAlive()) {
             return;
+        }
+
+        // Determin the actual status of this node
+        if (newStatus != Status.RED) {
+            String reporter = className + nodeId;
+            if (newStatus == Status.YELLOW) {
+                yellowReports.add(reporter);
+            } else {
+                yellowReports.remove(reporter);
+            }
+            // If there are any YELLOW reports still open, report YELLOW.
+            newStatus = yellowReports.isEmpty() ? Status.GREEN : Status.YELLOW;
         }
 
         /*
@@ -564,8 +582,12 @@ public final class WatchdogServiceImpl
         int retries = maxIoAttempts;
         while (retries-- > 0) {
             try {
-                serverProxy.setNodeStatus(nodeId, status, isLocal, className,
+                serverProxy.setNodeStatus(nodeId, newStatus, isLocal, className,
                                           maxIoAttempts);
+                
+                // Watchdog server knows, now inform any listeners
+	        notifyNodeListeners(
+                               new NodeImpl(localNodeId, localHost, newStatus));
                 break;
             } catch (IOException ioe) {
                 if (retries == 0) {
@@ -577,7 +599,7 @@ public final class WatchdogServiceImpl
             }
         }
         
-        if ((status == Status.RED) && isLocal) {
+        if ((newStatus == Status.RED) && isLocal) {
             setFailedThenNotify(true);
         }
     }
@@ -718,7 +740,7 @@ public final class WatchdogServiceImpl
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, Status.RED);
+	    Node node = new NodeImpl(localNodeId, localHost, status);
 	    notifyNodeListeners(node);
 	}
 
@@ -751,11 +773,11 @@ public final class WatchdogServiceImpl
 			if (!shuttingDown() &&
                             isLocalNodeAliveNonTransactional()) 
 			{
-			    if (node.isAlive()) {
-				nodeListener.nodeStarted(node);
-			    } else {
+//			    if (node.isAlive()) {
+//				nodeListener.nodeStarted(node);
+//			    } else {
 				nodeListener.nodeStatusChange(node);
-			    }
+//			    }
 			}
 		    }
 		}, taskOwner);

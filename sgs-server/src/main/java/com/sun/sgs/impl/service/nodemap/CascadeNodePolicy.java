@@ -27,12 +27,13 @@ import java.util.Properties;
  * no longer available.
  */
 public class CascadeNodePolicy extends AbstractNodePolicy {
-    
+
+    // index to walk through available list
     private int nextNode = 0;
 
     // Current node we are assigning. -1 indicates that a new node must be
-    // selected.
-    private long currentNode = -1;
+    // selected. (Not to be confused with NodeAssignPolicy.SERVER_NODE)
+    private long currentNode = -1L;
 
     /** 
      * Creates a new instance of the {@code CascadeNodePolicy}.
@@ -47,15 +48,17 @@ public class CascadeNodePolicy extends AbstractNodePolicy {
     public synchronized long chooseNode(Identity id, long requestingNode)
             throws NoNodesAvailableException 
     {
-        if (availableNodes.size() < 1) {
-            // We don't have any live nodes to assign to.
-            // Let the caller figure it out.
-            throw new NoNodesAvailableException("no live nodes available");
-        }
-        
-        // If the current node is no longer available, get a new one
+        // Be optimistic and assume the current node is available
+        // If the current node is no longer available, get a new one, if any
         if (!availableNodes.contains(currentNode)) {
-            currentNode = availableNodes.get(nextNode++ %availableNodes.size());
+            if (availableNodes.isEmpty()) {
+
+                // We don't have any nodes to assign to.
+                // Let the caller figure it out.
+                throw new NoNodesAvailableException("no nodes available");
+            }
+            currentNode =
+                    availableNodes.get(nextNode++ % availableNodes.size());
         }
         return currentNode;
     }

@@ -58,6 +58,7 @@ import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Status;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -284,6 +285,9 @@ public final class ClientSessionServiceImpl
      */
     final boolean allowNewLogin;
 
+    private Status status = Status.GREEN;
+    private final int loginHighWater;
+
     /** Our JMX exposed statistics. */
     final ClientSessionServiceStats serviceStats;
 
@@ -318,6 +322,13 @@ public final class ClientSessionServiceImpl
 		1, Integer.MAX_VALUE);
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
+
+            loginHighWater =
+                    wrappedProps.getIntProperty(PKG_NAME + ".high.water",
+                                                Integer.MAX_VALUE, 0,
+                                                Integer.MAX_VALUE);
+            logger.log(Level.CONFIG,
+                       "login high water set to {0}", loginHighWater);
 
             /* Export the ClientSessionServer. */
 	    int serverPort = wrappedProps.getIntProperty(
@@ -1232,6 +1243,7 @@ public final class ClientSessionServiceImpl
     void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
         assert handler != null;
 	handlers.put(sessionRefId, handler);
+        checkHighWater();
     }
     
     /**
@@ -1251,6 +1263,30 @@ public final class ClientSessionServiceImpl
 	}
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
+        checkHighWater();
+    }
+
+    private synchronized void checkHighWater() {
+        if (handlers.size() > loginHighWater) {
+            setStatus(Status.YELLOW);
+        } else {
+            setStatus(Status.GREEN);
+        }
+    }
+
+    private synchronized void setStatus(Status newStatus) {
+        if (newStatus == status) return;
+        this.status = newStatus;
+
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "Reporting change in status to ", status);
+        }
+        scheduleNonTransactionalTask(
+            new AbstractKernelRunnable("ReportStatus") {
+                public void run() {
+                   watchdogService.reportStatus(localNodeId, status, CLASSNAME);
+                }
+            }, taskOwner);
     }
 
     /**

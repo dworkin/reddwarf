@@ -556,6 +556,7 @@ public final class WatchdogServerImpl
 
             case GREEN:
             case YELLOW:
+                // don't really care about these
         }
     }
 
