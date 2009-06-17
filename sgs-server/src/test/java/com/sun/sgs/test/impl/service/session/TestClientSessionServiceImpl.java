@@ -33,8 +33,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
@@ -44,20 +42,17 @@ import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractService.Version;
-import com.sun.sgs.io.Connector;
-import com.sun.sgs.io.Connection;
-import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.SimpleCompletionHandler;
+import com.sun.sgs.test.util.DummyClient;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
-import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -65,9 +60,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.math.BigInteger;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -174,6 +166,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** The test clients, keyed by client session ID. */
     private static Map<BigInteger, DummyClient> dummyClients;
+
+    private static volatile RuntimeException receivedMessageException = null;
     
     private static Field getField(Class cl, String name) throws Exception {
 	Field field = cl.getDeclaredField(name);
@@ -191,7 +185,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void setUp() throws Exception {
-        dummyClients = new HashMap<BigInteger, DummyClient>();
         System.err.println("Testcase: " + getName());
         setUp(null, true);
     }
@@ -216,6 +209,8 @@ public class TestClientSessionServiceImpl extends TestCase {
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
         dataService = serverNode.getDataService();
+        dummyClients = new HashMap<BigInteger, DummyClient>();
+	receivedMessageException = null;
     }
 
     /** 
@@ -465,7 +460,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     // -- Test connecting, logging in, logging out with server -- 
 
     public void testConnection() throws Exception {
-	DummyClient client = new DummyClient("foo");
+	DummyClient client = createDummyClient("foo");
 	try {
 	    client.connect(serverNode.getAppPort());
 	} catch (Exception e) {
@@ -481,7 +476,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testLoginSuccess() throws Exception {
-	DummyClient client = new DummyClient("success");
+	DummyClient client = createDummyClient("success");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -500,13 +495,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	int redirectCount = 0;
 	try {
 	    for (String user : users) {
-		DummyClient client = new DummyClient(user);
+		DummyClient client = createDummyClient(user);
 		client.connect(serverAppPort);
-		if (! client.login() && client.loginRedirect) {
+		if (!client.login() && client.isLoginRedirected()) {
 		    // login redirected
 		    redirectCount++;
                     int port = client.redirectPort;
-		    client = new DummyClient(user);
+		    client = createDummyClient(user);
 		    client.connect(port);
 		    if (!client.login()) {
 			failed = true;
@@ -545,22 +540,22 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
     
     public void testSendBeforeLoginComplete() throws Exception {
-	DummyClient client = new DummyClient("dummy");
+	DummyClient client = createDummyClient("dummy");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(false);
-	    client.sendMessagesInSequence(1, 0, null);
+	    client.sendMessagesInSequence(1, 0);
 	} finally {
             client.disconnect();
 	}
     }
 
     public void testSendAfterLoginComplete() throws Exception {
-	DummyClient client = new DummyClient("dummy");
+	DummyClient client = createDummyClient("dummy");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(true);
-	    client.sendMessagesInSequence(1, 1, null);
+	    client.sendMessagesInSequence(1, 1);
 	} finally {
             client.disconnect();
 	}
@@ -568,7 +563,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
 	String name = "success";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -587,7 +582,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLoggedInReturningNonSerializableClientSessionListener()
 	throws Exception
     {
-	DummyClient client = new DummyClient(NON_SERIALIZABLE);
+	DummyClient client = createDummyClient(NON_SERIALIZABLE);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertFalse(client.login());
@@ -601,7 +596,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLoggedInReturningNullClientSessionListener()
 	throws Exception
     {
-	DummyClient client = new DummyClient(RETURN_NULL);
+	DummyClient client = createDummyClient(RETURN_NULL);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertFalse(client.login());
@@ -615,7 +610,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLoggedInThrowingRuntimeException()
 	throws Exception
     {
-	DummyClient client = new DummyClient(THROW_RUNTIME_EXCEPTION);
+	DummyClient client = createDummyClient(THROW_RUNTIME_EXCEPTION);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertFalse(client.login());
@@ -628,8 +623,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLoginTwiceBlockUser() throws Exception {
 	String name = "dummy";
-	DummyClient client1 = new DummyClient(name);
-	DummyClient client2 = new DummyClient(name);
+	DummyClient client1 = createDummyClient(name);
+	DummyClient client2 = createDummyClient(name);
 	int port = serverNode.getAppPort();
 	try {
 	    assertTrue(client1.connect(port).login());
@@ -651,8 +646,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	setUp(props, false);
 	String name = "dummy";
 	
-	DummyClient client1 = new DummyClient(name);
-	DummyClient client2 = new DummyClient(name);
+	DummyClient client1 = createDummyClient(name);
+	DummyClient client2 = createDummyClient(name);
 	int port = serverNode.getAppPort();
 	try {
 	    assertTrue(client1.connect(port).login());
@@ -669,7 +664,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     public void testDisconnectFromServerAfterLogout() throws Exception {
 	final String name = "logout";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -683,7 +678,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLogoutRequestAndDisconnectedCallback() throws Exception {
 	final String name = "logout";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -715,7 +710,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	throws Exception
     {
 	DummyClient client =
-	    new DummyClient(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION);
+	    createDummyClient(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -732,7 +727,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLogoutAndNotifyLoggedOutCallback() throws Exception {
 	String name = "logout";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    client.logout();
@@ -776,7 +771,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		 // invoking a session's listener's 'disconnected' callback
 		 // throws a non-retryable exception.
 		String name = (i % 2 == 0) ? "client" : "badClient";
-		DummyClient client = new DummyClient(name + String.valueOf(i));
+		DummyClient client = createDummyClient(name + String.valueOf(i));
 		assertTrue(client.connect(appPort).login());
 	    }
 	    checkBindings(numClients);
@@ -818,7 +813,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     // -- test ClientSession --
 
     public void testClientSessionIsConnected() throws Exception {
-	DummyClient client = new DummyClient("clientname");
+	DummyClient client = createDummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -847,7 +842,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testClientSessionGetName() throws Exception {
 	final String name = "clientname";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -877,7 +872,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testClientSessionToString() throws Exception {
 	final String name = "testClient";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -898,7 +893,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     public void testClientSessionToStringNoTransaction() throws Exception {
 	final String name = "testClient";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    GetClientSessionTask task = new GetClientSessionTask(name);
@@ -932,7 +927,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 	
     public void testClientSessionSendUnreliableMessages() throws Exception {
-	DummyClient client = new DummyClient("dummy");
+	DummyClient client = createDummyClient("dummy");
 	int iterations = 3;
 	int numAdditionalNodes = 2;
 	Queue<byte[]> messages =
@@ -946,7 +941,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testClientSessionSendUnreliableMessagesWithFailure()
 	throws Exception
     {
-	DummyClient client = new DummyClient("dummy");
+	DummyClient client = createDummyClient("dummy");
 	int iterations = 3;
 	int numAdditionalNodes = 2;
 	Queue<byte[]> messages =
@@ -958,7 +953,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
     
     public void testClientSessionSendSequence() throws Exception {
-	DummyClient client = new DummyClient("dummy");
+	DummyClient client = createDummyClient("dummy");
 	int iterations = 3;
 	int numAdditionalNodes = 2;
 	Queue<byte[]> messages =
@@ -1122,7 +1117,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	throws Exception
     {	
 	final String name = "dummy";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -1177,7 +1172,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     // space is used up.  Note that this test assumes that sending 400 KB of
     // data will surpass the I/O throttling limit.
     public void testClientSessionSendAbortRetryable() throws Exception {
-	DummyClient client = new DummyClient("clientname");
+	DummyClient client = createDummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -1224,11 +1219,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLocalSendPerformance() throws Exception {
 	final String user = "dummy";
-	DummyClient client = (new DummyClient(user)).connect(serverNode.getAppPort());
+	DummyClient client = (createDummyClient(user)).connect(serverNode.getAppPort());
 	assertTrue(client.login());
 
 	isPerformanceTest = true;
-	int numIterations = 1000;
+	int numIterations = 10;
 	final ByteBuffer msg = ByteBuffer.allocate(0);
 	long startTime = System.currentTimeMillis();
 	for (int i = 0; i < numIterations; i++) {
@@ -1248,7 +1243,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testRemoveSessionWhileSessionDisconnects() throws Exception {
 	final String user = "foo";
-	DummyClient client = new DummyClient(user);
+	DummyClient client = createDummyClient(user);
 	assertTrue(client.connect(serverNode.getAppPort()).login());
 	client.sendMessage(new byte[0]);
 	client.logout();
@@ -1272,7 +1267,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Thread.sleep(WAIT_TIME);
 	    assertEquals(objectCount, getObjectCount());
 	    checkBindings(1);
-	    assertFalse(client.receivedDisconnectedCallback);
+	    client.assertDisconnectedCallbackNotInvoked();
 	} finally {
 	    client.disconnect();
 	}
@@ -1322,8 +1317,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    waitForExpectedObjectCount(
 		objectCount - MANAGED_OBJECTS_PER_SESSION);
 	    checkBindings(0);
-	    assertTrue(client.receivedDisconnectedCallback);
-	    assertFalse(client.graceful);
+	    client.assertDisconnectedCallbackInvoked(false);
 	} finally {
 	    client.disconnect();
 	}
@@ -1334,14 +1328,14 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	String newNodeHost = "newNode";
 	DummyClient client = createClientToRelocate(newNodeHost);
-	DummyClient otherClient = new DummyClient("foo");
+	DummyClient otherClient = createDummyClient("foo");
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	try {
 	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
 	    assertFalse(otherClient.connect(newPort).login());
 	    client.relocate(newPort, true, true);
 	    checkBindings(1);
-	    assertFalse(client.receivedDisconnectedCallback);
+	    client.assertDisconnectedCallbackNotInvoked();
 	} finally {
 	    client.disconnect();
 	}
@@ -1353,7 +1347,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	String newNodeHost = "newNode";
 	allowNewLogin = true;	// enable login preemption on new node
 	DummyClient client = createClientToRelocate(newNodeHost);
-	DummyClient otherClient = new DummyClient("foo");
+	DummyClient otherClient = createDummyClient("foo");
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	try {
 	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
@@ -1362,8 +1356,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    assertTrue(otherClient.connect(newPort).login());
 	    //waitForExpectedObjectCount(objectCount);
 	    checkBindings(1);
-	    assertTrue(client.receivedDisconnectedCallback);
-	    assertFalse(client.graceful);
+	    client.assertDisconnectedCallbackInvoked(false);
 	} finally {
 	    client.disconnect();
 	}
@@ -1386,8 +1379,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	waitForExpectedObjectCount(
 	    objectCount - MANAGED_OBJECTS_PER_SESSION);
 	checkBindings(0);
-	assertTrue(client.receivedDisconnectedCallback);
-	assertFalse(client.graceful);
+	client.assertDisconnectedCallbackInvoked(false);
     }
 
     public void testOldNodeFailsDuringRelocateToNewNode()
@@ -1404,8 +1396,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    assertEquals(objectCount - MANAGED_OBJECTS_PER_SESSION,
 			 getObjectCount());
 	    checkBindings(0);
-	    assertTrue(client.receivedDisconnectedCallback);
-	    assertFalse(client.graceful);
+	    client.assertDisconnectedCallbackInvoked(false);
 	} finally {
 	    client.disconnect();
 	}
@@ -1424,8 +1415,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    newNode.shutdown(false);
 	    Thread.sleep(WAIT_TIME);
 	    checkBindings(0);
-	    assertTrue(client.receivedDisconnectedCallback);
-	    assertFalse(client.graceful);
+	    client.assertDisconnectedCallbackInvoked(false);
 	} finally {
 	    client.disconnect();
 	}
@@ -1448,7 +1438,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String name = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	addNodes(newNodeHost);
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	assertTrue(client.connect(serverNode.getAppPort()).login());
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	System.err.println("reassigning identity:" + name +
@@ -1547,17 +1537,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /* -- other methods -- */
 
+    /**
+     * If {@code throwException} is non-null, the {@code
+     * ClientSessionListener} will throw the specified exception in its
+     * {@code receivedMessage} method for only the first message it
+     * receives.
+     */
     private void sendMessagesAndCheck(
-	int numMessages, int expectedMessages, RuntimeException exception)
+	int numMessages, int expectedMessages,
+	RuntimeException throwException)
 	throws Exception
     {
 	String name = "clientname";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = createDummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
-	    client.sendMessagesInSequence(
-		numMessages, expectedMessages, exception);
+	    receivedMessageException = throwException;
+	    client.sendMessagesInSequence(numMessages, expectedMessages);
 	} finally {
 	    client.disconnect();
 	}
@@ -1632,605 +1629,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    StandardProperties.APP_LISTENER);
     }
 
-    /**
-     * Dummy client code for testing purposes.
-     */
-    private class DummyClient {
-	
-	final String name;
-	private String password;
-	private Connector<SocketAddress> connector;
-	private Listener listener;
-	private Connection connection;
-	private boolean connected = false;
-	private final Object lock = new Object();
-	private final Object disconnectedCallbackLock = new Object();
-	private boolean loginAck = false;
-	private boolean loginSuccess = false;
-	private boolean loginRedirect = false;
-	private boolean logoutAck = false;
-        private boolean awaitGraceful = false;
-        private boolean awaitLoginFailure = false;
-	private String reason;
-	private String redirectHost;
-        private int redirectPort;
-	private byte[] reconnectKey = new byte[0];
-
-	private boolean relocateSession;
-	private String relocateHost;
-	private int relocatePort;
-	private byte[] relocateKey = new byte[0];
-	private boolean relocateAck;
-	private boolean relocateSuccess;
-	private boolean relocateMessage;
-	private int messagesReceivedDuringRelocation = 0;
-	
-	volatile boolean receivedDisconnectedCallback = false;
-	volatile boolean graceful = false;
-	
-	volatile RuntimeException throwException;
-	volatile int expectedMessages;
-	// Messages received by this client's associated ClientSessionListener
-	Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
-	
-
-	DummyClient(String name) {
-	    this.name = name;
-	}
-
-	DummyClient connect(int port) {
-	    connected = false;
-	    listener = new Listener();
-	    try {
-		SocketEndpoint endpoint =
-		    new SocketEndpoint(
-		        new InetSocketAddress(InetAddress.getLocalHost(), port),
-			TransportType.RELIABLE);
-		connector = endpoint.createConnector();
-		connector.connect(listener);
-	    } catch (Exception e) {
-		System.err.println(toString() + " connect throws: " + e);
-		e.printStackTrace();
-		throw new RuntimeException("DummyClient.connect failed", e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (connected == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (connected != true) {
-			throw new RuntimeException(
-			    toString() + " connect timed out to " + port);
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			toString() + " connect timed out to " + port, e);
-		}
-	    }
-	    return this;
-	}
-
-	void disconnect() {
-            System.err.println(toString() + " disconnecting");
-
-            synchronized (lock) {
-                if (connected == false) {
-                    return;
-                }
-                connected = false;
-            }
-
-            try {
-                connection.close();
-            } catch (IOException e) {
-                System.err.println(toString() + " disconnect exception:" + e);
-            }
-
-            synchronized (lock) {
-                lock.notifyAll();
-            }
-	}
-
-	/**
-	 * Sends a login request and waits for it to be acknowledged,
-	 * returning {@code true} if login was successful, and {@code
-	 * false} if login was redirected.  If the login was not successful
-	 * or redirected, then a {@code RuntimeException} is thrown because
-	 * the login operation timed out before being acknowledged.
-	 */
-	boolean login() {
-	    return login(true);
-	}
-
-	/**
-	 * Sends a login request and if {@code waitForLogin} is {@code
-	 * true} waits for the request to be acknowledged, returning {@code
-	 * true} if login was successful, and {@code false} if login was
-	 * redirected, otherwise a {@code RuntimeException} is thrown
-	 * because the login operation timed out before being acknowldeged.
-	 *
-	 * If {@code waitForLogin} is false, this method returns {@code
-	 * true} if the login is known to be successful (the outcome may
-	 * not yet be known because the login operation is asynchronous),
-	 * otherwise it returns false.  Invoke {@code waitForLogin} to wait
-	 * for an expected successful login.
-	 */
-	boolean login(boolean waitForLogin) {
-	    synchronized (lock) {
-		if (connected == false) {
-		    throw new RuntimeException(toString() + " not connected");
-		}
-	    }
-	    this.password = "password";
-
-	    MessageBuffer buf =
-		new MessageBuffer(2 + MessageBuffer.getSize(name) +
-				  MessageBuffer.getSize(password));
-	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
-                putByte(SimpleSgsProtocol.VERSION).
-		putString(name).
-		putString(password);
-	    loginAck = false;
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	    if (waitForLogin) {
-		return waitForLogin();
-	    } else {
-		synchronized (lock) {
-		    return loginSuccess;
-		}
-	    }
-	}
-
-	/**
-	 * Waits for a login acknowledgement, and returns {@code true} if
-	 * login was successful, {@code false} if login was redirected or
-	 * failed, otherwise a {@code RuntimeException} is thrown because
-	 * the login operation timed out before being acknowledged.
-	 */
-	boolean waitForLogin() {
-	    synchronized (lock) {
-		try {
-		    if (loginAck == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (loginAck != true) {
-			throw new RuntimeException(
-			    toString() + " login timed out");
-		    }
-		    if (loginRedirect == true) {
-			return false;
-		    }
-		    return loginSuccess;
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			toString() + " login timed out", e);
-		}
-	    }
-	}
-
-	void relocate(int newPort, boolean useValidKey, boolean shouldSucceed) {
-	    synchronized (lock) {
-		if (!relocateSession) {
-		    waitForRelocationNotification(newPort);
-		} else {
-		    assertEquals(newPort, relocatePort);
-		}
-	    }
-	    System.err.println(toString() + " relocating...");
-	    disconnect();
-	    relocateAck = false;
-	    relocateSuccess = false;
-	    connect(relocatePort);
-	    byte[] key = useValidKey ? relocateKey : new byte[0];
-	    ByteBuffer buf = ByteBuffer.allocate(2 + key.length);
-	    buf.put(SimpleSgsProtocol.RELOCATE_REQUEST).
-		put(SimpleSgsProtocol.VERSION).
-		put(key).
-		flip();
-	    try {
-		connection.sendBytes(buf.array());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (!relocateAck) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (!relocateAck) {
-			throw new RuntimeException(
-			    toString() + " relocate timed out");
-		    }
-		    if (shouldSucceed) {
-			if (!relocateSuccess) {
-			    fail("relocation failed: " + relocateMessage);
-			}
-		    } else if (relocateSuccess) {
-			fail("relocation succeeded");
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			toString() + " relocate timed out", e);
-		}
-	    }
-	    assertEquals(0, messagesReceivedDuringRelocation);
-	}
-
-	/**
-	 * Waits for client to receive a RELOCATE_NOTIFICATION message.
-	 * Throws a RuntimeException if the notification is not received
-	 * before the timeout period, or if the relocation port specified
-	 * in the notification does not match the specified {@code newPort}.
-	 */
-	void waitForRelocationNotification(int newPort) {
-	    System.err.println(toString() +
-			       " waiting for relocation notification...");
-	    synchronized (lock) {
-		try {
-		    if (relocateSession == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (relocateSession != true) {
-			throw new RuntimeException(
-			    toString() + " relocate notification timed out");
-		    }
-		    assertEquals(newPort, relocatePort);
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			toString() + " relocated timed out", e);
-		}
-	    }
-	}
-
-	/**
-	 * Throws a {@code RuntimeException} if this session is not
-	 * logged in.
-	 */
-	private void checkLoggedIn() {
-	    synchronized (lock) {
-		if (!connected || !loginSuccess) {
-		    throw new RuntimeException(
-			toString() + " not connected or loggedIn");
-		}
-	    }
-	}
-
-	/**
-	 * Sends a SESSION_MESSAGE with the specified content.
-	 */
-	void sendMessage(byte[] message) {
-	    MessageBuffer buf =
-		new MessageBuffer(5 + reconnectKey.length + message.length);
-	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putByteArray(reconnectKey).
-		putByteArray(message);
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	}
-
-	/**
-	 * From this client, sends the number of messages (each containing a
-	 * monotonically increasing sequence number), then waits for all the
-	 * messages to be received by this client's associated {@code
-	 * ClientSessionListener}, and validates the sequence of messages
-	 * received by the listener.  If {@code throwException} is non-null,
-	 * the {@code ClientSessionListener} will throw the specified
-	 * exception in its {@code receivedMessage} method for only the first
-	 * message it receives.
-	 */
-	void sendMessagesInSequence(
-	    int numMessages, int expectedMessages, RuntimeException re)
-	{
-	    this.expectedMessages = expectedMessages;
-	    this.throwException = re;
-	    
-	    for (int i = 0; i < numMessages; i++) {
-		MessageBuffer buf = new MessageBuffer(4);
-		buf.putInt(i);
-		sendMessage(buf.getBuffer());
-	    }
-	    
-	    validateMessageSequence(messages, expectedMessages);
-	}
-
-	/**
-	 * Waits for this client to receive the number of messages sent from
-	 * the application.
-	 */
-	Queue<byte[]> waitForClientToReceiveExpectedMessages(
-	    int expectedMessages)
-	{
-	    Queue<byte[]> messageList = listener.getMessageList();
-	    waitForExpectedMessages(messageList, expectedMessages);
-	    return messageList;
-	}
-
-	/**
-	 * Waits for the number of expected messages to be deposited in the
-	 * specified message queue.
-	 */
-	private void waitForExpectedMessages(
-	    Queue<byte[]> messageQueue, int expectedMessages)
-	{
-	    this.expectedMessages = expectedMessages;
-	    synchronized (messageQueue) {
-		if (messageQueue.size() != expectedMessages) {
-		    try {
-			messageQueue.wait(WAIT_TIME);
-		    } catch (InterruptedException e) {
-		    }
-		}
-	    }
-	    int receivedMessages = messageQueue.size();
-	    if (receivedMessages != expectedMessages) {
-		fail(toString() + " expected " + expectedMessages +
-		     ", received " + receivedMessages);
-	    }
-	}
-
-	/**
-	 * Waits for the number of expected messages to be recorded in the
-	 * specified 'list', and validates that the expected number of messages
-	 * were received by the ClientSessionListener in the correct sequence.
-	 */
-	void validateMessageSequence(
-	    Queue<byte[]> messageQueue, int expectedMessages)
-	{
-	    waitForExpectedMessages(messageQueue, expectedMessages);
-	    if (expectedMessages != 0) {
-		int i = (new MessageBuffer(messageQueue.peek())).getInt();
-		for (byte[] message : messageQueue) {
-		    MessageBuffer buf = new MessageBuffer(message);
-		    int value = buf.getInt();
-		    System.err.println(toString() + " received message " + value);
-		    if (value != i) {
-			fail("expected message " + i + ", got " + value);
-		    }
-		    i++;
-		}
-	    }
-	}
-	
-	void logout() {
-            synchronized (lock) {
-                if (connected == false) {
-                    return;
-                }
-                logoutAck = false;
-                awaitGraceful = true;
-            }
-            MessageBuffer buf = new MessageBuffer(1);
-            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-            try {
-                connection.sendBytes(buf.getBuffer());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            synchronized (lock) {
-                try {
-                    if (logoutAck == false) {
-                        lock.wait(WAIT_TIME);
-                    }
-                    if (logoutAck != true) {
-                        throw new RuntimeException(
- 			    toString() + " disconnect timed out");
-                    }
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(
-                        toString() + " disconnect timed out", e);
-                } finally {
-                    if (! logoutAck)
-                        disconnect();
-                }
-            }
-	}
-
-	void checkDisconnectedCallback(boolean graceful) throws Exception {
-	    synchronized (disconnectedCallbackLock) {
-		if (!receivedDisconnectedCallback) {
-		    disconnectedCallbackLock.wait(WAIT_TIME);
-		}
-	    }
-	    if (!receivedDisconnectedCallback) {
-		fail(toString() + " disconnected callback not invoked");
-	    } else if (this.graceful != graceful) {
-		fail(toString() + " graceful was: " + this.graceful +
-		     ", expected: " + graceful);
-	    }
-	    System.err.println(toString() + " disconnect successful");
-	}
-
-	boolean isConnected() {
-	    synchronized (lock) {
-		return connected;
-	    }
-	}
-
-	// Returns true if disconnect occurred.
-	boolean waitForDisconnect() {
-	    synchronized (lock) {
-		try {
-		    if (connected == true) {
-			lock.wait(WAIT_TIME);
-		    }
-		} catch (InterruptedException ignore) {
-		}
-		return !connected;
-	    }
-	}
-
-	public String toString() {
-	    return "[" + name + "]";
-	}
-	
-	private class Listener implements ConnectionListener {
-
-	    final Queue<byte[]> messageList = new ConcurrentLinkedQueue<byte[]>();
-
-	    Queue<byte[]> getMessageList() {
-		return messageList;
-	    }
-
-	    
-            /** {@inheritDoc} */
-	    public void bytesReceived(Connection conn, byte[] buffer) {
-		if (connection != conn) {
-		    System.err.println(
-			"DummyClient.Listener connected wrong handle, got:" +
-			conn + ", expected:" + connection);
-		    return;
-		}
-
-		MessageBuffer buf = new MessageBuffer(buffer);
-
-		byte opcode = buf.getByte();
-
-		switch (opcode) {
-
-		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
-		    dummyClients.put(
-			new BigInteger(1, reconnectKey), DummyClient.this);
-		    synchronized (lock) {
-			loginAck = true;
-			loginSuccess = true;
-			System.err.println("login succeeded: " + name);
-			lock.notifyAll();
-		    }
-		    sendMessage(new byte[0]);
-		    break;
-		    
-		case SimpleSgsProtocol.LOGIN_FAILURE:
-		    reason = buf.getString();
-		    synchronized (lock) {
-			loginAck = true;
-			loginSuccess = false;
-			System.err.println("login failed: " + name +
-					   ", reason:" + reason);
-			lock.notifyAll();
-		    }
-		    break;
-
-		case SimpleSgsProtocol.LOGIN_REDIRECT:
-		    redirectHost = buf.getString();
-                    redirectPort = buf.getInt();
-		    synchronized (lock) {
-			loginAck = true;
-			loginRedirect = true;
-			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost +
-                                           ", port:" + redirectPort);
-			lock.notifyAll();
-		    }
-		    break;
-		    
-		case SimpleSgsProtocol.RELOCATE_NOTIFICATION:
-		    relocateHost = buf.getString();
-                    relocatePort = buf.getInt();
-		    relocateKey = buf.getBytes(buf.limit() - buf.position());
-		    synchronized (lock) {
-			relocateSession = true;
-			System.err.println(
- 			    "session to relocate: " + name +
-			    ", host:" + relocateHost +
-			    ", port:" + relocatePort +
-			    ", key:" + HexDumper.toHexString(relocateKey));
-			lock.notifyAll();
-		    } break;
-
-		case SimpleSgsProtocol.RELOCATE_SUCCESS:
-		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
-		    dummyClients.put(
-			new BigInteger(1, reconnectKey), DummyClient.this);
-		    synchronized (lock) {
-			relocateAck = true;
-			relocateSuccess = true;
-			messagesReceivedDuringRelocation = messages.size();
-			System.err.println("relocate succeeded: " + name);
-			lock.notifyAll();
-		    }
-		    sendMessage(new byte[0]);
-		    break;
-		    
-		case SimpleSgsProtocol.RELOCATE_FAILURE:
-		    reason = buf.getString();
-		    synchronized (lock) {
-			relocateAck = true;
-			relocateSuccess = false;
-			messagesReceivedDuringRelocation = messages.size();
-			System.err.println("relocate failed: " + name +
-					   ", reason:" + reason);
-			lock.notifyAll();
-		    }
-		    break;
-		    
-		case SimpleSgsProtocol.LOGOUT_SUCCESS:
-                    synchronized (lock) {
-                        logoutAck = true;
-                        System.err.println("logout succeeded: " + name);
-			lock.notifyAll();
-                    }
-		    break;
-
-		case SimpleSgsProtocol.SESSION_MESSAGE:
-		    byte[] message = buf.getBytes(buf.limit() - buf.position());
-		    synchronized (messageList) {
-			messageList.add(message);
-			printIt("[" + name + "] received SESSION_MESSAGE: " +
-				HexDumper.toHexString(message));
-			if (messageList.size() == expectedMessages) {
-			    messageList.notifyAll();
-			}
-		    }
-		    break;
-
-		default:
-		    System.err.println(	
-		"bytesReceived: unknown op code: " + opcode);
-		    break;
-		}
-	    }
-
-            /** {@inheritDoc} */
-	    public void connected(Connection conn) {
-		System.err.println("DummyClient.Listener.connected");
-		if (connection != null) {
-		    System.err.println(
-			"DummyClient.Listener.already connected handle: " +
-			connection);
-		    return;
-		}
-		connection = conn;
-		synchronized (lock) {
-		    connected = true;
-		    lock.notifyAll();
-		}
-	    }
-
-            /** {@inheritDoc} */
-	    public void disconnected(Connection conn) {
-                synchronized (lock) {
-                    connected = false;
-		    connection = null;
-                    lock.notifyAll();
-                }
-	    }
-	    
-            /** {@inheritDoc} */
-	    public void exceptionThrown(Connection conn, Throwable exception) {
-		System.err.println("DummyClient.Listener.exceptionThrown " +
-				   "exception:" + exception);
-		exception.printStackTrace();
-	    }
-	}
-    }
 
     public static class DummyAppListener implements AppListener, 
                                                     ManagedObject,
@@ -2337,11 +1735,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                     reconnectKey == null ? null :
                                            dummyClients.get(reconnectKey);
 	    if (client != null) {
-		client.receivedDisconnectedCallback = true;
-		client.graceful = graceful;
-		synchronized (client.disconnectedCallbackLock) {
-		    client.disconnectedCallbackLock.notifyAll();
-		}
+		client.setDisconnectedCallbackInvoked(graceful);
 	    }
 	    if (disconnectedThrowsException) {
 		throw new RuntimeException(
@@ -2363,17 +1757,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    DummyClient client = dummyClients.get(reconnectKey);
 	    System.err.println(
 		"receivedMessage: " + HexDumper.toHexString(bytes) + 
-		"\nthrowException: " + client.throwException);
-	    if (client.throwException != null) {
-		RuntimeException re = client.throwException;
-		client.throwException = null;
+		"\nthrow exception: " + receivedMessageException);
+	    if (receivedMessageException != null) {
+		RuntimeException re = receivedMessageException;
+		receivedMessageException = null;
 		throw re;
 	    } else {
-		AppContext.getDataManager().markForUpdate(this);
 		client.messages.add(bytes);
 	    }
 	    synchronized (client.messages) {
-		if (client.messages.size() == client.expectedMessages) {
+		if (client.messages.size() == client.expectedMessages0) {
 		    client.messages.notifyAll();
 		}
 	    }
@@ -2524,5 +1917,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
 				      SimpleCompletionHandler handler)
 	{ }
+    }
+
+    private DummyClient createDummyClient(String name) {
+	return new DummyClient(name, dummyClients);
     }
 }
