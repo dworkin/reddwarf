@@ -51,6 +51,7 @@ public class DummyClient extends Assert {
     private Connector<SocketAddress> connector;
     private Listener listener;
     private Connection connection;
+    private int connectPort = 0;
     private boolean connected = false;
     private final Object lock = new Object();
     private final Object disconnectedCallbackLock = new Object();
@@ -90,6 +91,7 @@ public class DummyClient extends Assert {
     }
 
     public DummyClient connect(int port) {
+	connectPort = port;
 	connected = false;
 	listener = new Listener();
 	try {
@@ -121,25 +123,42 @@ public class DummyClient extends Assert {
 	return this;
     }
 
+    /**
+     * Returns the port last specified for the {@link #connect connect}
+     * method.
+     */
+    public int getConnectPort() {
+	return connectPort;
+    }
+
     public void disconnect() {
 	System.err.println(toString() + " disconnecting");
 
 	synchronized (lock) {
-	    if (connected == false) {
+	    if (! connected) {
 		return;
 	    }
-	    connected = false;
+	    try {
+		connection.close();
+		lock.wait(WAIT_TIME);
+	    } catch (Exception e) {
+		System.err.println(toString() + " disconnect exception:" + e);
+		lock.notifyAll();
+	    } finally {
+		if (connected) {
+		    reset();
+		}
+	    }
 	}
+    }
 
-	try {
-	    connection.close();
-	} catch (IOException e) {
-	    System.err.println(toString() + " disconnect exception:" + e);
-	}
-
-	synchronized (lock) {
-	    lock.notifyAll();
-	}
+    void reset() {
+	assert Thread.holdsLock(lock);
+	connected = false;
+	connection = null;
+	loginAck = false;
+	loginSuccess = false;
+	loginRedirect = false;
     }
 
     public void setDisconnectedCallbackInvoked(boolean graceful) {
@@ -209,11 +228,17 @@ public class DummyClient extends Assert {
 	    throw new RuntimeException(e);
 	}
 	if (waitForLogin) {
-	    return waitForLogin();
-	} else {
-	    synchronized (lock) {
-		return loginSuccess;
+	    if (waitForLogin()) {
+		return true;
+	    } else if (isLoginRedirected()) {
+		int port = redirectPort;
+		disconnect();
+		connect(port);
+		return login();
 	    }
+	}
+	synchronized (lock) {
+	    return loginSuccess;
 	}
     }
 
@@ -451,11 +476,11 @@ public class DummyClient extends Assert {
 		}
 		if (logoutAck != true) {
 		    throw new RuntimeException(
-			toString() + " disconnect timed out");
+			toString() + " logout timed out");
 		}
 	    } catch (InterruptedException e) {
 		throw new RuntimeException(
-		    toString() + " disconnect timed out", e);
+		    toString() + " logout timed out", e);
 	    } finally {
 		if (! logoutAck)
 		    disconnect();
@@ -637,7 +662,7 @@ public class DummyClient extends Assert {
 	 * Gives a subclass a chance to handle an opCode that isn't
 	 * processed by this client implementation.
 	 */
-	protected void unhandledOpCode(byte opCode, MessageBuffer buf) {
+	protected void unhandledOpCode(byte opcode, MessageBuffer buf) {
 	}
 
 
@@ -660,8 +685,7 @@ public class DummyClient extends Assert {
 	/** {@inheritDoc} */
 	public void disconnected(Connection conn) {
 	    synchronized (lock) {
-		connected = false;
-		connection = null;
+		reset();
 		lock.notifyAll();
 	    }
 	}

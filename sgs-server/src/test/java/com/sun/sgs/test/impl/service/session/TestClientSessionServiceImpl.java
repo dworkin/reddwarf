@@ -497,17 +497,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (String user : users) {
 		DummyClient client = createDummyClient(user);
 		client.connect(serverAppPort);
-		if (!client.login() && client.isLoginRedirected()) {
-		    // login redirected
-		    redirectCount++;
-                    int port = client.redirectPort;
-		    client = createDummyClient(user);
-		    client.connect(port);
-		    if (!client.login()) {
-			failed = true;
-			System.err.println("login for user: " + user +
-					   " redirected twice");
+		if (client.login()) {
+		    if (client.getConnectPort() != serverAppPort) {
+			// login redirected
+			redirectCount++;
 		    }
+		} else {
+		    failed = true;
+		    System.err.println("login for user: " + user + " failed");
 		}
 		clients.add(client);
 	    }
