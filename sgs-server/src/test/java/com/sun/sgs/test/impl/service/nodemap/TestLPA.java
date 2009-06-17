@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
@@ -32,6 +33,7 @@ import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Graphs;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import org.junit.runner.RunWith;
 
 import org.junit.Assert;
@@ -71,7 +73,7 @@ public class TestLPA {
     public static void warmup() {
         // Warm up the compilers
         LabelPropagation lpa =
-                new LabelPropagation(new TestGraphBuilder(), true, false);
+                new LabelPropagation(new TestZachBuilder(), true, false);
 
         for (int i = 0; i < 100; i++) {
             lpa.findCommunities();
@@ -80,7 +82,7 @@ public class TestLPA {
 
     @Test
     public void testZachary() {
-        GraphBuilder builder = new TestGraphBuilder();
+        GraphBuilder builder = new TestZachBuilder();
         LabelPropagation lpa =
                 new LabelPropagation(builder, checkConverge, includeSelf);
         
@@ -96,21 +98,62 @@ public class TestLPA {
         }
         String con = checkConverge ? "checkConverge" : "noChange";
         String self = includeSelf ? "includeSelf" : "noSelf";
-        System.out.printf("XXX (%s, %s, %d runs): avg time : %4.2f ms, avg iters : %4.2f, " +
-                          " avg modularity: %.4f %n",
+        System.out.printf("XXX (%s, %s, %d runs): avg time : %4.2f ms, " +
+                          " avg iters : %4.2f, avg modularity: %.4f %n",
                           con, self, RUNS,
                           avgTime/(double) RUNS,
                           avgIter/(double) RUNS,
                           avgMod/(double) RUNS);
     }
 
+    // Really only needs to be run once.  Need to figure out where
+    // the modularity calculation really belongs.
+    @Test
+    public void testToyModularity() {
+        GraphBuilder builder = new TestToyBuilder();
+
+        Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
+        AffinityGroupImpl a = new AffinityGroupImpl();
+        a.addIdentity(new DummyIdentity("1"));
+        a.addIdentity(new DummyIdentity("2"));
+        a.addIdentity(new DummyIdentity("3"));
+        groups.add(a);
+        AffinityGroupImpl b = new AffinityGroupImpl();
+        b.addIdentity(new DummyIdentity("4"));
+        b.addIdentity(new DummyIdentity("5"));
+        groups.add(b);
+
+        double modularity =
+            LabelPropagation.calcModularity(builder.getAffinityGraph(), groups);
+        Assert.assertEquals(0.22, modularity, .001);
+
+        Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
+        a = new AffinityGroupImpl();
+        a.addIdentity(new DummyIdentity("1"));
+        a.addIdentity(new DummyIdentity("3"));
+        group1.add(a);
+        b = new AffinityGroupImpl();
+        b.addIdentity(new DummyIdentity("2"));
+        b.addIdentity(new DummyIdentity("4"));
+        b.addIdentity(new DummyIdentity("5"));
+        group1.add(b);
+
+        modularity =
+            LabelPropagation.calcModularity(builder.getAffinityGraph(), group1);
+        Assert.assertEquals(0.08, modularity, .001);
+
+        // JANE need to test with graph with weighted edges!
+    }
+
+
     /**
-     * A graph builder that returns a pre-made graph.
+     * A graph builder that returns a pre-made graph for the Zachary karate
+     * club network.
      */
-    private static class TestGraphBuilder implements GraphBuilder {
+    private static class TestZachBuilder implements GraphBuilder {
         private final Graph<Identity, WeightedEdge> graph;
 
-        public TestGraphBuilder() {
+        public TestZachBuilder() {
             graph = new UndirectedSparseMultigraph<Identity, WeightedEdge> ();
 
             // Create a graph for the Zachary network:
@@ -205,6 +248,47 @@ public class TestLPA {
 
             Assert.assertEquals(34, graph.getVertexCount());
             Assert.assertEquals(78, graph.getEdgeCount());
+        }
+
+        /** {@inheritDoc} */
+        public Graph<Identity, WeightedEdge> getAffinityGraph() {
+            return Graphs.unmodifiableGraph(graph);
+        }
+        /** {@inheritDoc} */
+        public Runnable getPruneTask() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+        /** {@inheritDoc} */
+        public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+            return;
+        }
+    }
+
+    /**
+     * A graph builder that returns a pre-made graph for a very simple toy
+     * graph.
+     */
+    private static class TestToyBuilder implements GraphBuilder {
+        private final Graph<Identity, WeightedEdge> graph;
+
+        public TestToyBuilder() {
+            graph = new UndirectedSparseMultigraph<Identity, WeightedEdge> ();
+
+            Identity[] nodes = new Identity[6];
+            for (int i = 1; i < nodes.length; i++) {
+                // Add identities 1-5
+                nodes[i] = new DummyIdentity(String.valueOf(i));
+                graph.addVertex(nodes[i]);
+            }
+
+            graph.addEdge(new WeightedEdge(), nodes[1], nodes[2]);
+            graph.addEdge(new WeightedEdge(), nodes[1], nodes[3]);
+            graph.addEdge(new WeightedEdge(), nodes[2], nodes[3]);
+            graph.addEdge(new WeightedEdge(), nodes[2], nodes[4]);
+            graph.addEdge(new WeightedEdge(), nodes[4], nodes[5]);
+
+            Assert.assertEquals(5, graph.getVertexCount());
+            Assert.assertEquals(5, graph.getEdgeCount());
         }
 
         /** {@inheritDoc} */

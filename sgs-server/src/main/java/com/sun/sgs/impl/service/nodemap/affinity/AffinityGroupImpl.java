@@ -45,7 +45,7 @@ public class AffinityGroupImpl implements AffinityGroup {
         return Collections.unmodifiableSet(identities);
     }
 
-    void addIdentity(Identity id) {
+    public void addIdentity(Identity id) {
         identities.add(id);
     }
 

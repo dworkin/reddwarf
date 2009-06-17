@@ -37,6 +37,10 @@ import java.util.TreeMap;
 
 /**
  *  Initial implementation of label propagation algorithm for a single node.
+ * <p>
+ * An implementation of the algorithm presented in
+ * "Near linear time algorithm to detect community structures in large-scale
+ * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
  * 
  */
 public class LabelPropagation {
@@ -326,6 +330,7 @@ public class LabelPropagation {
             System.out.println(" ");
         }
     }
+    
     // This doesn't belong here, it doesn't apply to any particular
     // algorithm for finding affinity groups.
     /**
@@ -353,43 +358,44 @@ public class LabelPropagation {
         // For each pair of vertices that are in the same community,
         // compute 1/(2m) * Sum(Aij - Pij), where Pij is kikj/2m.
         // See equation (18) in Newman's paper.
+        // Note also that modularity can be expressed as
+        // Sum(eii - ai*ai) where eii is the fraction of edges in the group
+        // and ai*ai is the expected fraction of edges in the group.
+        // See Raghavan paper (JANE also other earlier refs?)
         double q = 0;
-        for (AffinityGroup g : groups) {
-            // Look at all pairs in the community, which will be the i's and j's
+
+        for (AffinityGroup g : groups) {  
+            // value is weighted edge count within the community           
+            long value = 0;
+            // totEdges is the total number of connections for this community
+            long totEdges = 0;
+            
             ArrayList<Identity> groupList =
                     new ArrayList<Identity>(g.getIdentities());
+            for (Identity id : groupList) {
+                for (WeightedEdge edge : graph.getIncidentEdges(id)) {
+                    totEdges = totEdges + edge.getWeight();
+                }
+            }
+            // Look at each of the pairs in the community to find the number
+            // of edges within
             while (!groupList.isEmpty()) {
-                // Get the first identity off the list
+                // Get the first identity
                 Identity v1 = groupList.remove(0);
                 for (Identity v2 : groupList) {
                     Collection<WeightedEdge> edges = graph.findEdgeSet(v1, v2);
-                    // Calculate Aij, the adjacency info for v1 and v2
+                    // Calculate the adjacency info for v1 and v2
                     // We allow parallel, weighted edges
-                    long value = 0;
                     for (WeightedEdge edge : edges) {
-                        value = value + edge.getWeight();
+                        value = value + (edge.getWeight() * 2);
                     }
-
-                    // Calculate Pij, the probability of there being an
-                    // edge between v1 and v2.
-                    long prob = 0;
-                    // ki
-                    for (WeightedEdge edge : graph.getIncidentEdges(v1)) {
-                        prob = prob + edge.getWeight();
-                    }
-                    // kj
-                    for (WeightedEdge edge : graph.getIncidentEdges(v2)) {
-                        prob = prob + edge.getWeight();
-                    }
-
-                    q = q + (value - (prob / doublem));
                 }
             }
-        }
 
-        // JANE do I need to divide by m or double m here?  I'm only calculating
-        // half the graph.
-        return q / doublem;
+            double tmp = (double) totEdges / doublem;
+            q = q + (((double) value / doublem) - (tmp * tmp));
+        }
+        return q;
     }
 
     private static class LabelNode {
