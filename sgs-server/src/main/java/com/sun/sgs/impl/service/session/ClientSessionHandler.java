@@ -304,7 +304,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @return	{@code true} if this handler is connected
      */
-    boolean isConnected() {
+    private boolean isConnected() {
 
 	State currentState = getCurrentState();
 	return
@@ -614,7 +614,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * is invoked when a login is redirected and also when this client
      * session is disconnected.
      */
-    void deactivateIdentity() {
+    private void deactivateIdentity() {
 	try {
 	    /*
 	     * Set identity's status for this class to 'false'.
