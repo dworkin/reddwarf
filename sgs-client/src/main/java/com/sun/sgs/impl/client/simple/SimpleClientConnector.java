@@ -167,7 +167,7 @@ class SimpleClientConnector extends ClientConnector {
 	 */
 	ConnectWatchdogThread(ClientConnectionListener listener) {
 	    super("ConnectWatchdogThread-" +
-		  connector.getEndpoint().toString());
+                  connector.getEndpoint().toString());
 	    this.listener = listener;
 	    setDaemon(true);
 	}
@@ -203,7 +203,7 @@ class SimpleClientConnector extends ClientConnector {
 			}
 		    }
 		}
-	    } catch (Exception e) {
+	    } catch (RuntimeException e) {
 		// TBD: log exception
 	    }
 	}

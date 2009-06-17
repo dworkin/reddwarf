@@ -345,8 +345,9 @@ public class HelloUserClient extends JFrame
      * Encodes the string entered by the user and sends it to the server.
      */
     public void actionPerformed(ActionEvent event) {
-        if (! simpleClient.isConnected())
+        if (!simpleClient.isConnected()) {
             return;
+        }
 
         String text = getInputText();
         send(text);

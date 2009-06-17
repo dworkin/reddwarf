@@ -320,10 +320,10 @@ public class SimpleClient implements ServerSession {
         private volatile boolean redirect = false;
 
         /**
-         *  Store the login failure message sent by the server. This will be
+         * Store the login failure message sent by the server. This will be
          * held until the disconnection from the server is confirmed by a call
-         * to disconnected, at which point the application's loginFailure callback
-         * will be called with this string as the reason.
+         * to disconnected, at which point the application's loginFailure
+         * callback will be called with this string as the reason.
          */
          private volatile String loginFailureMsg;
 

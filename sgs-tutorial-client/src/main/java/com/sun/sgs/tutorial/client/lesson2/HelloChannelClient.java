@@ -135,8 +135,9 @@ public class HelloChannelClient extends HelloUserClient
      */
     @Override
     public void actionPerformed(ActionEvent event) {
-        if (! simpleClient.isConnected())
+        if (!simpleClient.isConnected()) {
             return;
+        }
 
         String text = getInputText();
         String channelName =

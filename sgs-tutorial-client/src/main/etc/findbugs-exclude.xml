@@ -1,0 +1,24 @@
+<!-- This file specifies a findbugs filter for excluding reports that
+     should not be considered errors.
+
+     The format of this file is documented at:
+
+       http://findbugs.sourceforge.net/manual/filter.html
+
+     When possible, please specify the full names of the bug codes,
+     using the pattern attribute, to make it clearer what reports are
+     being suppressed.  You can find a listing of codes at:
+
+       http://findbugs.sourceforge.net/bugDescriptions.html
+  -->
+
+<FindBugsFilter>
+
+  <!-- Not concerned with serializing Swing components -->
+  <Match>
+    <Class name="com.sun.sgs.tutorial.client.lesson1.HelloUserClient"/>
+    <Field name="simpleClient"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+</FindBugsFilter>
