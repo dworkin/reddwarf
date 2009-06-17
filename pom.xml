@@ -15,9 +15,9 @@
     It defines settings common to all projects
   </description>
 
-  <!-- Require at least Maven version 2.0.9 to build -->
+  <!-- Require minimum Maven version to build -->
   <prerequisites>
-    <maven>2.0.9</maven>
+    <maven>${maven.require.version}</maven>
   </prerequisites>
 
   <build>
@@ -277,6 +277,20 @@
 	 enabled and configured as shown unless they override those
 	 settings -->
     <plugins>
+
+      <!-- Configure checkstyle to have custom dependency -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<version>${maven-checkstyle-plugin.version}</version>
+	<dependencies>
+	  <dependency>
+	    <groupId>com.projectdarkstar.tools.build</groupId>
+	    <artifactId>sgs-build-utilities</artifactId>
+	    <version>${sgs-build-utilities.version}</version>
+	  </dependency>
+	</dependencies>
+      </plugin>
       
       <!-- Global compiler configuration -->
       <plugin>
@@ -287,6 +301,29 @@
 	  <source>1.5</source>
 	  <target>1.5</target>
 	</configuration>
+      </plugin>
+
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-enforcer-plugin</artifactId>
+	<executions>
+          <execution>
+            <id>enforce-versions</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+	    <configuration>
+	      <rules>
+		<requireMavenVersion>
+		  <version>${maven.require.version}</version>
+		</requireMavenVersion>
+		<requirePluginVersions>
+		  <message>Always define plugin version numbers!</message>
+		</requirePluginVersions>
+	      </rules>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
       <!-- Global manifest generation configuration -->
@@ -306,43 +343,6 @@
             </manifest>
           </archive>
         </configuration>
-      </plugin>
-
-      <!-- Configure checkstyle to have custom dependency -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-	<version>${maven-checkstyle-plugin.version}</version>
-	<dependencies>
-	  <dependency>
-	    <groupId>com.projectdarkstar.tools.build</groupId>
-	    <artifactId>sgs-build-utilities</artifactId>
-	    <version>${sgs-build-utilities.version}</version>
-	  </dependency>
-	</dependencies>
-      </plugin>
-
-      <plugin>
-	<groupId>org.apache.maven.plugins</groupId>
-	<artifactId>maven-enforcer-plugin</artifactId>
-	<executions>
-          <execution>
-            <id>enforce-versions</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-	    <configuration>
-	      <rules>
-		<requireMavenVersion>
-		  <version>2.0.9</version>
-		</requireMavenVersion>
-		<requirePluginVersions>
-		  <message>Always define plugin version numbers!</message>
-		</requirePluginVersions>
-	      </rules>
-	    </configuration>
-	  </execution>
-	</executions>
       </plugin>
 
     </plugins>
@@ -478,6 +478,7 @@
     <sgs-jar-resources-gpl-classpath.version>1.0</sgs-jar-resources-gpl-classpath.version>
     <sgs-jar-resources-bsd.version>1.1</sgs-jar-resources-bsd.version>
 
+    <!-- Versions for org.apache.maven.plugins listed in alphabetical order -->
     <maven-antrun-plugin.version>1.3</maven-antrun-plugin.version>
     <maven-assembly-plugin.version>2.2-beta-2</maven-assembly-plugin.version>
     <maven-clean-plugin.version>2.3</maven-clean-plugin.version>
@@ -496,11 +497,14 @@
     <maven-source-plugin.version>2.1</maven-source-plugin.version>
     <maven-surefire-plugin.version>2.4.3</maven-surefire-plugin.version>
 
+    <!-- Versions for com.google.code plugins listed in alphabetical order -->
     <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
 
+    <!-- Versions for org.codehaus.mojo plugins listed in alphabetical order -->
     <build-helper-maven-plugin.version>1.3</build-helper-maven-plugin.version>
     <buildnumber-maven-plugin.version>1.0-beta-2</buildnumber-maven-plugin.version>
 
+    <!-- Versions for reporting plugins -->
     <maven-checkstyle-plugin.version>2.2</maven-checkstyle-plugin.version>
     <findbugs-maven-plugin.version>2.0.1</findbugs-maven-plugin.version>
 
@@ -530,6 +534,8 @@
     <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
     <test.output.hide>true</test.output.hide>
     <test.bdb.cache.size>1000000</test.bdb.cache.size>
+
+    <maven.require.version>2.0.9</maven.require.version>
 
   </properties>
 
