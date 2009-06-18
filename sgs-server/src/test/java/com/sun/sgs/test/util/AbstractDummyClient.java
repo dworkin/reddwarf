@@ -148,7 +148,7 @@ public abstract class AbstractDummyClient extends Assert {
      */
     protected void checkLoggedIn() {
 	synchronized (lock) {
-	    if (!connected || !loginSuccess) {
+	    if (!(connected && (loginSuccess || relocateSuccess ))) {
 		throw new RuntimeException(
 		    toString() + " not connected or loggedIn");
 	    }
@@ -256,24 +256,65 @@ public abstract class AbstractDummyClient extends Assert {
     }
     
     /**
-     * Sends a RELOCATE_REQUEST message to the local host on {@code
-     * newPort}.  If {@code useValidKey} is {@code true}, the current
-     * relocation key is used in the relocate request.  This method waits
-     * for an acknowledgment (either RELOCATE_SUCCESS or
-     * RELOCATE_FAILURE).  If {@code shouldSucceed} is {@code true} and a
-     * RELOCATE_FAILURE is received, this method throws an {@code
-     * AssertionError}; similarly if {@code shouldSucceed} is {@code false}
-     * and a RELOCATE_SUCCESS is received, an {@code AssertionError} will
-     * be thrown.
+     * Waits for this client to receive a RELOCATE_NOTIFICATION message.
+     * Throws {@code AssertionError} if the notification is not received
+     * before the timeout period, or if {@code expectedPort} is non-zero
+     * and does not match the relocation port specified in the received
+     * RELOCATE_NOTIFICATION.
      */
-    public void relocate(int newPort, boolean useValidKey,
+    public void waitForRelocationNotification(int expectedPort) {
+	System.err.println(toString() +
+			   " waiting for relocation notification...");
+	synchronized (lock) {
+	    try {
+		if (relocateSession == false) {
+		    lock.wait(WAIT_TIME);
+		}
+		if (relocateSession != true) {
+		    fail(toString() + " relocate notification timed out");
+		}
+		if (expectedPort != 0) {
+		    assertEquals(expectedPort, relocatePort);
+		}
+	    } catch (InterruptedException e) {
+		fail(toString() + " relocated timed out: " + e.toString());
+	    }
+	}
+    }
+
+    /**
+     * Relocates this client's connection, if the server has instructed it
+     * to do so via a RELOCATE_NOTIFICATION. <p>
+     *
+     * If this client has not yet received a RELOCATE_NOTIFICATION, it first
+     * waits until one is received or the timeout expires, which ever comes
+     * first.  If a RELOCATE_NOTIFICATION is not received or if the
+     * specified {@code expectedPort} is non-zero and does not match the
+     * relocation port, then {@code AssertionError} is thrown. <p>
+     *
+     * If a RELOCATE_NOTIFICATION is correctly received, then this method
+     * sends a RELOCATE_REQUEST message to the local host on the relocation
+     * port received by a RELOCATE_NOTIFICATION. If {@code useValidKey} is
+     * {@code true}, the current valid relocation key is used in the
+     * relocate request, otherwise an invalid relocation key is used. <p>
+     *
+     * This method waits for an acknowledgment (either RELOCATE_SUCCESS or
+     * RELOCATE_FAILURE).  If {@code shouldSucceed} is {@code true} and a
+     * RELOCATE_FAILURE is received, this method throws {@code
+     * AssertionError}; similarly if {@code shouldSucceed} is {@code false}
+     * and a RELOCATE_SUCCESS is received, {@code AssertionError} will be
+     * thrown.
+     */
+    public void relocate(int expectedPort, boolean useValidKey,
 			 boolean shouldSucceed)
     {
 	synchronized (lock) {
 	    if (!relocateSession) {
-		waitForRelocationNotification(newPort);
+		waitForRelocationNotification(expectedPort);
 	    } else {
-		assertEquals(newPort, relocatePort);
+		if (expectedPort != 0) {
+		    assertEquals(expectedPort, relocatePort);
+		}
 	    }
 	}
 	System.err.println(toString() + " relocating...");
@@ -311,32 +352,6 @@ public abstract class AbstractDummyClient extends Assert {
 	    } catch (InterruptedException e) {
 		throw new RuntimeException(
 		    toString() + " relocate timed out", e);
-	    }
-	}
-    }
-
-    /**
-     * Waits for this client to receive a RELOCATE_NOTIFICATION message.
-     * Throws a RuntimeException if the notification is not received
-     * before the timeout period, or if the relocation port specified
-     * in the notification does not match the specified {@code newPort}.
-     */
-    public void waitForRelocationNotification(int newPort) {
-	System.err.println(toString() +
-			   " waiting for relocation notification...");
-	synchronized (lock) {
-	    try {
-		if (relocateSession == false) {
-		    lock.wait(WAIT_TIME);
-		}
-		if (relocateSession != true) {
-		    throw new RuntimeException(
-			toString() + " relocate notification timed out");
-		}
-		assertEquals(newPort, relocatePort);
-	    } catch (InterruptedException e) {
-		throw new RuntimeException(
-		    toString() + " relocated timed out", e);
 	    }
 	}
     }

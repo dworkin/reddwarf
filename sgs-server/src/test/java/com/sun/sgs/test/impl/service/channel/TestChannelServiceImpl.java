@@ -36,6 +36,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
+import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -171,6 +172,8 @@ public class TestChannelServiceImpl extends TestCase {
                                              DummyAppListener.class);
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
+			  DirectiveNodeAssignmentPolicy.class.getName());
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 	port = serverNode.getAppPort();
@@ -222,13 +225,15 @@ public class TestChannelServiceImpl extends TestCase {
         for (String host : hosts) {
 	    Properties props = SgsTestNode.getDefaultProperties(
 	        APP_NAME, serverNode, DummyAppListener.class);
+	    props.setProperty(StandardProperties.AUTHENTICATORS, 
+                "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
 	    additionalNodes.put(host, node);
         }
     }
-
+    /*
     // -- Test constructor -- 
 
     public void testConstructorNullProperties() throws Exception {
@@ -1608,6 +1613,38 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
     }
+    */
+    
+    // -- Relocation test cases
+
+    public void testChannelJoinAndRelocate() throws Exception {
+	String name = "dummy";
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	String newNodeHost = "newNode";
+	List<String> users = new ArrayList<String>();
+	users.add(name);
+	addNodes(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	try {
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
+	    createChannel(channelName);
+	    joinUsers(channelName, users);
+	    checkUsersJoined(channelName, users);
+	    printServiceBindings("before relocate");
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    System.err.println("reassigning identity:" + name +
+			       " from server node to host: " +
+			       newNodeHost);
+	    DirectiveNodeAssignmentPolicy.instance.
+		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	    client.relocate(0, true, true);
+	    checkUsersJoined(channelName, users);
+	    printServiceBindings("after relocate");
+	} finally {
+	    client.disconnect();
+	}
+    }
 
     // -- END TEST CASES --
 
@@ -2112,6 +2149,10 @@ public class TestChannelServiceImpl extends TestCase {
 	@Override
 	public void sendMessage(byte[] message) {
 	    checkLoggedIn();
+
+	    if (message.length == 0) {
+		return;
+	    }
 
 	    MessageBuffer buf =
 		new MessageBuffer(1 + message.length);
