@@ -545,7 +545,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         profileReport.finish();
         
         // queue up the report to be reported to our listeners
-        queue.offer(profileReport);
+        if (!queue.offer(profileReport)) {
+            logger.log(Level.FINE, "ProfileCollector queue is full");
+        }
         
         // Update the task aggregate data 
         boolean trans = profileReport.wasTaskTransactional();

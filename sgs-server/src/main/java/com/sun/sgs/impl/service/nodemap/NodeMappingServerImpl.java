@@ -1034,7 +1034,9 @@ public final class NodeMappingServerImpl
                             removeQueue.add(new RemoveInfo(id));
                             break;
                         }
-                    }                
+                    } else {
+                        break;
+                    }
                 } catch (Exception ex) {
                     logger.logThrow(Level.WARNING, ex, 
                         "Failed to move identity {0} from failed node {1}", 
