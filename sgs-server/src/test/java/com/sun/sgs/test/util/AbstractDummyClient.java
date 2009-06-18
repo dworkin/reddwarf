@@ -28,12 +28,10 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.junit.Assert;
@@ -41,30 +39,26 @@ import org.junit.Assert;
 /**
  * Dummy client code for testing purposes.
  */
-public class DummyClient extends Assert {
+public abstract class AbstractDummyClient extends Assert {
     
     private static final int WAIT_TIME = 5000;
-    private final Map<BigInteger, DummyClient> dummyClients;
 	
     public final String name;
     private String password;
     private Connector<SocketAddress> connector;
     private Listener listener;
     private Connection connection;
-    private int connectPort = 0;
+    private volatile int connectPort = 0;
     private boolean connected = false;
     private final Object lock = new Object();
-    private final Object disconnectedCallbackLock = new Object();
     private boolean loginAck = false;
     private boolean loginSuccess = false;
     private boolean loginRedirect = false;
     private boolean logoutAck = false;
-    private boolean awaitGraceful = false;
-    private boolean awaitLoginFailure = false;
     private String reason;
     private String redirectHost;
     public int redirectPort;
-    private byte[] reconnectKey = new byte[0];
+    protected volatile byte[] reconnectKey = new byte[0];
 
     private boolean relocateSession;
     private String relocateHost;
@@ -73,24 +67,26 @@ public class DummyClient extends Assert {
     private boolean relocateAck;
     private boolean relocateSuccess;
     private boolean relocateMessage;
-    private int messagesReceivedDuringRelocation = 0;
 	
-    private volatile boolean receivedDisconnectedCallback = false;
-    private volatile boolean graceful = false;
 	
     public volatile int expectedMessages0;
     // Messages received by this client's associated ClientSessionListener
     public Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
-	
+    private int messagesReceivedDuringRelocation = 0;
 
-    public DummyClient(String name,
-		       Map<BigInteger, DummyClient> dummyClients)
-    {
+    private final Queue<byte[]> clientReceivedMessages =
+	new ConcurrentLinkedQueue<byte[]>();
+
+    /** Constructs an instance with the given {@code name}. */
+    public AbstractDummyClient(String name) {
 	this.name = name;
-	this.dummyClients = dummyClients;
     }
 
-    public DummyClient connect(int port) {
+    /**
+     * Connects this client to the given {@code port} and returns this
+     * instance.
+     */
+    public AbstractDummyClient connect(int port) {
 	connectPort = port;
 	connected = false;
 	listener = new Listener();
@@ -124,6 +120,28 @@ public class DummyClient extends Assert {
     }
 
     /**
+     * Returns {@code true} if this client is connected.
+     */
+    public boolean isConnected() {
+	synchronized (lock) {
+	    return connected;
+	}
+    }
+
+    /**
+     * Throws a {@code RuntimeException} if this session is not
+     * logged in.
+     */
+    protected void checkLoggedIn() {
+	synchronized (lock) {
+	    if (!connected || !loginSuccess) {
+		throw new RuntimeException(
+		    toString() + " not connected or loggedIn");
+	    }
+	}
+    }
+
+    /**
      * Returns the port last specified for the {@link #connect connect}
      * method.
      */
@@ -131,6 +149,19 @@ public class DummyClient extends Assert {
 	return connectPort;
     }
 
+    /**
+     * Returns the redirect port.
+     */
+    public int getRedirectPort() {
+	synchronized (lock) {
+	    return redirectPort;
+	}
+    }
+    
+    /**
+     * Disconnects this client, and returns either when the connection
+     * is closed or the timeout expires, which ever comes first.
+     */
     public void disconnect() {
 	System.err.println(toString() + " disconnecting");
 
@@ -152,34 +183,17 @@ public class DummyClient extends Assert {
 	}
     }
 
-    void reset() {
+    /**
+     * Resets the connection state so that the client can connect and
+     * login again.
+     */
+    private void reset() {
 	assert Thread.holdsLock(lock);
 	connected = false;
 	connection = null;
 	loginAck = false;
 	loginSuccess = false;
 	loginRedirect = false;
-    }
-
-    public void setDisconnectedCallbackInvoked(boolean graceful) {
-	receivedDisconnectedCallback = true;
-	this.graceful = graceful;
-	synchronized (disconnectedCallbackLock) {
-	    disconnectedCallbackLock.notifyAll();
-	}
-    }
-
-    public void assertDisconnectedCallbackInvoked(boolean graceful) {
-	synchronized (disconnectedCallbackLock) {
-	    assertTrue(receivedDisconnectedCallback);
-	    assertEquals(this.graceful, graceful);
-	}
-    }
-
-    public void assertDisconnectedCallbackNotInvoked() {
-	synchronized (disconnectedCallbackLock) {
-	    assertFalse(receivedDisconnectedCallback);
-	}
     }
 
     /**
@@ -267,10 +281,32 @@ public class DummyClient extends Assert {
 	}
     }
 
+    /**
+     * Returns {@code true} if the login is redirected, otherwise returns
+     * {@code false}.
+     */
     public boolean isLoginRedirected() {
 	return loginRedirect;
     }
+
+    /**
+     * Notifies this client that it logged in or relocated and a new
+     * reconnect key is granted.
+     */
+    protected void newReconnectKey(byte[] reconnectKey) {
+    }
     
+    /**
+     * Sends a RELOCATE_REQUEST message to the local host on {@code
+     * newPort}.  If {@code useValidKey} is {@code true}, the current
+     * relocation key is used in the relocate request.  This method waits
+     * for an acknowledgment (either RELOCATE_SUCCESS or
+     * RELOCATE_FAILURE).  If {@code shouldSucceed} is {@code true} and a
+     * RELOCATE_FAILURE is received, this method throws an {@code
+     * AssertionError}; similarly if {@code shouldSucceed} is {@code false}
+     * and a RELOCATE_SUCCESS is received, an {@code AssertionError} will
+     * be thrown.
+     */
     public void relocate(int newPort, boolean useValidKey,
 			 boolean shouldSucceed)
     {
@@ -348,32 +384,21 @@ public class DummyClient extends Assert {
     }
 
     /**
-     * Throws a {@code RuntimeException} if this session is not
-     * logged in.
-     */
-    private void checkLoggedIn() {
-	synchronized (lock) {
-	    if (!connected || !loginSuccess) {
-		throw new RuntimeException(
-		    toString() + " not connected or loggedIn");
-	    }
-	}
-    }
-
-    /**
      * Sends a SESSION_MESSAGE with the specified content.
      */
-    public void sendMessage(byte[] message) {
-	MessageBuffer buf =
-	    new MessageBuffer(5 + reconnectKey.length + message.length);
-	buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-	    putByteArray(reconnectKey).
-	    putByteArray(message);
+    public abstract void sendMessage(byte[] message);
+
+    /**
+     * Writes the specified {@code bytes} directly to the underlying
+     * connection.
+     */
+    protected void sendRaw(byte[] bytes) {
 	try {
-	    connection.sendBytes(buf.getBuffer());
+	    connection.sendBytes(bytes);
 	} catch (IOException e) {
 	    throw new RuntimeException(e);
 	}
+	
     }
 
     /**
@@ -402,8 +427,6 @@ public class DummyClient extends Assert {
     public Queue<byte[]>
 	waitForClientToReceiveExpectedMessages(int expectedMessages)
     {
-	Queue<byte[]> clientReceivedMessages =
-	    listener.getClientReceivedMessages();
 	waitForExpectedMessages(clientReceivedMessages, expectedMessages);
 	return clientReceivedMessages;
     }
@@ -460,7 +483,6 @@ public class DummyClient extends Assert {
 		return;
 	    }
 	    logoutAck = false;
-	    awaitGraceful = true;
 	}
 	MessageBuffer buf = new MessageBuffer(1);
 	buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
@@ -488,29 +510,6 @@ public class DummyClient extends Assert {
 	}
     }
 
-    public void checkDisconnectedCallback(boolean graceful)
-	throws Exception
-    {
-	synchronized (disconnectedCallbackLock) {
-	    if (!receivedDisconnectedCallback) {
-		disconnectedCallbackLock.wait(WAIT_TIME);
-	    }
-	}
-	if (!receivedDisconnectedCallback) {
-	    fail(toString() + " disconnected callback not invoked");
-	} else if (this.graceful != graceful) {
-	    fail(toString() + " graceful was: " + this.graceful +
-		 ", expected: " + graceful);
-	}
-	System.err.println(toString() + " disconnect successful");
-    }
-
-    public boolean isConnected() {
-	synchronized (lock) {
-	    return connected;
-	}
-    }
-
     // Returns true if disconnect occurred.
     public boolean waitForDisconnect() {
 	synchronized (lock) {
@@ -524,20 +523,38 @@ public class DummyClient extends Assert {
 	}
     }
 
+    /**
+     * Gives a subclass a chance to handle an opCode that isn't
+     * processed by this client implementation.
+     */
+    protected void handleOpCode(byte opcode, MessageBuffer buf) {
+	switch (opcode) {
+	    
+	case SimpleSgsProtocol.SESSION_MESSAGE:
+	    byte[] message = buf.getBytes(buf.limit() - buf.position());
+	    synchronized (clientReceivedMessages) {
+		clientReceivedMessages.add(message);
+		System.err.println(
+		    toString() + " received SESSION_MESSAGE: " +
+		    HexDumper.toHexString(message));
+		if (clientReceivedMessages.size() == expectedMessages0) {
+		    clientReceivedMessages.notifyAll();
+		}
+	    }
+	    break;
+	    
+	default:
+	    System.err.println("unknown op code: " + opcode);
+	    break;
+	}
+    }
+
     public String toString() {
 	return "[" + name + "]";
     }
 	
     private class Listener implements ConnectionListener {
 
-	final Queue<byte[]> clientReceivedMessages =
-	    new ConcurrentLinkedQueue<byte[]>();
-
-	Queue<byte[]> getClientReceivedMessages() {
-	    return clientReceivedMessages;
-	}
-
-	    
 	/** {@inheritDoc} */
 	public void bytesReceived(Connection conn, byte[] buffer) {
 	    if (connection != conn) {
@@ -555,8 +572,7 @@ public class DummyClient extends Assert {
 
 	    case SimpleSgsProtocol.LOGIN_SUCCESS:
 		reconnectKey = buf.getBytes(buf.limit() - buf.position());
-		dummyClients.put(
-		    new BigInteger(1, reconnectKey), DummyClient.this);
+		newReconnectKey(reconnectKey);
 		synchronized (lock) {
 		    loginAck = true;
 		    loginSuccess = true;
@@ -606,8 +622,7 @@ public class DummyClient extends Assert {
 
 	    case SimpleSgsProtocol.RELOCATE_SUCCESS:
 		reconnectKey = buf.getBytes(buf.limit() - buf.position());
-		dummyClients.put(new BigInteger(1, reconnectKey),
-				 DummyClient.this);
+		newReconnectKey(reconnectKey);
 		synchronized (lock) {
 		    relocateAck = true;
 		    relocateSuccess = true;
@@ -638,33 +653,11 @@ public class DummyClient extends Assert {
 		}
 		break;
 
-	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		byte[] message = buf.getBytes(buf.limit() - buf.position());
-		synchronized (clientReceivedMessages) {
-		    clientReceivedMessages.add(message);
-		    System.err.println(
-			"[" + name + "] received SESSION_MESSAGE: " +
-			HexDumper.toHexString(message));
-		    if (clientReceivedMessages.size() == expectedMessages0) {
-			clientReceivedMessages.notifyAll();
-		    }
-		}
-		break;
-
 	    default:
-
-		System.err.println("bytesReceived: unknown op code: " + opcode);
+		handleOpCode(opcode, buf);
 		break;
 	    }
 	}
-
-	/**
-	 * Gives a subclass a chance to handle an opCode that isn't
-	 * processed by this client implementation.
-	 */
-	protected void unhandledOpCode(byte opcode, MessageBuffer buf) {
-	}
-
 
 	/** {@inheritDoc} */
 	public void connected(Connection conn) {
