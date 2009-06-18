@@ -398,6 +398,76 @@ public class LabelPropagation {
         return q;
     }
 
+    /**
+     * Calculates Jaccard's index for a pair of affinity groups, which is
+     * a measurement of similarity.  The value will be between {@code 0.0}
+     * and {@code 1.0}, with higher values indicating stronger similarity
+     * between two samples.
+     *
+     * @param sample1 the first sample
+     * @param sample2 the second sample
+     * @return the Jaccard index, a value between {@code 0.0} and {@code 1.0},
+     *    with higer values indicating more similarity
+     */
+    public static double calcJaccard(Collection<AffinityGroup> sample1,
+                                     Collection<AffinityGroup> sample2)
+    {
+        // a is number of pairs of identities in same affinity group
+        //    in both samples
+        // b is number of pairs that are in the same affinity gruop
+        //    in the first sample only
+        // c is the number of pairs that in the same affinity group
+        //    in the second sample only
+        long a = 0;
+        long b = 0;
+        long c = 0;
+        for (AffinityGroup group : sample1) {
+            ArrayList<Identity> groupList =
+                    new ArrayList<Identity>(group.getIdentities());
+            while (!groupList.isEmpty()) {
+                Identity v1 = groupList.remove(0);
+                for (Identity v2: groupList) {
+                    // v1 and v2 are in the same group in sample1.  Are they
+                    // in the same group in sample2?
+                    if (inSameGroup(v1, v2, sample2)) {
+                        a++;
+                    } else {
+                        b++;
+                    }
+                }
+            }
+        }
+        for (AffinityGroup group : sample2) {
+            ArrayList<Identity> groupList =
+                    new ArrayList<Identity>(group.getIdentities());
+            while (!groupList.isEmpty()) {
+                Identity v1 = groupList.remove(0);
+                for (Identity v2: groupList) {
+                    // v1 and v2 are in the same group in sample2.  Count those
+                    // that are not in the same group in sample1.
+                    if (!inSameGroup(v1, v2, sample1)) {
+                        c++;
+                    }
+                }
+            }
+        }
+
+        // Jaccard's index (or coefficient) is defined as a/(a+b+c).
+        return ((double) a / (double) (a + b + c));
+    }
+
+    private static boolean inSameGroup(Identity id1, Identity id2,
+                                       Collection<AffinityGroup> group)
+    {
+        for (AffinityGroup g : group) {
+            Set<Identity> idents = g.getIdentities();
+            if (idents.contains(id1) && idents.contains(id2)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static class LabelNode {
         Identity id;
         Identity label;

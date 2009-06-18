@@ -112,37 +112,41 @@ public class TestLPA {
     public void testToyModularity() {
         GraphBuilder builder = new TestToyBuilder();
 
-        Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
+        Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         AffinityGroupImpl a = new AffinityGroupImpl();
         a.addIdentity(new DummyIdentity("1"));
         a.addIdentity(new DummyIdentity("2"));
         a.addIdentity(new DummyIdentity("3"));
-        groups.add(a);
-        AffinityGroupImpl b = new AffinityGroupImpl();
-        b.addIdentity(new DummyIdentity("4"));
-        b.addIdentity(new DummyIdentity("5"));
-        groups.add(b);
-
-        double modularity =
-            LabelPropagation.calcModularity(builder.getAffinityGraph(), groups);
-        Assert.assertEquals(0.22, modularity, .001);
-
-        Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
-        a = new AffinityGroupImpl();
-        a.addIdentity(new DummyIdentity("1"));
-        a.addIdentity(new DummyIdentity("3"));
         group1.add(a);
-        b = new AffinityGroupImpl();
-        b.addIdentity(new DummyIdentity("2"));
+        AffinityGroupImpl b = new AffinityGroupImpl();
         b.addIdentity(new DummyIdentity("4"));
         b.addIdentity(new DummyIdentity("5"));
         group1.add(b);
 
-        modularity =
+        double modularity =
             LabelPropagation.calcModularity(builder.getAffinityGraph(), group1);
+        Assert.assertEquals(0.22, modularity, .001);
+
+        Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
+        a = new AffinityGroupImpl();
+        a.addIdentity(new DummyIdentity("1"));
+        a.addIdentity(new DummyIdentity("3"));
+        group2.add(a);
+        b = new AffinityGroupImpl();
+        b.addIdentity(new DummyIdentity("2"));
+        b.addIdentity(new DummyIdentity("4"));
+        b.addIdentity(new DummyIdentity("5"));
+        group2.add(b);
+
+        modularity =
+            LabelPropagation.calcModularity(builder.getAffinityGraph(), group2);
         Assert.assertEquals(0.08, modularity, .001);
 
         // JANE need to test with graph with weighted edges!
+
+        double jaccard = LabelPropagation.calcJaccard(group1, group2);
+        System.out.println("Jaccard index is " + jaccard);
+        Assert.assertEquals(0.333, jaccard, .001);
     }
 
 
@@ -158,7 +162,7 @@ public class TestLPA {
 
             // Create a graph for the Zachary network:
             // W. W. Zachary, An information flow model for conflict and
-            // fission in small groups,
+            // fission in small group1,
             // Journal of Anthropological Research 33, 452-473 (1977)
             Identity[] nodes = new Identity[35];
             for (int i = 1; i < nodes.length; i++) {
