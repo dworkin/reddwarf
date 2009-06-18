@@ -34,8 +34,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -43,9 +41,6 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.BoundNamesUtil;
-import com.sun.sgs.io.Connection;
-import com.sun.sgs.io.ConnectionListener;
-import com.sun.sgs.io.Connector;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
@@ -55,16 +50,12 @@ import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -2094,7 +2085,6 @@ public class TestChannelServiceImpl extends TestCase {
     // Dummy client code for testing purposes.
     private class DummyClient extends AbstractDummyClient {
 
-
 	private final Object lock = new Object();
 	private boolean joinAck = false;
 	private boolean leaveAck = false;
@@ -2106,7 +2096,8 @@ public class TestChannelServiceImpl extends TestCase {
 	private String reason;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
-	
+
+	/** Constructs an instance with the given {@code name}. */
 	DummyClient(String name) {
 	    super(name);
 	}
@@ -2225,6 +2216,11 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 
+	/**
+	 * Handles session and channel messages and channel joins and
+	 * leaves, then delegates to the super class to handle those
+	 * opcodes it doesn't handle.
+	 */
 	@Override
 	protected void handleOpCode(byte opcode, MessageBuffer buf) {
 	    switch (opcode) {
@@ -2311,7 +2307,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 		
 	    default:
-		System.err.println(toString() + " unknown opcode:" + opcode);
+		super.handleOpCode(opcode, buf);
 		break;
 	    }
 	}

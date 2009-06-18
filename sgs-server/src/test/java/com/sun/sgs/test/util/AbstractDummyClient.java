@@ -37,46 +37,43 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.junit.Assert;
 
 /**
- * Dummy client code for testing purposes.
+ * Abstract dummy client code for testing purposes.
  */
 public abstract class AbstractDummyClient extends Assert {
     
     private static final int WAIT_TIME = 5000;
-	
+
+    /* -- client state -- */
     public final String name;
-    private String password;
+    protected volatile byte[] reconnectKey = new byte[0];
+    private final Object lock = new Object();
+
+    /* -- connection state -- */
     private Connector<SocketAddress> connector;
     private Listener listener;
     private Connection connection;
     private volatile int connectPort = 0;
     private boolean connected = false;
-    private final Object lock = new Object();
+
+    /* -- login/logout state -- */
     private boolean loginAck = false;
     private boolean loginSuccess = false;
-    private boolean loginRedirect = false;
     private boolean logoutAck = false;
-    private String reason;
+
+    /* -- redirection state -- */
+    private boolean loginRedirect = false;
     private String redirectHost;
     public int redirectPort;
-    protected volatile byte[] reconnectKey = new byte[0];
 
+    /* -- relocation state -- */
     private boolean relocateSession;
     private String relocateHost;
     private int relocatePort;
     private byte[] relocateKey = new byte[0];
     private boolean relocateAck;
     private boolean relocateSuccess;
-    private boolean relocateMessage;
 	
 	
-    public volatile int expectedMessages0;
-    // Messages received by this client's associated ClientSessionListener
-    public Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
-    private int messagesReceivedDuringRelocation = 0;
-
-    private final Queue<byte[]> clientReceivedMessages =
-	new ConcurrentLinkedQueue<byte[]>();
-
     /** Constructs an instance with the given {@code name}. */
     public AbstractDummyClient(String name) {
 	this.name = name;
@@ -129,19 +126,6 @@ public abstract class AbstractDummyClient extends Assert {
     }
 
     /**
-     * Throws a {@code RuntimeException} if this session is not
-     * logged in.
-     */
-    protected void checkLoggedIn() {
-	synchronized (lock) {
-	    if (!connected || !loginSuccess) {
-		throw new RuntimeException(
-		    toString() + " not connected or loggedIn");
-	    }
-	}
-    }
-
-    /**
      * Returns the port last specified for the {@link #connect connect}
      * method.
      */
@@ -159,41 +143,16 @@ public abstract class AbstractDummyClient extends Assert {
     }
     
     /**
-     * Disconnects this client, and returns either when the connection
-     * is closed or the timeout expires, which ever comes first.
+     * Throws a {@code RuntimeException} if this session is not
+     * logged in.
      */
-    public void disconnect() {
-	System.err.println(toString() + " disconnecting");
-
+    protected void checkLoggedIn() {
 	synchronized (lock) {
-	    if (! connected) {
-		return;
-	    }
-	    try {
-		connection.close();
-		lock.wait(WAIT_TIME);
-	    } catch (Exception e) {
-		System.err.println(toString() + " disconnect exception:" + e);
-		lock.notifyAll();
-	    } finally {
-		if (connected) {
-		    reset();
-		}
+	    if (!connected || !loginSuccess) {
+		throw new RuntimeException(
+		    toString() + " not connected or loggedIn");
 	    }
 	}
-    }
-
-    /**
-     * Resets the connection state so that the client can connect and
-     * login again.
-     */
-    private void reset() {
-	assert Thread.holdsLock(lock);
-	connected = false;
-	connection = null;
-	loginAck = false;
-	loginSuccess = false;
-	loginRedirect = false;
     }
 
     /**
@@ -226,7 +185,7 @@ public abstract class AbstractDummyClient extends Assert {
 		throw new RuntimeException(toString() + " not connected");
 	    }
 	}
-	this.password = "password";
+	String password = "password";
 
 	MessageBuffer buf =
 	    new MessageBuffer(2 + MessageBuffer.getSize(name) +
@@ -290,8 +249,8 @@ public abstract class AbstractDummyClient extends Assert {
     }
 
     /**
-     * Notifies this client that it logged in or relocated and a new
-     * reconnect key is granted.
+     * Notifies this client that it is logged in or relocated and a new
+     * reconnect key has been granted.
      */
     protected void newReconnectKey(byte[] reconnectKey) {
     }
@@ -344,7 +303,7 @@ public abstract class AbstractDummyClient extends Assert {
 		}
 		if (shouldSucceed) {
 		    if (!relocateSuccess) {
-			fail("relocation failed: " + relocateMessage);
+			fail("relocation failed");
 		    }
 		} else if (relocateSuccess) {
 		    fail("relocation succeeded");
@@ -354,11 +313,10 @@ public abstract class AbstractDummyClient extends Assert {
 		    toString() + " relocate timed out", e);
 	    }
 	}
-	assertEquals(0, messagesReceivedDuringRelocation);
     }
 
     /**
-     * Waits for client to receive a RELOCATE_NOTIFICATION message.
+     * Waits for this client to receive a RELOCATE_NOTIFICATION message.
      * Throws a RuntimeException if the notification is not received
      * before the timeout period, or if the relocation port specified
      * in the notification does not match the specified {@code newPort}.
@@ -402,81 +360,13 @@ public abstract class AbstractDummyClient extends Assert {
     }
 
     /**
-     * From this client, sends the number of messages (each containing a
-     * monotonically increasing sequence number), then waits for all the
-     * messages to be received by this client's associated {@code
-     * ClientSessionListener}, and validates the sequence of messages
-     * received by the listener.  
+     * If this session is not connected, this method returns; otherwise
+     * this method sends a LOGOUT_REQUEST to the server, and waits for
+     * this client to receive a LOGOUT_SUCCESS acknowledgment or the
+     * timeout to expire, whichever comes first.  If the LOGOUT_SUCCESS
+     * acknowledgment is not received, then {@code AssertionError} is
+     * thrown. 
      */
-    public void sendMessagesInSequence(int numMessages, int expectedMessages) {
-	this.expectedMessages0 = expectedMessages;
-	    
-	for (int i = 0; i < numMessages; i++) {
-	    MessageBuffer buf = new MessageBuffer(4);
-	    buf.putInt(i);
-	    sendMessage(buf.getBuffer());
-	}
-	    
-	validateMessageSequence(messages, expectedMessages);
-    }
-
-    /**
-     * Waits for this client to receive the number of messages sent from
-     * the application.
-     */
-    public Queue<byte[]>
-	waitForClientToReceiveExpectedMessages(int expectedMessages)
-    {
-	waitForExpectedMessages(clientReceivedMessages, expectedMessages);
-	return clientReceivedMessages;
-    }
-
-    /**
-     * Waits for the number of expected messages to be deposited in the
-     * specified message queue.
-     */
-    private void waitForExpectedMessages(
-	Queue<byte[]> messageQueue, int expectedMessages)
-    {
-	this.expectedMessages0 = expectedMessages;
-	synchronized (messageQueue) {
-	    if (messageQueue.size() != expectedMessages) {
-		try {
-		    messageQueue.wait(WAIT_TIME);
-		} catch (InterruptedException e) {
-		}
-	    }
-	}
-	int receivedMessages = messageQueue.size();
-	if (receivedMessages != expectedMessages) {
-	    fail(toString() + " expected " + expectedMessages +
-		 ", received " + receivedMessages);
-	}
-    }
-
-    /**
-     * Waits for the number of expected messages to be recorded in the
-     * specified 'list', and validates that the expected number of messages
-     * were received by the ClientSessionListener in the correct sequence.
-     */
-    public void validateMessageSequence(
-	Queue<byte[]> messageQueue, int expectedMessages)
-    {
-	waitForExpectedMessages(messageQueue, expectedMessages);
-	if (expectedMessages != 0) {
-	    int i = (new MessageBuffer(messageQueue.peek())).getInt();
-	    for (byte[] message : messageQueue) {
-		MessageBuffer buf = new MessageBuffer(message);
-		int value = buf.getInt();
-		System.err.println(toString() + " received message " + value);
-		if (value != i) {
-		    fail("expected message " + i + ", got " + value);
-		}
-		i++;
-	    }
-	}
-    }
-	
     public void logout() {
 	synchronized (lock) {
 	    if (connected == false) {
@@ -497,12 +387,10 @@ public abstract class AbstractDummyClient extends Assert {
 		    lock.wait(WAIT_TIME);
 		}
 		if (logoutAck != true) {
-		    throw new RuntimeException(
-			toString() + " logout timed out");
+		    fail(toString() + " logout timed out");
 		}
 	    } catch (InterruptedException e) {
-		throw new RuntimeException(
-		    toString() + " logout timed out", e);
+		fail(toString() + " logout timed out: " + e.toString());
 	    } finally {
 		if (! logoutAck)
 		    disconnect();
@@ -510,11 +398,53 @@ public abstract class AbstractDummyClient extends Assert {
 	}
     }
 
-    // Returns true if disconnect occurred.
+    /**
+     * Disconnects this client, and returns either when the connection
+     * is closed or the timeout expires, which ever comes first.
+     */
+    public void disconnect() {
+	System.err.println(toString() + " disconnecting");
+
+	synchronized (lock) {
+	    if (! connected) {
+		return;
+	    }
+	    try {
+		connection.close();
+		lock.wait(WAIT_TIME);
+	    } catch (Exception e) {
+		System.err.println(toString() + " disconnect exception:" + e);
+		lock.notifyAll();
+	    } finally {
+		if (connected) {
+		    reset();
+		}
+	    }
+	}
+    }
+
+    /**
+     * Resets the connection state so that the client can connect and
+     * login again.
+     */
+    private void reset() {
+	assert Thread.holdsLock(lock);
+	connected = false;
+	connection = null;
+	loginAck = false;
+	loginSuccess = false;
+	loginRedirect = false;
+    }
+
+    /**
+     * Waits for the connection to close or the timeout to expire,
+     * whichever comes first, and returns {@code true} if the
+     * underlying connection disconnected, and {@code false} otherwise.
+     */
     public boolean waitForDisconnect() {
 	synchronized (lock) {
 	    try {
-		if (connected == true) {
+		if (connected) {
 		    lock.wait(WAIT_TIME);
 		}
 	    } catch (InterruptedException ignore) {
@@ -524,52 +454,13 @@ public abstract class AbstractDummyClient extends Assert {
     }
 
     /**
-     * Gives a subclass a chance to handle an opCode that isn't
-     * processed by this client implementation.
+     * Gives a subclass a chance to handle an {@code opcode}.  This
+     * implementation handles login, redirection, relocation, and
+     * logout but does not handle session or channel messages.
      */
     protected void handleOpCode(byte opcode, MessageBuffer buf) {
-	switch (opcode) {
-	    
-	case SimpleSgsProtocol.SESSION_MESSAGE:
-	    byte[] message = buf.getBytes(buf.limit() - buf.position());
-	    synchronized (clientReceivedMessages) {
-		clientReceivedMessages.add(message);
-		System.err.println(
-		    toString() + " received SESSION_MESSAGE: " +
-		    HexDumper.toHexString(message));
-		if (clientReceivedMessages.size() == expectedMessages0) {
-		    clientReceivedMessages.notifyAll();
-		}
-	    }
-	    break;
-	    
-	default:
-	    System.err.println("unknown op code: " + opcode);
-	    break;
-	}
-    }
-
-    public String toString() {
-	return "[" + name + "]";
-    }
 	
-    private class Listener implements ConnectionListener {
-
-	/** {@inheritDoc} */
-	public void bytesReceived(Connection conn, byte[] buffer) {
-	    if (connection != conn) {
-		System.err.println(
-		    "DummyClient.Listener connected wrong handle, got:" +
-		    conn + ", expected:" + connection);
-		return;
-	    }
-
-	    MessageBuffer buf = new MessageBuffer(buffer);
-
-	    byte opcode = buf.getByte();
-
-	    switch (opcode) {
-
+	switch (opcode) {
 	    case SimpleSgsProtocol.LOGIN_SUCCESS:
 		reconnectKey = buf.getBytes(buf.limit() - buf.position());
 		newReconnectKey(reconnectKey);
@@ -583,12 +474,12 @@ public abstract class AbstractDummyClient extends Assert {
 		break;
 		    
 	    case SimpleSgsProtocol.LOGIN_FAILURE:
-		reason = buf.getString();
+		String failureReason = buf.getString();
 		synchronized (lock) {
 		    loginAck = true;
 		    loginSuccess = false;
 		    System.err.println("login failed: " + name +
-				       ", reason:" + reason);
+				       ", reason:" + failureReason);
 		    lock.notifyAll();
 		}
 		break;
@@ -626,7 +517,6 @@ public abstract class AbstractDummyClient extends Assert {
 		synchronized (lock) {
 		    relocateAck = true;
 		    relocateSuccess = true;
-		    messagesReceivedDuringRelocation = messages.size();
 		    System.err.println("relocate succeeded: " + name);
 		    lock.notifyAll();
 		}
@@ -634,13 +524,12 @@ public abstract class AbstractDummyClient extends Assert {
 		break;
 		    
 	    case SimpleSgsProtocol.RELOCATE_FAILURE:
-		reason = buf.getString();
+		String relocateFailureReason = buf.getString();
 		synchronized (lock) {
 		    relocateAck = true;
 		    relocateSuccess = false;
-		    messagesReceivedDuringRelocation = messages.size();
 		    System.err.println("relocate failed: " + name +
-				       ", reason:" + reason);
+				       ", reason:" + relocateFailureReason);
 		    lock.notifyAll();
 		}
 		break;
@@ -656,7 +545,32 @@ public abstract class AbstractDummyClient extends Assert {
 	    default:
 		handleOpCode(opcode, buf);
 		break;
+	}
+    }
+
+    /** {@inheritDoc} */
+    public String toString() {
+	return "[" + name + "]";
+    }
+
+    /**
+     * ConnectionListener for connection I/O events.
+     */
+    private class Listener implements ConnectionListener {
+
+	/** {@inheritDoc} */
+	public void bytesReceived(Connection conn, byte[] buffer) {
+	    if (connection != conn) {
+		System.err.println(
+		    toString() + "AbstractDummyClient.Listener.bytesReceived:" +
+		    " wrong handle, got:" + conn + ", expected:" + connection);
+		return;
 	    }
+
+	    MessageBuffer buf = new MessageBuffer(buffer);
+	    byte opcode = buf.getByte();
+	    
+	    handleOpCode(opcode, buf);
 	}
 
 	/** {@inheritDoc} */

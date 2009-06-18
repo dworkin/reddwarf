@@ -1922,6 +1922,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean receivedDisconnectedCallback = false;
 	private boolean graceful = false;
 
+	public volatile int expectedMessages0;
+	// Messages received by this client's associated ClientSessionListener
+	public Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
+	private int messagesReceivedDuringRelocation = 0;
+	
+	private final Queue<byte[]> clientReceivedMessages =
+	    new ConcurrentLinkedQueue<byte[]>();
+
+	
+
 	/** Constructs an instance with the given {@code name}. */
 	DummyClient(String name) {
 	    super(name);
@@ -1936,11 +1946,38 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
+	 * Handles an {@code opcode}.
+	 */
+	@Override
+	protected void handleOpCode(byte opcode, MessageBuffer buf) {
+	    switch (opcode) {
+		
+	    case SimpleSgsProtocol.SESSION_MESSAGE:
+		byte[] message = buf.getBytes(buf.limit() - buf.position());
+		synchronized (clientReceivedMessages) {
+		    clientReceivedMessages.add(message);
+		    System.err.println(
+		    	toString() + " received SESSION_MESSAGE: " +
+			HexDumper.toHexString(message));
+		    if (clientReceivedMessages.size() == expectedMessages0) {
+			clientReceivedMessages.notifyAll();
+		    }
+		}
+		break;
+	    
+	    default:
+		super.handleOpCode(opcode, buf);
+		break;
+	    }
+	}
+
+	/**
 	 * Sends a SESSION_MESSAGE with the specified content, prefixing
 	 * the message with the reconnect key.  The {@code receivedMessage}
 	 * method of this client's associated ClientSessionListener must
 	 * expect that each message is prefixed with the reconnect key.
 	 */
+	@Override
 	public void sendMessage(byte[] message) {
 	    MessageBuffer buf =
 		new MessageBuffer(5 + reconnectKey.length + message.length);
@@ -2003,6 +2040,99 @@ public class TestClientSessionServiceImpl extends TestCase {
 		assertDisconnectedCallbackInvoked(graceful);
 		System.err.println(toString() + " disconnect successful");
 	    }
+	}
+
+	/**
+	 * From this client, sends the number of messages (each containing a
+	 * monotonically increasing sequence number), then waits for all the
+	 * messages to be received by this client's associated {@code
+	 * ClientSessionListener}, and validates the sequence of messages
+	 * received by the listener.  
+	 */
+	public void sendMessagesInSequence(int numMessages, int expectedMessages) {
+	    this.expectedMessages0 = expectedMessages;
+	    
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf = new MessageBuffer(4);
+		buf.putInt(i);
+		sendMessage(buf.getBuffer());
+	    }
+	    
+	    validateMessageSequence(messages, expectedMessages);
+	}
+	
+	/**
+	 * Waits for this client to receive the number of messages sent from
+	 * the application.
+	 */
+	public Queue<byte[]>
+	    waitForClientToReceiveExpectedMessages(int expectedMessages)
+	{
+	    waitForExpectedMessages(clientReceivedMessages, expectedMessages);
+	    return clientReceivedMessages;
+	}
+	
+	/**
+	 * Waits for the number of expected messages to be deposited in the
+	 * specified message queue.
+	 */
+	private void waitForExpectedMessages(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    this.expectedMessages0 = expectedMessages;
+	    synchronized (messageQueue) {
+		if (messageQueue.size() != expectedMessages) {
+		    try {
+			messageQueue.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+	    }
+	    int receivedMessages = messageQueue.size();
+	    if (receivedMessages != expectedMessages) {
+		fail(toString() + " expected " + expectedMessages +
+		     ", received " + receivedMessages);
+	    }
+	}
+
+	/**
+	 * Waits for the number of expected messages to be recorded in the
+	 * specified 'list', and validates that the expected number of messages
+	 * were received by the ClientSessionListener in the correct sequence.
+	 */
+	public void validateMessageSequence(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    waitForExpectedMessages(messageQueue, expectedMessages);
+	    if (expectedMessages != 0) {
+		int i = (new MessageBuffer(messageQueue.peek())).getInt();
+		for (byte[] message : messageQueue) {
+		    MessageBuffer buf = new MessageBuffer(message);
+		    int value = buf.getInt();
+		    System.err.println(
+			toString() + " received message " + value);
+		    if (value != i) {
+			fail("expected message " + i + ", got " + value);
+		    }
+		    i++;
+		}
+	    }
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>This implementation verifies that no messages were received
+	 * by this client's associated ClientSessionListener during relocation.
+	 */
+	public void relocate(int newPort, boolean useValidKey,
+			     boolean shouldSucceed)
+	{
+	    int numMessages = messages.size();
+	    super.relocate(newPort, useValidKey, shouldSucceed);
+	    // verify that no messages were received by this client's
+	    // associated ClientSessionListener during relocation.
+	    assertEquals(numMessages, messages.size());
 	}
     }
 }
