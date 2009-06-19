@@ -353,7 +353,12 @@ public abstract class AbstractDummyClient extends Assert {
 		throw new RuntimeException(
 		    toString() + " relocate timed out", e);
 	    }
+	    relocateSession = false;
+	    relocateAck = false;
+	    relocatePort = 0;
+	    relocateSuccess = false;
 	}
+	
     }
 
     /**
@@ -590,7 +595,9 @@ public abstract class AbstractDummyClient extends Assert {
 
 	/** {@inheritDoc} */
 	public void connected(Connection conn) {
-	    System.err.println("DummyClient.Listener.connected");
+	    System.err.println(
+		AbstractDummyClient.this.toString() + " connected to port:" +
+			       connectPort);
 	    if (connection != null) {
 		System.err.println(
 		    "DummyClient.Listener.already connected handle: " +

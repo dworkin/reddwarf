@@ -988,7 +988,27 @@ public class ClientSessionImpl
 	    sessionImpl.setRelocatingToNode(newNodeId);
 
 	    Node newNode = sessionService.watchdogService.getNode(newNodeId);
-	    if (newNode != null) {
+	    if (newNode == null) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE,
+			       "Session:{0} unable to relocate from node:{1} " +
+			       "to FAILED node:{2}", this,
+			       sessionService.getLocalNodeId(), newNodeId);
+		}
+	    } else if (handler == null) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE,
+			       "DISCONNECTED Session:{0} unable to relocate " +
+			       "from node:{1} to node:{2}", this,
+			       sessionService.getLocalNodeId(), newNodeId);
+		}
+	    } else {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE,
+			       "Session:{0} to relocate " +
+			       "from node:{1} to node:{2}", this,
+			       sessionService.getLocalNodeId(), newNodeId);
+		}
 		sessionService.checkContext().addCommitAction(
 		    eventQueue.getSessionRefId(),
 		    handler.new MoveAction(newNode), false);
