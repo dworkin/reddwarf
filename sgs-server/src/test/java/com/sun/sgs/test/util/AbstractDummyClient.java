@@ -257,10 +257,10 @@ public abstract class AbstractDummyClient extends Assert {
     
     /**
      * Waits for this client to receive a RELOCATE_NOTIFICATION message.
-     * Throws {@code AssertionError} if the notification is not received
-     * before the timeout period, or if {@code expectedPort} is non-zero
-     * and does not match the relocation port specified in the received
-     * RELOCATE_NOTIFICATION.
+     * Throws {@code AssertionFailedError} if the notification is not
+     * received before the timeout period, or if {@code expectedPort} is
+     * non-zero and does not match the relocation port specified in the
+     * received RELOCATE_NOTIFICATION.
      */
     public void waitForRelocationNotification(int expectedPort) {
 	System.err.println(toString() +
@@ -290,7 +290,7 @@ public abstract class AbstractDummyClient extends Assert {
      * waits until one is received or the timeout expires, which ever comes
      * first.  If a RELOCATE_NOTIFICATION is not received or if the
      * specified {@code expectedPort} is non-zero and does not match the
-     * relocation port, then {@code AssertionError} is thrown. <p>
+     * relocation port, then {@code AssertionFailedError} is thrown. <p>
      *
      * If a RELOCATE_NOTIFICATION is correctly received, then this method
      * sends a RELOCATE_REQUEST message to the local host on the relocation
@@ -301,9 +301,9 @@ public abstract class AbstractDummyClient extends Assert {
      * This method waits for an acknowledgment (either RELOCATE_SUCCESS or
      * RELOCATE_FAILURE).  If {@code shouldSucceed} is {@code true} and a
      * RELOCATE_FAILURE is received, this method throws {@code
-     * AssertionError}; similarly if {@code shouldSucceed} is {@code false}
-     * and a RELOCATE_SUCCESS is received, {@code AssertionError} will be
-     * thrown.
+     * AssertionFailedError}; similarly if {@code shouldSucceed} is {@code
+     * false} and a RELOCATE_SUCCESS is received, {@code
+     * AssertionFailedError} will be thrown.
      */
     public void relocate(int expectedPort, boolean useValidKey,
 			 boolean shouldSucceed)
@@ -379,8 +379,8 @@ public abstract class AbstractDummyClient extends Assert {
      * this method sends a LOGOUT_REQUEST to the server, and waits for
      * this client to receive a LOGOUT_SUCCESS acknowledgment or the
      * timeout to expire, whichever comes first.  If the LOGOUT_SUCCESS
-     * acknowledgment is not received, then {@code AssertionError} is
-     * thrown. 
+     * acknowledgment is not received, then {@code AssertionFailedError}
+     * is thrown. 
      */
     public void logout() {
 	synchronized (lock) {

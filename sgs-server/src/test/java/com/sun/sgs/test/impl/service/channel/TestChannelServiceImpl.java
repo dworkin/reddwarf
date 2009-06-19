@@ -150,6 +150,8 @@ public class TestChannelServiceImpl extends TestCase {
 	field.setAccessible(true);
 	return field;
     }
+
+    private int hostNum = 0;
     
     /** Constructs a test instance. */
     public TestChannelServiceImpl(String name) throws Exception  {
@@ -1615,36 +1617,69 @@ public class TestChannelServiceImpl extends TestCase {
     }
     */
     
-    // -- Relocation test cases
+    // -- Relocation test cases --
 
     public void testChannelJoinAndRelocate() throws Exception {
-	String name = "dummy";
+	String name = someUsers.get(0);
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
-	String newNodeHost = "newNode";
-	List<String> users = new ArrayList<String>();
-	users.add(name);
-	addNodes(newNodeHost);
-	DummyClient client = new DummyClient(name);
+	createChannel(channelName);
+	// All clients will log into server node.
+	ClientGroup group = new ClientGroup(someUsers);
 	try {
-	    assertTrue(client.connect(serverNode.getAppPort()).login());
-	    createChannel(channelName);
-	    joinUsers(channelName, users);
-	    checkUsersJoined(channelName, users);
+	    // Join all users to channel and send some messages on channel.
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+	    int count = getChannelServiceBindingCount();
+	    sendMessagesToChannel(channelName, group, 2);
+	    
+	    // Move clients to new nodes.
 	    printServiceBindings("before relocate");
-	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	    System.err.println("reassigning identity:" + name +
-			       " from server node to host: " +
-			       newNodeHost);
-	    DirectiveNodeAssignmentPolicy.instance.
-		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
-	    client.relocate(0, true, true);
-	    checkUsersJoined(channelName, users);
+	    moveClient(group.getClient(someUsers.get(0)));
+	    moveClient(group.getClient(someUsers.get(1)));	    
 	    printServiceBindings("after relocate");
+	    
+	    // Make sure all members are still joined and can receive messages.
+	    checkUsersJoined(channelName, someUsers);
+	    sendMessagesToChannel(channelName, group, 2);
+	    assertEquals(count, getChannelServiceBindingCount());
+
+	    // Disconnect each client and make sure that memberships/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    checkUsersJoined(channelName, Arrays.asList(new String[] {}));
+	    assertEquals(count - someUsers.size(),
+			 getChannelServiceBindingCount());
+	    
 	} finally {
-	    client.disconnect();
+	    group.disconnect(false);
 	}
     }
+
+    /**
+     * Moves the client to a newly created node and returns the "hostname"
+     * of the new node.
+     */
+    private String moveClient(DummyClient client) throws Exception {
+	String newNodeHost = "host" + Integer.toString(hostNum++);
+	addNodes(newNodeHost);
+	moveClient(client, newNodeHost);
+	return newNodeHost;
+    }
+	
+    private void moveClient(DummyClient client, String newNodeHost)
+	throws Exception
+    {
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	System.err.println("reassigning identity:" + client.name +
+			   " from server node to host: " +
+			   newNodeHost);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity(client.name, serverNode.getNodeId(),
+			 newNode.getNodeId());
+	client.relocate(0, true, true);
+    }
+    
 
     // -- END TEST CASES --
 
@@ -2150,6 +2185,8 @@ public class TestChannelServiceImpl extends TestCase {
 	public void sendMessage(byte[] message) {
 	    checkLoggedIn();
 
+	    // A zero-length message is sent when the superclass processes
+	    // a LOGIN_SUCCESS or RELOCATE_SUCCESS message, so eat it here.
 	    if (message.length == 0) {
 		return;
 	    }
