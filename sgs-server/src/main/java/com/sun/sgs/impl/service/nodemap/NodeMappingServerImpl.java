@@ -724,7 +724,6 @@ public final class NodeMappingServerImpl
         final long newNodeId;
         try {
             newNodeId = assignPolicy.chooseNode(id, requestingNode);
-            System.out.println("**Assign policy returned");
         } catch (NoNodesAvailableException ex) {
             logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}" +
                     " failed because no live nodes are available", 
@@ -878,7 +877,10 @@ public final class NodeMappingServerImpl
         }
 
         public void nodeStatusChange(Node node) {
-            System.out.println("NMS.nsc " + node);
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "Node {0} status change to {1}",
+                           node.getId(), node.getStatus());
+            }
             if (node.getStatus() == Status.GREEN) {
                 assignPolicy.nodeAvailable(node.getId());
             } else {

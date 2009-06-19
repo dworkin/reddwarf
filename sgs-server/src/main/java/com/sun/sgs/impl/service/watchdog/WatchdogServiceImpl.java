@@ -358,6 +358,9 @@ public final class WatchdogServiceImpl
             // create our profiling info and register our MBean
             ProfileCollector collector = 
                 systemRegistry.getComponent(ProfileCollector.class);
+
+            collector.addListener(new WatchdogProfileListener(properties, this), false);
+
             serviceStats = new WatchdogServiceStats(collector, this);
             try {
                 collector.registerMBean(serviceStats, 
