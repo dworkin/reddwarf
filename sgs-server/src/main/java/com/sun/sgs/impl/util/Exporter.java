@@ -49,7 +49,7 @@ public class Exporter<T extends Remote> {
 
     /** The type of the server. */
     private final Class<T> type;
-    
+
     /** The server for handling inbound requests. */
     private T server;
 
@@ -97,7 +97,7 @@ public class Exporter<T extends Remote> {
 	proxy = type.cast(
 	    UnicastRemoteObject.exportObject(server, port, null, ssf));
 	registry.rebind(name, proxy);
-	return ssf.getLocalPort();
+        return port == 0 ? ssf.getLastAnonymousPort() : ssf.getLastFixedPort();
     }
 
     /**
@@ -120,7 +120,7 @@ public class Exporter<T extends Remote> {
 	ServerSocketFactory ssf = new ServerSocketFactory();
 	proxy = type.cast(
 	    UnicastRemoteObject.exportObject(server, port, null, ssf));
-	return ssf.getLocalPort();
+        return port == 0 ? ssf.getLastAnonymousPort() : ssf.getLastFixedPort();
     }
 
     /**
@@ -150,7 +150,7 @@ public class Exporter<T extends Remote> {
 		logger.logThrow(
 		    Level.FINE, e, "Problem unexporting registry");
 		return;
-	    }
+            }
 	}
 	try {
 	    UnicastRemoteObject.unexportObject(server, true);
@@ -169,22 +169,47 @@ public class Exporter<T extends Remote> {
     private static class ServerSocketFactory
 	implements RMIServerSocketFactory
     {
-	/** The last server socket created. */
-	private ServerSocket serverSocket;
+	/** Port number of last fixed port server socket created. */
+	private static int lastFixedPort = -1;
+
+        /** Port number of last anonymous port server socket created. */
+        private static int lastAnonymousPort = -1;
 
 	/** Creates an instance. */
 	ServerSocketFactory() { }
 
 	/** {@inheritDoc} */
 	public ServerSocket createServerSocket(int port) throws IOException {
-	    serverSocket = new ServerSocket(port);
+	    ServerSocket serverSocket = new ServerSocket(port);
+            if(port != 0) {
+                lastFixedPort = (serverSocket == null) ?
+                    -1 : serverSocket.getLocalPort();
+            } else {
+                lastAnonymousPort = (serverSocket == null) ?
+                    -1 : serverSocket.getLocalPort();
+            }
 	    return serverSocket;
 	}
 
 	/** Returns the local port of the last server socket created. */
-	int getLocalPort() {
-	    return (serverSocket == null) ? -1 : serverSocket.getLocalPort();
-	}
+	int getLastFixedPort() {
+	    return lastFixedPort;
+        }
+
+        /** Returns the local port of the last anonymous port server socket. */
+        int getLastAnonymousPort() {
+            return lastAnonymousPort;
+        }
+
+        /** {@inheritDoc} */
+        public boolean equals(Object rhs) {
+            return rhs != null && rhs.getClass().equals(this.getClass());
+        }
+
+        /** {@inheritDoc} */
+        public int hashCode() {
+            return 1;
+        }
     }
 }   
 

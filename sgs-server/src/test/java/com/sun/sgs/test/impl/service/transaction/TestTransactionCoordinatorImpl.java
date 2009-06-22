@@ -69,7 +69,7 @@ public class TestTransactionCoordinatorImpl {
 		     TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT);
 
     /** Long enough for a transaction to timeout. */
-    private static final long TIMED_OUT = TIMEOUT + 15;
+    private static final long TIMED_OUT = TIMEOUT + 20;
 
     /** Transaction coordinator properties. */
     private static final Properties coordinatorProps = new Properties();
