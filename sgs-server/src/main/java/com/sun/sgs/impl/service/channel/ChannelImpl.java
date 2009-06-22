@@ -1943,7 +1943,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	public void run() {
 	    ChannelImpl channel =
 		(ChannelImpl) getObjectForId(channelRefId);
-	    channel.removeSessionSet(failedNodeId);
+	    if (channel != null) {
+		channel.removeSessionSet(failedNodeId);
+	    }
 	}
     }
 
@@ -1958,6 +1960,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	BigInteger channelRefId, long nodeId)
     {
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
-	return channel.getSessionSet(nodeId);
+	return
+	    channel != null ?
+	    channel.getSessionSet(nodeId) :
+	    new HashSet<BigInteger>();
     }
 }

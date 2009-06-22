@@ -954,10 +954,12 @@ public final class WatchdogServerImpl
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the
 		// client may have failed too.
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "Notifying {0} of node status changes failed:",
-		    notifyNode.getId());
+		if (!shuttingDown()) {
+		    logger.logThrow(
+		    	Level.WARNING, e,
+			"Notifying {0} of node status changes failed:",
+			notifyNode.getId());
+		}
 	    }
 	}
     }

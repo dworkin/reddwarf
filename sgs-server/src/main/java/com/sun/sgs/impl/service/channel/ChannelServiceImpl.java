@@ -112,7 +112,7 @@ public final class ChannelServiceImpl
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
 	
-    /** The default server port. */
+    /** The default server port: {@value #DEFAULT_SERVER_PORT}. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
     /** The property name for the maximum number of events to process in a
@@ -121,15 +121,24 @@ public final class ChannelServiceImpl
     private static final String EVENTS_PER_TXN_PROPERTY =
 	PKG_NAME + ".events.per.txn";
 
-    /** The default events per transaction. */
+    /** The default events per transaction: {@value #DEFAULT_EVENTS_PER_TXN}. */
     private static final int DEFAULT_EVENTS_PER_TXN = 1;
     
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".write.buffer.size";
 
-    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
+    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE}. */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+
+    /** The name of the session relocation timeout property. */
+    private static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
+	PKG_NAME + ".session.relocation.timeout";
+
+    /** The default session relocation timeout:
+     * {@value #DEFAULT_SESSION_RELOCATION_TIMEOUT}.
+     */
+    private static final int DEFAULT_SESSION_RELOCATION_TIMEOUT = 5000;
 
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
@@ -162,6 +171,11 @@ public final class ChannelServiceImpl
 	
     /** The proxy for the ChannelServer. */
     private final ChannelServer serverProxy;
+
+    /** The listener for client session status updates (relocation or
+     * disconnection).
+     */
+    private final ClientSessionStatusListener sessionStatusListener;
 
     /** The ID for the local node. */
     private final long localNodeId;
@@ -215,9 +229,14 @@ public final class ChannelServiceImpl
     /** The maximum number of channel events to service per transaction. */
     final int eventsPerTxn;
 
+    /** The timeout expiration for a client session relocating to this
+     * node, in milliseconds.
+     */
+    private final int sessionRelocationTimeout;
+    
     /** Our JMX exposed statistics. */
     final ChannelServiceStats serviceStats;
-    
+
     /**
      * Constructs an instance of this class with the specified {@code
      * properties}, {@code systemRegistry}, and {@code txnProxy}.
@@ -261,15 +280,20 @@ public final class ChannelServiceImpl
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 	    localNodeId = watchdogService.getLocalNodeId();
 
+	    /*
+	     * Get the properties for controlling write buffer size,
+	     * channel event processing, and session relocation timeout
+	     */
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
-	    /*
-	     * Get the property for controlling channel event processing.
-	     */
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
 		1, Integer.MAX_VALUE);
+	    sessionRelocationTimeout = wrappedProps.getIntProperty(
+		SESSION_RELOCATION_TIMEOUT_PROPERTY,
+		DEFAULT_SESSION_RELOCATION_TIMEOUT,
+		500, Integer.MAX_VALUE);
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -316,15 +340,15 @@ public final class ChannelServiceImpl
 
 	    /*
 	     * Add listeners for handling recovery and for receiving
-	     * notification of client session disconnection.
+	     * notification of client session relocation and disconnection.
 	     */
 	    watchdogService.addRecoveryListener(
 		new ChannelServiceRecoveryListener());
 
 	    watchdogService.addNodeListener(new ChannelServiceNodeListener());
 
-            sessionService.addSessionStatusListener(
-                new SessionStatusListener());
+	    sessionStatusListener = new SessionStatusListener();
+            sessionService.addSessionStatusListener(sessionStatusListener);
 
             /* Create our service profiling info and register our MBean. */
             ProfileCollector collector = 
@@ -525,6 +549,8 @@ public final class ChannelServiceImpl
 		 * send protocol messages to clients accordingly.
 		 */
 		Set<BigInteger> oldLocalMembers =
+		    newLocalMembers.isEmpty() ?
+		    localChannelMembersMap.remove(channelRefId) :
 		    localChannelMembersMap.put(channelRefId, newLocalMembers);
 		Set<BigInteger> joiners = null;
 		Set<BigInteger> leavers = null;
@@ -558,6 +584,7 @@ public final class ChannelServiceImpl
                                                 "channelJoin throws");
                             }
 			}
+			// FIXME: update per-session channel set.
 		    }
 		}
 		if (leavers != null) {
@@ -573,6 +600,7 @@ public final class ChannelServiceImpl
                             }
 			}
 		    }
+		    // FIXME: update per-session channel set.
 		}
 
 	    } finally {
@@ -783,23 +811,49 @@ public final class ChannelServiceImpl
 	 * {@inheritDoc}
 	 */
 	public void relocateChannelMemberships(
-	    BigInteger sessionRefId, long oldNodeId, BigInteger[] channelRefIds)
+	    final BigInteger sessionRefId, long oldNodeId,
+	    BigInteger[] channelRefIds)
 	{
+	    /*
+	     * Update the local per-session channel set and channel
+	     * membership caches with the session's channel memberships.
+	     */
 	    Set<BigInteger> channelSet =
 		Collections.synchronizedSet(new HashSet<BigInteger>());
 	    localPerSessionChannelsMap.put(sessionRefId, channelSet);
-	    
 	    for (BigInteger channelRefId : channelRefIds) {
-		// Update local channel membership cache.
-		addLocalChannelMember(channelRefId, sessionRefId);
-		// Update per-session channel set cache.
 		channelSet.add(channelRefId);
+		addLocalChannelMember(channelRefId, sessionRefId);
 	    }
 
+	    /*
+	     * Schedule task to add the session's channel memberships to
+	     * the new node (the local node).
+	     */
 	    taskScheduler.scheduleTask(
  		new AddRelocatingSessionToChannels(
 		    sessionRefId, oldNodeId, channelSet),
 		taskOwner);
+
+	    /*
+	     * Schedule a task to check whether the session has relocated
+	     * to the local node (within the timeout period), and if not,
+	     * it assumes that the session is disconnected and invokes the
+	     * 'disconnected' method of this channel service's
+	     * ClientSessionStatusListener so that the session's channel
+	     * memberships (persistent and cached) can be cleaned up.
+	     */
+	    taskScheduler.scheduleTask(
+ 		new AbstractKernelRunnable("CheckSessionRelocation") {
+		    public void run() {
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
+			if (protocol == null) {
+			    sessionStatusListener.disconnected(sessionRefId);
+			}
+		    } },
+		taskOwner,
+		System.currentTimeMillis() + sessionRelocationTimeout);
 	}
 	
 	/**
@@ -812,6 +866,7 @@ public final class ChannelServiceImpl
 	    // TBD: should this always return a non-null value?
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);
+	    
 	    // Remove session from locally cached channel membership lists
 	    // TBD: Are channel caches updated before channel membership cache
 	    // is xferred to new node?  Or should this be done here?
@@ -833,8 +888,11 @@ public final class ChannelServiceImpl
 	    if (handler != null) {
 		handler.completed();
 	    }
-	    
-	    // Schedule task to remove channel memberships.
+
+	    /*
+	     * Schedule task to remove channel memberships from old node
+	     * (the local node).
+	     */
 	    if (channelSet != null) {
 		taskScheduler.scheduleTask(
 		    new RemoveRelocatingSessionFromChannels(
@@ -1263,6 +1321,9 @@ public final class ChannelServiceImpl
 		transactionScheduler.runTask(
 		    new AbstractKernelRunnable("ScheduleRecoveryTasks") {
 			public void run() {
+			    if (shuttingDown()) {
+				return;
+			    }
 			    /*
 			     * Reassign each failed coordinator to a new node.
 			     */

@@ -1407,6 +1407,9 @@ public final class ClientSessionServiceImpl
 		transactionScheduler.runTask(
 		    new AbstractKernelRunnable("ScheduleRecoveryTasks") {
 			public void run() {
+			    if (shuttingDown()) {
+				return;
+			    }
 			    /*
 			     * For each session on the failed node, notify
 			     * the session's ClientSessionListener and
