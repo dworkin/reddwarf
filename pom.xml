@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>13</version>
+    <version>15</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-shared</artifactId>
   <name>Project Darkstar Shared</name>
   <packaging>jar</packaging>
-  <version>1.7</version>
+  <version>1.9</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
@@ -78,6 +78,18 @@
 	</executions>
       </plugin>
 
+      <!-- Verify correct license headers in each source code file -->
+      <plugin>
+	<groupId>com.google.code.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>check-license</id>
+	    <phase>compile</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
       <!-- Ensure 1.5 target -->
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
@@ -92,28 +104,6 @@
 
   </build>
 
-  <reporting>
-    <plugins>
-
-      <!-- Configure findbugs to run during site lifecycle -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>findbugs-maven-plugin</artifactId>
-	<configuration>
-	  <effort>Max</effort>
-	  <excludeFilterFile>
-	    ${basedir}/src/main/etc/findbugs-exclude.xml
-	  </excludeFilterFile>
-	  <threshold>Low</threshold>
-	  <xmlOutput>true</xmlOutput>
-	  <findbugsXmlOutput>true</findbugsXmlOutput>
-	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
-	</configuration>
-      </plugin>
-
-    </plugins>
-  </reporting>
-
   <repositories>
     <repository>
       <id>java.net</id>
@@ -122,5 +112,11 @@
       <layout>default</layout>
     </repository>
   </repositories>
+
+  <properties>
+    <findbugs-exclude.filter>
+      ${basedir}/src/main/etc/findbugs-exclude.xml
+    </findbugs-exclude.filter>
+  </properties>
 
 </project>
