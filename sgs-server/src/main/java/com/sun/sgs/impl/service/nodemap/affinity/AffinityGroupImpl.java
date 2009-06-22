@@ -23,18 +23,19 @@ import com.sun.sgs.auth.Identity;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
  *  This will need to change, of couse, for multinode.
  */
 public class AffinityGroupImpl implements AffinityGroup {
-    private static AtomicLong lastId = new AtomicLong();
-    private final long id = lastId.incrementAndGet();
+    private final long id;
     private final Set<Identity> identities = 
         Collections.synchronizedSet(new HashSet<Identity>());
 
+    public AffinityGroupImpl(long id) {
+        this.id = id;
+    }
     /** {@inheritDoc} */
     public long getId() {
         return id;

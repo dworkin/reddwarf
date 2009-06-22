@@ -27,11 +27,10 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
-import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Graphs;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import org.junit.runner.RunWith;
@@ -39,41 +38,18 @@ import org.junit.runner.RunWith;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runners.Parameterized;
 /**
  *
  * 
  */
-//@RunWith(FilteredNameRunner.class)
-@RunWith(ParameterizedFilteredNameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestLPA {
-
-    @Parameterized.Parameters
-    public static Collection data() {
-        return Arrays.asList(
-            new Object[][] {{true, false},
-                            {true, true},
-                            {false, false},
-                            {false, true}});
-
-    }
-    private final boolean checkConverge;
-    private final boolean includeSelf;
-
-    /**
-     * Create this test class.
-     * @param testType the type of profile data to create
-     */
-    public TestLPA(boolean checkConverge, boolean includeSelf) {
-        this.checkConverge = checkConverge;
-        this.includeSelf = includeSelf;
-    }
 
     @BeforeClass
     public static void warmup() {
         // Warm up the compilers
         LabelPropagation lpa =
-                new LabelPropagation(new TestZachBuilder(), true, false);
+                new LabelPropagation(new TestZachBuilder(), false);
 
         for (int i = 0; i < 100; i++) {
             lpa.findCommunities();
@@ -83,10 +59,10 @@ public class TestLPA {
     @Test
     public void testZachary() {
         GraphBuilder builder = new TestZachBuilder();
-        LabelPropagation lpa =
-                new LabelPropagation(builder, checkConverge, includeSelf);
+        // second argument true:  gather statistics
+        LabelPropagation lpa = new LabelPropagation(builder, true);
         
-        final int RUNS = 100;
+        final int RUNS = 500;
         long avgTime = 0;
         int avgIter = 0;
         double avgMod  = 0.0;
@@ -96,29 +72,26 @@ public class TestLPA {
             avgIter = avgIter + lpa.getIterations();
             avgMod = avgMod + lpa.getModularity();
         }
-        String con = checkConverge ? "checkConverge" : "noChange";
-        String self = includeSelf ? "includeSelf" : "noSelf";
-        System.out.printf("XXX (%s, %s, %d runs): avg time : %4.2f ms, " +
+        System.out.printf("XXX (%d runs): avg time : %4.2f ms, " +
                           " avg iters : %4.2f, avg modularity: %.4f %n",
-                          con, self, RUNS,
+                          RUNS,
                           avgTime/(double) RUNS,
                           avgIter/(double) RUNS,
                           avgMod/(double) RUNS);
     }
 
-    // Really only needs to be run once.  Need to figure out where
-    // the modularity calculation really belongs.
+    // Need to figure out where the modularity calculation really belongs.
     @Test
     public void testToyModularity() {
         GraphBuilder builder = new TestToyBuilder();
 
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
-        AffinityGroupImpl a = new AffinityGroupImpl();
+        AffinityGroupImpl a = new AffinityGroupImpl(1);
         a.addIdentity(new DummyIdentity("1"));
         a.addIdentity(new DummyIdentity("2"));
         a.addIdentity(new DummyIdentity("3"));
         group1.add(a);
-        AffinityGroupImpl b = new AffinityGroupImpl();
+        AffinityGroupImpl b = new AffinityGroupImpl(2);
         b.addIdentity(new DummyIdentity("4"));
         b.addIdentity(new DummyIdentity("5"));
         group1.add(b);
@@ -128,11 +101,11 @@ public class TestLPA {
         Assert.assertEquals(0.22, modularity, .001);
 
         Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
-        a = new AffinityGroupImpl();
+        a = new AffinityGroupImpl(3);
         a.addIdentity(new DummyIdentity("1"));
         a.addIdentity(new DummyIdentity("3"));
         group2.add(a);
-        b = new AffinityGroupImpl();
+        b = new AffinityGroupImpl(4);
         b.addIdentity(new DummyIdentity("2"));
         b.addIdentity(new DummyIdentity("4"));
         b.addIdentity(new DummyIdentity("5"));
@@ -149,6 +122,55 @@ public class TestLPA {
         Assert.assertEquals(0.333, jaccard, .001);
     }
 
+    @Test
+    public void testZachModularity() {
+        GraphBuilder builder = new TestZachBuilder();
+        Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
+        AffinityGroupImpl a = new AffinityGroupImpl(1);
+        a.addIdentity(new DummyIdentity("1"));
+        a.addIdentity(new DummyIdentity("2"));
+        a.addIdentity(new DummyIdentity("3"));
+        a.addIdentity(new DummyIdentity("4"));
+        a.addIdentity(new DummyIdentity("5"));
+        a.addIdentity(new DummyIdentity("6"));
+        a.addIdentity(new DummyIdentity("7"));
+        a.addIdentity(new DummyIdentity("8"));
+        a.addIdentity(new DummyIdentity("11"));
+        a.addIdentity(new DummyIdentity("12"));
+        a.addIdentity(new DummyIdentity("13"));
+        a.addIdentity(new DummyIdentity("14"));
+        a.addIdentity(new DummyIdentity("17"));
+        a.addIdentity(new DummyIdentity("18"));
+        a.addIdentity(new DummyIdentity("20"));
+        a.addIdentity(new DummyIdentity("22"));
+        groups.add(a);
+
+        AffinityGroupImpl b = new AffinityGroupImpl(2);
+        b.addIdentity(new DummyIdentity("9"));
+        b.addIdentity(new DummyIdentity("10"));
+        b.addIdentity(new DummyIdentity("15"));
+        b.addIdentity(new DummyIdentity("16"));
+        b.addIdentity(new DummyIdentity("19"));
+        b.addIdentity(new DummyIdentity("21"));
+        b.addIdentity(new DummyIdentity("23"));
+        b.addIdentity(new DummyIdentity("24"));
+        b.addIdentity(new DummyIdentity("25"));
+        b.addIdentity(new DummyIdentity("26"));
+        b.addIdentity(new DummyIdentity("27"));
+        b.addIdentity(new DummyIdentity("28"));
+        b.addIdentity(new DummyIdentity("29"));
+        b.addIdentity(new DummyIdentity("30"));
+        b.addIdentity(new DummyIdentity("31"));
+        b.addIdentity(new DummyIdentity("32"));
+        b.addIdentity(new DummyIdentity("33"));
+        b.addIdentity(new DummyIdentity("34"));
+        groups.add(b);
+
+        double modularity =
+            LabelPropagation.calcModularity(builder.getAffinityGraph(), groups);
+        System.out.println("Modularity for correct Zachary's karate club is " +
+                modularity);
+    }
 
     /**
      * A graph builder that returns a pre-made graph for the Zachary karate
