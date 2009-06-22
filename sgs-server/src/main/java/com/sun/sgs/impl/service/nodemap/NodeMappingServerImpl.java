@@ -876,15 +876,25 @@ public final class NodeMappingServerImpl
             // our client services register with us.     
         }
 
+        /** {@inheritDoc} */
         public void nodeStatusChange(Node node) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.log(Level.FINE, "Node {0} status change to {1}",
                            node.getId(), node.getStatus());
             }
-            if (node.getStatus() == Status.GREEN) {
-                assignPolicy.nodeAvailable(node.getId());
-            } else {
-                assignPolicy.nodeUnavailable(node.getId());
+            switch (node.getStatus()) {
+                case RED:
+                    // This will call assignPolicy.nodeUnavailable()
+                    nodeFailed(node);
+                    break;
+
+                case YELLOW:
+                    assignPolicy.nodeUnavailable(node.getId());
+                    break;
+
+                case GREEN:
+                    assignPolicy.nodeAvailable(node.getId());
+                    break;
             }
         }
 

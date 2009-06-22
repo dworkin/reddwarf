@@ -40,7 +40,7 @@ public interface WatchdogService extends Service {
      * remains fixed for the lifetime of the node (i.e., until it fails). <p>
      *
      * This method may be invoked any time after this service is
-     * intialized, whether or not the calling context is inside or outside
+     * initialized, whether or not the calling context is inside or outside
      * of a transaction.
      *
      * @return	the node ID for the local node
@@ -74,7 +74,7 @@ public interface WatchdogService extends Service {
      * #isLocalNodeAlive isLocalNodeAlive} method. <p>
      *
      * This method may be invoked any time after this service is
-     * intialized, whether or not the calling context is inside or outside
+     * initialized, whether or not the calling context is inside or outside
      * of a transaction.
      *
      * @return	{@code true} if the local node is considered alive, and
@@ -175,9 +175,9 @@ public interface WatchdogService extends Service {
     void reportStatus(long nodeId, Status status, String className);
 
     /**
-     * Informs the watchdog that a problem has occured in a service or
+     * Informs the watchdog that a problem has occurred in a service or
      * component. The watchdog will notify the server of the failure and
-     * then proceeed to shutting down the node. The node specified as the
+     * then proceed to shutting down the node. The node specified as the
      * {@code nodeId} can be a local node or a remote node. <p>
      *
      * This method must be invoked outside of a transaction.

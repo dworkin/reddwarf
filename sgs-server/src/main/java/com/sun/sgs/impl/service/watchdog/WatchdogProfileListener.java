@@ -59,7 +59,7 @@ class WatchdogProfileListener implements ProfileListener {
         noName = wrappedProps.getIntProperty(NO_NAME_PROPERTY,
                                              Integer.MAX_VALUE,
                                              1, Integer.MAX_VALUE);
-        System.out.println("ready high water= " + readyLimit +
+        System.out.println("CONFIG: ready queue limit= " + readyLimit +
                            " noName= " + noName);
         status = Status.GREEN;
         over = under = 0;
@@ -88,7 +88,6 @@ class WatchdogProfileListener implements ProfileListener {
 
     private void setStatus(Status newStatus) {
         if (newStatus == status) return;
-//        System.out.println("WPL.setStatus(" + newStatus + ") current status is: " + status);
         status = newStatus;
         service.reportStatus(service.getLocalNodeId(), status, CLASSNAME);
     }
