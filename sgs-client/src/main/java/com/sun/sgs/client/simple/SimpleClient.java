@@ -265,7 +265,12 @@ public class SimpleClient implements ServerSession {
      * @throws IOException if an IO problem occurs
      */
     private void sendRaw(ByteBuffer buf) throws IOException {
-        clientConnection.sendMessage(buf);
+	ClientConnection conn = clientConnection;
+	if (conn != null) {
+	    conn.sendMessage(buf);
+	} else {
+	    throw new IOException("client disconnected or reconnecting");
+	}
     }
 
     /**
