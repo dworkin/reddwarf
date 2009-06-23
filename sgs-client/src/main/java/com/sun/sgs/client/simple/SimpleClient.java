@@ -354,6 +354,7 @@ public class SimpleClient implements ServerSession {
 	}
         
         /* -- Implement ClientConnectionListener -- */
+	
         /**
          * {@inheritDoc}
          */
@@ -364,7 +365,7 @@ public class SimpleClient implements ServerSession {
                 connectionStateChanging = false;
                 clientConnection = connection;
             }
-
+	    
 	    if (relocateKey != null) {
 		sendRelocateRequest();
 	    } else {
@@ -372,7 +373,12 @@ public class SimpleClient implements ServerSession {
 	    }
         }
 
+	/**
+	 * Sends a login request, obtaining a password authentication if
+	 * one was not provided upon construction.
+	 */
 	private void sendLoginRequest() {
+	    assert relocateKey == null;
             // First time through, we haven't authenticated yet.
             // We don't want to have to reauthenticate for each login
             // redirect.
@@ -404,7 +410,11 @@ public class SimpleClient implements ServerSession {
             }
 	}
 
+	/**
+	 * Sends a relocate request.
+	 */
 	private void sendRelocateRequest() {
+	    assert relocateKey != null;
 	    ByteBuffer buf = ByteBuffer.allocate(2 + relocateKey.length);
 	    buf.put(SimpleSgsProtocol.RELOCATE_REQUEST).
 		put(SimpleSgsProtocol.VERSION).
@@ -636,7 +646,7 @@ public class SimpleClient implements ServerSession {
 	    checkLoggedIn();
 	    clientListener.reconnecting();
 	    redirectOrRelocateToNewNode(
-		host, port, new SimpleClientConnectionListener(authentication));
+ 		host, port, new SimpleClientConnectionListener(relocateKey));
 	}
 
 	/**

@@ -35,6 +35,7 @@ package com.sun.sgs.test.client.simple;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
@@ -57,6 +58,9 @@ public class SimpleServer implements ConnectionListener {
     private Acceptor<SocketAddress> acceptor;
 
     private static int DEFAULT_PORT_NUMBER = 10002;
+
+    private final static byte[] DEFAULT_RELOCATE_KEY =
+	new byte[] { 0x0a, 0x0b, 0x0c, 0x0d };
 
     private static String host = "localhost";
 
@@ -232,13 +236,41 @@ public class SimpleServer implements ConnectionListener {
                 startMessages(conn);
             } else if (serverMessage.equals("Leave Channel")) {
                 stopMessages(conn);
-            }
+            } else if (serverMessage.equals("Relocate")) {
+		int port = msg.getInt();
+		relocate(conn, port);
+	    } else {
+		System.out.println("Unknown server message: " +
+				   serverMessage);
+	    }
+	    
         } else if (command == SimpleSgsProtocol.LOGOUT_REQUEST) {
 	    System.out.println("Received logout request");
             MessageBuffer reply = new MessageBuffer(1);
             reply.putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
             sendMessage(conn, reply.getBuffer());
-        }
+        } else if (command == SimpleSgsProtocol.RELOCATE_REQUEST) {
+            byte version = msg.getByte();
+            if (version != SimpleSgsProtocol.VERSION) {
+                System.out.println("Version number mismatch: " + version
+                        + " " + SimpleSgsProtocol.VERSION);
+                return;
+            }
+	    byte[] relocateKey = msg.getBytes(msg.limit() - msg.position());
+	    if (!Arrays.equals(relocateKey, DEFAULT_RELOCATE_KEY)) {
+		System.out.println("Invalid relocateKey: " +
+				   HexDumper.toHexString(relocateKey));
+		return;
+	    }
+	    byte[] reconnectKey = new byte[] {
+		0x1a, 0x1b, 0x1c, 0x1d, 0x30, 0x31, 0x32, 0x33 
+	    };
+
+            MessageBuffer reply = new MessageBuffer(1 + reconnectKey.length);
+	    reply.putByte(SimpleSgsProtocol.RELOCATE_SUCCESS).
+		  putBytes(reconnectKey);
+            sendMessage(conn, reply.getBuffer());
+	}
     }
 
     final ConcurrentHashMap<Connection, Thread> messageThreads =
@@ -286,5 +318,16 @@ public class SimpleServer implements ConnectionListener {
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
+    }
+
+    private void relocate(Connection conn, int port) {
+	MessageBuffer reply  =
+	    new MessageBuffer(1 + MessageBuffer.getSize(host) + 4 +
+			      DEFAULT_RELOCATE_KEY.length);
+	reply.putByte(SimpleSgsProtocol.RELOCATE_NOTIFICATION).
+	      putString(host).
+	      putInt(port).
+	      putBytes(DEFAULT_RELOCATE_KEY);
+	sendMessage(conn, reply.getBuffer());
     }
 }
