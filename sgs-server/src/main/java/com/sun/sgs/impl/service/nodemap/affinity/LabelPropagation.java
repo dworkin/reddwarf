@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-//import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation.LabelNode;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
@@ -32,9 +31,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -48,6 +54,8 @@ import java.util.logging.Logger;
  * Set logging to Level.FINEST for a trace of the algorithm (very verbose
  * and slow).
  * Set logging to Level.FINER to see the final labeled graph.
+ * Set logging to Level.FINE and construct with {@code gatherStats} set to
+ *  {@code true} to print some high level statistics about each algorithm run.
  */
 public class LabelPropagation {
     private static final String PKG_NAME = 
@@ -59,6 +67,15 @@ public class LabelPropagation {
     // The producer of our graphs.
     private final GraphBuilder builder;
 
+    // A random number generator, to break ties.
+    private final Random ran = new Random();
+
+    // Our thread pool
+    private final ExecutorCompletionService<Boolean> ecs;
+    private final ExecutorService es;
+
+    // FOR TESTING
+    private final int numThreads;
     // If true, gather statistics for each run.
     private final boolean gatherStats;
     // Statistics for the last run, only if gatherStats is true
@@ -72,10 +89,28 @@ public class LabelPropagation {
      * @param builder the graph producer
      * @param gatherStats if {@code true}, gather extra statistics for each run.
      *            Useful for testing.
+     * @param numThreads number of threads, for TESTING.
+     *      If 1, use the sequential asynchronous version.
+     *      If >1, use the parallel version, with that number of threads.
+     *
+     * @throws IllegalArgumentException if {@code numThreads} is <= 0
      */
-    public LabelPropagation(GraphBuilder builder, boolean gatherStats) {
+    public LabelPropagation(GraphBuilder builder, boolean gatherStats, 
+                            int numThreads)
+    {
+        if (numThreads < 1) {
+            throw new IllegalArgumentException("Num threads must be > 0");
+        }
         this.builder = builder;
         this.gatherStats = gatherStats;
+        this.numThreads = numThreads;
+        if (numThreads > 1) {
+            es = Executors.newFixedThreadPool(numThreads);
+            ecs = new ExecutorCompletionService<Boolean>(es);
+        } else {
+            es = null;
+            ecs = null;
+        }
     }
 
     //JANE not sure of how best to return the groups
@@ -90,7 +125,7 @@ public class LabelPropagation {
         long startTime = System.currentTimeMillis();
         // Step 1.  Initialize all nodes in the network.
         //          Their labels are their Identities.
-        Graph<LabelNode, WeightedEdge> graph = createLabelGraph();
+        final Graph<LabelNode, WeightedEdge> graph = createLabelGraph();
 
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST,
@@ -119,8 +154,36 @@ public class LabelPropagation {
                 Collections.shuffle(vertices);
             }
 
-            for (LabelNode vertex : vertices) {
-                changed = setMostFrequentLabel(vertex, graph) || changed;
+            if (numThreads > 1) {
+                for (final LabelNode vertex : vertices) {
+                    ecs.submit(new Callable<Boolean>() {
+                        public Boolean call() {
+                            return setMostFrequentLabel(vertex, graph);
+                        }
+                    });
+                }
+                // Now run them
+                int n = vertices.size();
+                AtomicBoolean achanged = new AtomicBoolean(false);
+                for (int i = 0; i < n; ++i) {
+                    try {
+                        Boolean res = ecs.take().get();
+                        achanged.set(res);
+                    } catch (InterruptedException ie) {
+                        achanged.set(true);
+                        logger.logThrow(Level.INFO, ie,
+                                        " during iteration " + t);
+                    } catch (ExecutionException ee) {
+                        achanged.set(true);
+                        logger.logThrow(Level.INFO, ee,
+                                        " during iteration " + t);
+                    }
+                }
+                changed = achanged.get();
+            } else {
+                for (LabelNode vertex : vertices) {
+                    changed = setMostFrequentLabel(vertex, graph) || changed;
+                }
             }
 
             // Step 5. If every node has a label that the maximum number of
@@ -160,12 +223,35 @@ public class LabelPropagation {
             time = System.currentTimeMillis() - startTime;
             iterations = t;
             modularity = calcModularity(builder.getAffinityGraph(), groups);
-            printStats();
+
+            if (logger.isLoggable(Level.FINE)) {
+                StringBuffer sb = new StringBuffer();
+                sb.append(" LPA (" + numThreads + ") took " +
+                          time + " milliseconds, " +
+                          iterations + " iterations, and found " +
+                          groups.size() + " groups ");
+                sb.append(" modularity %.4f %n" + modularity);
+                for (AffinityGroup group : groups) {
+                    sb.append(" id: " + group.getId() + ": members");
+                    for (Identity id : group.getIdentities()) {
+                        sb.append(id + " ");
+                    }
+                }
+                logger.log(Level.FINE, sb.toString());
+            }
         }
 
         return groups;
     }
 
+    /**
+     * Shut down any resources used by this algorithm.
+     */
+    public void shutdown() {
+        if (es != null) {
+            es.shutdown();
+        }
+    }
     /**
      * Obtains a graph from the graph builder, and converts it into a
      * graph that adds labels to the vertices.  This graph is the first
@@ -210,7 +296,7 @@ public class LabelPropagation {
     private boolean setMostFrequentLabel(LabelNode node,
             Graph<LabelNode, WeightedEdge> graph)
     {
-        Set<Integer> highestSet = getNeighborCounts(node, graph);
+        ArrayList<Integer> highestSet = getNeighborCounts(node, graph);
 
         // If our current label is in the set of highest labels, we're done.
         if (highestSet.contains(node.label)) {
@@ -218,9 +304,7 @@ public class LabelPropagation {
         }
 
         // Otherwise, choose a label at random
-        List<Integer> random = new ArrayList<Integer>(highestSet);
-        Collections.shuffle(random);
-        node.label = random.get(0);
+        node.label = highestSet.get(ran.nextInt(highestSet.size()));
         logger.log(Level.FINEST, "Returning true: node is now {0}", node);
         return true;
     }
@@ -233,7 +317,7 @@ public class LabelPropagation {
      * @param graph the entire graph
      * @return
      */
-    private Set<Integer> getNeighborCounts(LabelNode node,
+    private ArrayList<Integer> getNeighborCounts(LabelNode node,
             Graph<LabelNode, WeightedEdge> graph)
     {
         // A map of labels -> count, effectively counting how many
@@ -275,8 +359,8 @@ public class LabelPropagation {
             identSet.add(entry.getKey());
             countMap.put(count, identSet);
         }
-        // Return the set of labels with the highest count.
-        return countMap.get(countMap.lastKey());
+        // Return the list of labels with the highest count.
+        return new ArrayList<Integer>(countMap.get(countMap.lastKey()));
     }
 
     /**
@@ -308,23 +392,6 @@ public class LabelPropagation {
     public long getTime()         { return time; }
     public int getIterations()    { return iterations; }
     public double getModularity() { return modularity; }
-
-    /**
-     * Print statistics about this run;  useful for testing.
-     */
-    private void printStats() {
-        System.out.print(" LPA took " +
-            time + " milliseconds, " + iterations + " iterations, and found " +
-            groups.size() + " groups ");
-        System.out.printf(" LPA modularity %.4f %n", modularity);
-        for (AffinityGroup group : groups) {
-            System.out.print(" id: " + group.getId() + ": members: ");
-            for (Identity id : group.getIdentities()) {
-                System.out.print(id + " ");
-            }
-            System.out.println(" ");
-        }
-    }
     
     // This doesn't belong here, it doesn't apply to any particular
     // algorithm for finding affinity groups.
@@ -338,7 +405,8 @@ public class LabelPropagation {
      * number being better.
      * <p>
      * See "Finding community structure in networks using eigenvectors
-     * of matrices" 2006 Mark Newman.
+     * of matrices" 2006 Mark Newman and "Finding community structure in
+     * very large networks" 2004 Clauset, Newman, Moore.
      *
      * @param graph the graph which was devided into communities
      * @param groups the communities found in the graph
@@ -347,21 +415,26 @@ public class LabelPropagation {
     public static double calcModularity(Graph<Identity, WeightedEdge> graph,
             Collection<AffinityGroup> groups)
     {
-        final int m = graph.getEdgeCount();
-        final int doublem = 2 * graph.getEdgeCount();
+        long m = 0;
+        for (WeightedEdge e : graph.getEdges()) {
+            m = m + e.getWeight();
+        }
+        final long doublem = 2 * m;
 
         // For each pair of vertices that are in the same community,
         // compute 1/(2m) * Sum(Aij - Pij), where Pij is kikj/2m.
-        // See equation (18) in Newman's paper.
+        // See equation (18) in Newman's 2006 paper.
+        //
         // Note also that modularity can be expressed as
-        // Sum(eii - ai*ai) where eii is the fraction of edges in the group
-        // and ai*ai is the expected fraction of edges in the group.
-        // See Raghavan paper (JANE also other earlier refs?)
+        // Sum(eii - ai*ai) where eii is the fraction of edges in the group i
+        // and ai is the fraction of ends of edges that are attached to
+        // vertices in community i.
+        // See equation (7) in Clauset, Newman, Moore 2004 paper.
         double q = 0;
 
         for (AffinityGroup g : groups) {  
-            // value is weighted edge count within the community           
-            long value = 0;
+            // ingroup is weighted edge count within the community
+            long ingroup = 0;
             // totEdges is the total number of connections for this community
             long totEdges = 0;
             
@@ -382,14 +455,17 @@ public class LabelPropagation {
                     // Calculate the adjacency info for v1 and v2
                     // We allow parallel, weighted edges
                     for (WeightedEdge edge : edges) {
-                        value = value + (edge.getWeight() * 2);
+                        ingroup = ingroup + (edge.getWeight() * 2);
                     }
                 }
             }
 
-            double tmp = (double) totEdges / doublem;
-            q = q + (((double) value / doublem) - (tmp * tmp));
+            double ai = (double) totEdges / doublem;
+            q = q + (((double) ingroup / doublem) - (ai * ai));
         }
+        // Ensure that the final value is between 0.0 and 1.0.  This number
+        // can go slightly negative if we have groups with single nodes.
+        q = Math.min(1.0, Math.max(0.0, q));
         return q;
     }
 

@@ -27,57 +27,89 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
-import com.sun.sgs.tools.test.FilteredNameRunner;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Graphs;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import org.junit.runner.RunWith;
 
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runners.Parameterized;
 /**
  *
  * 
  */
-@RunWith(FilteredNameRunner.class)
+//@RunWith(FilteredNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestLPA {
 
-    @BeforeClass
-    public static void warmup() {
+    private static int numThreads;
+    private static final int WARMUP_RUNS = 100;
+    private static final int RUNS = 500;
+
+    @Parameterized.Parameters
+    public static Collection data() {
+        return Arrays.asList(new Object[][] {{1}, {2}, {4}, {8}, {16}});
+
+    }
+
+    public TestLPA(int numThreads) {
+        this.numThreads = numThreads;
+    }
+
+    @Test
+    public void warmup() {
         // Warm up the compilers
         LabelPropagation lpa =
-                new LabelPropagation(new TestZachBuilder(), false);
+                new LabelPropagation(new TestZachBuilder(), false, numThreads);
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.findCommunities();
         }
+        lpa.shutdown();
     }
 
     @Test
     public void testZachary() {
         GraphBuilder builder = new TestZachBuilder();
         // second argument true:  gather statistics
-        LabelPropagation lpa = new LabelPropagation(builder, true);
+        LabelPropagation lpa = new LabelPropagation(builder, true, numThreads);
         
-        final int RUNS = 500;
         long avgTime = 0;
         int avgIter = 0;
         double avgMod  = 0.0;
+        double maxMod = 0.0;
+        double minMod = 1.0;
+        long maxTime = 0;
+        long minTime = 1;
         for (int i = 0; i < RUNS; i++) {
             Collection<AffinityGroup> groups = lpa.findCommunities();
-            avgTime = avgTime + lpa.getTime();
+            long time = lpa.getTime();
+            avgTime = avgTime + time;
+            maxTime = Math.max(maxTime, time);
+            minTime = Math.min(minTime, time);
+
             avgIter = avgIter + lpa.getIterations();
-            avgMod = avgMod + lpa.getModularity();
+            double mod = lpa.getModularity();
+            avgMod = avgMod + mod;
+            maxMod = Math.max(maxMod, mod);
+            minMod = Math.min(minMod, mod);
         }
-        System.out.printf("XXX (%d runs): avg time : %4.2f ms, " +
-                          " avg iters : %4.2f, avg modularity: %.4f %n",
-                          RUNS,
+        System.out.printf("XXX (%d runs, %d threads): avg time : %4.2f ms, " +
+                          " time range [%d - %d ms] " +
+                          " avg iters : %4.2f, avg modularity: %.4f, " +
+                          " modularity range [%.4f - %.4f] %n",
+                          RUNS, numThreads,
                           avgTime/(double) RUNS,
+                          minTime, maxTime,
                           avgIter/(double) RUNS,
-                          avgMod/(double) RUNS);
+                          avgMod/(double) RUNS,
+                          minMod, maxMod);
+        lpa.shutdown();
     }
 
     // Need to figure out where the modularity calculation really belongs.
@@ -169,6 +201,57 @@ public class TestLPA {
         double modularity =
             LabelPropagation.calcModularity(builder.getAffinityGraph(), groups);
         System.out.println("Modularity for correct Zachary's karate club is " +
+                modularity);
+    }
+
+    @Test
+    public void testModularityCalc() {
+        GraphBuilder builder = new TestZachBuilder();
+        Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
+        AffinityGroupImpl a = new AffinityGroupImpl(49);
+        a.addIdentity(new DummyIdentity("17"));
+        groups.add(a);
+
+        AffinityGroupImpl b = new AffinityGroupImpl(2);
+        b.addIdentity(new DummyIdentity("1"));
+        b.addIdentity(new DummyIdentity("2"));
+        b.addIdentity(new DummyIdentity("3"));
+        b.addIdentity(new DummyIdentity("4"));
+        b.addIdentity(new DummyIdentity("5"));
+        b.addIdentity(new DummyIdentity("6"));
+        b.addIdentity(new DummyIdentity("7"));
+        b.addIdentity(new DummyIdentity("8"));
+        b.addIdentity(new DummyIdentity("9"));
+        b.addIdentity(new DummyIdentity("10"));
+        b.addIdentity(new DummyIdentity("11"));
+        b.addIdentity(new DummyIdentity("12"));
+        b.addIdentity(new DummyIdentity("13"));
+        b.addIdentity(new DummyIdentity("14"));
+        b.addIdentity(new DummyIdentity("15"));
+        b.addIdentity(new DummyIdentity("16"));
+//        b.addIdentity(new DummyIdentity("17"));
+        b.addIdentity(new DummyIdentity("18"));
+        b.addIdentity(new DummyIdentity("19"));
+        b.addIdentity(new DummyIdentity("20"));
+        b.addIdentity(new DummyIdentity("21"));
+        b.addIdentity(new DummyIdentity("22"));
+        b.addIdentity(new DummyIdentity("23"));
+        b.addIdentity(new DummyIdentity("24"));
+        b.addIdentity(new DummyIdentity("25"));
+        b.addIdentity(new DummyIdentity("26"));
+        b.addIdentity(new DummyIdentity("27"));
+        b.addIdentity(new DummyIdentity("28"));
+        b.addIdentity(new DummyIdentity("29"));
+        b.addIdentity(new DummyIdentity("30"));
+        b.addIdentity(new DummyIdentity("31"));
+        b.addIdentity(new DummyIdentity("32"));
+        b.addIdentity(new DummyIdentity("33"));
+        b.addIdentity(new DummyIdentity("34"));
+        groups.add(b);
+
+        double modularity =
+            LabelPropagation.calcModularity(builder.getAffinityGraph(), groups);
+        System.out.println("Modularity test club partition is " +
                 modularity);
     }
 
