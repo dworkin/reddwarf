@@ -164,22 +164,19 @@ public class LabelPropagation {
                 }
                 // Now run them
                 int n = vertices.size();
-                AtomicBoolean achanged = new AtomicBoolean(false);
                 for (int i = 0; i < n; ++i) {
                     try {
-                        Boolean res = ecs.take().get();
-                        achanged.set(res);
+                        changed = ecs.take().get() || changed;
                     } catch (InterruptedException ie) {
-                        achanged.set(true);
+                        changed = true;
                         logger.logThrow(Level.INFO, ie,
                                         " during iteration " + t);
                     } catch (ExecutionException ee) {
-                        achanged.set(true);
+                        changed = true;
                         logger.logThrow(Level.INFO, ee,
                                         " during iteration " + t);
                     }
                 }
-                changed = achanged.get();
             } else {
                 for (LabelNode vertex : vertices) {
                     changed = setMostFrequentLabel(vertex, graph) || changed;
