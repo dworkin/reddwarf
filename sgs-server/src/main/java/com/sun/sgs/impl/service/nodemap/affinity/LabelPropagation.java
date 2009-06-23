@@ -36,8 +36,6 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -70,11 +68,10 @@ public class LabelPropagation {
     // A random number generator, to break ties.
     private final Random ran = new Random();
 
-    // Our thread pool
-    private final ExecutorCompletionService<Boolean> ecs;
-    private final ExecutorService es;
+    // Our executor, for running tasks in parallel
+    private final ExecutorService executor;
 
-    // FOR TESTING
+    // The number of threads this algorithm should use.
     private final int numThreads;
     // If true, gather statistics for each run.
     private final boolean gatherStats;
@@ -93,7 +90,8 @@ public class LabelPropagation {
      *      If 1, use the sequential asynchronous version.
      *      If >1, use the parallel version, with that number of threads.
      *
-     * @throws IllegalArgumentException if {@code numThreads} is <= 0
+     * @throws IllegalArgumentException if {@code numThreads} is
+     *       less than {@code 1}
      */
     public LabelPropagation(GraphBuilder builder, boolean gatherStats, 
                             int numThreads)
@@ -105,11 +103,9 @@ public class LabelPropagation {
         this.gatherStats = gatherStats;
         this.numThreads = numThreads;
         if (numThreads > 1) {
-            es = Executors.newFixedThreadPool(numThreads);
-            ecs = new ExecutorCompletionService<Boolean>(es);
+            executor = Executors.newFixedThreadPool(numThreads);
         } else {
-            es = null;
-            ecs = null;
+            executor = null;
         }
     }
 
@@ -155,28 +151,29 @@ public class LabelPropagation {
             }
 
             if (numThreads > 1) {
+                final AtomicBoolean abool = new AtomicBoolean(false);
+                List<Callable<Void>> tasks = new ArrayList<Callable<Void>>();
                 for (final LabelNode vertex : vertices) {
-                    ecs.submit(new Callable<Boolean>() {
-                        public Boolean call() {
-                            return setMostFrequentLabel(vertex, graph);
+                    tasks.add(new Callable<Void>() {
+                        public Void call() {
+                            boolean res = setMostFrequentLabel(vertex, graph);
+                            abool.compareAndSet(false, res);
+                            return null;
                         }
                     });
                 }
-                // Now run them
-                int n = vertices.size();
-                for (int i = 0; i < n; ++i) {
-                    try {
-                        changed = ecs.take().get() || changed;
-                    } catch (InterruptedException ie) {
-                        changed = true;
-                        logger.logThrow(Level.INFO, ie,
-                                        " during iteration " + t);
-                    } catch (ExecutionException ee) {
-                        changed = true;
-                        logger.logThrow(Level.INFO, ee,
-                                        " during iteration " + t);
-                    }
+
+                // Invoke all the tasks, waiting for them to be done.
+                // We don't look at the returned futures.
+                try {
+                    executor.invokeAll(tasks);
+                } catch (InterruptedException ie) {
+                    changed = true;
+                    logger.logThrow(Level.INFO, ie,
+                                    " during iteration " + t);
                 }
+                changed = abool.get();
+
             } else {
                 for (LabelNode vertex : vertices) {
                     changed = setMostFrequentLabel(vertex, graph) || changed;
@@ -245,10 +242,11 @@ public class LabelPropagation {
      * Shut down any resources used by this algorithm.
      */
     public void shutdown() {
-        if (es != null) {
-            es.shutdown();
+        if (executor != null) {
+            executor.shutdown();
         }
     }
+
     /**
      * Obtains a graph from the graph builder, and converts it into a
      * graph that adds labels to the vertices.  This graph is the first
@@ -368,7 +366,7 @@ public class LabelPropagation {
      * @param graph the input graph
      * @return the affinity groups
      */
-    private Collection<AffinityGroup> gatherGroups (
+    private Collection<AffinityGroup> gatherGroups(
             Graph<LabelNode, WeightedEdge> graph)
     {
         // All nodes with the same label are in the same community.
@@ -386,8 +384,28 @@ public class LabelPropagation {
         return groupMap.values();
     }
 
+    /**
+     * Returns the time used for the last algorithm run.  This is only
+     * valid if we were constructed to gather statistics.
+     *
+     * @return the time used for the last algorithm run
+     */
     public long getTime()         { return time; }
+
+    /**
+     * Returns the iterations required for the last algorithm run.  This is only
+     * valid if we were constructed to gather statistics.
+     *
+     * @return the iterations required for the last algorithm run
+     */
     public int getIterations()    { return iterations; }
+
+    /**
+     * Returns the moduarity of the last algorithm run results. This is only
+     * valid if we were constructed to gather statistics.
+     *
+     * @return the moduarity of the last algorithm run results
+     */
     public double getModularity() { return modularity; }
     
     // This doesn't belong here, it doesn't apply to any particular
@@ -407,7 +425,7 @@ public class LabelPropagation {
      *
      * @param graph the graph which was devided into communities
      * @param groups the communities found in the graph
-     * @return
+     * @return the modularity of the groups found in the graph
      */
     public static double calcModularity(Graph<Identity, WeightedEdge> graph,
             Collection<AffinityGroup> groups)
@@ -494,7 +512,7 @@ public class LabelPropagation {
                     new ArrayList<Identity>(group.getIdentities());
             while (!groupList.isEmpty()) {
                 Identity v1 = groupList.remove(0);
-                for (Identity v2: groupList) {
+                for (Identity v2 : groupList) {
                     // v1 and v2 are in the same group in sample1.  Are they
                     // in the same group in sample2?
                     if (inSameGroup(v1, v2, sample2)) {
@@ -510,7 +528,7 @@ public class LabelPropagation {
                     new ArrayList<Identity>(group.getIdentities());
             while (!groupList.isEmpty()) {
                 Identity v1 = groupList.remove(0);
-                for (Identity v2: groupList) {
+                for (Identity v2 : groupList) {
                     // v1 and v2 are in the same group in sample2.  Count those
                     // that are not in the same group in sample1.
                     if (!inSameGroup(v1, v2, sample1)) {
@@ -548,7 +566,7 @@ public class LabelPropagation {
      */
     private static class LabelNode {
         final Identity id;
-        int label;
+        volatile int label;
 
         public LabelNode(Identity id) {
             this.id = id;

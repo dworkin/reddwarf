@@ -33,9 +33,14 @@ public class AffinityGroupImpl implements AffinityGroup {
     private final Set<Identity> identities = 
         Collections.synchronizedSet(new HashSet<Identity>());
 
+    /**
+     * Constructs a new affinity group with the given identity.
+     * @param id the affinity group identity
+     */
     public AffinityGroupImpl(long id) {
         this.id = id;
     }
+
     /** {@inheritDoc} */
     public long getId() {
         return id;
@@ -46,14 +51,17 @@ public class AffinityGroupImpl implements AffinityGroup {
         return Collections.unmodifiableSet(identities);
     }
 
-    public void addIdentity(Identity id) {
-        identities.add(id);
-    }
-
     /** {@inheritDoc} */
     public String toString() {
         return getClass().getName() + "[" + id +
                ",  size: " + identities.size() + "]";
     }
 
+    /**
+     * Add the given identity to this affinity group.
+     * @param id the identity to add
+     */
+    public void addIdentity(Identity id) {
+        identities.add(id);
+    }
 }
