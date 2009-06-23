@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.util;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
@@ -64,6 +65,7 @@ public class TestTransactionContextFactory extends TestCase {
 		    };
 		}
 	    };
+	DummyProfileCoordinator.initialize();
 	DummyTransaction txn = new DummyTransaction(
 	    DummyTransaction.UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
