@@ -16,6 +16,17 @@
       <artifactId>sgs-server-api</artifactId>
       <version>${sgs-server.version}</version>
     </dependency>
+    <dependency>
+        <groupId>com.projectdarkstar.server</groupId>
+        <artifactId>sgs-shared</artifactId>
+        <classifier>sources</classifier>
+        <version>${sgs-shared.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>com.projectdarkstar.client</groupId>
+        <artifactId>sgs-client</artifactId>
+        <version>${sgs-client.version}</version>
+    </dependency>
   </dependencies>
   <description>Validate client API by iterating through all protocol messages.</description>
 
@@ -161,6 +172,8 @@ A
     <node.type>single</node.type>
     <shutdown.port>1138</shutdown.port>
     <app.port>1139</app.port>
+    <sgs-shared.version>1.7</sgs-shared.version>
+    <sgs-client.version>0.9.11-SNAPSHOT</sgs-client.version>
   </properties>
 
   <repositories>
