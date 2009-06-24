@@ -67,9 +67,9 @@ final class ReferenceTable {
      * Finds the managed reference associated with a managed object, returning
      * null if no reference is found.
      */
-    ManagedReferenceImpl<?> find(Object object) {
+    ManagedReferenceImpl<?> find(ManagedObject object) {
 	assert object != null : "Object is null";
-	ManagedReferenceImpl<?> result = objects.get(object);
+        ManagedReferenceImpl<?> result = objects.get(object);
 	if (result == null &&
 	    trackStaleObjects &&
 	    staleObjects.containsKey(object))

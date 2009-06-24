@@ -842,7 +842,7 @@ public class TestMBeans {
         
         // Get individual fields
         long reg = (Long) mbsc.getAttribute(name, 
-                                "RegisterSessionDisconnectListenerCalls");
+                                "AddSessionStatusListenerCalls");
         long get = (Long) mbsc.getAttribute(name, 
                                 "GetSessionProtocolCalls");
         
