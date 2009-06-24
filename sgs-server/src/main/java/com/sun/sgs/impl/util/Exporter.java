@@ -47,6 +47,9 @@ public class Exporter<T extends Remote> {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    /** The ServerSocketFactory used for all exports. */
+    private static final ServerSocketFactory ssf = new ServerSocketFactory();
+
     /** The type of the server. */
     private final Class<T> type;
 
@@ -92,12 +95,14 @@ public class Exporter<T extends Remote> {
 	    throw new NullPointerException("null name");
 	}
 	this.server = server;
-	ServerSocketFactory ssf = new ServerSocketFactory();
-	registry = LocateRegistry.createRegistry(port, null, ssf);
-	proxy = type.cast(
-	    UnicastRemoteObject.exportObject(server, port, null, ssf));
-	registry.rebind(name, proxy);
-        return port == 0 ? ssf.getLastAnonymousPort() : ssf.getLastFixedPort();
+
+        synchronized(ssf) {
+            registry = LocateRegistry.createRegistry(port, null, ssf);
+            proxy = type.cast(
+                    UnicastRemoteObject.exportObject(server, port, null, ssf));
+            registry.rebind(name, proxy);
+            return ssf.getLastPort();
+        }
     }
 
     /**
@@ -117,10 +122,12 @@ public class Exporter<T extends Remote> {
 	    throw new NullPointerException("null server");
 	}
 	this.server = server;
-	ServerSocketFactory ssf = new ServerSocketFactory();
-	proxy = type.cast(
-	    UnicastRemoteObject.exportObject(server, port, null, ssf));
-        return port == 0 ? ssf.getLastAnonymousPort() : ssf.getLastFixedPort();
+
+        synchronized(ssf) {
+            proxy = type.cast(
+                    UnicastRemoteObject.exportObject(server, port, null, ssf));
+            return ssf.getLastPort();
+        }
     }
 
     /**
@@ -169,11 +176,8 @@ public class Exporter<T extends Remote> {
     private static class ServerSocketFactory
 	implements RMIServerSocketFactory
     {
-	/** Port number of last fixed port server socket created. */
-	private static int lastFixedPort = -1;
-
-        /** Port number of last anonymous port server socket created. */
-        private static int lastAnonymousPort = -1;
+	/** Port number of last server socket created. */
+	private static int lastPort = -1;
 
 	/** Creates an instance. */
 	ServerSocketFactory() { }
@@ -181,24 +185,21 @@ public class Exporter<T extends Remote> {
 	/** {@inheritDoc} */
 	public ServerSocket createServerSocket(int port) throws IOException {
 	    ServerSocket serverSocket = new ServerSocket(port);
-            if(port != 0) {
-                lastFixedPort = (serverSocket == null) ?
-                    -1 : serverSocket.getLocalPort();
-            } else {
-                lastAnonymousPort = (serverSocket == null) ?
-                    -1 : serverSocket.getLocalPort();
-            }
+            lastPort = (serverSocket == null) ?
+                -1 : serverSocket.getLocalPort();
 	    return serverSocket;
 	}
 
-	/** Returns the local port of the last server socket created. */
-	int getLastFixedPort() {
-	    return lastFixedPort;
-        }
-
-        /** Returns the local port of the last anonymous port server socket. */
-        int getLastAnonymousPort() {
-            return lastAnonymousPort;
+	/**
+         * Returns the local port of the last server socket created.
+         * This method should only be called once per call to
+         * {@link #createServerSocket(int) createServerSocket}.  Subsequent
+         * calls will return {@code -1}.
+         */
+	int getLastPort() {
+            int port = lastPort;
+            lastPort = -1;
+            return port;
         }
 
         /** {@inheritDoc} */
