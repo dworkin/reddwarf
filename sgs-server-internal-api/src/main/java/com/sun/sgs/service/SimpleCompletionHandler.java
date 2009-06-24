@@ -27,6 +27,8 @@ package com.sun.sgs.service;
  * A handler to be notified when operations for an associated
  * request are complete.
  *
+ * @see ClientSessionStatusListener#prepareToRelocate(
+ *		BigInteger,long,SimpleCompletionHandler)
  * @see RecoveryListener#recover(Node,SimpleCompletionHandler)
  */
 public interface SimpleCompletionHandler {

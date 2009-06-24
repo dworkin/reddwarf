@@ -33,16 +33,16 @@ import java.math.BigInteger;
 public interface ClientSessionService extends Service {
 
     /**
-     * Registers the specified disconnect listener with this service.
-     * This method is non-transactional and should be called outside
-     * of a transaction.
+     * Registers the specified status listener with this service.  This
+     * method is non-transactional and should be called outside of a
+     * transaction.
      *
-     * @param   listener a listener to notify when a session disconnects
+     * @param   listener a listener to notify when a session disconnects or
+     *		is being prepared to relocate
      * @throws	IllegalStateException if this method is invoked from a
      *		transactional context
      */
-    void registerSessionDisconnectListener(
-        ClientSessionDisconnectListener listener);
+    void addSessionStatusListener(ClientSessionStatusListener listener);
 
     /**
      * Returns a protocol for the <i>local</i> client session with the

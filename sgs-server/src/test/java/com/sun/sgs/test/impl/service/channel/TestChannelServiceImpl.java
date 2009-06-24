@@ -34,36 +34,29 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
+import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.BoundNamesUtil;
-import com.sun.sgs.io.Connection;
-import com.sun.sgs.io.ConnectionListener;
-import com.sun.sgs.io.Connector;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.test.util.AbstractDummyClient;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -157,6 +150,8 @@ public class TestChannelServiceImpl extends TestCase {
 	field.setAccessible(true);
 	return field;
     }
+
+    private int hostNum = 0;
     
     /** Constructs a test instance. */
     public TestChannelServiceImpl(String name) throws Exception  {
@@ -179,6 +174,8 @@ public class TestChannelServiceImpl extends TestCase {
                                              DummyAppListener.class);
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
+			  DirectiveNodeAssignmentPolicy.class.getName());
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 	port = serverNode.getAppPort();
@@ -230,13 +227,15 @@ public class TestChannelServiceImpl extends TestCase {
         for (String host : hosts) {
 	    Properties props = SgsTestNode.getDefaultProperties(
 	        APP_NAME, serverNode, DummyAppListener.class);
+	    props.setProperty(StandardProperties.AUTHENTICATORS, 
+                "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
 	    additionalNodes.put(host, node);
         }
     }
-
+    /*
     // -- Test constructor -- 
 
     public void testConstructorNullProperties() throws Exception {
@@ -1460,8 +1459,8 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName = "foo";
 	final String user = "dummy";
 	final String listenerName = "ValidatingChannelListener";
-	DummyClient client =
-	    (new DummyClient()).connect(port).login(user, "password");
+	DummyClient client = new DummyClient(user);
+	client.connect(port).login();
 
 	// Create a channel with a ValidatingChannelListener and join the
 	// client to the channel.
@@ -1501,8 +1500,8 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName = "perf";
 	createChannel(channelName);
 	String user = "dummy";
-	DummyClient client =
-	    (new DummyClient()).connect(port).login(user, "password");
+	DummyClient client = new DummyClient(user);
+	client.connect(port).login();
 
 	final String sessionKey = user;
 	isPerformanceTest = true;
@@ -1616,6 +1615,189 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
     }
+    */
+    
+    // -- Relocation test cases --
+
+    public void testChannelJoinAndRelocate() throws Exception {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	createChannel(channelName);
+	// All clients will log into server node.
+	ClientGroup group = new ClientGroup(someUsers);
+	addNodes("host2", "host3");
+	
+	try {
+	    // Join all users to channel and send some messages on channel.
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+	    int count = getChannelServiceBindingCount();
+	    sendMessagesToChannel(channelName, group, 2);
+	    
+	    // Move clients to new nodes.
+	    printServiceBindings("before relocate");
+	    moveClient(group.getClient(someUsers.get(0)), serverNode,
+		       additionalNodes.get("host2"));
+	    moveClient(group.getClient(someUsers.get(1)), serverNode,
+		       additionalNodes.get("host3"));	    
+	    printServiceBindings("after relocate");
+	    
+	    // Make sure all members are still joined and can receive messages.
+	    checkUsersJoined(channelName, someUsers);
+	    sendMessagesToChannel(channelName, group, 2);
+	    assertEquals(count, getChannelServiceBindingCount());
+
+	    // Disconnect each client and make sure that memberships/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    Thread.sleep(WAIT_TIME);
+	    checkUsersJoined(channelName, new ArrayList<String>());
+	    assertEquals(count - someUsers.size(),
+			 getChannelServiceBindingCount());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
+    public void testChannelJoinAndRelocateThrice()
+	throws Exception
+    {
+	String channelName = "foo";
+	createChannel(channelName);
+	// All clients will log into the server node.
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	ClientGroup group = new ClientGroup(someUsers);
+	String[] hosts = new String[] {"host2", "host3", "host4"};
+	addNodes(hosts);
+	
+	try {
+	    // Join all users to channel and send some messages on channel.
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+	    int count = getChannelServiceBindingCount();
+	    sendMessagesToChannel(channelName, group, 2);
+	    
+	    // Move clients to new nodes.
+	    DummyClient relocatingClient =
+		group.getClient(someUsers.get(0));
+	    SgsTestNode oldNode = serverNode;
+	    for (String host : hosts) {
+		SgsTestNode newNode = additionalNodes.get(host);
+		printServiceBindings("before relocate");
+		moveClient(relocatingClient, oldNode, newNode);
+		// Make sure all members are still joined and can receive messages.
+		checkUsersJoined(channelName, someUsers);
+		sendMessagesToChannel(channelName, group, 2);
+		assertEquals(count, getChannelServiceBindingCount());
+		oldNode = newNode;
+	    }
+	    printServiceBindings("after relocate");
+	    // Disconnect each client and make sure that memberships/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    checkUsersJoined(channelName, new ArrayList<String>());
+	    assertEquals(count - someUsers.size(),
+			 getChannelServiceBindingCount());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
+    public void testChannelJoinAndRelocateWithOldNodeFailure()
+	throws Exception
+    {
+	List<String> users = new ArrayList<String>(someUsers);
+	String channelName = "foo";
+	createChannel(channelName);
+	// All clients will log into the server node.
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	ClientGroup group = new ClientGroup(users);
+	String[] hosts = new String[] {"host2", "host3", "host4"};
+	addNodes(hosts);
+	
+	try {
+	    // Join all users to channel and send some messages on channel.
+	    joinUsers(channelName, users);
+	    checkUsersJoined(channelName, users);
+	    int count = getChannelServiceBindingCount();
+	    sendMessagesToChannel(channelName, group, 2);
+	    
+	    // move client to host2
+	    DummyClient relocatingClient =
+		group.getClient(users.get(0));
+	    SgsTestNode node = additionalNodes.get(hosts[0]);
+	    printServiceBindings("before first relocation");
+	    moveClient(relocatingClient, serverNode, node);
+	    printServiceBindings("after first relocation");
+	    // notify client to move to host3, but don't relocate yet.
+	    moveIdentityAndWaitForRelocationNotification(
+		relocatingClient, node, additionalNodes.get(hosts[1]));
+	    printServiceBindings("after second relocate notification");
+	    // channel bindings should include new binding for
+	    // session, and may or may include old because the old binding
+	    // may have been cleaned up already.
+	    int countAfterRelocateNotification =
+		getChannelServiceBindingCount();
+	    assertTrue(countAfterRelocateNotification == count ||
+		       countAfterRelocateNotification == count + 1);
+	    // crash host2.
+	    node.shutdown(false);
+	    // give recovery a chance.
+	    printServiceBindings("after crash");
+	    Thread.sleep(WAIT_TIME*3);
+	    printServiceBindings("after crash & timeout");
+	    users.remove(relocatingClient.name);
+	    group.removeSessionsFromGroup(node.getAppPort());
+	    checkUsersJoined(channelName, users);
+	    sendMessagesToChannel(channelName, group, 2);
+	    assertEquals(count - 1,
+			 getChannelServiceBindingCount());
+	    // Disconnect each client and make sure that membership/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    checkUsersJoined(channelName, new ArrayList<String>());
+	    assertEquals(count - users.size() - 1,
+			 getChannelServiceBindingCount());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
+    /**
+     * Reassigns the idenity from {@code oldNode} to {@code newNode}, and
+     * waits for the client to receive the relocation notification.  The
+     * client does not relocated unless instructed to do so via a {@code
+     * relocate} invocation.
+     */
+    private void moveIdentityAndWaitForRelocationNotification(
+	DummyClient client, SgsTestNode oldNode, SgsTestNode newNode)
+	throws Exception
+    {
+	System.err.println("reassigning identity:" + client.name +
+			   " from node: " + oldNode.getNodeId() +
+			   " to node: " + newNode.getNodeId());
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity(client.name, oldNode.getNodeId(),
+			 newNode.getNodeId());
+	client.waitForRelocationNotification(0);
+    }
+    
+    /**
+     * Moves the client from the server node to a new node.
+     */
+    private void moveClient(DummyClient client, SgsTestNode oldNode,
+			    SgsTestNode newNode)
+	throws Exception
+    {
+	moveIdentityAndWaitForRelocationNotification(
+	    client, oldNode, newNode);
+	client.relocate(0, true, true);
+    }
+
+    
 
     // -- END TEST CASES --
 
@@ -1630,10 +1812,10 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup(List<String> users) {
 	    clients = new HashMap<String, DummyClient>();
 	    for (String user : users) {
-		DummyClient client = new DummyClient();
+		DummyClient client = new DummyClient(user);
 		clients.put(user, client);
 		client.connect(port);
-		client.login(user, "password");
+		client.login();
 	    }
 	}
 
@@ -1662,14 +1844,12 @@ public class TestChannelServiceImpl extends TestCase {
 	    while (iter.hasNext()) {
 		String user = iter.next();
 		DummyClient client = clients.get(user);
-		System.err.println("user: " + user +
-				   ", redirectHost: " + client.redirectHost +
-				   ", redirectPort: " + client.redirectPort);
                 // Note that the redirectPort can sometimes be zero,
                 // as it won't be assigned if the initial login request
                 // was successful.
-		if ((client.redirectPort != 0 && port == client.redirectPort) ||
-		    (client.redirectPort == 0 && port == client.initialPort))
+		int redirectPort = client.getRedirectPort();
+		if ((redirectPort != 0 && port == redirectPort) ||
+		    (redirectPort == 0 && port == client.getConnectPort()))
 		{
 		    iter.remove();
 		    removedClients.put(user, client);
@@ -1740,9 +1920,11 @@ public class TestChannelServiceImpl extends TestCase {
     // -- other methods --
 
     private DummyClient newClient() {
-	return (new DummyClient()).connect(port).login("dummy", "password");	
+	DummyClient client = new DummyClient("dummy");
+	client.connect(port).login();
+	return client;
     }
-
+    
     private ClientSession getClientSession(String name) {
 	try {
 	    return (ClientSession) dataService.getBinding(name);
@@ -2091,161 +2273,23 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     // Dummy client code for testing purposes.
-    private class DummyClient {
+    private class DummyClient extends AbstractDummyClient {
 
-	String name;
-	private Connector<SocketAddress> connector;
-	private ConnectionListener listener;
-	private Connection connection;
-	private boolean connected = false;
 	private final Object lock = new Object();
-	private boolean loginAck = false;
-	private boolean loginSuccess = false;
-	private boolean loginRedirect = false;
-	private boolean logoutAck = false;
 	private boolean joinAck = false;
 	private boolean leaveAck = false;
-        private boolean awaitGraceful = false;
 	private Set<String> channelNames = new HashSet<String>();
 	private Map<BigInteger, String> channelIdToName =
 	    new HashMap<BigInteger, String>();
 	private Map<String, BigInteger> channelNameToId =
 	    new HashMap<String, BigInteger>();
 	private String reason;
-	private int initialPort;
-	private String redirectHost;
-        private int redirectPort;
-        private byte[] reconnectKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
-	
-	DummyClient() {
-	}
 
-	boolean isConnected() {
-	    synchronized (lock) {
-		return connected;
-	    }
-	}
-
-	DummyClient connect(int port) {
-	    this.initialPort = port;
-	    if (connected) {
-		throw new RuntimeException("DummyClient.connect: already connected");
-	    }
-	    System.err.println("DummyClient.connect[port=" + port + "]");
-	    connected = false;
-	    listener = new Listener();
-	    try {
-		SocketEndpoint endpoint =
-		    new SocketEndpoint(
-		        new InetSocketAddress(InetAddress.getLocalHost(), port),
-			TransportType.RELIABLE);
-		connector = endpoint.createConnector();
-		connector.connect(listener);
-	    } catch (Exception e) {
-		System.err.println("DummyClient.connect[" + name + "] throws: " + e);
-		e.printStackTrace();
-		throw new RuntimeException(
-		    "DummyClient.connect[" + name + "]  failed", e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (connected == false) {
-			lock.wait(WAIT_TIME * 2);
-		    }
-		    if (connected != true) {
-			throw new RuntimeException(
- 			    "DummyClient.connect[" + name + "] timed out");
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.connect[" + name + "] timed out", e);
-		}
-	    }
-	    return this;
-	}
-
-	void disconnect() {
-	    System.err.println("DummyClient.disconnect[" + name + "]");
-
-            synchronized (lock) {
-		if (! connected) {
-		    return;
-		}
-                try {
-                    connection.close();
-		    lock.wait(WAIT_TIME);
-                } catch (Exception e) {
-                    System.err.println(
-                        "DummyClient.disconnect exception:" + e);
-                    lock.notifyAll();
-		    return;
-                } finally {
-		    if (connected) {
-			reset();
-		    }
-		}
-            }
-	}
-
-	void reset() {
-	    assert Thread.holdsLock(lock);
-	    connected = false;
-	    connection = null;
-	    loginAck = false;
-	    loginSuccess = false;
-	    loginRedirect = false;
-	}
-
-	DummyClient login(String user, String pass) {
-	    synchronized (lock) {
-		if (connected == false) {
-		    throw new RuntimeException(
-			"DummyClient.login[" + name + "] not connected");
-		}
-	    }
-	    this.name = user;
-
-	    MessageBuffer buf =
-		new MessageBuffer(2 + MessageBuffer.getSize(user) +
-				  MessageBuffer.getSize(pass));
-	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
-                putByte(SimpleSgsProtocol.VERSION).
-		putString(user).
-		putString(pass);
-	    loginAck = false;
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (loginAck == false) {
-			lock.wait(WAIT_TIME * 2);
-		    }
-		    if (loginAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.login[" + name + "] timed out");
-		    }
-		    if (loginSuccess) {
-			return this;
-		    } else if (loginRedirect) {
-                        // cache a local copy of redirect port, in case it's ever
-                        // cleared by disconnect
-                        int port = redirectPort;
-                        disconnect();
-                        connect(port);
-                        return login(user, pass);
-		    } else {
-			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.login[" + name + "] timed out", e);
-		}
-	    }
+	/** Constructs an instance with the given {@code name}. */
+	DummyClient(String name) {
+	    super(name);
 	}
 
 	ClientSession getSession() throws Exception {
@@ -2254,19 +2298,22 @@ public class TestChannelServiceImpl extends TestCase {
 	    return task.getSession();
 	}
 
-	// Sends a SESSION_MESSAGE.
-	void sendMessage(byte[] message) {
+	/** {@inheritDoc} */
+	@Override
+	public void sendMessage(byte[] message) {
 	    checkLoggedIn();
+
+	    // A zero-length message is sent when the superclass processes
+	    // a LOGIN_SUCCESS or RELOCATE_SUCCESS message, so eat it here.
+	    if (message.length == 0) {
+		return;
+	    }
 
 	    MessageBuffer buf =
 		new MessageBuffer(1 + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 		putBytes(message);
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
+	    sendRaw(buf.getBuffer());
 	}
 
 	// Sends a CHANNEL_MESSAGE.
@@ -2283,11 +2330,7 @@ public class TestChannelServiceImpl extends TestCase {
 		putShort(channelId.length).
 		putBytes(channelId).
 		putInt(seq);
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
+	    sendRaw(buf.getBuffer());
 	}
 	
 	MessageInfo nextChannelMessage() {
@@ -2302,17 +2345,6 @@ public class TestChannelServiceImpl extends TestCase {
 		    channelMessages.isEmpty() ?
 		    null :
 		    channelMessages.remove(0);
-	    }
-	}
-
-	// Throws a {@code RuntimeException} if this session is not
-	// logged in.
-	private void checkLoggedIn() {
-	    synchronized (lock) {
-		if (!connected || !loginSuccess) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected or loggedIn");
-		}
 	    }
 	}
 
@@ -2379,225 +2411,100 @@ public class TestChannelServiceImpl extends TestCase {
 		}
 	    }
 	}
-	
-	void logout() {
-            synchronized (lock) {
-                if (connected == false) {
-                    return;
-                }
-                logoutAck = false;
-                awaitGraceful = true;
-            }
-            MessageBuffer buf = new MessageBuffer(1);
-            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-            try {
-                connection.sendBytes(buf.getBuffer());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            synchronized (lock) {
-                try {
-                    if (logoutAck == false) {
-                        lock.wait(WAIT_TIME);
-                    }
-                    if (logoutAck != true) {
-                        throw new RuntimeException(
-                            "DummyClient.disconnect[" + name + "] timed out");
-                    }
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(
-                        "DummyClient.disconnect[" + name + "] timed out", e);
-                } finally {
-                    if (! logoutAck)
-                        disconnect();
-                }
-            }
-	}
 
-	private class Listener implements ConnectionListener {
-
-	    List<byte[]> messageList = new ArrayList<byte[]>();
-	    
-	    public void bytesReceived(Connection conn, byte[] buffer) {
-		if (connection != conn) {
-		    System.err.println(
-			"[" + name + "] bytesReceived: " +
-			"wrong handle, got:" +
-			conn + ", expected:" + connection);
-		    return;
-		}
-
-		MessageBuffer buf = new MessageBuffer(buffer);
-
-		processAppProtocolMessage(buf);
-	    }
-
-	    private void processAppProtocolMessage(MessageBuffer buf) {
-
-		byte opcode = buf.getByte();
-
-		switch (opcode) {
-
-		case SimpleSgsProtocol.LOGIN_SUCCESS:
-                    reconnectKey = buf.getBytes(buf.limit() - buf.position());
-		    synchronized (lock) {
-			loginAck = true;
-			loginSuccess = true;
-			System.err.println("[" + name + "] login succeeded");
-			lock.notifyAll();
-		    }
-		    break;
-		    
-		case SimpleSgsProtocol.LOGIN_FAILURE:
-		    reason = buf.getString();
-		    synchronized (lock) {
-			loginAck = true;
-			loginSuccess = false;
-			System.err.println("[" + name + "] login failed: " +
-					   ", reason:" + reason);
-			lock.notifyAll();
-		    }
-		    break;
-
-		case SimpleSgsProtocol.LOGOUT_SUCCESS:
-		    synchronized (lock) {
-			logoutAck = true;
-			System.err.println("logout succeeded: " + name);
-                        // let disconnect do the lock notification
-		    }
-		    break;
-
-		case SimpleSgsProtocol.LOGIN_REDIRECT:
-		    redirectHost = buf.getString();
-                    redirectPort = buf.getInt();
-		    synchronized (lock) {
-			loginAck = true;
-			loginRedirect = true;
-			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost +
-                                           ", port:" + redirectPort);
-			lock.notifyAll();
-		    } break;
-
-		case SimpleSgsProtocol.SESSION_MESSAGE: {
-		    String action = buf.getString();
-		    if (action.equals("join")) {
-			String channelName = buf.getString();
-			synchronized (lock) {
-			    joinAck = true;
-			    channelNames.add(channelName);
-			    System.err.println(
-				name + ": got join ack, channel: " +
-				channelName);
-			    lock.notifyAll();
-			}
-		    } else if (action.equals("leave")) {
-			String channelName = buf.getString();
-			synchronized (lock) {
-			    leaveAck = true;
-			    channelNames.remove(channelName);
-			    System.err.println(
-				name + ": got leave ack, channel: " +
-				channelName);
-			    lock.notifyAll();
-			}
-		    } else if (action.equals("message")) {
-			String channelName = buf.getString();
-			int seq = buf.getInt();
-			synchronized (lock) {
-			    channelMessages.add(new MessageInfo(channelName, seq));
-			    System.err.println(name + ": message received: " + seq);
-			    lock.notifyAll();
-			}
-		    } else {
-			System.err.println(
-			    name + ": received message with unknown action: " +
-			    action);
-		    }
-		    break;
-		}
-
-		case SimpleSgsProtocol.CHANNEL_JOIN: {
+	/**
+	 * Handles session and channel messages and channel joins and
+	 * leaves, then delegates to the super class to handle those
+	 * opcodes it doesn't handle.
+	 */
+	@Override
+	protected void handleOpCode(byte opcode, MessageBuffer buf) {
+	    switch (opcode) {
+	    case SimpleSgsProtocol.SESSION_MESSAGE: {
+		String action = buf.getString();
+		if (action.equals("join")) {
 		    String channelName = buf.getString();
-		    BigInteger channelId = new BigInteger(1,
-			buf.getBytes(buf.limit() - buf.position()));
 		    synchronized (lock) {
 			joinAck = true;
-			channelIdToName.put(channelId, channelName);
-			channelNameToId.put(channelName, channelId);
-			printIt("[" + name + "] join succeeded: " +
-				channelName);
+			channelNames.add(channelName);
+			System.err.println(
+			    name + ": got join ack, channel: " +
+			    channelName);
 			lock.notifyAll();
 		    }
-		    break;
-		}
-		    
-		case SimpleSgsProtocol.CHANNEL_LEAVE: {
-		    BigInteger channelId = new BigInteger(1,
-			buf.getBytes(buf.limit() - buf.position()));
+		} else if (action.equals("leave")) {
+		    String channelName = buf.getString();
 		    synchronized (lock) {
 			leaveAck = true;
-			String channelName = channelIdToName.remove(channelId);
-			printIt("[" + name + "] leave succeeded: " +
-					   channelName);
+			channelNames.remove(channelName);
+			System.err.println(
+			    name + ": got leave ack, channel: " +
+			    channelName);
 			lock.notifyAll();
 		    }
-		    break;
-		    
-		}
-		case SimpleSgsProtocol.CHANNEL_MESSAGE: {
-		    BigInteger channelId = new BigInteger(1,
-			buf.getBytes(buf.getShort()));
+		} else if (action.equals("message")) {
+		    String channelName = buf.getString();
 		    int seq = buf.getInt();
 		    synchronized (lock) {
-			String channelName = channelIdToName.get(channelId);
-			System.err.println("[" + name + "] received message: " +
-					   seq + ", channel: " + channelName);
 			channelMessages.add(new MessageInfo(channelName, seq));
+			System.err.println(name + ": message received: " + seq);
 			lock.notifyAll();
 		    }
-		    break;
-		}
-
-		default:
-		    System.err.println(	
-			"[" + name + "] " +
-			"processAppProtocolMessage: unknown op code: " +
-			opcode);
-		    break;
-		}
-	    }
-
-	    public void connected(Connection conn) {
-		System.err.println("DummyClient.Listener.connected");
-		if (connection != null) {
+		} else {
 		    System.err.println(
-			"DummyClient.Listener.already connected handle: " +
-			connection);
-		    return;
+			name + ": received message with unknown action: " +
+			action);
 		}
-		connection = conn;
+		break;
+	    }
+		
+	    case SimpleSgsProtocol.CHANNEL_JOIN: {
+		String channelName = buf.getString();
+		BigInteger channelId =
+		    new BigInteger(1,
+				   buf.getBytes(buf.limit() - buf.position()));
 		synchronized (lock) {
-		    connected = true;
+		    joinAck = true;
+		    channelIdToName.put(channelId, channelName);
+		    channelNameToId.put(channelName, channelId);
+		    printIt("[" + name + "] join succeeded: " +
+			    channelName);
 		    lock.notifyAll();
 		}
+		break;
 	    }
-
-	    public void disconnected(Connection conn) {
-                synchronized (lock) {
-                    if (awaitGraceful) {
-                        // Hack since client might not get last msg
-                        logoutAck = true;
-                    }
-		    reset();
-                    lock.notifyAll();
-                }
+		
+	    case SimpleSgsProtocol.CHANNEL_LEAVE: {
+		BigInteger channelId =
+		    new BigInteger(1,
+				   buf.getBytes(buf.limit() - buf.position()));
+		synchronized (lock) {
+		    leaveAck = true;
+		    String channelName = channelIdToName.remove(channelId);
+		    printIt("[" + name + "] leave succeeded: " +
+			    channelName);
+		    lock.notifyAll();
+		}
+		break;
+		
 	    }
-	    
-	    public void exceptionThrown(Connection conn, Throwable exception) {
-		System.err.println("DummyClient.Listener.exceptionThrown " +
-				   "exception:" + exception);
-		exception.printStackTrace();
+	    case SimpleSgsProtocol.CHANNEL_MESSAGE: {
+		BigInteger channelId =
+		    new BigInteger(1, buf.getBytes(buf.getShort()));
+		int seq = buf.getInt();
+		synchronized (lock) {
+		    String channelName = channelIdToName.get(channelId);
+		    System.err.println("[" + name + "] received message: " +
+				       seq + ", channel: " + channelName);
+		    channelMessages.add(new MessageInfo(channelName, seq));
+		    lock.notifyAll();
+		}
+		break;
+	    }
+		
+	    default:
+		super.handleOpCode(opcode, buf);
+		break;
 	    }
 	}
     }

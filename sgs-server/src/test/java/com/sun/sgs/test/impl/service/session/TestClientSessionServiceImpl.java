@@ -33,29 +33,26 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
+import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractService.Version;
-import com.sun.sgs.io.Connector;
-import com.sun.sgs.io.Connection;
-import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionDisconnectListener;
+import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.SimpleCompletionHandler;
+import com.sun.sgs.test.util.AbstractDummyClient;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
-import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -63,9 +60,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.math.BigInteger;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -110,6 +104,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static final int WAIT_TIME = 5000;
 
+    /** Number of managed objects per client session: 4 (ClientSessionImpl,
+     * ClientSessionWrapper, EventQueue, ManagedQueue).
+     */
+    private static final int MANAGED_OBJECTS_PER_SESSION = 4;
+
     private static final String RETURN_NULL = "return null";
 
     private static final String NON_SERIALIZABLE = "non-serializable";
@@ -136,7 +135,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY, "20000");
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
+	    "20000");
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
@@ -144,6 +144,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Any additional nodes, keyed by node host name (for tests
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
+
+    private boolean allowNewLogin = false;
 
     /** Version information from ClientSessionServiceImpl class. */
     private final String VERSION_KEY;
@@ -164,6 +166,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** The test clients, keyed by client session ID. */
     private static Map<BigInteger, DummyClient> dummyClients;
+
+    private static volatile RuntimeException receivedMessageException = null;
     
     private static Field getField(Class cl, String name) throws Exception {
 	Field field = cl.getDeclaredField(name);
@@ -181,7 +185,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void setUp() throws Exception {
-        dummyClients = new HashMap<BigInteger, DummyClient>();
         System.err.println("Testcase: " + getName());
         setUp(null, true);
     }
@@ -195,6 +198,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
+			  DirectiveNodeAssignmentPolicy.class.getName());
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
@@ -204,6 +209,8 @@ public class TestClientSessionServiceImpl extends TestCase {
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
         dataService = serverNode.getDataService();
+        dummyClients = new HashMap<BigInteger, DummyClient>();
+	receivedMessageException = null;
     }
 
     /** 
@@ -220,7 +227,14 @@ public class TestClientSessionServiceImpl extends TestCase {
         for (String host : hosts) {
             Properties props = SgsTestNode.getDefaultProperties(
                 APP_NAME, serverNode, DummyAppListener.class);
+	    props.setProperty(StandardProperties.AUTHENTICATORS, 
+                "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
             props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+	    if (allowNewLogin) {
+		props.setProperty(
+		    "com.sun.sgs.impl.service.session.allow.new.login", "true");
+	    }
+	    
             SgsTestNode node =
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             additionalNodes.put(host, node);
@@ -379,27 +393,27 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    // -- Test registerSessionDisconnectListener --
+    // -- Test addSessionStatusListener --
 
-    public void testRegisterSessionDisconnectListenerNullArg() {
+    public void testRegisterSessionStatusListenerNullArg() {
 	try {
 	    serverNode.getClientSessionService().
-		registerSessionDisconnectListener(null);
+		addSessionStatusListener(null);
 	    fail("expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testRegisterSessionDisconnectListenerInTxn()
+    public void testRegisterSessionStatusListenerInTxn()
 	throws Exception
     {
 	try {
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    serverNode.getClientSessionService().
-			registerSessionDisconnectListener(
-			    new DummyDisconnectListener());
+			addSessionStatusListener(
+			    new DummyStatusListener());
 		}}, taskOwner);
 	    fail("expected IllegalStateException");
 	} catch (IllegalStateException e) {
@@ -407,9 +421,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
     
-    public void testRegisterSessionDisconnectListenerNoTxn() {
+    public void testRegisterSessionStatusListenerNoTxn() {
 	serverNode.getClientSessionService().
-	    registerSessionDisconnectListener(new DummyDisconnectListener());
+	    addSessionStatusListener(new DummyStatusListener());
     }
 
     // -- Test getSessionProtocol --
@@ -465,7 +479,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient("success");
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	} finally {
             client.disconnect();
 	}
@@ -483,17 +497,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (String user : users) {
 		DummyClient client = new DummyClient(user);
 		client.connect(serverAppPort);
-		if (! client.login()) {
-		    // login redirected
-		    redirectCount++;
-                    int port = client.redirectPort;
-		    client = new DummyClient(user);
-		    client.connect(port);
-		    if (!client.login()) {
-			failed = true;
-			System.err.println("login for user: " + user +
-					   " redirected twice");
+		if (client.login()) {
+		    if (client.getConnectPort() != serverAppPort) {
+			// login redirected
+			redirectCount++;
 		    }
+		} else {
+		    failed = true;
+		    System.err.println("login for user: " + user + " failed");
 		}
 		clients.add(client);
 	    }
@@ -530,7 +541,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(false);
-	    client.sendMessagesInSequence(1, 0, null);
+	    client.sendMessagesInSequence(1, 0);
 	} finally {
             client.disconnect();
 	}
@@ -541,7 +552,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(true);
-	    client.sendMessagesInSequence(1, 1, null);
+	    client.sendMessagesInSequence(1, 1);
 	} finally {
             client.disconnect();
 	}
@@ -552,7 +563,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    if (SimpleTestIdentityAuthenticator.allIdentities.
                     getNotifyLoggedIn(name)) {
 		System.err.println(
@@ -571,21 +582,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(NON_SERIALIZABLE);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    fail("expected login failure");
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-		if (SimpleTestIdentityAuthenticator.allIdentities.
-		        getNotifyLoggedIn(NON_SERIALIZABLE))
-		{
-		    fail("unexpected notifyLoggedIn invoked on identity: " +
-			 NON_SERIALIZABLE);
-		}
-		return;
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertFalse(client.login());
+	    assertFalse(SimpleTestIdentityAuthenticator.allIdentities.
+			getNotifyLoggedIn(NON_SERIALIZABLE));
 	} finally {
 	    client.disconnect();
 	}
@@ -597,21 +596,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(RETURN_NULL);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    fail("expected login failure");	
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-		if (SimpleTestIdentityAuthenticator.allIdentities.
-		        getNotifyLoggedIn(NON_SERIALIZABLE))
-		{
-		    fail("unexpected notifyLoggedIn invoked on identity: " +
-			 NON_SERIALIZABLE);
-		}
-		return;
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertFalse(client.login());
+	    assertFalse(SimpleTestIdentityAuthenticator.allIdentities.
+		        getNotifyLoggedIn(RETURN_NULL));
 	} finally {
 	    client.disconnect();
 	}
@@ -623,21 +610,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(THROW_RUNTIME_EXCEPTION);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    fail("expected login failure");	
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-		if (SimpleTestIdentityAuthenticator.allIdentities.
-		        getNotifyLoggedIn(NON_SERIALIZABLE))
-		{
-		    fail("unexpected notifyLoggedIn invoked on identity: " +
-			 NON_SERIALIZABLE);
-		}
-		return;
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertFalse(client.login());
+	    assertFalse(SimpleTestIdentityAuthenticator.allIdentities.
+			getNotifyLoggedIn(THROW_RUNTIME_EXCEPTION));
 	} finally {
 	    client.disconnect();
 	}
@@ -648,16 +623,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client1 = new DummyClient(name);
 	DummyClient client2 = new DummyClient(name);
 	int port = serverNode.getAppPort();
-	client1.connect(port).login();
 	try {
-	    client2.connect(port).login();
-	    fail("expected client2 login failure");
-	} catch (RuntimeException e) {
-	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		System.err.println("login refused");
-	    } else {
-		fail("unexpected login failure: " + e);
-	    }
+	    assertTrue(client1.connect(port).login());
+	    assertFalse(client2.connect(port).login());
 	} finally {
 	    client1.disconnect();
 	    client2.disconnect();
@@ -679,9 +647,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client2 = new DummyClient(name);
 	int port = serverNode.getAppPort();
 	try {
-	    client1.connect(port).login();
+	    assertTrue(client1.connect(port).login());
 	    Thread.sleep(100);
-	    client2.connect(port).login();
+	    assertTrue(client2.connect(port).login());
 	    client1.checkDisconnectedCallback(false);
 	    assertTrue(client2.isConnected());
 	    
@@ -696,7 +664,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    client.logout();
 	    assertTrue(client.isConnected());
 	    assertTrue(client.waitForDisconnect());
@@ -710,7 +678,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    checkBindings(1);
 	    client.logout();
 	    client.checkDisconnectedCallback(true);
@@ -742,7 +710,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    new DummyClient(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    checkBindings(1);
 	    client.logout();
 	    client.checkDisconnectedCallback(true);
@@ -758,7 +726,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	String name = "logout";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    client.logout();
 	    if (SimpleTestIdentityAuthenticator.allIdentities.
                     getNotifyLoggedIn(name)) {
@@ -801,7 +769,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		 // throws a non-retryable exception.
 		String name = (i % 2 == 0) ? "client" : "badClient";
 		DummyClient client = new DummyClient(name + String.valueOf(i));
-		client.connect(appPort).login();
+		assertTrue(client.connect(appPort).login());
 	    }
 	    checkBindings(numClients);
 
@@ -845,7 +813,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
@@ -874,7 +842,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
@@ -903,7 +871,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String name = "testClient";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		    public void run() {
 			ClientSession session = (ClientSession)
@@ -924,7 +892,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String name = "testClient";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
 	    GetClientSessionTask task = new GetClientSessionTask(name);
 	    txnScheduler.runTask(task, taskOwner);
 	    try {
@@ -1001,7 +969,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    final String counterName = "counter";
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    for (int i = 0; i < numAdditionalNodes; i++) {
 		addNodes(Integer.toString(i));
 	    }
@@ -1085,7 +1053,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			setBinding(counterName, new Counter());
 		}}, taskOwner);
 
-	    return client.waitForClientToRecieveExpectedMessages(
+	    return client.waitForClientToReceiveExpectedMessages(
 		expectedMessages);
 
 	} finally {
@@ -1149,21 +1117,21 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    final int numMessages = 3;
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() {
-		    ClientSession session = (ClientSession)
-			AppContext.getDataManager().getBinding(name);
-		    System.err.println("Sending messages");
-		    for (int i = 0; i < numMessages; i++) {
-			session.send(buf, delivery);
-		    }
-		}}, taskOwner);
+	    for (int i = 0; i < numMessages; i++) {
+		txnScheduler.runTask(new TestAbstractKernelRunnable() {
+			public void run() {
+			    ClientSession session = (ClientSession)
+				AppContext.getDataManager().getBinding(name);
+			    System.err.println("Sending messages");
+			    session.send(buf, delivery);
+			} }, taskOwner);
+	    }
 	
 	    System.err.println("waiting for client to receive messages");
 	    Queue<byte[]> messages =
-		client.waitForClientToRecieveExpectedMessages(numMessages);
+		client.waitForClientToReceiveExpectedMessages(numMessages);
 	    for (byte[] message : messages) {
 		if (message.length == 0) {
 		    fail("message buffer emtpy");
@@ -1204,7 +1172,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    assertTrue(client.login());
 	    txnScheduler.runTask(
 		new TestAbstractKernelRunnable() {
 		    int tryCount = 0;
@@ -1248,11 +1216,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLocalSendPerformance() throws Exception {
 	final String user = "dummy";
-	DummyClient client = (new DummyClient(user)).connect(serverNode.getAppPort());
-	client.login();
+	DummyClient client = new DummyClient(user);
+	assertTrue(client.connect(serverNode.getAppPort()).login());
 
 	isPerformanceTest = true;
-	int numIterations = 1000;
+	int numIterations = 10;
 	final ByteBuffer msg = ByteBuffer.allocate(0);
 	long startTime = System.currentTimeMillis();
 	for (int i = 0; i < numIterations; i++) {
@@ -1273,25 +1241,317 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testRemoveSessionWhileSessionDisconnects() throws Exception {
 	final String user = "foo";
 	DummyClient client = new DummyClient(user);
-	client.connect(serverNode.getAppPort()).login();
+	assertTrue(client.connect(serverNode.getAppPort()).login());
 	client.sendMessage(new byte[0]);
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
+
+    public void testClientSessionReceiveRelocateNotification() throws Exception {
+	DummyClient client = createClientToRelocate("newNode");
+	client.disconnect();
+    }
     
+    public void testRelocateClientSession() throws Exception {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	int objectCount = getObjectCount();
+	try {
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    client.relocate(newNode.getAppPort(), true, true);
+	    // need to wait here to get the true object count to make sure
+	    // that objects and bindings aren't cleaned up.
+	    Thread.sleep(WAIT_TIME);
+	    assertEquals(objectCount, getObjectCount());
+	    checkBindings(1);
+	    client.assertDisconnectedCallbackNotInvoked();
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateClientSessionSendingAfterRelocate()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	try {
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    client.relocate(newNode.getAppPort(), true, true);
+	    sendMessagesFromNodeToClient(serverNode, client, 4, 0);
+	    sendMessagesFromNodeToClient(newNode, client, 4, 10);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateClientSessionSendingDuringRelocate()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	try {
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    int objectCount = getObjectCount();
+	    sendMessagesFromNode(serverNode, client, 4, 0);
+	    sendMessagesFromNode(newNode, client, 4, 10);
+	    client.relocate(newNode.getAppPort(), true, true);
+	    waitForClientMessages(client, 4, 0);
+	    waitForClientMessages(client, 4, 10);
+	    waitForExpectedObjectCount(objectCount);
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
+    public void testRelocateInvalidRelocationKey()  throws Exception {
+	String newNodeHost = "new";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	try {
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    int objectCount = getObjectCount();
+	    client.relocate(newNode.getAppPort(), false, false);
+	    waitForExpectedObjectCount(
+		objectCount - MANAGED_OBJECTS_PER_SESSION);
+	    checkBindings(0);
+	    client.assertDisconnectedCallbackInvoked(false);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithInterveningClientLoginRejected()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	DummyClient otherClient = new DummyClient("foo");
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	try {
+	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    assertFalse(otherClient.connect(newPort).login());
+	    client.relocate(newPort, true, true);
+	    checkBindings(1);
+	    client.assertDisconnectedCallbackNotInvoked();
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithLoginPreemptedAfterRelocate()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	allowNewLogin = true;	// enable login preemption on new node
+	DummyClient client = createClientToRelocate(newNodeHost);
+	DummyClient otherClient = new DummyClient("foo");
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	try {
+	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    client.relocate(newPort, true, true);
+	    int objectCount = getObjectCount();
+	    assertTrue(otherClient.connect(newPort).login());
+	    //waitForExpectedObjectCount(objectCount);
+	    checkBindings(1);
+	    client.assertDisconnectedCallbackInvoked(false);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithRedirect()
+	throws Exception
+    {
+	String host2 = "host2";
+	String host3 = "host3";
+	DummyClient client = createClientToRelocate(host2);
+	addNodes(host3);
+	SgsTestNode node2 = additionalNodes.get(host2);
+	SgsTestNode node3 = additionalNodes.get(host3);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity("foo", node2.getNodeId(),
+			 node3.getNodeId());
+	int objectCount = getObjectCount();
+	client.relocate(node2.getAppPort(), true, false);
+	waitForExpectedObjectCount(
+	    objectCount - MANAGED_OBJECTS_PER_SESSION);
+	checkBindings(0);
+	client.assertDisconnectedCallbackInvoked(false);
+    }
+
+    public void testOldNodeFailsDuringRelocateToNewNode()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	int objectCount = getObjectCount();
+	checkBindings(1);
+	try {
+	    // Simulate oldNode crashing by having client not connect to
+	    // newNode by the timeout period.
+	    Thread.sleep(WAIT_TIME);
+	    assertEquals(objectCount - MANAGED_OBJECTS_PER_SESSION,
+			 getObjectCount());
+	    checkBindings(0);
+	    client.assertDisconnectedCallbackInvoked(false);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testNewNodeFailsDuringRelocateToNewNode()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	checkBindings(1);
+	try {
+	    // Shutdown new node, and wait before checking if
+	    // session's persistent data has been cleaned up.
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    newNode.shutdown(false);
+	    Thread.sleep(WAIT_TIME);
+	    checkBindings(0);
+	    client.assertDisconnectedCallbackInvoked(false);
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
+    /**
+     * Performs the following in preparation for a relocation test:
+     * <ul>
+     * <li>creates a new {@code DummyClient} named "foo"
+     * <li>creates a new node named {@code newNodeHost} 
+     * <li>logs the client into the server node
+     * <li>reassigns the client's identity to the new node
+     * <li>waits for the client to receive the relocate notification
+     * <li>returns the constructed {@code DummyClient}
+     * </ul>
+     */
+    private DummyClient createClientToRelocate(String newNodeHost)
+	throws Exception
+    {
+	final String name = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	addNodes(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	assertTrue(client.connect(serverNode.getAppPort()).login());
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	System.err.println("reassigning identity:" + name +
+			   " from server node to host: " +
+			   newNodeHost);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	System.err.println("(done) reassigning identity");
+	client.waitForRelocationNotification(newNode.getAppPort());
+	return client;
+    }
+
+    /**
+     * Sends the number of specified messages from the specified node to
+     * the specified client.  The content of each message is a consecutive
+     * integer starting at the specified offset.
+     */
+    private void sendMessagesFromNode(
+	SgsTestNode node, final DummyClient client, final int numMessages,
+	final int offset)
+	throws Exception
+    {
+	System.err.println("sending messages to client [" + client.name + "]");
+        TransactionScheduler transactionScheduler = 
+            node.getSystemRegistry(). getComponent(TransactionScheduler.class);
+	for (int i = 0; i < numMessages; i++) {
+	    final int x = i + offset;
+	    transactionScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    ClientSession session = (ClientSession)
+			AppContext.getDataManager().getBinding(client.name);
+			ByteBuffer buf = ByteBuffer.allocate(4);
+			buf.putInt(x).flip();
+			session.send(buf, Delivery.RELIABLE);
+		    } }, taskOwner);
+	}
+    }
+
+    /**
+     * Waits for the client to receive the specified number of messages and
+     * verifies the message content.  The content of each message is a
+     * consecutive integer starting at the specified offset.
+     */
+    private void waitForClientMessages(
+	 DummyClient client, int numMessages, int offset)
+	throws Exception
+    {
+	System.err.println("waiting for client [" + client.name +
+			   "] to receive messages");
+	Queue<byte[]> messages =
+	    client.waitForClientToReceiveExpectedMessages(numMessages);
+	int expected = offset;
+	for (byte[] message : messages) {
+	    if (message.length != 4) {
+		fail("message buffer emtpy");
+	    }
+	    int x = ByteBuffer.wrap(message).getInt();
+	    if (x != expected) {
+		fail("expected: " + expected + ", received: " + x);
+	    } else {
+		System.err.println("received expected message: " + x);
+	    }
+	    expected++;
+	}
+	messages.clear();
+    }
+    
+    /**
+     * Sends the number of specified messages from the specified node to
+     * the specified client and waits for the client to receive the
+     * expected messages.  The content of each message is a consecutive
+     * integer starting at the specified offset.
+     */
+    private void sendMessagesFromNodeToClient(
+	SgsTestNode node,  DummyClient client, int numMessages, int offset)
+	throws Exception
+    {
+        sendMessagesFromNode(node, client, numMessages, offset);
+	waitForClientMessages(client, numMessages, offset);
+    }
+
+    private void waitForExpectedObjectCount(int expectedCount)
+	throws Exception
+    {
+	int objectCount = 0;
+	for (int i = 0; i < 10; i++) {
+	    objectCount = getObjectCount();
+	    if (objectCount == expectedCount) {
+		return;
+	    } else {
+		Thread.sleep(WAIT_TIME / 10);
+	    }
+	}
+	assertEquals(expectedCount, objectCount);
+    }
+
     /* -- other methods -- */
 
+    /**
+     * If {@code throwException} is non-null, the {@code
+     * ClientSessionListener} will throw the specified exception in its
+     * {@code receivedMessage} method for only the first message it
+     * receives.
+     */
     private void sendMessagesAndCheck(
-	int numMessages, int expectedMessages, RuntimeException exception)
+	int numMessages, int expectedMessages,
+	RuntimeException throwException)
 	throws Exception
     {
 	String name = "clientname";
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    client.sendMessagesInSequence(
-		numMessages, expectedMessages, exception);
+	    assertTrue(client.login());
+	    receivedMessageException = throwException;
+	    client.sendMessagesInSequence(numMessages, expectedMessages);
 	} finally {
 	    client.disconnect();
 	}
@@ -1366,485 +1626,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    StandardProperties.APP_LISTENER);
     }
 
-    /**
-     * Dummy client code for testing purposes.
-     */
-    private class DummyClient {
-	
-	final String name;
-	private String password;
-	private Connector<SocketAddress> connector;
-	private Listener listener;
-	private Connection connection;
-	private boolean connected = false;
-	private final Object lock = new Object();
-	private final Object disconnectedCallbackLock = new Object();
-	private final Object receivedAllMessagesLock = new Object();
-	private boolean loginAck = false;
-	private boolean loginSuccess = false;
-	private boolean loginRedirect = false;
-	private boolean logoutAck = false;
-        private boolean awaitGraceful = false;
-        private boolean awaitLoginFailure = false;
-	private String reason;
-	private String redirectHost;
-        private int redirectPort;
-	private byte[] reconnectKey = new byte[0];
-	
-	volatile boolean receivedDisconnectedCallback = false;
-	volatile boolean graceful = false;
-	
-	volatile RuntimeException throwException;
-	volatile int expectedMessages;
-	// Messages received by this client's associated ClientSessionListener
-	Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
-	
-
-	DummyClient(String name) {
-	    this.name = name;
-	}
-
-	DummyClient connect(int port) {
-	    connected = false;
-	    listener = new Listener();
-	    try {
-		SocketEndpoint endpoint =
-		    new SocketEndpoint(
-		        new InetSocketAddress(InetAddress.getLocalHost(), port),
-			TransportType.RELIABLE);
-		connector = endpoint.createConnector();
-		connector.connect(listener);
-	    } catch (Exception e) {
-		System.err.println(toString() + " connect throws: " + e);
-		e.printStackTrace();
-		throw new RuntimeException("DummyClient.connect failed", e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (connected == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (connected != true) {
-			throw new RuntimeException(
-			    toString() + " connect timed out to " + port);
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			toString() + " connect timed out to " + port, e);
-		}
-	    }
-	    return this;
-	}
-
-	void disconnect() {
-            System.err.println(toString() + " disconnecting");
-
-            synchronized (lock) {
-                if (connected == false) {
-                    return;
-                }
-                connected = false;
-            }
-
-            try {
-                connection.close();
-            } catch (IOException e) {
-                System.err.println(toString() + " disconnect exception:" + e);
-            }
-
-            synchronized (lock) {
-                lock.notifyAll();
-            }
-	}
-
-	/**
-	 * Sends a login request and waits for it to be acknowledged,
-	 * returning {@code true} if login was successful, and {@code
-	 * false} if login was redirected.  If the login was not successful
-	 * or redirected, then a {@code RuntimeException} is thrown because
-	 * the login operation timed out before being acknowledged.
-	 */
-	boolean login() {
-	    return login(true);
-	}
-
-	/**
-	 * Sends a login request and if {@code waitForLogin} is {@code
-	 * true} waits for the request to be acknowledged, returning {@code
-	 * true} if login was successful, and {@code false} if login was
-	 * redirected, otherwise a {@code RuntimeException} is thrown
-	 * because the login operation timed out before being acknowldeged.
-	 *
-	 * If {@code waitForLogin} is false, this method returns {@code
-	 * true} if the login is known to be successful (the outcome may
-	 * not yet be known because the login operation is asynchronous),
-	 * otherwise it returns false.  Invoke {@code waitForLogin} to wait
-	 * for an expected successful login.
-	 */
-	boolean login(boolean waitForLogin) {
-	    synchronized (lock) {
-		if (connected == false) {
-		    throw new RuntimeException(toString() + " not connected");
-		}
-	    }
-	    this.password = "password";
-
-	    MessageBuffer buf =
-		new MessageBuffer(2 + MessageBuffer.getSize(name) +
-				  MessageBuffer.getSize(password));
-	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
-                putByte(SimpleSgsProtocol.VERSION).
-		putString(name).
-		putString(password);
-	    loginAck = false;
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	    if (waitForLogin) {
-		return waitForLogin();
-	    } else {
-		synchronized (lock) {
-		    return loginSuccess;
-		}
-	    }
-	}
-
-	/**
-	 * Waits for a login acknowledgement, and returns {@code true} if
-	 * login was successful, {@code false} if login was redirected,
-	 * otherwise a {@code RuntimeException} is thrown because the login
-	 * operation timed out before being acknowledged.
-	 */
-	boolean waitForLogin() {
-	    synchronized (lock) {
-		try {
-		    if (loginAck == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (loginAck != true) {
-			throw new RuntimeException(
-			    toString() + " login timed out");
-		    }
-		    if (loginRedirect == true) {
-			return false;
-		    }
-		    if (!loginSuccess) {
-			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			toString() + " login timed out", e);
-		}
-	    }
-	    return true;
-	}
-
-	/**
-	 * Throws a {@code RuntimeException} if this session is not
-	 * logged in.
-	 */
-	private void checkLoggedIn() {
-	    synchronized (lock) {
-		if (!connected || !loginSuccess) {
-		    throw new RuntimeException(
-			toString() + " not connected or loggedIn");
-		}
-	    }
-	}
-
-	/**
-	 * Sends a SESSION_MESSAGE with the specified content.
-	 */
-	void sendMessage(byte[] message) {
-	    MessageBuffer buf =
-		new MessageBuffer(5 + reconnectKey.length + message.length);
-	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putByteArray(reconnectKey).
-		putByteArray(message);
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	}
-
-	/**
-	 * From this client, sends the number of messages (each containing a
-	 * monotonically increasing sequence number), then waits for all the
-	 * messages to be received by this client's associated {@code
-	 * ClientSessionListener}, and validates the sequence of messages
-	 * received by the listener.  If {@code throwException} is non-null,
-	 * the {@code ClientSessionListener} will throw the specified
-	 * exception in its {@code receivedMessage} method for only the first
-	 * message it receives.
-	 */
-	void sendMessagesInSequence(
-	    int numMessages, int expectedMessages, RuntimeException re)
-	{
-	    this.expectedMessages = expectedMessages;
-	    this.throwException = re;
-	    
-	    for (int i = 0; i < numMessages; i++) {
-		MessageBuffer buf = new MessageBuffer(4);
-		buf.putInt(i);
-		sendMessage(buf.getBuffer());
-	    }
-	    
-	    validateMessageSequence(messages, expectedMessages);
-	}
-
-	/**
-	 * Waits until all messages have been received by this client, and
-	 * validates that the expected number of messages were received by the
-	 * client in the correct sequence.
-	 */
-	void checkMessagesReceived(int expectedMessages) {
-	    validateMessageSequence(listener.messageList, expectedMessages);
-	}
-
-	/**
-	 * Waits for this client to receive the number of messages sent from
-	 * the application.
-	 */
-	Queue<byte[]> waitForClientToRecieveExpectedMessages(
-	    int expectedMessages)
-	{
-	    waitForExpectedMessages(listener.messageList, expectedMessages);
-	    return listener.messageList;
-	}
-
-	/**
-	 * Waits for the number of expected messages to be deposited in the
-	 * specified message queue.
-	 */
-	private void waitForExpectedMessages(
-	    Queue<byte[]> messageQueue, int expectedMessages)
-	{
-	    this.expectedMessages = expectedMessages;
-	    synchronized (receivedAllMessagesLock) {
-		if (messageQueue.size() != expectedMessages) {
-		    try {
-			receivedAllMessagesLock.wait(WAIT_TIME);
-		    } catch (InterruptedException e) {
-		    }
-		}
-	    }
-	    int receivedMessages = messageQueue.size();
-	    if (receivedMessages != expectedMessages) {
-		fail(toString() + " expected " + expectedMessages +
-		     ", received " + receivedMessages);
-	    }
-	}
-
-	/**
-	 * Waits for the number of expected messages to be recorded in the
-	 * specified 'list', and validates that the expected number of messages
-	 * were received by the ClientSessionListener in the correct sequence.
-	 */
-	void validateMessageSequence(
-	    Queue<byte[]> messageQueue, int expectedMessages)
-	{
-	    waitForExpectedMessages(messageQueue, expectedMessages);
-	    if (expectedMessages != 0) {
-		int i = (new MessageBuffer(messageQueue.peek())).getInt();
-		for (byte[] message : messageQueue) {
-		    MessageBuffer buf = new MessageBuffer(message);
-		    int value = buf.getInt();
-		    System.err.println(toString() + " received message " + value);
-		    if (value != i) {
-			fail("expected message " + i + ", got " + value);
-		    }
-		    i++;
-		}
-	    }
-	}
-	
-	void logout() {
-            synchronized (lock) {
-                if (connected == false) {
-                    return;
-                }
-                logoutAck = false;
-                awaitGraceful = true;
-            }
-            MessageBuffer buf = new MessageBuffer(1);
-            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-            try {
-                connection.sendBytes(buf.getBuffer());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            synchronized (lock) {
-                try {
-                    if (logoutAck == false) {
-                        lock.wait(WAIT_TIME);
-                    }
-                    if (logoutAck != true) {
-                        throw new RuntimeException(
- 			    toString() + " disconnect timed out");
-                    }
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(
-                        toString() + " disconnect timed out", e);
-                } finally {
-                    if (! logoutAck)
-                        disconnect();
-                }
-            }
-	}
-
-	void checkDisconnectedCallback(boolean graceful) throws Exception {
-	    synchronized (disconnectedCallbackLock) {
-		if (!receivedDisconnectedCallback) {
-		    disconnectedCallbackLock.wait(WAIT_TIME);
-		}
-	    }
-	    if (!receivedDisconnectedCallback) {
-		fail(toString() + " disconnected callback not invoked");
-	    } else if (this.graceful != graceful) {
-		fail(toString() + " graceful was: " + this.graceful +
-		     ", expected: " + graceful);
-	    }
-	    System.err.println(toString() + " disconnect successful");
-	}
-
-	boolean isConnected() {
-	    synchronized (lock) {
-		return connected;
-	    }
-	}
-
-	// Returns true if disconnect occurred.
-	boolean waitForDisconnect() {
-	    synchronized(lock) {
-		try {
-		    if (connected == true) {
-			lock.wait(WAIT_TIME);
-		    }
-		} catch (InterruptedException ignore) {
-		}
-		return !connected;
-	    }
-	}
-
-	public String toString() {
-	    return "[" + name + "]";
-	}
-	
-	private class Listener implements ConnectionListener {
-
-	    Queue<byte[]> messageList = new LinkedList<byte[]>();
-	    
-            /** {@inheritDoc} */
-	    public void bytesReceived(Connection conn, byte[] buffer) {
-		if (connection != conn) {
-		    System.err.println(
-			"DummyClient.Listener connected wrong handle, got:" +
-			conn + ", expected:" + connection);
-		    return;
-		}
-
-		MessageBuffer buf = new MessageBuffer(buffer);
-
-		byte opcode = buf.getByte();
-
-		switch (opcode) {
-
-		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
-		    dummyClients.put(
-			new BigInteger(1, reconnectKey), DummyClient.this);
-		    synchronized (lock) {
-			loginAck = true;
-			loginSuccess = true;
-			System.err.println("login succeeded: " + name);
-			lock.notifyAll();
-		    }
-		    sendMessage(new byte[0]);
-		    break;
-		    
-		case SimpleSgsProtocol.LOGIN_FAILURE:
-		    reason = buf.getString();
-		    synchronized (lock) {
-			loginAck = true;
-			loginSuccess = false;
-			System.err.println("login failed: " + name +
-					   ", reason:" + reason);
-			lock.notifyAll();
-		    }
-		    break;
-
-		case SimpleSgsProtocol.LOGIN_REDIRECT:
-		    redirectHost = buf.getString();
-                    redirectPort = buf.getInt();
-		    synchronized (lock) {
-			loginAck = true;
-			loginRedirect = true;
-			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost +
-                                           ", port:" + redirectPort);
-			lock.notifyAll();
-		    } break;
-
-		case SimpleSgsProtocol.LOGOUT_SUCCESS:
-                    synchronized (lock) {
-                        logoutAck = true;
-                        System.err.println("logout succeeded: " + name);
-			lock.notifyAll();
-                    }
-		    break;
-
-		case SimpleSgsProtocol.SESSION_MESSAGE:
-		    byte[] message = buf.getBytes(buf.limit() - buf.position());
-		    synchronized (lock) {
-			messageList.add(message);
-			printIt("[" + name + "] received SESSION_MESSAGE: " +
-				HexDumper.toHexString(message));
-			lock.notifyAll();
-		    }
-		    break;
-
-		default:
-		    System.err.println(	
-		"bytesReceived: unknown op code: " + opcode);
-		    break;
-		}
-	    }
-
-            /** {@inheritDoc} */
-	    public void connected(Connection conn) {
-		System.err.println("DummyClient.Listener.connected");
-		if (connection != null) {
-		    System.err.println(
-			"DummyClient.Listener.already connected handle: " +
-			connection);
-		    return;
-		}
-		connection = conn;
-		synchronized (lock) {
-		    connected = true;
-		    lock.notifyAll();
-		}
-	    }
-
-            /** {@inheritDoc} */
-	    public void disconnected(Connection conn) {
-                synchronized (lock) {
-                    connected = false;
-                    lock.notifyAll();
-                }
-	    }
-	    
-            /** {@inheritDoc} */
-	    public void exceptionThrown(Connection conn, Throwable exception) {
-		System.err.println("DummyClient.Listener.exceptionThrown " +
-				   "exception:" + exception);
-		exception.printStackTrace();
-	    }
-	}
-    }
 
     public static class DummyAppListener implements AppListener, 
                                                     ManagedObject,
@@ -1951,11 +1732,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                     reconnectKey == null ? null :
                                            dummyClients.get(reconnectKey);
 	    if (client != null) {
-		client.receivedDisconnectedCallback = true;
-		client.graceful = graceful;
-		synchronized (client.disconnectedCallbackLock) {
-		    client.disconnectedCallbackLock.notifyAll();
-		}
+		client.setDisconnectedCallbackInvoked(graceful);
 	    }
 	    if (disconnectedThrowsException) {
 		throw new RuntimeException(
@@ -1977,18 +1754,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    DummyClient client = dummyClients.get(reconnectKey);
 	    System.err.println(
 		"receivedMessage: " + HexDumper.toHexString(bytes) + 
-		"\nthrowException: " + client.throwException);
-	    if (client.throwException != null) {
-		RuntimeException re = client.throwException;
-		client.throwException = null;
+		"\nthrow exception: " + receivedMessageException);
+	    if (receivedMessageException != null) {
+		RuntimeException re = receivedMessageException;
+		receivedMessageException = null;
 		throw re;
 	    } else {
-		AppContext.getDataManager().markForUpdate(this);
 		client.messages.add(bytes);
 	    }
-	    if (client.messages.size() == client.expectedMessages) {
-		synchronized (client.receivedAllMessagesLock) {
-		    client.receivedAllMessagesLock.notifyAll();
+	    synchronized (client.messages) {
+		if (client.messages.size() == client.expectedMessages0) {
+		    client.messages.notifyAll();
 		}
 	    }
 	}
@@ -2010,6 +1786,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * This invocation handler adds a 100 ms delay before invoking any
+     * method on the underlying instance.
+     */
     private static class DelayingInvocationHandler
 	implements InvocationHandler, Serializable
     {
@@ -2039,7 +1819,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
     }
-    
+
+    /**
+     * This invocation handler prevents forwarding the {@code send} and
+     * {@code serviceEventQueue} methods to the underlying instance.
+     */
     private static class HungryInvocationHandler
 	implements InvocationHandler, Serializable
     {
@@ -2073,9 +1857,282 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    private static class DummyDisconnectListener
-	implements ClientSessionDisconnectListener
+    private int getObjectCount() throws Exception {
+	GetObjectCountTask task = new GetObjectCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+    
+    private class GetObjectCountTask extends TestAbstractKernelRunnable {
+
+	volatile int count = 0;
+	
+	GetObjectCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    BigInteger last = null;
+	    while (true) {
+		BigInteger next = dataService.nextObjectId(last);
+		if (next == null) {
+		    break;
+		}
+                // NOTE: this count is used at the end of the test to make sure
+                // that no objects were leaked in stressing the structure but
+                // any given service (e.g., the task service) may accumulate
+                // managed objects, so a more general way to exclude these from
+                // the count would be nice but for now the specific types that
+                // are accumulated get excluded from the count.
+		ManagedReference ref =
+		    dataService.createReferenceForId(next);
+		Object obj = ref.get();
+                String name = obj.getClass().getName();
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask") &&
+		    ! name.equals("com.sun.sgs.impl.service.nodemap.IdentityMO"))
+		{
+		    /*
+		    System.err.print(count + "[" + obj.getClass().getName() + "]:");
+		    try {
+			System.err.println(obj.toString());
+		    } catch (ObjectNotFoundException e) {
+			System.err.println("<< caught ObjectNotFoundException >>");
+		    }
+		    */
+                    count++;
+		}
+                last = next;
+	    }
+	}
+    }
+
+    private static class DummyStatusListener
+	implements ClientSessionStatusListener
     {
 	public void disconnected(BigInteger sessionRefId) { }
+
+	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
+				      SimpleCompletionHandler handler)
+	{ }
+    }
+
+    private static class DummyClient extends AbstractDummyClient {
+
+	private final Object disconnectedCallbackLock = new Object();
+	private boolean receivedDisconnectedCallback = false;
+	private boolean graceful = false;
+
+	public volatile int expectedMessages0;
+	// Messages received by this client's associated ClientSessionListener
+	public Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
+	private int messagesReceivedDuringRelocation = 0;
+	
+	private final Queue<byte[]> clientReceivedMessages =
+	    new ConcurrentLinkedQueue<byte[]>();
+
+	
+
+	/** Constructs an instance with the given {@code name}. */
+	DummyClient(String name) {
+	    super(name);
+	}
+
+	/**
+	 * Records this client in the global map, keyed by client
+	 * reconnectKey.
+	 */
+	protected void newReconnectKey(byte[] reconnectKey) {
+	    dummyClients.put(new BigInteger(1, reconnectKey), this);
+	}
+
+	/**
+	 * Handles an {@code opcode}.
+	 */
+	@Override
+	protected void handleOpCode(byte opcode, MessageBuffer buf) {
+	    switch (opcode) {
+		
+	    case SimpleSgsProtocol.SESSION_MESSAGE:
+		byte[] message = buf.getBytes(buf.limit() - buf.position());
+		synchronized (clientReceivedMessages) {
+		    clientReceivedMessages.add(message);
+		    System.err.println(
+		    	toString() + " received SESSION_MESSAGE: " +
+			HexDumper.toHexString(message));
+		    if (clientReceivedMessages.size() == expectedMessages0) {
+			clientReceivedMessages.notifyAll();
+		    }
+		}
+		break;
+	    
+	    default:
+		super.handleOpCode(opcode, buf);
+		break;
+	    }
+	}
+
+	/**
+	 * Sends a SESSION_MESSAGE with the specified content, prefixing
+	 * the message with the reconnect key.  The {@code receivedMessage}
+	 * method of this client's associated ClientSessionListener must
+	 * expect that each message is prefixed with the reconnect key.
+	 */
+	@Override
+	public void sendMessage(byte[] message) {
+	    MessageBuffer buf =
+		new MessageBuffer(5 + reconnectKey.length + message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putByteArray(reconnectKey).
+		putByteArray(message);
+	    sendRaw(buf.getBuffer());
+	}
+
+	/**
+	 * Records that this client's associated ClientSessionListener's
+	 * {@code disconnected} method was invoked with the specified value
+	 * for {@code graceful}.
+	 */
+	public void setDisconnectedCallbackInvoked(boolean graceful) {
+	    synchronized (disconnectedCallbackLock) {
+		receivedDisconnectedCallback = true;
+		this.graceful = graceful;
+		disconnectedCallbackLock.notifyAll();
+	    }
+	}
+
+	/**
+	 * Verifies that the {@code disconnected} method of this client's
+	 * associated ClientSessionListener was invoked with the specified
+	 * value for {@code graceful}, and if not, this method throws
+	 * {@code AssertionError}.
+	 */
+	public void assertDisconnectedCallbackInvoked(boolean graceful) {
+	    synchronized (disconnectedCallbackLock) {
+		assertTrue(receivedDisconnectedCallback);
+		assertEquals(this.graceful, graceful);
+	    }
+	}
+
+	/**
+	 * Verifies that the {@code disconnected} method of this client's
+	 * associated ClientSessionListener was NOT invoked, otherwise this
+	 * method throws {@code AssertionError}.
+	 */
+	public void assertDisconnectedCallbackNotInvoked() {
+	    synchronized (disconnectedCallbackLock) {
+		assertFalse(receivedDisconnectedCallback);
+	    }
+	}
+
+	/**
+	 * Waits for the {@code disconnected} method of this client's
+	 * associated ClientSessionListener to be invoked with the
+	 * specified value for {@code graceful} (within a timeout
+	 * period), and if not, this method throws {@code AssertionError}.
+	 */
+	public void checkDisconnectedCallback(boolean graceful)
+	    throws Exception
+	{
+	    synchronized (disconnectedCallbackLock) {
+		if (!receivedDisconnectedCallback) {
+		    disconnectedCallbackLock.wait(WAIT_TIME);
+		}
+		assertDisconnectedCallbackInvoked(graceful);
+		System.err.println(toString() + " disconnect successful");
+	    }
+	}
+
+	/**
+	 * From this client, sends the number of messages (each containing a
+	 * monotonically increasing sequence number), then waits for all the
+	 * messages to be received by this client's associated {@code
+	 * ClientSessionListener}, and validates the sequence of messages
+	 * received by the listener.  
+	 */
+	public void sendMessagesInSequence(int numMessages, int expectedMessages) {
+	    this.expectedMessages0 = expectedMessages;
+	    
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf = new MessageBuffer(4);
+		buf.putInt(i);
+		sendMessage(buf.getBuffer());
+	    }
+	    
+	    validateMessageSequence(messages, expectedMessages);
+	}
+	
+	/**
+	 * Waits for this client to receive the number of messages sent from
+	 * the application.
+	 */
+	public Queue<byte[]>
+	    waitForClientToReceiveExpectedMessages(int expectedMessages)
+	{
+	    waitForExpectedMessages(clientReceivedMessages, expectedMessages);
+	    return clientReceivedMessages;
+	}
+	
+	/**
+	 * Waits for the number of expected messages to be deposited in the
+	 * specified message queue.
+	 */
+	private void waitForExpectedMessages(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    this.expectedMessages0 = expectedMessages;
+	    synchronized (messageQueue) {
+		if (messageQueue.size() != expectedMessages) {
+		    try {
+			messageQueue.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+	    }
+	    int receivedMessages = messageQueue.size();
+	    if (receivedMessages != expectedMessages) {
+		fail(toString() + " expected " + expectedMessages +
+		     ", received " + receivedMessages);
+	    }
+	}
+
+	/**
+	 * Waits for the number of expected messages to be recorded in the
+	 * specified 'list', and validates that the expected number of messages
+	 * were received by the ClientSessionListener in the correct sequence.
+	 */
+	public void validateMessageSequence(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    waitForExpectedMessages(messageQueue, expectedMessages);
+	    if (expectedMessages != 0) {
+		int i = (new MessageBuffer(messageQueue.peek())).getInt();
+		for (byte[] message : messageQueue) {
+		    MessageBuffer buf = new MessageBuffer(message);
+		    int value = buf.getInt();
+		    System.err.println(
+			toString() + " received message " + value);
+		    if (value != i) {
+			fail("expected message " + i + ", got " + value);
+		    }
+		    i++;
+		}
+	    }
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>This implementation verifies that no messages were received
+	 * by this client's associated ClientSessionListener during relocation.
+	 */
+	public void relocate(int newPort, boolean useValidKey,
+			     boolean shouldSucceed)
+	{
+	    int numMessages = messages.size();
+	    super.relocate(newPort, useValidKey, shouldSucceed);
+	    // verify that no messages were received by this client's
+	    // associated ClientSessionListener during relocation.
+	    assertEquals(numMessages, messages.size());
+	}
     }
 }

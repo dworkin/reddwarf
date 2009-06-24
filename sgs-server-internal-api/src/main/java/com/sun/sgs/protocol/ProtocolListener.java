@@ -25,6 +25,7 @@ package com.sun.sgs.protocol;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.protocol.LoginFailureException.FailureReason;
+import java.math.BigInteger;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -73,5 +74,23 @@ public interface ProtocolListener {
      */
     void newLogin(
 	Identity identity, SessionProtocol protocol,
+	RequestCompletionHandler<SessionProtocolHandler> completionHandler);
+
+    /**
+     * Re-establishes an existing client session corresponding to the
+     * specified {@code relocationKey}, and when this listener has
+     * completed processing this request, invokes the 
+     * {@link RequestCompletionHandler#completed completed} method on the
+     * given {@code completionHandler} with a {@link Future} containing
+     * the result of this request. <p>
+     *
+     * TBD: discuss exceptions...
+     *
+     * @param	relocationKey a relocationKey
+     * @param	protocol a session protocol
+     * @param completionHandler a completion handler
+     */
+    void relocatedSession(
+	BigInteger relocationKey, SessionProtocol protocol,
 	RequestCompletionHandler<SessionProtocolHandler> completionHandler);
 }

@@ -842,7 +842,7 @@ public class TestMBeans {
         
         // Get individual fields
         long reg = (Long) mbsc.getAttribute(name, 
-                                "RegisterSessionDisconnectListenerCalls");
+                                "AddSessionStatusListenerCalls");
         long get = (Long) mbsc.getAttribute(name, 
                                 "GetSessionProtocolCalls");
         
@@ -850,7 +850,7 @@ public class TestMBeans {
         ClientSessionServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, ClientSessionServiceMXBean.class);
         
-        assertTrue(reg <= proxy.getRegisterSessionDisconnectListenerCalls());
+        assertTrue(reg <= proxy.getAddSessionStatusListenerCalls());
         assertTrue(get <= proxy.getGetSessionProtocolCalls());
         
         serverNode.getClientSessionService().

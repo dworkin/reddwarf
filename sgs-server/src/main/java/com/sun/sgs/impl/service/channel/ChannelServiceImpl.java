@@ -24,6 +24,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -43,7 +44,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.SessionProtocol;
-import com.sun.sgs.service.ClientSessionDisconnectListener;
+import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -65,6 +66,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -110,7 +112,7 @@ public final class ChannelServiceImpl
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
 	
-    /** The default server port. */
+    /** The default server port: {@value #DEFAULT_SERVER_PORT}. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
     /** The property name for the maximum number of events to process in a
@@ -119,15 +121,24 @@ public final class ChannelServiceImpl
     private static final String EVENTS_PER_TXN_PROPERTY =
 	PKG_NAME + ".events.per.txn";
 
-    /** The default events per transaction. */
+    /** The default events per transaction: {@value #DEFAULT_EVENTS_PER_TXN}. */
     private static final int DEFAULT_EVENTS_PER_TXN = 1;
     
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".write.buffer.size";
 
-    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
+    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE}. */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+
+    /** The name of the session relocation timeout property. */
+    private static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
+	PKG_NAME + ".session.relocation.timeout";
+
+    /** The default session relocation timeout:
+     * {@value #DEFAULT_SESSION_RELOCATION_TIMEOUT}.
+     */
+    private static final int DEFAULT_SESSION_RELOCATION_TIMEOUT = 5000;
 
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
@@ -161,6 +172,11 @@ public final class ChannelServiceImpl
     /** The proxy for the ChannelServer. */
     private final ChannelServer serverProxy;
 
+    /** The listener for client session status updates (relocation or
+     * disconnection).
+     */
+    private final ClientSessionStatusListener sessionStatusListener;
+
     /** The ID for the local node. */
     private final long localNodeId;
 
@@ -177,6 +193,12 @@ public final class ChannelServiceImpl
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
 	localPerSessionChannelsMap =
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
+
+    /** Map of completion handlers for relocating client sessions, keyed by
+     * session ID. */
+    private final ConcurrentHashMap<BigInteger, SimpleCompletionHandler>
+	relocatingSessions =
+	    new ConcurrentHashMap<BigInteger, SimpleCompletionHandler>();
 
     /** The map of channel coordinator task queues, keyed by channel ID.
      * A coordinator task queue orders the delivery of incoming
@@ -207,9 +229,14 @@ public final class ChannelServiceImpl
     /** The maximum number of channel events to service per transaction. */
     final int eventsPerTxn;
 
+    /** The timeout expiration for a client session relocating to this
+     * node, in milliseconds.
+     */
+    private final int sessionRelocationTimeout;
+    
     /** Our JMX exposed statistics. */
     final ChannelServiceStats serviceStats;
-    
+
     /**
      * Constructs an instance of this class with the specified {@code
      * properties}, {@code systemRegistry}, and {@code txnProxy}.
@@ -253,15 +280,20 @@ public final class ChannelServiceImpl
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 	    localNodeId = watchdogService.getLocalNodeId();
 
+	    /*
+	     * Get the properties for controlling write buffer size,
+	     * channel event processing, and session relocation timeout
+	     */
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
-	    /*
-	     * Get the property for controlling channel event processing.
-	     */
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
 		1, Integer.MAX_VALUE);
+	    sessionRelocationTimeout = wrappedProps.getIntProperty(
+		SESSION_RELOCATION_TIMEOUT_PROPERTY,
+		DEFAULT_SESSION_RELOCATION_TIMEOUT,
+		500, Integer.MAX_VALUE);
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -308,15 +340,15 @@ public final class ChannelServiceImpl
 
 	    /*
 	     * Add listeners for handling recovery and for receiving
-	     * notification of client session disconnection.
+	     * notification of client session relocation and disconnection.
 	     */
 	    watchdogService.addRecoveryListener(
 		new ChannelServiceRecoveryListener());
 
 	    watchdogService.addNodeListener(new ChannelServiceNodeListener());
 
-            sessionService.registerSessionDisconnectListener(
-                new ChannelSessionDisconnectListener());
+	    sessionStatusListener = new SessionStatusListener();
+            sessionService.addSessionStatusListener(sessionStatusListener);
 
             /* Create our service profiling info and register our MBean. */
             ProfileCollector collector = 
@@ -517,6 +549,8 @@ public final class ChannelServiceImpl
 		 * send protocol messages to clients accordingly.
 		 */
 		Set<BigInteger> oldLocalMembers =
+		    newLocalMembers.isEmpty() ?
+		    localChannelMembersMap.remove(channelRefId) :
 		    localChannelMembersMap.put(channelRefId, newLocalMembers);
 		Set<BigInteger> joiners = null;
 		Set<BigInteger> leavers = null;
@@ -550,6 +584,7 @@ public final class ChannelServiceImpl
                                                 "channelJoin throws");
                             }
 			}
+			// FIXME: update per-session channel set.
 		    }
 		}
 		if (leavers != null) {
@@ -565,6 +600,7 @@ public final class ChannelServiceImpl
                             }
 			}
 		    }
+		    // FIXME: update per-session channel set.
 		}
 
 	    } finally {
@@ -593,18 +629,7 @@ public final class ChannelServiceImpl
 		}
 
 		// Update local channel membership cache.
-		Set<BigInteger> localMembers =
-		    localChannelMembersMap.get(channelRefId);
-		if (localMembers == null) {
-		    Set<BigInteger> newLocalMembers =
-			Collections.synchronizedSet(new HashSet<BigInteger>());
-		    localMembers = localChannelMembersMap.
-			putIfAbsent(channelRefId, newLocalMembers);
-		    if (localMembers == null) {
-			localMembers = newLocalMembers;
-		    }
-		}
-		localMembers.add(sessionRefId);
+		addLocalChannelMember(channelRefId, sessionRefId);
 
 		// Update per-session channel set cache.
 		Set<BigInteger> channelSet =
@@ -620,6 +645,10 @@ public final class ChannelServiceImpl
 		}
 		channelSet.add(channelRefId);
 
+		// TBD: If the session is disconnecting, then session needs
+		// to be removed from channel's membership list, and the
+		// channel needs to be removed from the channelSet.
+
 		// Send channel join protocol message.
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
@@ -627,6 +656,7 @@ public final class ChannelServiceImpl
                     try {
                         protocol.channelJoin(name, channelRefId, delivery);
                     } catch (IOException ioe) {
+			// TBD: session disconnecting?
                         logger.logThrow(Level.WARNING, ioe,
                                         "channelJoin throws");
                     }
@@ -776,6 +806,100 @@ public final class ChannelServiceImpl
 		callFinished();
 	    }
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void relocateChannelMemberships(
+	    final BigInteger sessionRefId, long oldNodeId,
+	    BigInteger[] channelRefIds)
+	{
+	    /*
+	     * Update the local per-session channel set and channel
+	     * membership caches with the session's channel memberships.
+	     */
+	    Set<BigInteger> channelSet =
+		Collections.synchronizedSet(new HashSet<BigInteger>());
+	    localPerSessionChannelsMap.put(sessionRefId, channelSet);
+	    for (BigInteger channelRefId : channelRefIds) {
+		channelSet.add(channelRefId);
+		addLocalChannelMember(channelRefId, sessionRefId);
+	    }
+
+	    /*
+	     * Schedule task to add the session's channel memberships to
+	     * the new node (the local node).
+	     */
+	    taskScheduler.scheduleTask(
+ 		new AddRelocatingSessionToChannels(
+		    sessionRefId, oldNodeId, channelSet),
+		taskOwner);
+
+	    /*
+	     * Schedule a task to check whether the session has relocated
+	     * to the local node (within the timeout period), and if not,
+	     * it assumes that the session is disconnected and invokes the
+	     * 'disconnected' method of this channel service's
+	     * ClientSessionStatusListener so that the session's channel
+	     * memberships (persistent and cached) can be cleaned up.
+	     */
+	    taskScheduler.scheduleTask(
+ 		new AbstractKernelRunnable("CheckSessionRelocation") {
+		    public void run() {
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
+			if (protocol == null) {
+			    sessionStatusListener.disconnected(sessionRefId);
+			}
+		    } },
+		taskOwner,
+		System.currentTimeMillis() + sessionRelocationTimeout);
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	public void channelMembershipsUpdated(
+	    BigInteger sessionRefId, long newNodeId)
+	{
+	    // Remove session's channel membership set.
+	    // TBD: should this always return a non-null value?
+	    Set<BigInteger> channelSet =
+		localPerSessionChannelsMap.remove(sessionRefId);
+	    
+	    // Remove session from locally cached channel membership lists
+	    // TBD: Are channel caches updated before channel membership cache
+	    // is xferred to new node?  Or should this be done here?
+	    if (channelSet != null) {
+		synchronized (channelSet) {
+		    for (BigInteger channelRefId : channelSet) {
+			Set<BigInteger> localMembers =
+			    localChannelMembersMap.get(channelRefId);
+			if (localMembers != null) {
+			    localMembers.remove(sessionRefId);
+			}
+		    }
+		}
+	    }
+	    
+	    // Notify completion handler that relocation preparation is done.
+	    SimpleCompletionHandler handler =
+		relocatingSessions.get(sessionRefId);
+	    if (handler != null) {
+		handler.completed();
+	    }
+
+	    /*
+	     * Schedule task to remove channel memberships from old node
+	     * (the local node).
+	     */
+	    if (channelSet != null) {
+		taskScheduler.scheduleTask(
+		    new RemoveRelocatingSessionFromChannels(
+			sessionRefId, channelSet),
+		    taskOwner);
+	    }
+	}
 	
 	/** {@inheritDoc}
 	 *
@@ -792,6 +916,24 @@ public final class ChannelServiceImpl
 	    }
 	}
     }
+
+    private void addLocalChannelMember(BigInteger channelRefId,
+				       BigInteger sessionRefId)
+    {
+	Set<BigInteger> localMembers =
+	    localChannelMembersMap.get(channelRefId);
+	if (localMembers == null) {
+	    Set<BigInteger> newLocalMembers =
+		Collections.synchronizedSet(new HashSet<BigInteger>());
+	    localMembers = localChannelMembersMap.
+		putIfAbsent(channelRefId, newLocalMembers);
+	    if (localMembers == null) {
+		localMembers = newLocalMembers;
+	    }
+	}
+	localMembers.add(sessionRefId);
+    }
+
 
     /* -- Implement TransactionContextFactory -- */
        
@@ -1003,10 +1145,10 @@ public final class ChannelServiceImpl
 	    channelTaskQueues.remove(channelRefId);
 	}
     }
-    /* -- Implement ClientSessionDisconnectListener -- */
+    /* -- Implement ClientSessionStatusListener -- */
 
-    private final class ChannelSessionDisconnectListener
-	implements ClientSessionDisconnectListener
+    private final class SessionStatusListener
+	implements ClientSessionStatusListener
     {
         /**
          * {@inheritDoc}
@@ -1022,14 +1164,57 @@ public final class ChannelServiceImpl
 	     * currently a member of.
 	     */
 	    if (channelSet != null) {
-		for (final BigInteger channelRefId : channelSet) {
-		    transactionScheduler.scheduleTask(
-			new AbstractKernelRunnable("RemoveSessionFromChannel") {
+		synchronized (channelSet) {
+		    for (final BigInteger channelRefId : channelSet) {
+			transactionScheduler.scheduleTask(
+			  new AbstractKernelRunnable(
+				"RemoveSessionFromChannel")
+			  {
 			    public void run() {
 				ChannelImpl.removeSessionFromChannel(
 				    localNodeId, sessionRefId, channelRefId);
 			    }
 			}, taskOwner);
+			// Remove session from channel membership cache
+			// NOTE: THIS FIXES A MEMORY LEAK!
+			Set<BigInteger> localMembers =
+			    localChannelMembersMap.get(channelRefId);
+			if (localMembers != null) {
+			    localMembers.remove(sessionRefId);
+			}
+		    }
+		}
+	    }
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
+				      SimpleCompletionHandler handler)
+	{
+	    Set<BigInteger> channelSet =
+		localPerSessionChannelsMap.get(sessionRefId);		
+	    if (channelSet == null) {
+		// The session is not a member of any channel.
+		handler.completed();
+	    } else {
+		// Transfer the session's channel membership cache to new node.
+		relocatingSessions.put(sessionRefId, handler);
+		try {
+		    // TBD:IoTask?
+		    // TBD: Does the channelSet need to be locked for the
+		    // toArray call?
+		    getChannelServer(newNodeId).
+			relocateChannelMemberships(
+			    sessionRefId, localNodeId,
+			    channelSet.toArray(
+				new BigInteger[channelSet.size()]));
+		    // TBD: Schedule task to disconnect session if the
+		    // channel memberships updated message hasn't been received
+		    // by a certain period of time.
+		} catch (IOException e) {
+		    // TBD: probably want to disconnect the session...
 		}
 	    }
 	}
@@ -1136,6 +1321,9 @@ public final class ChannelServiceImpl
 		transactionScheduler.runTask(
 		    new AbstractKernelRunnable("ScheduleRecoveryTasks") {
 			public void run() {
+			    if (shuttingDown()) {
+				return;
+			    }
 			    /*
 			     * Reassign each failed coordinator to a new node.
 			     */
@@ -1180,10 +1368,10 @@ public final class ChannelServiceImpl
 	    // TBD: cache channel server for node?
 	}
 
-        @Override
-        public void nodeStatusChange(Node node) {
+	/** {@inheritDoc} */
+	public void nodeStatusChange(Node node) {
             // Only worry about node failures
-            if (node.isAlive()) return;
+            if (!node.isAlive()) return;
 
 	    final long nodeId = node.getId();
 	    channelServerCache.remove(nodeId);
@@ -1276,5 +1464,142 @@ public final class ChannelServiceImpl
 	public void run() {
 	    channelServer = getChannelServerMap().get(Long.toString(nodeId));
 	}
+    }
+
+    private static Object getObjectForId(BigInteger refId) {
+	try {
+	    return getDataService().createReferenceForId(refId).get();
+	} catch (ObjectNotFoundException e) {
+	    return null;
+	}
+    }
+
+    /**
+     * A task that adds a relocating session to the next channel in the
+     * channel membership set (specified during construction) and then
+     * reschedules itself to handle the next channel.  If there are no
+     * more channels to handle, this task notifies the old node that the
+     * relocating session's channel memberships have been updated.
+     */
+    private class AddRelocatingSessionToChannels
+	extends AbstractKernelRunnable
+    {
+	private final BigInteger sessionRefId;
+	private final long oldNodeId;
+	private final Queue<BigInteger> channels =
+	    new LinkedList<BigInteger>();
+
+	/** Constructs an instance. */
+	AddRelocatingSessionToChannels(
+	    BigInteger sessionRefId, long oldNodeId, Set<BigInteger> channelSet)
+	{
+	    super(null);
+	    this.sessionRefId = sessionRefId;
+	    this.oldNodeId = oldNodeId;
+	    this.channels.addAll(channelSet);
+	}
+
+	/**
+	 * Adds the session to the next channel (if any) in the queue, or
+	 * if the queue is empty, notifies the old node's server that the
+	 * channel memberships have been updated.
+	 */
+	public void run() {
+	    final BigInteger channelRefId = channels.poll();
+	    if (channelRefId != null) {
+		try {
+		    // Add relocating client session to channel
+		    transactionScheduler.runTask(
+		      new AbstractKernelRunnable(
+			    "addRelocatingSessionToChannel")
+		      {
+			public void run() {
+			    ChannelImpl channelImpl = (ChannelImpl)
+				getObjectForId(channelRefId);
+			    if (channelImpl != null) {
+				channelImpl.addSessionRelocatingToLocalNode(
+				    sessionRefId);
+			    } else {
+				// TBD: throw Exception to indicate that
+				// channel has been closed so session
+				// should be notified (when relocated)
+				// via "leave" message?
+			    }
+			}
+		    }, taskOwner);
+		} catch (Exception e) {
+		    // TBD: exception handling...
+		}
+		taskScheduler.scheduleTask(this, taskOwner);
+		
+	    } else {
+		// Finished adding relocating session to channels, so notify
+		// old node that we are done.
+		ChannelServer server = getChannelServer(oldNodeId);
+		// TBD: ioTask?
+		try {
+		    server.channelMembershipsUpdated(sessionRefId, localNodeId);
+		} catch (IOException e) {
+		    // TBD: exception handling...
+		}
+	    }
+	}	
+    }
+
+    /**
+     * A task that removes a relocating session from the next channel
+     * in the channel membership set (specified during construction)
+     * and then reschedules itself to handle the next channel (if
+     * any).
+     */
+    private class RemoveRelocatingSessionFromChannels
+	extends AbstractKernelRunnable
+    {
+	private final BigInteger sessionRefId;
+	private final Queue<BigInteger> channels =
+	    new LinkedList<BigInteger>();
+
+	/** Constructs an instance. */
+	RemoveRelocatingSessionFromChannels(
+	    BigInteger sessionRefId, Set<BigInteger> channelSet)
+	{
+	    super(null);
+	    this.sessionRefId = sessionRefId;
+	    this.channels.addAll(channelSet);
+	}
+
+	/**
+	 * Removes the session from the next channel (if any) in the
+	 * queue.
+	 */
+	public void run() {
+	    final BigInteger channelRefId = channels.poll();
+	    if (channelRefId != null) {
+		try {
+		    // Remove relocating client session from channel
+		    transactionScheduler.runTask(
+		      new AbstractKernelRunnable(
+			    "removeRelocatingSessionFromChannel")
+		      {
+			public void run() {
+			    ChannelImpl channelImpl = (ChannelImpl)
+				getObjectForId(channelRefId);
+			    if (channelImpl != null) {
+				channelImpl.
+				    removeSessionRelocatingFromLocalNode(
+				        sessionRefId);
+			    }
+			}
+		    }, taskOwner);
+		} catch (Exception e) {
+		    // TBD: exception handling...
+		}
+	    }
+	    if (!channels.isEmpty()) {
+		taskScheduler.scheduleTask(this, taskOwner);
+	    } else {
+		relocatingSessions.remove(sessionRefId);
+	    }
+	}	
     }
 }

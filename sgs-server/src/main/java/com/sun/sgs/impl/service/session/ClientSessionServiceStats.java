@@ -33,7 +33,7 @@ import com.sun.sgs.profile.ProfileOperation;
  */
 class ClientSessionServiceStats implements ClientSessionServiceMXBean {
 
-    final ProfileOperation registerSessionDisconnectListenerOp;
+    final ProfileOperation addSessionStatusListenerOp;
     final ProfileOperation getSessionProtocolOp;
     
     ClientSessionServiceStats(ProfileCollector collector) {
@@ -43,17 +43,17 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         
-        registerSessionDisconnectListenerOp =
-            consumer.createOperation("registerSessionDisconnectListener", 
+        addSessionStatusListenerOp =
+            consumer.createOperation("addSessionStatusListener", 
                                      type, level);
         getSessionProtocolOp =
             consumer.createOperation("getSessionProtocol", type, level);
     }
 
     /** {@inheritDoc} */
-    public long getRegisterSessionDisconnectListenerCalls() {
+    public long getAddSessionStatusListenerCalls() {
         return ((AggregateProfileOperation) 
-                    registerSessionDisconnectListenerOp).getCount();
+                    addSessionStatusListenerOp).getCount();
     }
 
     /** {@inheritDoc} */
