@@ -544,7 +544,7 @@ public class TestScalableHashMapStress extends Assert {
 			initTxnState(++attempts);
 			int count = 0;
 			while (msEntries.get().hasNext()) {
-			    if (++count % 100 == 0)
+			    if (++count % 50 == 0)
 				return;
                             dataService.markForUpdate(msEntries);
 			    Entry<Key, Value> entry = msEntries.get().next();
