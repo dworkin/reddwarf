@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
@@ -260,19 +261,20 @@ public class TestLPA {
      * club network.
      */
     private static class TestZachBuilder implements GraphBuilder {
-        private final Graph<Identity, WeightedEdge> graph;
+        private final Graph<LabelVertex, WeightedEdge> graph;
 
         public TestZachBuilder() {
-            graph = new UndirectedSparseMultigraph<Identity, WeightedEdge> ();
+            graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
 
             // Create a graph for the Zachary network:
             // W. W. Zachary, An information flow model for conflict and
             // fission in small group1,
             // Journal of Anthropological Research 33, 452-473 (1977)
-            Identity[] nodes = new Identity[35];
+            LabelVertex[] nodes = new LabelVertex[35];
             for (int i = 1; i < nodes.length; i++) {
                 // Add identities 1-34
-                nodes[i] = new DummyIdentity(String.valueOf(i));
+                nodes[i] =
+                        new LabelVertex(new DummyIdentity(String.valueOf(i)));
                 graph.addVertex(nodes[i]);
             }
 
@@ -360,7 +362,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Graph<Identity, WeightedEdge> getAffinityGraph() {
+        public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
             return Graphs.unmodifiableGraph(graph);
         }
         /** {@inheritDoc} */
@@ -378,15 +380,16 @@ public class TestLPA {
      * graph.
      */
     private static class TestToyBuilder implements GraphBuilder {
-        private final Graph<Identity, WeightedEdge> graph;
+        private final Graph<LabelVertex, WeightedEdge> graph;
 
         public TestToyBuilder() {
-            graph = new UndirectedSparseMultigraph<Identity, WeightedEdge> ();
+            graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
 
-            Identity[] nodes = new Identity[6];
+            LabelVertex[] nodes = new LabelVertex[6];
             for (int i = 1; i < nodes.length; i++) {
                 // Add identities 1-5
-                nodes[i] = new DummyIdentity(String.valueOf(i));
+                nodes[i] =
+                        new LabelVertex(new DummyIdentity(String.valueOf(i)));
                 graph.addVertex(nodes[i]);
             }
 
@@ -401,7 +404,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Graph<Identity, WeightedEdge> getAffinityGraph() {
+        public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
             return Graphs.unmodifiableGraph(graph);
         }
         /** {@inheritDoc} */

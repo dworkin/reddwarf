@@ -64,8 +64,8 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
             new HashMap<Object, Map<Identity, Long>>();
     
     // Our graph of object accesses
-    private final CopyableGraph<Identity, AffinityEdge> affinityGraph =
-            new CopyableGraph<Identity, AffinityEdge>();
+    private final CopyableGraph<LabelVertex, AffinityEdge> affinityGraph =
+            new CopyableGraph<LabelVertex, AffinityEdge>();
     
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -101,8 +101,9 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
     {
         long startTime = System.currentTimeMillis();
         updateCount++;
-        
-        affinityGraph.addVertex(owner);
+
+        LabelVertex vowner = new LabelVertex(owner);
+        affinityGraph.addVertex(vowner);
 
         // For each object accessed in this task...
         for (AccessedObject obj : detail.getAccessedObjects()) {    
@@ -126,13 +127,14 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
                 // edge if the identity isn't the owner
                 if (!ident.equals(owner)) {
                     long otherValue = entry.getValue();
-                
+                    LabelVertex vident = new LabelVertex(ident);
+
                     // Check to see if we already have an edge between
                     // owner and ident for this object.  If so, update
                     // the edge weight rather than adding a new edge.
                     boolean edgeFound = false;
                     Collection<AffinityEdge> edges = 
-                            affinityGraph.findEdgeSet(owner, ident);
+                            affinityGraph.findEdgeSet(vowner, vident);
                     for (AffinityEdge e : edges) {
                         if (e.getId().equals(objId)) {
                             // Only update the edge weight if ident has 
@@ -153,7 +155,7 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
 
                     if (!edgeFound) {
                         AffinityEdge newEdge = new AffinityEdge(objId);
-                        affinityGraph.addEdge(newEdge, owner, ident);
+                        affinityGraph.addEdge(newEdge, vowner, vident);
                         // period info
                         pruneTask.incrementEdge(newEdge);
                     }
@@ -189,17 +191,17 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Graph<Identity, WeightedEdge> getAffinityGraph() {
+    public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
         // Copy the graph, to get the edge types correct
-        Graph<Identity, WeightedEdge> graphCopy = 
-            new UndirectedSparseMultigraph<Identity, WeightedEdge>();
+        Graph<LabelVertex, WeightedEdge> graphCopy =
+            new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
         synchronized (affinityGraph) {
 
-            for (Identity id : affinityGraph.getVertices()) {
+            for (LabelVertex id : affinityGraph.getVertices()) {
                 graphCopy.addVertex(id);
             }
             for (AffinityEdge e : affinityGraph.getEdges()) {
-                Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
+                Pair<LabelVertex> endpoints = affinityGraph.getEndpoints(e);
                 graphCopy.addEdge(new WeightedEdge(e.getWeight()), endpoints);
             }
         }
@@ -266,9 +268,9 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
                 AffinityEdge edge = entry.getKey();
                 long weight = entry.getValue();
                 if (edge.getWeight() == weight) {
-                    Pair<Identity> endpts = affinityGraph.getEndpoints(edge);
+                    Pair<LabelVertex> endpts = affinityGraph.getEndpoints(edge);
                     affinityGraph.removeEdge(edge);
-                    for (Identity end : endpts) {
+                    for (LabelVertex end : endpts) {
                         if (affinityGraph.degree(end) == 0) {
                             affinityGraph.removeVertex(end);
                         }

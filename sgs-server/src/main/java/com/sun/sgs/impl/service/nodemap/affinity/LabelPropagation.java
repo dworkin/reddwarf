@@ -22,8 +22,6 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import edu.uci.ics.jung.graph.Graph;
-import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
-import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -121,7 +119,7 @@ public class LabelPropagation {
         long startTime = System.currentTimeMillis();
         // Step 1.  Initialize all nodes in the network.
         //          Their labels are their Identities.
-        final Graph<LabelNode, WeightedEdge> graph = createLabelGraph();
+        final Graph<LabelVertex, WeightedEdge> graph = createLabelGraph();
 
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST,
@@ -132,8 +130,8 @@ public class LabelPropagation {
         // Step 2.  Set t = 1;
         int t = 1;
 
-        List<LabelNode> vertices =
-                new ArrayList<LabelNode>(graph.getVertices());
+        List<LabelVertex> vertices =
+                new ArrayList<LabelVertex>(graph.getVertices());
         while (true) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST, "GRAPH at iteration {0} is {1}",
@@ -153,7 +151,7 @@ public class LabelPropagation {
             if (numThreads > 1) {
                 final AtomicBoolean abool = new AtomicBoolean(false);
                 List<Callable<Void>> tasks = new ArrayList<Callable<Void>>();
-                for (final LabelNode vertex : vertices) {
+                for (final LabelVertex vertex : vertices) {
                     tasks.add(new Callable<Void>() {
                         public Void call() {
                             boolean res = setMostFrequentLabel(vertex, graph);
@@ -175,7 +173,7 @@ public class LabelPropagation {
                 changed = abool.get();
 
             } else {
-                for (LabelNode vertex : vertices) {
+                for (LabelVertex vertex : vertices) {
                     changed = setMostFrequentLabel(vertex, graph) || changed;
                 }
             }
@@ -193,7 +191,7 @@ public class LabelPropagation {
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
                 Collection<AffinityGroup> intermediateGroups =
-                        gatherGroups(graph);
+                        gatherGroups(graph, false);
                 for (AffinityGroup group : intermediateGroups) {
                     StringBuffer logSB = new StringBuffer();
                     for (Identity id : group.getIdentities()) {
@@ -210,7 +208,7 @@ public class LabelPropagation {
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER, "FINAL GRAPH IS {0}", graph);
         }
-        groups = gatherGroups(graph);
+        groups = gatherGroups(graph, true);
 
         if (gatherStats) {
             // Record our statistics for this run, used for testing.
@@ -255,27 +253,8 @@ public class LabelPropagation {
      *
      * @return a graph to run the label propagation algorithm over
      */
-    private Graph<LabelNode, WeightedEdge> createLabelGraph() {
-        Graph<LabelNode, WeightedEdge> graph =
-                new UndirectedSparseMultigraph<LabelNode, WeightedEdge>();
-        Graph<Identity, WeightedEdge> affinityGraph =
-                builder.getAffinityGraph();
-
-        Map<Identity, LabelNode> nodeMap = new HashMap<Identity, LabelNode>();
-        for (Identity id : affinityGraph.getVertices()) {
-            LabelNode newNode = new LabelNode(id);
-            graph.addVertex(newNode);
-            nodeMap.put(id, newNode);
-        }
-        for (WeightedEdge e : affinityGraph.getEdges()) {
-            Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
-            graph.addEdge(new WeightedEdge(e.getWeight()),
-                                          nodeMap.get(endpoints.getFirst()),
-                                          nodeMap.get(endpoints.getSecond()));
-        }
-
-        return graph;
-
+    private Graph<LabelVertex, WeightedEdge> createLabelGraph() {
+        return builder.getAffinityGraph();
     }
 
     /**
@@ -288,18 +267,18 @@ public class LabelPropagation {
      * @return {@code true} if {@code node}'s label is changed, {@code false}
      *        if it is not changed
      */
-    private boolean setMostFrequentLabel(LabelNode node,
-            Graph<LabelNode, WeightedEdge> graph)
+    private boolean setMostFrequentLabel(LabelVertex node,
+            Graph<LabelVertex, WeightedEdge> graph)
     {
         ArrayList<Integer> highestSet = getNeighborCounts(node, graph);
 
         // If our current label is in the set of highest labels, we're done.
-        if (highestSet.contains(node.label)) {
+        if (highestSet.contains(node.getLabel())) {
             return false;
         }
 
         // Otherwise, choose a label at random
-        node.label = highestSet.get(ran.nextInt(highestSet.size()));
+        node.setLabel(highestSet.get(ran.nextInt(highestSet.size())));
         logger.log(Level.FINEST, "Returning true: node is now {0}", node);
         return true;
     }
@@ -312,8 +291,8 @@ public class LabelPropagation {
      * @param graph the entire graph
      * @return
      */
-    private ArrayList<Integer> getNeighborCounts(LabelNode node,
-            Graph<LabelNode, WeightedEdge> graph)
+    private ArrayList<Integer> getNeighborCounts(LabelVertex node,
+            Graph<LabelVertex, WeightedEdge> graph)
     {
         // A map of labels -> count, effectively counting how many
         // of our neighbors use a particular label.
@@ -323,11 +302,11 @@ public class LabelPropagation {
         // use edge weights.
         // NOTE can remove some code if we decide we don't need parallel edges
         StringBuffer logSB = new StringBuffer();
-        for (LabelNode neighbor : graph.getNeighbors(node)) {
+        for (LabelVertex neighbor : graph.getNeighbors(node)) {
             if (logger.isLoggable(Level.FINEST)) {
                 logSB.append(neighbor + " ");
             }
-            Integer label = neighbor.label;
+            Integer label = neighbor.getLabel();
             long value = labelMap.containsKey(label) ?
                          labelMap.get(label) : 0;
             Collection<WeightedEdge> edges = graph.findEdgeSet(node, neighbor);
@@ -367,19 +346,24 @@ public class LabelPropagation {
      * @return the affinity groups
      */
     private Collection<AffinityGroup> gatherGroups(
-            Graph<LabelNode, WeightedEdge> graph)
+            Graph<LabelVertex, WeightedEdge> graph,
+            boolean finished)
     {
         // All nodes with the same label are in the same community.
         Map<Integer, AffinityGroup> groupMap =
                 new HashMap<Integer, AffinityGroup>();
-        for (LabelNode vertex : graph.getVertices()) {
+        for (LabelVertex vertex : graph.getVertices()) {
+            int label = vertex.getLabel();
             AffinityGroupImpl ag =
-                    (AffinityGroupImpl) groupMap.get(vertex.label);
+                    (AffinityGroupImpl) groupMap.get(label);
             if (ag == null) {
-                ag = new AffinityGroupImpl(vertex.label);
-                groupMap.put(vertex.label, ag);
+                ag = new AffinityGroupImpl(label);
+                groupMap.put(label, ag);
             }
-            ag.addIdentity(vertex.id);
+            ag.addIdentity(vertex.getIdentity());
+            if (finished) {
+                vertex.initializeLabel();
+            }
         }
         return groupMap.values();
     }
@@ -427,7 +411,7 @@ public class LabelPropagation {
      * @param groups the communities found in the graph
      * @return the modularity of the groups found in the graph
      */
-    public static double calcModularity(Graph<Identity, WeightedEdge> graph,
+    public static double calcModularity(Graph<LabelVertex, WeightedEdge> graph,
             Collection<AffinityGroup> groups)
     {
         long m = 0;
@@ -456,7 +440,8 @@ public class LabelPropagation {
             ArrayList<Identity> groupList =
                     new ArrayList<Identity>(g.getIdentities());
             for (Identity id : groupList) {
-                for (WeightedEdge edge : graph.getIncidentEdges(id)) {
+                for (WeightedEdge edge :
+                     graph.getIncidentEdges(new LabelVertex(id))) {
                     totEdges = totEdges + edge.getWeight();
                 }
             }
@@ -466,7 +451,9 @@ public class LabelPropagation {
                 // Get the first identity
                 Identity v1 = groupList.remove(0);
                 for (Identity v2 : groupList) {
-                    Collection<WeightedEdge> edges = graph.findEdgeSet(v1, v2);
+                    Collection<WeightedEdge> edges = 
+                        graph.findEdgeSet(new LabelVertex(v1),
+                                          new LabelVertex(v2));
                     // Calculate the adjacency info for v1 and v2
                     // We allow parallel, weighted edges
                     for (WeightedEdge edge : edges) {
@@ -552,29 +539,5 @@ public class LabelPropagation {
             }
         }
         return false;
-    }
-
-    /**
-     * Vertices for our LPA graph.  Labels change as we iterate
-     * through the algorithm, and once it has converged, vertices
-     * with the same label are in the same cluster.
-     * <p>
-     * We are using the identity's hash code for the label for faster
-     * comparisions.  This has some risk of us clustering identities
-     * that actually are not related, because hash codes are not guaranteed
-     * to be unique.
-     */
-    private static class LabelNode {
-        final Identity id;
-        volatile int label;
-
-        public LabelNode(Identity id) {
-            this.id = id;
-            label = id.hashCode();
-        }
-
-        public String toString() {
-            return "[" + id.toString() + ":" + label + "]";
-        }
     }
 }

@@ -97,5 +97,5 @@ public interface GraphBuilder {
      *
      * @return the graph of access information
      */
-    Graph<Identity, WeightedEdge> getAffinityGraph();
+    Graph<LabelVertex, WeightedEdge> getAffinityGraph();
 }

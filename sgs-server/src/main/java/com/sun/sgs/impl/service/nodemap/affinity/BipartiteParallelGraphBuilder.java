@@ -44,12 +44,12 @@ public class BipartiteParallelGraphBuilder extends BipartiteGraphBuilder {
     }
     
     /** {@inheritDoc} */
-    public Graph<Identity, WeightedEdge> getAffinityGraph() {
+    public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
 
         // our folded graph
-        Graph<Identity, WeightedEdge> newGraph =
-                new UndirectedSparseMultigraph<Identity, WeightedEdge>();
+        Graph<LabelVertex, WeightedEdge> newGraph =
+                new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
 
         // vertices in our folded graph
         Collection<Identity> vertices = new HashSet<Identity>();
@@ -69,24 +69,26 @@ public class BipartiteParallelGraphBuilder extends BipartiteGraphBuilder {
             // the current AccessedObjects, I think -- would need to check
             // again.
             if (vert instanceof Identity) {
-                vertices.add((Identity) vert);
-                newGraph.addVertex((Identity) vert);
+                Identity ivert = (Identity) vert;
+                vertices.add(ivert);
+                newGraph.addVertex(new LabelVertex(ivert));
             }
         }
         
         // would it be better to just use the new graph vertices? 
         // or is this more efficient?
         for (Identity v1 : vertices) {
+            LabelVertex labelv1 = new LabelVertex(v1);
             for (Object intermediate : graphCopy.getSuccessors(v1)) {
                 for (Object v2 : graphCopy.getSuccessors(intermediate)) {
                     if (v2.equals(v1)) {
                         continue;
                     }
-                    Identity v2Ident = (Identity) v2;
+                    LabelVertex labelv2 = new LabelVertex((Identity) v2);
                   
                     boolean addEdge = true;
                     Collection<WeightedEdge> edges =
-                            newGraph.findEdgeSet(v1, v2Ident);
+                            newGraph.findEdgeSet(labelv1, labelv2);
 
                     for (WeightedEdge e : edges) {
                         if (e instanceof AffinityEdge) {
@@ -105,7 +107,7 @@ public class BipartiteParallelGraphBuilder extends BipartiteGraphBuilder {
                         long minWeight = Math.min(e1Weight, e2Weight);
                         newGraph.addEdge(
                             new AffinityEdge(intermediate, minWeight), 
-                            v1, v2Ident);
+                            labelv1, labelv2);
                     }
                 }
             } 

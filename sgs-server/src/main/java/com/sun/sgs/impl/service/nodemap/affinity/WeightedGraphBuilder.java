@@ -61,8 +61,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
             new HashMap<Object, Map<Identity, Long>>();
     
     // Our graph of object accesses
-    private final CopyableGraph<Identity, WeightedEdge> affinityGraph =
-            new CopyableGraph<Identity, WeightedEdge>();
+    private final CopyableGraph<LabelVertex, WeightedEdge> affinityGraph =
+            new CopyableGraph<LabelVertex, WeightedEdge>();
     
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -99,8 +99,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     {
         long startTime = System.currentTimeMillis();
         updateCount++;
-        
-        affinityGraph.addVertex(owner);
+
+        LabelVertex vowner = new LabelVertex(owner);
+        affinityGraph.addVertex(vowner);
 
         // For each object accessed in this task...
         for (AccessedObject obj : detail.getAccessedObjects()) {    
@@ -124,14 +125,14 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 // edge if the identity isn't the owner
                 if (!ident.equals(owner)) {
                     long otherValue = entry.getValue();
-                
+                    LabelVertex vident = new LabelVertex(ident);
                     // Check to see if we already have an edge between
                     // the two vertices.  If so, update its weight.
                     
-                    WeightedEdge edge = affinityGraph.findEdge(owner, ident);
+                    WeightedEdge edge = affinityGraph.findEdge(vowner, vident);
                     if (edge == null) {
                         WeightedEdge newEdge = new WeightedEdge();
-                        affinityGraph.addEdge(newEdge, owner, ident);
+                        affinityGraph.addEdge(newEdge, vowner, vident);
                         // period info
                         pruneTask.incrementEdge(newEdge);
                     } else {
@@ -173,10 +174,10 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Graph<Identity, WeightedEdge> getAffinityGraph() {
+    public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
-        CopyableGraph<Identity, WeightedEdge> graphCopy =
-            new CopyableGraph<Identity, WeightedEdge>(affinityGraph);
+        CopyableGraph<LabelVertex, WeightedEdge> graphCopy =
+            new CopyableGraph<LabelVertex, WeightedEdge>(affinityGraph);
         System.out.println("Time for graph copy is : " +
                 (System.currentTimeMillis() - startTime) +
                 "msec");
@@ -245,9 +246,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 WeightedEdge edge = entry.getKey();
                 long weight = entry.getValue();
                 if (edge.getWeight() == weight) {
-                    Pair<Identity> endpts = affinityGraph.getEndpoints(edge);
+                    Pair<LabelVertex> endpts = affinityGraph.getEndpoints(edge);
                     affinityGraph.removeEdge(edge);
-                    for (Identity end : endpts) {
+                    for (LabelVertex end : endpts) {
                         if (affinityGraph.degree(end) == 0) {
                             affinityGraph.removeVertex(end);
                         }

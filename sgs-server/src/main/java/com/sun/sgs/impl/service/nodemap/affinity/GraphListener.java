@@ -103,17 +103,6 @@ public class GraphListener implements ProfileListener {
 
         builder.updateGraph(owner, detail);
     }
-    
-    /**
-     * Returns the current graph, with identities as vertices, and 
-     * edges representing each object accessed by both identity
-     * endpoints.
-     * 
-     * @return the folded graph of accesses
-     */
-    public Graph<Identity, WeightedEdge> getAffinityGraph() {
-        return builder.getAffinityGraph();
-    }
 
     /**
      * Returns the graph builder used by this listener.

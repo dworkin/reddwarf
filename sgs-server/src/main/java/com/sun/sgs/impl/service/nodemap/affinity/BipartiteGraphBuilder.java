@@ -130,7 +130,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Graph<Identity, WeightedEdge> getAffinityGraph() {
+    public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
 
         // Copy our input graph
@@ -150,8 +150,8 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         Collection<Identity> vertices = new HashSet<Identity>();
         
         // Our final, folded graph.
-        Graph<Identity, WeightedEdge> foldedGraph = 
-            new UndirectedSparseMultigraph<Identity, WeightedEdge>();
+        Graph<LabelVertex, WeightedEdge> foldedGraph =
+            new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
         
         // Separate out the vertex set for our new folded graph.
         for (Object vert : graphCopy.getVertices()) {
@@ -163,7 +163,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 Identity ivert = (Identity) vert;
                 vertices.add(ivert);
                 affinityGraph.addVertex(ivert);
-                foldedGraph.addVertex(ivert);
+                foldedGraph.addVertex(new LabelVertex(ivert));
             }
         }
         
@@ -201,10 +201,11 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         // Now collapse the parallel edges in the affinity graph
         for (AffinityEdge e : affinityGraph.getEdges()) {
             Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
-            WeightedEdge edge = foldedGraph.findEdge(endpoints.getFirst(), 
-                                                     endpoints.getSecond());
+            LabelVertex v1 = new LabelVertex(endpoints.getFirst());
+            LabelVertex v2 = new LabelVertex(endpoints.getSecond());
+            WeightedEdge edge = foldedGraph.findEdge(v1, v2);
             if (edge == null) {
-                foldedGraph.addEdge(new WeightedEdge(e.getWeight()), endpoints);
+                foldedGraph.addEdge(new WeightedEdge(e.getWeight()), v1, v2);
             } else {
                 edge.addWeight(e.getWeight());
             }
