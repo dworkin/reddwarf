@@ -47,12 +47,9 @@ public class Exporter<T extends Remote> {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    /** The ServerSocketFactory used for all exports. */
-    private static final ServerSocketFactory ssf = new ServerSocketFactory();
-
     /** The type of the server. */
     private final Class<T> type;
-
+    
     /** The server for handling inbound requests. */
     private T server;
 
@@ -95,14 +92,12 @@ public class Exporter<T extends Remote> {
 	    throw new NullPointerException("null name");
 	}
 	this.server = server;
-
-        synchronized(ssf) {
-            registry = LocateRegistry.createRegistry(port, null, ssf);
-            proxy = type.cast(
-                    UnicastRemoteObject.exportObject(server, port, null, ssf));
-            registry.rebind(name, proxy);
-            return ssf.getLastPort();
-        }
+	ServerSocketFactory ssf = new ServerSocketFactory();
+	registry = LocateRegistry.createRegistry(port, null, ssf);
+	proxy = type.cast(
+	    UnicastRemoteObject.exportObject(server, port, null, ssf));
+	registry.rebind(name, proxy);
+	return ssf.getLocalPort();
     }
 
     /**
@@ -122,12 +117,10 @@ public class Exporter<T extends Remote> {
 	    throw new NullPointerException("null server");
 	}
 	this.server = server;
-
-        synchronized(ssf) {
-            proxy = type.cast(
-                    UnicastRemoteObject.exportObject(server, port, null, ssf));
-            return ssf.getLastPort();
-        }
+	ServerSocketFactory ssf = new ServerSocketFactory();
+	proxy = type.cast(
+	    UnicastRemoteObject.exportObject(server, port, null, ssf));
+	return ssf.getLocalPort();
     }
 
     /**
@@ -157,7 +150,7 @@ public class Exporter<T extends Remote> {
 		logger.logThrow(
 		    Level.FINE, e, "Problem unexporting registry");
 		return;
-            }
+	    }
 	}
 	try {
 	    UnicastRemoteObject.unexportObject(server, true);
@@ -176,41 +169,22 @@ public class Exporter<T extends Remote> {
     private static class ServerSocketFactory
 	implements RMIServerSocketFactory
     {
-	/** Port number of last server socket created. */
-	private static int lastPort = -1;
+	/** The last server socket created. */
+	private ServerSocket serverSocket;
 
 	/** Creates an instance. */
 	ServerSocketFactory() { }
 
 	/** {@inheritDoc} */
 	public ServerSocket createServerSocket(int port) throws IOException {
-	    ServerSocket serverSocket = new ServerSocket(port);
-            lastPort = (serverSocket == null) ?
-                -1 : serverSocket.getLocalPort();
+	    serverSocket = new ServerSocket(port);
 	    return serverSocket;
 	}
 
-	/**
-         * Returns the local port of the last server socket created.
-         * This method should only be called once per call to
-         * {@link #createServerSocket(int) createServerSocket}.  Subsequent
-         * calls will return {@code -1}.
-         */
-	int getLastPort() {
-            int port = lastPort;
-            lastPort = -1;
-            return port;
-        }
-
-        /** {@inheritDoc} */
-        public boolean equals(Object rhs) {
-            return rhs != null && rhs.getClass().equals(this.getClass());
-        }
-
-        /** {@inheritDoc} */
-        public int hashCode() {
-            return 1;
-        }
+	/** Returns the local port of the last server socket created. */
+	int getLocalPort() {
+	    return (serverSocket == null) ? -1 : serverSocket.getLocalPort();
+	}
     }
 }   
 
