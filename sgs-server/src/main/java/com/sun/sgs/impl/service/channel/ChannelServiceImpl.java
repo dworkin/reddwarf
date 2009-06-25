@@ -1321,9 +1321,6 @@ public final class ChannelServiceImpl
 		transactionScheduler.runTask(
 		    new AbstractKernelRunnable("ScheduleRecoveryTasks") {
 			public void run() {
-			    if (shuttingDown()) {
-				return;
-			    }
 			    /*
 			     * Reassign each failed coordinator to a new node.
 			     */

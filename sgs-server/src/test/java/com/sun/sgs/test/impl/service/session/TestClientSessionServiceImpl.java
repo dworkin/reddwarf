@@ -673,6 +673,38 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testDisconnectedCallbackAfterClientDropsConnection()
+	throws Exception
+    {
+	final String name = "dummy";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort());
+	    assertTrue(client.login());
+	    checkBindings(1);
+	    client.disconnect();
+	    client.checkDisconnectedCallback(false);
+	    checkBindings(0);
+	    // check that client session was removed after disconnected callback
+	    // returned 
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() {
+		    try {
+			dataService.getBinding(name);
+			fail("expected ObjectNotFoundException: " +
+			     "object not removed");
+		    } catch (ObjectNotFoundException e) {
+		    }
+                }
+             }, taskOwner);
+	} catch (InterruptedException e) {
+	    e.printStackTrace();
+	    fail("testLogout interrupted");
+	} finally {
+	    client.disconnect();
+	}
+    }
+
     public void testLogoutRequestAndDisconnectedCallback() throws Exception {
 	final String name = "logout";
 	DummyClient client = new DummyClient(name);

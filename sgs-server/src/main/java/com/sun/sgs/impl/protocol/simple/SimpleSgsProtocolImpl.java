@@ -438,10 +438,18 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void close() throws IOException {
-        asyncMsgChannel.close();
+    public void close() {
+	if (isOpen()) {
+	    try {
+		asyncMsgChannel.close();
+	    } catch (IOException e) {
+	    }
+	}
 	readHandler = new ClosedReadHandler();
         writeHandler = new ClosedWriteHandler();
+	if (protocolHandler != null) {
+	    protocolHandler.disconnect(new RequestHandler());
+	}
     }
 
     /* -- Methods for reading and writing -- */
@@ -507,22 +515,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    }
 	    messageQueue.clear();
 	}
-    }
-
-    /**
-     * Method to disconnect the connection.
-     */
-    private void disconnect() {
-        // If there is a handler it is up to them to close
-        // the connection
-	if (protocolHandler != null) {
-	    protocolHandler.disconnect(new RequestHandler());
-	} else {
-            try {
-                close();
-            } catch (IOException ignore) {
-	    }
-        }
     }
     
     /**
@@ -671,7 +663,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		synchronized (writeLock) {
 		    pendingWrites.clear();
 		}
-		disconnect();
+		close();
             }
         }
     }
@@ -734,7 +726,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-		    disconnect();
+		    close();
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
@@ -763,7 +755,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                         Level.FINE, e,
                         "Read completion exception {0}", asyncMsgChannel);
                 }
-                disconnect();
+                close();
             }
         }
 
@@ -792,7 +784,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
-		    disconnect();
+		    close();
 	            break;
 	        }
 
@@ -827,7 +819,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
-		    disconnect();
+		    close();
 	            break;
 	        }
 
@@ -891,10 +883,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		if (protocolHandler == null) {
-		    try {
-			close();
-		    } catch (IOException ignore) {
-		    }
+		    close();
 		    return;
 		}
 		protocolHandler.logoutRequest(new LogoutHandler());
@@ -911,7 +900,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 			"unknown opcode 0x{0}",
 			Integer.toHexString(opcode));
 		}
-		disconnect();
+		close();
 		break;
 	    }
 	}

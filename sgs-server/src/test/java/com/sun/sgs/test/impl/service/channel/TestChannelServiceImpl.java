@@ -1000,7 +1000,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	tearDown(false);
 	setUp(false);
 	addNodes("ay", "bee", "sea");
-	Thread.sleep(1000);
+	Thread.sleep(2000);
 	int afterCount = getObjectCount();
 	for (int i = 0; i < 2; i++) {
 	    // Make sure that previous sessions were cleaned up.
@@ -1455,6 +1455,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
 	
     }
+
     // -- other classes --
 
     private static class NonSerializableChannelListener

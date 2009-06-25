@@ -558,7 +558,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /**
      * Closes the connection associated with this instance.
      */
-    void closeConnection() {
+    private void closeConnection() {
 	if (protocol.isOpen()) {
 	    try {
 		protocol.close();
