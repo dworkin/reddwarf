@@ -2296,6 +2296,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		    elements = currentNode.get().getSubList().getElements();
 		    index = currentNode.get().size() - 1;
 		} else {
+                    cannotRemoveOrSet = true;
 		    throw new NoSuchElementException(
 			    "The previous element does not exist");
 		}
@@ -2392,7 +2393,12 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 */
 	public E next() {
 	    cannotRemoveOrSet = false;
-	    return super.next();
+	    try {
+                return super.next();
+            } catch (NoSuchElementException e) {
+                cannotRemoveOrSet = true;
+                throw e;
+            }
 	}
 
 	/**
