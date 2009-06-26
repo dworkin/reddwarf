@@ -39,7 +39,7 @@ import com.sun.sgs.test.util.DummyTransactionListener;
 import com.sun.sgs.test.util.DummyTransactionListener.CalledAfter;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant.State;
-import com.sun.sgs.test.util.TestConstants;
+import com.sun.sgs.test.util.Constants;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.IOException;
@@ -71,7 +71,7 @@ public class TestTransactionCoordinatorImpl {
 
     /** Long enough for a transaction to timeout. */
     private static final long TIMED_OUT = TIMEOUT + 
-            TestConstants.MAX_CLOCK_GRANULARITY;
+            Constants.MAX_CLOCK_GRANULARITY;
 
     /** Transaction coordinator properties. */
     private static final Properties coordinatorProps = new Properties();

@@ -22,7 +22,7 @@ package com.sun.sgs.test.util;
 /**
  * Contains constant values to be used with tests.
  */
-public final class TestConstants {
+public final class Constants {
 
     /**
      * This value is the maximum clock granularity that is expected for calls
@@ -38,7 +38,7 @@ public final class TestConstants {
     /**
      * This class should not be instantiated,
      */
-    private TestConstants() {
+    private Constants() {
 
     }
 }
