@@ -3534,12 +3534,12 @@ public class TestScalableList extends Assert {
 	    public void run() throws Exception {
 		ScalableList<String> list = new ScalableList<String>(3, 1);
 
-                // Populate the lists
+                // Populate the list
 		for (int i = 0; i < 5; i++) {
 		    list.add(Integer.toString(i));
 		}
 
-                // place iterators at the beginning
+                // place iterator at the beginning
 		ListIterator<String> listIter =
 			list.listIterator();
 
@@ -3576,12 +3576,12 @@ public class TestScalableList extends Assert {
 	    public void run() throws Exception {
 		ScalableList<String> list = new ScalableList<String>(3, 1);
 
-                // Populate the lists
+                // Populate the list
 		for (int i = 0; i < 5; i++) {
 		    list.add(Integer.toString(i));
 		}
 
-                // place iterators at the beginning
+                // place iterator at the end
 		ListIterator<String> listIter =
 			list.listIterator(list.size());
 
