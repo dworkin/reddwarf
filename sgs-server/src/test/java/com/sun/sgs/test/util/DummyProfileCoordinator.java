@@ -76,11 +76,6 @@ public class DummyProfileCoordinator {
         }
     }
 
-    /** Initialize the static state. */
-    public static void initialize() {
-
-    }
-
     /** Get the singleton, backing collector. */
     public static ProfileCollectorImpl getCollector() {
         return instance.collector;

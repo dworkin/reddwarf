@@ -65,7 +65,6 @@ public class TestTransactionContextFactory extends TestCase {
 		    };
 		}
 	    };
-	DummyProfileCoordinator.initialize();
 	DummyTransaction txn = new DummyTransaction(
 	    DummyTransaction.UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
