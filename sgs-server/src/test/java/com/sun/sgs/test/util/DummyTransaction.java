@@ -71,7 +71,7 @@ public class DummyTransaction implements Transaction {
     private final long id = nextId.getAndIncrement();
 
     /** The creation time of this transaction. */
-    private final long creationTime = System.currentTimeMillis();
+    private final long creationTime;
 
     /** The length of time this transaction is allowed to run. */
     private final long timeout;
@@ -140,6 +140,7 @@ public class DummyTransaction implements Transaction {
 	this.timeout = timeout;
 	logger.log(Level.FINER, "create {0}", this);
         DummyProfileCoordinator.startTask();
+        this.creationTime = System.currentTimeMillis();
     }
 
     /* -- Implement Transaction -- */

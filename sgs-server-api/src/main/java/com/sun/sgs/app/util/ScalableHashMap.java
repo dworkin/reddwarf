@@ -1052,10 +1052,10 @@ public class ScalableHashMap<K, V>
 
 	DataManager dm = AppContext.getDataManager();
 
+        // mark this node for update since we will be changing its directory
+	dm.markForUpdate(this);
 	// remove the old leaf node
 	dm.removeObject(leaf);
-	// mark this node for update since we will be changing its directory
-	dm.markForUpdate(this);
 
 	// update the new children nodes to point to this directory node as
 	// their parent
@@ -2046,6 +2046,7 @@ public class ScalableHashMap<K, V>
 	    } else if (isKeyValuePair()) {
                 ManagedSerializable<KeyValuePair<K, V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
+                dm.markForUpdate(msPair);
 		msPair.get().setValue(newValue);
 	    } else if (isKeyWrapped()) {
 		/* Switch from wrapping key to wrapping key/value pair */
@@ -2053,6 +2054,7 @@ public class ScalableHashMap<K, V>
 		    uncheckedCast(keyOrPairRef.get());
                 ManagedSerializable<KeyValuePair<K, V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
+                dm.markForUpdate(msPair);
                 msPair.set(new KeyValuePair<K, V>(msKey.get(), newValue));
 		if (isValueWrapped()) {
 		    dm.removeObject(valueRef.get());

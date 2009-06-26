@@ -144,9 +144,6 @@ public class TestDataStoreImpl extends TestCase {
 	    if (txn != null) {
 		txn.abort(new RuntimeException("abort"));
 	    }
-	    if (!passed && store != null) {
-		new ShutdownAction().waitForDone();
-	    }
 	} catch (RuntimeException e) {
 	    if (passed) {
 		throw e;
@@ -154,10 +151,11 @@ public class TestDataStoreImpl extends TestCase {
 		e.printStackTrace();
 	    }
 	} finally {
-	    txn = null;
-	    if (!passed) {
-		store = null;
-	    }
+            txn = null;
+            if (!passed && store != null) {
+                new ShutdownAction().waitForDone();
+                store = null;
+            }
 	}
     }
 
