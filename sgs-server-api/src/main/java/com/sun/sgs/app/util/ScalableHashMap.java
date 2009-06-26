@@ -2036,7 +2036,6 @@ public class ScalableHashMap<K, V>
 			uncheckedCast(keyOrPairRef.get());
 		    ManagedSerializable<K> msKey =
 			uncheckedCast(keyOrPairRef.get());
-                    dm.markForUpdate(msKey);
 		    msKey.set(msPair.get().getKey());
 		    setKeyWrapped(true);
 		} else if (isValueWrapped()) {
@@ -2063,7 +2062,6 @@ public class ScalableHashMap<K, V>
 		setKeyValuePair();
 	    } else if (isValueWrapped()) {
 		ManagedSerializable<V> ms = uncheckedCast(valueRef.get());
-                dm.markForUpdate(ms);
 		ms.set(newValue);
 	    } else {
 		valueRef = dm.createReference(
