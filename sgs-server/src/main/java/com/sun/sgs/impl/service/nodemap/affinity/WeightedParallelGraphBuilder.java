@@ -231,6 +231,7 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
             // Update the data structures for this snapshot
             addPeriodStructures();
             if (current <= count) {
+                // Do nothing, we're still in our inital snapshot window
                 current++;
                 return;
             }

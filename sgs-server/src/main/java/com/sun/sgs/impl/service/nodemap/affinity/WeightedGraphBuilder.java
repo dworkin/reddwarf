@@ -24,6 +24,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -61,8 +62,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
             new HashMap<Object, Map<Identity, Long>>();
     
     // Our graph of object accesses
-    private final CopyableGraph<LabelVertex, WeightedEdge> affinityGraph =
-            new CopyableGraph<LabelVertex, WeightedEdge>();
+    private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
+        affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
     
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -175,20 +176,15 @@ public class WeightedGraphBuilder implements GraphBuilder {
 
     /** {@inheritDoc} */
     public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
-        long startTime = System.currentTimeMillis();
-        CopyableGraph<LabelVertex, WeightedEdge> graphCopy =
-            new CopyableGraph<LabelVertex, WeightedEdge>(affinityGraph);
-        System.out.println("Time for graph copy is : " +
-                (System.currentTimeMillis() - startTime) +
-                "msec");
-        return graphCopy;
+        return affinityGraph;
     }
 
 
     private class PruneTask extends TimerTask {
-        // JANE what would happen if we made this non-final?
+        // JANE what would happen if we made count non-final?
+        // The number of snapshots we retain in our moving window
         private final int count;
-
+        // The current snapshot count, used to initially fill up our window.
         private int current = 1;
 
         private final Queue<Map<Object, Map<Identity, Long>>> periodObjectQueue;
@@ -208,6 +204,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
             // Update the data structures for this snapshot
             addPeriodStructures();
             if (current <= count) {
+                // Do nothing, we're still in our inital snapshot window
                 current++;
                 return;
             }
