@@ -935,7 +935,7 @@ public class TestTaskServiceImpl extends TestCase {
             getProperty(
 		"com.sun.sgs.impl.service.watchdog.server.renew.interval",
 		"500");
-        Thread.sleep(3 * Long.valueOf(interval));
+        Thread.sleep(4 * Long.valueOf(interval));
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
