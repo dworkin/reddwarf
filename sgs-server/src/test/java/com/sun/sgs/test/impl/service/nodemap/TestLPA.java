@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.Graphs;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
@@ -31,7 +32,6 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
-import edu.uci.ics.jung.graph.util.Graphs;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -129,8 +129,8 @@ public class TestLPA {
         b.addIdentity(new DummyIdentity("5"));
         group1.add(b);
 
-        double modularity =
-            LabelPropagation.calcModularity(builder.getAffinityGraph(), group1);
+        double modularity = 
+                Graphs.calcModularity(builder.getAffinityGraph(), group1);
         Assert.assertEquals(0.22, modularity, .001);
 
         Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
@@ -144,13 +144,12 @@ public class TestLPA {
         b.addIdentity(new DummyIdentity("5"));
         group2.add(b);
 
-        modularity =
-            LabelPropagation.calcModularity(builder.getAffinityGraph(), group2);
+        modularity = Graphs.calcModularity(builder.getAffinityGraph(), group2);
         Assert.assertEquals(0.08, modularity, .001);
 
         // JANE need to test with graph with weighted edges!
 
-        double jaccard = LabelPropagation.calcJaccard(group1, group2);
+        double jaccard = Graphs.calcJaccard(group1, group2);
         System.out.println("Jaccard index is " + jaccard);
         Assert.assertEquals(0.333, jaccard, .001);
     }
@@ -200,7 +199,7 @@ public class TestLPA {
         groups.add(b);
 
         double modularity =
-            LabelPropagation.calcModularity(builder.getAffinityGraph(), groups);
+                Graphs.calcModularity(builder.getAffinityGraph(), groups);
         System.out.println("Modularity for correct Zachary's karate club is " +
                 modularity);
     }
@@ -251,7 +250,7 @@ public class TestLPA {
         groups.add(b);
 
         double modularity =
-            LabelPropagation.calcModularity(builder.getAffinityGraph(), groups);
+            Graphs.calcModularity(builder.getAffinityGraph(), groups);
         System.out.println("Modularity test club partition is " +
                 modularity);
     }
@@ -363,7 +362,7 @@ public class TestLPA {
 
         /** {@inheritDoc} */
         public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
-            return Graphs.unmodifiableGraph(graph);
+            return graph;
         }
         /** {@inheritDoc} */
         public Runnable getPruneTask() {
@@ -405,7 +404,7 @@ public class TestLPA {
 
         /** {@inheritDoc} */
         public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
-            return Graphs.unmodifiableGraph(graph);
+            return graph;
         }
         /** {@inheritDoc} */
         public Runnable getPruneTask() {

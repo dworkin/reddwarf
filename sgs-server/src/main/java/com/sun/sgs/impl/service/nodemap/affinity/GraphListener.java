@@ -25,7 +25,6 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
-import edu.uci.ics.jung.graph.Graph;
 import java.beans.PropertyChangeEvent;
 import java.util.Properties;
 
