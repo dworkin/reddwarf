@@ -569,7 +569,7 @@ public final class WatchdogServiceImpl
 	 * service is shutdown.
 	 */
 	public void run() {
-	    long startRenewInterval = renewInterval / 2;
+	    long startRenewInterval = renewInterval;
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
@@ -613,7 +613,7 @@ public final class WatchdogServiceImpl
 			Math.max(nextRenewInterval / 2, MIN_RENEW_INTERVAL);
 		}
 		long now = System.currentTimeMillis();
-		if (now - lastRenewTime > renewInterval) {
+		if (now - lastRenewTime > renewInterval * 2) {
                     // server has already marked node as failed, so we can
                     // go directly to removing this node
                     setFailedThenNotify(true);

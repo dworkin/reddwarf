@@ -359,6 +359,8 @@ public class TestNodeMappingServiceImpl {
         nodeMappingService.assignNode(NodeMappingService.class, id);
                 
         verifyMapCorrect(id);
+	TestListener l = nodeListenerMap.get(serverNode.getNodeId());
+        l.waitForNotification();
        
         // Now expect to be able to find the identity
         txnScheduler.runTask(
@@ -746,6 +748,7 @@ public class TestNodeMappingServiceImpl {
         
         // clear out the listener
         TestListener listener = nodeListenerMap.get(node.getId());
+	listener.waitForNotification();
         listener.clear();
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         listener.waitForNotification(removeTime * 4);
@@ -769,6 +772,7 @@ public class TestNodeMappingServiceImpl {
         
         // clear out the listener
         TestListener listener = nodeListenerMap.get(node.getId());
+	listener.waitForNotification();
         listener.clear();
         // SetStatus is idempotent:  it doesn't matter how often a particular
         // service says an id is active.
@@ -803,6 +807,7 @@ public class TestNodeMappingServiceImpl {
         
         // clear out the listener
         TestListener listener = nodeListenerMap.get(node.getId());
+	listener.waitForNotification();
         listener.clear();
 
         // We arrange for the test to fail if there is a WARNING log message
@@ -858,6 +863,7 @@ public class TestNodeMappingServiceImpl {
         
         // Sanity check, be sure our listener still gets a single notification
         // in this log in, out, in, out scenario.
+	listener.waitForNotification();
         try {
             txnScheduler.runTask(task, taskOwner);
             fail("Expected UnknownIdentityException");
@@ -903,6 +909,7 @@ public class TestNodeMappingServiceImpl {
         Node firstNode = task.getNode();
         long firstNodeId = task.getNodeId();
         TestListener firstNodeListener = nodeListenerMap.get(firstNodeId);
+	firstNodeListener.waitForNotification();
 
         NodeMappingServerImpl server = 
             (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
@@ -918,6 +925,9 @@ public class TestNodeMappingServiceImpl {
         Node secondNode = task.getNode();
         TestListener secondNodeListener = 
                 nodeListenerMap.get(secondNode.getId());
+
+	firstNodeListener.waitForNotification();
+	secondNodeListener.waitForNotification();
 
         checkIdMoved(firstNodeListener, firstNode,
                      secondNodeListener, secondNode, id);
@@ -949,6 +959,8 @@ public class TestNodeMappingServiceImpl {
         TestListener firstNodeListener = nodeListenerMap.get(firstNodeId);
         TestRelocationListener idListener = moveMap.get(firstNodeId);
 
+	firstNodeListener.waitForNotification();
+
         NodeMappingServerImpl server =
             (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
 
@@ -971,6 +983,8 @@ public class TestNodeMappingServiceImpl {
         long secondNodeId = task.getNodeId();
         TestListener secondNodeListener =
                 nodeListenerMap.get(secondNodeId);
+
+	secondNodeListener.waitForNotification();
 
         checkRelocationNotification(idListener, id, secondNodeId);
 
@@ -1002,7 +1016,10 @@ public class TestNodeMappingServiceImpl {
         txnScheduler.runTask(task, taskOwner);;
         long firstNodeId = task.getNodeId();
         Node firstNode = task.getNode();
+        TestListener firstNodeListener = nodeListenerMap.get(firstNodeId);
         TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+	firstNodeListener.waitForNotification();
 
         NodeMappingServerImpl server =
             (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
@@ -1080,7 +1097,10 @@ public class TestNodeMappingServiceImpl {
         txnScheduler.runTask(task, taskOwner);;
         long firstNodeId = task.getNodeId();
         Node firstNode = task.getNode();
+        TestListener firstNodeListener = nodeListenerMap.get(firstNodeId);
         TestRelocationListener idListener = moveMap.get(firstNodeId);
+
+	firstNodeListener.waitForNotification();
 
         NodeMappingServerImpl server =
             (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
