@@ -621,7 +621,7 @@ public final class WatchdogServerImpl
      * Returns an expiration time based on the current time.
      */
     private long calculateExpiration() {
-	return System.currentTimeMillis() + renewInterval * 2;
+	return System.currentTimeMillis() + renewInterval;
     }
     
     /**
@@ -739,7 +739,7 @@ public final class WatchdogServerImpl
 		synchronized (expirationSet) {
 		    sleepTime =
 			expirationSet.isEmpty() ?
-			renewInterval * 2 :
+			renewInterval :
 			expirationSet.first().getExpiration() - now;
 		}
 		synchronized (this) {

@@ -117,6 +117,9 @@ public class TestNodeMappingServiceImpl {
     
     /** A specific property we started with, for remove tests */
     private int removeTime;
+
+    /** The renew interval for the watchdog service */
+    private int renewTime;
     
     /** The transaction scheduler. */
     private TransactionScheduler txnScheduler;
@@ -148,6 +151,9 @@ public class TestNodeMappingServiceImpl {
         removeTime = Integer.valueOf(
             serviceProps.getProperty(
                 "com.sun.sgs.impl.service.nodemap.remove.expire.time"));
+	renewTime = Integer.valueOf(
+	    serviceProps.getProperty(
+		"com.sun.sgs.impl.service.watchdog.server.renew.interval"));
         
         txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
@@ -1073,7 +1079,7 @@ public class TestNodeMappingServiceImpl {
         // Wait for notification.  We expect to be notified on the 
         // newNode assigned above.
         TestListener secondNodeListener = nodeListenerMap.get(newNode);
-        secondNodeListener.waitForNotification();
+        secondNodeListener.waitForNotification(renewTime * 2);
 
         txnScheduler.runTask(task, taskOwner);
         assertEquals((long) newNode, task.getNodeId());
