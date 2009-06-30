@@ -50,9 +50,6 @@ import java.util.TimerTask;
  * been used by which identities.  Edges between identities represent an object,
  * and has an associated weight, indicating the number of times both identities
  * have accessed the object.
- * <p>
- * This class is currently assumed to be single threaded. JUNG provides a
- * way to wrap graphs so they are synchronized;  we might need to use that.
  */
 public class WeightedGraphBuilder implements GraphBuilder {
     // Map for tracking object-> map of identity-> number accesses
@@ -95,77 +92,78 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
     
     /** {@inheritDoc} */
-    public synchronized void updateGraph(Identity owner, 
-                                         AccessedObjectsDetail detail)
-    {
+    public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
         long startTime = System.currentTimeMillis();
         updateCount++;
 
         LabelVertex vowner = new LabelVertex(owner);
-        affinityGraph.addVertex(vowner);
+        synchronized(affinityGraph) {
+            affinityGraph.addVertex(vowner);
 
-        // For each object accessed in this task...
-        for (AccessedObject obj : detail.getAccessedObjects()) {    
-            Object objId = obj.getObjectId();
+            // For each object accessed in this task...
+            for (AccessedObject obj : detail.getAccessedObjects()) {
+                Object objId = obj.getObjectId();
 
-            // find the identities that have already used this object
-            Map<Identity, Long> idMap = objectMap.get(objId);
-            if (idMap == null) {
-                // first time we've seen this object
-                idMap = new HashMap<Identity, Long>();
-            }
-            
-            long value = idMap.containsKey(owner) ? idMap.get(owner) : 0;
-            value++;
-            
-            // add or update edges between task owner and identities
-            for (Map.Entry<Identity, Long> entry : idMap.entrySet()) {
-                Identity ident = entry.getKey();
-
-                // Our folded graph has no self-loops:  only add an
-                // edge if the identity isn't the owner
-                if (!ident.equals(owner)) {
-                    long otherValue = entry.getValue();
-                    LabelVertex vident = new LabelVertex(ident);
-                    // Check to see if we already have an edge between
-                    // the two vertices.  If so, update its weight.
-                    
-                    WeightedEdge edge = affinityGraph.findEdge(vowner, vident);
-                    if (edge == null) {
-                        WeightedEdge newEdge = new WeightedEdge();
-                        affinityGraph.addEdge(newEdge, vowner, vident);
-                        // period info
-                        pruneTask.incrementEdge(newEdge);
-                    } else {
-                        if (value <= otherValue) {
-                            edge.incrementWeight();
-                            // period info
-                            pruneTask.incrementEdge(edge);
-                        }
-                    }
+                // find the identities that have already used this object
+                Map<Identity, Long> idMap = objectMap.get(objId);
+                if (idMap == null) {
+                    // first time we've seen this object
+                    idMap = new HashMap<Identity, Long>();
                 }
 
-            }
-            idMap.put(owner, value);
-            objectMap.put(objId, idMap);
+                long value = idMap.containsKey(owner) ? idMap.get(owner) : 0;
+                value++;
 
-            // period info
-            pruneTask.updateObjectAccess(objId, owner);
-        }
-        
-        totalTime += System.currentTimeMillis() - startTime;
-        
-        // Print out some data, just for helping look at the algorithms
-        // for now
-        if (updateCount % 500 == 0) {
-            System.out.println("Weighted Graph Builder results after " + 
-                               updateCount + " updates: ");
-            System.out.println("  graph vertex count: " + 
-                               affinityGraph.getVertexCount());
-            System.out.println("  graph edge count: " + 
-                               affinityGraph.getEdgeCount());
-            System.out.printf("  mean graph processing time: %.2fms %n", 
-                              totalTime / (double) updateCount);
+                // add or update edges between task owner and identities
+                for (Map.Entry<Identity, Long> entry : idMap.entrySet()) {
+                    Identity ident = entry.getKey();
+
+                    // Our folded graph has no self-loops:  only add an
+                    // edge if the identity isn't the owner
+                    if (!ident.equals(owner)) {
+                        long otherValue = entry.getValue();
+                        LabelVertex vident = new LabelVertex(ident);
+                        // Check to see if we already have an edge between
+                        // the two vertices.  If so, update its weight.
+
+                        WeightedEdge edge =
+                                affinityGraph.findEdge(vowner, vident);
+                        if (edge == null) {
+                            WeightedEdge newEdge = new WeightedEdge();
+                            affinityGraph.addEdge(newEdge, vowner, vident);
+                            // period info
+                            pruneTask.incrementEdge(newEdge);
+                        } else {
+                            if (value <= otherValue) {
+                                edge.incrementWeight();
+                                // period info
+                                pruneTask.incrementEdge(edge);
+                            }
+                        }
+                    }
+
+                }
+                idMap.put(owner, value);
+                objectMap.put(objId, idMap);
+
+                // period info
+                pruneTask.updateObjectAccess(objId, owner);
+            }
+
+            totalTime += System.currentTimeMillis() - startTime;
+
+            // Print out some data, just for helping look at the algorithms
+            // for now
+            if (updateCount % 500 == 0) {
+                System.out.println("Weighted Graph Builder results after " +
+                                   updateCount + " updates: ");
+                System.out.println("  graph vertex count: " +
+                                   affinityGraph.getVertexCount());
+                System.out.println("  graph edge count: " +
+                                   affinityGraph.getEdgeCount());
+                System.out.printf("  mean graph processing time: %.2fms %n",
+                                  totalTime / (double) updateCount);
+            }
         }
     }
 
@@ -179,7 +177,10 @@ public class WeightedGraphBuilder implements GraphBuilder {
         return affinityGraph;
     }
 
-
+    /**
+     * The graph pruner.  It runs periodically, and is the only code
+     * that removes edges and vertices from the graph.
+     */
     private class PruneTask extends TimerTask {
         // JANE what would happen if we made count non-final?
         // The number of snapshots we retain in our moving window
@@ -197,75 +198,83 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 new LinkedList<Map<Object, Map<Identity, Long>>>();
             periodEdgeIncrementsQueue = 
                 new LinkedList<Map<WeightedEdge, Long>>();
-            addPeriodStructures();
+            synchronized (affinityGraph) {
+                addPeriodStructures();
+            }
         }
 
-        public synchronized void run() {
-            // Update the data structures for this snapshot
-            addPeriodStructures();
-            if (current <= count) {
-                // Do nothing, we're still in our inital snapshot window
-                current++;
-                return;
-            }
+        public void run() {
+            synchronized (affinityGraph) {
+                // Update the data structures for this snapshot
+                addPeriodStructures();
+                if (current <= count) {
+                    // Do nothing, we're still in our inital snapshot window
+                    current++;
+                    return;
+                }
 
-            // take care of everything.
-            Map<Object, Map<Identity, Long>> periodObject =
-                    periodObjectQueue.remove();
-            Map<WeightedEdge, Long> periodEdgeIncrements =
-                    periodEdgeIncrementsQueue.remove();
+                // take care of everything.
+                Map<Object, Map<Identity, Long>> periodObject =
+                        periodObjectQueue.remove();
+                Map<WeightedEdge, Long> periodEdgeIncrements =
+                        periodEdgeIncrementsQueue.remove();
 
-            // For each object, remove the added access counts
-            for (Map.Entry<Object, Map<Identity, Long>> entry :
-                 periodObject.entrySet())
-            {
-                Map<Identity, Long> idMap = objectMap.get(entry.getKey());
-                for (Map.Entry<Identity, Long> updateEntry :
-                     entry.getValue().entrySet())
+                // For each object, remove the added access counts
+                for (Map.Entry<Object, Map<Identity, Long>> entry :
+                     periodObject.entrySet())
                 {
-                    Identity idUpdate = updateEntry.getKey();
-                    long newVal = idMap.get(idUpdate) - updateEntry.getValue();
-                    if (newVal == 0) {
-                        idMap.remove(idUpdate);
-                    } else {
-                        idMap.put(idUpdate, newVal);
-                    }
-                }
-                if (idMap.isEmpty()) {
-                    objectMap.remove(entry.getKey());
-                }
-            }
-
-            // For each modified edge in the graph, update weights
-            for (Map.Entry<WeightedEdge, Long> entry :
-                 periodEdgeIncrements.entrySet())
-            {
-                WeightedEdge edge = entry.getKey();
-                long weight = entry.getValue();
-                if (edge.getWeight() == weight) {
-                    Pair<LabelVertex> endpts = affinityGraph.getEndpoints(edge);
-                    affinityGraph.removeEdge(edge);
-                    for (LabelVertex end : endpts) {
-                        if (affinityGraph.degree(end) == 0) {
-                            affinityGraph.removeVertex(end);
+                    Map<Identity, Long> idMap = objectMap.get(entry.getKey());
+                    for (Map.Entry<Identity, Long> updateEntry :
+                         entry.getValue().entrySet())
+                    {
+                        Identity idUpdate = updateEntry.getKey();
+                        long newVal =
+                                idMap.get(idUpdate) - updateEntry.getValue();
+                        if (newVal == 0) {
+                            idMap.remove(idUpdate);
+                        } else {
+                            idMap.put(idUpdate, newVal);
                         }
                     }
-                } else {
-                    edge.addWeight(-weight);
+                    if (idMap.isEmpty()) {
+                        objectMap.remove(entry.getKey());
+                    }
+                }
+
+                // For each modified edge in the graph, update weights
+                for (Map.Entry<WeightedEdge, Long> entry :
+                     periodEdgeIncrements.entrySet())
+                {
+                    WeightedEdge edge = entry.getKey();
+                    long weight = entry.getValue();
+                    if (edge.getWeight() == weight) {
+                        Pair<LabelVertex> endpts =
+                                affinityGraph.getEndpoints(edge);
+                        affinityGraph.removeEdge(edge);
+                        for (LabelVertex end : endpts) {
+                            if (affinityGraph.degree(end) == 0) {
+                                affinityGraph.removeVertex(end);
+                            }
+                        }
+                    } else {
+                        edge.addWeight(-weight);
+                    }
                 }
             }
         }
 
-        public synchronized void incrementEdge(WeightedEdge edge) {
+        public void incrementEdge(WeightedEdge edge) {
+            assert Thread.holdsLock(affinityGraph);
             long v = currentPeriodEdgeIncrements.containsKey(edge) ?
                      currentPeriodEdgeIncrements.get(edge) : 0;
             v++;
             currentPeriodEdgeIncrements.put(edge, v);
         }
 
-        public synchronized void updateObjectAccess(Object objId,
+        public void updateObjectAccess(Object objId,
                                                     Identity owner)
         {
+            assert Thread.holdsLock(affinityGraph);
             Map<Identity, Long> periodIdMap = currentPeriodObject.get(objId);
             if (periodIdMap == null) {
                 periodIdMap = new HashMap<Identity, Long>();
@@ -277,7 +286,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
             currentPeriodObject.put(objId, periodIdMap);
         }
 
-        private synchronized void addPeriodStructures() {
+        private void addPeriodStructures() {
+            assert Thread.holdsLock(affinityGraph);
             currentPeriodObject = new HashMap<Object, Map<Identity, Long>>();
             periodObjectQueue.add(currentPeriodObject);
             currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Long>();

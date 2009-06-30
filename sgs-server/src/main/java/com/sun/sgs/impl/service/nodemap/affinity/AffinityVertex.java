@@ -70,6 +70,6 @@ public class AffinityVertex {
 
     /** {@inheritDoc} */
     public String toString() {
-        return "[" + id.toString() + "]";
+        return "[" + id.getName() + "]";
     }
 }
