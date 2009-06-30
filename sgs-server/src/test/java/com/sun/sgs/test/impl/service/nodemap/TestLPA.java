@@ -36,25 +36,33 @@ import org.junit.runners.Parameterized;
 @RunWith(ParameterizedFilteredNameRunner.class)
 public class TestLPA {
 
-    private static int numThreads;
     private static final int WARMUP_RUNS = 100;
     private static final int RUNS = 500;
+    
+    // Number of threads, set with data below for each run
+    private int numThreads;
+    private double nodePref;
 
     @Parameterized.Parameters
     public static Collection data() {
-        return Arrays.asList(new Object[][] {{1}, {2}, {4}, {8}, {16}});
+        return Arrays.asList(new Object[][] 
+            {{1, 0.00}, {2, 0.00}, {4, 0.00}, {8, 0.00}, {16, 0.00},
+             {1, 0.01}, {2, 0.01}, {4, 0.01}, {8, 0.01}, {16, 0.01},
+             {1, 0.02}, {2, 0.02}, {4, 0.02}, {8, 0.02}, {16, 0.02},
+             {1, -0.01}, {2, -0.01}, {4, -0.01}, {8, -0.01}, {16, -0.01}});
 
     }
 
-    public TestLPA(int numThreads) {
+    public TestLPA(int numThreads, double nodePref) {
         this.numThreads = numThreads;
+        this.nodePref = nodePref;
     }
 
     @Test
     public void warmup() {
         // Warm up the compilers
         LabelPropagation lpa =
-                new LabelPropagation(new ZachBuilder(), false, numThreads);
+           new LabelPropagation(new ZachBuilder(), false, numThreads, nodePref);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.findCommunities();
@@ -66,7 +74,8 @@ public class TestLPA {
     public void testZachary() {
         GraphBuilder builder = new ZachBuilder();
         // second argument true:  gather statistics
-        LabelPropagation lpa = new LabelPropagation(builder, true, numThreads);
+        LabelPropagation lpa =
+            new LabelPropagation(builder, true, numThreads, nodePref);
         
         long avgTime = 0;
         int avgIter = 0;
@@ -74,7 +83,7 @@ public class TestLPA {
         double maxMod = 0.0;
         double minMod = 1.0;
         long maxTime = 0;
-        long minTime = 1;
+        long minTime = Integer.MAX_VALUE;
         for (int i = 0; i < RUNS; i++) {
             Collection<AffinityGroup> groups = lpa.findCommunities();
             long time = lpa.getTime();
@@ -88,11 +97,12 @@ public class TestLPA {
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
         }
-        System.out.printf("XXX (%d runs, %d threads): avg time : %4.2f ms, " +
+        System.out.printf("XXX (%d runs, %d threads, %.4f): " +
+                          "avg time : %4.2f ms, " +
                           " time range [%d - %d ms] " +
                           " avg iters : %4.2f, avg modularity: %.4f, " +
                           " modularity range [%.4f - %.4f] %n",
-                          RUNS, numThreads,
+                          RUNS, numThreads, nodePref,
                           avgTime/(double) RUNS,
                           minTime, maxTime,
                           avgIter/(double) RUNS,

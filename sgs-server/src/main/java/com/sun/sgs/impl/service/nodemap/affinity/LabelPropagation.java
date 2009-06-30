@@ -72,6 +72,14 @@ public class LabelPropagation {
     // The number of threads this algorithm should use.
     private final int numThreads;
 
+    // The node preference factor.  Zero means no node preference, a small
+    // positive number means a slight preference to nodes with higher degrees,
+    // and a small negative number means a slight preference to nodes with
+    // lower degrees.
+    // See Towards Real-Time Community Detection in Large Networks, 2009,
+    // Leung, Hui, Lio, Crowcroft.
+    private final double nodePref;
+
     // If true, gather statistics for each run.
     private final boolean gatherStats;
     // Statistics for the last run, only if gatherStats is true.
@@ -92,12 +100,13 @@ public class LabelPropagation {
      * @param numThreads number of threads, for TESTING.
      *      If 1, use the sequential asynchronous version.
      *      If >1, use the parallel version, with that number of threads.
+     * @param nodePref node preference factor
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
      */
     public LabelPropagation(GraphBuilder builder, boolean gatherStats, 
-                            int numThreads)
+                            int numThreads, double nodePref)
     {
         if (numThreads < 1) {
             throw new IllegalArgumentException("Num threads must be > 0");
@@ -110,6 +119,7 @@ public class LabelPropagation {
         } else {
             executor = null;
         }
+        this.nodePref = nodePref;
     }
 
     //JANE not sure of how best to return the groups
@@ -143,6 +153,10 @@ public class LabelPropagation {
         // Step 2.  Set t = 1;
         int t = 1;
 
+        // The set of vertices we iterate over is fixed (e.g. we don't
+        // consider new vertices as we process this graph).  If processing
+        // takes a long time, or if we use a more dynamic work queue, we'll
+        // want to revisit this.
         List<LabelVertex> vertices =
                 new ArrayList<LabelVertex>(graph.getVertices());
         while (true) {
@@ -167,8 +181,8 @@ public class LabelPropagation {
                 for (final LabelVertex vertex : vertices) {
                     tasks.add(new Callable<Void>() {
                         public Void call() {
-                            boolean res = setMostFrequentLabel(vertex);
-                            abool.compareAndSet(false, res);
+                            abool.set(setMostFrequentLabel(vertex) ||
+                                      abool.get());
                             return null;
                         }
                     });
@@ -204,7 +218,7 @@ public class LabelPropagation {
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
                 Collection<AffinityGroup> intermediateGroups =
-                        gatherGroups(false);
+                        gatherGroups(vertices, false);
                 for (AffinityGroup group : intermediateGroups) {
                     StringBuffer logSB = new StringBuffer();
                     for (Identity id : group.getIdentities()) {
@@ -221,7 +235,7 @@ public class LabelPropagation {
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER, "FINAL GRAPH IS {0}", graph);
         }
-        groups = gatherGroups(true);
+        groups = gatherGroups(vertices, true);
 
         if (gatherStats) {
             // Record our statistics for this run, used for testing.
@@ -308,9 +322,9 @@ public class LabelPropagation {
      * @return a list of labels with the higest counts
      */
     private ArrayList<Integer> getNeighborCounts(LabelVertex node) {
-        // A map of labels -> count, effectively counting how many
+        // A map of labels -> value, effectively counting how many
         // of our neighbors use a particular label.
-        Map<Integer, Long> labelMap = new HashMap<Integer, Long>();
+        Map<Integer, Double> labelMap = new HashMap<Integer, Double>();
 
         // Put our neighbors node into the map.  We allow parallel edges, and
         // use edge weights.
@@ -321,13 +335,14 @@ public class LabelPropagation {
             // No neighbors found: return an empty list.
             return new ArrayList<Integer>();
         }
+        int degree = neighbors.size();
         for (LabelVertex neighbor : neighbors) {
             if (logger.isLoggable(Level.FINEST)) {
                 logSB.append(neighbor + " ");
             }
             Integer label = neighbor.getLabel();
-            long value = labelMap.containsKey(label) ?
-                         labelMap.get(label) : 0;
+            Double value = labelMap.containsKey(label) ?
+                         labelMap.get(label) : 0.0;
             // Use findEdgeSet to allow parallel edges
             Collection<WeightedEdge> edges = graph.findEdgeSet(node, neighbor);
             // edges will be null if node and neighbor are no longer connected;
@@ -336,7 +351,7 @@ public class LabelPropagation {
                 for (WeightedEdge edge : edges) {
                     value = value + edge.getWeight();
                 }
-                labelMap.put(label, value);
+                labelMap.put(label, value * Math.pow(degree, nodePref));
             }
         }
         if (logger.isLoggable(Level.FINEST)) {
@@ -346,10 +361,10 @@ public class LabelPropagation {
 
         // Now go through the labelMap, and create a map of
         // values to sets of labels.
-        SortedMap<Long, Set<Integer>> countMap =
-                new TreeMap<Long, Set<Integer>>();
-        for (Map.Entry<Integer, Long> entry : labelMap.entrySet()) {
-            long count = entry.getValue();
+        SortedMap<Double, Set<Integer>> countMap =
+                new TreeMap<Double, Set<Integer>>();
+        for (Map.Entry<Integer, Double> entry : labelMap.entrySet()) {
+            Double count = entry.getValue();
             Set<Integer> identSet = countMap.get(count);
             if (identSet == null) {
                 identSet = new HashSet<Integer>();
@@ -362,19 +377,21 @@ public class LabelPropagation {
     }
 
     /**
-     * Return the affinity groups found within the graph putting all
+     * Return the affinity groups found within the given vertices, putting all
      * nodes with the same label in a group.  The affinity group's id
-     * will be the label.
+     * will be the common label of the group.
      *
+     * @param vertices the vertices that we gather groups from
      * @param clean if {@code true}, reinitialize the labels
      * @return the affinity groups
      */
-    private Collection<AffinityGroup> gatherGroups(boolean clean)
+    private Collection<AffinityGroup> gatherGroups(List<LabelVertex> vertices,
+                                                   boolean clean)
     {
         // All nodes with the same label are in the same community.
         Map<Integer, AffinityGroup> groupMap =
                 new HashMap<Integer, AffinityGroup>();
-        for (LabelVertex vertex : graph.getVertices()) {
+        for (LabelVertex vertex : vertices) {
             int label = vertex.getLabel();
             AffinityGroupImpl ag =
                     (AffinityGroupImpl) groupMap.get(label);

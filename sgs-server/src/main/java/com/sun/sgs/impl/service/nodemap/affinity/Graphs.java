@@ -57,6 +57,8 @@ public final class Graphs {
     public static double calcModularity(Graph<LabelVertex, WeightedEdge> graph,
             Collection<AffinityGroup> groups)
     {
+        // NOTE: this algorithm might need to be optimized if we use it for
+        // more than goodness testing.
         long m = 0;
         for (WeightedEdge e : graph.getEdges()) {
             m = m + e.getWeight();
@@ -84,7 +86,7 @@ public final class Graphs {
                     new ArrayList<Identity>(g.getIdentities());
             for (Identity id : groupList) {
                 for (WeightedEdge edge :
-                     graph.getIncidentEdges(new LabelVertex(id))) {
+                    graph.getIncidentEdges(new LabelVertex(id))) {
                     totEdges = totEdges + edge.getWeight();
                 }
             }
