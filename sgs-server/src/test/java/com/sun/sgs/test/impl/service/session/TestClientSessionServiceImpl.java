@@ -54,7 +54,8 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
+import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -79,30 +80,16 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestClientSessionServiceImpl extends TestCase {
-
-    /** If this property is set, then only run the single named test method. */
-    private static final String testMethod = System.getProperty("test.method");
-
-    /**
-     * Specify the test suite to include all tests, or just a single method if
-     * specified.
-     */
-    public static TestSuite suite() throws Exception {
-	if (testMethod == null) {
-	    return new TestSuite(TestClientSessionServiceImpl.class);
-	}
-	TestSuite suite = new TestSuite();
-	suite.addTest(new TestClientSessionServiceImpl(testMethod));
-	return suite;
-    }
+@RunWith(FilteredNameRunner.class)
+public class TestClientSessionServiceImpl extends Assert {
 
     private static final String APP_NAME = "TestClientSessionServiceImpl";
     
@@ -172,17 +159,16 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     /** Constructs a test instance. */
-    public TestClientSessionServiceImpl(String name) throws Exception {
-	super(name);
+    public TestClientSessionServiceImpl() throws Exception {
 	Class cl = ClientSessionServiceImpl.class;
 	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
 	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
 	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         dummyClients = new HashMap<BigInteger, DummyClient>();
-        System.err.println("Testcase: " + getName());
         setUp(null, true);
     }
 
@@ -227,13 +213,8 @@ public class TestClientSessionServiceImpl extends TestCase {
         }
     }
 
-    /** Sets passed if the test passes. */
-    protected void runTest() throws Throwable {
-	super.runTest();
-        Thread.sleep(100);
-    }
-
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         tearDown(true);
     }
 
@@ -251,6 +232,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     // -- Test constructor --
 
+    @Test
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -262,6 +244,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(serviceProps, null,
@@ -272,6 +255,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(serviceProps,
@@ -282,6 +266,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorNoAppName() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -293,6 +278,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorNoPort() throws Exception {
         Properties props =
             createProperties(StandardProperties.APP_NAME, APP_NAME);
@@ -301,6 +287,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             serverNode.getProxy());
     }
 
+    @Test
     public void testConstructorDisconnectDelayTooSmall() throws Exception {
 	try {
 	    Properties props =
@@ -316,6 +303,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructedVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -330,7 +318,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		}}, taskOwner);
     }
-    
+
+    @Test
     public void testConstructorWithCurrentVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -343,6 +332,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    serverNode.getProxy());
     }
 
+    @Test
     public void testConstructorWithMajorVersionMismatch() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -361,6 +351,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorWithMinorVersionMismatch() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -381,6 +372,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     // -- Test registerSessionDisconnectListener --
 
+    @Test
     public void testRegisterSessionDisconnectListenerNullArg() {
 	try {
 	    serverNode.getClientSessionService().
@@ -391,6 +383,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testRegisterSessionDisconnectListenerInTxn()
 	throws Exception
     {
@@ -406,7 +399,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
+
+    @Test
     public void testRegisterSessionDisconnectListenerNoTxn() {
 	serverNode.getClientSessionService().
 	    registerSessionDisconnectListener(new DummyDisconnectListener());
@@ -414,6 +408,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     // -- Test getSessionProtocol --
 
+    @Test
     public void testGetSessionProtocolNullArg() {
 	try {
 	    serverNode.getClientSessionService(). getSessionProtocol(null);
@@ -422,7 +417,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
+
+    @Test
     public void testGetSessionProtocolInTxn()
 	throws Exception
     {
@@ -438,6 +434,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetSessionProtocolNoTxn() {
 	assertNull(serverNode.getClientSessionService().
 		   getSessionProtocol(new BigInteger(1, new byte[] {0})));
@@ -445,6 +442,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     // -- Test connecting, logging in, logging out with server -- 
 
+    @Test
     public void testConnection() throws Exception {
 	DummyClient client = new DummyClient("foo");
 	try {
@@ -461,6 +459,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testLoginSuccess() throws Exception {
 	DummyClient client = new DummyClient("success");
 	try {
@@ -471,6 +470,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLoginRedirect() throws Exception {
 	int serverAppPort = serverNode.getAppPort();
 	String[] hosts = new String[] { "one", "two", "three", "four"};
@@ -524,7 +525,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 	
     }
-    
+
+    @Test
+    @IntegrationTest
     public void testSendBeforeLoginComplete() throws Exception {
 	DummyClient client = new DummyClient("dummy");
 	try {
@@ -536,6 +539,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testSendAfterLoginComplete() throws Exception {
 	DummyClient client = new DummyClient("dummy");
 	try {
@@ -547,6 +552,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
 	String name = "success";
 	DummyClient client = new DummyClient(name);
@@ -565,6 +572,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLoggedInReturningNonSerializableClientSessionListener()
 	throws Exception
     {
@@ -591,6 +600,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLoggedInReturningNullClientSessionListener()
 	throws Exception
     {
@@ -617,6 +628,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLoggedInThrowingRuntimeException()
 	throws Exception
     {
@@ -643,6 +656,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLoginTwiceBlockUser() throws Exception {
 	String name = "dummy";
 	DummyClient client1 = new DummyClient(name);
@@ -664,6 +679,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLoginTwicePreemptUser() throws Exception {
 	// Set up ClientSessionService to preempt user if same user logs in
 	tearDown(false);
@@ -690,7 +707,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client2.disconnect();
 	}
     }
-    
+
+    @Test
+    @IntegrationTest
     public void testDisconnectFromServerAfterLogout() throws Exception {
 	final String name = "logout";
 	DummyClient client = new DummyClient(name);
@@ -705,6 +724,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLogoutRequestAndDisconnectedCallback() throws Exception {
 	final String name = "logout";
 	DummyClient client = new DummyClient(name);
@@ -735,6 +756,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testDisconnectedCallbackThrowingNonRetryableException()
 	throws Exception
     {
@@ -754,6 +777,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testLogoutAndNotifyLoggedOutCallback() throws Exception {
 	String name = "logout";
 	DummyClient client = new DummyClient(name);
@@ -779,6 +804,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
 	int numClients = 4;
 	try {
@@ -841,6 +868,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     // -- test ClientSession --
 
+    @Test
     public void testClientSessionIsConnected() throws Exception {
 	DummyClient client = new DummyClient("clientname");
 	try {
@@ -869,6 +897,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testClientSessionGetName() throws Exception {
 	final String name = "clientname";
 	DummyClient client = new DummyClient(name);
@@ -899,6 +928,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testClientSessionToString() throws Exception {
 	final String name = "testClient";
 	DummyClient client = new DummyClient(name);
@@ -919,7 +949,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect();
 	}
     }
-    
+
+    @Test
     public void testClientSessionToStringNoTransaction() throws Exception {
 	final String name = "testClient";
 	DummyClient client = new DummyClient(name);
@@ -954,7 +985,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
     }
-	
+
+    @Test
     public void testClientSessionSendUnreliableMessages() throws Exception {
 	DummyClient client = new DummyClient("dummy");
 	int iterations = 3;
@@ -967,6 +999,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	assertEquals(expectedMessages, messages.size());
     }
 
+    @Test
     public void testClientSessionSendUnreliableMessagesWithFailure()
 	throws Exception
     {
@@ -980,7 +1013,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	int expectedMessages = iterations;
 	assertEquals(expectedMessages, messages.size());
     }
-    
+
+    @Test
     public void testClientSessionSendSequence() throws Exception {
 	DummyClient client = new DummyClient("dummy");
 	int iterations = 3;
@@ -1093,6 +1127,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testClientSessionSendNullMessage() throws Exception {
 	try {
 	    sendBufferToClient(null, null);
@@ -1101,7 +1136,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
+
+    @Test
     public void testClientSessionSendNullDelivery() throws Exception {
 	try {
 	    sendBufferToClient(ByteBuffer.wrap(new byte[0]), "", null);
@@ -1110,7 +1146,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
+
+    @Test
     public void testClientSessionSendSameBuffer() throws Exception {
 	String msgString = "buffer";
 	MessageBuffer msg =
@@ -1120,6 +1157,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	sendBufferToClient(buf, msgString);
     }
 
+    @Test
     public void testClientSessionSendSameBufferWithOffset()
 	throws Exception
     {
@@ -1200,6 +1238,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     // being reclaimed then the sends will eventually fail because the buffer
     // space is used up.  Note that this test assumes that sending 400 KB of
     // data will surpass the I/O throttling limit.
+    @Test
     public void testClientSessionSendAbortRetryable() throws Exception {
 	DummyClient client = new DummyClient("clientname");
 	try {
@@ -1227,10 +1266,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testClientSend() throws Exception {
 	sendMessagesAndCheck(5, 5, null);
     }
 
+    @Test
     public void testClientSendWithListenerThrowingRetryableException()
 	throws Exception
     {
@@ -1238,6 +1279,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    5, 5, new MaybeRetryException("retryable", true));
     }
 
+    @Test
     public void testClientSendWithListenerThrowingNonRetryableException()
 	throws Exception
     {
@@ -1246,6 +1288,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
 
+    @Test
     public void testLocalSendPerformance() throws Exception {
 	final String user = "dummy";
 	DummyClient client = (new DummyClient(user)).connect(serverNode.getAppPort());
@@ -1270,6 +1313,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			   " ms.");
     }
 
+    @Test
     public void testRemoveSessionWhileSessionDisconnects() throws Exception {
 	final String user = "foo";
 	DummyClient client = new DummyClient(user);
