@@ -181,6 +181,8 @@ public class TestClientSessionServiceImpl extends Assert {
 	}
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	props.setProperty("com.sun.sgs.impl.service.watchdog.server.renew.interval",
+			  "100000");
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
