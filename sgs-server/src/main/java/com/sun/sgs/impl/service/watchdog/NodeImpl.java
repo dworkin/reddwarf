@@ -294,6 +294,15 @@ class NodeImpl
 	nodeImpl.primaryIds.clear();
     }
 
+    /**
+     * Sets the status of this node instance.
+     *
+     * @param dataService a data service
+     * @param newStatus the new status of this node
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
     synchronized void setStatus(DataService dataService, Status newStatus) {
 	NodeImpl nodeImpl = getForUpdate(dataService);
 	this.status = newStatus;

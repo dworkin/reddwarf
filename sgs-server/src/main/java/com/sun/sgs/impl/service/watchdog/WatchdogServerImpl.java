@@ -568,7 +568,7 @@ public final class WatchdogServerImpl
     }
 
     /**
-     * Persists node and backup status updates in data service.
+     * Persists node status in data service.
      */
     private void setStatus(final NodeImpl node, final Status status) {
         try {
@@ -583,6 +583,10 @@ public final class WatchdogServerImpl
         }
     }
 
+    /**
+     * Set node as failed. Called when setNodeStatus is called with
+     * status == RED. See that method for parameter descriptions.
+     */
     private void setNodeAsFailed(NodeImpl node, boolean isLocal,
                                  String className, int maxNumberOfAttempts)
     {
@@ -618,7 +622,9 @@ public final class WatchdogServerImpl
      * @return a subset of {@code nodesToFail} that were marked as failed from
      * this method
      */
-    Collection<NodeImpl> processNodeFailures(Collection<NodeImpl> nodesToFail) {
+    private Collection<NodeImpl>
+            processNodeFailures(Collection<NodeImpl> nodesToFail)
+    {
         Collection<NodeImpl> aliveNodesToFail = new ArrayList<NodeImpl>();
 
 	// Declare the nodes as failed only if it has not be reported to be

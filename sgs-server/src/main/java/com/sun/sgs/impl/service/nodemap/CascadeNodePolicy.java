@@ -24,15 +24,18 @@ import java.util.Properties;
 
 /**
  * Node selection policy that assigns to a single node until that node is
- * no longer available.
+ * no longer available. When a node that has been used for assignments becomes
+ * unavailable, the next node in the list of available nodes is chosen for
+ * future assignments.
  */
 public class CascadeNodePolicy extends AbstractNodePolicy {
 
     // index to walk through available list
     private int nextNode = 0;
 
-    // Current node we are assigning. -1 indicates that a new node must be
-    // selected. (Not to be confused with NodeAssignPolicy.SERVER_NODE)
+    // Current node we are assigning. The initial valuse of -1 indicates that a
+    // new node must be selected. (Not to be confused with
+    // NodeAssignPolicy.SERVER_NODE)
     private long currentNode = -1L;
 
     /** 
@@ -59,22 +62,7 @@ public class CascadeNodePolicy extends AbstractNodePolicy {
             }
             currentNode =
                     availableNodes.get(nextNode++ % availableNodes.size());
-            System.out.println("Future assignements go to node " + currentNode);
         }
         return currentNode;
-    }
-
-    @Override
-    public synchronized void nodeUnavailable(long nodeId) {
-        super.nodeUnavailable(nodeId);
-        if (nodeId == currentNode) {
-            currentNode = -1;
-        }
-    }
-
-    @Override
-    public synchronized void reset() {
-        super.reset();
-        currentNode = -1;
     }
 }

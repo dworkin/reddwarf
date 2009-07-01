@@ -29,6 +29,9 @@ package com.sun.sgs.service;
  */
 public interface Node {
 
+    /**
+     * Status of a node.
+     */
     enum Status {
 
         /**
@@ -49,7 +52,7 @@ public interface Node {
         ORANGE,
 
         /**
-         *  The node has failed, been shutdown, or its state is unknown.
+         * The node has failed, been shutdown, or its state is unknown.
          */
         RED
     }

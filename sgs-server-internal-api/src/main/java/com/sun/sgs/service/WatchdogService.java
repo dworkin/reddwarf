@@ -166,10 +166,12 @@ public interface WatchdogService extends Service {
     /**
      * Informs the watchdog of a node's status. Multiple components may report
      * on a node's status. The watchdog will use these reports to determine the
-     * overall node's status which can be found on {@link Node#getStatus()}.
-     * 
+     * overall node's status. <p>
+     *
+     * This method must be invoked outside of a transaction.
+     *
      * @param nodeId the id of the node
-     * @param status the node's status
+     * @param status the status
      * @param className the class name of the service reporting status
      */
     void reportStatus(long nodeId, Status status, String className);

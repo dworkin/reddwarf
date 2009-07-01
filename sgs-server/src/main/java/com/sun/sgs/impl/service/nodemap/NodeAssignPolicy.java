@@ -52,6 +52,12 @@ interface NodeAssignPolicy {
     long chooseNode(Identity id, long requestingNode) 
             throws NoNodesAvailableException;
 
+    /**
+     * Indicates whether any nodes are available for assignment.
+     *
+     * @return {@code true} if a node is available for assignment, otherwise
+     * {@code false}
+     */
     boolean nodesAvailable();
 
     /**

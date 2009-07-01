@@ -45,12 +45,10 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -578,7 +576,6 @@ public final class WatchdogServiceImpl
                     }
                 }
             }
-            System.out.println("Determined local status is " + newStatus);
         }
 
         /*
@@ -789,11 +786,7 @@ public final class WatchdogServiceImpl
 			if (!shuttingDown() &&
                             isLocalNodeAliveNonTransactional()) 
 			{
-//			    if (node.isAlive()) {
-//				nodeListener.nodeStarted(node);
-//			    } else {
-				nodeListener.nodeStatusChange(node);
-//			    }
+                            nodeListener.nodeStatusChange(node);
 			}
 		    }
 		}, taskOwner);

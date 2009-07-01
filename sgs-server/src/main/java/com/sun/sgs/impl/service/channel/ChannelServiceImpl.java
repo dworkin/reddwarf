@@ -1371,7 +1371,7 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc} */
 	public void nodeStatusChange(Node node) {
             // Only worry about node failures
-            if (!node.isAlive()) return;
+            if (node.isAlive()) return;
 
 	    final long nodeId = node.getId();
 	    channelServerCache.remove(nodeId);

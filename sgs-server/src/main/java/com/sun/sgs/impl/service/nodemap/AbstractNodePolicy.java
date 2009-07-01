@@ -23,10 +23,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Abstract node policy class.
+ * Abstract node policy class. This class manages the list of nodes that
+ * are available for assignment. Subclasses must implement the logic for
+ * making the assignments.
+ * @see NodeAssignPolicy#chooseNode(com.sun.sgs.auth.Identity, long)
  */
 public abstract class AbstractNodePolicy implements NodeAssignPolicy {
-    
+
+    /**
+     * The list of available nodes.
+     */
     protected final List<Long> availableNodes = new ArrayList<Long>();
 
     /** 
@@ -37,24 +43,19 @@ public abstract class AbstractNodePolicy implements NodeAssignPolicy {
 
     /** {@inheritDoc} */
     public synchronized boolean nodesAvailable() {
-        System.out.println("### there are " + availableNodes.size() + " nodes available");
         return !availableNodes.isEmpty();
     }
     
     /** {@inheritDoc} */
     public synchronized void nodeAvailable(long nodeId) {
-        System.out.println("### node " + nodeId + " available");
         if (!availableNodes.contains(nodeId)) {
             availableNodes.add(nodeId);
         }
-        nodesAvailable();
     }
 
     /** {@inheritDoc} */
     public synchronized void nodeUnavailable(long nodeId) {
-        System.out.println("### node " + nodeId + " UNavailable");
         availableNodes.remove(nodeId);
-        nodesAvailable();
     }
     
     /** {@inheritDoc} */
