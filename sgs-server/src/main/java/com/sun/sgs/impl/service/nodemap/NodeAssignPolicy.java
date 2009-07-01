@@ -51,7 +51,9 @@ interface NodeAssignPolicy {
      */
     long chooseNode(Identity id, long requestingNode) 
             throws NoNodesAvailableException;
-    
+
+    boolean nodesAvailable();
+
     /**
      * Inform the policy that a node is now available.
      *

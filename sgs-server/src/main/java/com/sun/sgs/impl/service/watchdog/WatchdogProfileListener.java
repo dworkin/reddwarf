@@ -45,8 +45,8 @@ class WatchdogProfileListener implements ProfileListener {
     private final int readyLimit;
     private final int noName;
     private Status status;
-    private int over;
-    private int under;
+    private Status lastSeen;
+    private int lastSeenCount;
 
     public WatchdogProfileListener(Properties properties,
                                    WatchdogService service)
@@ -62,7 +62,8 @@ class WatchdogProfileListener implements ProfileListener {
         System.out.println("CONFIG: ready queue limit= " + readyLimit +
                            " noName= " + noName);
         status = Status.GREEN;
-        over = under = 0;
+        lastSeen = Status.GREEN;
+        lastSeenCount = 0;
     }
 
     @Override
@@ -71,25 +72,29 @@ class WatchdogProfileListener implements ProfileListener {
 
     @Override
     public synchronized void report(ProfileReport profileReport) {
-        if (profileReport.getReadyCount() > readyLimit) {
-            under = 0;
-            over++;
-            if (over == noName) {
-                setStatus(Status.YELLOW);
-            }
+        Status thisTime = determineStatus(profileReport);
+
+        if (thisTime != lastSeen) {
+            lastSeenCount = 0;
+            lastSeen = thisTime;
         } else {
-            over = 0;
-            under++;
-            if (under == noName) {
-                setStatus(Status.GREEN);
+            lastSeenCount++;
+
+            if ((lastSeenCount == noName) &&
+                (thisTime != status))
+            {
+                status = thisTime;
+                service.reportStatus(service.getLocalNodeId(),
+                                     status, CLASSNAME);
             }
         }
     }
 
-    private void setStatus(Status newStatus) {
-        if (newStatus == status) return;
-        status = newStatus;
-        service.reportStatus(service.getLocalNodeId(), status, CLASSNAME);
+    private Status determineStatus(ProfileReport profileReport) {
+        if (profileReport.getReadyCount() > readyLimit) {
+            return Status.YELLOW;
+        }
+        return Status.GREEN;
     }
 
     @Override

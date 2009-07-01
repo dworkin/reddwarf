@@ -1242,7 +1242,7 @@ public final class ClientSessionServiceImpl
     
     /**
      * Adds the handler for the specified session to the internal
-     * sessio n handler map.  This method is invoked by the handler
+     * session handler map.  This method is invoked by the handler
      * once the client has successfully logged in or has
      * successfully relocated.  If the client has relocated, the
      * {@code identity} should be non-null, otherwise, the identity
@@ -1259,6 +1259,7 @@ public final class ClientSessionServiceImpl
     {
         assert handler != null;
 	handlers.put(sessionRefId, handler);
+        checkHighWater();
 	if (identity != null) {
 	    relocatingIdentities.remove(identity);
 	}
@@ -1282,8 +1283,8 @@ public final class ClientSessionServiceImpl
 	    }
 	}
 	handlers.remove(sessionRefId);
-	sessionTaskQueues.remove(sessionRefId);
         checkHighWater();
+	sessionTaskQueues.remove(sessionRefId);
     }
 
     private synchronized void checkHighWater() {
@@ -1299,7 +1300,7 @@ public final class ClientSessionServiceImpl
         this.status = newStatus;
 
         if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "Reporting change in status to ", status);
+            logger.log(Level.FINE, "Reporting change in status to " + status);
         }
         scheduleNonTransactionalTask(
             new AbstractKernelRunnable("ReportStatus") {

@@ -545,8 +545,11 @@ public final class WatchdogServerImpl
     {
         NodeImpl node = aliveNodes.get(nodeId);
         if (node == null) {
-            logger.log(Level.FINEST, "Node with ID '" + nodeId +
-                       "' is already reported as failed");
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST,
+                           "Node with ID {0} is already reported as failed",
+                           nodeId);
+            }
             return;
         }
         switch (status) {
@@ -554,9 +557,29 @@ public final class WatchdogServerImpl
                 setNodeAsFailed(node, isLocal, className, maxNumberOfAttempts);
                 break;
 
-            case GREEN:
-            case YELLOW:
-                // don't really care about these
+            default:
+                setStatus(node, status);
+                // Notify clients of a status change.
+                statusChangedNodes.add(node);
+                synchronized (notifyClientsLock) {
+                    notifyClientsLock.notifyAll();
+                }
+        }
+    }
+
+    /**
+     * Persists node and backup status updates in data service.
+     */
+    private void setStatus(final NodeImpl node, final Status status) {
+        try {
+            transactionScheduler.runTask(
+                new AbstractKernelRunnable("SetNodeStatus") {
+                    public void run() {
+                        node.setStatus(dataService, status);
+                    } }, taskOwner);
+        } catch (Exception e) {
+            logger.logThrow(
+                Level.SEVERE, e, "Setting node: {0} status throws", node);
         }
     }
 

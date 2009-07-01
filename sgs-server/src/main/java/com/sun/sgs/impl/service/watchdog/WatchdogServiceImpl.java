@@ -44,8 +44,10 @@ import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
@@ -222,9 +224,6 @@ public final class WatchdogServiceImpl
     /** The interval for renewals with the watchdog server. */
     private final long renewInterval;
 
-    /** The set of yellow status reports */
-    private final Set<String> yellowReports = new HashSet<String>();
-
     /** The set of node listeners for all nodes. */
     private final ConcurrentMap<NodeListener, NodeListener> nodeListeners =
 	new ConcurrentHashMap<NodeListener, NodeListener>();
@@ -242,7 +241,14 @@ public final class WatchdogServiceImpl
 
     /** The lock for {@code isAlive} field. */
     private final Object lock = new Object();
-    
+
+    /** The set of status reports for this node. The actual status of this
+     * node is the highest (worse) condition reported, or GREEN is no
+     * reports exits.
+     */
+    private final Map<String, Status> statusReports =
+            new HashMap<String, Status>();
+
     /** The local node's status. Initially, the field is {@code
      * Status.GREEN}. Accesses to this field should be protected
      * by {@code lock}.
@@ -432,7 +438,9 @@ public final class WatchdogServiceImpl
 	if (serverImpl != null) {
 	    serverImpl.shutdown();
 	}
-        yellowReports.clear();
+        synchronized (this) {
+            statusReports.clear();
+        }
     }
 	
     /* -- Implement WatchdogService -- */
@@ -449,13 +457,13 @@ public final class WatchdogServiceImpl
         checkState();
         serviceStats.isLocalNodeAliveOp.report();
 	if (!getIsAlive()) {
-	    return Status.RED;
+	    return getStatus();
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
                 reportFailure(localNodeId, CLASSNAME);
-		return Status.RED;
+		return getStatus();
 	    } else {
 		return node.getStatus();
 	    }
@@ -464,20 +472,7 @@ public final class WatchdogServiceImpl
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
-	checkState();
-        serviceStats.getLocalNodeStatusOp.report();
-	if (!getIsAlive()) {
-	    return false;
-	} else {
-	    Node node = NodeImpl.getNode(dataService, localNodeId);
-	    if (node == null || !node.isAlive()) {
-		// this will call setFailedThenNotify(true)
-                reportFailure(localNodeId, CLASSNAME);
-		return false;
-	    } else {
-		return true;
-	    }
-	}
+        return getLocalNodeStatus() != Status.RED;
     }
 
     /** {@inheritDoc} */
@@ -553,28 +548,37 @@ public final class WatchdogServiceImpl
 
         boolean isLocal = (nodeId == localNodeId);
 
-        if (isLocal) {
-            logger.log(Level.WARNING, "{1} reported {2} status in local " +
-                       "node with id: {0}", nodeId, className, newStatus);
-        } else {
-            logger.log(Level.WARNING, "{1} reported {2} status in remote" +
-                       " node with id {0}", nodeId, className, newStatus);
+        if (logger.isLoggable(Level.FINER) || (newStatus == Status.RED)) {
+            logger.log((newStatus == Status.RED ? Level.WARNING : Level.FINER),
+                       "{1} reported {2} status in {3} node with id: {0}",
+                       nodeId, className, newStatus,
+                       isLocal ? "local" : "remote");
         }
 
         if (shuttingDown() || !getIsAlive()) {
             return;
         }
 
-        // Determin the actual status of this node
-        if (newStatus != Status.RED) {
-            String reporter = className + nodeId;
-            if (newStatus == Status.YELLOW) {
-                yellowReports.add(reporter);
+        // If the report is for this node, determine the actual (overall) status
+        if (isLocal && (newStatus != Status.RED)) {
+            if (newStatus == Status.GREEN) {
+                statusReports.remove(className);
             } else {
-                yellowReports.remove(reporter);
+                statusReports.put(className, newStatus);
             }
-            // If there are any YELLOW reports still open, report YELLOW.
-            newStatus = yellowReports.isEmpty() ? Status.GREEN : Status.YELLOW;
+
+            // If the new status is not the worst, find out what is
+            if (newStatus != Status.ORANGE) {
+                for (Status s : statusReports.values()) {
+                    if (s == Status.ORANGE) {
+                        newStatus = s;
+                        break;
+                    } if (s == Status.YELLOW) {
+                        newStatus = s;
+                    }
+                }
+            }
+            System.out.println("Determined local status is " + newStatus);
         }
 
         /*
@@ -602,8 +606,13 @@ public final class WatchdogServiceImpl
             }
         }
         
-        if ((newStatus == Status.RED) && isLocal) {
-            setFailedThenNotify(true);
+        if (isLocal) {
+            if (newStatus == Status.RED) {
+                // will call setStatus()
+                setFailedThenNotify(true);
+            } else {
+                setStatus(newStatus);
+            }
         }
     }
 
@@ -708,18 +717,27 @@ public final class WatchdogServiceImpl
      * considered alive.
      */
     private boolean getIsAlive() {
-	synchronized (lock) {
-	    return status != Status.RED;
-	}
+	return getStatus() != Status.RED;
     }
 
     /**
      * Returns the local node status.
      */
     private Status getStatus() {
+	return status;
+    }
+
+    private boolean setStatus(Status newStatus) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "Set local status to {0}", newStatus);
+        }
         synchronized (lock) {
-	    return status;
+	    if (status == newStatus) {
+		return false;
+	    }
+	    status = newStatus;
 	}
+        return true;
     }
 
     /**
@@ -735,12 +753,7 @@ public final class WatchdogServiceImpl
      *		node listeners of this node's failure
      */
     private void setFailedThenNotify(boolean notify) {
-	synchronized (lock) {
-	    if (status == Status.RED) {
-		return;
-	    }
-	    status = Status.RED;
-	}
+	if (!setStatus(Status.RED)) return;
 
 	if (notify) {
 	    Node node = new NodeImpl(localNodeId, localHost, status);

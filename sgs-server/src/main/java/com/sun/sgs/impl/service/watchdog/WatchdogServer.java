@@ -97,7 +97,7 @@ public interface WatchdogServer extends Remote {
      */
     void recoveredNode(long nodeId, long backupId) throws IOException;
 
-    void setNodeStatus(long nodeId, Status status,boolean isLocal,
+    void setNodeStatus(long nodeId, Status status, boolean isLocal,
                        String className, int maxNumberOfAttempts)
 	    throws IOException;
 

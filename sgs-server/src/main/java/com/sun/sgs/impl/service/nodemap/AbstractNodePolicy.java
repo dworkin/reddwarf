@@ -34,15 +34,27 @@ public abstract class AbstractNodePolicy implements NodeAssignPolicy {
      */
     public AbstractNodePolicy() {          
     }
+
+    /** {@inheritDoc} */
+    public synchronized boolean nodesAvailable() {
+        System.out.println("### there are " + availableNodes.size() + " nodes available");
+        return !availableNodes.isEmpty();
+    }
     
     /** {@inheritDoc} */
     public synchronized void nodeAvailable(long nodeId) {
-        availableNodes.add(nodeId);
+        System.out.println("### node " + nodeId + " available");
+        if (!availableNodes.contains(nodeId)) {
+            availableNodes.add(nodeId);
+        }
+        nodesAvailable();
     }
 
     /** {@inheritDoc} */
     public synchronized void nodeUnavailable(long nodeId) {
+        System.out.println("### node " + nodeId + " UNavailable");
         availableNodes.remove(nodeId);
+        nodesAvailable();
     }
     
     /** {@inheritDoc} */

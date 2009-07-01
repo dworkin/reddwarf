@@ -32,19 +32,26 @@ public interface Node {
     enum Status {
 
         /**
-         *  The node has failed or its state is unknown
-         */
-        RED,
-
-        /**
-         * The node is operating normally
+         * The node is operating normally and is available for additional work.
          */
         GREEN,
 
         /**
-         * The node is operational, but is in need of attention
+         * The node is operating normally but is not available for additional
+         * work.
          */
         YELLOW,
+
+        /**
+         * The node is operational, but is in need of attention such as
+         * offloading some of its work.
+         */
+        ORANGE,
+
+        /**
+         *  The node has failed, been shutdown, or its state is unknown.
+         */
+        RED
     }
 
     /**

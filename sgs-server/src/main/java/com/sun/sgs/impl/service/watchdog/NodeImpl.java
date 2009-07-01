@@ -294,6 +294,12 @@ class NodeImpl
 	nodeImpl.primaryIds.clear();
     }
 
+    synchronized void setStatus(DataService dataService, Status newStatus) {
+	NodeImpl nodeImpl = getForUpdate(dataService);
+	this.status = newStatus;
+	nodeImpl.status = newStatus;
+    }
+
     /**
      * Adds the specified {@code primaryId} to the list of primaries
      * for which this node is a backup, and updates the node's state

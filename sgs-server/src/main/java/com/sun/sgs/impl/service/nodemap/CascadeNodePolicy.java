@@ -59,6 +59,7 @@ public class CascadeNodePolicy extends AbstractNodePolicy {
             }
             currentNode =
                     availableNodes.get(nextNode++ % availableNodes.size());
+            System.out.println("Future assignements go to node " + currentNode);
         }
         return currentNode;
     }
