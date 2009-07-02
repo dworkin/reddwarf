@@ -30,9 +30,9 @@ package com.sun.sgs.service;
 public interface Node {
 
     /**
-     * Status of a node.
+     * Health of a node.
      */
-    enum Status {
+    enum Health {
 
         /**
          * The node is operating normally and is available for additional work.
@@ -82,9 +82,9 @@ public interface Node {
     boolean isAlive();
 
     /**
-     * Returns the status of the node.
+     * Returns the health of the node.
      *
-     * @return	the node's status
+     * @return	the node's health
      */
-    Status getStatus();
+    Health getHealth();
 }

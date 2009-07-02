@@ -25,11 +25,11 @@ package com.sun.sgs.service;
 
 import java.util.Iterator;
 import com.sun.sgs.app.TransactionException;
-import com.sun.sgs.service.Node.Status;
+import com.sun.sgs.service.Node.Health;
 
 /**
  * The {@code WatchdogService} monitors the health of server nodes and
- * notifies registered listeners of node status change events.  It
+ * notifies registered listeners of node health change events.  It
  * also provides information and notification services about node
  * backup and recovery.
  */
@@ -48,11 +48,11 @@ public interface WatchdogService extends Service {
     long getLocalNodeId();
 
     /**
-     * Returns the local node's status.
+     * Returns the local node's health.
      * 
-     * @return the local node's status
+     * @return the local node's health
      */
-    Node.Status getLocalNodeStatus();
+    Health getLocalNodeHealth();
 
     /**
      * Returns {@code true} if the local node is considered alive,
@@ -164,17 +164,17 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
 
     /**
-     * Informs the watchdog of a node's status. Multiple components may report
-     * on a node's status. The watchdog will use these reports to determine the
-     * overall node's status. <p>
+     * Informs the watchdog of a node's health. Multiple components may report
+     * on a node's health. The watchdog will use these reports to determine the
+     * overall node's health. <p>
      *
      * This method must be invoked outside of a transaction.
      *
      * @param nodeId the id of the node
-     * @param status the status
-     * @param className the class name of the service reporting status
+     * @param health the health
+     * @param className the class name of the service reporting health
      */
-    void reportStatus(long nodeId, Status status, String className);
+    void reportHealth(long nodeId, Health health, String className);
 
     /**
      * Informs the watchdog that a problem has occurred in a service or

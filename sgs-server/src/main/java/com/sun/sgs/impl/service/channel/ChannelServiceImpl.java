@@ -1369,7 +1369,7 @@ public final class ChannelServiceImpl
 	}
 
 	/** {@inheritDoc} */
-	public void nodeStatusChange(Node node) {
+	public void nodeHealthChange(Node node) {
             // Only worry about node failures
             if (node.isAlive()) return;
 

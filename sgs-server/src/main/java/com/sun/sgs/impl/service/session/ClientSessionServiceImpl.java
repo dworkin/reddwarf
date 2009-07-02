@@ -60,7 +60,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.Node.Status;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -313,7 +313,7 @@ public final class ClientSessionServiceImpl
      */
     final boolean allowNewLogin;
 
-    private Status status = Status.GREEN;
+    private Health health = Health.GREEN;
     private final int loginHighWater;
 
     /** Our JMX exposed statistics. */
@@ -1289,23 +1289,23 @@ public final class ClientSessionServiceImpl
 
     private synchronized void checkHighWater() {
         if (handlers.size() > loginHighWater) {
-            setStatus(Status.YELLOW);
+            setHealth(Health.YELLOW);
         } else {
-            setStatus(Status.GREEN);
+            setHealth(Health.GREEN);
         }
     }
 
-    private synchronized void setStatus(Status newStatus) {
-        if (newStatus == status) return;
-        this.status = newStatus;
+    private synchronized void setHealth(Health newHealth) {
+        if (newHealth == health) return;
+        this.health = newHealth;
 
         if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "Reporting change in status to " + status);
+            logger.log(Level.FINE, "Reporting change in health to " + health);
         }
         scheduleNonTransactionalTask(
-            new AbstractKernelRunnable("ReportStatus") {
+            new AbstractKernelRunnable("ReportHealth") {
                 public void run() {
-                   watchdogService.reportStatus(localNodeId, status, CLASSNAME);
+                   watchdogService.reportHealth(localNodeId, health, CLASSNAME);
                 }
             }, taskOwner);
     }

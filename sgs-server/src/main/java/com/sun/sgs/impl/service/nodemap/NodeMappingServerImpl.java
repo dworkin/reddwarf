@@ -35,7 +35,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.Node.Status;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -994,14 +994,14 @@ public final class NodeMappingServerImpl
         }
 
         /** {@inheritDoc} */
-        public void nodeStatusChange(Node node) {
+        public void nodeHealthChange(Node node) {
             long nodeId = node.getId();
 
             if (logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINE, "Node {0} status change to {1}",
-                           nodeId, node.getStatus());
+                logger.log(Level.FINE, "Node {0} health change to {1}",
+                           nodeId, node.getHealth());
             }
-            switch (node.getStatus()) {
+            switch (node.getHealth()) {
                 case GREEN:
                     assignPolicy.nodeAvailable(nodeId);
                     break;
@@ -1076,7 +1076,7 @@ System.out.println("Calling offloadNode for " + nodeId);
 System.out.println("Runing offload task for " + node);
 
             /// If the node is completely gone, or is better return
-            if (node == null || node.getStatus() == Status.GREEN) {
+            if (node == null || node.getHealth() == Health.GREEN) {
                 offloadingDone(nodeId);
                 return;
             }

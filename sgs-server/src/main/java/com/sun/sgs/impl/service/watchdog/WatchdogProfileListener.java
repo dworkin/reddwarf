@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.watchdog;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
-import com.sun.sgs.service.Node.Status;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.WatchdogService;
 import java.beans.PropertyChangeEvent;
 import java.util.Properties;
@@ -44,8 +44,8 @@ class WatchdogProfileListener implements ProfileListener {
     private final WatchdogService service;
     private final int readyLimit;
     private final int noName;
-    private Status status;
-    private Status lastSeen;
+    private Health health;
+    private Health lastSeen;
     private int lastSeenCount;
 
     public WatchdogProfileListener(Properties properties,
@@ -61,8 +61,8 @@ class WatchdogProfileListener implements ProfileListener {
                                              1, Integer.MAX_VALUE);
         System.out.println("CONFIG: ready queue limit= " + readyLimit +
                            " noName= " + noName);
-        status = Status.GREEN;
-        lastSeen = Status.GREEN;
+        health = Health.GREEN;
+        lastSeen = Health.GREEN;
         lastSeenCount = 0;
     }
 
@@ -72,7 +72,7 @@ class WatchdogProfileListener implements ProfileListener {
 
     @Override
     public synchronized void report(ProfileReport profileReport) {
-        Status thisTime = determineStatus(profileReport);
+        Health thisTime = determineHealth(profileReport);
 
         if (thisTime != lastSeen) {
             lastSeenCount = 0;
@@ -81,20 +81,20 @@ class WatchdogProfileListener implements ProfileListener {
             lastSeenCount++;
 
             if ((lastSeenCount == noName) &&
-                (thisTime != status))
+                (thisTime != health))
             {
-                status = thisTime;
-                service.reportStatus(service.getLocalNodeId(),
-                                     status, CLASSNAME);
+                health = thisTime;
+                service.reportHealth(service.getLocalNodeId(),
+                                     health, CLASSNAME);
             }
         }
     }
 
-    private Status determineStatus(ProfileReport profileReport) {
+    private Health determineHealth(ProfileReport profileReport) {
         if (profileReport.getReadyCount() > readyLimit) {
-            return Status.YELLOW;
+            return Health.YELLOW;
         }
-        return Status.GREEN;
+        return Health.GREEN;
     }
 
     @Override

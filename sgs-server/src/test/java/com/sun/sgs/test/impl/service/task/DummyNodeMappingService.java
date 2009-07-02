@@ -164,7 +164,7 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** {@inheritDoc} */
-    public void nodeStatusChange(Node node) {
+    public void nodeHealthChange(Node node) {
         
     }
 

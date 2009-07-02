@@ -23,7 +23,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.Node.Status;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
@@ -54,8 +54,8 @@ public class DummyWatchdogService implements WatchdogService {
 
     // a node-local copy of the node's identifier
     private final long localId;
-    // a node-local indicator of the node status
-    private Node.Status status = Node.Status.GREEN;
+    // a node-local indicator of the node's health
+    private Health health = Health.GREEN;
 
     /** Creates an instance of the service. */
     public DummyWatchdogService(Properties p, ComponentRegistry cr,
@@ -82,11 +82,11 @@ public class DummyWatchdogService implements WatchdogService {
 
     /** {@inheritDoc} */
     public void shutdown() {
-        status = Node.Status.RED;
+        health = Health.RED;
         nodeMap.remove(localId);
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
-            listener.nodeStatusChange(localNode);
+            listener.nodeHealthChange(localNode);
     }
 
     /** {@inheritDoc} */
@@ -95,13 +95,13 @@ public class DummyWatchdogService implements WatchdogService {
     }
 
     /** {@inheritDoc} */
-    public Node.Status getLocalNodeStatus() {
-        return status;
+    public Health getLocalNodeHealth() {
+        return health;
     }
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
-        return status != Node.Status.RED;
+        return health != Health.RED;
     }
 
     /** {@inheritDoc} */
@@ -155,7 +155,7 @@ public class DummyWatchdogService implements WatchdogService {
      * <p>
      * This implementation does nothing.
      */
-    public void reportStatus(long nodeId, Status status, String className) {
+    public void reportHealth(long nodeId, Health health, String className) {
         // Don't do anything for now
     }
 
@@ -178,8 +178,8 @@ public class DummyWatchdogService implements WatchdogService {
         public boolean isAlive() {
             return isLocalNodeAlive();
         }
-        public Status getStatus() {
-            return getLocalNodeStatus();
+        public Health getHealth() {
+            return getLocalNodeHealth();
         }
     }
 }

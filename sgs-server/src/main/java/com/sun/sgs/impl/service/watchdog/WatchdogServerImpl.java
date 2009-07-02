@@ -32,7 +32,7 @@ import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.NodesMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.Node.Status;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -540,7 +540,7 @@ public final class WatchdogServerImpl
     /**
      * {@inheritDoc}
      */
-    public void setNodeStatus(long nodeId, Status status, boolean isLocal,
+    public void setNodeHealth(long nodeId, Health health, boolean isLocal,
                               String className, int maxNumberOfAttempts)
     {
         NodeImpl node = aliveNodes.get(nodeId);
@@ -552,13 +552,13 @@ public final class WatchdogServerImpl
             }
             return;
         }
-        switch (status) {
+        switch (health) {
             case RED:
                 setNodeAsFailed(node, isLocal, className, maxNumberOfAttempts);
                 break;
 
             default:
-                setStatus(node, status);
+                setHealth(node, health);
                 // Notify clients of a status change.
                 statusChangedNodes.add(node);
                 synchronized (notifyClientsLock) {
@@ -568,24 +568,24 @@ public final class WatchdogServerImpl
     }
 
     /**
-     * Persists node status in data service.
+     * Persists node health in data service.
      */
-    private void setStatus(final NodeImpl node, final Status status) {
+    private void setHealth(final NodeImpl node, final Health health) {
         try {
             transactionScheduler.runTask(
-                new AbstractKernelRunnable("SetNodeStatus") {
+                new AbstractKernelRunnable("SetNodeHealth") {
                     public void run() {
-                        node.setStatus(dataService, status);
+                        node.setHealth(dataService, health);
                     } }, taskOwner);
         } catch (Exception e) {
             logger.logThrow(
-                Level.SEVERE, e, "Setting node: {0} status throws", node);
+                Level.SEVERE, e, "Setting node: {0} health throws", node);
         }
     }
 
     /**
-     * Set node as failed. Called when setNodeStatus is called with
-     * status == RED. See that method for parameter descriptions.
+     * Set node as failed. Called when setNodeHealth is called with
+     * health == RED. See that method for parameter descriptions.
      */
     private void setNodeAsFailed(NodeImpl node, boolean isLocal,
                                  String className, int maxNumberOfAttempts)
@@ -957,11 +957,11 @@ public final class WatchdogServerImpl
 
     /**
      * Notifies the {@code WatchdogClient} of each node in the
-     * collection of {@code notifyNodes} of the node status changes in
+     * collection of {@code notifyNodes} of the node health changes in
      * {@code changedNodes}.
      *
      * @param	notifyNodes nodes whose clients should be notified
-     * @param	changedNodes nodes with status changes
+     * @param	changedNodes nodes with health changes
      */
     private void notifyClients(Collection<NodeImpl> notifyNodes,
 			       Collection<NodeImpl> changedNodes)
@@ -970,7 +970,7 @@ public final class WatchdogServerImpl
 	int size = changedNodes.size();
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
-	Status[] status = new Status[size];
+	Health[] health = new Health[size];
 	long[] backups = new long[size];
 
 	int i = 0;
@@ -978,28 +978,28 @@ public final class WatchdogServerImpl
 	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
-	    status[i] = changedNode.getStatus();
+	    health[i] = changedNode.getHealth();
 	    backups[i] = changedNode.getBackupId();
 	    i++;
 	}
 
-	// Notify clients of status changes.
+	// Notify clients of health changes.
 	for (NodeImpl notifyNode : notifyNodes) {
 	    WatchdogClient client = notifyNode.getWatchdogClient();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"notifying client:{0} of status change", notifyNode);
+			"notifying client:{0} of health change", notifyNode);
 		}
-		client.nodeStatusChanges(ids, hosts, status, backups);
+		client.nodeHealthChanges(ids, hosts, health, backups);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the
 		// client may have failed too.
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "Notifying {0} of node status changes failed:",
+		    "Notifying {0} of node health changes failed:",
 		    notifyNode.getId());
 	    }
 	}

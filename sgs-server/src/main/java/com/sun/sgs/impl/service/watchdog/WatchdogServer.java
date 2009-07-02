@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.service.Node.Status;
+import com.sun.sgs.service.Node.Health;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -45,8 +45,8 @@ public interface WatchdogServer extends Remote {
      * the caller should not retry as this indicates a fatal error.
      *
      * <p>When a node fails or a new node starts, the given {@code
-     * client} will be notified of these status changes via its {@link
-     * WatchdogClient#nodeStatusChanges nodeStatusChanges} method.
+     * client} will be notified of these changes via its {@link
+     * WatchdogClient#nodeHealthChanges nodeHealthChanges} method.
      *
      * @param	host  a host name
      * @param	client a watchdog client
@@ -98,8 +98,8 @@ public interface WatchdogServer extends Remote {
     void recoveredNode(long nodeId, long backupId) throws IOException;
 
     /**
-     * Notifies the node with the given ID that its status be set. If the
-     * {@code status} is {@link Node#Status#RED RED} it indicates that the
+     * Notifies the node with the given ID that its health be set. If the
+     * {@code health} is {@link Node#health#RED RED} it indicates that the
      * node has failed and should be shutdown. In this case, if the given node
      * is a remote node, this notification is a
      * result of a server running into difficulty communicating with a remote
@@ -107,16 +107,16 @@ public interface WatchdogServer extends Remote {
      * watchdog service in order to issue the shutdown.
      *
      * @param nodeId the node's ID
-     * @param status the node's status
-     * @param isLocal specifies if the node is reporting status on itself or
+     * @param health the node's health
+     * @param isLocal specifies if the node is reporting health on itself or
      * a remote node
-     * @param className the class issuing the status
+     * @param className the class issuing the health
      * @param maxNumberOfAttempts the maximum number of attempts to try and
      * resolve an {@code IOException}
      * @throws IOException if a communication error occurs while trying to set
-     * the node's status
+     * the node's health
      */
-    void setNodeStatus(long nodeId, Status status, boolean isLocal,
+    void setNodeHealth(long nodeId, Health health, boolean isLocal,
                        String className, int maxNumberOfAttempts)
 	    throws IOException;
 }

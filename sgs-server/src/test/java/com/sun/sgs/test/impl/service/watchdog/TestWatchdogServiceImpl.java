@@ -1691,7 +1691,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    startedNodes.add(node);
 	}
 
-        public void nodeStatusChange(Node node) {
+        public void nodeHealthChange(Node node) {
             if (!node.isAlive()) {
                 failedNodes.add(node);
             }
