@@ -45,12 +45,11 @@ public class TestLPA {
 
     @Parameterized.Parameters
     public static Collection data() {
-        return Arrays.asList(new Object[][] 
+        return Arrays.asList(new Object[][]
             {{1, 0.00}, {2, 0.00}, {4, 0.00}, {8, 0.00}, {16, 0.00},
-             {1, 0.01}, {2, 0.01}, {4, 0.01}, {8, 0.01}, {16, 0.01},
-             {1, 0.02}, {2, 0.02}, {4, 0.02}, {8, 0.02}, {16, 0.02},
-             {1, -0.01}, {2, -0.01}, {4, -0.01}, {8, -0.01}, {16, -0.01}});
-
+             {1, 0.1}, {2, 0.1}, {4, 0.1}, {8, 0.1}, {16, 0.1},
+             {1, 0.2}, {2, 0.2}, {4, 0.2}, {8, 0.2}, {16, 0.2},
+             {1, -0.1}, {2, -0.1}, {4, -0.1}, {8, -0.1}, {16, -0.1}});
     }
 
     public TestLPA(int numThreads, double nodePref) {

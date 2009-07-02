@@ -251,9 +251,9 @@ public class LabelPropagation {
                           time + " milliseconds, " +
                           iterations + " iterations, and found " +
                           groups.size() + " groups ");
-                sb.append(" modularity %.4f %n" + modularity);
+                sb.append(" modularity " + modularity);
                 for (AffinityGroup group : groups) {
-                    sb.append(" id: " + group.getId() + ": members");
+                    sb.append(" id: " + group.getId() + ": members ");
                     for (Identity id : group.getIdentities()) {
                         sb.append(id + " ");
                     }
@@ -296,7 +296,7 @@ public class LabelPropagation {
      *        if it is not changed
      */
     private boolean setMostFrequentLabel(LabelVertex node) {
-        ArrayList<Integer> highestSet = getNeighborCounts(node);
+        List<Integer> highestSet = getNeighborCounts(node);
 
         // If we got back an empty set, no neighbors were found and we're done.
         if (highestSet.isEmpty()) {
@@ -321,7 +321,7 @@ public class LabelPropagation {
      * @param node the node whose neighbors labels will be examined
      * @return a list of labels with the higest counts
      */
-    private ArrayList<Integer> getNeighborCounts(LabelVertex node) {
+    private List<Integer> getNeighborCounts(LabelVertex node) {
         // A map of labels -> value, effectively counting how many
         // of our neighbors use a particular label.
         Map<Integer, Double> labelMap = new HashMap<Integer, Double>();
@@ -335,7 +335,6 @@ public class LabelPropagation {
             // No neighbors found: return an empty list.
             return new ArrayList<Integer>();
         }
-        int degree = neighbors.size();
         for (LabelVertex neighbor : neighbors) {
             if (logger.isLoggable(Level.FINEST)) {
                 logSB.append(neighbor + " ");
@@ -348,10 +347,16 @@ public class LabelPropagation {
             // edges will be null if node and neighbor are no longer connected;
             // in that case, do nothing
             if (edges != null) {
+                long edgew = 0;
                 for (WeightedEdge edge : edges) {
-                    value = value + edge.getWeight();
+                    edgew += edge.getWeight();
                 }
-                labelMap.put(label, value * Math.pow(degree, nodePref));
+                // Using node preference alone causes the single threaded
+                // version to drop quite a bit for Zachary and a value of
+                // 0.1 or 0.2, and nice modularity boost at -0.1
+//                value += Math.pow(graph.degree(neighbor), nodePref) * edgew;
+                value += edgew;
+                labelMap.put(label, value);
             }
         }
         if (logger.isLoggable(Level.FINEST)) {
@@ -359,21 +364,19 @@ public class LabelPropagation {
                        node, logSB.toString());
         }
 
-        // Now go through the labelMap, and create a map of
-        // values to sets of labels.
-        SortedMap<Double, Set<Integer>> countMap =
-                new TreeMap<Double, Set<Integer>>();
+        double maxValue = -1.0;
+        List<Integer> maxLabelSet = new ArrayList<Integer>();
         for (Map.Entry<Integer, Double> entry : labelMap.entrySet()) {
-            Double count = entry.getValue();
-            Set<Integer> identSet = countMap.get(count);
-            if (identSet == null) {
-                identSet = new HashSet<Integer>();
+            double val = entry.getValue();
+            if (val > maxValue) {
+                maxValue = val;
+                maxLabelSet.clear();
+                maxLabelSet.add(entry.getKey());
+            } else if (val == maxValue) {
+                maxLabelSet.add(entry.getKey());
             }
-            identSet.add(entry.getKey());
-            countMap.put(count, identSet);
         }
-        // Return the list of labels with the highest count.
-        return new ArrayList<Integer>(countMap.get(countMap.lastKey()));
+        return maxLabelSet;
     }
 
     /**
