@@ -19,94 +19,199 @@
 
 package com.sun.sgs.test.impl.service.nodemap;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
-import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
-import java.util.Arrays;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAClient;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAProxy;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAServer;
+import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
+import com.sun.sgs.test.util.DummyIdentity;
+import com.sun.sgs.tools.test.FilteredNameRunner;
+import java.io.IOException;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.junit.runner.RunWith;
 import org.junit.Test;
-import org.junit.runners.Parameterized;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 /**
  *
  * 
  */
-//@RunWith(FilteredNameRunner.class)
-@RunWith(ParameterizedFilteredNameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestLPA {
-
-    private static final int WARMUP_RUNS = 100;
-    private static final int RUNS = 500;
-    
-    // Number of threads, set with data below for each run
-    private int numThreads;
-    private double nodePref;
-
-    @Parameterized.Parameters
-    public static Collection data() {
-        return Arrays.asList(new Object[][]
-            {{1, 0.00}, {2, 0.00}, {4, 0.00}, {8, 0.00}, {16, 0.00},
-             {1, 0.1}, {2, 0.1}, {4, 0.1}, {8, 0.1}, {16, 0.1},
-             {1, 0.2}, {2, 0.2}, {4, 0.2}, {8, 0.2}, {16, 0.2},
-             {1, -0.1}, {2, -0.1}, {4, -0.1}, {8, -0.1}, {16, -0.1}});
-    }
-
-    public TestLPA(int numThreads, double nodePref) {
-        this.numThreads = numThreads;
-        this.nodePref = nodePref;
-    }
-
     @Test
-    public void warmup() {
-        // Warm up the compilers
-        LabelPropagation lpa =
-           new LabelPropagation(new ZachBuilder(), false, numThreads, nodePref);
-
-        for (int i = 0; i < WARMUP_RUNS; i++) {
-            lpa.findCommunities();
+    public void testDistributedFramework() throws Exception {
+        // Create a server, and add a few "nodes"
+        LabelPropagationServer server = new LabelPropagationServer();
+        Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
+        {
+            AffinityGroupImpl a = new AffinityGroupImpl(1);
+            a.addIdentity(new DummyIdentity("1"));
+            a.addIdentity(new DummyIdentity("2"));
+            a.addIdentity(new DummyIdentity("3"));
+            group1.add(a);
+            AffinityGroupImpl b = new AffinityGroupImpl(2);
+            b.addIdentity(new DummyIdentity("4"));
+            b.addIdentity(new DummyIdentity("5"));
+            group1.add(b);
         }
-        lpa.shutdown();
+        Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
+        {
+            AffinityGroupImpl a = new AffinityGroupImpl(1);
+            a.addIdentity(new DummyIdentity("6"));
+            a.addIdentity(new DummyIdentity("7"));
+            group2.add(a);
+            AffinityGroupImpl b = new AffinityGroupImpl(3);
+            b.addIdentity(new DummyIdentity("8"));
+            b.addIdentity(new DummyIdentity("9"));
+            group2.add(b);
+        }
+        Collection<AffinityGroup> group3 = new HashSet<AffinityGroup>();
+        {
+            AffinityGroupImpl a = new AffinityGroupImpl(4);
+            a.addIdentity(new DummyIdentity("10"));
+            a.addIdentity(new DummyIdentity("11"));
+            group3.add(a);
+        }
+
+        HashSet<TestLPAClient> clients = new HashSet<TestLPAClient>();
+        TestLPAClient client1 = new TestLPAClient(server, 10, 10, 3, group1);
+        TestLPAClient client2 = new TestLPAClient(server, 20, 20, 4, group2);
+        TestLPAClient client3 = new TestLPAClient(server, 30, 30, 2, group3);
+        clients.add(client1);
+        clients.add(client2);
+        clients.add(client3);
+        server.register(10, client1, new TestLPAProxy());
+        server.register(20, client2, new TestLPAProxy());
+        server.register(30, client3, new TestLPAProxy());
+
+        long now = System.currentTimeMillis();
+        Collection<AffinityGroup> groups = server.findAffinityGroups();
+        System.out.printf("finished in %d milliseconds %n",
+                          System.currentTimeMillis() - now);
+        for (TestLPAClient client : clients) {
+            assertFalse(client.failed);
+            assertTrue(client.currentIter >= client.convergeCount);
+        }
+        for (AffinityGroup ag : groups) {
+            Set<Identity> ids = ag.getIdentities();
+            if (ag.getId() == 1) {
+                assertEquals(5, ids.size());
+                assertTrue(ids.contains(new DummyIdentity("1")));
+                assertTrue(ids.contains(new DummyIdentity("2")));
+                assertTrue(ids.contains(new DummyIdentity("3")));
+                assertTrue(ids.contains(new DummyIdentity("6")));
+                assertTrue(ids.contains(new DummyIdentity("7")));
+            } else if (ag.getId() == 2) {
+                assertEquals(2, ids.size());
+                assertTrue(ids.contains(new DummyIdentity("4")));
+                assertTrue(ids.contains(new DummyIdentity("5")));
+            } else if (ag.getId() == 3) {
+                assertEquals(2, ids.size());
+                assertTrue(ids.contains(new DummyIdentity("8")));
+                assertTrue(ids.contains(new DummyIdentity("9")));
+            } else if (ag.getId() == 4) {
+                assertEquals(2, ids.size());
+                assertTrue(ids.contains(new DummyIdentity("10")));
+                assertTrue(ids.contains(new DummyIdentity("11")));
+            } else {
+                fail("Unknown group found " + ag.getId());
+            }
+        }
     }
 
-    @Test
-    public void testZachary() {
-        GraphBuilder builder = new ZachBuilder();
-        // second argument true:  gather statistics
-        LabelPropagation lpa =
-            new LabelPropagation(builder, true, numThreads, nodePref);
-        
-        long avgTime = 0;
-        int avgIter = 0;
-        double avgMod  = 0.0;
-        double maxMod = 0.0;
-        double minMod = 1.0;
-        long maxTime = 0;
-        long minTime = Integer.MAX_VALUE;
-        for (int i = 0; i < RUNS; i++) {
-            Collection<AffinityGroup> groups = lpa.findCommunities();
-            long time = lpa.getTime();
-            avgTime = avgTime + time;
-            maxTime = Math.max(maxTime, time);
-            minTime = Math.min(minTime, time);
+    private class TestLPAClient implements LPAClient {
+        private final long sleepTime;
+        private final long nodeId;
+        private final int convergeCount;
+        private final Collection<AffinityGroup> result;
+        private final LPAServer server;
 
-            avgIter = avgIter + lpa.getIterations();
-            double mod = lpa.getModularity();
-            avgMod = avgMod + mod;
-            maxMod = Math.max(maxMod, mod);
-            minMod = Math.min(minMod, mod);
+        boolean failed = false;
+        boolean startedExchangeInfo = false;
+        boolean finishedExchangeInfo = false;
+        boolean startedStartIter = false;
+        boolean finishedStartIter = false;
+        int currentIter = -1;
+
+        public TestLPAClient(LPAServer server, long nodeId, long sleepTime, 
+                int convergeCount, Collection<AffinityGroup> result)
+        {
+            this.server = server;
+            this.nodeId = nodeId;
+            this.convergeCount = convergeCount;
+            this.sleepTime = sleepTime;
+            this.result = result;
         }
-        System.out.printf("XXX (%d runs, %d threads, %.4f): " +
-                          "avg time : %4.2f ms, " +
-                          " time range [%d - %d ms] " +
-                          " avg iters : %4.2f, avg modularity: %.4f, " +
-                          " modularity range [%.4f - %.4f] %n",
-                          RUNS, numThreads, nodePref,
-                          avgTime/(double) RUNS,
-                          minTime, maxTime,
-                          avgIter/(double) RUNS,
-                          avgMod/(double) RUNS,
-                          minMod, maxMod);
-        lpa.shutdown();
+
+        /** {@inheritDoc} */
+        public Collection<AffinityGroup> affinityGroups() throws IOException {
+            return result;
+        }
+
+        /** {@inheritDoc} */
+        public void exchangeCrossNodeInfo() throws IOException {
+            startedExchangeInfo = true;
+            try {
+                Thread.sleep(sleepTime);
+            } catch (InterruptedException ex) {
+                throw new IOException("failed", ex);
+            }
+            finishedExchangeInfo = true;
+            server.readyToBegin(nodeId);
+        }
+
+        /** {@inheritDoc} */
+        public void startIteration(int iteration) throws IOException {
+            // Should not be called if we haven't completed exchanging info
+            failed = failed || !finishedExchangeInfo;
+            // Should not be called if we are in the middle of an iteration
+            failed = failed || startedStartIter;
+            if (!failed) {
+                currentIter = iteration;
+                startedStartIter = true;
+                finishedStartIter = false;
+                try {
+                    Thread.sleep(sleepTime);
+                } catch (InterruptedException ex) {
+                    throw new IOException("failed", ex);
+                }
+                startedStartIter = false;
+                finishedStartIter = true;
+            }
+            boolean converged = currentIter >= convergeCount;
+            server.finishedIteration(nodeId, converged, currentIter);
+        }
+
+        /** {@inheritDoc} */
+        public void removeNode(long nodeId) throws IOException {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+    }
+
+    private class TestLPAProxy implements LPAProxy {
+
+        /** {@inheritDoc} */
+        public void crossNodeEdges(Collection<Object> objIds, long nodeId)
+                throws IOException
+        {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        /** {@inheritDoc} */
+        public Map<Object, Set<Integer>> getRemoteLabels(
+                Collection<Object> objIds) throws IOException
+        {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
     }
 }

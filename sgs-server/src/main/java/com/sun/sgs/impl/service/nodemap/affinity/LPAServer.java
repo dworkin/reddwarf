@@ -1,0 +1,74 @@
+/*
+ * Copyright 2007-2009 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package com.sun.sgs.impl.service.nodemap.affinity;
+
+import java.io.IOException;
+import java.rmi.Remote;
+
+/**
+ * The label propagation algorithm server.  These methods can all be
+ * called by LPA client nodes.
+ */
+public interface LPAServer extends Remote {
+    /**
+     * Indicates that the given {@code nodeId} is ready to begin the label
+     * propagation algorithm.
+     *
+     * @param nodeId the node that is ready to begin
+     * @throws IOException if there is a communication problem
+     */
+    void readyToBegin(long nodeId) throws IOException;
+
+    /**
+     * Indicates that the given {@code nodeId} has completed an iteration
+     * of the label propagation algorithm.
+     *
+     * @param nodeId the node that has finished an iteration
+     * @param converged {@code true} if the node believes the algorithm has
+     *     converged and can be stopped
+     * @param iteration the iteration that has finished
+     * @throws IOException if there is a communication problem
+     */
+    void finishedIteration(long nodeId, boolean converged, int iteration)
+            throws IOException;
+
+    /**
+     * Registers the given proxies for the node.
+     *
+     * @param nodeId the node the proxies represent
+     * @param client the client proxy, which this server can call
+     * @param proxy the LPA proxy, which other nodes can call
+     * @throws IOException if there is a communication problem
+     */
+    void register(long nodeId, LPAClient client, LPAProxy proxy)
+            throws IOException;
+
+    /**
+     * Returns the {@code LPAProxy} for the given {@code nodeId}.
+     * If {@code null} is returned, the node should be considered failed
+     * and safe to remove, as though {@link LPAClient#removeNode} had been
+     * called.
+     * 
+     * @param nodeId the node we need the proxy for
+     * @return the LPA proxy for the given node
+     * @throws IOException if there is a communication problem
+     */
+    LPAProxy getLPAProxy(long nodeId) throws IOException;
+}
