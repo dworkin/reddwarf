@@ -20,22 +20,18 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.util.Exporter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -45,10 +41,17 @@ import java.util.concurrent.TimeUnit;
  * responsible for preparing the nodes for a run of the algorithm, coordinating
  * the iterations of the algorithm, and collecting and merging results from
  * each node when finished.
- * 
  */
 public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
+    /** The default value of the server port. */
+    static final int DEFAULT_SERVER_PORT = 44537;
 
+    /** The name we export ourselves under. */
+    static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
+
+    // The exporter for this server
+    private final Exporter<LPAServer> exporter;
+    
     // A map from node id to client proxy objects.
     private final Map<Long, LPAClient> clientProxyMap =
             new ConcurrentHashMap<Long, LPAClient>();
@@ -61,10 +64,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // the algorithm.  This is required, rather than a simple Barrier, because
     // our calls must be idempotent.
     // This is replaced at each iteration.
-    private Set<Long> nodeBarrier =
-            Collections.synchronizedSet(new HashSet<Long>());
-    // This is replaced on each iteration
-    private CountDownLatch latch = new CountDownLatch(2);
+    private Set<Long> nodeBarrier;
+
+    // A latch to ensure our main thread waits for all nodes to complete
+    // each step of the algorithm before proceeding.
+    // This is replaced on each iteration.
+    private CountDownLatch latch;
 
     // Algorithm iteration information
     private int currentIteration;
@@ -78,6 +83,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // starvation problems using a fixed thread pool - JANE?), with a timeout
     // of 60 sec before unused threads are reaped.
     private final ExecutorService executor = Executors.newCachedThreadPool();
+
+    public LabelPropagationServer() throws IOException {
+        // Export ourself.
+        exporter = new Exporter<LPAServer>(LPAServer.class);
+        exporter.export(this, SERVER_EXPORT_NAME, DEFAULT_SERVER_PORT);
+    }
 
     // ---- Implement AffinityGroupFinder --- //
     /** {@inheritDoc} */
@@ -100,6 +111,29 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             clean.add(id);
         }
 
+        // This server controls the running of the distributed label
+        // propagation algorithm, using the LPAServer and LPAClient
+        // interfaces.  The protocol is:
+        // Server calls each LPAClient.exchangeCrossNodeInfo().
+        //     Nodes contact other nodes which their graphs might be
+        //     connected to, using LPAProxy.crossNodeEdges.
+        //     Nodes can find the appropriate LPAProxy by calling
+        //     LPAServer.getLPAProxy.
+        //     When finished exchanging information, each node calls
+        //     LPAServer.readyToBegin().
+        // Server begins iterations of the algorithm.  For each iteration,
+        // it calls LPAClient.startIteration().
+        //     Nodes compute one iteration of the label propagation algorithm.
+        //     Remote information (cross node edges discovered above) can
+        //     be found by calling LPAProxy.getRemoteLabels on other nodes.
+        //     When finished, each node calls LPAServer.finishedIteration,
+        //     noting whether it believes the algorithm has converged.
+        // When all nodes agree that the algorithm has converged, or many
+        // iterations have been run, the server gathers all group information
+        // from each node by calling LPAClient.affinityGroups().  The server
+        // combines groups that might cross nodes, and creates new, final
+        // affinity group information.
+        
         failed = false;
         nodesConverged = false;
         // Tell each node to exchange their cross node information.  This
@@ -158,6 +192,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 failed = true;
             }
             // Completely arbitrary number to ensure we actually converge
+            // This can probably be much lower.
             if (++currentIteration > 100) {
                 break;
             }
@@ -168,52 +203,49 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         if (failed) {
             return new HashSet<AffinityGroup>();
         }
+
+        final Set<AffinityGroup> returnedGroups =
+                Collections.synchronizedSet(new HashSet<AffinityGroup>());
+        latch = new CountDownLatch(clientSize);
+        for (final LPAClient proxy : clientProxySet) {
+            executor.execute(new Runnable() {
+                public void run() {
+                    try {
+                        returnedGroups.addAll(proxy.affinityGroups());
+                    } catch (IOException ioe) {
+                        failed = true;
+                        // JANE should retry a few times, then
+                        // assume the node has failed.
+                    } finally {
+                        // this will need to change when we have retries
+                        latch.countDown();
+                    }
+                }
+            });
+        }
+
+        // Wait for the calls to complete on all nodes
+        try {
+            // Completely arbitrary timeout!
+            latch.await(10, TimeUnit.HOURS);
+        } catch (InterruptedException ex) {
+            failed = true;
+        }
+
         Map<Long, AffinityGroupImpl> groupMap =
                 new HashMap<Long, AffinityGroupImpl>();
-        List<Future<Collection<AffinityGroup>>> futures =
-                new ArrayList<Future<Collection<AffinityGroup>>>();
-        for (final LPAClient proxy : clientProxySet) {
-            Callable<Collection<AffinityGroup>> worker =
-                    new Callable<Collection<AffinityGroup>>() {
-                        public Collection<AffinityGroup> call() {
-                            try {
-                                return proxy.affinityGroups();
-                            } catch (IOException ioe) {
-                                failed = true;
-                                // JANE should retry a few times, then
-                                // assume the node has failed.
-                                return new HashSet<AffinityGroup>();
-                            }
-                        }
-            };
-            futures.add(executor.submit(worker));
-        }
-
-        // This code doesn't handle a node not answering, need to use a barrier
-        for (Future<Collection<AffinityGroup>> future : futures) {
-            Collection<AffinityGroup> nodeGroup;
-            try {
-                nodeGroup = future.get();
-            } catch (InterruptedException ex) {
-                failed = true;
-                return new HashSet<AffinityGroup>();
-            } catch (ExecutionException ex) {
-                failed = true;
-                return new HashSet<AffinityGroup>();
+        for (AffinityGroup ag : returnedGroups) {
+            long id = ag.getId();
+            AffinityGroupImpl group = groupMap.get(id);
+            if (group == null) {
+                group = new AffinityGroupImpl(id);
+                groupMap.put(id, group);
             }
-
-            for (AffinityGroup g : nodeGroup) {
-                long id = g.getId();
-                AffinityGroupImpl group = groupMap.get(id);
-                if (group == null) {
-                    group = new AffinityGroupImpl(id);
-                    groupMap.put(id, group);
-                }
-                for (Identity gid : g.getIdentities()) {
-                    group.addIdentity(gid);
-                }
+            for (Identity gid : ag.getIdentities()) {
+                group.addIdentity(gid);
             }
         }
+
         // convert our types
         Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
         for (AffinityGroupImpl agi : groupMap.values()) {
@@ -228,6 +260,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             clientProxyMap.remove(nodeId);
             lpaProxyMap.remove(nodeId);
         }
+    }
+
+    /** {@inheritDoc} */
+    public void shutdown() {
+        executor.shutdownNow();
+        exporter.unexport();
     }
 
     // --- Implement LPAServer --- //

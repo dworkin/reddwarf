@@ -40,4 +40,9 @@ public interface AffinityGroupFinder {
      * @param nodeId the id of a failed node
      */
     void removeNode(long nodeId);
+
+    /**
+     * Shuts down the affinity group finder.
+     */
+    void shutdown();
 }
