@@ -47,4 +47,23 @@ public interface TransactionCoordinator {
      * @return	a handle for managing the newly created transaction.
      */
     TransactionHandle createTransaction(boolean unbounded);
+
+    /**
+     * Creates a new transaction, and returns a handle for managing it.
+     *
+     * @param timeout the timeout, in milliseconds, to be used for this
+     *        transaction
+     *
+     * @return	a handle for managing the newly created transaction.
+     */
+    TransactionHandle createTransaction(long timeout);
+
+    /**
+     * Returns the default transaction timeout to use for transactions.
+     * This value is specified using the property
+     * {@value #TXN_TIMEOUT_PROPERTY}
+     *
+     * @return the default transaction timeout
+     */
+    long getDefaultTimeout();
 }

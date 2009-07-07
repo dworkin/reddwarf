@@ -168,4 +168,21 @@ public final class TransactionCoordinatorImpl
                                              collectorHandle);
 	}
     }
+
+    /** {@inheritDoc} */
+    public TransactionHandle createTransaction(long timeout) {
+        if(timeout <= 0) {
+            throw new IllegalArgumentException(
+                    "Timeout value must be greater than 0 : " + timeout);
+        }
+        return new TransactionHandleImpl(nextTid.getAndIncrement(),
+                                         timeout,
+                                         disablePrepareAndCommitOpt,
+                                         collectorHandle);
+    }
+
+    /** {@inheritDoc} */
+    public long getDefaultTimeout() {
+        return boundedTimeout;
+    }
 }

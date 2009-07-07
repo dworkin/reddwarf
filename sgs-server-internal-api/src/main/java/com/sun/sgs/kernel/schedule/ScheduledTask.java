@@ -15,9 +15,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
-package com.sun.sgs.impl.kernel.schedule;
+package com.sun.sgs.kernel.schedule;
 
 import com.sun.sgs.auth.Identity;
 
@@ -71,6 +75,35 @@ public interface ScheduledTask {
      * @return the period between recurring executions.
      */
     long getPeriod();
+
+    /**
+     * Returns the try count (the number of times that this task has been
+     * attempted).
+     */
+    int getTryCount();
+
+    /**
+     * Returns {@code null} if the task completed successfully, or the
+     * {@code Throwable} that caused the task to fail permanently. If the
+     * task has not yet completed then this will block until the result
+     * is known or the caller is interrupted. An {@code InterruptedException}
+     * is thrown either if the calling thread is interrupted before a result
+     * is known or if the task is cancelled meaning that no result is known.
+     */
+    Throwable get() throws InterruptedException;
+
+    /**
+     * Returns the transaction timeout.  A Scheduler may or may not choose
+     * to use this timeout value.
+     *
+     * @return the transaction timeout to use for this task.
+     */
+    long getTimeout();
+
+    /**
+     * Sets the transaction timeout for this task.
+     */
+    void setTimeout(long timeout);
 
     /**
      * Returns whether this is a recurring task. If this is not a recurring

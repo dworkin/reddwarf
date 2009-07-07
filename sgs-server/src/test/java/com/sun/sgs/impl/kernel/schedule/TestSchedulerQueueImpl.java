@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
+import com.sun.sgs.kernel.schedule.ScheduledTask;
+import com.sun.sgs.kernel.schedule.SchedulerQueue;
 import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
@@ -623,6 +625,7 @@ public class TestSchedulerQueueImpl {
         private final DummyIdentity owner;
         private final long start;
         private final long period;
+        private long timeout = 100;
         private RecurringTaskHandle handle = null;
         private boolean cancelled = false;
         ScheduledTaskImpl() {
@@ -651,6 +654,10 @@ public class TestSchedulerQueueImpl {
         public Priority getPriority() { return Priority.getDefaultPriority(); }
         public long getStartTime() { return start; }
         public long getPeriod() { return period; }
+        public long getTimeout() { return timeout; }
+        public void setTimeout(long timeout) { this.timeout = timeout; }
+        public Throwable get() { return null; }
+        public int getTryCount() { return 0; }
         public boolean isRecurring() { return period != NON_RECURRING; }
         void setRecurringTaskHandle(RecurringTaskHandle handle) {
             this.handle = handle;

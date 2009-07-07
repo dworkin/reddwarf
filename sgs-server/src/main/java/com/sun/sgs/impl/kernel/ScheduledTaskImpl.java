@@ -21,7 +21,7 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.kernel.schedule.ScheduledTask;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -54,6 +54,7 @@ class ScheduledTaskImpl implements ScheduledTask {
     private RecurringTaskHandle recurringTaskHandle = null;
     private int tryCount = 0;
     private TaskQueue queue = null;
+    private long timeout;
 
     // state associated with the lifetime of the task
     private enum State {
@@ -84,7 +85,8 @@ class ScheduledTaskImpl implements ScheduledTask {
      *                     since January 1, 1970
      */
     ScheduledTaskImpl(ScheduledTaskImpl task, long newStartTime) {
-        this(task.task, task.owner, task.priority, newStartTime, task.period);
+        this(task.task, task.owner, task.priority, 
+             newStartTime, task.period, task.timeout);
         this.recurringTaskHandle = task.recurringTaskHandle;
     }
 
@@ -97,11 +99,12 @@ class ScheduledTaskImpl implements ScheduledTask {
      * @param priority the <code>Priority</code> of the task
      * @param startTime the time at which to start in milliseconds since
      *                  January 1, 1970
+     * @param timeout the transaction timeout to use for this task
      */
     ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime)
+                      Priority priority, long startTime, long timeout)
     {
-        this(task, owner, priority, startTime, NON_RECURRING);
+        this(task, owner, priority, startTime, NON_RECURRING, timeout);
     }
 
     /**
@@ -114,9 +117,10 @@ class ScheduledTaskImpl implements ScheduledTask {
      *                  January 1, 1970
      * @param period the delay between recurring executions, or
      *               <code>NON_RECURRING</code>
+     * @param timeout the transaction timeout to use for this task
      */
-    ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime, long period)
+    ScheduledTaskImpl(KernelRunnable task, Identity owner, Priority priority,
+                      long startTime, long period, long timeout)
     {
         if (task == null) {
             throw new NullPointerException("Task cannot be null");
@@ -133,6 +137,7 @@ class ScheduledTaskImpl implements ScheduledTask {
         this.priority = priority;
         this.startTime = startTime;
         this.period = period;
+        this.timeout = timeout;
     }
 
     /** Implementation of ScheduledTask interface. */
@@ -160,6 +165,32 @@ class ScheduledTaskImpl implements ScheduledTask {
     /** {@inheritDoc} */
     public long getPeriod() {
         return period;
+    }
+
+    /** {@inheritDoc} */
+    public int getTryCount() {
+        return tryCount;
+    }
+
+    /** {@inheritDoc} */
+    public synchronized Throwable get() throws InterruptedException {
+        // wait for the task to finish
+        while (!isDone()) {
+            wait();
+        }
+        if (state == State.CANCELLED) {
+            throw new InterruptedException("interrupted while getting result");
+        }
+        return result;
+    }
+
+    /** {@inheritDoc} */
+    public long getTimeout() {
+        return timeout;
+    }
+
+    public synchronized void setTimeout(long timeout) {
+        this.timeout = timeout;
     }
 
     /** {@inheritDoc} */
@@ -218,25 +249,6 @@ class ScheduledTaskImpl implements ScheduledTask {
     /** Re-sets the starting time to the now. */
     void resetStartTime() {
         startTime = System.currentTimeMillis();
-    }
-
-    /**
-     * Returns {@code null} if the task completed successfully, or the
-     * {@code Throwable} that caused the task to fail permanently. If the
-     * task has not yet completed then this will block until the result
-     * is known or the caller is interrupted. An {@code InterruptedException}
-     * is thrown either if the calling thread is interrupted before a result
-     * is known or if the task is cancelled meaning that no result is known.
-     */
-    synchronized Throwable get() throws InterruptedException {
-        // wait for the task to finish
-        while (!isDone()) {
-            wait();
-        }
-        if (state == State.CANCELLED) {
-            throw new InterruptedException("interrupted while getting result");
-        }
-        return result;
     }
 
     /** Returns whether the task has finished. */
@@ -320,14 +332,6 @@ class ScheduledTaskImpl implements ScheduledTask {
      */
     void incrementTryCount() {
         tryCount++;
-    }
-
-    /**
-     * Returns the try count (the number of times that this task has been
-     * attempted).
-     */
-    int getTryCount() {
-        return tryCount;
     }
 
     /**
