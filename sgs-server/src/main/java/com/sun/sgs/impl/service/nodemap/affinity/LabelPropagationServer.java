@@ -151,6 +151,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                         failed = true;
                         // JANE should retry a few times, then
                         // assume the node has failed.
+                        // Will want a way to contact the watchdog to
+                        // let it know.
                     }
                 }
             });
@@ -179,6 +181,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                         } catch (IOException ioe) {
                             // JANE should retry a few times, then
                             // assume the node has failed.
+                            // Will want a way to contact the watchdog to
+                            // let it know.
                             failed = true;
                         }
                     }
@@ -199,10 +203,16 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
 
         // Now, gather up our results
-
         if (failed) {
             return new HashSet<AffinityGroup>();
         }
+
+        // If, after this point, we cannot contact a node, simply
+        // return the information that we have.   JANE is that safe?
+        // Assuming a node has failed, we won't report the identities
+        // on the failed node as being part of any group.  On the other
+        // hand, we'll have lost all information about those identities
+        // and will have to rebuild their object connections.
 
         final Set<AffinityGroup> returnedGroups =
                 Collections.synchronizedSet(new HashSet<AffinityGroup>());
@@ -216,6 +226,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                         failed = true;
                         // JANE should retry a few times, then
                         // assume the node has failed.
+                        // Will want a way to contact the watchdog to
+                        // let it know.
                     } finally {
                         // this will need to change when we have retries
                         latch.countDown();
