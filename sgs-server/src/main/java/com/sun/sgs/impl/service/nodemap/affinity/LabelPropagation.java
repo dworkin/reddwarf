@@ -59,6 +59,9 @@ public class LabelPropagation {
     // The producer of our graphs.
     private final GraphBuilder builder;
 
+    // The local node id
+    private final long localNodeId;
+
     // A random number generator, to break ties.
     private final Random ran = new Random();
 
@@ -91,6 +94,7 @@ public class LabelPropagation {
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
+     * @param nodeId the local node ID
      * @param gatherStats if {@code true}, gather extra statistics for each run.
      *            Useful for testing.
      * @param numThreads number of threads, for TESTING.
@@ -101,13 +105,15 @@ public class LabelPropagation {
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
      */
-    public LabelPropagation(GraphBuilder builder, boolean gatherStats, 
+    public LabelPropagation(GraphBuilder builder, long nodeId,
+                            boolean gatherStats,
                             int numThreads, double nodePref)
     {
         if (numThreads < 1) {
             throw new IllegalArgumentException("Num threads must be > 0");
         }
         this.builder = builder;
+        localNodeId = nodeId;
         this.gatherStats = gatherStats;
         this.numThreads = numThreads;
         if (numThreads > 1) {

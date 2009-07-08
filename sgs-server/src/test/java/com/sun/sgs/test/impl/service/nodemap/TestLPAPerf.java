@@ -61,7 +61,8 @@ public class TestLPAPerf {
     public void warmup() {
         // Warm up the compilers
         LabelPropagation lpa =
-           new LabelPropagation(new ZachBuilder(), false, numThreads, nodePref);
+           new LabelPropagation(new ZachBuilder(), 1, false,
+                                numThreads, nodePref);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.findCommunities();
@@ -74,7 +75,7 @@ public class TestLPAPerf {
         GraphBuilder builder = new ZachBuilder();
         // second argument true:  gather statistics
         LabelPropagation lpa =
-            new LabelPropagation(builder, true, numThreads, nodePref);
+            new LabelPropagation(builder, 1, true, numThreads, nodePref);
 
         long avgTime = 0;
         int avgIter = 0;
