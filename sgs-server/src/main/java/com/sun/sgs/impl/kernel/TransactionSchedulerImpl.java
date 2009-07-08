@@ -24,6 +24,7 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.kernel.schedule.SchedulerQueue;
 import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
 
@@ -619,8 +620,9 @@ final class TransactionSchedulerImpl
 
                 try {
                     // setup the transaction state
-                    TransactionHandle handle =
-                        transactionCoordinator.createTransaction(unbounded);
+                    TransactionHandle handle = 
+                            transactionCoordinator.createTransaction(unbounded ?
+                                ScheduledTask.UNBOUNDED : task.getTimeout());
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
                     

@@ -40,6 +40,9 @@ public interface ScheduledTask {
     /** Identifier that represents a non-recurring task. */
     int NON_RECURRING = -1;
 
+    /** Identifier that represents an unbounded timeout. */
+    int UNBOUNDED = -1;
+
     /**
      * Returns the task.
      *
