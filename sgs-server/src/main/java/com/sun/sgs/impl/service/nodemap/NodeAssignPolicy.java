@@ -61,6 +61,14 @@ interface NodeAssignPolicy {
     boolean nodesAvailable();
 
     /**
+     * Returns {@code true} of the specified node is available for assignment.
+     *
+     * @param nodeId a node ID
+     * @return {@code true} of the specified node is available for assignment
+     */
+    boolean isNodeAvailable(long nodeId);
+
+    /**
      * Inform the policy that a node is now available.
      *
      * @param nodeId the available node

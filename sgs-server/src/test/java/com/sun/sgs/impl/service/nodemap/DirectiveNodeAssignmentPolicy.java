@@ -74,7 +74,7 @@ public class DirectiveNodeAssignmentPolicy extends RoundRobinPolicy {
 		new GetNodeTask(server.watchdogService, oldNode);
 	    server.runTransactionally(task);
 	    server.mapToNewNode(new DummyIdentity(name), null,
-				task.node, newNode);
+				task.node, -1, newNode);
 	} finally {
 	    roundRobin = saveRoundRobin;
 	}

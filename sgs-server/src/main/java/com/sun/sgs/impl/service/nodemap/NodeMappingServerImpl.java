@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
-import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -35,7 +34,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -43,9 +41,11 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
@@ -195,7 +195,9 @@ public final class NodeMappingServerImpl
     
     /** The watchdog service. */
     final WatchdogService watchdogService;
-    
+
+    private final AffinityServer affinityServer;
+
     /** The policy for assigning new nodes.  This will likely morph into
      *  the load balancing policy, as well. */
     private final NodeAssignPolicy assignPolicy;
@@ -209,12 +211,7 @@ public final class NodeMappingServerImpl
     
     /** Our string representation, used by toString(). */
     private final String fullName;
-
-    /**
-     * Nodes being offloaded. Must be synchronized.
-     */
-    private final Set<Long> offloading = new HashSet<Long>();
-
+    
     /** Identities waiting to be removed, with the time they were
      *  entered in the map.
      *
@@ -316,7 +313,9 @@ public final class NodeMappingServerImpl
         // Register our node listener with the watchdog service.
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
-        
+
+        affinityServer = new DummyAffinityServer(properties, this);
+
         // Export ourselves.  At this point, this object is public.
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
         port = exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
@@ -377,7 +376,7 @@ public final class NodeMappingServerImpl
     /** {@inheritDoc} */
     public void assignNode(Class service, Identity identity, 
                            long requestingNode)
-        throws IOException
+        throws IOException 
     {
         callStarted();    
         try {
@@ -409,16 +408,15 @@ public final class NodeMappingServerImpl
 
             try {
                 long newNodeId = 
-                    mapToNewNode(identity, serviceName, node, requestingNode);
+                  mapToNewNode(identity, serviceName, node, -1, requestingNode);
                 logger.log(Level.FINEST, 
                            "assignNode id:{0} to {1}", identity, newNodeId);
             } catch (NoNodesAvailableException ex) {
-                // TODO - can happen often now
                 // This should only occur if no nodes are available, which
                 // can only happen if our client shutdown and unregistered
                 // while we were in this call.
                 // Ignore the error.
-                logger.logThrow(Level.FINEST, ex, "Unable to assign node");
+                logger.logThrow(Level.FINEST, ex, "Exception ignored");
             }
             
         } finally {
@@ -649,8 +647,6 @@ public final class NodeMappingServerImpl
         
         try {
             notifyMap.put(nodeId, client);
-
-            // TODO - should check to see if the node is really available
             assignPolicy.nodeAvailable(nodeId);
             logger.log(Level.FINEST, 
                        "Registered node listener for {0} ", nodeId);
@@ -742,8 +738,8 @@ public final class NodeMappingServerImpl
     }
     
     /**
-     * Move an identity.  First, choose a new node for the identity
-     * (which can take a while) and then update the map to reflect
+     * Move an identity.  If {@code targetNodeId} is -1, choose a new node for
+     * the identity (which can take a while). Then update the map to reflect
      * the choice, cleaning up old mappings as appropriate.  If given
      * a {@code serviceName}, the status of the identity is set to active
      * for that service on the new node.  The change in mappings might need
@@ -754,12 +750,14 @@ public final class NodeMappingServerImpl
      * @param serviceName the name of the requesting service's class, or null
      * @param oldNode the last node the identity was mapped to, or null if there
      *        was no prior mapping
+     * @param targetNodeId the target node ID or -1
      * @param requestingNode the node making the mapping request
      *
-     * @throws NoNodesAvailableException if there are no live nodes to map to
+     * @throws NoNodesAvailableException if there are no nodes available to map
+     *      to or the target node is not available
      */
     long mapToNewNode(final Identity id, String serviceName, Node oldNode,
-                      long requestingNode) 
+                      long targetNodeId, long requestingNode)
         throws NoNodesAvailableException
     {
         assert (id != null);
@@ -782,13 +780,21 @@ public final class NodeMappingServerImpl
         // Choose the node.  This needs to occur outside of a transaction,
         // as it could take a while.  
         final long newNodeId;
-        try {
-            newNodeId = assignPolicy.chooseNode(id, requestingNode);
-        } catch (NoNodesAvailableException ex) {
-            logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}" +
-                    " failed because no live nodes are available", 
-                    id, oldNode);
-            throw ex;
+        if (targetNodeId == -1) {
+            try {
+                newNodeId = assignPolicy.chooseNode(id, requestingNode);
+            } catch (NoNodesAvailableException ex) {
+                logger.logThrow(Level.FINEST, ex,
+                        "mapToNewNode: id {0} from {1}" +
+                        " failed because no live nodes are available",
+                        id, oldNode);
+                throw ex;
+            }
+        } else {
+            if (!assignPolicy.isNodeAvailable(targetNodeId)) {
+               throw new NoNodesAvailableException("target node not available");
+            }
+            newNodeId = targetNodeId;
         }
         
         if (oldNode != null && newNodeId == oldNode.getId()) {
@@ -804,7 +810,8 @@ public final class NodeMappingServerImpl
         
         // Create a new task with the move information.
         moveTask = new MoveIdTask(id, oldNode, newNodeId, serviceName);
-        
+
+        System.out.println("mapToNewNode moving id " + id.getName() + " from " + oldNode + " to " + newNodeId);
         if (oldNode != null && oldNode.isAlive()) {
             // Tell the id's old node, so it can tell the id relocation
             // listeners.  We won't actually move the identity until the
@@ -813,6 +820,7 @@ public final class NodeMappingServerImpl
             long oldId = oldNode.getId();
             final NotifyClient oldClient = notifyMap.get(oldId);
             if (oldClient != null) {
+                System.out.println("running IO task");
                 runIoTask(
                     new IoRunnable() {
                         public void run() throws IOException {
@@ -821,6 +829,7 @@ public final class NodeMappingServerImpl
                     }, oldId);
             }
         } else {
+            System.out.println("moving now???");
             // Go ahead and make the move now.
             moveIdAndNotifyListeners(moveTask);
         }
@@ -837,11 +846,9 @@ public final class NodeMappingServerImpl
         final long newNodeId = moveTask.newNodeId;
         try {
             runTransactionally(moveTask); 
-            GetNodeTask atask = new GetNodeTask(newNodeId);
-            runTransactionally(atask);
 
             // Tell our listeners
-            notifyListeners(oldNode, atask.getNode(), id);
+            notifyListeners(oldNode, getNode(newNodeId), id);
         } catch (Exception e) {
             // We can get an IllegalStateException if this server shuts
             // down while we're moving identities from failed nodes.
@@ -952,7 +959,20 @@ public final class NodeMappingServerImpl
             }
         }
     }
-    
+
+    /**
+     * Get the node that the specified mode id. Returns {@code null} if
+     * the node has failed and been removed from the data store.
+     *
+     * @param nodeId a node id
+     * @return the node or {@code null}
+     */
+    private Node getNode(long nodeId) throws Exception {
+        GetNodeTask atask = new GetNodeTask(nodeId);
+        runTransactionally(atask);
+        return atask.getNode();
+    }
+
     private class GetNodeTask extends AbstractKernelRunnable {
         /** Return value, the new node.  Must be obtained under transaction. */
         private Node node = null;
@@ -960,7 +980,7 @@ public final class NodeMappingServerImpl
         private final long nodeId;
                             
         GetNodeTask(long nodeId) {
-	    super(null);
+	    super("GetNodeTask");
             this.nodeId = nodeId; 
         }               
                     
@@ -976,8 +996,49 @@ public final class NodeMappingServerImpl
         public Node getNode() {
             return node;
         }
-    }    
-        
+    }
+
+    /**
+     * Get the node that the specified identity is assigned to. Returns
+     * {@code null} the node has failed and been removed from the data store.
+     *
+     * @param id an identity
+     * @return the node or {@code null}
+     */
+    private Node getNode(Identity id) throws Exception {
+        GetNodeFromIdentityTask atask = new GetNodeFromIdentityTask(id);
+        runTransactionally(atask);
+        return atask.getNode();
+    }
+
+    private class GetNodeFromIdentityTask extends AbstractKernelRunnable {
+        /** Return value, the new node.  Must be obtained under transaction. */
+        private Node node = null;
+
+        private final String idkey;
+
+        GetNodeFromIdentityTask(Identity id) {
+	    super("GetNodeFromIdentityTask");
+            idkey = NodeMapUtil.getIdentityKey(id);
+        }
+
+        public void run() {
+            IdentityMO idmo = (IdentityMO)dataService.getServiceBinding(idkey);
+            if (idmo != null) {
+                node = watchdogService.getNode(idmo.getNodeId());
+            }
+        }
+
+        /**
+         * Returns the node found by the watchdog service, or null if
+         * this task has not run or the node has failed and been removed
+         * from the data store.
+         */
+        public Node getNode() {
+            return node;
+        }
+    }
+
     /** 
      * The listener registered with the watchdog service.  These methods
      * will be notified if a node starts or stops.
@@ -1012,7 +1073,7 @@ public final class NodeMappingServerImpl
 
                 case ORANGE:
                     assignPolicy.nodeUnavailable(nodeId);
-                    offloadNode(nodeId);
+                    offloadNode(node);
                     break;
 
                 case RED:
@@ -1025,139 +1086,125 @@ public final class NodeMappingServerImpl
                     } catch (IOException ex) {
                         // won't happen, this is a local call
                     }
-                    offloadNode(nodeId);
+                    offloadNode(node);
                     break;
             }
         }
-    }
 
-    /**
-     * Offload a node. Some or all of the identities will be reassigned to
-     * another node if possible.
-     * @param nodeId the ID of the node to offload
-     */
-    private void offloadNode(long nodeId) {
-System.out.println("Calling offloadNode for " + nodeId);
-        // Can't do it if there are no nodes to unload onto...
-        if (assignPolicy.nodesAvailable()) {
-            synchronized (offloading) {
+        private void offloadNode(Node node) {
+            long nodeId = node.getId();
 
-                if (offloading.add(nodeId)) {
-                    taskScheduler.scheduleTask(new OffloadTask(nodeId),
-                                               taskOwner);
-                }
-            }
-        }
-    }
-
-    private void offloadingDone(long nodeId) {
-        System.out.println("Offloading is done for " + nodeId);
-        synchronized (offloading) {
-            offloading.remove(nodeId);
-        }
-    }
-
-    /**
-     * Task to offload a node.
-     */
-    private class OffloadTask extends AbstractKernelRunnable {
-        private final long nodeId;
-
-        OffloadTask(long nodeId) {
-            super("OffloadTask " + nodeId);
-            this.nodeId = nodeId;
-        }
-
-        @Override
-        public void run() throws Exception {
-            GetNodeTask nodeTask = new GetNodeTask(nodeId);
-            runTransactionally(nodeTask);
-            Node node = nodeTask.getNode();
-System.out.println("Runing offload task for " + node);
-
-            /// If the node is completely gone, or is better return
-            if (node == null || node.getHealth() == Health.GREEN) {
-                offloadingDone(nodeId);
-                return;
+            if (logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER, "Offload request for {0}", node);
             }
 
             // Look up each identity on the failed node and move it
             String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
-            GetIdOnNodeTask task =
-                     new GetIdOnNodeTask(dataService, nodekey, logger);
+            Iterator<Identity> identities =
+                            new GetIdOnNodeTask(dataService, nodekey, logger);
 
-            while (true) {
-                // Return if we're shutting down.
-                if (shuttingDown()) {
-                    offloadingDone(nodeId);
-                    return;
-                }
-                try {
-                    // Find an identity on the node
-                    runTransactionally(task);
+            // If node is alive we are just offloading due to bad health
+            if (node.isAlive()) {
 
-                    if (task.done()) {
-                        offloadingDone(nodeId);
-                        return;
+                // TODO - should schedule a periodic offload task to offload
+                // unhealth node until it reaches a better condition??
+                if (identities.hasNext()) {
+                    Identity id = identities.next();
+                
+                    // Attempt to move the entire group off
+                    AffinityGroup ag;
+                    if ((affinityServer != null) &&
+                        (ag = affinityServer.getGroup(id)) != null) {
+                        try {
+                            // Setting the affinity group node will eventually
+                            // call back to moveIdentities()
+                            ag.setNode(assignPolicy.chooseNode(id,
+                                                 NodeAssignPolicy.SERVER_NODE));
+                        } catch (NoNodesAvailableException ex) {
+                            // no other healthy nodes available, so just hold on
+                        }
+                    } else {
+                        // just one to move
+                        moveIdentities(Collections.singletonList(id).iterator(),
+                                       node, -1);
                     }
-
-                    Identity id = task.getId().getIdentity();
-System.out.println("Found id: " + id);
-                    try {
-                        // If we're already trying to move the identity,
-                        // but the old node failed before preparations are
-                        // complete, just make the move now.
-                        MoveIdTask moveTask = moveMap.remove(id);
-System.out.println("move task= " + moveTask);
-                        if (moveTask != null) {
-                            moveIdAndNotifyListeners(moveTask);
-                        } else {
-System.out.println("Offloading identity: " + id.getName());
-                            mapToNewNode(id, null, node,
-                                         NodeAssignPolicy.SERVER_NODE);
-                         }
-                    } catch (NoNodesAvailableException e) {
-                        // This can be thrown from mapToNewNode if there are
-                        // no live nodes.  Stop.
-                        //
-                        // TODO - not convinced this is correct.
-                        // I think the task service needs a positive
-                        // action here.  I think I need to keep a list
-                        // somewhere of failed nodes, and have a background
-                        // thread that tries to move them.
-                        removeQueue.add(new RemoveInfo(id));
-                        offloadingDone(nodeId);
-                        return;
-                    }
-                } catch (Exception ex) {
-                    logger.logThrow(Level.WARNING, ex,
-                        "Failed to move identity {0} from failed node {1}",
-                         task.getId(), node);
-                    offloadingDone(nodeId);
-                    return;
                 }
-
-                // If the node is dead remove all of the identies at once
-                // otherwise remove them a little at a time
-                if (node.isAlive()) {
-                    break;
-                }
+            } else {
+                // Node is dead, move everyone
+                moveIdentities(identities, node, -1);
             }
-
-            // If here, there are identies left and the node is not dead
-            // Reschedule to remove more if necessary
-            taskScheduler.scheduleTask(this, taskOwner,
-                                       System.currentTimeMillis() + 20 * 1000);
-         }
-     }
+        }
+    }
 
     /**
-     *  Task to support moving identities, run under a transaction.
-     *  Finds an identity on the specified node.  Code outside
+     * Move a set of identities. If {@code targetNodeId} is -1 the identities
+     * are moved to the next available node (based on the assignment policy),
+     * otherwise an attempt is made to move the identities to the specified
+     * target node. If {@code oldNode} is not {@code null} it is assumed that
+     * all of the identities are on that node.
+     * 
+     * @param identities iterator over the set of identities to move
+     * @param oldNode the node the identities are on, if known, otherwise
+     *  {@code null}
+     * @param targetNodeId the target node id, or -1
+     */
+    void moveIdentities(Iterator<Identity> identities,
+                        Node oldNode, long targetNodeId)
+    {
+        System.out.println("moveIdenities " + oldNode + "  " + targetNodeId);
+        while (identities.hasNext()) {
+            // Break out of the loop if we're shutting down.
+            if (shuttingDown()) {
+                break;
+            }
+            Identity id = identities.next();
+             System.out.println("moveing " + id.getName());
+            try {
+                // If we're already trying to move the identity,
+                // but the old node failed before preparations are
+                // complete, just make the move now.
+                MoveIdTask moveTask = moveMap.remove(id);
+                if (moveTask != null) {
+                    moveIdAndNotifyListeners(moveTask);
+                } else {
+                    mapToNewNode(id, null,
+                                 oldNode == null ? getNode(id) : oldNode,
+                                 targetNodeId,
+                                 NodeAssignPolicy.SERVER_NODE);
+                }
+            } catch (NoNodesAvailableException e) {
+                // This can be thrown from mapToNewNode if there are
+                // no live nodes or the target node is unavailable.
+                // Stop our loop.
+                //
+                // TODO - not convinced this is correct.
+                // I think the task service needs a positive
+                // action here.  I think I need to keep a list
+                // somewhere of failed nodes, and have a background
+                // thread that tries to move them.
+                if ((oldNode != null) && !oldNode.isAlive()) {
+                    removeQueue.add(new RemoveInfo(id));
+                }
+                break;
+            } catch (Exception ex) {
+                logger.logThrow(Level.WARNING, ex,
+                    "Failed to move identity {0} from node {1}",
+                    id, oldNode);
+                break;
+            }
+        }
+    }
+    
+    /**
+     *  Task to support offloading a node, run under a transaction.
+     *  Finds the identities that was on the specified node and makes them
+     *  available through an iterator. Code outside
      *  the transaction moves the identity to another node and removes
      *  the old id<->failedNode mapping, and any status information.
      */
-    private static class GetIdOnNodeTask extends AbstractKernelRunnable {
+    private class GetIdOnNodeTask extends AbstractKernelRunnable
+                                  implements Iterator<Identity>
+    {
         /** Set to true when no more identities to be found */
         private boolean done = false;
         /** If !done, the identity we were looking for */
@@ -1198,27 +1245,37 @@ System.out.println("Offloading identity: " + id.getName());
             }
         }
         
-        /**
-         * Returns true if there are no more identities to be found.
-         * @return {@code true} if no more identities could be found for the 
-         *          node, {@code false} otherwise.
-         */
-        public boolean done() {
-            return done;
+        @Override
+        public boolean hasNext() {
+            if (!done) {
+                if (idmo == null) {
+                    try {
+                        runTransactionally(this);
+                    } catch (Exception ex) {
+                        done = true;
+                        logger.logThrow(Level.WARNING, ex,
+                                        "Exception running task");
+                    }
+                }
+            }
+            return !done;
         }
-        
-        /**
-         *  The identity MO retrieved from the data store, or null if
-         *  the task has not yet executed or there was an error while
-         *  executing.
-         * @return the IdentityMO
-         */
-        public IdentityMO getId() {
-            return idmo;
+
+        @Override
+        public Identity next() {
+            if (hasNext()) {
+                Identity id = idmo.getIdentity();
+                idmo = null;
+                return id;
+            }
+            throw new NoSuchElementException();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
         }
     }   
-    
-    
     
     /* -- Methods to assist in testing and verification -- */
     
@@ -1231,7 +1288,7 @@ System.out.println("Offloading identity: " + id.getName());
      *
      * @throws Exception if any error occurs
      */
-    long getNodeForIdentity(Identity id) throws Exception {
+    long getNodeIdForIdentity(Identity id) throws Exception {
         String idkey = NodeMapUtil.getIdentityKey(id);
         GetIdTask idtask = new GetIdTask(dataService, idkey);
         runTransactionally(idtask);

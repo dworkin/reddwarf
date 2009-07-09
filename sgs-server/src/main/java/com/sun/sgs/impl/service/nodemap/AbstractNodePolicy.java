@@ -45,7 +45,11 @@ public abstract class AbstractNodePolicy implements NodeAssignPolicy {
     public synchronized boolean nodesAvailable() {
         return !availableNodes.isEmpty();
     }
-    
+
+    public synchronized boolean isNodeAvailable(long nodeId) {
+        return availableNodes.contains(nodeId);
+    }
+
     /** {@inheritDoc} */
     public synchronized void nodeAvailable(long nodeId) {
         if (!availableNodes.contains(nodeId)) {

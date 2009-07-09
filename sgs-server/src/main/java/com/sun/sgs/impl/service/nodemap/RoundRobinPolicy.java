@@ -140,7 +140,7 @@ class RoundRobinPolicy extends AbstractNodePolicy {
                         Node node = task.getNode();
                         try {
                             long newnode =
-                                server.mapToNewNode(idToMove, null, node, 
+                                server.mapToNewNode(idToMove, null, node, -1,
                                                  NodeAssignPolicy.SERVER_NODE);
                             
                             // mapToNewNode will call this method again. We
