@@ -28,6 +28,7 @@ import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.kernel.schedule.SchedulerQueue;
 import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
 
+import com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -59,6 +60,7 @@ import java.util.Queue;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -82,13 +84,37 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>{@value #SCHEDULER_QUEUE_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i> <code>{@value #DEFAULT_SCHEDULER_QUEUE}</code>
- *
+ * 
  * <dd style="padding-top: .5em">The implementation class used to track
  *      access to define which queue implementation should back this scheduler.
  *      The value of this property should be the
  *      name of a public, non-abstract class that implements the
  *      {@link SchedulerQueue} interface, and that provides a public
  *      constructor with the parameters {@link Properties}<p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #THROTTLE_SCHEDULER_QUEUE_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_THROTTLE_SCHEDULER_QUEUE}</code>
+ *
+ * <dd style="padding-top: .5em">The implementation class used to define
+ *      which queue implementation to use for the scheduling tasks to run
+ *      in a throttled single threaded mode.
+ *      The value of this property should be the
+ *      name of a public, non-abstract class that implements the
+ *      {@link SchedulerQueue} interface, and that provides a public
+ *      constructor with the parameters {@link Properties}<p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #SCHEDULER_RETRY_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_SCHEDULER_RETRY}</code>
+ *
+ * <dd style="padding-top: .5em">The implementation class used to define
+ *      which retry policy implementation to use when tasks fail or abort.
+ *      The value of this property should be the
+ *      name of a public, non-abstract class that implements the
+ *      {@link SchedulerRetryPolicy} interface, and that provides a public
+ *      constructor with the parameters {@link Properties}<p>
+ *
  * </dl>
  */
 final class TransactionSchedulerImpl
@@ -105,13 +131,26 @@ final class TransactionSchedulerImpl
      * this scheduler.
      */
     public static final String SCHEDULER_QUEUE_PROPERTY =
-        "com.sun.sgs.impl.kernel.scheduler.queue";
+            "com.sun.sgs.impl.kernel.scheduler.queue";
 
     /**
      * The default scheduler.
      */
     public static final String DEFAULT_SCHEDULER_QUEUE =
-        "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
+            "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
+
+    /**
+     * The property used to define which queue implementation should
+     * be used for the throttle queue
+     */
+    public static final String THROTTLE_SCHEDULER_QUEUE_PROPERTY =
+            "com.sun.sgs.impl.kernel.scheduler.throttlequeue";
+
+    /**
+     * The default throttle scheduler
+     */
+    public static final String DEFAULT_THROTTLE_SCHEDULER_QUEUE =
+            "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
 
     /**
      * The property used to define which retry policy should be used in
@@ -124,7 +163,7 @@ final class TransactionSchedulerImpl
      * The default retry policy
      */
     public static final String DEFAULT_SCHEDULER_RETRY =
-            "com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy";
+            "com.sun.sgs.impl.kernel.schedule.ExperimentalRetryPolicy";
 
     /**
      * The property used to define the default number of initial consumer
@@ -148,6 +187,9 @@ final class TransactionSchedulerImpl
     // the backing scheduler queue used for ordering tasks
     private final SchedulerQueue backingQueue;
 
+    // the backing scheduler queue used to run tasks in single threaded mode
+    private final SchedulerQueue throttleQueue;
+
     // the retry policy used for this scheduler
     private final SchedulerRetryPolicy retryPolicy;
 
@@ -163,6 +205,9 @@ final class TransactionSchedulerImpl
     // the actual number of threads we're currently using
     private final AtomicInteger threadCount = new AtomicInteger(0);
 
+    // the number of requested consumer threads
+    private final int requestedThreads;
+
     // flag to note that this scheduler has shutdown
     private volatile boolean isShutdown = false;
 
@@ -171,6 +216,9 @@ final class TransactionSchedulerImpl
 
     // the number of dependent tasks sitting in queues
     private final AtomicInteger dependencyCount = new AtomicInteger(0);
+
+    // a semaphore used to control execution of task consumers
+    private final Semaphore consumerControl;
 
     /**
      * Creates an instance of {@code TransactionSchedulerImpl}.
@@ -218,6 +266,11 @@ final class TransactionSchedulerImpl
                 SCHEDULER_QUEUE_PROPERTY, DEFAULT_SCHEDULER_QUEUE,
                 SchedulerQueue.class, new Class[]{Properties.class},
                 properties);
+        this.throttleQueue = wrappedProps.getClassInstanceProperty(
+                THROTTLE_SCHEDULER_QUEUE_PROPERTY,
+                DEFAULT_THROTTLE_SCHEDULER_QUEUE,
+                SchedulerQueue.class, new Class[]{Properties.class},
+                properties);
         this.retryPolicy = wrappedProps.getClassInstanceProperty(
                 SCHEDULER_RETRY_PROPERTY, DEFAULT_SCHEDULER_RETRY,
                 SchedulerRetryPolicy.class, new Class[]{Properties.class},
@@ -227,7 +280,7 @@ final class TransactionSchedulerImpl
         // NOTE: this is a simple implmentation to replicate the previous
         // behvavior, with the assumption that it will change if the
         // scheduler starts trying to add or drop consumers adaptively
-        int requestedThreads =
+        this.requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
         if (logger.isLoggable(Level.CONFIG)) {
@@ -238,6 +291,10 @@ final class TransactionSchedulerImpl
         for (int i = 0; i < requestedThreads; i++) {
             executor.submit(new TaskConsumer());
         }
+        this.consumerControl = new Semaphore(requestedThreads, true);
+
+        //startup the single threaded mode consumer thread
+        executor.submit(new SingleTaskConsumer());
     }
 
     /**
@@ -526,6 +583,9 @@ final class TransactionSchedulerImpl
      * running until it catches an {@code InterruptedException}.
      */
     private class TaskConsumer implements Runnable {
+        // true if a consumer lock is currently held
+        private boolean locked = false;
+
         /** {@inheritDoc} */
         public void run() {
             logger.log(Level.FINE, "Starting a consumer for transactions");
@@ -538,22 +598,13 @@ final class TransactionSchedulerImpl
                     ScheduledTaskImpl task =
                         (ScheduledTaskImpl) (backingQueue.getNextTask(true));
 
-                    // run the task, checking if it completed
-                    if (executeTask(task, false, true)) {
-                        // if it's a recurring task, schedule the next run
-                        if (task.isRecurring()) {
-                            long nextStart =
-                                task.getStartTime() + task.getPeriod();
-                            task = new ScheduledTaskImpl(task, nextStart);
-                            backingQueue.addTask(task);
-                        }
-                        // if it has dependent tasks, schedule the next one
-                        TaskQueueImpl queue =
-                            (TaskQueueImpl) (task.getTaskQueue());
-                        if (queue != null) {
-                            queue.scheduleNextTask();
-                        }
-                    }
+                    consumerControl.acquire();
+                    locked = true;
+
+                    consume(task);
+                    
+                    consumerControl.release();
+                    locked = false;
                 }
             } catch (InterruptedException ie) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -564,7 +615,83 @@ final class TransactionSchedulerImpl
                 // never throw an exception that isn't handled
                 logger.logThrow(Level.SEVERE, e, "Fatal error for consumer");
             } finally {
+                if(locked) {
+                    consumerControl.release();
+                }
                 notifyThreadLeaving();
+            }
+        }
+    }
+
+    /**
+     * Private {@code Runnable} class used to consume tasks as they become
+     * available in the {@code throttleQueue}.  Tasks that are executed
+     * by this class will never run in parallel with any other tasks and
+     * thus should never experience any conflicts.
+     */
+    private class SingleTaskConsumer implements Runnable {
+        // true if all consumer locks are currently held
+        private boolean locked = false;
+
+        /** {@inheritDoc} */
+        public void run() {
+            logger.log(Level.FINE, "Starting a consumer for " +
+                                   "throttled transactions");
+            try {
+                while (true) {
+                    // wait for the next task, at which point we may get
+                    // interrupted and should therefore return
+                    ScheduledTaskImpl task =
+                        (ScheduledTaskImpl) (throttleQueue.getNextTask(true));
+
+                    if(!locked) {
+                        consumerControl.acquire(requestedThreads);
+                        locked = true;
+                    }
+
+                    consume(task);
+
+                    // we want to clear out the single threaded queue before
+                    // starting up the parallel consumer tasks again so
+                    // only release the locks if the queue is empty
+                    if(throttleQueue.getReadyCount() == 0) {
+                        consumerControl.release(requestedThreads);
+                        locked = false;
+                    }
+                }
+            } catch (InterruptedException ie) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, ie, "Throttle Consumer is " +
+                                                    "finishing");
+                }
+            } catch (Exception e) {
+                // this should never happen, since running the task should
+                // never throw an exception that isn't handled
+                logger.logThrow(Level.SEVERE, e, "Fatal error for consumer");
+            } finally {
+                if(locked) {
+                    consumerControl.release(requestedThreads);
+                }
+            }
+        }
+    }
+
+    private void consume(ScheduledTaskImpl task)
+            throws InterruptedException {
+        // run the task, checking if it completed
+        if (executeTask(task, false, true)) {
+            // if it's a recurring task, schedule the next run
+            if (task.isRecurring()) {
+                long nextStart =
+                     task.getStartTime() + task.getPeriod();
+                task = new ScheduledTaskImpl(task, nextStart);
+                backingQueue.addTask(task);
+            }
+            // if it has dependent tasks, schedule the next one
+            TaskQueueImpl queue =
+                          (TaskQueueImpl) (task.getTaskQueue());
+            if (queue != null) {
+                queue.scheduleNextTask();
             }
         }
     }
@@ -666,7 +793,10 @@ final class TransactionSchedulerImpl
                     // then we want to note that and possibly re-queue the
                     // task to run in a usable thread
                     if (task.setInterrupted() && retryOnInterruption) {
-                        if (!retryPolicy.handoffRetry(task, ie, backingQueue)) {
+                        if (!retryPolicy.handoffRetry(task,
+                                                      ie,
+                                                      backingQueue,
+                                                      throttleQueue)) {
                             // if the task couldn't be re-queued, then there's
                             // nothing left to do but drop it
                             task.setDone(ie);
@@ -693,7 +823,10 @@ final class TransactionSchedulerImpl
                     } else {
                         // see if the re-try should be handed-off
                         task.setRunning(false);
-                        if (retryPolicy.handoffRetry(task, t, backingQueue)) {
+                        if (retryPolicy.handoffRetry(task,
+                                                     t,
+                                                     backingQueue,
+                                                     throttleQueue)) {
                             return false;
                         }
                     }

@@ -26,10 +26,17 @@ import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
 import java.util.Properties;
 
 /**
- *
+ * This {@code SchedulerRetryPolicy} always causes a task to
+ * retry immediately unless the task was interrupted in which case it
+ * is put back onto the scheduler's standard backing queue.
  */
 public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
 
+    /**
+     * Constructs an {@code ImmediateRetryPolicy}
+     *
+     * @param properties the system properties available
+     */
     public ImmediateRetryPolicy(Properties properties) {
 
     }
@@ -37,13 +44,14 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
     /** {@inheritDoc} */
     public boolean handoffRetry(ScheduledTask task, 
                                 Throwable result,
-                                SchedulerQueue queue) {
+                                SchedulerQueue backingQueue,
+                                SchedulerQueue throttleQueue) {
         // NOTE: this is a very simple initial policy that always causes
         // tasks to re-try "in place" unless they were interrupted, in which
         // case there's nothing to do but re-queue the task
         if (result instanceof InterruptedException) {
             try {
-                queue.addTask(task);
+                backingQueue.addTask(task);
                 return true;
             } catch (TaskRejectedException tre) {
                 return false;
