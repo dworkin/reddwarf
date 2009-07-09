@@ -953,7 +953,12 @@ public abstract class AbstractDataStore
 	Transaction txn, long oid, AccessType type)
     {
 	checkOid(oid);
-	objectAccesses.reportObjectAccess(txn, oid, type);
+	try {
+	    objectAccesses.reportObjectAccess(txn, oid, type);
+	} catch (IllegalArgumentException e) {
+	    throw new IllegalStateException(
+	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
+	}
     }
 
     /**
@@ -966,7 +971,12 @@ public abstract class AbstractDataStore
     protected void reportNameAccess(
 	Transaction txn, String name, AccessType type)
     {
-	nameAccesses.reportObjectAccess(txn, getNameForAccess(name), type);
+	try {
+	    nameAccesses.reportObjectAccess(txn, getNameForAccess(name), type);
+	} catch (IllegalArgumentException e) {
+	    throw new IllegalStateException(
+	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
+	}
     }
 
     /**
