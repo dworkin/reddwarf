@@ -26,6 +26,7 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
+import java.util.Map;
 import org.junit.Assert;
 
 /**
@@ -142,7 +143,18 @@ class ZachBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
+    public Map<Object, Map<Long, Integer>> getConflictMap() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    /** {@inheritDoc} */
+    public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    /** {@inheritDoc} */
     public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
         return;
     }
+
 }

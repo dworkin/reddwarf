@@ -22,9 +22,12 @@ package com.sun.sgs.test.impl.service.nodemap;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
+import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.Arrays;
 import java.util.Collection;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
@@ -43,6 +46,8 @@ public class TestLPAPerf {
     private int numThreads;
     private double nodePref;
 
+    private static LabelPropagationServer lpaServer;
+
     @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(new Object[][]
@@ -57,25 +62,44 @@ public class TestLPAPerf {
         this.nodePref = nodePref;
     }
 
+    @BeforeClass
+    public static void before() throws Exception {
+        lpaServer = new LabelPropagationServer();
+    }
+
+    @AfterClass
+    public static void after() throws Exception {
+        lpaServer.shutdown();
+    }
+
     @Test
-    public void warmup() {
+    public void warmup() throws Exception {
+        final int node = 1;
         // Warm up the compilers
         LabelPropagation lpa =
-           new LabelPropagation(new ZachBuilder(), 1, false,
+           new LabelPropagation(new ZachBuilder(), node,
+                                "localhost",
+                                LabelPropagationServer.DEFAULT_SERVER_PORT,
+                                false,
                                 numThreads, nodePref);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.findCommunities();
         }
+        lpaServer.removeNode(node);
         lpa.shutdown();
     }
 
     @Test
-    public void testZachary() {
+    public void testZachary() throws Exception {
+        final int node = 1;
         GraphBuilder builder = new ZachBuilder();
         // second argument true:  gather statistics
         LabelPropagation lpa =
-            new LabelPropagation(builder, 1, true, numThreads, nodePref);
+            new LabelPropagation(builder, node,
+                                 "localhost",
+                                 LabelPropagationServer.DEFAULT_SERVER_PORT,
+                                 true, numThreads, nodePref);
 
         long avgTime = 0;
         int avgIter = 0;
@@ -108,6 +132,7 @@ public class TestLPAPerf {
                           avgIter/(double) RUNS,
                           avgMod/(double) RUNS,
                           minMod, maxMod);
+        lpaServer.removeNode(node);
         lpa.shutdown();
     }
 }

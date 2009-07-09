@@ -32,6 +32,7 @@ import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Map;
 import junit.framework.Assert;
 import org.junit.Test;
 
@@ -219,6 +220,17 @@ public class TestGraphs {
         public Runnable getPruneTask() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
+
+        /** {@inheritDoc} */
+        public Map<Object, Map<Long, Integer>> getConflictMap() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        /** {@inheritDoc} */
+        public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
         /** {@inheritDoc} */
         public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
             return;

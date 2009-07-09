@@ -23,7 +23,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAClient;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAProxy;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAServer;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
 import com.sun.sgs.test.util.DummyIdentity;
@@ -88,9 +87,9 @@ public class TestLPA {
         clients.add(client1);
         clients.add(client2);
         clients.add(client3);
-        server.register(10, client1, new TestLPAProxy());
-        server.register(20, client2, new TestLPAProxy());
-        server.register(30, client3, new TestLPAProxy());
+        server.register(10, client1);
+        server.register(20, client2);
+        server.register(30, client3);
 
         long now = System.currentTimeMillis();
         Collection<AffinityGroup> groups = server.findAffinityGroups();
@@ -195,10 +194,6 @@ public class TestLPA {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
-    }
-
-    private class TestLPAProxy implements LPAProxy {
-
         /** {@inheritDoc} */
         public void crossNodeEdges(Collection<Object> objIds, long nodeId)
                 throws IOException
@@ -212,6 +207,5 @@ public class TestLPA {
         {
             throw new UnsupportedOperationException("Not supported yet.");
         }
-
     }
 }

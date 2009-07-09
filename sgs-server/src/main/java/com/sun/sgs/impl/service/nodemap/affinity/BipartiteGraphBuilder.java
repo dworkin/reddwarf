@@ -58,8 +58,8 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of object to map of remote nodes it was accessed on, with a weight
     // for each node.
-    private final Map<Object, Map<Long, Long>> conflictMap =
-            new ConcurrentHashMap<Object, Map<Long, Long>>();
+    private final Map<Object, Map<Long, Integer>> conflictMap =
+            new ConcurrentHashMap<Object, Map<Long, Integer>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -233,12 +233,12 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Long, Long>> getConflictMap() {
+    public Map<Object, Map<Long, Integer>> getConflictMap() {
         return conflictMap;
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
+    public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -246,11 +246,11 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        Map<Long, Long> nodeMap = conflictMap.get(objId);
+        Map<Long, Integer> nodeMap = conflictMap.get(objId);
         if (nodeMap == null) {
-            nodeMap = new HashMap<Long, Long>();
+            nodeMap = new HashMap<Long, Integer>();
         }
-        long value = nodeMap.containsKey(nodeId) ? nodeMap.get(nodeId) : 0;
+        int value = nodeMap.containsKey(nodeId) ? nodeMap.get(nodeId) : 0;
         value++;
         pruneTask.updateConflict(objId, nodeId);
         conflictMap.put(objId, nodeMap);
@@ -262,16 +262,18 @@ public class BipartiteGraphBuilder implements GraphBuilder {
 
         private int current = 1;
 
-        private final Queue<Map<WeightedEdge, Long>> periodEdgeIncrementsQueue;
-        private Map<WeightedEdge, Long> currentPeriodEdgeIncrements;
-        private final Queue<Map<Object, Map<Long, Long>>> periodConflictQueue;
-        private Map<Object, Map<Long, Long>> currentPeriodConflicts;
+        private final Queue<Map<WeightedEdge, Integer>>
+                                                periodEdgeIncrementsQueue;
+        private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
+        private final Queue<Map<Object, Map<Long, Integer>>>
+                                                periodConflictQueue;
+        private Map<Object, Map<Long, Integer>> currentPeriodConflicts;
         public PruneTask(int count) {
             this.count = count;
             periodEdgeIncrementsQueue =
-                new LinkedList<Map<WeightedEdge, Long>>();
+                new LinkedList<Map<WeightedEdge, Integer>>();
             periodConflictQueue =
-                new LinkedList<Map<Object, Map<Long, Long>>>();
+                new LinkedList<Map<Object, Map<Long, Integer>>>();
             addPeriodStructures();
         }
         public synchronized void run() {
@@ -284,18 +286,18 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             }
 
             // take care of everything.
-            Map<WeightedEdge, Long> periodEdgeIncrements =
+            Map<WeightedEdge, Integer> periodEdgeIncrements =
                     periodEdgeIncrementsQueue.remove();
-            Map<Object, Map<Long, Long>> periodConflicts =
+            Map<Object, Map<Long, Integer>> periodConflicts =
                         periodConflictQueue.remove();
 
 
             // For each modified edge in the graph, update weights
-            for (Map.Entry<WeightedEdge, Long> entry :
+            for (Map.Entry<WeightedEdge, Integer> entry :
                  periodEdgeIncrements.entrySet())
             {
                 WeightedEdge edge = entry.getKey();
-                long weight = entry.getValue();
+                int weight = entry.getValue();
                 if (edge.getWeight() == weight) {
                     Pair<Object> endpts = bipartiteGraph.getEndpoints(edge);
                     bipartiteGraph.removeEdge(edge);
@@ -310,15 +312,15 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             }
 
             // For each conflict, update values
-            for (Map.Entry<Object, Map<Long, Long>> entry :
+            for (Map.Entry<Object, Map<Long, Integer>> entry :
                 periodConflicts.entrySet())
             {
-                Map<Long, Long> nodeMap = conflictMap.get(entry.getKey());
-                for (Map.Entry<Long, Long> updateEntry :
+                Map<Long, Integer> nodeMap = conflictMap.get(entry.getKey());
+                for (Map.Entry<Long, Integer> updateEntry :
                      entry.getValue().entrySet())
                 {
                     Long nodeUpdate = updateEntry.getKey();
-                    long newVal =
+                    int newVal =
                         nodeMap.get(nodeUpdate) - updateEntry.getValue();
                     if (newVal == 0) {
                         nodeMap.remove(nodeUpdate);
@@ -333,29 +335,30 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         }
 
         public synchronized void incrementEdge(WeightedEdge edge) {
-            long v = currentPeriodEdgeIncrements.containsKey(edge) ?
-                     currentPeriodEdgeIncrements.get(edge) : 0;
+            int v = currentPeriodEdgeIncrements.containsKey(edge) ?
+                    currentPeriodEdgeIncrements.get(edge) : 0;
             v++;
             currentPeriodEdgeIncrements.put(edge, v);
         }
 
-                public void updateConflict(Object objId, long nodeId) {
-            Map<Long, Long> periodNodeMap = currentPeriodConflicts.get(objId);
+        public void updateConflict(Object objId, long nodeId) {
+            Map<Long, Integer> periodNodeMap =
+                    currentPeriodConflicts.get(objId);
             if (periodNodeMap == null) {
-                periodNodeMap = new HashMap<Long, Long>();
+                periodNodeMap = new HashMap<Long, Integer>();
             }
-            long periodValue = periodNodeMap.containsKey(nodeId) ?
-                               periodNodeMap.get(nodeId) : 0;
+            int periodValue = periodNodeMap.containsKey(nodeId) ?
+                              periodNodeMap.get(nodeId) : 0;
             periodValue++;
             periodNodeMap.put(nodeId, periodValue);
             currentPeriodConflicts.put(objId, periodNodeMap);
         }
 
         private synchronized void addPeriodStructures() {
-            currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Long>();
+            currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Integer>();
             periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
             currentPeriodConflicts =
-                    new ConcurrentHashMap<Object, Map<Long, Long>>();
+                    new ConcurrentHashMap<Object, Map<Long, Integer>>();
             periodConflictQueue.add(currentPeriodConflicts);
         }
     }

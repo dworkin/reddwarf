@@ -53,22 +53,22 @@ public interface LPAServer extends Remote {
      * Registers the given proxies for the node.
      *
      * @param nodeId the node the proxies represent
-     * @param client the client proxy, which this server can call
-     * @param proxy the LPA proxy, which other nodes can call
+     * @param client the client proxy, which this server and other nodes
+     *        can call
      * @throws IOException if there is a communication problem
      */
-    void register(long nodeId, LPAClient client, LPAProxy proxy)
+    void register(long nodeId, LPAClient client)
             throws IOException;
 
     /**
-     * Returns the {@code LPAProxy} for the given {@code nodeId}.
+     * Returns the {@code LPAClient} for the given {@code nodeId}.
      * If {@code null} is returned, the node should be considered failed
      * and safe to remove, as though {@link LPAClient#removeNode} had been
      * called.
      * 
      * @param nodeId the node we need the proxy for
-     * @return the LPA proxy for the given node
+     * @return the LPA client proxy for the given node
      * @throws IOException if there is a communication problem
      */
-    LPAProxy getLPAProxy(long nodeId) throws IOException;
+    LPAClient getLPAClientProxy(long nodeId) throws IOException;
 }

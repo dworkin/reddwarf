@@ -105,12 +105,12 @@ public interface GraphBuilder {
      * the objects, and a count of the number of uses.
      *
      */
-    Map<Object, Map<Identity, Long>> getObjectUseMap();
+    Map<Object, Map<Identity, Integer>> getObjectUseMap();
 
     /**
      * Returns a map of object IDs to node IDs, and a count of the number
      * of uses on that node.
      * @return
      */
-    Map<Object, Map<Long, Long>> getConflictMap();
+    Map<Object, Map<Long, Integer>> getConflictMap();
 }

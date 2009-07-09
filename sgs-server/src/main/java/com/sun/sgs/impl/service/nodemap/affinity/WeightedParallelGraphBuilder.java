@@ -61,8 +61,8 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
     // Map for tracking object-> map of identity-> number accesses
     // (thus we keep track of the number of accesses each identity has made
     // for an object, to aid maintaining weighted edges)
-    private final Map<Object, Map<Identity, Long>> objectMap = 
-            new HashMap<Object, Map<Identity, Long>>();
+    private final Map<Object, Map<Identity, Integer>> objectMap =
+            new HashMap<Object, Map<Identity, Integer>>();
     
     // Our graph of object accesses
     private final CopyableGraph<LabelVertex, AffinityEdge> affinityGraph =
@@ -74,8 +74,8 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of object to map of remote nodes it was accessed on, with a weight
     // for each node.
-    private final Map<Object, Map<Long, Long>> conflictMap =
-            new ConcurrentHashMap<Object, Map<Long, Long>>();
+    private final Map<Object, Map<Long, Integer>> conflictMap =
+            new ConcurrentHashMap<Object, Map<Long, Integer>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -120,17 +120,17 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
             Object objId = obj.getObjectId();
 
             // find the identities that have already used this object
-            Map<Identity, Long> idMap = objectMap.get(objId);
+            Map<Identity, Integer> idMap = objectMap.get(objId);
             if (idMap == null) {
                 // first time we've seen this object
-                idMap = new HashMap<Identity, Long>();
+                idMap = new HashMap<Identity, Integer>();
             }
             
-            long value = idMap.containsKey(owner) ? idMap.get(owner) : 0;
+            int value = idMap.containsKey(owner) ? idMap.get(owner) : 0;
             value++;
             
             // add or update edges between task owner and identities
-            for (Map.Entry<Identity, Long> entry : idMap.entrySet()) {
+            for (Map.Entry<Identity, Integer> entry : idMap.entrySet()) {
                 Identity ident = entry.getKey();
 
                 // Our folded graph has no self-loops:  only add an
@@ -219,12 +219,12 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Long, Long>> getConflictMap() {
+    public Map<Object, Map<Long, Integer>> getConflictMap() {
         return conflictMap;
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
+    public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
         return objectMap;
     }
 
@@ -233,11 +233,11 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        Map<Long, Long> nodeMap = conflictMap.get(objId);
+        Map<Long, Integer> nodeMap = conflictMap.get(objId);
         if (nodeMap == null) {
-            nodeMap = new HashMap<Long, Long>();
+            nodeMap = new HashMap<Long, Integer>();
         }
-        long value = nodeMap.containsKey(nodeId) ? nodeMap.get(nodeId) : 0;
+        int value = nodeMap.containsKey(nodeId) ? nodeMap.get(nodeId) : 0;
         value++;
         pruneTask.updateConflict(objId, nodeId);
         conflictMap.put(objId, nodeMap);
@@ -249,21 +249,24 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
 
         private int current = 1;
 
-        private final Queue<Map<Object, Map<Identity, Long>>> periodObjectQueue;
-        private final Queue<Map<AffinityEdge, Long>> periodEdgeIncrementsQueue;
-        private final Queue<Map<Object, Map<Long, Long>>> periodConflictQueue;
-        private Map<Object, Map<Identity, Long>> currentPeriodObject;
-        private Map<AffinityEdge, Long> currentPeriodEdgeIncrements;
-        private Map<Object, Map<Long, Long>> currentPeriodConflicts;
+        private final Queue<Map<Object, Map<Identity, Integer>>>
+                                                    periodObjectQueue;
+        private final Queue<Map<AffinityEdge, Integer>>
+                                                    periodEdgeIncrementsQueue;
+        private final Queue<Map<Object, Map<Long, Integer>>>
+                                                    periodConflictQueue;
+        private Map<Object, Map<Identity, Integer>> currentPeriodObject;
+        private Map<AffinityEdge, Integer> currentPeriodEdgeIncrements;
+        private Map<Object, Map<Long, Integer>> currentPeriodConflicts;
 
         public PruneTask(int count) {
             this.count = count;
             periodObjectQueue =
-                new LinkedList<Map<Object, Map<Identity, Long>>>();
+                new LinkedList<Map<Object, Map<Identity, Integer>>>();
             periodEdgeIncrementsQueue =
-                new LinkedList<Map<AffinityEdge, Long>>();
+                new LinkedList<Map<AffinityEdge, Integer>>();
             periodConflictQueue =
-                new LinkedList<Map<Object, Map<Long, Long>>>();
+                new LinkedList<Map<Object, Map<Long, Integer>>>();
             addPeriodStructures();
         }
         public synchronized void run() {
@@ -275,23 +278,23 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
                 return;
             }
             // take care of everything.
-            Map<Object, Map<Identity, Long>> periodObject =
+            Map<Object, Map<Identity, Integer>> periodObject =
                     periodObjectQueue.remove();
-            Map<AffinityEdge, Long> periodEdgeIncrements =
+            Map<AffinityEdge, Integer> periodEdgeIncrements =
                     periodEdgeIncrementsQueue.remove();
-            Map<Object, Map<Long, Long>> periodConflicts =
+            Map<Object, Map<Long, Integer>> periodConflicts =
                         periodConflictQueue.remove();
 
             // For each object, remove the added access counts
-            for (Map.Entry<Object, Map<Identity, Long>> entry :
+            for (Map.Entry<Object, Map<Identity, Integer>> entry :
                  periodObject.entrySet())
             {
-                Map<Identity, Long> idMap = objectMap.get(entry.getKey());
-                for (Map.Entry<Identity, Long> updateEntry :
+                Map<Identity, Integer> idMap = objectMap.get(entry.getKey());
+                for (Map.Entry<Identity, Integer> updateEntry :
                      entry.getValue().entrySet())
                 {
                     Identity idUpdate = updateEntry.getKey();
-                    long newVal = idMap.get(idUpdate) - updateEntry.getValue();
+                    int newVal = idMap.get(idUpdate) - updateEntry.getValue();
                     if (newVal == 0) {
                         idMap.remove(idUpdate);
                     } else {
@@ -304,7 +307,7 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
             }
 
             // For each modified edge in the graph, update weights
-            for (Map.Entry<AffinityEdge, Long> entry :
+            for (Map.Entry<AffinityEdge, Integer> entry :
                  periodEdgeIncrements.entrySet())
             {
                 AffinityEdge edge = entry.getKey();
@@ -323,15 +326,15 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
             }
 
             // For each conflict, update values
-            for (Map.Entry<Object, Map<Long, Long>> entry :
+            for (Map.Entry<Object, Map<Long, Integer>> entry :
                 periodConflicts.entrySet())
             {
-                Map<Long, Long> nodeMap = conflictMap.get(entry.getKey());
-                for (Map.Entry<Long, Long> updateEntry :
+                Map<Long, Integer> nodeMap = conflictMap.get(entry.getKey());
+                for (Map.Entry<Long, Integer> updateEntry :
                      entry.getValue().entrySet())
                 {
                     Long nodeUpdate = updateEntry.getKey();
-                    long newVal =
+                    int newVal =
                         nodeMap.get(nodeUpdate) - updateEntry.getValue();
                     if (newVal == 0) {
                         nodeMap.remove(nodeUpdate);
@@ -346,8 +349,8 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
         }
 
         public synchronized void incrementEdge(AffinityEdge edge) {
-            long v = currentPeriodEdgeIncrements.containsKey(edge) ?
-                     currentPeriodEdgeIncrements.get(edge) : 0;
+            int v = currentPeriodEdgeIncrements.containsKey(edge) ?
+                    currentPeriodEdgeIncrements.get(edge) : 0;
             v++;
             currentPeriodEdgeIncrements.put(edge, v);
         }
@@ -355,36 +358,36 @@ public class WeightedParallelGraphBuilder implements GraphBuilder {
         public synchronized void updateObjectAccess(Object objId,
                                                     Identity owner)
         {
-            Map<Identity, Long> periodIdMap = currentPeriodObject.get(objId);
+            Map<Identity, Integer> periodIdMap = currentPeriodObject.get(objId);
             if (periodIdMap == null) {
-                periodIdMap = new HashMap<Identity, Long>();
+                periodIdMap = new HashMap<Identity, Integer>();
             }
-            long periodValue = periodIdMap.containsKey(owner) ?
-                               periodIdMap.get(owner) : 0;
+            int periodValue = periodIdMap.containsKey(owner) ?
+                              periodIdMap.get(owner) : 0;
             periodValue++;
             periodIdMap.put(owner, periodValue);
             currentPeriodObject.put(objId, periodIdMap);
         }
 
         public void updateConflict(Object objId, long nodeId) {
-            Map<Long, Long> periodNodeMap = currentPeriodConflicts.get(objId);
+            Map<Long, Integer> periodNodeMap = currentPeriodConflicts.get(objId);
             if (periodNodeMap == null) {
-                periodNodeMap = new HashMap<Long, Long>();
+                periodNodeMap = new HashMap<Long, Integer>();
             }
-            long periodValue = periodNodeMap.containsKey(nodeId) ?
-                               periodNodeMap.get(nodeId) : 0;
+            int periodValue = periodNodeMap.containsKey(nodeId) ?
+                              periodNodeMap.get(nodeId) : 0;
             periodValue++;
             periodNodeMap.put(nodeId, periodValue);
             currentPeriodConflicts.put(objId, periodNodeMap);
         }
 
         private synchronized void addPeriodStructures() {
-            currentPeriodObject = new HashMap<Object, Map<Identity, Long>>();
+            currentPeriodObject = new HashMap<Object, Map<Identity, Integer>>();
             periodObjectQueue.add(currentPeriodObject);
-            currentPeriodEdgeIncrements = new HashMap<AffinityEdge, Long>();
+            currentPeriodEdgeIncrements = new HashMap<AffinityEdge, Integer>();
             periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
             currentPeriodConflicts =
-                    new ConcurrentHashMap<Object, Map<Long, Long>>();
+                    new ConcurrentHashMap<Object, Map<Long, Integer>>();
             periodConflictQueue.add(currentPeriodConflicts);
         }
     }

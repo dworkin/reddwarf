@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import java.io.IOException;
 import java.util.Collection;
@@ -33,6 +34,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The server portion of the distributed label propagation algorithm.
@@ -43,8 +46,14 @@ import java.util.concurrent.TimeUnit;
  * each node when finished.
  */
 public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
+    private static final String PKG_NAME =
+            "com.sun.sgs.impl.service.nodemap.affinity";
+    // Our logger
+    private static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(PKG_NAME));
+
     /** The default value of the server port. */
-    static final int DEFAULT_SERVER_PORT = 44537;
+    static public final int DEFAULT_SERVER_PORT = 44537;
 
     /** The name we export ourselves under. */
     static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
@@ -55,9 +64,6 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // A map from node id to client proxy objects.
     private final Map<Long, LPAClient> clientProxyMap =
             new ConcurrentHashMap<Long, LPAClient>();
-    // A map from node id to proxy objects used by other nodes.
-    private final Map<Long, LPAProxy> lpaProxyMap =
-            new ConcurrentHashMap<Long, LPAProxy>();
 
     // A barrier that consists of the set of nodes we expect to hear back
     // from.  Once this set is empty, we can move on to the next step of
@@ -94,6 +100,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     /** {@inheritDoc} */
     // JANE does this need to be synchronized on something?
     public Collection<AffinityGroup> findAffinityGroups() {
+        long startTime = System.currentTimeMillis();
+
         // Don't pay any attention to changes while we're running, at least
         // to start with.  If a node fails, we'll stop and return no information
         // for now.  JANE does that make sense?  If a node fails, a lot of
@@ -116,16 +124,16 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // interfaces.  The protocol is:
         // Server calls each LPAClient.exchangeCrossNodeInfo().
         //     Nodes contact other nodes which their graphs might be
-        //     connected to, using LPAProxy.crossNodeEdges.
-        //     Nodes can find the appropriate LPAProxy by calling
-        //     LPAServer.getLPAProxy.
+        //     connected to, using LPAClient.crossNodeEdges.
+        //     Nodes can find the appropriate LPAClient by calling
+        //     LPAServer.getLPAClientProxy.
         //     When finished exchanging information, each node calls
         //     LPAServer.readyToBegin().
         // Server begins iterations of the algorithm.  For each iteration,
         // it calls LPAClient.startIteration().
         //     Nodes compute one iteration of the label propagation algorithm.
         //     Remote information (cross node edges discovered above) can
-        //     be found by calling LPAProxy.getRemoteLabels on other nodes.
+        //     be found by calling LPAClient.getRemoteLabels on other nodes.
         //     When finished, each node calls LPAServer.finishedIteration,
         //     noting whether it believes the algorithm has converged.
         // When all nodes agree that the algorithm has converged, or many
@@ -263,6 +271,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         for (AffinityGroupImpl agi : groupMap.values()) {
             retVal.add(agi);
         }
+        
+        if (logger.isLoggable(Level.FINE)) {
+            long time = System.currentTimeMillis() - startTime;
+            logger.log(Level.FINE, "Algorithm took {0} milliseconds", time);
+        }
+
         return retVal;
     }
 
@@ -270,7 +284,6 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     public void removeNode(long nodeId) {
         synchronized (clientProxyMap) {
             clientProxyMap.remove(nodeId);
-            lpaProxyMap.remove(nodeId);
         }
     }
 
@@ -305,18 +318,15 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     }
 
     /** {@inheritDoc} */
-    public LPAProxy getLPAProxy(long nodeId) throws IOException {
-        return lpaProxyMap.get(nodeId);
+    public LPAClient getLPAClientProxy(long nodeId) throws IOException {
+        return clientProxyMap.get(nodeId);
     }
 
 
     /** {@inheritDoc} */
-    public void register(long nodeId, LPAClient client, LPAProxy proxy)
-            throws IOException
-    {
+    public void register(long nodeId, LPAClient client) throws IOException {
         synchronized (clientProxyMap) {
             clientProxyMap.put(nodeId, client);
-            lpaProxyMap.put(nodeId, proxy);
         }
     }
 }

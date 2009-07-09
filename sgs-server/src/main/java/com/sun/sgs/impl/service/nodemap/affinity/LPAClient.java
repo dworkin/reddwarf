@@ -20,20 +20,23 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import java.io.IOException;
+import java.rmi.Remote;
 import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * The label propagation algorithm clients, which can be called by
  * the {@code LPAServer} to coordinate runs of the algorithm.
  * 
  */
-public interface LPAClient {
+public interface LPAClient extends Remote {
 
     /**
      * A new run of the algorithm is about to start, so the client nodes
      * should exchange any cross-node information in their graph.  When
      * finished, {@link LPAServer#readyToBegin} should be called.
-     *
+     * Called by the LPAServer.
      * @throws IOException if there is a communication problem
      */
     void exchangeCrossNodeInfo() throws IOException;
@@ -41,7 +44,7 @@ public interface LPAClient {
     /**
      * Start an iteration of the algorithm.  When finished,
      * {@link LPAServer#finishedIteration} should be called.
-     *
+     * Called by the LPAServer.
      * @param iteration the iteration number
      * @throws IOException if there is a communication problem
      */
@@ -49,7 +52,7 @@ public interface LPAClient {
 
     /**
      * Returns the affinity groups found on this node.
-     *
+     * Called by the LPAServer.
      * @return the affinity groups on this node
      * @throws IOException if there is a communication problem
      */
@@ -57,8 +60,36 @@ public interface LPAClient {
 
     /**
      * Remove any cached information about a node.
+     * Called by the LPAServer.
      * @param nodeId the node to be removed
      * @throws IOException if there is a communication problem
      */
     void removeNode(long nodeId) throws IOException;
+
+    /**
+     * Indicates that the given node probably contains edges to the graph on
+     * the local node.  This informs the local node where non-local neighbors
+     * might reside. If there are no endpoints for the edges on this node,
+     * nothing is done.
+     * Called by other LPAClients.
+     * @param objIds the collection of objects, representing edges, that
+     *               probably have endpoints to vertices on this node
+     * @param nodeId the node with vertices attached to the edges
+     * @throws IOException if there is a communication problem
+     */
+    void crossNodeEdges(Collection<Object> objIds, long nodeId)
+            throws IOException;
+
+    /**
+     * Get the labels for the given edges.  If no vertex on this node is
+     * a possible endpoint for an edge, ignore that edge.
+     * Called by other LPAClients.
+     * @param objIds the collection of objects, representing edges, that
+     *               we want neighbor node information for
+     * @return a map of Objects (one for each element of {@code objIds}) to
+     *               neighbor labels
+     * @throws IOException if there is a communication problem
+     */
+    Map<Object, Set<Integer>> getRemoteLabels(Collection<Object> objIds)
+            throws IOException;
 }
