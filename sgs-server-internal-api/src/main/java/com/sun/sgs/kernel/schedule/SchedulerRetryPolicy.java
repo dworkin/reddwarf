@@ -30,20 +30,22 @@ package com.sun.sgs.kernel.schedule;
 public interface SchedulerRetryPolicy {
 
     /**
-     * Determines how a task should be retried after a failure.  This
-     * method should be called by a scheduler if a task aborts with a
-     * retryable exception.
+     * Determines if and how a task should be retried after a failure.  This
+     * method should be called by a scheduler if a task aborts.
      * <p>
-     * A return value of {@code true} means that the caller has been relieved of
-     * responsibility of executing the task and the task has been handed off
-     * to be run by another usable thread.  A return value of false means that
+     * A return value of {@link SchedulerRetryAction#DROP} means that the
+     * task should be dropped and not retried.
+     * A return value of {@link SchedulerRetryAction#HANDOFF} means that the
+     * caller has been relieved of responsibility of executing the task and
+     * the task has been handed off to be run by another usable thread.
+     * A return value of {@link SchedulerRetryAction#RETRY} means that
      * the task has not been handed off, and the caller is still responsible
      * for executing it.
      * <p>
      * A task may be handed off by being placed on either the given
      * {@code backingQueue} or the given {@code throttleQueue} but never both.
      * It may also be handed off by some other means specific to the retry
-     * policy implementation.
+     * policy implementation, but must be run in a transactional context.
      *
      * @param task the task that has been aborted
      * @param result the {@code Throwable} that was thrown by this task and
@@ -53,11 +55,12 @@ public interface SchedulerRetryPolicy {
      * @param throttleQueue the {@code SchedulerQueue} that backs a special
      *                      single threaded consumer used by the scheduler
      *                      to execute tasks free of concurrency conflicts
-     * @return
+     * @return the {@code SchedulerRetryAction} that the scheduler should
+     *         take with respect to retrying the given task
      */
-    boolean handoffRetry(ScheduledTask task,
-                         Throwable result,
-                         SchedulerQueue backingQueue,
-                         SchedulerQueue throttleQueue);
+    SchedulerRetryAction getRetryAction(ScheduledTask task,
+                                        Throwable result,
+                                        SchedulerQueue backingQueue,
+                                        SchedulerQueue throttleQueue);
 
 }

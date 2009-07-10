@@ -144,13 +144,26 @@ final class TransactionSchedulerImpl
      * be used for the throttle queue
      */
     public static final String THROTTLE_SCHEDULER_QUEUE_PROPERTY =
-            "com.sun.sgs.impl.kernel.scheduler.throttlequeue";
+            "com.sun.sgs.impl.kernel.scheduler.throttle.queue";
 
     /**
      * The default throttle scheduler
      */
     public static final String DEFAULT_THROTTLE_SCHEDULER_QUEUE =
             "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
+
+    /**
+     * The property used to define how often the single threaded
+     * throttling task consumer is allowed to throttle the standard
+     * thread pool in milliseconds.
+     */
+    public static final String THROTTLE_FREQUENCY_PROPERTY =
+            "com.sun.sgs.impl.kernel.scheduler.throttle.frequency";
+
+    /**
+     * The default throttle frequency
+     */
+    public static final String DEFAULT_THROTTLE_FREQUENCY = "5000";
 
     /**
      * The property used to define which retry policy should be used in
@@ -163,7 +176,7 @@ final class TransactionSchedulerImpl
      * The default retry policy
      */
     public static final String DEFAULT_SCHEDULER_RETRY =
-            "com.sun.sgs.impl.kernel.schedule.ExperimentalRetryPolicy";
+            "com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy";
 
     /**
      * The property used to define the default number of initial consumer
@@ -189,6 +202,9 @@ final class TransactionSchedulerImpl
 
     // the backing scheduler queue used to run tasks in single threaded mode
     private final SchedulerQueue throttleQueue;
+
+    // the minimum time allowed between usages of the throttle consumer
+    private final long throttleFrequency;
 
     // the retry policy used for this scheduler
     private final SchedulerRetryPolicy retryPolicy;
@@ -271,6 +287,8 @@ final class TransactionSchedulerImpl
                 DEFAULT_THROTTLE_SCHEDULER_QUEUE,
                 SchedulerQueue.class, new Class[]{Properties.class},
                 properties);
+        this.throttleFrequency = Integer.parseInt(properties.getProperty(
+                THROTTLE_FREQUENCY_PROPERTY, DEFAULT_THROTTLE_FREQUENCY));
         this.retryPolicy = wrappedProps.getClassInstanceProperty(
                 SCHEDULER_RETRY_PROPERTY, DEFAULT_SCHEDULER_RETRY,
                 SchedulerRetryPolicy.class, new Class[]{Properties.class},
@@ -401,7 +419,7 @@ final class TransactionSchedulerImpl
                     task, owner, defaultPriority,
                     System.currentTimeMillis(),
                     transactionCoordinator.getDefaultTimeout());
-            waitForTask(scheduledTask, false);
+            waitForTask(scheduledTask);
         }
     }
 
@@ -474,22 +492,14 @@ final class TransactionSchedulerImpl
      * Private method that blocks until the task has completed, re-throwing
      * any exception resulting from the task failing.
      */
-    private void waitForTask(ScheduledTaskImpl task, boolean unbounded)
+    private void waitForTask(ScheduledTaskImpl task)
         throws Exception
     {
         Throwable t = null;
 
         try {
-            // NOTE: calling executeTask() directly means that we're trying
-            // to run the transaction in the calling thread, so there are
-            // actually more threads running tasks simulaneously than there
-            // are threads in the scheduler pool. This could be changed to
-            // hand-off the task and wait for the result if we wanted more
-            // direct control over concurrent transactions
-            executeTask(task, unbounded, false);
-            // wait for the task to complete...at this point it may have
-            // already completed, or else it is being re-tried in a
-            // scheduler thread
+            backingQueue.addTask(task);
+            // wait for the task to complete...
             t = task.get();
         } catch (InterruptedException ie) {
             // we were interrupted, so try to cancel the task, re-throwing
@@ -548,8 +558,8 @@ final class TransactionSchedulerImpl
         ScheduledTaskImpl scheduledTask =
             new ScheduledTaskImpl(task, owner, defaultPriority,
                                   System.currentTimeMillis(),
-                                  transactionCoordinator.getDefaultTimeout());
-        waitForTask(scheduledTask, true);
+                                  ScheduledTask.UNBOUNDED);
+        waitForTask(scheduledTask);
     }
 
     /**
@@ -633,6 +643,9 @@ final class TransactionSchedulerImpl
         // true if all consumer locks are currently held
         private boolean locked = false;
 
+        // last time throttling occurred
+        private long lastThrottleTime = System.currentTimeMillis();
+
         /** {@inheritDoc} */
         public void run() {
             logger.log(Level.FINE, "Starting a consumer for " +
@@ -644,20 +657,23 @@ final class TransactionSchedulerImpl
                     ScheduledTaskImpl task =
                         (ScheduledTaskImpl) (throttleQueue.getNextTask(true));
 
-                    if(!locked) {
-                        consumerControl.acquire(requestedThreads);
-                        locked = true;
+                    // enforce a minimum time between throttling
+                    long now = System.currentTimeMillis();
+                    long wait = throttleFrequency - (now - lastThrottleTime);
+                    if(wait > 0) {
+                        Thread.sleep(wait);
                     }
+
+                    // acquire all of the permits from the other consumers
+                    // once they finish their current task
+                    consumerControl.acquire(requestedThreads);
+                    locked = true;
 
                     consume(task);
 
-                    // we want to clear out the single threaded queue before
-                    // starting up the parallel consumer tasks again so
-                    // only release the locks if the queue is empty
-                    if(throttleQueue.getReadyCount() == 0) {
-                        consumerControl.release(requestedThreads);
-                        locked = false;
-                    }
+                    consumerControl.release(requestedThreads);
+                    locked = false;
+                    lastThrottleTime = System.currentTimeMillis();
                 }
             } catch (InterruptedException ie) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -793,18 +809,27 @@ final class TransactionSchedulerImpl
                     // then we want to note that and possibly re-queue the
                     // task to run in a usable thread
                     if (task.setInterrupted() && retryOnInterruption) {
-                        if (!retryPolicy.handoffRetry(task,
-                                                      ie,
-                                                      backingQueue,
-                                                      throttleQueue)) {
-                            // if the task couldn't be re-queued, then there's
-                            // nothing left to do but drop it
-                            task.setDone(ie);
-                            if (logger.isLoggable(Level.WARNING)) {
-                                logger.logThrow(Level.WARNING, ie, "dropping " +
-                                                "an interrupted task: {0}" +
-                                                task);
-                            }
+                        switch (retryPolicy.getRetryAction(task,
+                                                       ie,
+                                                       backingQueue,
+                                                       throttleQueue)) {
+                            case DROP:
+                                task.setDone(ie);
+                                break;
+                            case HANDOFF:
+                                break;
+                            case RETRY:
+                                task.setDone(ie);
+                                if (logger.isLoggable(Level.WARNING)) {
+                                    logger.logThrow(Level.WARNING, ie,
+                                                    "unable to retry a task " +
+                                                    "that has been " +
+                                                    "interrupted : {0}",
+                                                    task);
+                                }
+                                break;
+                            default:
+                                // we should never get here
                         }
                     }
                     // always re-throw the interruption
@@ -815,20 +840,23 @@ final class TransactionSchedulerImpl
                         transaction.abort(t);
                     }
                     profileCollectorHandle.finishTask(task.getTryCount(), t);
+
                     // some error occurred, so see if we should re-try
-                    if (!shouldRetry(task, t)) {
-                        // the task is not being re-tried
-                        task.setDone(t);
-                        return true;
-                    } else {
-                        // see if the re-try should be handed-off
-                        task.setRunning(false);
-                        if (retryPolicy.handoffRetry(task,
-                                                     t,
-                                                     backingQueue,
-                                                     throttleQueue)) {
+                    switch (retryPolicy.getRetryAction(task,
+                                                       t,
+                                                       backingQueue,
+                                                       throttleQueue)) {
+                        case DROP:
+                            task.setDone(t);
+                            return true;
+                        case HANDOFF:
+                            task.setRunning(false);
                             return false;
-                        }
+                        case RETRY:
+                            task.setRunning(false);
+                            break;
+                        default:
+                            // we should never get here
                     }
                 }
             }
@@ -836,60 +864,6 @@ final class TransactionSchedulerImpl
             // always restore the previous owner before leaving...
             ContextResolver.setTaskState(kernelContext, parent);
         }
-    }
-
-    /**
-     * Private method that determines whether a given task should be re-tried
-     * based on the given {@code Throwable} that caused failure. If this
-     * returns {@code true} then the task should be re-tried. Otherwise, the
-     * task should be dropped.
-     */
-    private boolean shouldRetry(ScheduledTaskImpl task, Throwable t) {
-        // NOTE: as a first-pass implementation this simply instructs the
-        // caller to try again if retry is requested, but other strategies
-        // (like the number of times re-tried) might be considered later
-        if ((t instanceof ExceptionRetryStatus) &&
-            (((ExceptionRetryStatus) t).shouldRetry())) 
-        {
-            return true;
-        }
-
-        // we're not re-trying the task, so log that it's being dropped
-        if (logger.isLoggable(Level.WARNING)) {
-            if (task.isRecurring()) {
-                logger.logThrow(Level.WARNING, t, "skipping a recurrence of " +
-                                "a task that failed with a non-retryable " +
-                                "exception: {0}", task);
-            } else {
-                logger.logThrow(Level.WARNING, t, "dropping a task that " +
-                                "failed with a non-retryable exception: {0}",
-                                task);
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Private method that determines how to handoff a task that needs to
-     * be re-tried. If this returns {@code true} then the task has been
-     * taken and handed-off, and the caller is therefore no longer responsible
-     * for executing the task. If this returns {@code false} then it's up to
-     * the caller to try running the task again.
-     */
-    private boolean handoffRetry(ScheduledTaskImpl task, Throwable t) {
-        // NOTE: this is a very simple initial policy that always causes
-        // tasks to re-try "in place" unless they were interrupted, in which
-        // case there's nothing to do but re-queue the task
-        if (t instanceof InterruptedException) {
-            try {
-                backingQueue.addTask(task);
-                return true;
-            } catch (TaskRejectedException tre) {
-                return false;
-            }
-        }
-        return false;
     }
 
     /** Private implementation of {@code TaskQueue}. */

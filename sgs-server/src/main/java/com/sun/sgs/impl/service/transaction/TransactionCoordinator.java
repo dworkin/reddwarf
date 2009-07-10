@@ -42,7 +42,7 @@ public interface TransactionCoordinator {
             "com.sun.sgs.txn.disable.prepareandcommit.optimization";
     /**
      * Creates a new transaction, and returns a handle for managing it.
-     * If a timeout of {@value ScheduledTask#UNBOUNDED} is given, a
+     * If a timeout of {@link ScheduledTask#UNBOUNDED} is given, a
      * transaction will be created with the timeout value specified
      * by the property {@value #TXN_UNBOUNDED_TIMEOUT_PROPERTY}.
      *

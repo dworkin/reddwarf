@@ -173,18 +173,6 @@ class ScheduledTaskImpl implements ScheduledTask {
     }
 
     /** {@inheritDoc} */
-    public synchronized Throwable get() throws InterruptedException {
-        // wait for the task to finish
-        while (!isDone()) {
-            wait();
-        }
-        if (state == State.CANCELLED) {
-            throw new InterruptedException("interrupted while getting result");
-        }
-        return result;
-    }
-
-    /** {@inheritDoc} */
     public long getTimeout() {
         return timeout;
     }
@@ -245,6 +233,25 @@ class ScheduledTaskImpl implements ScheduledTask {
     }
 
     /** Package-private utility methods. */
+
+    /**
+     * Returns {@code null} if the task completed successfully, or the
+     * {@code Throwable} that caused the task to fail permanently. If the
+     * task has not yet completed then this will block until the result
+     * is known or the caller is interrupted. An {@code InterruptedException}
+     * is thrown either if the calling thread is interrupted before a result
+     * is known or if the task is cancelled meaning that no result is known.
+     */
+    synchronized Throwable get() throws InterruptedException {
+        // wait for the task to finish
+        while (!isDone()) {
+            wait();
+        }
+        if (state == State.CANCELLED) {
+            throw new InterruptedException("interrupted while getting result");
+        }
+        return result;
+    }
 
     /** Re-sets the starting time to the now. */
     void resetStartTime() {

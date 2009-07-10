@@ -86,16 +86,6 @@ public interface ScheduledTask {
     int getTryCount();
 
     /**
-     * Returns {@code null} if the task completed successfully, or the
-     * {@code Throwable} that caused the task to fail permanently. If the
-     * task has not yet completed then this will block until the result
-     * is known or the caller is interrupted. An {@code InterruptedException}
-     * is thrown either if the calling thread is interrupted before a result
-     * is known or if the task is cancelled meaning that no result is known.
-     */
-    Throwable get() throws InterruptedException;
-
-    /**
      * Returns the transaction timeout.  A Scheduler may or may not choose
      * to use this timeout value.
      *
