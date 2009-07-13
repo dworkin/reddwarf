@@ -37,12 +37,12 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.sun.sgs.impl.io.ServerSocketEndpoint;
+import com.sun.sgs.test.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.io.AcceptorListener;
-import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.test.io.AcceptorListener;
+import com.sun.sgs.test.io.Acceptor;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;

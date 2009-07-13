@@ -30,33 +30,41 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.sun.sgs.io;
+package com.sun.sgs.test.io;
+
+import com.sun.sgs.test.io.Acceptor;
+import java.io.IOException;
 
 /**
- * Receives asynchronous notification of events from an associated
- * {@link Acceptor}.  The {@link #newConnection newConnection} method
- * is invoked when a connection has been accepted to obtain an appropriate
- * {@link ConnectionListener} from this  listener.  When the
- * {@code Acceptor} is shut down, the listener is notified by
- * invoking its {@code disconnected()} method.
+ * Represents an abstract local communication endpoint. Implementations of
+ * {@code ServerEndpoint} encapsulate the passive connection initiation
+ * mechanism for particular address families (such as
+ * {@link java.net.SocketAddress}).
+ * <p>
+ * Passive connection initiation is accomplished by obtaining a
+ * {@code ServerEndpoint}'s {@link Acceptor} via {@link #createAcceptor}.
+ *
+ * @param <T> the address family encapsulated by this {@code ServerEndpoint}
  */
-public interface AcceptorListener {
+public interface ServerEndpoint<T> {
 
     /**
-     * Returns an appropriate {@link ConnectionListener} for a newly-accepted
-     * connection.  The new {@link Connection} is  passed to the
-     * {@link ConnectionListener#connected connected} method of the
-     * returned {@code ConnectionListener} once it is fully established.
+     * Creates an {@link Acceptor} to passively listen for connections
+     * on this local {@code ServerEndpoint}.
      *
-     * @return a {@code ConnectionListener} to receive events for the
-     *          newly-accepted {@code Connection}
+     * @return an {@code Acceptor} configured to listen on this
+     *         {@code ServerEndpoint}
+     *
+     * @throws IOException if an acceptor cannot be created
      */
-    ConnectionListener newConnection();
+    Acceptor<T> createAcceptor() throws IOException;
 
     /**
-     * Notifies this listener that its associated {@link Acceptor}
-     * has shut down.
+     * Returns the address of type {@code T} encapsulated by this
+     * {@code ServerEndpoint}.
+     *
+     * @return the address encapsulated by this {@code ServerEndpoint}
      */
-    void disconnected();
+    T getAddress();
 
 }

@@ -30,8 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.sun.sgs.impl.io;
+package com.sun.sgs.test.impl.io;
 
+import com.sun.sgs.impl.io.*;
 import java.net.SocketAddress;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
@@ -43,8 +44,8 @@ import org.apache.mina.transport.socket.nio.DatagramAcceptor;
 import org.apache.mina.transport.socket.nio.SocketAcceptorConfig;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.io.Acceptor;
-import com.sun.sgs.io.ServerEndpoint;
+import com.sun.sgs.test.io.Acceptor;
+import com.sun.sgs.test.io.ServerEndpoint;
 
 /**
  * An implementation of {@link ServerEndpoint} that wraps a

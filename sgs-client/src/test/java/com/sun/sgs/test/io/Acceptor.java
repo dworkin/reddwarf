@@ -30,8 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.sun.sgs.io;
+package com.sun.sgs.test.io;
 
+import com.sun.sgs.io.*;
 import java.io.IOException;
 
 /**

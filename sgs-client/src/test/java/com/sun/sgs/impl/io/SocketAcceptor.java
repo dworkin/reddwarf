@@ -32,6 +32,8 @@
 
 package com.sun.sgs.impl.io;
 
+import com.sun.sgs.impl.io.*;
+import com.sun.sgs.test.impl.io.ServerSocketEndpoint;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.Set;
@@ -42,9 +44,9 @@ import org.apache.mina.common.IoAcceptor;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.io.ServerEndpoint;
-import com.sun.sgs.io.AcceptorListener;
-import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.test.io.ServerEndpoint;
+import com.sun.sgs.test.io.AcceptorListener;
+import com.sun.sgs.test.io.Acceptor;
 import com.sun.sgs.io.ConnectionListener;
 
 /**

@@ -39,9 +39,8 @@ import java.net.SocketAddress;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 
-import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.test.io.Acceptor;
 
 /**
  * JUnit test class for the SocketAcceptor. 
