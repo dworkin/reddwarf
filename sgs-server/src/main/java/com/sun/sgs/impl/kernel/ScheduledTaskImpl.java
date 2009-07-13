@@ -54,7 +54,7 @@ class ScheduledTaskImpl implements ScheduledTask {
     private RecurringTaskHandle recurringTaskHandle = null;
     private int tryCount = 0;
     private TaskQueue queue = null;
-    private long timeout;
+    private volatile long timeout;
 
     // state associated with the lifetime of the task
     private enum State {
@@ -177,7 +177,8 @@ class ScheduledTaskImpl implements ScheduledTask {
         return timeout;
     }
 
-    public synchronized void setTimeout(long timeout) {
+    /** {@inheritDoc} */
+    public void setTimeout(long timeout) {
         this.timeout = timeout;
     }
 

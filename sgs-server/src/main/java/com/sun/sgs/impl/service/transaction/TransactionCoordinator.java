@@ -54,7 +54,7 @@ public interface TransactionCoordinator {
     TransactionHandle createTransaction(long timeout);
 
     /**
-     * Returns the default transaction timeout to use for transactions.
+     * Returns the default transaction timeout to use for bounded transactions.
      * This value is specified using the property
      * {@value #TXN_TIMEOUT_PROPERTY}
      *

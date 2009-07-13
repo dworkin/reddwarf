@@ -30,17 +30,17 @@ package com.sun.sgs.kernel.schedule;
 public enum SchedulerRetryAction {
 
     /**
-     * Indicates that a task should be dropped
+     * Indicates that a task should be dropped.
      */
     DROP,
 
     /**
-     * Indicates that a task has been handed off to be run by another thread
+     * Indicates that a task has been handed off to be run by another thread.
      */
     HANDOFF,
 
     /**
-     * Indicates that a task should be retried immediately
+     * Indicates that a task should be retried immediately.
      */
     RETRY;
 

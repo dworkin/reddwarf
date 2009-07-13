@@ -104,6 +104,13 @@ import java.util.logging.Logger;
  *      {@link SchedulerQueue} interface, and that provides a public
  *      constructor with the parameters {@link Properties}<p>
  *
+ * <dt> <i>Property:</i> <code><b>{@value #THROTTLE_FREQUENCY_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_THROTTLE_FREQUENCY}</code>
+ *
+ * <dd style="padding-top: .5em">The minimum amount of time in milliseconds
+ *      in between executions of tasks in the throttle queue.<p>
+ *
  * <dt> <i>Property:</i> <code><b>{@value #SCHEDULER_RETRY_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i> <code>{@value #DEFAULT_SCHEDULER_RETRY}</code>
@@ -625,7 +632,7 @@ final class TransactionSchedulerImpl
                 // never throw an exception that isn't handled
                 logger.logThrow(Level.SEVERE, e, "Fatal error for consumer");
             } finally {
-                if(locked) {
+                if (locked) {
                     consumerControl.release();
                 }
                 notifyThreadLeaving();
@@ -660,7 +667,7 @@ final class TransactionSchedulerImpl
                     // enforce a minimum time between throttling
                     long now = System.currentTimeMillis();
                     long wait = throttleFrequency - (now - lastThrottleTime);
-                    if(wait > 0) {
+                    if (wait > 0) {
                         Thread.sleep(wait);
                     }
 
@@ -685,7 +692,7 @@ final class TransactionSchedulerImpl
                 // never throw an exception that isn't handled
                 logger.logThrow(Level.SEVERE, e, "Fatal error for consumer");
             } finally {
-                if(locked) {
+                if (locked) {
                     consumerControl.release(requestedThreads);
                 }
             }
@@ -749,10 +756,12 @@ final class TransactionSchedulerImpl
                     return true;
                 }
 
-                // NOTE: We could report the two queue sizes separately,
+                // NOTE: We could report the queue sizes separately,
                 // so we should figure out how we want to represent these
                 int waitSize =
-                    backingQueue.getReadyCount() + dependencyCount.get();
+                    backingQueue.getReadyCount() +
+                    throttleQueue.getReadyCount() +
+                    dependencyCount.get();
                 profileCollectorHandle.startTask(task.getTask(), 
                                                  task.getOwner(),
                                                  task.getStartTime(), 

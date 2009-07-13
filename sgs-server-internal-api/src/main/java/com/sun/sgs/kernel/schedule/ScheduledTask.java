@@ -82,6 +82,8 @@ public interface ScheduledTask {
     /**
      * Returns the try count (the number of times that this task has been
      * attempted).
+     *
+     * @return the total number of times this task has been retried
      */
     int getTryCount();
 
@@ -95,6 +97,8 @@ public interface ScheduledTask {
 
     /**
      * Sets the transaction timeout for this task.
+     *
+     * @param timeout the new transaction timeout for this task
      */
     void setTimeout(long timeout);
 

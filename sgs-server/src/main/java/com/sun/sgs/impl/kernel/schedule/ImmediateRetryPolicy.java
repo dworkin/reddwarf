@@ -31,10 +31,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * This {@code SchedulerRetryPolicy} always causes a task that throws a
- * retryable exception to
- * retry immediately unless the task was interrupted in which case it
- * is put back onto the scheduler's standard backing queue.
+ * A simple retry "in place" {@code SchedulerRetryPolicy}.  This
+ * {@code SchedulerRetryPolicy} always causes a task that throws a
+ * retryable exception to retry immediately unless the task was interrupted
+ * in which case it is put back onto the scheduler's standard backing queue.
  */
 public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
 
@@ -44,7 +44,7 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
                                            class.getName()));
 
     /**
-     * Constructs an {@code ImmediateRetryPolicy}
+     * Constructs an {@code ImmediateRetryPolicy}.
      *
      * @param properties the system properties available
      */
