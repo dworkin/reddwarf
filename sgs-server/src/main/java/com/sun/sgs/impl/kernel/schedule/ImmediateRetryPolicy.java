@@ -57,6 +57,11 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
                                                Throwable result,
                                                SchedulerQueue backingQueue,
                                                SchedulerQueue throttleQueue) {
+        // null result is not allowed
+        if (result == null) {
+            throw new IllegalArgumentException("result cannot be null");
+        }
+
         // An interrupted task must be either handed off or dropped
         if (result instanceof InterruptedException) {
             try {

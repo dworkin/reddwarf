@@ -488,6 +488,7 @@ final class TransactionSchedulerImpl
 
             executor.shutdownNow();
             backingQueue.shutdown();
+            throttleQueue.shutdown();
         }
     }
 
@@ -822,9 +823,9 @@ final class TransactionSchedulerImpl
                     // task to run in a usable thread
                     if (task.setInterrupted() && retryOnInterruption) {
                         switch (retryPolicy.getRetryAction(task,
-                                                       ie,
-                                                       backingQueue,
-                                                       throttleQueue)) {
+                                                           ie,
+                                                           backingQueue,
+                                                           throttleQueue)) {
                             case DROP:
                                 task.setDone(ie);
                                 break;

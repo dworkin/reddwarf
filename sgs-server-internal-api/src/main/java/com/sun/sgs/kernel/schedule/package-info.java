@@ -21,5 +21,10 @@
  * this code.
  */
 
+/**
+ * Provides a scheduler queue and retry behavior abstraction layer
+ * for use by the default implementation of the
+ * {@link com.sun.sgs.kernel.TransactionScheduler} class.
+ */
 package com.sun.sgs.kernel.schedule;
 

@@ -57,6 +57,7 @@ public interface SchedulerRetryPolicy {
      *                      to execute tasks free of concurrency conflicts
      * @return the {@code SchedulerRetryAction} that the scheduler should
      *         take with respect to retrying the given task
+     * @throws IllegalArgumentException if {@code result} is {@code null}
      */
     SchedulerRetryAction getRetryAction(ScheduledTask task,
                                         Throwable result,
