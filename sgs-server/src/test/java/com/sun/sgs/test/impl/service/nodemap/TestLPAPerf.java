@@ -23,6 +23,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
+import com.sun.sgs.tools.test.IntegrationTest;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.Arrays;
 import java.util.Collection;
@@ -36,6 +37,7 @@ import org.junit.runners.Parameterized;
  *
  */
 //@RunWith(FilteredNameRunner.class)
+@IntegrationTest
 @RunWith(ParameterizedFilteredNameRunner.class)
 public class TestLPAPerf {
 

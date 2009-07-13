@@ -42,7 +42,7 @@ class ZachBuilder implements GraphBuilder {
         graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
         // Create a graph for the Zachary network:
         // W. W. Zachary, An information flow model for conflict and
-        // fission in small group1,
+        // fission in small group,
         // Journal of Anthropological Research 33, 452-473 (1977)
         LabelVertex[] nodes = new LabelVertex[35];
         for (int i = 1; i < nodes.length; i++) {
