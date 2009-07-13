@@ -44,6 +44,7 @@ import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
+import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -567,7 +568,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	assertTrue(watchdogService.isLocalNodeAliveNonTransactional());
     }
     
-    public void testIsLocalNodeAliveNonTransactionalInTransaction()
+    @Test public void testIsLocalNodeAliveNonTransactionalInTransaction()
 	throws Exception
     {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -578,6 +579,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
     /* -- Test getNodes -- */
 
+    @IntegrationTest
     @Test public void testGetNodes() throws Exception {
         addNodes(null, NUM_WATCHDOGS);
         Thread.sleep(renewTime);
@@ -630,6 +632,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
     /* -- Test getNode -- */
 
+    @IntegrationTest
     @Test public void testGetNode() throws Exception {
         addNodes(null, NUM_WATCHDOGS);
 
@@ -715,7 +718,8 @@ public class TestWatchdogServiceImpl extends Assert {
 		watchdogService.addNodeListener(new DummyNodeListener());
             } }, taskOwner);
     }
-    
+
+    @IntegrationTest
     @Test public void testAddNodeListenerNodeStarted() throws Exception {
         DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
@@ -738,6 +742,7 @@ public class TestWatchdogServiceImpl extends Assert {
         }
     }
 
+    @IntegrationTest
     @Test public void testAddNodeListenerNodeFailed() throws Exception {
         DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
@@ -787,6 +792,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
     /* -- test shutdown -- */
 
+    @IntegrationTest
     @Test public void testShutdownAndNotifyFailedNodes() throws Exception {
 	Map<WatchdogServiceImpl, DummyNodeListener> watchdogMap =
 	    new HashMap<WatchdogServiceImpl, DummyNodeListener>();
@@ -809,6 +815,8 @@ public class TestWatchdogServiceImpl extends Assert {
 	
 	    // shutdown watchdog server
 	    watchdogService.shutdown();
+
+	    Thread.sleep(renewTime * 4);
 
 	    for (WatchdogServiceImpl watchdog : watchdogMap.keySet()) {
 		DummyNodeListener listener = watchdogMap.get(watchdog);
@@ -863,6 +871,7 @@ public class TestWatchdogServiceImpl extends Assert {
     
     /* -- test recovery -- */
 
+    @IntegrationTest
     @Test public void testRecovery() throws Exception {
 	Map<Long, WatchdogServiceImpl> watchdogs =
 	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
@@ -905,6 +914,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @IntegrationTest
     @Test public void testRecoveryWithBackupFailureDuringRecovery()
 	throws Exception
     {
@@ -963,6 +973,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @IntegrationTest
     @Test public void testRecoveryWithDelayedBackupAssignment()
 	throws Exception
     {
@@ -1014,6 +1025,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @IntegrationTest
     @Test public void testRecoveryAfterServerCrash() throws Exception {
 	Map<Long, WatchdogServiceImpl> watchdogs =
 	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
@@ -1051,6 +1063,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @IntegrationTest
     @Test public void testRecoveryAfterAllNodesAndServerCrash()
 	throws Exception
     {
@@ -1104,6 +1117,7 @@ public class TestWatchdogServiceImpl extends Assert {
     }
     
     /** Test creating two nodes at the same host and port  */
+    @IntegrationTest
     @Test public void testReuseHostPort() throws Exception {
         addNodes(null, 1);
         Properties props = additionalNodes[0].getServiceProperties();
@@ -1138,6 +1152,7 @@ public class TestWatchdogServiceImpl extends Assert {
     }
 
     /** Test creating two single nodes at the same host and port  */
+    @IntegrationTest
     @Test public void testReuseHostPortSingleNode() throws Exception {
         final String appName = "ReuseHostPort";
         SgsTestNode node = null;
@@ -1180,6 +1195,7 @@ public class TestWatchdogServiceImpl extends Assert {
     /** Test that an application node can be restarted on the same host
      *  and port after a crash.
      */
+    @IntegrationTest
     @Test public void testNodeCrashAndRestart() throws Exception {
         SgsTestNode node = null;
         SgsTestNode node1 = null;
@@ -1193,7 +1209,7 @@ public class TestWatchdogServiceImpl extends Assert {
             node = null;
             // Note that we need to wait for the system to detect the
             // failed node.
-            Thread.sleep(renewTime * 2);
+            Thread.sleep(renewTime * 4);
 
             System.err.println("attempting to restart failed node");
             node1 = new SgsTestNode("TestWatchdogServiceImpl", 
@@ -1211,6 +1227,7 @@ public class TestWatchdogServiceImpl extends Assert {
     /** Check that we can restart a single node system on the same
      *  host and port after a crash.
      */
+    @IntegrationTest
     @Test public void testSingleNodeServerCrashAndRestart() throws Exception {
         final String appName = "TestServerCrash";
         SgsTestNode node = null;
@@ -1327,6 +1344,7 @@ public class TestWatchdogServiceImpl extends Assert {
      * Check that a node can report a failure in a remote node and 
      * the failed node should shutdown accordingly
      */
+    @IntegrationTest
     @Test public void testReportRemoteFailure() throws Exception {
         final String appName = "TestReportRemoteFailure_node";
         try {
@@ -1380,6 +1398,7 @@ public class TestWatchdogServiceImpl extends Assert {
      * Check that a server that has lost communication with it's service will
      * issue a shutdown of the node with the failed service
      */
+    @IntegrationTest
     @Test public void testReportFailureServerSide() {
         final String appName = "TestFailureServerSide";
         try {
@@ -1455,6 +1474,7 @@ public class TestWatchdogServiceImpl extends Assert {
      * Check that if two concurrent shutdowns are issued for a node, the second 
      * shutdown will fail quietly without throwing any exceptions.
      */
+    @IntegrationTest
     @Test public void testConcurrentShutdowns() throws Exception {
         final SgsTestNode appNode = new SgsTestNode(serverNode, null, null);
         // issue a shutdown; this shutdown runs in a seperate thread
@@ -1468,6 +1488,7 @@ public class TestWatchdogServiceImpl extends Assert {
     /**
      * Check if a node shutdown can be issued from a component successfully
      */
+    @IntegrationTest
     @Test(expected = IllegalStateException.class)
     public void testComponentShutdown() throws Exception {
         final SgsTestNode node = new SgsTestNode(serverNode, null, null);
