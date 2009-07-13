@@ -505,6 +505,9 @@ final class TransactionSchedulerImpl
         Throwable t = null;
 
         try {
+            // set the task state for the sake of the calling thread
+            ContextResolver.setTaskState(kernelContext, task.getOwner());
+            // handoff
             backingQueue.addTask(task);
             // wait for the task to complete...
             t = task.get();

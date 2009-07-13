@@ -189,11 +189,8 @@ public class TestTransactionSchedulerImpl {
                         throw new InterruptedException("test");
                 }
             };
-        try {
-            txnScheduler.runTask(r, taskOwner);
-            fail("Expected Interrupted Exception");
-        } catch (InterruptedException ie) {}
-        assertEquals(i.get(), 1);
+        txnScheduler.runTask(r, taskOwner);
+        assertEquals(i.get(), 2);
     }
 
     /**
