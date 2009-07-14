@@ -29,7 +29,7 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.test.impl.kernel.TestTransactionSchedulerImpl.DependentTask;
+import com.sun.sgs.impl.kernel.TestTransactionSchedulerImpl.DependentTask;
 
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
