@@ -427,20 +427,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Adds the specified channel {@code event} to this channel's event queue
      * and notifies the coordinator that there is an event to service.  As
      * an optimization, if the local node is the coordinator for this channel
-     * and the event queue is empty, then service the event immediately
-     * without adding it to the event queue.
+     * and the event queue is empty, then service the event immediately.
      */
     protected void addEvent(ChannelEvent event) {
 
 	EventQueue eventQueue = eventQueueRef.get();
 
-	if (isCoordinator() && eventQueue.isEmpty()) {
-	    // TBD: This invocation circumvents the write buffer capacity
-	    // check in the EventQueue.offer method.  Is this OK?
-	    event.serviceEvent(this);
-	} else if (eventQueue.offer(event)) {
-	    notifyServiceEventQueue(eventQueue);
-	} else {
+	if (!eventQueue.offer(event, this)) {
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add channel event");
 	}
@@ -456,7 +449,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private void notifyServiceEventQueue(EventQueue eventQueue) {
 
 	if (isCoordinator()) {
-	    eventQueue.serviceEvent();
+	    eventQueue.serviceEventQueue();
 
 	} else {
 
@@ -705,16 +698,24 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the node ID for the specified  {@code session}.
+     * Returns the {@link NodeAssignment} instance for the specified
+     * {@code session}.
      */
-    private static long getNodeId(ClientSession session) {
+    private static NodeAssignment getNodeAssignment(ClientSession session) {
 	if (session instanceof NodeAssignment) {
-	    return ((NodeAssignment) session).getNodeId();
+	    return (NodeAssignment) session;
 	} else {
 	    throw new IllegalArgumentException(
 		"session does not implement NodeAssignment: " +
 		session.getClass());
 	}
+    }
+    
+    /**
+     * Returns the node ID for the specified  {@code session}.
+     */
+    private static long getNodeId(ClientSession session) {
+	return getNodeAssignment(session).getNodeId();
     }
 
     /**
@@ -1203,6 +1204,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	private boolean sendRefresh = false;
 
+	private int eventsToProcess = 0;
+
 	/**
 	 * The number of bytes of the write buffer that are currently
 	 * available.
@@ -1225,17 +1228,39 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * {@code true} if successful, and {@code false} otherwise.
 	 *
 	 * @param event the event
+	 * @param isCoordinator {@code true} if the caller is the
+	 *	  channel's coordinator
 	 * @return {@code true} if successful, and {@code false} otherwise
 	 * @throws MessageRejectedException if the cost of the event
 	 *         exceeds the available buffer space in the queue
 	 */
-	boolean offer(ChannelEvent event) {
+	boolean offer(ChannelEvent event, ChannelImpl channel) {
+
+	    boolean notifyServiceEventQueue = true;
+	    
 	    int cost = event.getCost();
 	    if (cost > writeBufferAvailable) {
 	        throw new MessageRejectedException(
 	            "Not enough queue space: " + writeBufferAvailable +
 		    " bytes available, " + cost + " requested");
 	    }
+	    
+	    if (channel.isCoordinator() && isEmpty()) {
+		// The event queue is empty, and this node is the
+		// coordinator for the channel's event queue, so process
+		// the event now.
+		event.processing();
+		if (event.serviceEvent(channel)) {
+		    // Event completed processing, so return success.
+		    return true;
+		}
+		// The event needs to be added to the head of the queue
+		// (below) because it is not yet complete.  There is no
+		// need to notify the event queue because it will be
+		// notified when the event has completed processing.
+		notifyServiceEventQueue = false;
+	    }
+	   
 	    boolean success = getQueue().offer(event);
 	    if (success && (cost > 0)) {
 		getDataService().markForUpdate(this);
@@ -1245,6 +1270,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
                         "{0} reserved {1,number,#} leaving {2,number,#}",
                         this, cost, writeBufferAvailable);
                 }
+	    }
+	    if (notifyServiceEventQueue) {
+		channel.notifyServiceEventQueue(this);
 	    }
 	    return success;
 	}
@@ -1301,9 +1329,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Processes (at least) the first event in the queue.
+	 * Processes (at least) the first event in the queue and
+	 * returns {@code true} if more events need to be serviced and
+	 * {@code false} otherwise.
 	 */
-	void serviceEvent() {
+	boolean serviceEventQueue() {
 	    checkState();
 	    ChannelImpl channel = getChannel();
 	    if (!channel.isCoordinator()) {
@@ -1316,7 +1346,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    getLocalNodeId(),
 		    HexDumper.toHexString(channel.channelRefId.toByteArray()),
 		    channel.coordNodeId);
-		return;
+		return false;
 	    }
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
@@ -1360,17 +1390,35 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	    /*
 	     * Process channel events.  If the 'serviceAllEvents' flag is
-	     * true, then service all pending events.
+	     * true, then service pending events while events are completed.
 	     */
-	    int eventsToService = channelService.eventsPerTxn;
+	    int eventsPerTxn = channelService.eventsPerTxn;
 	    ManagedQueue<ChannelEvent> eventQueue = getQueue();
+	    
+	    boolean completed = false;
 	    do {
-		ChannelEvent event = eventQueue.poll();
+		ChannelEvent event = eventQueue.peek();
 		if (event == null) {
-		    return;
+		    //  No more events to process, so return.
+		    return false;
+		} else if (event.isCompleted()) {
+		    // Remove completed event and get next event to
+		    // process. Return if there are no more events.
+		    eventQueue.poll();
+		    event = eventQueue.peek();
+		    if (event == null) {
+			return false;
+		    }
+		} else if (event.isProcessing()) {
+		    // Event at head of queue is still processing, but
+		    // will schedule event queue to be serviced when
+		    // event has completed processing.
+		    return false;
 		}
 
+		// Process event.
                 logger.log(Level.FINEST, "processing event:{0}", event);
+		event.processing();
                 int cost = event.getCost();
 		if (cost > 0) {
 		    dataService.markForUpdate(this);
@@ -1383,9 +1431,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				   this, cost, writeBufferAvailable);
 		    }
 		}
-		event.serviceEvent(getChannel());
+		completed = event.serviceEvent(getChannel());
+		if (completed) {
+		    eventQueue.poll();
+		}
 
-	    } while (serviceAllEvents || --eventsToService > 0);
+	    } while (completed && (serviceAllEvents || --eventsPerTxn > 0));
+
+	    return eventQueue.peek() != null;
 	}
 
 	/* -- Implement ManagedObjectRemoval -- */
@@ -1411,10 +1464,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Services this event, taken from the head of the event queue
-	 * whose reference is specified during construction.
+	 * The event's completed status, indicating whether this event has
+	 * been completely processed and it is safe to service the next
+	 * event in the queue.
 	 */
-	abstract void serviceEvent(ChannelImpl channel);
+	private boolean completed = false;
+
+	private boolean processing = false;
+
+	/**
+	 * Services this event (taken from the head of the event queue) for
+	 * the specified {@code channel}, and returns {@code true} if the
+	 * event has completed processing and can be removed from the event
+	 * queue.
+	 */
+	abstract boolean serviceEvent(ChannelImpl channel);
 
 	/**
 	 * Returns the cost of this event, which the {@code EventQueue}
@@ -1425,6 +1489,33 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	int getCost() {
 	    return 0;
+	}
+
+	/**
+	 * Marks this event as completed.
+	 */
+	boolean completed() {
+	    getDataService().markForUpdate(this);
+	    completed = true;
+	    return completed;
+	}
+
+	void processing() {
+	    getDataService().markForUpdate(this);
+	    processing = true;
+	}
+	
+	/**
+	 * Returns {@code true} if this event is completed and it is safe
+	 * to service the next event in the queue, otherwise returns {@code
+	 * false}.
+	 */
+	boolean isCompleted() {
+	    return completed;
+	}
+
+	boolean isProcessing() {
+	    return processing;
 	}
     }
 
@@ -1445,42 +1536,20 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(final ChannelImpl channel) {
-
+	public boolean serviceEvent(final ChannelImpl channel) {
+	    assert isProcessing() && !isCompleted();
 	    ClientSession session =
 		(ClientSession) getObjectForId(sessionRefId);
 	    if (session == null) {
 		logger.log(
 		    Level.FINE,
 		    "unable to obtain client session for ID:{0}", this);
-		return;
+		return completed();
 	    }
-	    if (!channel.addSession(session)) {
-		return;
-	    }
-	    long nodeId = getNodeId(session);
-	    final ChannelServer server = getChannelServer(nodeId);
-	    if (server == null) {
-		/*
-		 * If there is no channel server for the session's node,
-		 * then the session's node has failed and the session is
-		 * now disconnected.  There is no need to send a 'join'
-		 * notification (to update the channel membership cache) to
-		 * the failed server.
-		 */
-		return;
-	    }
-	    final String channelName = channel.name;
-	    final BigInteger channelRefId = channel.channelRefId;
-	    final Delivery channelDelivery = channel.delivery;
-	    ChannelServiceImpl.getChannelService().addChannelTask(
-		channelRefId,
-		new IoRunnable() {
-		    public void run() throws IOException {
-			server.join(channelName, channelRefId,
-				    channelDelivery, sessionRefId);
-		    } },
-		nodeId);
+	    channel.addSession(session);
+
+	    ProcessJoinTask task = new ProcessJoinTask(channel, this);
+	    return isCompleted();
 	}
 
 	/** {@inheritDoc} */
@@ -1488,6 +1557,153 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	public String toString() {
 	    return getClass().getName() + ": " +
 		HexDumper.toHexString(sessionRefId.toByteArray());
+	}
+    }
+
+    private static class ProcessJoinTask extends AbstractKernelRunnable {
+
+	private final ChannelImpl channel;
+	private final BigInteger eventRefId;
+	private final BigInteger sessionRefId;
+	
+	private volatile long serverNodeId;
+	private volatile ChannelServer server;
+	private volatile boolean relocating;
+	private int tries = 0;
+
+	/**
+	 * Constructs an instance.  This contructor must be called within a
+	 * transaction.
+	 */
+	ProcessJoinTask(ChannelImpl channel, JoinEvent joinEvent) {
+	    super(null);
+	    this.channel = channel;
+	    this.eventRefId =
+		getDataService().createReference(joinEvent).getId();
+	    this.sessionRefId = joinEvent.sessionRefId;
+	    refreshServerInfo();
+	    if (server != null) {	
+		ChannelServiceImpl.getChannelService().addChannelTask(
+		    channel.channelRefId, this);
+	    }
+	}
+
+	/**
+	 * This must be called outside of a transaction.
+	 */
+	public void run() {
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    channelService.checkNonTransactionalContext();
+	    while (server != null && tries < 3
+		   // && !isShutdown()
+		   )
+	    {
+		long nodeId = -1;
+		try {
+		    nodeId =
+			server.join(channel.name, channel.channelRefId,
+				    channel.delivery, sessionRefId, relocating);
+		    if (nodeId == serverNodeId) {
+			// Join was successful.
+			break;
+		    }
+		} catch (IOException e) {
+		    tries++;
+		}
+		
+		if (nodeId != -1) {
+		    // Session is relocating to the node with the returned
+		    // nodeId, so retry join request to new node.
+		    serverNodeId = nodeId;
+		    server = getChannelServer(serverNodeId);
+		    relocating = true;
+		    tries = 0;
+		    
+		} else {
+		    // Session is probably relocating to another node,
+		    // recheck session info and try again.
+		    long oldServerNodeId = serverNodeId;
+		    try {
+			channelService.runTransactionalTask(
+			  new AbstractKernelRunnable("RefreshServerInfo") {
+			    public void run() {
+				refreshServerInfo();
+			    } } );
+		    } catch (Exception e) {
+			// TBD: log exception
+		    }
+		    if (serverNodeId != oldServerNodeId) {
+			// The session's server node has changed, so reset the
+			// retry count.
+			tries = 0;
+		    } else {
+			// Server node hasn't changed to wait to give the server
+			// node a chance.
+			try {
+			    // TBD: this should be configurable
+			    Thread.sleep(100);
+			} catch (InterruptedException e) {
+			}
+		    }
+		}
+	    }
+	    try {
+		channelService.runTransactionalTask(
+		    new AbstractKernelRunnable("MarkJoinEventCompleted") {
+			public void run() {
+			    completed();
+			} } );
+	    } catch (Exception e) {
+		// TBD: log exception
+	    }
+	    channelService.addServiceEventQueueTask(channel.channelRefId);
+	}
+
+	/**
+	 * This must be called within a transaction.
+	 */
+	private void refreshServerInfo() {
+	    server = null;
+	    ClientSessionImpl session = (ClientSessionImpl)
+		getObjectForId(sessionRefId);
+	    if (session != null) {
+		long relocatingToNodeId =
+		    session.getRelocatingToNodeId();
+		relocating = relocatingToNodeId != -1;
+		serverNodeId =
+		    relocating ?
+		    relocatingToNodeId :
+		    session.getNodeId();
+		server = getChannelServer(serverNodeId);
+	    }
+	    if (server == null) {
+		/*
+		 * If there is no channel server for the session's node,
+		 * then the session or its node has failed and the
+		 * session is now disconnected.  There is no need to send
+		 * a 'join' notification (to update the channel
+		 * membership cache) to a disconnected session.
+		 */
+		completed();
+	    }
+	}
+
+	/**
+	 * This must be called within a transaction.
+	 */
+	private void completed() {
+	    JoinEvent event = (JoinEvent) getObjectForId(eventRefId);
+	    if (event != null) {
+		event.completed();
+	    } else {
+		// This shouldn't happen
+		logger.log(
+ 		    Level.SEVERE,
+		    "channel name:{0} session:{1} join event " +
+		    "removed before completed", channel.name,
+		    HexDumper.toHexString(sessionRefId.toByteArray()));
+	    }
 	}
     }
 
@@ -1508,7 +1724,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(ChannelImpl channel) {
+	public boolean serviceEvent(ChannelImpl channel) {
 
 	    ClientSession session =
 		(ClientSession) getObjectForId(sessionRefId);
@@ -1516,13 +1732,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		logger.log(
 		    Level.FINE,
 		    "unable to obtain client session for ID:{0}", this);
-		return;
+		return completed();
 	    }
 	    if (!channel.removeSession(
 		    getNodeId(session), sessionRefId, true))
 	    {
-		return;
+		return completed();
 	    }
+	    return completed();
 	}
 
 	/** {@inheritDoc} */
@@ -1547,7 +1764,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(ChannelImpl channel) {
+	public boolean serviceEvent(ChannelImpl channel) {
 
 	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
 	    channel.removeAllSessions();
@@ -1566,6 +1783,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			} },
 		    nodeId);
 	    }
+	    return completed();
 	}
 
 	/** {@inheritDoc} */
@@ -1607,7 +1825,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * send event.  This could be repeated for multiple
 	 * send events appearing in the queue.
 	 */
-	public void serviceEvent(ChannelImpl channel) {
+	public boolean serviceEvent(ChannelImpl channel) {
 
 	    /*
 	     * Verfiy that the sending session (if any) is a member of this
@@ -1619,7 +1837,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		if (sender == null ||
 		    !channel.hasSession(getNodeId(sender), senderRefId))
 		{
-		    return;
+		    return completed();
 		}
 	    }
 	    /*
@@ -1644,6 +1862,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    nodeId);
 	    }
 
+	    return completed();
 	    // TBD: need to add a task to update queue that all
 	    // channel servers have been notified of
 	    // the 'send'.
@@ -1685,7 +1904,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(ChannelImpl channel) {
+	public boolean serviceEvent(ChannelImpl channel) {
 
 	    final BigInteger channelRefId = channel.channelRefId;
 	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
@@ -1711,6 +1930,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    public void run() {
 			channelService.closedChannel(channelRefId);
 		    } });
+	    return completed();
 	}
 
 	/** {@inheritDoc} */
@@ -1771,10 +1991,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Services the event queue for the channel with the specified {@code
      * channelRefId}.
      */
-    static void serviceEventQueue(BigInteger channelRefId) {
+    static boolean serviceEventQueue(BigInteger channelRefId) {
 	EventQueue eventQueue = getEventQueue(getLocalNodeId(), channelRefId);
 	if (eventQueue != null) {
-	    eventQueue.serviceEvent();
+	    return eventQueue.serviceEventQueue();
+	} else {
+	    return false;
 	}
     }
 

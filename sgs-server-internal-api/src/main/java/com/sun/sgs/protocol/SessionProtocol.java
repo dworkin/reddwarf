@@ -106,6 +106,8 @@ public interface SessionProtocol extends Channel {
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
+     * @throws	RelocatingSessionException if the associated session is
+     *		relocating to another node
      */
     void sessionMessage(ByteBuffer message, Delivery delivery)
 	throws IOException;
@@ -122,6 +124,8 @@ public interface SessionProtocol extends Channel {
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
+     * @throws	RelocatingSessionException if the associated session is
+     *		relocating to another node
      */
     void channelJoin(String name, BigInteger channelId, Delivery delivery)
             throws IOException;
@@ -134,6 +138,8 @@ public interface SessionProtocol extends Channel {
      * @param	channelId a channel ID
      * 
      * @throws IOException if an I/O error occurs
+     * @throws	RelocatingSessionException if the associated session is
+     *		relocating to another node
      */
     void channelLeave(BigInteger channelId) throws IOException;
 
@@ -165,6 +171,8 @@ public interface SessionProtocol extends Channel {
      * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
      * @throws	IOException if an I/O error occurs
+     * @throws	RelocatingSessionException if the associated session is
+     *		relocating to another node
      */
     void channelMessage(
 	BigInteger channelId, ByteBuffer message, Delivery delivery)
@@ -180,13 +188,17 @@ public interface SessionProtocol extends Channel {
      * method can be invoked on the new node with the given relocation key
      * to reestablish the client session without having to log in again.<p>
      *
-     * Once this method is invoked, the client should close any underlying
-     * local connection(s) in a timely fashion.
+     * Once this method is invoked, an invocation on a method that sends a
+     * message to the client should throw {@link RelocatingSessionException}.
+     * Additionally, the client should close any underlying local
+     * connection(s) in a timely fashion.
      *
      * @param	newNode the new node to establish a connection with
      * @param	descriptors protocol descriptors for {@code newNode}
      * @param	relocationKey the key to be supplied to the new node
      * @throws	IOException if an I/O error occurs
+     * @throws	RelocatingSessionException if the associated session is
+     *		relocating to another node
      */
     void relocate(Node newNode,
 		  Set<ProtocolDescriptor> descriptors,
@@ -202,7 +214,9 @@ public interface SessionProtocol extends Channel {
      
      * @param	reason	the reason for disconnection
      * 
-     * @throws IOException if an I/O error occurs
+     * @throws	IOException if an I/O error occurs
+     * @throws	RelocatingSessionException if the associated session is
+     *		relocating to another node
      */
     void disconnect(DisconnectReason reason) throws IOException;
 }

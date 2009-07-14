@@ -43,6 +43,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -194,11 +195,18 @@ public final class ChannelServiceImpl
 	localPerSessionChannelsMap =
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
 
-    /** Map of completion handlers for relocating client sessions, keyed by
-     * session ID. */
-    private final ConcurrentHashMap<BigInteger, SimpleCompletionHandler>
+    /** Map of relocation information (new node IDs and completion
+     * handlers) for client sessions relocating from this node, keyed by
+     * the relocating session's ID. */
+    private final ConcurrentHashMap<BigInteger, RelocationInfo>
 	relocatingSessions =
-	    new ConcurrentHashMap<BigInteger, SimpleCompletionHandler>();
+	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
+
+    /** Map of task queues for client sessions relocating to this node,
+     * keyed by session ID. */
+    private final ConcurrentHashMap<BigInteger, List<KernelRunnable>>
+	relocatedSessionTaskQueues =
+	    new ConcurrentHashMap<BigInteger, List<KernelRunnable>>();
 
     /** The map of channel coordinator task queues, keyed by channel ID.
      * A coordinator task queue orders the delivery of incoming
@@ -456,38 +464,12 @@ public final class ChannelServiceImpl
 
 	/** {@inheritDoc}
 	 *
-	 * The service event queue request is enqueued in the given
-	 * channel's coordinator task queue so that the requests can be
-	 * performed serially, rather than concurrently.  If tasks to
-	 * service a given channel's event queue were processed
-	 * concurrently, there would be many transaction conflicts because
-	 * servicing a channel event accesses a single per-channel data
-	 * structure (the channel's event queue).
+	 * Add a task to service the specified channel's event queue.
 	 */
-	public void serviceEventQueue(final BigInteger channelRefId) {
+	public void serviceEventQueue(BigInteger channelRefId) {
 	    callStarted();
 	    try {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST, "serviceEventQueue channelId:{0}",
-			HexDumper.toHexString(channelRefId.toByteArray()));
-		}
-
-		TaskQueue taskQueue = coordinatorTaskQueues.get(channelRefId);
-		if (taskQueue == null) {
-		    TaskQueue newTaskQueue =
-			transactionScheduler.createTaskQueue();
-		    taskQueue = coordinatorTaskQueues.
-			putIfAbsent(channelRefId, newTaskQueue);
-		    if (taskQueue == null) {
-			taskQueue = newTaskQueue;
-		    }
-		}
-		taskQueue.addTask(
-		  new AbstractKernelRunnable("ServiceEventQueue") {
-		    public void run() {
-			ChannelImpl.serviceEventQueue(channelRefId);
-		    } }, taskOwner);
+		addServiceEventQueueTask(channelRefId);
 					  
 	    } finally {
 		callFinished();
@@ -610,58 +592,90 @@ public final class ChannelServiceImpl
 	
 	/** {@inheritDoc}
 	 *
-	 * Adds the specified {@code sessionRefId} to the per-channel cache
-	 * for the given channel's local member sessions, and sends a
-	 * channel join message to the session with the corresponding
-	 * {@code sessionId}.
+	 * If the session is locally-connected and not relocating, this method
+	 * adds the specified {@code sessionRefId} to the per-channel cache for
+	 * the given channel's local member sessions, and sends a channel join
+	 * message to the session with the corresponding {@code sessionId}.
 	 */
-	public void join(String name, BigInteger channelRefId,
-			 Delivery delivery, BigInteger sessionRefId)
+	public long join(String name, BigInteger channelRefId,
+			 Delivery delivery, BigInteger sessionRefId,
+			 boolean relocatingToLocalNode)
 
 	{
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
-			Level.FINEST, "join channelId:{0} sessionId:{1}",
+			Level.FINEST, "join name::{0} channelId:{1} " +
+			"sessionId:{1} relocatingToNode:{2} localNodeId:{3}",
+			name,
 			HexDumper.toHexString(channelRefId.toByteArray()),
-			HexDumper.toHexString(sessionRefId.toByteArray()));
+			HexDumper.toHexString(sessionRefId.toByteArray()),
+			relocatingToLocalNode, localNodeId);
 		}
 
-		// Update local channel membership cache.
-		addLocalChannelMember(channelRefId, sessionRefId);
-
-		// Update per-session channel set cache.
-		Set<BigInteger> channelSet =
-		    localPerSessionChannelsMap.get(sessionRefId);
-		if (channelSet == null) {
-		    Set<BigInteger> newChannelSet =
-			Collections.synchronizedSet(new HashSet<BigInteger>());
-		    channelSet = localPerSessionChannelsMap.
-			putIfAbsent(sessionRefId, newChannelSet);
-		    if (channelSet == null) {
-			channelSet = newChannelSet;
-		    }
+		RelocationInfo info = relocatingSessions.get(sessionRefId);
+		if (info != null) {
+		    // Session is relocating from this node, so return the
+		    // new node's ID, so that the join request can be sent
+		    // to the new node.
+		    return info.newNodeId;
 		}
-		channelSet.add(channelRefId);
-
-		// TBD: If the session is disconnecting, then session needs
-		// to be removed from channel's membership list, and the
-		// channel needs to be removed from the channelSet.
-
-		// Send channel join protocol message.
+		
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
-		if (protocol != null) {
-                    try {
-                        protocol.channelJoin(name, channelRefId, delivery);
-                    } catch (IOException ioe) {
-			// TBD: session disconnecting?
-                        logger.logThrow(Level.WARNING, ioe,
-                                        "channelJoin throws");
-                    }
+		if (protocol == null && !relocatingToLocalNode) {
+		    // The session is not locally-connected and is not
+		    // known to be relocating to the local node, so return
+		    // -1 (unknown status).
+		    return -1;
 		}
 
+		ChannelJoinTask joinTask =
+		    new ChannelJoinTask(name, channelRefId, sessionRefId,
+					delivery);
+		if (protocol == null) {
+		    assert relocatingToLocalNode;
+		    // The session is relocating to this node, but the
+		    // session hasn't been established yet, so enqueue the
+		    // join request until relocation is complete.
+		    List<KernelRunnable> taskQueue =
+			relocatedSessionTaskQueues.get(sessionRefId);
+		    if (taskQueue == null) {
+			List<KernelRunnable> newTaskQueue =
+			    Collections.synchronizedList(
+				new LinkedList<KernelRunnable>());
+			taskQueue = relocatedSessionTaskQueues.
+			    putIfAbsent(sessionRefId, newTaskQueue);
+			if (taskQueue == null) {
+			    taskQueue = newTaskQueue;
+			    // TBD: schedule task to clean up task queue if
+			    // session doesn't relocate to this node in a
+			    // timely manner.
+			}
+		    }
+		    
+		    taskQueue.add(joinTask);
+		    return localNodeId;
+		    
+		} else {
+		    // The session is locally-connected, so process the
+		    // join request locally.
+		    try {
+			// TBD: need to make sure that this join is processed
+			// *after* all messages enqueued during relocation,
+			// because messages received during relocation may be
+			// processed at the same time as this request.
+			joinTask.run();
+			return localNodeId;
+			
+		    } catch (RelocatingSessionException e) {
+			// Session is relocating to another node, but its
+			// destination unknown.
+			return -1;
+		    }
+		}
+		
 	    } finally {
 		callFinished();
 	    }
@@ -883,10 +897,10 @@ public final class ChannelServiceImpl
 	    }
 	    
 	    // Notify completion handler that relocation preparation is done.
-	    SimpleCompletionHandler handler =
+	    RelocationInfo info =
 		relocatingSessions.get(sessionRefId);
-	    if (handler != null) {
-		handler.completed();
+	    if (info != null) {
+		info.handler.completed();
 	    }
 
 	    /*
@@ -917,6 +931,46 @@ public final class ChannelServiceImpl
 	}
     }
 
+    /**
+     * Adds a task to service the event queue for the channel with the
+     * specified {@code channelRefId}.<p>
+     *
+     * The service event queue request is enqueued in the given
+     * channel's coordinator task queue so that the requests can be
+     * performed serially, rather than concurrently.  If tasks to
+     * service a given channel's event queue were processed
+     * concurrently, there would be many transaction conflicts because
+     * servicing a channel event accesses a single per-channel data
+     * structure (the channel's event queue).
+     *
+     * @param	channelRefId a channel ID
+     */
+    void addServiceEventQueueTask(final BigInteger channelRefId) {
+	checkNonTransactionalContext();
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST, "serviceEventQueue channelId:{0}",
+		HexDumper.toHexString(channelRefId.toByteArray()));
+	}
+
+	TaskQueue taskQueue = coordinatorTaskQueues.get(channelRefId);
+	if (taskQueue == null) {
+	    TaskQueue newTaskQueue =
+		transactionScheduler.createTaskQueue();
+	    taskQueue = coordinatorTaskQueues.
+		putIfAbsent(channelRefId, newTaskQueue);
+	    if (taskQueue == null) {
+		taskQueue = newTaskQueue;
+	    }
+	}
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("ServiceEventQueue") {
+		public void run() {
+		    //boolean serviceMoreEvents =
+			ChannelImpl.serviceEventQueue(channelRefId);
+		} }, taskOwner);
+    }
+    
     private void addLocalChannelMember(BigInteger channelRefId,
 				       BigInteger sessionRefId)
     {
@@ -1193,6 +1247,10 @@ public final class ChannelServiceImpl
 	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
 				      SimpleCompletionHandler handler)
 	{
+	    // TBD: can't relocate until previous relocation is complete,
+	    // i.e., all enqueued requests (if any) need to be delivered to
+	    // session first.
+	    
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.get(sessionRefId);		
 	    if (channelSet == null) {
@@ -1200,7 +1258,8 @@ public final class ChannelServiceImpl
 		handler.completed();
 	    } else {
 		// Transfer the session's channel membership cache to new node.
-		relocatingSessions.put(sessionRefId, handler);
+		relocatingSessions.put(sessionRefId,
+				       new RelocationInfo(newNodeId, handler));
 		try {
 		    // TBD:IoTask?
 		    // TBD: Does the channelSet need to be locked for the
@@ -1217,6 +1276,14 @@ public final class ChannelServiceImpl
 		    // TBD: probably want to disconnect the session...
 		}
 	    }
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void relocated(BigInteger sessionRefId) {
+	    // TBD: flush any enqueued channel joins/leaves/message
+	    // to the client session.
 	}
     }
 
@@ -1264,6 +1331,10 @@ public final class ChannelServiceImpl
 	return txnProxy.getService(WatchdogService.class).getLocalNodeId();
     }
 
+    public void checkNonTransactionalContext() {
+	super.checkNonTransactionalContext();
+    }
+
     /**
      * Returns the {@code ChannelServer} for the given {@code nodeId},
      * or {@code null} if no channel server exists for the given
@@ -1296,6 +1367,17 @@ public final class ChannelServiceImpl
 		}
 	    }
 	}
+    }
+
+    /**
+     * Runs the specified non-durable, transactional {@code task} using this
+     * service's task owner.
+     *
+     * @param	task a transactional task
+     * @throws	Exception the exception thrown while running {@code task}
+     */
+    void runTransactionalTask(KernelRunnable task) throws Exception {
+	transactionScheduler.runTask(task, taskOwner);
     }
 
     /**
@@ -1595,5 +1677,78 @@ public final class ChannelServiceImpl
 		relocatingSessions.remove(sessionRefId);
 	    }
 	}	
+    }
+
+    /**
+     * A task to update local caches and send a join request to a client
+     * session.
+     */
+    private class ChannelJoinTask extends AbstractKernelRunnable {
+
+	private final String name;
+	private final BigInteger channelRefId;
+	private final BigInteger sessionRefId;
+	private final Delivery delivery;
+
+	ChannelJoinTask(String name, BigInteger channelRefId,
+			BigInteger sessionRefId, Delivery delivery)
+
+	{
+	    super(null);
+	    this.name = name;
+	    this.channelRefId = channelRefId;
+	    this.sessionRefId = sessionRefId;
+	    this.delivery = delivery;
+	}
+
+	public void run() throws RelocatingSessionException {
+	    // Update local channel membership cache.
+	    addLocalChannelMember(channelRefId, sessionRefId);
+
+	    // Update per-session channel set cache.
+	    Set<BigInteger> channelSet =
+		localPerSessionChannelsMap.get(sessionRefId);
+	    if (channelSet == null) {
+		Set<BigInteger> newChannelSet =
+		    Collections.synchronizedSet(new HashSet<BigInteger>());
+		channelSet = localPerSessionChannelsMap.
+		    putIfAbsent(sessionRefId, newChannelSet);
+		if (channelSet == null) {
+		    channelSet = newChannelSet;
+		}
+	    }
+	    channelSet.add(channelRefId);
+	    
+	    // TBD: If the session is disconnecting, then session needs
+	    // to be removed from channel's membership list, and the
+	    // channel needs to be removed from the channelSet.
+	    
+	    // Send channel join protocol message.
+	    SessionProtocol protocol =
+		sessionService.getSessionProtocol(sessionRefId);
+	    if (protocol != null) {
+		try {
+		    protocol.channelJoin(name, channelRefId, delivery);
+		} catch (IOException ioe) {
+		    // TBD: session disconnecting?
+		    logger.logThrow(Level.WARNING, ioe,
+				    "channelJoin throws");
+		}
+	    }
+	}
+    }
+
+    /**
+     * Information pertaining to a client session relocating from this node.
+     */
+    private static class RelocationInfo {
+	final long newNodeId;
+	final SimpleCompletionHandler handler;
+
+	/** Constructs an instance. */
+	RelocationInfo(long newNodeId, SimpleCompletionHandler handler) {
+	    this.newNodeId = newNodeId;
+	    this.handler = handler;
+	}
     }
 }

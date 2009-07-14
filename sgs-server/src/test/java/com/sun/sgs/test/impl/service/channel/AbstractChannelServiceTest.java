@@ -465,6 +465,7 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		Set<ClientSession> sessions = getSessions(channel);
+		System.err.println("Sessions joined:" + sessions);
 		if (sessions.size() != users.size()) {
 		    fail("Expected " + users.size() + " sessions, got " +
 			 sessions.size());
@@ -474,7 +475,6 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 			fail("Expected session: " + session);
 		    }
 		}
-		System.err.println("All sessions joined");
 	    }
 	}, taskOwner);
     }

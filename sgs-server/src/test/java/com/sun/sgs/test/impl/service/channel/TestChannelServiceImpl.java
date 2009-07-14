@@ -518,6 +518,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	ClientGroup group = new ClientGroup(someUsers);
 	try {
 	    joinUsers("foo", someUsers);
+	    checkUsersJoined("foo", someUsers);
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = channelService.getChannel(channelName);
@@ -1265,7 +1266,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    for (int i = 0; i < numMessages; i++) {
 		moe.sendChannelMessage(channelName, i);
 	    }
-	    Thread.sleep(2000);
+	    Thread.sleep(4000);
 	    boolean fail = false;
 	    for (int i = 0; i < numMessages / 2; i++) {
 		for (DummyClient client : group.getClients()) {

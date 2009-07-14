@@ -29,10 +29,14 @@ import junit.framework.TestSuite;
 import org.junit.runner.RunWith;
 
 @RunWith(FilteredJUnit3TestRunner.class)
-public class TestChannelServiceImplRelocatingSessions extends AbstractChannelServiceTest {
+public class TestChannelServiceImplRelocatingSessions
+    extends AbstractChannelServiceTest
+{
     
     /** Constructs a test instance. */
-    public TestChannelServiceImplRelocatingSessions(String name) throws Exception  {
+    public TestChannelServiceImplRelocatingSessions(String name)
+	throws Exception
+    {
 	super(name);
     }
 
@@ -105,7 +109,8 @@ public class TestChannelServiceImplRelocatingSessions extends AbstractChannelSer
 		SgsTestNode newNode = additionalNodes.get(host);
 		printServiceBindings("before relocate");
 		moveClient(relocatingClient, oldNode, newNode);
-		// Make sure all members are still joined and can receive messages.
+		// Make sure all members are still joined and can receive
+		// messages. 
 		checkUsersJoined(channelName, someUsers);
 		sendMessagesToChannel(channelName, group, 2);
 		assertEquals(count, getChannelServiceBindingCount());
@@ -116,6 +121,7 @@ public class TestChannelServiceImplRelocatingSessions extends AbstractChannelSer
 	    // are cleaned up.
 	    group.disconnect(true);
 	    checkUsersJoined(channelName, new ArrayList<String>());
+	    printServiceBindings("after disconnect");
 	    assertEquals(count - someUsers.size(),
 			 getChannelServiceBindingCount());
 	    

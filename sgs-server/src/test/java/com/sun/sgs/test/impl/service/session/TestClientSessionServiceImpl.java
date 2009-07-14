@@ -1944,8 +1944,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(BigInteger sessionRefId) { }
 
 	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
-				      SimpleCompletionHandler handler)
-	{ }
+				      SimpleCompletionHandler handler) { }
+	
+	public void relocated(BigInteger sessionRefId) { }
     }
 
     private static class DummyClient extends AbstractDummyClient {

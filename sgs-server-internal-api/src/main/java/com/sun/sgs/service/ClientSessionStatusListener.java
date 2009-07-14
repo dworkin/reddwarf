@@ -38,9 +38,12 @@ public interface ClientSessionStatusListener {
 
     /**
      * Notifies this listener that the session with the given
-     * {@code sessionRefId} has disconnected.
+     * {@code sessionRefId} has disconnected so that any cached
+     * or persistent data associated with the client session can
+     * be cleaned up.  This method is not invoked when the client
+     * session disconnects due to relocating to another node.
      * 
-     * @param sessionRefId the client session ID for the disconnected client
+     * @param sessionRefId the client session ID
      */
     void disconnected(BigInteger sessionRefId);
 
@@ -55,9 +58,21 @@ public interface ClientSessionStatusListener {
      * has completed preparing for the relocation.
      * 
      * @param sessionRefId the client session ID
-     * @param newNode the ID of the new node
+     * @param newNodeId the ID of the new node
      * @param handler a handler to notify when preparation is complete
      */
-    void prepareToRelocate(BigInteger sessionRefId, long newNode,
+    void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
 			   SimpleCompletionHandler handler);
+
+
+    /**
+     * Notifies this listener that the session with the given
+     * {@code sessionRefId} has completed relocation to the local
+     * node, so that this listener can communicate with the
+     * relocated client session (e.g. to deliver enqueued
+     * requests) if needed.
+     *
+     * @param sessionRefId the client session ID
+     */
+    void relocated(BigInteger sessionRefId);
 }
