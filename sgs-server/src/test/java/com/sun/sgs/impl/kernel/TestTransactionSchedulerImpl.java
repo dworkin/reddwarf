@@ -268,9 +268,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void dropInterruptedTask() throws Exception {
         final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(result,
-                                             SchedulerRetryAction.DROP,
-                                             null));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.DROP, null));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -290,9 +288,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void retryInterruptedTask() throws Exception {
         final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(result,
-                                             SchedulerRetryAction.RETRY,
-                                             null));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY, null));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -312,8 +308,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void handoffInterruptedTask() throws Exception {
         final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(result,
-                                             SchedulerRetryAction.HANDOFF,
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.HANDOFF,
                                              "backing"));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
@@ -328,9 +323,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void dropFailedTask() throws Exception {
         final Exception result = new Exception("task failed");
-        replaceRetryPolicy(createRetryPolicy(result,
-                                             SchedulerRetryAction.DROP,
-                                             null));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.DROP, null));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -350,9 +343,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void retryFailedTask() throws Exception {
         final Exception result = new Exception("task failed");
-        replaceRetryPolicy(createRetryPolicy(result,
-                                             SchedulerRetryAction.RETRY,
-                                             null));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY, null));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -366,8 +357,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void handoffFailedTaskToBackingQueue() throws Exception {
         final Exception result = new Exception("task failed");
-        replaceRetryPolicy(createRetryPolicy(result,
-                                             SchedulerRetryAction.HANDOFF,
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.HANDOFF,
                                              "backing"));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
@@ -382,8 +372,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void handoffFailedTaskToThrottleQueue() throws Exception {
         final Exception result = new Exception("task failed");
-        replaceRetryPolicy(createRetryPolicy(result,
-                                             SchedulerRetryAction.HANDOFF,
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.HANDOFF,
                                              "throttle"));
         final AtomicLong backingStart = new AtomicLong(0);
         final AtomicLong backingFinish = new AtomicLong(0);
@@ -391,13 +380,16 @@ public class TestTransactionSchedulerImpl {
             public void run() throws Exception {
                 backingStart.set(System.currentTimeMillis());
                 Thread.sleep(500);
-                backingFinish.set(System.currentTimeMillis());
+                synchronized(backingFinish) {
+                    backingFinish.set(System.currentTimeMillis());
+                    backingFinish.notifyAll();
+                }
             }
         };
 
         final AtomicInteger i = new AtomicInteger(0);
         final AtomicLong throttleStart = new AtomicLong(0);
-        final KernelRunnable r = new TestAbstractKernelRunnable() {
+        final KernelRunnable throttleTask = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 if (i.getAndIncrement() == 0) {
                     throw result;
@@ -407,12 +399,17 @@ public class TestTransactionSchedulerImpl {
             }
         };
         txnScheduler.scheduleTask(backingTask, taskOwner);
-        txnScheduler.runTask(r, taskOwner);
+        txnScheduler.runTask(throttleTask, taskOwner);
         assertEquals(i.get(), 2);
 
         // verify that the throttled task did not start before the backing
         // task finished
-        assertTrue(backingFinish.get() <= throttleStart.get());
+        synchronized (backingFinish) {
+            if (backingFinish.get() == 0) {
+                backingFinish.wait();
+            }
+            assertTrue(backingFinish.get() <= throttleStart.get());
+        }
     }
 
     /**
@@ -427,8 +424,7 @@ public class TestTransactionSchedulerImpl {
         policyField.set((TransactionSchedulerImpl) txnScheduler, policy);
     }
 
-    private SchedulerRetryPolicy createRetryPolicy(Throwable result,
-                                                   final SchedulerRetryAction action,
+    private SchedulerRetryPolicy createRetryPolicy(final SchedulerRetryAction action,
                                                    final String handoffQueue) {
         return new SchedulerRetryPolicy() {
             public SchedulerRetryAction getRetryAction(ScheduledTask task,

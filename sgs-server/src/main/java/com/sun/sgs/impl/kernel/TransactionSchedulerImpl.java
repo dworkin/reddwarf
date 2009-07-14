@@ -655,7 +655,7 @@ final class TransactionSchedulerImpl
         private boolean locked = false;
 
         // last time throttling occurred
-        private long lastThrottleTime = System.currentTimeMillis();
+        private long lastThrottleTime = 0;
 
         /** {@inheritDoc} */
         public void run() {
