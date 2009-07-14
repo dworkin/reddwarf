@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.impl.service.nodemap.coordinator.simple.SimpleCoordinator;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -41,7 +42,6 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -89,6 +89,20 @@ import java.util.logging.Logger;
  *	NodeAssignPolicy}, used for the node assignment policy. The class 
  *      should be public, not abstract, and should provide a public constructor
  *      with {@link Properties} and {@link NodeMappingServerImpl} parameters. 
+ *      <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.coordinator.class
+ *	</b></code> <br>
+ *	<i>Default:</i>
+ *	<code>com.sun.sgs.impl.service.nodemap.coordinator.simple.SimpleCoordinator</code>
+ *
+ * <dd style="padding-top: .5em">
+ *      The name of the class that implements {@link
+ *	GroupCoordinator}, used for coordinating identity groups. The class
+ *      should be public, not abstract, and should provide a public constructor
+ *      with {@link Properties}, {@link NodeMappingServerImpl}, and
+ *      {@link DataService} parameters.
  *      <p>
  *
  * <dt> <i>Property:</i> <code><b>
@@ -155,11 +169,18 @@ public final class NodeMappingServerImpl
     
     /**
      * The property that specifies the name of the class that implements
-     * DataStore.
+     * {@link NodeAssignPolicy}.
      */
     private static final String ASSIGN_POLICY_CLASS_PROPERTY =
             PKG_NAME + ".policy.class";
     
+    /**
+     * The property that specifies the name of the class that implements
+     * {@link GroupCoordinator}.
+     */
+    private static final String GROUP_COORDINATOR_CLASS_PROPERTY =
+            PKG_NAME + ".coordinator.class";
+
     /** The property name for the amount of time to wait before removing an
      * identity from the node map.
      */
@@ -196,7 +217,7 @@ public final class NodeMappingServerImpl
     /** The watchdog service. */
     final WatchdogService watchdogService;
 
-    private final AffinityServer affinityServer;
+    private final GroupCoordinator groupCoordinator;
 
     /** The policy for assigning new nodes.  This will likely morph into
      *  the load balancing policy, as well. */
@@ -314,7 +335,19 @@ public final class NodeMappingServerImpl
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
 
-        affinityServer = new DummyAffinityServer(properties, this);
+        String coordinatorClassName =
+                wrappedProps.getProperty(GROUP_COORDINATOR_CLASS_PROPERTY);
+
+        if (coordinatorClassName == null) {
+            groupCoordinator =
+                        new SimpleCoordinator(properties, this, dataService);
+        } else {
+            groupCoordinator = wrappedProps.getClassInstanceProperty(
+                GROUP_COORDINATOR_CLASS_PROPERTY, GroupCoordinator.class,
+                new Class[] { Properties.class, NodeMappingServerImpl.class,
+                              DataService.class },
+                properties, this, dataService);
+        }
 
         // Export ourselves.  At this point, this object is public.
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
@@ -733,7 +766,7 @@ public final class NodeMappingServerImpl
      *  if the exception is of type <@code ExceptionRetryStatus>.
      * @param task the task
      */
-    void runTransactionally(KernelRunnable task) throws Exception {   
+    public void runTransactionally(KernelRunnable task) throws Exception {
         transactionScheduler.runTask(task, taskOwner);
     }
     
@@ -782,7 +815,7 @@ public final class NodeMappingServerImpl
         final long newNodeId;
         if (targetNodeId == -1) {
             try {
-                newNodeId = assignPolicy.chooseNode(id, requestingNode);
+                newNodeId = assignPolicy.chooseNode(requestingNode);
             } catch (NoNodesAvailableException ex) {
                 logger.logThrow(Level.FINEST, ex,
                         "mapToNewNode: id {0} from {1}" +
@@ -1098,38 +1131,21 @@ public final class NodeMappingServerImpl
                 logger.log(Level.FINER, "Offload request for {0}", node);
             }
 
-            // Look up each identity on the failed node and move it
-            String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
-            Iterator<Identity> identities =
-                            new GetIdOnNodeTask(dataService, nodekey, logger);
-
             // If node is alive we are just offloading due to bad health
             if (node.isAlive()) {
-
-                // TODO - should schedule a periodic offload task to offload
-                // unhealth node until it reaches a better condition??
-                if (identities.hasNext()) {
-                    Identity id = identities.next();
-                
-                    // Attempt to move the entire group off
-                    AffinityGroup ag;
-                    if ((affinityServer != null) &&
-                        (ag = affinityServer.getGroup(id)) != null) {
-                        try {
-                            // Setting the affinity group node will eventually
-                            // call back to moveIdentities()
-                            ag.setNode(assignPolicy.chooseNode(id,
-                                                 NodeAssignPolicy.SERVER_NODE));
-                        } catch (NoNodesAvailableException ex) {
-                            // no other healthy nodes available, so just hold on
-                        }
-                    } else {
-                        // just one to move
-                        moveIdentities(Collections.singletonList(id).iterator(),
-                                       node, -1);
-                    }
+                try {
+                    // TODO - should schedule a periodic offload task to offload
+                    // unhealth node until it reaches a better condition??
+                    groupCoordinator.offload(node,
+                         assignPolicy.chooseNode(NodeAssignPolicy.SERVER_NODE));
+                } catch (NoNodesAvailableException ex) {
+                    logger.logThrow(Level.FINEST, ex, "Exception ignored");
                 }
             } else {
+                // Look up each identity on the failed node and move it
+                String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
+                Iterator<Identity> identities =
+                            new GetIdOnNodeTask(dataService, nodekey, logger);
                 // Node is dead, move everyone
                 moveIdentities(identities, node, -1);
             }
@@ -1143,13 +1159,19 @@ public final class NodeMappingServerImpl
      * target node. If {@code oldNode} is not {@code null} it is assumed that
      * all of the identities are on that node.
      * 
-     * @param identities iterator over the set of identities to move
+     * @param identities a set of identities to move
      * @param oldNode the node the identities are on, if known, otherwise
      *  {@code null}
      * @param targetNodeId the target node id, or -1
      */
-    void moveIdentities(Iterator<Identity> identities,
-                        Node oldNode, long targetNodeId)
+    public void moveIdentities(Set<Identity> identities,
+                               Node oldNode, long targetNodeId)
+    {
+        moveIdentities(identities.iterator(), oldNode, targetNodeId);
+    }
+
+    private void moveIdentities(Iterator<Identity> identities,
+                                Node oldNode, long targetNodeId)
     {
         System.out.println("moveIdenities " + oldNode + "  " + targetNodeId);
         while (identities.hasNext()) {
@@ -1197,7 +1219,7 @@ public final class NodeMappingServerImpl
     
     /**
      *  Task to support offloading a node, run under a transaction.
-     *  Finds the identities that was on the specified node and makes them
+     *  Finds the identities that are on the specified node and makes them
      *  available through an iterator. Code outside
      *  the transaction moves the identity to another node and removes
      *  the old id<->failedNode mapping, and any status information.

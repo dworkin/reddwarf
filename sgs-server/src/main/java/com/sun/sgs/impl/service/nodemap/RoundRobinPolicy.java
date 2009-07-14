@@ -86,7 +86,7 @@ class RoundRobinPolicy extends AbstractNodePolicy {
     }
     
     /** {@inheritDoc} */
-    public synchronized long chooseNode(Identity id, long requestingNode) 
+    public synchronized long chooseNode(long requestingNode) 
         throws NoNodesAvailableException 
     {
         if (availableNodes.size() < 1) {

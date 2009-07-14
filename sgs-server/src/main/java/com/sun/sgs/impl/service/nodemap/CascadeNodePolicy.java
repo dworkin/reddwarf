@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
-import com.sun.sgs.auth.Identity;
 import java.util.Properties;
 
 /**
@@ -48,7 +47,7 @@ public class CascadeNodePolicy extends AbstractNodePolicy {
     }
     
     @Override
-    public synchronized long chooseNode(Identity id, long requestingNode)
+    public synchronized long chooseNode(long requestingNode)
             throws NoNodesAvailableException 
     {
         // Be optimistic and assume the current node is available

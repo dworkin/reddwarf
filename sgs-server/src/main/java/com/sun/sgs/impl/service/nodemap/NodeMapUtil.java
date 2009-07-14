@@ -25,7 +25,7 @@ import com.sun.sgs.auth.Identity;
  * Static utility methods used by both the server and service for
  * data service name bindings.
  */
-final class NodeMapUtil {
+public final class NodeMapUtil {
     private static final String PREFIX = "nodemap";
     
     /** The major and minor version numbers for the layout of
@@ -78,7 +78,7 @@ final class NodeMapUtil {
      * Returns a node key for the given {@code nodeId};  used for 
      * iterating through a node for all identities assigned to it.
      */
-    static String getPartialNodeKey(long nodeId) {
+    public static String getPartialNodeKey(long nodeId) {
 	return buildNodeKey(nodeId).toString();
     }   
     

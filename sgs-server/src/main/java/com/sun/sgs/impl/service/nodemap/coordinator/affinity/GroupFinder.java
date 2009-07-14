@@ -17,29 +17,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap;
-
-import com.sun.sgs.auth.Identity;
-import java.util.Properties;
+package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 /**
- * Dummy server for testing
+ * Thing that finds groups
  */
-public class DummyAffinityServer implements AffinityServer {
+public interface GroupFinder {
 
-    final private NodeMappingServerImpl server;
- 
-    DummyAffinityServer(Properties props, NodeMappingServerImpl server) {
-        this.server = server;
-    }
+    void start();
 
-    @Override
-    public AffinityGroup getGroup(Identity id) {
-        return null;
-    }
+    void stop();
 
-    @Override
-    public AffinityGroup getGroup(long agid) {
-        return null;
-    }
+    void shutdown();
 }

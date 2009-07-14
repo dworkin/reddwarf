@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
-import com.sun.sgs.auth.Identity;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -49,7 +48,7 @@ public class LocalNodePolicy extends AbstractNodePolicy {
      * Round robin assignment is used if the server is making the request
      * (due to reassigning identities from a failed node).
      */
-    public long chooseNode(Identity id, long requestingNode) 
+    public long chooseNode(long requestingNode) 
             throws NoNodesAvailableException 
     {
         if (requestingNode == NodeAssignPolicy.SERVER_NODE) {

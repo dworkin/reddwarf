@@ -19,12 +19,10 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator.DummyIdentity;
-import java.io.Serializable;
 import java.util.Properties;
 
 public class DirectiveNodeAssignmentPolicy extends RoundRobinPolicy {
@@ -50,11 +48,11 @@ public class DirectiveNodeAssignmentPolicy extends RoundRobinPolicy {
     
     /** {@inheritDoc} */
     @Override
-    public long chooseNode(Identity id, long requestingNode)
+    public long chooseNode(long requestingNode)
         throws NoNodesAvailableException 
     {
 	if (roundRobin || requestingNode == -1) {
-	    return super.chooseNode(id, requestingNode);
+	    return super.chooseNode(requestingNode);
 	} else {
 	    return requestingNode;
 	}

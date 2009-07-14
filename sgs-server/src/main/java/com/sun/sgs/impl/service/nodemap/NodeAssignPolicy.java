@@ -19,8 +19,6 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
-import com.sun.sgs.auth.Identity;
-
 /**
  *
  * Interface for node assignment.  I expect that we'll replace
@@ -38,18 +36,15 @@ interface NodeAssignPolicy {
     long SERVER_NODE = -1L;
     
     /**
-     * Choose a node to assign the identity to.  It is assumed that
-     * we've already checked to see if the identity is in the map
-     * before calling this method.
+     * Choose a node to assign an identity to.
      *
-     * @param id the identity which needs an assignment.
      * @param requestingNode the id of the node making the request, or 
      *         {@code SERVER_NODE} if the system is making the request
      * @return the chosen node's id
      *
      * @throws NoNodesAvailableException if there are no live nodes to assign to
      */
-    long chooseNode(Identity id, long requestingNode) 
+    long chooseNode(long requestingNode) 
             throws NoNodesAvailableException;
 
     /**
