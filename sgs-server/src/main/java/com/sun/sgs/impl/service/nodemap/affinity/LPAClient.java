@@ -53,10 +53,11 @@ public interface LPAClient extends Remote {
     /**
      * Returns the affinity groups found on this node.
      * Called by the LPAServer.
+     * @param done {@code true} if all iterations are done, allowing cleanup
      * @return the affinity groups on this node
      * @throws IOException if there is a communication problem
      */
-    Collection<AffinityGroup> affinityGroups() throws IOException;
+    Collection<AffinityGroup> affinityGroups(boolean done) throws IOException;
 
     /**
      * Remove any cached information about a node.
@@ -71,13 +72,16 @@ public interface LPAClient extends Remote {
      * the local node.  This informs the local node where non-local neighbors
      * might reside. If there are no endpoints for the edges on this node,
      * nothing is done.
-     * Called by other LPAClients.
+     * Called by other LPAClients.  Nodes will only call other nodes with a
+     * lower node id.
      * @param objIds the collection of objects, representing edges, that
      *               probably have endpoints to vertices on this node
      * @param nodeId the node with vertices attached to the edges
+     * @return the edges that {@code nodeId} believes it might have in common
+     *         with this node
      * @throws IOException if there is a communication problem
      */
-    void crossNodeEdges(Collection<Object> objIds, long nodeId)
+    Collection<Object> crossNodeEdges(Collection<Object> objIds, long nodeId)
             throws IOException;
 
     /**

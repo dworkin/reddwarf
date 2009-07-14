@@ -70,7 +70,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // the algorithm.  This is required, rather than a simple Barrier, because
     // our calls must be idempotent.
     // This is replaced at each iteration.
-    private Set<Long> nodeBarrier;
+    private Set<Long> nodeBarrier = new HashSet<Long>();
 
     // A latch to ensure our main thread waits for all nodes to complete
     // each step of the algorithm before proceeding.
@@ -229,7 +229,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        returnedGroups.addAll(proxy.affinityGroups());
+                        returnedGroups.addAll(proxy.affinityGroups(true));
                     } catch (IOException ioe) {
                         failed = true;
                         // JANE should retry a few times, then

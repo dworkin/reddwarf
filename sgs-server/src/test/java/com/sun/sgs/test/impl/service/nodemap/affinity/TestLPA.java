@@ -22,16 +22,28 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAServer;
+import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
+import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
+import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
+import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.FilteredNameRunner;
+import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.InetAddress;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.junit.After;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
@@ -45,10 +57,21 @@ import static org.junit.Assert.fail;
  */
 @RunWith(FilteredNameRunner.class)
 public class TestLPA {
+
+    private LabelPropagationServer server;
+
+    @After
+    public void shutdown() throws Exception {
+        if (server != null) {
+            server.shutdown();
+            server = null;
+        }
+    }
+    
     @Test
     public void testDistributedFramework() throws Exception {
         // Create a server, and add a few "nodes"
-        LabelPropagationServer server = new LabelPropagationServer();
+        server = new LabelPropagationServer();
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         {
             AffinityGroupImpl a = new AffinityGroupImpl(1);
@@ -126,6 +149,81 @@ public class TestLPA {
         }
     }
 
+    @Test
+    public void testCrossNodeData() throws Exception {
+        // Create our server and three clients.
+        server = new LabelPropagationServer();
+        int port = LabelPropagationServer.DEFAULT_SERVER_PORT;
+        String localHost = InetAddress.getLocalHost().getHostName();
+
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        server.register(PartialToyBuilder.NODE1, lp1);
+        LabelPropagation lp2 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
+                    PartialToyBuilder.NODE2, localHost, port, true, 1, 0);
+        server.register(PartialToyBuilder.NODE2, lp2);
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
+        server.register(PartialToyBuilder.NODE3, lp3);
+
+        lp1.exchangeCrossNodeInfo();
+        lp2.exchangeCrossNodeInfo();
+        lp3.exchangeCrossNodeInfo();
+
+        // Wait an appropriate time - want server to be called back 3 times
+        Thread.sleep(1000);
+
+        // examine the node conflict map -it is public so I can get it here
+        //public Map<Long, Map<Object, Integer>> nodeConflictMap
+        System.out.println("NODE1 nodeConflictMap");
+        printNodeConflictMap(lp1);
+        System.out.println("NODE2 nodeConflictMap");
+        printNodeConflictMap(lp2);
+        System.out.println("NODE3 nodeConflictMap");
+        printNodeConflictMap(lp3);
+
+        lp1.affinityGroups(true);
+        lp2.affinityGroups(true);
+        lp3.affinityGroups(true);
+
+        System.out.println("Exchanging info a second time");
+        lp3.exchangeCrossNodeInfo();
+        lp2.exchangeCrossNodeInfo();
+        lp1.exchangeCrossNodeInfo();
+
+        // Wait an appropriate time - want server to be called back 3 times
+        Thread.sleep(1000);
+
+        // examine the node conflict map -it is public so I can get it here
+        //public Map<Long, Map<Object, Integer>> nodeConflictMap
+        System.out.println("NODE1 nodeConflictMap");
+        printNodeConflictMap(lp1);
+        System.out.println("NODE2 nodeConflictMap");
+        printNodeConflictMap(lp2);
+        System.out.println("NODE3 nodeConflictMap");
+        printNodeConflictMap(lp3);
+    }
+
+    private void printNodeConflictMap(LabelPropagation lp) {
+        
+        for (Map.Entry<Long, Map<Object, Integer>> entry :
+             lp.nodeConflictMap.entrySet())
+        {
+            StringBuilder sb1 = new StringBuilder();
+            sb1.append(entry.getKey());
+            sb1.append(":  ");
+            for (Map.Entry<Object, Integer> subEntry :
+                 entry.getValue().entrySet())
+            {
+                sb1.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
+            }
+            System.out.println(sb1.toString());
+        }
+    }
+
     private class TestLPAClient implements LPAClient {
         private final long sleepTime;
         private final long nodeId;
@@ -151,7 +249,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Collection<AffinityGroup> affinityGroups() throws IOException {
+        public Collection<AffinityGroup> affinityGroups(boolean done) throws IOException {
             return result;
         }
 
@@ -195,7 +293,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public void crossNodeEdges(Collection<Object> objIds, long nodeId)
+        public Collection<Object> crossNodeEdges(Collection<Object> objIds, long nodeId)
                 throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
@@ -206,6 +304,123 @@ public class TestLPA {
                 Collection<Object> objIds) throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
+        }
+    }
+
+    // Simple builder spread across 3 nodes
+    private class PartialToyBuilder implements GraphBuilder {
+        private final Graph<LabelVertex, WeightedEdge> graph;
+        private final Map<Object, Map<Long, Integer>> conflictMap;
+        private final Map<Object, Map<Identity, Integer>> objUseMap;
+
+        static final long NODE1 = 1;
+        static final long NODE2 = 2;
+        static final long NODE3 = 3;
+        // location of identities
+        // node1: 1,2
+        // node2: 3
+        // node3: 4, 5
+        //
+        // ids 1,2,3 used obj1
+        // ids 2,4 used obj2
+        // ids 4,5 used obj3
+        public PartialToyBuilder(long node) {
+            super();
+            graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
+            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Integer>>();
+            conflictMap = new ConcurrentHashMap<Object, Map<Long, Integer>>();
+
+            if (node == NODE1) {
+                // Create a partial graph
+                Identity[] idents = {new DummyIdentity("1"),
+                                     new DummyIdentity("2")};
+                LabelVertex[] nodes = new LabelVertex[2];
+                for (int i = 0; i < nodes.length; i++) {
+                    nodes[i] = new LabelVertex(idents[i]);
+                    graph.addVertex(nodes[i]);
+                }
+                graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
+
+                // Obj uses
+                Map<Identity, Integer> tempMap =
+                        new HashMap<Identity, Integer>();
+                tempMap.put(idents[0], 1);
+                tempMap.put(idents[1], 1);
+                objUseMap.put("obj1", tempMap);
+                tempMap =  new HashMap<Identity, Integer>();
+                tempMap.put(idents[1], 1);
+                objUseMap.put("obj2", tempMap);
+
+                // conflicts - data cache evictions due to conflict
+                Map<Long, Integer> conflict = new HashMap<Long, Integer>();
+                conflict.put(NODE2, 1);
+                conflictMap.put("obj1", conflict);
+                conflict = new HashMap<Long, Integer>();
+                conflict.put(NODE3, 1);
+                conflictMap.put("obj2", conflict);
+            } else if (node == NODE2) {
+                // Create a partial graph
+                Identity ident = new DummyIdentity("3");
+                LabelVertex ver = new LabelVertex(ident);
+                graph.addVertex(ver);
+
+                // Obj uses
+                Map<Identity, Integer> tempMap =
+                        new HashMap<Identity, Integer>();
+                tempMap.put(ident, 1);
+
+                // conflicts - data cache evictions due to conflict
+                Map<Long, Integer> conflict = new HashMap<Long, Integer>();
+                conflict.put(NODE1, 1);
+                conflictMap.put("obj1", conflict);
+            } else if (node == NODE3) {
+                Identity[] idents = {new DummyIdentity("4"),
+                                     new DummyIdentity("5")};
+                LabelVertex[] nodes = new LabelVertex[2];
+                for (int i = 0; i < nodes.length; i++) {
+                    nodes[i] = new LabelVertex(idents[i]);
+                    graph.addVertex(nodes[i]);
+                }
+                graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
+
+                // Obj uses
+                Map<Identity, Integer> tempMap =
+                        new HashMap<Identity, Integer>();
+                tempMap.put(idents[0], 1);
+                tempMap.put(idents[1], 1);
+                objUseMap.put("obj3", tempMap);
+                tempMap =  new HashMap<Identity, Integer>();
+                tempMap.put(idents[0], 1);
+                objUseMap.put("obj2", tempMap);
+
+                // conflicts - data cache evictions due to conflict
+                // none on this node
+            }
+        }
+
+        /** {@inheritDoc} */
+        public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+            return graph;
+        }
+
+        /** {@inheritDoc} */
+        public Runnable getPruneTask() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        /** {@inheritDoc} */
+        public Map<Object, Map<Long, Integer>> getConflictMap() {
+            return conflictMap;
+        }
+
+        /** {@inheritDoc} */
+        public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+            return objUseMap;
+        }
+
+        /** {@inheritDoc} */
+        public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+            return;
         }
     }
 }
