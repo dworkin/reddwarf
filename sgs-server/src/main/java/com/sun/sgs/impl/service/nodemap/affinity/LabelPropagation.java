@@ -434,7 +434,6 @@ public class LabelPropagation implements LPAClient {
         // We have heard back from all the nodes we expected, so we're
         // ready to start the algorithm iterations.
         if (conflictNodes.isEmpty()) {
-            // Rather than ready to begin, can I just run my first iteration?
             server.readyToBegin(localNodeId);
         }
     }
