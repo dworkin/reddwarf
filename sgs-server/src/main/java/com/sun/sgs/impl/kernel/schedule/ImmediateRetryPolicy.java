@@ -40,7 +40,7 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
 
     // logger for this class
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(ExperimentalRetryPolicy.
+        new LoggerWrapper(Logger.getLogger(ImmediateRetryPolicy.
                                            class.getName()));
 
     /**
