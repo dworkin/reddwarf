@@ -77,7 +77,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     }
 
     // -- Test constructor -- 
-
+ 
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ChannelServiceImpl(null, serverNode.getSystemRegistry(),
@@ -1251,7 +1251,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    group.disconnect(false);
 	}
     }
-
+    
     public void testClientSendToChannelWithFilteringListener()
 	throws Exception
     {

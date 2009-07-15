@@ -1333,7 +1333,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * returns {@code true} if more events need to be serviced and
 	 * {@code false} otherwise.
 	 */
-	boolean serviceEventQueue() {
+	void serviceEventQueue() {
 	    checkState();
 	    ChannelImpl channel = getChannel();
 	    if (!channel.isCoordinator()) {
@@ -1346,7 +1346,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    getLocalNodeId(),
 		    HexDumper.toHexString(channel.channelRefId.toByteArray()),
 		    channel.coordNodeId);
-		return false;
+		return;
 	    }
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
@@ -1400,24 +1400,23 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		ChannelEvent event = eventQueue.peek();
 		if (event == null) {
 		    //  No more events to process, so return.
-		    return false;
+		    return;
 		} else if (event.isCompleted()) {
 		    // Remove completed event and get next event to
 		    // process. Return if there are no more events.
 		    eventQueue.poll();
 		    event = eventQueue.peek();
 		    if (event == null) {
-			return false;
+			return;
 		    }
 		} else if (event.isProcessing()) {
 		    // Event at head of queue is still processing, but
 		    // will schedule event queue to be serviced when
 		    // event has completed processing.
-		    return false;
+		    return;
 		}
 
 		// Process event.
-                logger.log(Level.FINEST, "processing event:{0}", event);
 		event.processing();
                 int cost = event.getCost();
 		if (cost > 0) {
@@ -1438,7 +1437,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	    } while (completed && (serviceAllEvents || --eventsPerTxn > 0));
 
-	    return eventQueue.peek() != null;
+	    if (eventQueue.peek() != null) {
+		channelService.addChannelToService(channel.channelRefId);
+	    }
 	}
 
 	/* -- Implement ManagedObjectRemoval -- */
@@ -1495,12 +1496,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Marks this event as completed.
 	 */
 	boolean completed() {
+	    // TBD: markForUpdate can throw ONFE if this event has been
+	    // removed.
 	    getDataService().markForUpdate(this);
 	    completed = true;
 	    return completed;
 	}
 
 	void processing() {
+	    logger.log(Level.FINEST, "processing event:{0}", this);
 	    getDataService().markForUpdate(this);
 	    processing = true;
 	}
@@ -1991,12 +1995,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Services the event queue for the channel with the specified {@code
      * channelRefId}.
      */
-    static boolean serviceEventQueue(BigInteger channelRefId) {
+    static void serviceEventQueue(BigInteger channelRefId) {
 	EventQueue eventQueue = getEventQueue(getLocalNodeId(), channelRefId);
 	if (eventQueue != null) {
-	    return eventQueue.serviceEventQueue();
-	} else {
-	    return false;
+	    eventQueue.serviceEventQueue();
 	}
     }
 

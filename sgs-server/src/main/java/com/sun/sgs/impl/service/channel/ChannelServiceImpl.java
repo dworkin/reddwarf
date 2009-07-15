@@ -963,14 +963,22 @@ public final class ChannelServiceImpl
 		taskQueue = newTaskQueue;
 	    }
 	}
+
 	taskQueue.addTask(
 	    new AbstractKernelRunnable("ServiceEventQueue") {
 		public void run() {
-		    //boolean serviceMoreEvents =
-			ChannelImpl.serviceEventQueue(channelRefId);
+		    ChannelImpl.serviceEventQueue(channelRefId);
 		} }, taskOwner);
     }
-    
+
+    /**
+     * Updates the local channel members cache by adding the specified
+     * {@code sessionRefId} as a local member of the channel with the
+     * specified {@code channelRefId}.
+     *
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
+     */
     private void addLocalChannelMember(BigInteger channelRefId,
 				       BigInteger sessionRefId)
     {
@@ -987,7 +995,6 @@ public final class ChannelServiceImpl
 	}
 	localMembers.add(sessionRefId);
     }
-
 
     /* -- Implement TransactionContextFactory -- */
        
@@ -1063,12 +1070,26 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Adds the specified {@code task} to the task list of the given {@code
-     * channelRefId}.
+     * Adds the specified non-transactional {@code task} to the task list
+     * of the given {@code channelRefId}.
+     *
+     * @param	channelRefId a channel ID
+     * @param	task a non-transactional task
      */
     void addChannelTask(BigInteger channelRefId, KernelRunnable task) {
 	Context context = contextFactory.joinTransaction();
 	context.addTask(channelRefId, task);
+    }
+
+    /**
+     * Adds the specified {@code channelRefId} to the list of
+     * locally-coordinated channels that need servicing.
+     *
+     * @param	channelRefId a channel ID for a locally-coordinated channel
+     */
+    void addChannelToService(BigInteger channelRefId) {
+	Context context = contextFactory.joinTransaction();
+	context.addChannelToService(channelRefId);
     }
 
     /* -- Implement TransactionContext -- */
@@ -1088,6 +1109,15 @@ public final class ChannelServiceImpl
 	    new HashMap<BigInteger, List<KernelRunnable>>();
 
 	/**
+	 * Locally-coordinated channels that need servicing as a result of
+	 * operations during this context's associated transaction.  When
+	 * this context is flushed, a task to service the event queue will
+	 * be added to the channel coordinator's task queue.
+	 */
+	private final Set<BigInteger> channelsToService =
+	    new HashSet<BigInteger>();
+
+	/**
 	 * Constructs a context with the specified transaction. 
 	 */
 	private Context(Transaction txn) {
@@ -1095,9 +1125,9 @@ public final class ChannelServiceImpl
 	}
 
 	/**
-	 * Adds the specified {@code task} to the task list of the given
-	 * {@code channelRefId}.  If the transaction commits, the task will be
-	 * added to the channel's tasks queue.
+	 * Adds the specified non-transactional {@code task} to the task
+	 * list of the given {@code channelRefId}.  If the transaction
+	 * commits, the task will be added to the channel's tasks queue.
 	 */
 	public void addTask(BigInteger channelRefId, KernelRunnable task) {
 	    List<KernelRunnable> taskList = internalTaskLists.get(channelRefId);
@@ -1106,6 +1136,23 @@ public final class ChannelServiceImpl
 		internalTaskLists.put(channelRefId, taskList);
 	    }
 	    taskList.add(task);
+	}
+
+	/**
+	 * Adds the specified {@code channelRefId} to the set of
+	 * locally-coordinated channels whose event queues need to be
+	 * serviced as a result of operations executed during this
+	 * context's associated transaction. <p>
+	 *
+	 * When this context is flushed, for each channel that needs to be
+	 * serviced, a task to service the channel's event queue will be
+	 * added to that channel coordinator's task queue.
+	 *
+	 * @param channelRefId a locally-coordinated channel that needs to
+	 *	  be serviced
+	 */
+	public void addChannelToService(BigInteger channelRefId) {
+	    channelsToService.add(channelRefId);
 	}
 
 	/* -- transaction participant methods -- */
@@ -1162,6 +1209,9 @@ public final class ChannelServiceImpl
 		for (BigInteger channelRefId : internalTaskLists.keySet()) {
 		    flushTasks(
 			channelRefId, internalTaskLists.get(channelRefId));
+		}
+		for (BigInteger channelRefId : channelsToService) {
+		    addServiceEventQueueTask(channelRefId);
 		}
 	    }
 	    return isCommitted;
