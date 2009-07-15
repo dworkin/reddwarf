@@ -104,13 +104,16 @@ public interface GraphBuilder {
      * Returns a map of local object uses to the identities that used
      * the objects, and a count of the number of uses.
      *
+     * @return the map of local object uses
      */
     Map<Object, Map<Identity, Integer>> getObjectUseMap();
 
     /**
-     * Returns a map of object IDs to node IDs, and a count of the number
-     * of uses on that node.
-     * @return
+     * Returns a map of detected cross node data conflicts.  This is a map 
+     * of node IDs to object IDs, and a count of the number of conflicts on the
+     * object with that node.
+     * 
+     * @return the map of detected cross node data conflicts
      */
-    Map<Object, Map<Long, Integer>> getConflictMap();
+    Map<Long, Map<Object, Integer>> getConflictMap();
 }

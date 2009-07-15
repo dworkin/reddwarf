@@ -310,7 +310,7 @@ public class TestLPA {
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements GraphBuilder {
         private final Graph<LabelVertex, WeightedEdge> graph;
-        private final Map<Object, Map<Long, Integer>> conflictMap;
+        private final Map<Long, Map<Object, Integer>> conflictMap;
         private final Map<Object, Map<Identity, Integer>> objUseMap;
 
         static final long NODE1 = 1;
@@ -328,7 +328,7 @@ public class TestLPA {
             super();
             graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Integer>>();
-            conflictMap = new ConcurrentHashMap<Object, Map<Long, Integer>>();
+            conflictMap = new ConcurrentHashMap<Long, Map<Object, Integer>>();
 
             if (node == NODE1) {
                 // Create a partial graph
@@ -352,12 +352,12 @@ public class TestLPA {
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                Map<Long, Integer> conflict = new HashMap<Long, Integer>();
-                conflict.put(NODE2, 1);
-                conflictMap.put("obj1", conflict);
-                conflict = new HashMap<Long, Integer>();
-                conflict.put(NODE3, 1);
-                conflictMap.put("obj2", conflict);
+                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                conflict.put("obj1", 1);
+                conflictMap.put(NODE2, conflict);
+                conflict = new HashMap<Object, Integer>();
+                conflict.put("obj2", 1);
+                conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
                 // Create a partial graph
                 Identity ident = new DummyIdentity("3");
@@ -370,9 +370,9 @@ public class TestLPA {
                 tempMap.put(ident, 1);
 
                 // conflicts - data cache evictions due to conflict
-                Map<Long, Integer> conflict = new HashMap<Long, Integer>();
-                conflict.put(NODE1, 1);
-                conflictMap.put("obj1", conflict);
+                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                conflict.put("obj1", 1);
+                conflictMap.put(NODE1, conflict);
             } else if (node == NODE3) {
                 Identity[] idents = {new DummyIdentity("4"),
                                      new DummyIdentity("5")};
@@ -409,7 +409,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Map<Long, Integer>> getConflictMap() {
+        public Map<Long, Map<Object, Integer>> getConflictMap() {
             return conflictMap;
         }
 

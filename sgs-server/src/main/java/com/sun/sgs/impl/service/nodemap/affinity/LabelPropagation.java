@@ -624,35 +624,7 @@ public class LabelPropagation implements LPAClient {
         }
 
         // Get conflict information from the graph builder.
-        Map<Object, Map<Long, Integer>> conflictMap =
-               builder.getConflictMap();
-
-        // Go through the map, gathering together all obj ids for a single
-        // node.  JANE perhaps we should allow the builder to return this
-        // view, as well, and maintain it as the info comes in?  That means
-        // more work for the pruner, though.
-        //
-        for (Map.Entry<Object, Map<Long, Integer>> entry:
-             conflictMap.entrySet())
-        {
-            Object objId = entry.getKey();
-            Map<Long, Integer> nodeIdMap = entry.getValue();
-            for (Map.Entry<Long, Integer> nodeEntry : nodeIdMap.entrySet()) {
-                Long nodeId = nodeEntry.getKey();
-                Integer weight = nodeEntry.getValue();
-                Map<Object, Integer> idMap = nodeConflictMap.get(nodeId);
-                int oldWeight;
-                if (idMap == null) {
-                    idMap = new HashMap<Object, Integer>();
-                    oldWeight = 0;
-                } else {
-                    oldWeight = idMap.get(objId);
-                }
-
-                idMap.put(objId, oldWeight + weight);
-                nodeConflictMap.put(nodeId, idMap);
-            }
-        }
+        nodeConflictMap = new ConcurrentHashMap(builder.getConflictMap());
     }
 
     private void updateNodeConflictMap(Collection<Object> objIds, long nodeId) {
