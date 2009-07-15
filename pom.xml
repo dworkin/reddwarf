@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>14</version>
+    <version>15</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
@@ -425,8 +425,8 @@
 
   <properties>
     <sgs.version>${version}</sgs.version>
-    <sgs-shared.version>1.7</sgs-shared.version>
-    <sgs-client.version>0.9.9</sgs-client.version>
+    <sgs-shared.version>1.8</sgs-shared.version>
+    <sgs-client.version>0.9.10</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
     <sgs-test-ext.version>1.0</sgs-test-ext.version>

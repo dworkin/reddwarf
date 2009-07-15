@@ -58,6 +58,14 @@ interface NodeMappingServer extends Remote {
      */
     void canRemove(Identity id) throws IOException;
     
+    /**
+     * All {@code IdentityRelocationListener}s have completed their work,
+     * so it's safe to move the identity.
+     * @param id the identity which can now be moved
+     * @throws IOException if a communication problem occurs while
+     *         invoking this method
+     */
+    void canMove(Identity id) throws IOException;
     
     /**
      * Register a {@link NotifyClient} object to be called when changes

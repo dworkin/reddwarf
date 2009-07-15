@@ -162,7 +162,7 @@ final class ManagedReferenceImpl<T>
 	assert object instanceof ManagedObject
 	    : "Object is not a managed object";
 	ManagedReferenceImpl<T> ref = Objects.uncheckedCast(
-	    context.refs.find(object));
+	    context.refs.find((ManagedObject) object));
 	if (ref != null && ref.isRemoved()) {
 	    throw new ObjectNotFoundException("Object has been removed");
 	}
@@ -177,7 +177,8 @@ final class ManagedReferenceImpl<T>
 	Context context, T object)
     {
 	if (object instanceof ManagedObject) {
-	    return Objects.uncheckedCast(context.refs.find(object));
+	    return Objects.uncheckedCast(
+                    context.refs.find((ManagedObject) object));
 	} else {
 	    return null;
 	}
@@ -194,7 +195,7 @@ final class ManagedReferenceImpl<T>
 	assert object instanceof ManagedObject
 	    : "Object is not a managed object";
 	ManagedReferenceImpl<T> ref = Objects.uncheckedCast(
-	    context.refs.find(object));
+	    context.refs.find((ManagedObject) object));
 	if (ref == null) {
 	    ref = new ManagedReferenceImpl<T>(context, object);
 	    context.refs.add(ref);

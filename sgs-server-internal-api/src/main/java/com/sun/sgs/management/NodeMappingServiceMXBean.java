@@ -55,6 +55,16 @@ public interface NodeMappingServiceMXBean {
     
     /**
      * Returns the number of times 
+     * {@link NodeMappingService#addIdentityRelocationListener 
+     *  addIdentityRelocationListener} has been called.
+     * 
+     * @return the number of times {@code addIdentityRelocationListener} 
+     *         has been called
+     */
+    long getAddIdentityRelocationListenerCalls();
+    
+    /**
+     * Returns the number of times 
      * {@link NodeMappingService#assignNode assignNode} has been called.
      * 
      * @return the number of times {@code assignNode} has been called
