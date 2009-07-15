@@ -191,6 +191,44 @@ public class TestChannelServiceImplRelocatingSessions
 	}
     }
 
+    public void testChannelJoinDuringRelocate() throws Exception {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	createChannel(channelName);
+	// All clients will log into server node.
+	ClientGroup group = new ClientGroup(someUsers);
+	addNodes("host2", "host3");
+	
+	try {
+	    // Initiate client relocation to new node.
+	    printServiceBindings("before relocate");
+	    DummyClient relocatingClient = group.getClient(someUsers.get(0));
+	    moveIdentityAndWaitForRelocationNotification(
+		relocatingClient, serverNode, additionalNodes.get("host2"));
+	    
+	    // Join all users (including relocating client) to channel.
+	    joinUsers(channelName, someUsers);
+	    printServiceBindings("after join, but before relocation complete");
+
+	    // Finish relocation.
+	    relocatingClient.relocate(0, true, true);
+	    
+	    // Make sure all members are joined and can receive messages.
+	    checkUsersJoined(channelName, someUsers);
+	    printServiceBindings("after all joins");
+	    sendMessagesToChannel(channelName, group, 2);
+
+	    // Disconnect each client and make sure that memberships/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    Thread.sleep(WAIT_TIME);
+	    checkUsersJoined(channelName, new ArrayList<String>());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
     // -- Other methods --
     
     /**

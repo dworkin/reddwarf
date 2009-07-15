@@ -1250,6 +1250,16 @@ public final class ClientSessionServiceImpl
 	handlers.put(sessionRefId, handler);
 	if (identity != null) {
 	    relocatingIdentities.remove(identity);
+	    //  Notify status listeners that the specified client session
+	    //  has completed relocating to this node.
+	    for (ClientSessionStatusListener statusListener :
+		     sessionStatusListeners)
+	    {
+		try {
+		    statusListener.relocated(sessionRefId);
+		} catch (Exception e) {
+		}
+	    }
 	}
     }
     
@@ -1267,7 +1277,10 @@ public final class ClientSessionServiceImpl
 	    for (ClientSessionStatusListener statusListener :
 		     sessionStatusListeners)
 	    {
-		statusListener.disconnected(sessionRefId);
+		try {
+		    statusListener.disconnected(sessionRefId);
+		} catch (Exception e) {
+		}
 	    }
 	}
 	handlers.remove(sessionRefId);

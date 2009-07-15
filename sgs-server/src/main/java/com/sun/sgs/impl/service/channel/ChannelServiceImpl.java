@@ -606,8 +606,8 @@ public final class ChannelServiceImpl
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
-			Level.FINEST, "join name::{0} channelId:{1} " +
-			"sessionId:{1} relocatingToNode:{2} localNodeId:{3}",
+			Level.FINEST, "join name:{0} channelId:{1} " +
+			"sessionId:{2} relocatingToNode:{3} localNodeId:{4}",
 			name,
 			HexDumper.toHexString(channelRefId.toByteArray()),
 			HexDumper.toHexString(sessionRefId.toByteArray()),
@@ -656,16 +656,39 @@ public final class ChannelServiceImpl
 		    }
 		    
 		    taskQueue.add(joinTask);
+		    protocol = sessionService.getSessionProtocol(sessionRefId);
+		    if (protocol != null) {
+			// Client relocated while adding a task to the queue.
+			// The task could have been added to the queue after
+			// the 'relocated' notification, so it wouldn't have
+			// been processed.  Therefore notify the channel
+			// service that the session has been relocated so that
+			// it can process the task queue.
+			sessionStatusListener.relocated(sessionRefId);
+		    }
+
 		    return localNodeId;
 		    
 		} else {
 		    // The session is locally-connected, so process the
 		    // join request locally.
 		    try {
-			// TBD: need to make sure that this join is processed
-			// *after* all messages enqueued during relocation,
-			// because messages received during relocation may be
-			// processed at the same time as this request.
+			List<KernelRunnable> taskQueue =
+			    relocatedSessionTaskQueues.get(sessionRefId);
+			if (taskQueue != null) {
+			    synchronized (taskQueue) {
+				// If this session is relocating to this node,
+				// wait for all channel requests enqueued during
+				// relocation to be processed.
+				if (! taskQueue.isEmpty()) {
+				    try {
+					// TBD: bounded timeout?
+					taskQueue.wait();
+				    } catch (InterruptedException e) {
+				    }
+				}
+			    }
+			}
 			joinTask.run();
 			return localNodeId;
 			
@@ -781,9 +804,11 @@ public final class ChannelServiceImpl
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
-			Level.FINEST, "send channelId:{0} message:{1}",
+			Level.FINEST,
+			"send channelId:{0} message:{1} localNodeId:{2}",
 			HexDumper.toHexString(channelRefId.toByteArray()),
-			HexDumper.format(message, 0x50));
+			HexDumper.format(message, 0x50),
+			localNodeId);
 		}
 		/*
 		 * TBD: (optimization) this should enqueue the send
@@ -1332,8 +1357,31 @@ public final class ChannelServiceImpl
 	 * {@inheritDoc}
 	 */
 	public void relocated(BigInteger sessionRefId) {
-	    // TBD: flush any enqueued channel joins/leaves/message
+	    // Flush any enqueued channel joins/leaves/message
 	    // to the client session.
+	    List<KernelRunnable> taskQueue =
+		relocatedSessionTaskQueues.get(sessionRefId);
+	    if (taskQueue != null) {
+		synchronized (taskQueue) {
+		    for (KernelRunnable task : taskQueue) {
+			try {
+			    task.run();
+			} catch (Exception e) {
+			    if (logger.isLoggable(Level.FINE)) {
+				logger.logThrow(
+				    Level.FINE, e,
+				    "Running task:{0} for relocated " +
+				    "session:{1} throws", task,
+				    HexDumper.toHexString(
+					sessionRefId.toByteArray()));
+			    }
+			}
+		    }
+		    taskQueue.clear();
+		    taskQueue.notify();
+		}
+		relocatedSessionTaskQueues.remove(sessionRefId);
+	    }
 	}
     }
 
