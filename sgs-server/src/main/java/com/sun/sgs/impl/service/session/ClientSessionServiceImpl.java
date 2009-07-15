@@ -50,6 +50,7 @@ import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.RelocateFailureException;
+import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -1030,11 +1031,14 @@ public final class ClientSessionServiceImpl
 		SessionProtocol sessionProtocol =
 		    getSessionProtocol(new BigInteger(1, sessionId));
 		if (sessionProtocol != null) {
+		    Delivery delivery = Delivery.values()[deliveryOrdinal];
+
 		    try {
 			sessionProtocol.sessionMessage(
-			    ByteBuffer.wrap(message),
-			    Delivery.values()[deliveryOrdinal]);
+			    ByteBuffer.wrap(message), delivery);
 		    } catch (IOException e) {
+			// TBD: should we disconnect the session because
+			// messages can't be delivered?
 			if (logger.isLoggable(Level.FINE)) {
 			    logger.logThrow(
 				Level.FINE, e,
@@ -1044,6 +1048,16 @@ public final class ClientSessionServiceImpl
 				HexDumper.toHexString(message));
 					    
 			}
+		    } catch (RelocatingSessionException e) {
+			// This shouldn't happen because client session
+			// events are not processed while a session is
+			// relocating.
+			logger.logThrow(
+			    Level.SEVERE, e,
+			    "Attempted send to session:{0} during relocation, " +
+			    "message:{1}",
+			    HexDumper.toHexString(sessionId),
+			    HexDumper.toHexString(message));
 		    }
 		} else {
 		    if (logger.isLoggable(Level.FINE)) {

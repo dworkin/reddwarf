@@ -35,6 +35,7 @@ import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.RelocateFailureException;
+import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.RequestFailureException;
 import com.sun.sgs.protocol.RequestFailureException.FailureReason;
 import com.sun.sgs.protocol.RequestCompletionHandler;
@@ -86,7 +87,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** A random number generator for reconnect keys. */
     private static final SecureRandom random = new SecureRandom();
-    
+
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...).
@@ -117,7 +118,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The completion handler for writing to the I/O channel. */
     private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
-    /** A lock for {@code loginHandled} and {@code messageQueue} fields. */
+    /** A lock for {@code loginHandled}, {@code messageQueue}, and
+     * {@code relocating}  fields. */
     private Object lock = new Object();
 
     /** Indicates whether the client's login ack has been sent. */
@@ -128,6 +130,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** The set of supported delivery requirements. */
     protected final Set<Delivery> deliverySet = new HashSet<Delivery>();
+
+    /** Flag to indicate whether the associated client session is relocating to
+     * another node. */
+    private boolean relocating = false;
 
 
     /**
@@ -198,7 +204,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
     
     /** {@inheritDoc} */
-    public void sessionMessage(ByteBuffer message, Delivery delivery) {
+    public void sessionMessage(ByteBuffer message, Delivery delivery)
+	throws RelocatingSessionException
+    {
+	checkRelocating();
 	int messageLength = 1 + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf = ByteBuffer.wrap(new byte[messageLength]);
@@ -211,7 +220,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** {@inheritDoc} */
     public void channelJoin(
 	String name, BigInteger channelId, Delivery delivery)
+	throws RelocatingSessionException
     {
+	checkRelocating();
 	byte[] channelIdBytes = channelId.toByteArray();
 	MessageBuffer buf =
 	    new MessageBuffer(1 + MessageBuffer.getSize(name) +
@@ -223,7 +234,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void channelLeave(BigInteger channelId) {
+    public void channelLeave(BigInteger channelId)
+	throws RelocatingSessionException
+    {
+	checkRelocating();
 	byte[] channelIdBytes = channelId.toByteArray();
 	ByteBuffer buf =
 	    ByteBuffer.allocate(1 + channelIdBytes.length);
@@ -246,7 +260,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     public void channelMessage(BigInteger channelId,
                                ByteBuffer message,
                                Delivery delivery)
+	throws RelocatingSessionException
     {
+	checkRelocating();
 	byte[] channelIdBytes = channelId.toByteArray();
 	int messageLength = 3 + channelIdBytes.length + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
@@ -282,7 +298,15 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     public void relocate(Node newNode,
 			 Set<ProtocolDescriptor> descriptors,
 			 ByteBuffer relocationKey)
+	throws RelocatingSessionException
     {
+	synchronized (lock) {
+	    if (relocating) {
+		throw new RelocatingSessionException("session already relocating");
+	    } else {
+		relocating = true;
+	    }
+	}
         for (ProtocolDescriptor descriptor : descriptors) {
             if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
 		byte[] redirectionData =
@@ -526,6 +550,20 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	byte[] key = new byte[DEFAULT_RECONNECT_KEY_LENGTH];
 	random.nextBytes(key);
 	return key;
+    }
+
+    /**
+     * Throws {@link RelocatingSessionException} if the client session is
+     * relocating.
+     *
+     * @throws	RelocatingSessionException if the client session is relocating
+     */
+    private void checkRelocating() throws RelocatingSessionException {
+	synchronized (lock) {
+	    if (relocating) {
+		throw new RelocatingSessionException("session relocating");
+	    }
+	}
     }
 
     /* -- I/O completion handlers -- */

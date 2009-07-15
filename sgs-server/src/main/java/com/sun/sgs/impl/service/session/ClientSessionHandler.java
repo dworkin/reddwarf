@@ -37,6 +37,7 @@ import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.RelocateFailureException;
+import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.RequestFailureException;
 import com.sun.sgs.protocol.SessionProtocol;
@@ -1423,6 +1424,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
 			"relocating client session:{0} throws", this);
 		}
 		handleDisconnect(false, true);
+	    } catch (RelocatingSessionException e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"relocating client session:{0} throws", this);
+		}
 	    }
 	}
     }

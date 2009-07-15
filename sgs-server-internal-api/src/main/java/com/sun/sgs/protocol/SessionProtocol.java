@@ -110,7 +110,7 @@ public interface SessionProtocol extends Channel {
      *		relocating to another node
      */
     void sessionMessage(ByteBuffer message, Delivery delivery)
-	throws IOException;
+	throws IOException, RelocatingSessionException;
     
     /**
      * Notifies the associated client that it is joined to the channel
@@ -128,7 +128,7 @@ public interface SessionProtocol extends Channel {
      *		relocating to another node
      */
     void channelJoin(String name, BigInteger channelId, Delivery delivery)
-            throws IOException;
+	throws IOException, RelocatingSessionException;
 
     /**
      * Notifies the associated client that it is no longer a member of
@@ -141,7 +141,8 @@ public interface SessionProtocol extends Channel {
      * @throws	RelocatingSessionException if the associated session is
      *		relocating to another node
      */
-    void channelLeave(BigInteger channelId) throws IOException;
+    void channelLeave(BigInteger channelId)
+	throws IOException, RelocatingSessionException;
 
     /**
      * Sends the associated client the specified channel {@code message}
@@ -176,7 +177,7 @@ public interface SessionProtocol extends Channel {
      */
     void channelMessage(
 	BigInteger channelId, ByteBuffer message, Delivery delivery)
-        throws IOException;
+        throws IOException, RelocatingSessionException;
 
     /**
      * Notifies the associated client to relocate its session to the
@@ -203,7 +204,7 @@ public interface SessionProtocol extends Channel {
     void relocate(Node newNode,
 		  Set<ProtocolDescriptor> descriptors,
 		  ByteBuffer relocationKey)
-	throws IOException;
+	throws IOException, RelocatingSessionException;
 
     /**
      * Disconnects the associated session for the specified {@code reason}.
@@ -211,12 +212,13 @@ public interface SessionProtocol extends Channel {
      * the reason for the disconnection, or the protocol may close the
      * connection immediately.  Any underlying connection(s) should be
      * closed in a timely fashion.
-     
+     *
+     * <p>TBD: should this throw RelocatingSessionException?
+     *
      * @param	reason	the reason for disconnection
      * 
      * @throws	IOException if an I/O error occurs
-     * @throws	RelocatingSessionException if the associated session is
-     *		relocating to another node
      */
-    void disconnect(DisconnectReason reason) throws IOException;
+    void disconnect(DisconnectReason reason)
+	throws IOException, RelocatingSessionException;
 }

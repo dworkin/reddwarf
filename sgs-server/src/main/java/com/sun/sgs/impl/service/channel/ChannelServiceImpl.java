@@ -561,10 +561,14 @@ public final class ChannelServiceImpl
                             try {
                                 protocol.channelJoin(name, channelRefId,
                                                      delivery);
-                            } catch (IOException ioe) {
-                                logger.logThrow(Level.WARNING, ioe,
+                            } catch (IOException e) {
+                                logger.logThrow(Level.WARNING, e,
                                                 "channelJoin throws");
-                            }
+                            } catch (RelocatingSessionException e) {
+				// TBD
+                                logger.logThrow(Level.WARNING, e,
+                                                "channelJoin throws");
+			    }
 			}
 			// FIXME: update per-session channel set.
 		    }
@@ -576,8 +580,12 @@ public final class ChannelServiceImpl
 			if (protocol != null) {
                             try {
                                 protocol.channelLeave(channelRefId);
-                            } catch (IOException ioe) {
-                                logger.logThrow(Level.WARNING, ioe,
+                            } catch (IOException e) {
+                                logger.logThrow(Level.WARNING, e,
+                                                "channelLeave throws");
+                            } catch (RelocatingSessionException e) {
+				// TBD
+                                logger.logThrow(Level.WARNING, e,
                                                 "channelLeave throws");
                             }
 			}
@@ -742,10 +750,14 @@ public final class ChannelServiceImpl
 		if (protocol != null) {
                     try {
                         protocol.channelLeave(channelRefId);
-                    } catch (IOException ioe) {
-                        logger.logThrow(Level.WARNING, ioe,
+                    } catch (IOException e) {
+                        logger.logThrow(Level.WARNING, e,
                                         "channelLeave throws");
-                    }
+                    } catch (RelocatingSessionException e) {
+			// TBD
+                        logger.logThrow(Level.WARNING, e,
+                                        "channelLeave throws");
+		    }
 		}
 		
 	    } finally {
@@ -776,10 +788,14 @@ public final class ChannelServiceImpl
 			if (protocol != null) {
                             try {
                                 protocol.channelLeave(channelRefId);
-                            } catch (IOException ioe) {
-                                logger.logThrow(Level.WARNING, ioe,
+                            } catch (IOException e) {
+                                logger.logThrow(Level.WARNING, e,
                                                 "channelLeave throws");
-                            }
+                            } catch (RelocatingSessionException e) {
+				// TBD
+                                logger.logThrow(Level.WARNING, e,
+                                                "channelLeave throws");
+			    }
 			}
 		    }
 		}
@@ -834,8 +850,12 @@ public final class ChannelServiceImpl
                             protocol.channelMessage(channelRefId,
                                                     ByteBuffer.wrap(message),
                                                     delivery);
-                        } catch (IOException ioe) {
-                            logger.logThrow(Level.WARNING, ioe,
+                        } catch (IOException e) {
+                            logger.logThrow(Level.WARNING, e,
+                                            "channelMessage throws");
+                        } catch (RelocatingSessionException e) {
+			    // TBD
+                            logger.logThrow(Level.WARNING, e,
                                             "channelMessage throws");
                         }
 		    }
@@ -1827,9 +1847,9 @@ public final class ChannelServiceImpl
 	    if (protocol != null) {
 		try {
 		    protocol.channelJoin(name, channelRefId, delivery);
-		} catch (IOException ioe) {
+		} catch (IOException e) {
 		    // TBD: session disconnecting?
-		    logger.logThrow(Level.WARNING, ioe,
+		    logger.logThrow(Level.WARNING, e,
 				    "channelJoin throws");
 		}
 	    }

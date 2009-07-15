@@ -20,8 +20,11 @@
 package com.sun.sgs.test.impl.service.channel;
 
 import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
+import com.sun.sgs.service.ClientSessionStatusListener;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -191,13 +194,66 @@ public class TestChannelServiceImplRelocatingSessions
 	}
     }
 
-    public void testChannelJoinDuringRelocate() throws Exception {
+    public void testChannelJoinDuringRelocatePreparation()
+	throws Exception
+    {
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	createChannel(channelName);
 	// All clients will log into server node.
 	ClientGroup group = new ClientGroup(someUsers);
-	addNodes("host2", "host3");
+	addNodes("host2");
+	MySessionStatusListener mySessionStatusListener =
+	    new MySessionStatusListener();
+	serverNode.getClientSessionService().
+	    addSessionStatusListener(mySessionStatusListener);
+	
+	try {
+	    // Initiate client relocation to new node.
+	    printServiceBindings("before relocate");
+	    DummyClient relocatingClient = group.getClient(someUsers.get(0));
+	    SgsTestNode newNode = additionalNodes.get("host2");
+	    moveIdentity(relocatingClient, serverNode, newNode);
+	    SimpleCompletionHandler handler =
+		mySessionStatusListener.waitForPrepare();
+	    
+	    // Join all users (including relocating client) to channel during
+	    // prepare phase.
+	    joinUsers(channelName, someUsers);
+	    printServiceBindings("after join, but before relocation complete");
+
+	    Thread.sleep(200);
+	    // Mark preparation completed.
+	    handler.completed();
+	    
+	    // Finish relocation.
+	    relocatingClient.relocate(0, true, true);
+	    
+	    // Make sure all members are joined and can receive messages.
+	    checkUsersJoined(channelName, someUsers);
+	    printServiceBindings("after all joins");
+	    sendMessagesToChannel(channelName, group, 2);
+
+	    // Disconnect each client and make sure that memberships/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    Thread.sleep(WAIT_TIME);
+	    checkUsersJoined(channelName, new ArrayList<String>());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+	
+    }
+
+    public void testChannelJoinDuringRelocate() throws Exception {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	createChannel(channelName);
+	// All clients will log into server node.
+	ClientGroup
+	    group = new ClientGroup(someUsers);
+	addNodes("host2");
 	
 	try {
 	    // Initiate client relocation to new node.
@@ -230,10 +286,21 @@ public class TestChannelServiceImplRelocatingSessions
     }
 
     // -- Other methods --
+
+    /**
+     * Reassigns the client's identity from {@code oldNode} to {@code newNode}.
+     */
+    private void moveIdentity(
+	DummyClient client, SgsTestNode oldNode, SgsTestNode newNode)
+	throws Exception
+    {
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity(client.name, oldNode.getNodeId(), newNode.getNodeId());
+    }
     
     /**
-     * Reassigns the idenity from {@code oldNode} to {@code newNode}, and
-     * waits for the client to receive the relocation notification.  The
+     * Reassigns the client's identity from {@code oldNode} to {@code newNode},
+     * and waits for the client to receive the relocation notification.  The
      * client does not relocated unless instructed to do so via a {@code
      * relocate} invocation.
      */
@@ -244,9 +311,7 @@ public class TestChannelServiceImplRelocatingSessions
 	System.err.println("reassigning identity:" + client.name +
 			   " from node: " + oldNode.getNodeId() +
 			   " to node: " + newNode.getNodeId());
-	DirectiveNodeAssignmentPolicy.instance.
-	    moveIdentity(client.name, oldNode.getNodeId(),
-			 newNode.getNodeId());
+	moveIdentity(client, oldNode, newNode);
 	client.waitForRelocationNotification(0);
     }
     
@@ -260,5 +325,41 @@ public class TestChannelServiceImplRelocatingSessions
 	moveIdentityAndWaitForRelocationNotification(
 	    client, oldNode, newNode);
 	client.relocate(0, true, true);
+    }
+
+    private class MySessionStatusListener
+	implements ClientSessionStatusListener
+    {
+	private SimpleCompletionHandler handler = null;
+	    
+	public void disconnected(final BigInteger sessionRefId) {}
+
+	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
+				      SimpleCompletionHandler handler)
+	{
+	    synchronized (this) {
+		this.handler = handler;
+		notifyAll();
+	    }
+	}
+	
+	public void relocated(BigInteger sessionRefId) {
+	}
+
+	SimpleCompletionHandler waitForPrepare() {
+	    synchronized (this) {
+		if (handler == null) {
+		    try {
+			wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+	    }
+	    return handler;
+	}
+	
+	void setPrepared() {
+	    handler.completed();
+	}
     }
 }
