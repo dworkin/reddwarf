@@ -193,7 +193,6 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-//    public Map<Object, Map<Long, Integer>> getConflictMap() {
     public Map<Long, Map<Object, Integer>> getConflictMap() {
         return conflictMap;
     }

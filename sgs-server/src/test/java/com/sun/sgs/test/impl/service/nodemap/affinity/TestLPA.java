@@ -35,15 +35,17 @@ import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
@@ -57,8 +59,31 @@ import static org.junit.Assert.fail;
  */
 @RunWith(FilteredNameRunner.class)
 public class TestLPA {
+    /** The default initial unique port for this test suite. */
+    private final static int DEFAULT_PORT = 20000;
+
+    /** The property that can be used to select an initial port. */
+    private final static String PORT_PROPERTY = "test.sgs.port";
+
+    /** The next unique port to use for this test suite. */
+    private static AtomicInteger nextUniquePort;
+
+    static {
+        Integer systemPort = Integer.getInteger(PORT_PROPERTY);
+        int port = systemPort == null ? DEFAULT_PORT
+                                      : systemPort.intValue();
+        nextUniquePort = new AtomicInteger(port);
+    }
 
     private LabelPropagationServer server;
+
+    @Before
+    public void setup() throws Exception {
+        Properties props = new Properties();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(getNextUniquePort()));
+        server = new LabelPropagationServer(props);
+    }
 
     @After
     public void shutdown() throws Exception {
@@ -67,11 +92,18 @@ public class TestLPA {
             server = null;
         }
     }
+    /**
+     * Returns a unique port number.  Note that the ports are only unique
+     * within the current process.
+     */
+    public static int getNextUniquePort() {
+        return nextUniquePort.incrementAndGet();
+    }
+
     
     @Test
     public void testDistributedFramework() throws Exception {
         // Create a server, and add a few "nodes"
-        server = new LabelPropagationServer();
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         {
             AffinityGroupImpl a = new AffinityGroupImpl(1);
@@ -152,22 +184,18 @@ public class TestLPA {
     @Test
     public void testCrossNodeData() throws Exception {
         // Create our server and three clients.
-        server = new LabelPropagationServer();
-        int port = LabelPropagationServer.DEFAULT_SERVER_PORT;
+        int port = nextUniquePort.get();
         String localHost = InetAddress.getLocalHost().getHostName();
 
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
                     PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
-        server.register(PartialToyBuilder.NODE1, lp1);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
                     PartialToyBuilder.NODE2, localHost, port, true, 1, 0);
-        server.register(PartialToyBuilder.NODE2, lp2);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
                     PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
-        server.register(PartialToyBuilder.NODE3, lp3);
 
         lp1.exchangeCrossNodeInfo();
         lp2.exchangeCrossNodeInfo();
@@ -221,6 +249,39 @@ public class TestLPA {
                 sb1.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
             }
             System.out.println(sb1.toString());
+        }
+    }
+
+    @Test
+    public void testCrossNodeLabels() throws Exception {
+        // Create our server and three clients.
+        int port = nextUniquePort.get();
+        String localHost = InetAddress.getLocalHost().getHostName();
+
+        // These match the ones from the partial toy builder
+        Identity id1 = new DummyIdentity("1");
+        Identity id2 = new DummyIdentity("2");
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        lp1.initializeLPARun();
+
+        Set<Object> objIds = new HashSet<Object>();
+        objIds.add("obj1");
+        objIds.add("obj2");
+        Map<Object, Set<Integer>> labels = lp1.getRemoteLabels(objIds);
+        assertEquals(2, labels.size());
+        assertTrue(labels.keySet().equals(objIds));
+        Set<Integer> obj1Set = labels.get("obj1");
+        assertEquals(2, obj1Set.size());
+        for (Integer label : obj1Set) {
+            assertTrue(label.equals(id1.getName().hashCode()) ||
+                       label.equals(id2.getName().hashCode()));
+        }
+        Set<Integer> obj2Set = labels.get("obj2");
+        assertEquals(1, obj2Set.size());
+        for (Integer label : obj2Set) {
+            assertTrue(label.equals(id2.getName().hashCode()));
         }
     }
 

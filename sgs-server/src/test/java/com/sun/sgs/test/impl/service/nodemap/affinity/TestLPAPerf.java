@@ -27,6 +27,7 @@ import com.sun.sgs.tools.test.IntegrationTest;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Properties;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
@@ -66,7 +67,7 @@ public class TestLPAPerf {
 
     @BeforeClass
     public static void before() throws Exception {
-        lpaServer = new LabelPropagationServer();
+        lpaServer = new LabelPropagationServer(new Properties());
     }
 
     @AfterClass

@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import java.io.IOException;
 import java.util.Collection;
@@ -28,6 +29,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -52,6 +54,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
+    /** The property name for the server port. */
+    static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
+    
     /** The default value of the server port. */
     static public final int DEFAULT_SERVER_PORT = 44537;
 
@@ -90,10 +95,13 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // of 60 sec before unused threads are reaped.
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    public LabelPropagationServer() throws IOException {
+    public LabelPropagationServer(Properties properties) throws IOException {
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        int requestedPort = wrappedProps.getIntProperty(
+                SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
         // Export ourself.
         exporter = new Exporter<LPAServer>(LPAServer.class);
-        exporter.export(this, SERVER_EXPORT_NAME, DEFAULT_SERVER_PORT);
+        exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
     }
 
     // ---- Implement AffinityGroupFinder --- //

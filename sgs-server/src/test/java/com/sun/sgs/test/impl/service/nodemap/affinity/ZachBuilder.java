@@ -143,7 +143,7 @@ class ZachBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Long, Integer>> getConflictMap() {
+    public Map<Long, Map<Object, Integer>> getConflictMap() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

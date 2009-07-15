@@ -210,24 +210,22 @@ public class LabelPropagation implements LPAClient {
             // Are there any timing errors or deadlock conditions I should
             // think about?
             Long nodeId = entry.getKey();
-//            if (nodeId > localNodeId) {
-                LPAClient proxy = getProxy(nodeId);
-                // Tell the other node about the conflicts we know of.
-                // JANE should this also include weights?  I think so,
-                // so both sides are using the same info
-                if (proxy != null) {
-                    Collection<Object> objs =
-                        proxy.crossNodeEdges(
-                            new HashSet<Object>(entry.getValue().keySet()),
-                            localNodeId);
-                    updateNodeConflictMap(objs, nodeId);
-                } else {
-                    // JANE failure? or just don't care?  The node might have
-                    // gone down before this call was made, and we have stale
-                    // info from the graph builder.
+            LPAClient proxy = getProxy(nodeId);
+            // Tell the other node about the conflicts we know of.
+            // JANE should this also include weights?  I think so,
+            // so both sides are using the same info
+            if (proxy != null) {
+                Collection<Object> objs =
+                    proxy.crossNodeEdges(
+                        new HashSet<Object>(entry.getValue().keySet()),
+                        localNodeId);
+                updateNodeConflictMap(objs, nodeId);
+            } else {
+                // JANE failure? or just don't care?  The node might have
+                // gone down before this call was made, and we have stale
+                // info from the graph builder.
 
-                }
-//            }
+            }
         }
 
         // Tell the server we're ready for the iterations to begin
@@ -255,6 +253,7 @@ public class LabelPropagation implements LPAClient {
     /** {@inheritDoc} */
     public void removeNode(long nodeId) throws IOException {
         nodeProxies.remove(nodeId);
+        nodeConflictMap.remove(nodeId);
     }
 
     /** {@inheritDoc} */
@@ -266,17 +265,12 @@ public class LabelPropagation implements LPAClient {
         //          a node is first created, and reinitialized when we
         //          since we know we're in the first iteration.
         if (iteration == 1) {
-            // The set of vertices we iterate over is fixed (e.g. we don't
-            // consider new vertices as we process this graph).  If processing
-            // takes a long time, or if we use a more dynamic work queue, we'll
-            // want to revisit this.
-            graph = createLabelGraph();
-            vertices = new ArrayList<LabelVertex>(graph.getVertices());
+            initializeLPARun();
         }
 
         // JANE get the remote labels from each node
         // will need a map of nodeId -> objects of interest on the node.
-        getRemoteLabels();
+        updateRemoteLabels();
 
 //        // Step 2.  Set t = 1;
 //        int t = 1;
@@ -394,54 +388,75 @@ public class LabelPropagation implements LPAClient {
     public Map<Object, Set<Integer>> getRemoteLabels(Collection<Object> objIds) 
             throws IOException
     {
-        throw new UnsupportedOperationException("Not supported yet.");
+        Map<Object, Set<Integer>> retMap = new HashMap<Object, Set<Integer>>();
+        Map<Object, Map<Identity, Integer>> objectMap =
+                builder.getObjectUseMap();
+
+        for (Object obj : objIds) {
+            // look up the set of identities
+            Map<Identity, Integer> idents = objectMap.get(obj);
+            Set<Integer> intSet = new HashSet<Integer>();
+            for (Identity id : idents.keySet()) {
+                // JANE not dealing with weights here
+                // Find the label associated with the id in the graph.
+                // We do this by creating vid, a template of the LabelVertex,
+                // and then finding the actual graph vertex with that identity.
+                LabelVertex vid = new LabelVertex(id);
+                int index = vertices.indexOf(vid);
+                intSet.add(vertices.get(index).getLabel());
+            }
+            retMap.put(obj, intSet);
+        }
+        return retMap;
     }
 
-    private void getRemoteLabels() throws IOException {
+    private void updateRemoteLabels() throws IOException {
         Map<Object, Map<Identity, Integer>> objectMap =
                 builder.getObjectUseMap();
 
         // Now, go through the new map, asking for its labels
-        for (Map.Entry<Long, Map<Object, Integer>> entry : nodeConflictMap.entrySet()) {
+        for (Map.Entry<Long, Map<Object, Integer>> entry : 
+             nodeConflictMap.entrySet())
+        {
             // JANE is it safe to make a remote call from a remote call?
             // Are there any timing errors or deadlock conditions I should
             // think about?
             Long nodeId = entry.getKey();
-            LPAClient proxy = nodeProxies.get(nodeId);
+            LPAClient proxy = getProxy(nodeId);
+
+            // If the node failed, continue asking the other nodes for their
+            // information -- JANE probably want to exit out of the algorithm
+            // in this case
             if (proxy == null) {
-                // Ask the server for it. Retries?
-                proxy = server.getLPAClientProxy(nodeId);
-                if (proxy != null) {
-                    nodeProxies.put(nodeId, proxy);
-                } else {
-                    removeNode(nodeId);
-                    // JANE failure? or just don't care?  The node might have
-                    // gone down before this call was made, and we have stale
-                    // info from the graph builder.
-                }
+                break;
             }
+
             // Tell the other node about the conflicts we know of.
-            // JANE should this also include weights?  I think so,
+            // JANE should this also include counts?  I think so,
             // so both sides are using the same info
-            if (proxy != null) {
-                Map<Object, Set<Integer>> labels = proxy.getRemoteLabels(entry.getValue().keySet());
-                //Map<Identity, Map<Integer, Integer>> remoteLabelMap
-                for (Map.Entry<Object, Set<Integer>> remoteEntry : labels.entrySet()) {
-                    Object remoteObject = remoteEntry.getKey();
-                    Set<Integer> remoteLabels = remoteEntry.getValue();
-                    Map<Identity, Integer> objUse = objectMap.get(remoteObject);
-                    for (Map.Entry<Identity, Integer> objUseId : objUse.entrySet()) {
-                        Identity id = objUseId.getKey();
-                        Integer weight = objUseId.getValue();
-                        Map<Integer, Integer> labelWeight = remoteLabelMap.get(id);
-                        if (labelWeight == null) {
-                            labelWeight = new ConcurrentHashMap<Integer, Integer>();
-                        }
-                        for (Integer label : remoteLabels) {
-                            labelWeight.put(label, weight);
-                        }
-                        remoteLabelMap.put(id, labelWeight);
+            Map<Object, Set<Integer>> labels =
+                    proxy.getRemoteLabels(
+                        new HashSet<Object>(entry.getValue().keySet()));
+            //Map<Identity, Map<Integer, Integer>> remoteLabelMap
+            // Process the returned labels
+            for (Map.Entry<Object, Set<Integer>> remoteEntry :
+                 labels.entrySet())
+            {
+                Object remoteObject = remoteEntry.getKey();
+                Set<Integer> remoteLabels = remoteEntry.getValue();
+                Map<Identity, Integer> objUse = objectMap.get(remoteObject);
+                for (Map.Entry<Identity, Integer> objUseId : objUse.entrySet())
+                {
+                    Identity id = objUseId.getKey();
+                    Integer weight = objUseId.getValue();
+                    Map<Integer, Integer> labelWeight = remoteLabelMap.get(id);
+                    if (labelWeight == null) {
+                        labelWeight = new ConcurrentHashMap<Integer, Integer>();
                     }
+                    for (Integer label : remoteLabels) {
+                        labelWeight.put(label, weight);
+                    }
+                    remoteLabelMap.put(id, labelWeight);
                 }
             }
         }
@@ -624,7 +639,8 @@ public class LabelPropagation implements LPAClient {
         }
 
         // Get conflict information from the graph builder.
-        nodeConflictMap = new ConcurrentHashMap(builder.getConflictMap());
+        nodeConflictMap = new ConcurrentHashMap<Long, Map<Object, Integer>>
+                (builder.getConflictMap());
     }
 
     private void updateNodeConflictMap(Collection<Object> objIds, long nodeId) {
@@ -720,7 +736,8 @@ public class LabelPropagation implements LPAClient {
 
         // Account for the remote neighbors:  look up this LabelVertex in
         // the remoteNeighborMap
-        Map<Integer, Integer> remoteMap = remoteLabelMap.get(node.getIdentity());
+        Map<Integer, Integer> remoteMap =
+                remoteLabelMap.get(node.getIdentity());
         if (remoteMap != null) {
             // The check above is just so I can continue to test in single node
             // mode
@@ -829,6 +846,16 @@ public class LabelPropagation implements LPAClient {
      */
     public double getModularity() { return modularity; }
 
+    // public for testing right now
+    public void initializeLPARun() {
+        // The set of vertices we iterate over is fixed (e.g. we don't
+        // consider new vertices as we process this graph).  If processing
+        // takes a long time, or if we use a more dynamic work queue, we'll
+        // want to revisit this.
+        graph = createLabelGraph();
+        vertices = new ArrayList<LabelVertex>(graph.getVertices());
+    }
+    
     private void printNodeConflictMap() {
 
         for (Map.Entry<Long, Map<Object, Integer>> entry :
