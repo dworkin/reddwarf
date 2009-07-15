@@ -227,8 +227,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		NodeInfo nodeInfo = request.getLocker();
 		Object key = request.getKey();
 		CallbackTask task = new CallbackTask(
-		    nodeInfo.callbackServer,
-		    forRequest.getRequestedStartTime(), key, downgrade);
+		    nodeInfo.callbackServer, key, downgrade);
 		runIoTask(task, nodeInfo.nodeId);
 		if (task.released) {
 		    if (downgrade) {
@@ -243,17 +242,14 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     private static class CallbackTask implements IoRunnable {
 	private final CallbackServer callbackServer;
-	private final long timestamp;
 	private final Object key;
 	private final boolean downgrade;
 	boolean released;
 	CallbackTask(CallbackServer callbackServer,
-		     long timestamp,
 		     Object key,
 		     boolean downgrade)
 	{
 	    this.callbackServer = callbackServer;
-	    this.timestamp = timestamp;
 	    this.key = key;
 	    this.downgrade = downgrade;
 	}
@@ -261,18 +257,18 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    if (key instanceof String) {
 		if (downgrade) {
 		    released = callbackServer.requestDowngradeBinding(
-			timestamp, (String) key);
+			(String) key, /* FIXME: nodeId */ 0);
 		} else {
 		    released = callbackServer.requestEvictBinding(
-			timestamp, (String) key);
+			(String) key, /* FIXME: nodeId */ 0);
 		}
 	    } else {
 		if (downgrade) {
 		    released = callbackServer.requestDowngradeObject(
-			timestamp, (Long) key);
+			(Long) key, /* FIXME: nodeId */ 0);
 		} else {
 		    released = callbackServer.requestEvictObject(
-			timestamp, (Long) key);
+			(Long) key, /* FIXME: nodeId */ 0);
 		}
 	    }
 	}
@@ -347,21 +343,22 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /* -- Implement CachingDataStoreServer -- */
 
-    public int registerNode(
-	long nodeId, CallbackServer callbackServer)
-    {
+    public RegisterNodeResult registerNode(CallbackServer callbackServer) {
 	checkNull("callbackServer", callbackServer);
-	synchronized (nodeInfoMap) {
-	    if (nodeInfoMap.containsKey(nodeId)) {
-		throw new IllegalArgumentException(
-		    "Node " + nodeId + " has already been registered");
-	    } else {
-		nodeInfoMap.put(
-		    nodeId,
-		    new NodeInfo(this, lockManager, nodeId, callbackServer));
-	    }
-	}
-	return updateQueuePort;
+// FIXME
+// 	synchronized (nodeInfoMap) {
+// 	    if (nodeInfoMap.containsKey(nodeId)) {
+// 		throw new IllegalArgumentException(
+// 		    "Node " + nodeId + " has already been registered");
+// 	    } else {
+// 		nodeInfoMap.put(
+// 		    nodeId,
+// 		    new NodeInfo(this, lockManager, nodeId, callbackServer));
+// 	    }
+// 	}
+	return new RegisterNodeResult(
+	    /* FIXME: Get node ID */ 0,
+	    updateQueuePort);
     }
 
     public long newObjectIds(int numIds) {
@@ -379,10 +376,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	}
     }
 
-    public GetObjectResults getObject(long nodeId, long timestamp, long oid) {
-	checkTimestamp(timestamp);
+    public GetObjectResults getObject(long nodeId, long oid) {
 	checkOid(oid);
-	lock(nodeId, timestamp, oid, false);
+	lock(nodeId, oid, false);
 	DbTransaction txn = env.beginTransaction(txnTimeout);
 	boolean txnDone = false;
 	try {
@@ -391,7 +387,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    txn.commit();
 	    return (result == null) ? null
 		: new GetObjectResults(
-		    result, getWaitingTimestamp(oid, false));
+		    result, getWaiting(oid, false));
 	} finally {
 	    if (!txnDone) {
 		txn.abort();
@@ -400,11 +396,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     }
 
     public GetObjectForUpdateResults getObjectForUpdate(
-	long nodeId, long timestamp, long oid)
+	long nodeId, long oid)
     {
-	checkTimestamp(timestamp);
 	checkOid(oid);
-	lock(nodeId, timestamp, oid, true);
+	lock(nodeId, oid, true);
 	DbTransaction txn = env.beginTransaction(txnTimeout);
 	boolean txnDone = false;
 	try {
@@ -413,8 +408,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    txn.commit();
 	    return (result == null) ? null
 		: new GetObjectForUpdateResults(
-		    result, getWaitingTimestamp(oid, false),
-		    getWaitingTimestamp(oid, true));
+		    result, getWaiting(oid, false), getWaiting(oid, true));
 	} finally {
 	    if (!txnDone) {
 		txn.abort();
@@ -422,10 +416,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	}
     }
 
-    public long upgradeObject(long nodeId, long timestamp, long oid)
+    public boolean upgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException
     {
-	checkTimestamp(timestamp);
 	checkOid(oid);
 	NodeInfo nodeInfo = getNodeInfo(nodeId);
 	boolean found = false;
@@ -434,7 +427,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	{
 	    if (nodeInfo == owner.getLocker()) {
 		if (owner.getForWrite()) {
-		    return -1;
+		    return false;
 		} else {
 		    found = true;
 		    break;
@@ -446,14 +439,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		"Node " + nodeId + " attempted to upgrade object " + oid +
 		", but does not own that object for read");
 	}
-	lock(nodeInfo, timestamp, oid, true);
-	return getWaitingTimestamp(oid, true);
+	lock(nodeInfo, oid, true);
+	return getWaiting(oid, true);
     }
 
-    public NextObjectResults nextObjectId(
-	long nodeId, long timestamp, long oid)
-    {
-	checkTimestamp(timestamp);
+    public NextObjectResults nextObjectId(long nodeId, long oid) {
 	checkOid(oid);
 	DbTransaction txn = env.beginTransaction(txnTimeout);
 	DbCursor cursor = null;
@@ -469,7 +459,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		result = new NextObjectResults(
 		    decodeLong(cursor.getKey()),
 		    cursor.getValue(),
-		    getWaitingTimestamp(oid, false));
+		    getWaiting(oid, false));
 	    }
 	    done = true;
 	} finally {
@@ -482,14 +472,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		txn.abort();
 	    }
 	}
-	lock(nodeId, timestamp, result.oid, false);
+	lock(nodeId, result.oid, false);
 	return result;
     }
 
-    public GetBindingResults getBinding(
-	long nodeId, long timestamp, String name)
-    {
-	checkTimestamp(timestamp);
+    public GetBindingResults getBinding(long nodeId, String name) {
 	checkNull("name", name);
 	DbTransaction txn = env.beginTransaction(txnTimeout);
 	boolean done = false;
@@ -518,16 +505,15 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		txn.abort();
 	    }
 	}
-	lock(nodeId, timestamp, name, false);
+	lock(nodeId, name, false);
 	return new GetBindingResults(
 	    found, found ? null : name, oid,
-	    (oid == -1) ? -1 : getWaitingTimestamp(name, false));
+	    (oid == -1) ? false : getWaiting(name, false));
     }
 
     public GetBindingForUpdateResults getBindingForUpdate(
-	long nodeId, long timestamp, String name)
+	long nodeId, String name)
     {
-	checkTimestamp(timestamp);
 	checkNull("name", name);
 	boolean done = false;
 	DbTransaction txn = env.beginTransaction(txnTimeout);
@@ -557,20 +543,19 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		txn.abort();
 	    }
 	}
-	lock(nodeId, timestamp, name, true);
+	lock(nodeId, name, true);
 	if (!found) {
-	    lock(nodeId, timestamp, nextName, true);
+	    lock(nodeId, nextName, true);
 	}
 	return new GetBindingForUpdateResults(
 	    found, found ? null : nextName, oid,
-	    (oid == -1) ? -1 : getWaitingTimestamp(name, true),
-	    (oid == -1) ? -1 : getWaitingTimestamp(name, false));
+	    (oid == -1) ? false : getWaiting(name, true),
+	    (oid == -1) ? false : getWaiting(name, false));
     }
 
     public GetBindingForRemoveResults getBindingForRemove(
-	long nodeId, long timestamp, String name)
+	long nodeId, String name)
     {
-	checkTimestamp(timestamp);
 	checkNull("name", name);
 	DbTransaction txn = env.beginTransaction(txnTimeout);
 	boolean done = false;
@@ -597,24 +582,21 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    }
 	}
 	if (oid != -1) {
-	    lock(nodeId, timestamp, name, true);
+	    lock(nodeId, name, true);
 	}
-	lock(nodeId, timestamp, nextName, oid != -1);
+	lock(nodeId, nextName, oid != -1);
 	return new GetBindingForRemoveResults(
 	    oid != -1,
 	    nextName,
 	    oid,
-	    oid == -1 ? -1 : getWaitingTimestamp(name, true),
-	    oid == -1 ? -1 : getWaitingTimestamp(name, false),
+	    oid == -1 ? false : getWaiting(name, true),
+	    oid == -1 ? false : getWaiting(name, false),
 	    nextOid,
-	    getWaitingTimestamp(nextName, true),
-	    oid == -1 ? -1 : getWaitingTimestamp(nextName, false));
+	    getWaiting(nextName, true),
+	    oid == -1 ? false : getWaiting(nextName, false));
     }
 
-    public NextBoundNameResults nextBoundName(
-	long nodeId, long timestamp, String name)
-    {
-	checkTimestamp(timestamp);
+    public NextBoundNameResults nextBoundName(long nodeId, String name) {
 	checkNull("name", name);
 	long oid;
 	boolean done = false;
@@ -635,9 +617,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		txn.abort();
 	    }
 	}
-	lock(nodeId, timestamp, name, false);
+	lock(nodeId, name, false);
 	return new NextBoundNameResults(
-	    name, oid, getWaitingTimestamp(name, false));
+	    name, oid, getWaiting(name, false));
     }
 
     public int getClassId(byte[] classInfo) {
@@ -772,25 +754,20 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /* -- Other methods -- */
 
-    private void lock(
-	long nodeId, long timestamp, Object key, boolean forWrite)
-    {
-	lock(getNodeInfo(nodeId), timestamp, key, forWrite);
+    private void lock(long nodeId, Object key, boolean forWrite) {
+	lock(getNodeInfo(nodeId), key, forWrite);
     }
 
-    private void lock(
-	NodeInfo nodeInfo, long timestamp, Object key, boolean forWrite)
-    {
+    private void lock(NodeInfo nodeInfo, Object key, boolean forWrite) {
 	synchronized (nodeInfo) {
 	    LockConflict<Object, NodeInfo> conflict =
-		lockManager.lockNoWait(nodeInfo, key, forWrite, timestamp);
+		lockManager.lockNoWait(nodeInfo, key, forWrite, -1);
 	    if (conflict != null) {
 		NodeRequest request = (NodeRequest) conflict.getLockRequest();
 		callbackRequests.add(request);
 		conflict = lockManager.waitForLock(nodeInfo);
 		if (conflict != null) {
 		    String accessMsg = "Access nodeId:" + nodeInfo.nodeId +
-		    ", timestamp:" + timestamp +
 		    ", key:" + key +
 		    ", forWrite:" + forWrite +
 		    " failed: ";
@@ -843,28 +820,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     }
 
     /**
-     * Returns the timestamp of the oldest request waiting to access to
-     * specified key for read or write.
+     * Returns whether there is a request waiting to access to specified key
+     * for read or write.
      */
-    private long getWaitingTimestamp(Object key, boolean forWrite) {
-	long timestamp = -1;
-	for (LockRequest<Object, NodeInfo> waiter :
-		 lockManager.getWaiters(key))
-	{
-	    NodeRequest nodeRequest = (NodeRequest) waiter;
-	    if (!forWrite) {
-		/*
-		 * If we're blocked waiting for read, then there must only be
-		 * one owner for write.
-		 */
-		return waiter.getRequestedStartTime();
-	    } else if (timestamp == -1 ||
-		       waiter.getRequestedStartTime() < timestamp)
-	    {
-		timestamp = waiter.getRequestedStartTime();
-	    }
-	}
-	return timestamp;
+    private boolean getWaiting(Object key, boolean forWrite) {
+	return !lockManager.getWaiters(key).isEmpty();
     }
 
     /**
@@ -880,14 +840,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	}
 	throw new IllegalArgumentException(
 	    "Node ID " + nodeId + " is not known");
-    }
-
-    /** Checks that the timestamp is not negative. */
-    private static void checkTimestamp(long timestamp) {
-	if (timestamp < 0) {
-	    throw new IllegalArgumentException(
-		"The timestamp must not be negative");
-	}
     }
 
     /** Checks that the object ID is not negative. */

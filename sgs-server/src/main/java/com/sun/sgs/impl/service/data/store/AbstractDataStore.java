@@ -995,7 +995,7 @@ public abstract class AbstractDataStore
      * @param	oid the object ID
      * @throws	IllegalArgumentException if {@code oid} is negative
      */
-    protected static void checkOid(long oid) {
+    public static void checkOid(long oid) {
 	if (oid < 0) {
 	    throw new IllegalArgumentException(
 		"Object ID must not be negative");

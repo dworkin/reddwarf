@@ -35,15 +35,13 @@ public interface CallbackServer extends Remote {
      * node will arrange to call {@link UpdateQueue#downgradeObject} to notify
      * the server that it has downgraded the object.
      *
-     * @param	timestamp the start time, in milliseconds, of the operation
-     *		making the request
      * @param	oid the object ID
+     * @param	nodeId the ID of the node requesting the downgrade
      * @return	{@code true} if the object has been downgraded as requested, or
      *		else {@code false} if the downgrade is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestDowngradeObject(long timestamp, long oid)
-	throws IOException;
+    boolean requestDowngradeObject(long oid, long nodeId) throws IOException;
 
     /**
      * Requests that the node give up access to an object.  If the method
@@ -52,14 +50,13 @@ public interface CallbackServer extends Remote {
      * UpdateQueue#evictObject} to notify the server that it has evicted the
      * object.
      *
-     * @param	timestamp the start time, in milliseconds, of the operation
-     *		making the request
      * @param	oid the object ID
+     * @param	nodeId the ID of the node requesting the eviction
      * @return	{@code true} if the object has been evicted as requested, or
      *		else {@code false} if the eviction is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestEvictObject(long timestamp, long oid) throws IOException;
+    boolean requestEvictObject(long oid, long nodeId) throws IOException;
 
     /**
      * Requests that the node downgrade write access to a name binding from
@@ -69,14 +66,13 @@ public interface CallbackServer extends Remote {
      * UpdateQueue#downgradeBinding} to notify the server that it has
      * downgraded the name binding.
      *
-     * @param	timestamp the start time, in milliseconds, of the operation
-     *		making the request
      * @param	name the name
+     * @param	nodeId the ID of the node requesting the downgrade
      * @return	{@code true} if the name binding has been downgraded as
      *		requested, or else {@code false} if the downgrade is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestDowngradeBinding(long timestamp, String name)
+    boolean requestDowngradeBinding(String name, long nodeId)
 	throws IOException;
 
     /**
@@ -86,13 +82,11 @@ public interface CallbackServer extends Remote {
      * will arrange to call {@link UpdateQueue#downgradeBinding} to notify the
      * server that it has evicted the name binding.
      *
-     * @param	timestamp the start time, in milliseconds, of the operation
-     *		making the request
      * @param	name the name
+     * @param	nodeId the ID of the node requesting the eviction
      * @return	{@code true} if the name binding has been evicted as
      *		requested, or else {@code false} if the eviction is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestEvictBinding(long timestamp, String name)
-	throws IOException;
+    boolean requestEvictBinding(String name, long nodeId) throws IOException;
 }

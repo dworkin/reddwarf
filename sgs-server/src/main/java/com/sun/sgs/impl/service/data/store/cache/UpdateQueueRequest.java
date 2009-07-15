@@ -27,14 +27,13 @@ import static com.sun.sgs.impl.util.DataStreamUtil.writeByteArrays;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeLongs;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeString;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeStrings;
+import com.sun.sgs.service.SimpleCompletionHandler;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.EOFException;
 import java.io.IOException;
 
-/**
- * The subclass of all requests used to implement {@link UpdateQueue}.
- */
+/** The subclass of all requests used by {@link UpdateQueue}. */
 abstract class UpdateQueueRequest implements Request {
 
     /** The identifier for {@link Commit} requests. */
@@ -69,7 +68,8 @@ abstract class UpdateQueueRequest implements Request {
 	 * @param	nodeId the node ID associated with this queue
 	 */
 	UpdateQueueRequestHandler(
-	    CachingDataStoreServerImpl server, long nodeId) {
+	    CachingDataStoreServerImpl server, long nodeId)
+	{
 	    this.server = server;
 	    this.nodeId = nodeId;
 	}
@@ -121,45 +121,36 @@ abstract class UpdateQueueRequest implements Request {
     /**
      * A subclass of {@code UpdateQueueRequest} for requests that contain a
      * completion handler.
-     *
-     * @param	<T> the type value associated with this request
      */
-    abstract static class UpdateQueueRequestWithCompletion<T>
+    abstract static class UpdateQueueRequestWithCompletion
 	extends UpdateQueueRequest
     {
-	/** The value associated with the request. */
-	final T value;
-
-	/** The completion handler or {@code null}. */
-	private final UpdateQueue.CompletionHandler<T> handler;
-
 	/**
-	 * Creates an instance with no completion handler.
-	 *
-	 * @param	value the value associated with this request
+	 * The {@code SimpleCompletionHandler} to call when the request is
+	 * completed, or {@code null} if there is no handler.
 	 */
-	UpdateQueueRequestWithCompletion(T value) {
-	    this.value = value;
-	    handler = null;
+	private final SimpleCompletionHandler completionHandler;
+
+	/** Creates an instance with no completion handler. */
+	UpdateQueueRequestWithCompletion() {
+	    completionHandler = null;
 	}
 
 	/**
 	 * Creates an instance with the specified completion handler.
 	 *
-	 * @param	value the value associated with this request
 	 * @param	handler the completion handler
 	 */
 	UpdateQueueRequestWithCompletion(
-	    T value, UpdateQueue.CompletionHandler<T> handler)
+	    SimpleCompletionHandler completionHandler)
 	{
-	    this.value = value;
-	    this.handler = handler;
+	    this.completionHandler = completionHandler;
 	}
 
 	public void completed(Throwable exception) {
-	    /* FIXME: Need to handle exception */
-	    if (handler != null) {
-		handler.completed(value);
+	    /* FIXME: Need to handle exception, which should cause a shutdown */
+	    if (completionHandler != null) {
+		completionHandler.completed();
 	    }
 	}
     }
@@ -203,107 +194,114 @@ abstract class UpdateQueueRequest implements Request {
 	}
 
 	public void completed(Throwable exception) {
-	    /* FIXME: Need to handle exception */
+	    /* FIXME: Need to handle exception, which should cause a shutdown */
 	}
     }
 
     /** Represents a call to {@link UpdateQueue#evictObject}. */
-    static class EvictObject extends UpdateQueueRequestWithCompletion<Long> {
+    static class EvictObject extends UpdateQueueRequestWithCompletion {
+	private final long oid;
 
-	EvictObject(long oid, UpdateQueue.CompletionHandler<Long> handler) {
-	    super(oid, handler);
+	EvictObject(long oid, SimpleCompletionHandler completionHandler) {
+	    super(completionHandler);
+	    this.oid = oid;
 	}
 
 	EvictObject(DataInput in) throws IOException {
-	    super(in.readLong());
+	    oid = in.readLong();
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId)
 	    throws CacheConsistencyException
 	{
-	    server.evictObject(nodeId, value);
+	    server.evictObject(nodeId, oid);
 	}
 
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(EVICT_OBJECT);
-	    out.writeLong(value);
+	    out.writeLong(oid);
 	}
     }
 
     /** Represents a call to {@link UpdateQueue#downgradeObject}. */
     static class DowngradeObject
-	extends UpdateQueueRequestWithCompletion<Long>
+	extends UpdateQueueRequestWithCompletion
     {
-	DowngradeObject(long oid, UpdateQueue.CompletionHandler<Long> handler)
-	{
-	    super(oid, handler);
+	private final long oid;
+
+	DowngradeObject(long oid, SimpleCompletionHandler completionHandler) {
+	    super(completionHandler);
+	    this.oid = oid;
 	}
 
 	DowngradeObject(DataInput in) throws IOException {
-	    super(in.readLong());
+	    oid = in.readLong();
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId) 
 	    throws CacheConsistencyException
 	{
-	    server.downgradeObject(nodeId, value);
+	    server.downgradeObject(nodeId, oid);
 	}
 
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(DOWNGRADE_OBJECT);
-	    out.writeLong(value);
+	    out.writeLong(oid);
 	}
     }
 
     /** Represents a call to {@link UpdateQueue#evictBinding}. */
     static class EvictBinding
-	extends UpdateQueueRequestWithCompletion<String>
+	extends UpdateQueueRequestWithCompletion
     {
-	EvictBinding(
-	    String name, UpdateQueue.CompletionHandler<String> handler)
-	{
-	    super(name, handler);
+	private final String name;
+
+	EvictBinding(String name, SimpleCompletionHandler completionHandler) {
+	    super(completionHandler);
+	    this.name = name;
 	}
 
 	EvictBinding(DataInput in) throws IOException {
-	    super(readString(in));
+	    name = readString(in);
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId)
 	    throws CacheConsistencyException
 	{
-	    server.evictBinding(nodeId, value);
+	    server.evictBinding(nodeId, name);
 	}
 
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(EVICT_BINDING);
-	    writeString(value, out);
+	    writeString(name, out);
 	}
     }
 
     /** Represents a call to {@link UpdateQueue#downgradeBinding}. */
     static class DowngradeBinding
-	extends UpdateQueueRequestWithCompletion<String>
+	extends UpdateQueueRequestWithCompletion
     {
+	private final String name;
 	DowngradeBinding(
-	    String name, UpdateQueue.CompletionHandler<String> handler)
+	    String name, SimpleCompletionHandler completionHandler)
 	{
-	    super(name, handler);
+	    super(completionHandler);
+	    this.name = name;
 	}
 
 	DowngradeBinding(DataInput in) throws IOException {
-	    super(readString(in));
+	    name = readString(in);
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId)
 	    throws CacheConsistencyException
 	{
-	    server.downgradeBinding(nodeId, value);
+	    server.downgradeBinding(nodeId, name);
 	}
 
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(DOWNGRADE_BINDING);
-	    writeString(value, out);
+	    writeString(name, out);
 	}
     }
 }
