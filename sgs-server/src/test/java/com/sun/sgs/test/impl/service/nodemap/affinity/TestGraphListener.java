@@ -24,12 +24,10 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.affinity.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
-import com.sun.sgs.impl.service.nodemap.affinity.BipartiteParallelGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedGraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.WeightedParallelGraphBuilder;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -63,8 +61,6 @@ public class TestGraphListener {
     public static Collection data() {
         return Arrays.asList(
             new Object[][] {{"default", false},
-                        {WeightedParallelGraphBuilder.class.getName(), true},
-                        {BipartiteParallelGraphBuilder.class.getName(), true},
                         {WeightedGraphBuilder.class.getName(), false},
                         {BipartiteGraphBuilder.class.getName(), false}});
     }
