@@ -472,8 +472,8 @@ public class TestLPA {
                 // Obj uses
                 Map<Identity, Integer> tempMap =
                         new HashMap<Identity, Integer>();
-                tempMap.put(idents[0], 1);
-                tempMap.put(idents[1], 1);
+                tempMap.put(idents[0], 2);
+                tempMap.put(idents[1], 2);
                 objUseMap.put("obj1", tempMap);
                 tempMap =  new HashMap<Identity, Integer>();
                 tempMap.put(idents[1], 1);
@@ -495,7 +495,7 @@ public class TestLPA {
                 // Obj uses
                 Map<Identity, Integer> tempMap =
                         new HashMap<Identity, Integer>();
-                tempMap.put(ident, 1);
+                tempMap.put(ident, 2);
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict

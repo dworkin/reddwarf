@@ -165,9 +165,7 @@ public class LabelPropagation implements LPAClient {
         Registry registry = LocateRegistry.getRegistry(host, port);
         server = (LPAServer) registry.lookup(
                          LabelPropagationServer.SERVER_EXPORT_NAME);
-        // Export ourselves using anonymous ports, and register with server
-        // Do we want to combine these 2 interfaces?  Most likely.
-        // Do we want to combine this with the NMS client?  I doubt it.
+        // Export ourselves using an anonymous port, and register with server
         // Another option is to have the LPAServer collect and exchange
         // all cross node edge info, and the remote labels at the start
         // of each iteration.  That would be helpful, because then the
@@ -180,8 +178,8 @@ public class LabelPropagation implements LPAClient {
     
     // --- implement LPAClient -- //
     /** {@inheritDoc} */
-    public Collection<AffinityGroup> affinityGroups(boolean done) 
-            throws IOException
+    public Collection<AffinityGroup> affinityGroups(boolean done)
+        throws IOException
     {
         // This can happen in testing - JANE probably will change
         if (vertices == null) {
@@ -201,7 +199,9 @@ public class LabelPropagation implements LPAClient {
             nodeConflictMap.clear();
             remoteLabelMap.clear();
         }
-        return groups;
+        logger.log(Level.FINEST, "{0} returning {1} groups",
+                   localNodeId, groups.size());
+        return new HashSet<AffinityGroup>(groups);
     }
 
     /** 

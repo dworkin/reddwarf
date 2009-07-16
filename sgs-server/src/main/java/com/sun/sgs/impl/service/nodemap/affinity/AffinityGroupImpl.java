@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -28,7 +29,9 @@ import java.util.Set;
  *
  *  This will need to change, of couse, for multinode.
  */
-public class AffinityGroupImpl implements AffinityGroup {
+public class AffinityGroupImpl implements AffinityGroup, Serializable {
+    /** Serialization version. */
+    private static final long serialVersionUID = 1L;
     private final long id;
     private final Set<Identity> identities = 
         Collections.synchronizedSet(new HashSet<Identity>());

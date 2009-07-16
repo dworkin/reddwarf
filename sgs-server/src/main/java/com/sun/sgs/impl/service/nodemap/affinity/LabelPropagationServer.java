@@ -114,18 +114,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // to start with.  If a node fails, we'll stop and return no information
         // for now.  JANE does that make sense?  If a node fails, a lot of
         // churn will be created.
-        final Set<Long> clientIdSet;
-        final Collection<LPAClient> clientProxySet;
-        synchronized (clientProxyMap) {
-            clientIdSet = clientProxyMap.keySet();
-            clientProxySet = clientProxyMap.values();
-        }
-        final int clientSize = clientIdSet.size();
+        final Map<Long, LPAClient> clientProxyCopy =
+                new HashMap<Long, LPAClient>(clientProxyMap);
 
-        Set<Long> clean = new HashSet<Long>(clientSize);
-        for (Long id : clientIdSet) {
-            clean.add(id);
-        }
+        final Set<Long> clean = 
+                Collections.unmodifiableSet(clientProxyCopy.keySet());
+        final int clientSize = clean.size();
 
         // This server controls the running of the distributed label
         // propagation algorithm, using the LPAServer and LPAClient
@@ -158,17 +152,18 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // has a similar confict with node 1.
         nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
         latch = new CountDownLatch(clientSize);
-        for (final LPAClient proxy : clientProxySet) {
+
+        for (final Map.Entry<Long, LPAClient> ce : clientProxyCopy.entrySet()) {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        proxy.exchangeCrossNodeInfo();
+                        ce.getValue().exchangeCrossNodeInfo();
                     } catch (IOException ioe) {
                         failed = true;
-                        // JANE should retry a few times, then
-                        // assume the node has failed.
-                        // Will want a way to contact the watchdog to
-                        // let it know.
+                        // NEED retry logic here.  If we cannot reach
+                        // the proxy, we need to remove it from the
+                        // clientProxyMap.
+                        removeNode(ce.getKey());
                     }
                 }
             });
@@ -177,7 +172,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // Wait for the initialization to complete on all nodes
         try {
             // Completely arbitrary timeout!
-            latch.await(10, TimeUnit.HOURS);
+            latch.await(10, TimeUnit.MINUTES);
         } catch (InterruptedException ex) {
             failed = true;
         }
@@ -191,17 +186,19 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             nodesConverged = true;
             nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
             latch = new CountDownLatch(clientSize);
-            for (final LPAClient proxy : clientProxySet) {
+            for (final Map.Entry<Long, LPAClient> ce :
+                       clientProxyCopy.entrySet())
+            {
                 executor.execute(new Runnable() {
                     public void run() {
                         try {
-                            proxy.startIteration(currentIteration);
+                            ce.getValue().startIteration(currentIteration);
                         } catch (IOException ioe) {
-                            // JANE should retry a few times, then
-                            // assume the node has failed.
-                            // Will want a way to contact the watchdog to
-                            // let it know.
                             failed = true;
+                            // NEED retry logic here.  If we cannot reach
+                            // the proxy, we need to remove it from the
+                            // clientProxyMap.
+                            removeNode(ce.getKey());
                         }
                     }
                 });
@@ -209,7 +206,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             // Wait for all nodes to complete this iteration
             try {
                 // Completely arbitrary timeout!
-                latch.await(10, TimeUnit.HOURS);
+                latch.await(10, TimeUnit.MINUTES);
             } catch (InterruptedException ex) {
                 failed = true;
             }
@@ -226,26 +223,23 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
 
         // If, after this point, we cannot contact a node, simply
-        // return the information that we have.   JANE is that safe?
+        // return the information that we have.
         // Assuming a node has failed, we won't report the identities
-        // on the failed node as being part of any group.  On the other
-        // hand, we'll have lost all information about those identities
-        // and will have to rebuild their object connections.
-
+        // on the failed node as being part of any group.  
         final Set<AffinityGroup> returnedGroups =
                 Collections.synchronizedSet(new HashSet<AffinityGroup>());
         latch = new CountDownLatch(clientSize);
-        for (final LPAClient proxy : clientProxySet) {
+        for (final LPAClient proxy : clientProxyCopy.values()) {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
                         returnedGroups.addAll(proxy.affinityGroups(true));
                     } catch (IOException ioe) {
                         failed = true;
-                        // JANE should retry a few times, then
-                        // assume the node has failed.
-                        // Will want a way to contact the watchdog to
-                        // let it know.
+                        ioe.printStackTrace();
+                        // NEED retry here.
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     } finally {
                         // this will need to change when we have retries
                         latch.countDown();
@@ -257,7 +251,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // Wait for the calls to complete on all nodes
         try {
             // Completely arbitrary timeout!
-            latch.await(10, TimeUnit.HOURS);
+            latch.await(10, TimeUnit.MINUTES);
         } catch (InterruptedException ex) {
             failed = true;
         }
@@ -285,6 +279,16 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         if (logger.isLoggable(Level.FINE)) {
             long time = System.currentTimeMillis() - startTime;
             logger.log(Level.FINE, "Algorithm took {0} milliseconds", time);
+            StringBuffer sb = new StringBuffer();
+            sb.append(" LPA found " +  retVal.size() + " groups ");
+
+            for (AffinityGroup group : retVal) {
+                sb.append(" id: " + group.getId() + ": members ");
+                for (Identity id : group.getIdentities()) {
+                    sb.append(id + " ");
+                }
+            }
+            logger.log(Level.FINE, sb.toString());
         }
 
         return retVal;
