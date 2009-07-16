@@ -304,16 +304,19 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // --- Implement LPAServer --- //
 
     /** {@inheritDoc} */
-    public void readyToBegin(long nodeId) throws IOException {
+    public void readyToBegin(long nodeId, boolean failed) throws IOException {
         if (nodeBarrier.remove(nodeId)) {
             latch.countDown();
         }
+        this.failed = this.failed || failed;
     }
 
     /** {@inheritDoc} */
-    public void finishedIteration(long nodeId, boolean converged, int iteration)
+    public void finishedIteration(long nodeId, boolean converged, 
+                                  boolean failed, int iteration)
             throws IOException
     {
+        this.failed = this.failed || failed;
         if (iteration != currentIteration) {
             // THINGS ARE VERY CONFUSED - need to log this
             failed = true;

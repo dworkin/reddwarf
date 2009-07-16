@@ -87,7 +87,7 @@ public class TestLPAPerf {
                                 numThreads, nodePref);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            lpa.findCommunities();
+            lpa.singleNodeFindCommunities();
         }
         lpaServer.removeNode(node);
         lpa.shutdown();
@@ -112,7 +112,7 @@ public class TestLPAPerf {
         long maxTime = 0;
         long minTime = Integer.MAX_VALUE;
         for (int i = 0; i < RUNS; i++) {
-            Collection<AffinityGroup> groups = lpa.findCommunities();
+            Collection<AffinityGroup> groups = lpa.singleNodeFindCommunities();
             long time = lpa.getTime();
             avgTime = avgTime + time;
             maxTime = Math.max(maxTime, time);

@@ -52,7 +52,10 @@ public interface LPAClient extends Remote {
 
     /**
      * Returns the affinity groups found on this node.
-     * Called by the LPAServer.
+     * Called by the LPAServer.  The LPAServer must call this with an
+     * argument of {@code true} if it intends to start another algorithm
+     * run at any time in the future, even if the current run fails.
+     * <p>
      * @param done {@code true} if all iterations are done, allowing cleanup
      * @return the affinity groups on this node
      * @throws IOException if there is a communication problem

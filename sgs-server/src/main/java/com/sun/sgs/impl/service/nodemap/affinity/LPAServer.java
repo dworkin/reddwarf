@@ -32,9 +32,10 @@ public interface LPAServer extends Remote {
      * propagation algorithm.
      *
      * @param nodeId the node that is ready to begin
+     * @param failed {@code true} if there was a problem while setting up
      * @throws IOException if there is a communication problem
      */
-    void readyToBegin(long nodeId) throws IOException;
+    void readyToBegin(long nodeId, boolean failed) throws IOException;
 
     /**
      * Indicates that the given {@code nodeId} has completed an iteration
@@ -43,11 +44,13 @@ public interface LPAServer extends Remote {
      * @param nodeId the node that has finished an iteration
      * @param converged {@code true} if the node believes the algorithm has
      *     converged and can be stopped
+     * @param failed {@code true} if there was a problem while setting up
      * @param iteration the iteration that has finished
      * @throws IOException if there is a communication problem
      */
-    void finishedIteration(long nodeId, boolean converged, int iteration)
-            throws IOException;
+    void finishedIteration(long nodeId, boolean converged, boolean failed,
+                           int iteration)
+        throws IOException;
 
     /**
      * Registers the given proxies for the node.
@@ -57,8 +60,7 @@ public interface LPAServer extends Remote {
      *        can call
      * @throws IOException if there is a communication problem
      */
-    void register(long nodeId, LPAClient client)
-            throws IOException;
+    void register(long nodeId, LPAClient client) throws IOException;
 
     /**
      * Returns the {@code LPAClient} for the given {@code nodeId}.

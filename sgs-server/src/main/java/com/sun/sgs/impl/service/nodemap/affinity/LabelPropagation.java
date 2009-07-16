@@ -37,7 +37,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,7 +44,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *  Initial implementation of label propagation algorithm for a single node.
+ *  Initial implementation of label propagation algorithm for a single vertex.
  * <p>
  * An implementation of the algorithm presented in
  * "Near linear time algorithm to detect community structures in large-scale
@@ -67,11 +66,12 @@ public class LabelPropagation implements LPAClient {
     // The producer of our graphs.
     private final GraphBuilder builder;
 
-    // The local node id
+    // The local vertex id
     private final long localNodeId;
 
     // The server : our master
     private final LPAServer server;
+    
     // A map of cached nodeId->LPAClient
     private final Map<Long, LPAClient> nodeProxies = new
             ConcurrentHashMap<Long, LPAClient>();
@@ -88,7 +88,7 @@ public class LabelPropagation implements LPAClient {
     // The number of threads this algorithm should use.
     private final int numThreads;
 
-    // The node preference factor.  Zero means no node preference, a small
+    // The vertex preference factor.  Zero means no vertex preference, a small
     // positive number means a slight preference to nodes with higher degrees,
     // and a small negative number means a slight preference to nodes with
     // lower degrees.
@@ -127,7 +127,7 @@ public class LabelPropagation implements LPAClient {
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
-     * @param nodeId the local node ID
+     * @param nodeId the local vertex ID
      * @param host the server host name
      * @param port the port used by the LPAServer
      * @param gatherStats if {@code true}, gather extra statistics for each run.
@@ -135,7 +135,7 @@ public class LabelPropagation implements LPAClient {
      * @param numThreads number of threads, for TESTING.
      *      If 1, use the sequential asynchronous version.
      *      If >1, use the parallel version, with that number of threads.
-     * @param nodePref node preference factor
+     * @param nodePref vertex preference factor
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
@@ -169,7 +169,7 @@ public class LabelPropagation implements LPAClient {
         // Do we want to combine these 2 interfaces?  Most likely.
         // Do we want to combine this with the NMS client?  I doubt it.
         // Another option is to have the LPAServer collect and exchange
-        // all cross node edge info, and the remote labels at the start
+        // all cross vertex edge info, and the remote labels at the start
         // of each iteration.  That would be helpful, because then the
         // server knows when all preliminary information has been exchanged.
         clientExporter = new Exporter<LPAClient>(LPAClient.class);
@@ -183,7 +183,21 @@ public class LabelPropagation implements LPAClient {
     public Collection<AffinityGroup> affinityGroups(boolean done) 
             throws IOException
     {
+        // This can happen in testing - JANE probably will change
+        if (vertices == null) {
+            initializeLPARun();
+        }
+        groups = gatherGroups(vertices, done);
         if (done) {
+            if (logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER, "FINAL GRAPH IS {0}", graph);
+            }
+
+            // Clear our maps that are set up as the first step of an
+            // algorithm run.  This is done here, rather than when
+            // exchangeCrossNodeInfo is called, to ensure the node conflict
+            // map is properly initialized.  We use an empty map as a
+            // signal that it needs to be initialized.
             nodeConflictMap.clear();
             remoteLabelMap.clear();
         }
@@ -195,13 +209,14 @@ public class LabelPropagation implements LPAClient {
      * <p>
      * Each pair of nodes needs to exchange conflict information to ensure
      * that both pairs know the complete set for both.  It might be better
-     * to just let the server ask each node for its information and merge
+     * to just let the server ask each vertex for its information and merge
      * it there.
      */
     public void exchangeCrossNodeInfo() throws IOException {
         initializeNodeConflictMap();
 
-        // Now, go through the new map, and tell each node about the
+        boolean failed = false;
+        // Now, go through the new map, and tell each vertex about the
         // edges we might have in common.
         for (Map.Entry<Long, Map<Object, Integer>> entry : 
              nodeConflictMap.entrySet())
@@ -211,9 +226,11 @@ public class LabelPropagation implements LPAClient {
             // think about?
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
-            // Tell the other node about the conflicts we know of.
+            // Tell the other vertex about the conflicts we know of.
             // JANE should this also include weights?  I think so,
             // so both sides are using the same info
+
+            // JANE need retry
             if (proxy != null) {
                 Collection<Object> objs =
                     proxy.crossNodeEdges(
@@ -221,15 +238,13 @@ public class LabelPropagation implements LPAClient {
                         localNodeId);
                 updateNodeConflictMap(objs, nodeId);
             } else {
-                // JANE failure? or just don't care?  The node might have
-                // gone down before this call was made, and we have stale
-                // info from the graph builder.
-
+                failed = true;
+                break;
             }
         }
 
         // Tell the server we're ready for the iterations to begin
-        server.readyToBegin(localNodeId);
+        server.readyToBegin(localNodeId, failed);
     }
 
     /** {@inheritDoc} */
@@ -256,43 +271,39 @@ public class LabelPropagation implements LPAClient {
         nodeConflictMap.remove(nodeId);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * At this point, the node conflict map is complete, as we have
+     * exchanged information with other nodes.
+     */
     public void startIteration(int iteration) throws IOException {
         long startTime = System.currentTimeMillis();
-        // Step 1.  Initialize all nodes in the network.
-        //          Their labels are their Identities.
-        //          Note that labels are initialized to the Identity when
-        //          a node is first created, and reinitialized when we
-        //          since we know we're in the first iteration.
+
         if (iteration == 1) {
             initializeLPARun();
         }
 
-        // JANE get the remote labels from each node
-        // will need a map of nodeId -> objects of interest on the node.
-        updateRemoteLabels();
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "GRAPH at iteration {0} is {1}",
+                                      iteration, graph);
+        }
 
-//        // Step 2.  Set t = 1;
-//        int t = 1;
+        // Gather the remote labels from each node.
+        boolean failed = updateRemoteLabels();
 
-        // Exchange label information with remote nodes.
-      // XXX findRemoteNeighbors and get their information.
-//        while (true) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST, "GRAPH at iteration {0} is {1}",
-                                          iteration, graph);
-            }
-            // Step 3.  Arrange the nodes in a random order and set it to X.
-            // Step 4.  For each vertices in X chosen in that specific order,
-            //          let the label of vertices be the label of the highest
-            //          frequency of its neighbors.
-            boolean changed = false;
+        // JANE still not happy with this stopping criteria
+        boolean changed = false;
 
-            // Choose a different ordering for each iteration
+        if (!failed) {
+            // Arrange the vertices in a random order for each iteration.
+            // For the first iteration, we just use the iterator ordering.
             if (iteration > 1) {
                 Collections.shuffle(vertices);
             }
 
+            // For each of the vertices, set the label to the label with the
+            // highest frequency of its neighbors.
             if (numThreads > 1) {
                 final AtomicBoolean abool = new AtomicBoolean(false);
                 List<Callable<Void>> tasks = new ArrayList<Callable<Void>>();
@@ -311,7 +322,7 @@ public class LabelPropagation implements LPAClient {
                 try {
                     executor.invokeAll(tasks);
                 } catch (InterruptedException ie) {
-                    changed = true;
+                    failed = true;
                     logger.logThrow(Level.INFO, ie,
                                     " during iteration " + iteration);
                 }
@@ -322,16 +333,6 @@ public class LabelPropagation implements LPAClient {
                     changed = setMostFrequentLabel(vertex) || changed;
                 }
             }
-
-            // Step 5. If every node has a label that the maximum number of
-            //         their neighbors have, then stop.   Otherwise, set
-            //         t++ and loop.
-            // Note that Leung's paper suggests we don't need the extra stopping
-            // condition if we include each node in the neighbor freq calc.
-//            if (!changed) {
-//                break;
-//            }
-//            t++;
 
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
@@ -347,15 +348,9 @@ public class LabelPropagation implements LPAClient {
                                group, logSB.toString());
                 }
             }
-
-            // Tell the server we've finished this iteration
-            server.finishedIteration(localNodeId, !changed, iteration);
-//        }
-
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "FINAL GRAPH IS {0}", graph);
         }
-        groups = gatherGroups(vertices, true);
+        // Tell the server we've finished this iteration
+        server.finishedIteration(localNodeId, !changed, failed, iteration);
 
         if (gatherStats) {
             // Record our statistics for this run, used for testing.
@@ -363,6 +358,8 @@ public class LabelPropagation implements LPAClient {
             iterations = iteration;
             // Note that the graph might be changing while we ran
             // the algorithm.
+            groups = gatherGroups(vertices, false);
+            // This doesn't make sense in multinode case
             modularity = Graphs.calcModularity(graph, groups);
 
             if (logger.isLoggable(Level.FINE)) {
@@ -381,7 +378,6 @@ public class LabelPropagation implements LPAClient {
                 logger.log(Level.FINE, sb.toString());
             }
         }
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     /** {@inheritDoc} */
@@ -410,7 +406,13 @@ public class LabelPropagation implements LPAClient {
         return retMap;
     }
 
-    private void updateRemoteLabels() throws IOException {
+    /**
+     * Exchanges information with other nodes in the system to fill in the
+     * remoteLabelMap.
+     * @return {@code true} if a problem occurred
+     * @throws IOException if there is a communication problem
+     */
+    private boolean updateRemoteLabels() throws IOException {
         Map<Object, Map<Identity, Integer>> objectMap =
                 builder.getObjectUseMap();
 
@@ -423,15 +425,11 @@ public class LabelPropagation implements LPAClient {
             // think about?
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
-
-            // If the node failed, continue asking the other nodes for their
-            // information -- JANE probably want to exit out of the algorithm
-            // in this case
             if (proxy == null) {
-                break;
+                return true;
             }
 
-            // Tell the other node about the conflicts we know of.
+            // Tell the other vertex about the conflicts we know of.
             // JANE should this also include counts?  I think so,
             // so both sides are using the same info
             Map<Object, Set<Integer>> labels =
@@ -460,8 +458,9 @@ public class LabelPropagation implements LPAClient {
                 }
             }
         }
+        return false;
     }
-    //JANE not sure of how best to return the groups
+
     /**
      * Find the communities, using a graph obtained from the graph builder
      * provided at construction time.  The communities are found using the
@@ -469,10 +468,13 @@ public class LabelPropagation implements LPAClient {
      * <p>
      * This algorithm will not modify the graph by adding or removing vertices
      * or edges, but it will modify the labels in the vertices.
+     * <p>
+     * This implementation is for graphs on a single node only, and is useful
+     * for testing algorithm optimizations.
      *
      * @return the affinity groups
      */
-    public Collection<AffinityGroup> findCommunities() {
+    public Collection<AffinityGroup> singleNodeFindCommunities() {
         long startTime = System.currentTimeMillis();
 
         // Step 1.  Initialize all nodes in the network.
@@ -482,22 +484,11 @@ public class LabelPropagation implements LPAClient {
         // variations are returning snapshots.  If we got to only the
         // weighted graph builder, can make the graph field final and
         // set it in the constructor.
-        graph = createLabelGraph();
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST,
-                       "Graph creation took {0} milliseconds",
-                       (System.currentTimeMillis() - startTime));
-        }
+        initializeLPARun();
 
         // Step 2.  Set t = 1;
         int t = 1;
 
-        // The set of vertices we iterate over is fixed (e.g. we don't
-        // consider new vertices as we process this graph).  If processing
-        // takes a long time, or if we use a more dynamic work queue, we'll
-        // want to revisit this.
-        List<LabelVertex> vertices =
-                new ArrayList<LabelVertex>(graph.getVertices());
         while (true) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST, "GRAPH at iteration {0} is {1}",
@@ -544,11 +535,11 @@ public class LabelPropagation implements LPAClient {
                 }
             }
 
-            // Step 5. If every node has a label that the maximum number of
+            // Step 5. If every vertex has a label that the maximum number of
             //         their neighbors have, then stop.   Otherwise, set
             //         t++ and loop.
             // Note that Leung's paper suggests we don't need the extra stopping
-            // condition if we include each node in the neighbor freq calc.
+            // condition if we include each vertex in the neighbor freq calc.
             if (!changed) {
                 break;
             }
@@ -615,22 +606,26 @@ public class LabelPropagation implements LPAClient {
     }
 
     /**
-     * Obtains a graph from the graph builder, and converts it into a
-     * graph that adds labels to the vertices.  This graph is the first
-     * step in our label propagation algorithm (give each graph node a
-     * unique label).
-     *
-     * @return a graph to run the label propagation algorithm over
+     * Initialize ourselves for a run of the algorithm.
+     * This is public for testing.
      */
-    private Graph<LabelVertex, WeightedEdge> createLabelGraph() {
-        return builder.getAffinityGraph();
+    public void initializeLPARun() {
+        // Grab the graph (the weighted graph builder returns a pointer
+        // to the live graph) and a snapshot of the vertices.
+        graph = builder.getAffinityGraph();
+        
+        // The set of vertices we iterate over is fixed (e.g. we don't
+        // consider new vertices as we process this graph).  If processing
+        // takes a long time, or if we use a more dynamic work queue, we'll
+        // want to revisit this.
+        vertices = new ArrayList<LabelVertex>(graph.getVertices());
     }
 
     /**
-     * Initialize our node conflicts.  This needs to happen before
-     * we send our node conflict information to other (higher node-id)
+     * Initialize our vertex conflicts.  This needs to happen before
+     * we send our vertex conflict information to other (higher vertex-id)
      * nodes in response to an exchangeCrossNodeInfo call from the server,
-     * and before a crossNodeEdges call from a (lower node-id) node.
+     * and before a crossNodeEdges call from a (lower vertex-id) vertex.
      */
     private synchronized void initializeNodeConflictMap() {
         if (!nodeConflictMap.isEmpty()) {
@@ -661,12 +656,12 @@ public class LabelPropagation implements LPAClient {
     }
 
     /**
-     * Sets the label of {@code node} to the label used most frequently
-     * by {@code node}'s neighbors.  Returns {@code true} if {@code node}'s
+     * Sets the label of {@code vertex} to the label used most frequently
+     * by {@code vertex}'s neighbors.  Returns {@code true} if {@code vertex}'s
      * label changed.
      *
-     * @param node a vertex in the graph
-     * @return {@code true} if {@code node}'s label is changed, {@code false}
+     * @param vertex a vertex in the graph
+     * @return {@code true} if {@code vertex}'s label is changed, {@code false}
      *        if it is not changed
      */
     private boolean setMostFrequentLabel(LabelVertex node) {
@@ -689,22 +684,22 @@ public class LabelPropagation implements LPAClient {
     }
 
     /**
-     * Given a graph, and a node within that graph, find the set of labels
-     * with the highest count amongst {@code node}'s neighbors
+     * Given a graph, and a vertex within that graph, find the set of labels
+     * with the highest count amongst {@code vertex}'s neighbors
      *
-     * @param node the node whose neighbors labels will be examined
+     * @param vertex the vertex whose neighbors labels will be examined
      * @return a list of labels with the higest counts
      */
-    private List<Integer> getNeighborCounts(LabelVertex node) {
+    private List<Integer> getNeighborCounts(LabelVertex vertex) {
         // A map of labels -> oldWeight, effectively counting how many
         // of our neighbors use a particular label.
         Map<Integer, Double> labelMap = new HashMap<Integer, Double>();
 
-        // Put our neighbors node into the map.  We allow parallel edges, and
+        // Put our neighbors vertex into the map.  We allow parallel edges, and
         // use edge weights.
         // NOTE can remove some code if we decide we don't need parallel edges
         StringBuffer logSB = new StringBuffer();
-        Collection<LabelVertex> neighbors = graph.getNeighbors(node);
+        Collection<LabelVertex> neighbors = graph.getNeighbors(vertex);
         if (neighbors == null) {
             // No neighbors found: return an empty list.
             return new ArrayList<Integer>();
@@ -717,15 +712,15 @@ public class LabelPropagation implements LPAClient {
             Double value = labelMap.containsKey(label) ?
                          labelMap.get(label) : 0.0;
             // Use findEdgeSet to allow parallel edges
-            Collection<WeightedEdge> edges = graph.findEdgeSet(node, neighbor);
-            // edges will be null if node and neighbor are no longer connected;
+            Collection<WeightedEdge> edges = graph.findEdgeSet(vertex, neighbor);
+            // edges will be null if vertex and neighbor are no longer connected;
             // in that case, do nothing
             if (edges != null) {
                 long edgew = 0;
                 for (WeightedEdge edge : edges) {
                     edgew += edge.getWeight();
                 }
-                // Using node preference alone causes the single threaded
+                // Using vertex preference alone causes the single threaded
                 // version to drop quite a bit for Zachary and a oldWeight of
                 // 0.1 or 0.2, and nice modularity boost at -0.1
 //                oldWeight += Math.pow(graph.degree(neighbor), nodePref) * edgew;
@@ -737,13 +732,16 @@ public class LabelPropagation implements LPAClient {
         // Account for the remote neighbors:  look up this LabelVertex in
         // the remoteNeighborMap
         Map<Integer, Integer> remoteMap =
-                remoteLabelMap.get(node.getIdentity());
+                remoteLabelMap.get(vertex.getIdentity());
         if (remoteMap != null) {
-            // The check above is just so I can continue to test in single node
+            // The check above is just so I can continue to test in single vertex
             // mode
             for (Map.Entry<Integer, Integer> entry : remoteMap.entrySet()) {
                 // want to log this, too!
                 Integer label = entry.getKey();
+                if (logger.isLoggable(Level.FINEST)) {
+                    logSB.append("RLabel:" + label + " ");
+                }
                 Double value = labelMap.containsKey(label) ?
                                 labelMap.get(label) : 0.0;
                 value += entry.getValue();
@@ -754,7 +752,7 @@ public class LabelPropagation implements LPAClient {
 
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "Neighbors of {0} : {1}",
-                       node, logSB.toString());
+                       vertex, logSB.toString());
         }
 
         double maxValue = -1.0;
@@ -846,16 +844,7 @@ public class LabelPropagation implements LPAClient {
      */
     public double getModularity() { return modularity; }
 
-    // public for testing right now
-    public void initializeLPARun() {
-        // The set of vertices we iterate over is fixed (e.g. we don't
-        // consider new vertices as we process this graph).  If processing
-        // takes a long time, or if we use a more dynamic work queue, we'll
-        // want to revisit this.
-        graph = createLabelGraph();
-        vertices = new ArrayList<LabelVertex>(graph.getVertices());
-    }
-    
+    // For debugging.
     private void printNodeConflictMap() {
 
         for (Map.Entry<Long, Map<Object, Integer>> entry :
