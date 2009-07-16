@@ -185,7 +185,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // Start our algorithm iterations
         currentIteration = 1;
         while (!failed && !nodesConverged) {
-            // Assume we'll converge unless told otherwise
+            // Assume we'll converge unless told otherwise; all nodes must
+            // say we've converged for nodesConverged to remain true in
+            // this iteration
             nodesConverged = true;
             nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
             latch = new CountDownLatch(clientSize);
@@ -213,7 +215,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             }
             // Completely arbitrary number to ensure we actually converge
             // This can probably be much lower.
-            if (++currentIteration > 100) {
+            if (++currentIteration > 10) {
                 break;
             }
         }

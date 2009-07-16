@@ -334,6 +334,24 @@ public class TestLPA {
         }
     }
 
+    @Test
+    public void testLPAAlgorithm() throws Exception {
+        // Create our server and three clients.
+        int port = nextUniquePort.get();
+        String localHost = InetAddress.getLocalHost().getHostName();
+
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        LabelPropagation lp2 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
+                    PartialToyBuilder.NODE2, localHost, port, true, 1, 0);
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
+        Collection<AffinityGroup> groups = server.findAffinityGroups();
+    }
+
     private class TestLPAClient implements LPAClient {
         private final long sleepTime;
         private final long nodeId;
@@ -394,7 +412,7 @@ public class TestLPA {
                 finishedStartIter = true;
             }
             boolean converged = currentIter >= convergeCount;
-            server.finishedIteration(nodeId, converged, false, currentIter);
+            server.finishedIteration(nodeId, converged, failed, currentIter);
         }
 
         /** {@inheritDoc} */
@@ -478,6 +496,7 @@ public class TestLPA {
                 Map<Identity, Integer> tempMap =
                         new HashMap<Identity, Integer>();
                 tempMap.put(ident, 1);
+                objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
                 Map<Object, Integer> conflict = new HashMap<Object, Integer>();

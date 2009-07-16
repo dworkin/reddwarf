@@ -169,7 +169,7 @@ public class LabelPropagation implements LPAClient {
         // Do we want to combine these 2 interfaces?  Most likely.
         // Do we want to combine this with the NMS client?  I doubt it.
         // Another option is to have the LPAServer collect and exchange
-        // all cross vertex edge info, and the remote labels at the start
+        // all cross node edge info, and the remote labels at the start
         // of each iteration.  That would be helpful, because then the
         // server knows when all preliminary information has been exchanged.
         clientExporter = new Exporter<LPAClient>(LPAClient.class);
@@ -187,15 +187,15 @@ public class LabelPropagation implements LPAClient {
         if (vertices == null) {
             initializeLPARun();
         }
+        if (done && logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
+                                         localNodeId, graph);
+        }
         groups = gatherGroups(vertices, done);
         if (done) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "FINAL GRAPH IS {0}", graph);
-            }
-
             // Clear our maps that are set up as the first step of an
             // algorithm run.  This is done here, rather than when
-            // exchangeCrossNodeInfo is called, to ensure the node conflict
+            // exchangeCrossNodeInfo is called, to ensure the vertex conflict
             // map is properly initialized.  We use an empty map as a
             // signal that it needs to be initialized.
             nodeConflictMap.clear();
@@ -285,8 +285,8 @@ public class LabelPropagation implements LPAClient {
         }
 
         if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST, "GRAPH at iteration {0} is {1}",
-                                      iteration, graph);
+            logger.log(Level.FINEST, "{0}: GRAPH at iteration {1} is {2}",
+                                      localNodeId, iteration, graph);
         }
 
         // Gather the remote labels from each node.
@@ -344,8 +344,8 @@ public class LabelPropagation implements LPAClient {
                         logSB.append(id + " ");
                     }
                     logger.log(Level.FINEST,
-                               "Intermediate group {0} , members: {1}",
-                               group, logSB.toString());
+                               "{0}: Intermediate group {1} , members: {2}",
+                               localNodeId, group, logSB.toString());
                 }
             }
         }
@@ -439,7 +439,7 @@ public class LabelPropagation implements LPAClient {
             // Process the returned labels
             for (Map.Entry<Object, Set<Integer>> remoteEntry :
                  labels.entrySet())
-            {
+            {   
                 Object remoteObject = remoteEntry.getKey();
                 Set<Integer> remoteLabels = remoteEntry.getValue();
                 Map<Identity, Integer> objUse = objectMap.get(remoteObject);
@@ -491,8 +491,8 @@ public class LabelPropagation implements LPAClient {
 
         while (true) {
             if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST, "GRAPH at iteration {0} is {1}",
-                                          t, graph);
+                logger.log(Level.FINEST, "{0}: GRAPH at iteration {1} is {2}",
+                                          localNodeId, t, graph);
             }
             // Step 3.  Arrange the nodes in a random order and set it to X.
             // Step 4.  For each vertices in X chosen in that specific order, 
@@ -555,15 +555,16 @@ public class LabelPropagation implements LPAClient {
                         logSB.append(id + " ");
                     }
                     logger.log(Level.FINEST,
-                               "Intermediate group {0} , members: {1}",
-                               group, logSB.toString());
+                               "{0}: Intermediate group {1} , members: {2}",
+                               localNodeId, group, logSB.toString());
                 }
 
             }
         }
 
         if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "FINAL GRAPH IS {0}", graph);
+            logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
+                                    localNodeId, graph);
         }
         groups = gatherGroups(vertices, true);
 
@@ -664,8 +665,8 @@ public class LabelPropagation implements LPAClient {
      * @return {@code true} if {@code vertex}'s label is changed, {@code false}
      *        if it is not changed
      */
-    private boolean setMostFrequentLabel(LabelVertex node) {
-        List<Integer> highestSet = getNeighborCounts(node);
+    private boolean setMostFrequentLabel(LabelVertex vertex) {
+        List<Integer> highestSet = getNeighborCounts(vertex);
 
         // If we got back an empty set, no neighbors were found and we're done.
         if (highestSet.isEmpty()) {
@@ -673,13 +674,14 @@ public class LabelPropagation implements LPAClient {
         }
         
         // If our current label is in the set of highest labels, we're done.
-        if (highestSet.contains(node.getLabel())) {
+        if (highestSet.contains(vertex.getLabel())) {
             return false;
         }
 
         // Otherwise, choose a label at random
-        node.setLabel(highestSet.get(ran.nextInt(highestSet.size())));
-        logger.log(Level.FINEST, "Returning true: node is now {0}", node);
+        vertex.setLabel(highestSet.get(ran.nextInt(highestSet.size())));
+        logger.log(Level.FINEST, "{0} : Returning true: vertex is now {1}",
+                                 localNodeId, vertex);
         return true;
     }
 
@@ -751,8 +753,8 @@ public class LabelPropagation implements LPAClient {
 
 
         if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST, "Neighbors of {0} : {1}",
-                       vertex, logSB.toString());
+            logger.log(Level.FINEST, "{0}: Neighbors of {1} : {2}",
+                       localNodeId, vertex, logSB.toString());
         }
 
         double maxValue = -1.0;
