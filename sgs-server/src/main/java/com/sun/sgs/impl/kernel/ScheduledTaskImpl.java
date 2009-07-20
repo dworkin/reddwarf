@@ -46,15 +46,16 @@ class ScheduledTaskImpl implements ScheduledTask {
     // the common, immutable aspects of a task
     private final KernelRunnable task;
     private final Identity owner;
-    private final Priority priority;
     private final long period;
 
     // the common, mutable aspects of a task
+    private volatile Priority priority;
     private volatile long startTime;
     private RecurringTaskHandle recurringTaskHandle = null;
     private int tryCount = 0;
     private TaskQueue queue = null;
     private volatile long timeout;
+    private volatile Throwable lastFailure = null;
 
     // state associated with the lifetime of the task
     private enum State {
@@ -175,6 +176,16 @@ class ScheduledTaskImpl implements ScheduledTask {
     /** {@inheritDoc} */
     public long getTimeout() {
         return timeout;
+    }
+    
+    /** {@inheritDoc} */
+    public Throwable getLastFailure() {
+        return lastFailure;
+    }
+
+    /** {@inheritDoc} */
+    public void setPriority(Priority priority) {
+        this.priority = priority;
     }
 
     /** {@inheritDoc} */
@@ -340,6 +351,15 @@ class ScheduledTaskImpl implements ScheduledTask {
      */
     void incrementTryCount() {
         tryCount++;
+    }
+
+    /**
+     * Sets the {@code Throwable} that caused the last failure of this task.
+     *
+     * @param lastFailure the last failure
+     */
+    void setLastFailure(Throwable lastFailure) {
+        this.lastFailure = lastFailure;
     }
 
     /**

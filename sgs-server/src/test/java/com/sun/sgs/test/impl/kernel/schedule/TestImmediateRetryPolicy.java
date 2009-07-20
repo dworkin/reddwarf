@@ -42,9 +42,6 @@ public class TestImmediateRetryPolicy {
 
     private ImmediateRetryPolicy policy;
     private ScheduledTask task;
-    private Throwable result;
-    private SchedulerQueue backingQueue;
-    private SchedulerQueue throttleQueue;
 
     @Before
     public void setup() {
@@ -52,114 +49,94 @@ public class TestImmediateRetryPolicy {
         policy = new ImmediateRetryPolicy(emptyProps);
 
         task = EasyMock.createMock(ScheduledTask.class);
-        backingQueue = EasyMock.createMock(SchedulerQueue.class);
-        throttleQueue = EasyMock.createMock(SchedulerQueue.class);
     }
 
     @After
     public void tearDown() {
         policy = null;
+        task = null;
+    }
+
+    private void setupTask(Throwable result) {
+        EasyMock.expect(task.getLastFailure()).andStubReturn(result);
     }
 
     private void replayMocks() {
         EasyMock.replay(task);
-        EasyMock.replay(backingQueue);
-        EasyMock.replay(throttleQueue);
     }
 
     private void verifyMocks() {
         EasyMock.verify(task);
-        EasyMock.verify(backingQueue);
-        EasyMock.verify(throttleQueue);
     }
 
     @Test(expected=IllegalArgumentException.class)
+    public void testNullTask() {
+        policy.getRetryAction(null);
+    }
+
+    @Test(expected=IllegalStateException.class)
     public void testNullResult() {
-        result = null;
-        policy.getRetryAction(task, result, backingQueue, throttleQueue);
+        setupTask(null);
+        replayMocks();
+        policy.getRetryAction(task);
     }
 
     @Test
-    public void testInterruptedResultQueueOk() {
-        // expect task to be added to queue
-        backingQueue.addTask(task);
+    public void testInterruptedResult() {
+        setupTask(new InterruptedException("task interrupted"));
         replayMocks();
 
         // verify
-        result = new InterruptedException("task interrupted");
-        SchedulerRetryAction action = policy.getRetryAction(
-                task, result, backingQueue, throttleQueue);
+        SchedulerRetryAction action = policy.getRetryAction(task);
         Assert.assertEquals(SchedulerRetryAction.HANDOFF, action);
         verifyMocks();
     }
 
     @Test
-    public void testInterruptedResultQueueFull() {
-        // expect task to be added to full queue
-        backingQueue.addTask(task);
-        EasyMock.expectLastCall().andThrow(
-                new TaskRejectedException("queue full"));
-        replayMocks();
-
-        // verify
-        result = new InterruptedException("task interrupted");
-        SchedulerRetryAction action = policy.getRetryAction(
-                task, result, backingQueue, throttleQueue);
-        Assert.assertEquals(SchedulerRetryAction.DROP, action);
-        verifyMocks();
-    }
-
-    @Test
     public void testRetryableTrueResult() {
-        // no expected behavior to record
+        setupTask(new RetryableException(true));
         replayMocks();
 
         // verify
-        result = new RetryableException(true);
-        SchedulerRetryAction action = policy.getRetryAction(
-                task, result, backingQueue, throttleQueue);
+        SchedulerRetryAction action = policy.getRetryAction(task);
         Assert.assertEquals(SchedulerRetryAction.RETRY, action);
         verifyMocks();
     }
 
     @Test
     public void testRetryableFalseResult() {
-        // give task needed behavior
+        setupTask(new RetryableException(false));
         EasyMock.expect(task.isRecurring()).andReturn(true);
         replayMocks();
 
         // verify
-        result = new RetryableException(false);
-        SchedulerRetryAction action = policy.getRetryAction(
-                task, result, backingQueue, throttleQueue);
+        SchedulerRetryAction action = policy.getRetryAction(task);
         Assert.assertEquals(SchedulerRetryAction.DROP, action);
         verifyMocks();
     }
 
     @Test
     public void testNotRetryableExceptionAndRecurringTask() {
+        setupTask(new Exception());
         // record recurring task
         EasyMock.expect(task.isRecurring()).andReturn(true);
         replayMocks();
 
         // verify
-        result = new Exception();
-        SchedulerRetryAction action = policy.getRetryAction(
-                task, result, backingQueue, throttleQueue);
+        SchedulerRetryAction action = policy.getRetryAction(task);
         Assert.assertEquals(SchedulerRetryAction.DROP, action);
         verifyMocks();
     }
 
     @Test
     public void testNotRetryableExceptionAndNotRecurringTask() {
+        setupTask(new Exception());
         // record recurring task
         EasyMock.expect(task.isRecurring()).andReturn(false);
         replayMocks();
 
         // verify
-        result = new Exception();
-        SchedulerRetryAction action = policy.getRetryAction(
-                task, result, backingQueue, throttleQueue);
+        SchedulerRetryAction action = policy.getRetryAction(task);
         Assert.assertEquals(SchedulerRetryAction.DROP, action);
         verifyMocks();
     }

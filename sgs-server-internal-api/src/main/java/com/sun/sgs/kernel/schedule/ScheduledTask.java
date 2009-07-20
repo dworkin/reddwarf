@@ -96,6 +96,21 @@ public interface ScheduledTask {
     long getTimeout();
 
     /**
+     * Returns the {@code Throwable} that was the last failure of this task
+     * or {@code null} if it has never been run or never failed.
+     *
+     * @return the {@code Throwable} that was the cause of the last failure
+     */
+    Throwable getLastFailure();
+
+    /**
+     * Sets the priority for this task.
+     *
+     * @param priority the new priority for this task
+     */
+    void setPriority(Priority priority);
+
+    /**
      * Sets the transaction timeout for this task.
      *
      * @param timeout the new transaction timeout for this task

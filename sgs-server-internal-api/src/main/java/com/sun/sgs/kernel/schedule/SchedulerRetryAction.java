@@ -35,7 +35,7 @@ public enum SchedulerRetryAction {
     DROP,
 
     /**
-     * Indicates that a task has been handed off to be run by another thread.
+     * Indicates that a task should be handed off to be run by another thread.
      */
     HANDOFF,
 

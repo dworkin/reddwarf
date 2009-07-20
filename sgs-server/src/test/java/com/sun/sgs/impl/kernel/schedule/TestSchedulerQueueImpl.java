@@ -626,8 +626,10 @@ public class TestSchedulerQueueImpl {
         private final long start;
         private final long period;
         private long timeout = 100;
+        private Throwable lastFailure = null;
         private RecurringTaskHandle handle = null;
         private boolean cancelled = false;
+
         ScheduledTaskImpl() {
             this(0, NON_RECURRING);
         }
@@ -655,8 +657,13 @@ public class TestSchedulerQueueImpl {
         public long getStartTime() { return start; }
         public long getPeriod() { return period; }
         public long getTimeout() { return timeout; }
-        public void setTimeout(long timeout) { this.timeout = timeout; }
-        public Throwable get() { return null; }
+        public Throwable getLastFailure() { return lastFailure; }
+        public void setPriority(Priority priority) {
+
+        }
+        public void setTimeout(long timeout) {
+            throw new UnsupportedOperationException("not supported");
+        }
         public int getTryCount() { return 0; }
         public boolean isRecurring() { return period != NON_RECURRING; }
         void setRecurringTaskHandle(RecurringTaskHandle handle) {
