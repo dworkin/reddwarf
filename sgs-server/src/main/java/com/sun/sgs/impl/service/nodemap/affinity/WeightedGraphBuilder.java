@@ -107,7 +107,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
         updateCount++;
 
         LabelVertex vowner = new LabelVertex(owner);
-        synchronized(affinityGraph) {
+        synchronized (affinityGraph) {
             affinityGraph.addVertex(vowner);
 
             // For each object accessed in this task...
@@ -198,7 +198,14 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
 
-    /** This will be the implementation of our conflict detection listener */
+    /**
+     * This will be the implementation of our conflict detection listener.
+     *
+     * @param objId the object that was evicted
+     * @param nodeId the node that caused the eviction
+     * @param forUpdate {@code true} if this eviction was for an update,
+     *                  {@code false} if it was for read only access
+     */
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
@@ -224,9 +231,12 @@ public class WeightedGraphBuilder implements GraphBuilder {
         // The current snapshot count, used to initially fill up our window.
         private int current = 1;
 
-        private final Queue<Map<Object, Map<Identity, Integer>>> periodObjectQueue;
-        private final Queue<Map<WeightedEdge, Integer>> periodEdgeIncrementsQueue;
-        private final Queue<Map<Long, Map<Object, Integer>>> periodConflictQueue;
+        private final Queue<Map<Object, Map<Identity, Integer>>>
+                periodObjectQueue;
+        private final Queue<Map<WeightedEdge, Integer>>
+                periodEdgeIncrementsQueue;
+        private final Queue<Map<Long, Map<Object, Integer>>>
+                periodConflictQueue;
 
         private Map<Object, Map<Identity, Integer>> currentPeriodObject;
         private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
@@ -267,7 +277,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 for (Map.Entry<Object, Map<Identity, Integer>> entry :
                      periodObject.entrySet())
                 {
-                    Map<Identity, Integer> idMap = objectMap.get(entry.getKey());
+                    Map<Identity, Integer> idMap =
+                            objectMap.get(entry.getKey());
                     for (Map.Entry<Identity, Integer> updateEntry :
                          entry.getValue().entrySet())
                     {

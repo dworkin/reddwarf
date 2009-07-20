@@ -55,13 +55,13 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
     /** The property name for the server port. */
-    static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
+    public static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
     
     /** The default value of the server port. */
-    static public final int DEFAULT_SERVER_PORT = 44537;
+    public static final int DEFAULT_SERVER_PORT = 44537;
 
     /** The name we export ourselves under. */
-    static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
+    public static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
 
     // The exporter for this server
     private final Exporter<LPAServer> exporter;
@@ -71,10 +71,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             new ConcurrentHashMap<Long, LPAClient>();
 
     // A barrier that consists of the set of nodes we expect to hear back
-    // from.  Once this set is empty, we can move on to the next step of
-    // the algorithm.  This is required, rather than a simple Barrier, because
-    // our calls must be idempotent.
-    // This is replaced at each iteration.
+    // from asynchronous calls.  Once this set is empty, we can move on to the
+    // next step of the algorithm.  This is required, rather than a simple
+    // Barrier, because our calls must be idempotent.
     private Set<Long> nodeBarrier = new HashSet<Long>();
 
     // A latch to ensure our main thread waits for all nodes to complete
@@ -95,6 +94,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // of 60 sec before unused threads are reaped.
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
+    /**
+     * Constructs a new label propagation server. Only one should exist
+     * within a Darkstar cluster.
+     * @param properties the application properties
+     * @throws IOException if an error occurs
+     */
     public LabelPropagationServer(Properties properties) throws IOException {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
@@ -105,22 +110,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     }
 
     // ---- Implement AffinityGroupFinder --- //
+
     /** {@inheritDoc} */
-    // JANE does this need to be synchronized on something?
     public Collection<AffinityGroup> findAffinityGroups() {
-        long startTime = System.currentTimeMillis();
-
-        // Don't pay any attention to changes while we're running, at least
-        // to start with.  If a node fails, we'll stop and return no information
-        // for now.  JANE does that make sense?  If a node fails, a lot of
-        // churn will be created.
-        final Map<Long, LPAClient> clientProxyCopy =
-                new HashMap<Long, LPAClient>(clientProxyMap);
-
-        final Set<Long> clean = 
-                Collections.unmodifiableSet(clientProxyCopy.keySet());
-        final int clientSize = clean.size();
-
         // This server controls the running of the distributed label
         // propagation algorithm, using the LPAServer and LPAClient
         // interfaces.  The protocol is:
@@ -143,79 +135,30 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // from each node by calling LPAClient.affinityGroups().  The server
         // combines groups that might cross nodes, and creates new, final
         // affinity group information.
+        long startTime = System.currentTimeMillis();
+
+        // Don't pay any attention to changes while we're running, at least
+        // to start with.  If a node fails, we'll stop and return no information
+        // for now.  JANE does that make sense?  If a node fails, a lot of
+        // churn will be created.
+        final Map<Long, LPAClient> clientProxyCopy =
+                new HashMap<Long, LPAClient>(clientProxyMap);
         
         failed = false;
         nodesConverged = false;
-        // Tell each node to exchange their cross node information.  This
-        // allows each node to have symmetric information:  e.g. if node 1
-        // has a data conflict on obj1 with node 2, it lets node 2 know it
-        // has a similar confict with node 1.
-        nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
-        latch = new CountDownLatch(clientSize);
 
-        for (final Map.Entry<Long, LPAClient> ce : clientProxyCopy.entrySet()) {
-            executor.execute(new Runnable() {
-                public void run() {
-                    try {
-                        ce.getValue().exchangeCrossNodeInfo();
-                    } catch (IOException ioe) {
-                        failed = true;
-                        // NEED retry logic here.  If we cannot reach
-                        // the proxy, we need to remove it from the
-                        // clientProxyMap.
-                        removeNode(ce.getKey());
-                    }
-                }
-            });
+        // Tell each node to prepare for the algorithm to start
+        prepareAlgorithm(clientProxyCopy);
+
+        if (logger.isLoggable(Level.FINE)) {
+            long time = System.currentTimeMillis() - startTime;
+            logger.log(Level.FINE,
+                       "Algorithm prepare took {0} milliseconds", time);
         }
 
-        // Wait for the initialization to complete on all nodes
-        try {
-            // Completely arbitrary timeout!
-            latch.await(10, TimeUnit.MINUTES);
-        } catch (InterruptedException ex) {
-            failed = true;
-        }
-
-        // Start our algorithm iterations
-        currentIteration = 1;
-        while (!failed && !nodesConverged) {
-            // Assume we'll converge unless told otherwise; all nodes must
-            // say we've converged for nodesConverged to remain true in
-            // this iteration
-            nodesConverged = true;
-            nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
-            latch = new CountDownLatch(clientSize);
-            for (final Map.Entry<Long, LPAClient> ce :
-                       clientProxyCopy.entrySet())
-            {
-                executor.execute(new Runnable() {
-                    public void run() {
-                        try {
-                            ce.getValue().startIteration(currentIteration);
-                        } catch (IOException ioe) {
-                            failed = true;
-                            // NEED retry logic here.  If we cannot reach
-                            // the proxy, we need to remove it from the
-                            // clientProxyMap.
-                            removeNode(ce.getKey());
-                        }
-                    }
-                });
-            }
-            // Wait for all nodes to complete this iteration
-            try {
-                // Completely arbitrary timeout!
-                latch.await(10, TimeUnit.MINUTES);
-            } catch (InterruptedException ex) {
-                failed = true;
-            }
-            // Completely arbitrary number to ensure we actually converge
-            // This can probably be much lower.
-            if (++currentIteration > 10) {
-                break;
-            }
-        }
+        // Run the algorithm in multiple iterations, until it has failed
+        // or converged
+        runIterations(clientProxyCopy);
 
         // Now, gather up our results
         if (failed) {
@@ -228,7 +171,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // on the failed node as being part of any group.  
         final Set<AffinityGroup> returnedGroups =
                 Collections.synchronizedSet(new HashSet<AffinityGroup>());
-        latch = new CountDownLatch(clientSize);
+        latch = new CountDownLatch(clientProxyCopy.keySet().size());
         for (final LPAClient proxy : clientProxyCopy.values()) {
             executor.execute(new Runnable() {
                 public void run() {
@@ -239,7 +182,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                         ioe.printStackTrace();
                         // NEED retry here.
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        failed = true;
                     } finally {
                         // this will need to change when we have retries
                         latch.countDown();
@@ -249,12 +192,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
 
         // Wait for the calls to complete on all nodes
-        try {
-            // Completely arbitrary timeout!
-            latch.await(10, TimeUnit.MINUTES);
-        } catch (InterruptedException ex) {
-            failed = true;
-        }
+        waitOnLatch();
 
         Map<Long, AffinityGroupImpl> groupMap =
                 new HashMap<Long, AffinityGroupImpl>();
@@ -344,6 +282,89 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     public void register(long nodeId, LPAClient client) throws IOException {
         synchronized (clientProxyMap) {
             clientProxyMap.put(nodeId, client);
+        }
+    }
+
+    /**
+     * Tells each registred LPAClient to prepare for a run of the algorithm.
+     * 
+     * @param clientProxies a map of node ids to LPAClient proxies
+     */
+    private void prepareAlgorithm(Map<Long, LPAClient> clientProxies) {
+        // Tell each node to exchange their cross node information.  This
+        // allows each node to have symmetric information:  e.g. if node 1
+        // has a data conflict on obj1 with node 2, it lets node 2 know it
+        // has a similar confict with node 1.
+        final Set<Long> clean =
+                Collections.unmodifiableSet(clientProxies.keySet());
+        nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
+        latch = new CountDownLatch(clean.size());
+
+        for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
+            executor.execute(new Runnable() {
+                public void run() {
+                    try {
+                        ce.getValue().exchangeCrossNodeInfo();
+                    } catch (IOException ioe) {
+                        failed = true;
+                        // NEED retry logic here.  If we cannot reach
+                        // the proxy, we need to remove it from the
+                        // clientProxyMap.
+                        removeNode(ce.getKey());
+                    }
+                }
+            });
+        }
+
+        // Wait for the initialization to complete on all nodes
+        waitOnLatch();
+    }
+
+    private void runIterations(Map<Long, LPAClient> clientProxies) {
+        final Set<Long> clean =
+                Collections.unmodifiableSet(clientProxies.keySet());
+        final int cleanSize = clean.size();
+        currentIteration = 1;
+        while (!failed && !nodesConverged) {
+            // Assume we'll converge unless told otherwise; all nodes must
+            // say we've converged for nodesConverged to remain true in
+            // this iteration
+            nodesConverged = true;
+            assert (nodeBarrier.isEmpty());
+            nodeBarrier.addAll(clean);
+            latch = new CountDownLatch(cleanSize);
+            for (final Map.Entry<Long, LPAClient> ce :
+                       clientProxies.entrySet())
+            {
+                executor.execute(new Runnable() {
+                    public void run() {
+                        try {
+                            ce.getValue().startIteration(currentIteration);
+                        } catch (IOException ioe) {
+                            failed = true;
+                            // NEED retry logic here.  If we cannot reach
+                            // the proxy, we need to remove it from the
+                            // clientProxyMap.
+                            removeNode(ce.getKey());
+                        }
+                    }
+                });
+            }
+            // Wait for all nodes to complete this iteration
+            waitOnLatch();
+            // Completely arbitrary number to ensure we actually converge
+            if (++currentIteration > 10) {
+                break;
+            }
+        }
+    }
+    
+    private void waitOnLatch() {
+        try {
+            // Completely arbitrary timeout!
+            latch.await(10, TimeUnit.MINUTES);
+        } catch (InterruptedException ex) {
+            failed = true;
         }
     }
 }

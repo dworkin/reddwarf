@@ -94,7 +94,8 @@ public interface GraphBuilder {
     /**
      * Returns the current graph, with identities as vertices, and
      * edges representing each object accessed by both identity
-     * endpoints.
+     * endpoints. An empty graph will be returned if there is no affinity
+     * data collected.
      *
      * @return the graph of access information
      */
@@ -102,7 +103,8 @@ public interface GraphBuilder {
 
     /**
      * Returns a map of local object uses to the identities that used
-     * the objects, and a count of the number of uses.
+     * the objects, and a count of the number of uses. An empty map will
+     * be returned if there are no object uses.
      *
      * @return the map of local object uses
      */
@@ -111,7 +113,8 @@ public interface GraphBuilder {
     /**
      * Returns a map of detected cross node data conflicts.  This is a map 
      * of node IDs to object IDs, and a count of the number of conflicts on the
-     * object with that node.
+     * object with that node.  An emtpy map will be returned if there are no
+     * conflicts.
      * 
      * @return the map of detected cross node data conflicts
      */

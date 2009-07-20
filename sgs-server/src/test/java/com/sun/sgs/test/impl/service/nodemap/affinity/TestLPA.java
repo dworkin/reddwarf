@@ -205,27 +205,27 @@ public class TestLPA {
         Thread.sleep(1000);
 
         // examine the node conflict map -it is public so I can get it here
-        assertEquals(2, lp1.nodeConflictMap.size());
+        assertEquals(2, lp1.getNodeConflictMap().size());
         Set<Long> expected = new HashSet<Long>();
         expected.add(PartialToyBuilder.NODE2);
         expected.add(PartialToyBuilder.NODE3);
-        assertTrue(expected.containsAll(lp1.nodeConflictMap.keySet()));
+        assertTrue(expected.containsAll(lp1.getNodeConflictMap().keySet()));
         Map<Object, Integer> map =
-                lp1.nodeConflictMap.get(PartialToyBuilder.NODE2);
+                lp1.getNodeConflictMap().get(PartialToyBuilder.NODE2);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj1"));
-        map = lp1.nodeConflictMap.get(PartialToyBuilder.NODE3);
+        map = lp1.getNodeConflictMap().get(PartialToyBuilder.NODE3);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj2"));
         // JANE not checking weights
 
-        assertEquals(1, lp2.nodeConflictMap.size());
-        map = lp2.nodeConflictMap.get(PartialToyBuilder.NODE1);
+        assertEquals(1, lp2.getNodeConflictMap().size());
+        map = lp2.getNodeConflictMap().get(PartialToyBuilder.NODE1);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj1"));
 
-        assertEquals(1, lp3.nodeConflictMap.size());
-        map = lp3.nodeConflictMap.get(PartialToyBuilder.NODE1);
+        assertEquals(1, lp3.getNodeConflictMap().size());
+        map = lp3.getNodeConflictMap().get(PartialToyBuilder.NODE1);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj2"));
 
@@ -252,26 +252,26 @@ public class TestLPA {
 
         // examine the node conflict map -it is public so I can get it here
         // Expect same result as above
-        assertEquals(2, lp1.nodeConflictMap.size());
+        assertEquals(2, lp1.getNodeConflictMap().size());
         expected = new HashSet<Long>();
         expected.add(PartialToyBuilder.NODE2);
         expected.add(PartialToyBuilder.NODE3);
-        assertTrue(expected.containsAll(lp1.nodeConflictMap.keySet()));
-        map = lp1.nodeConflictMap.get(PartialToyBuilder.NODE2);
+        assertTrue(expected.containsAll(lp1.getNodeConflictMap().keySet()));
+        map = lp1.getNodeConflictMap().get(PartialToyBuilder.NODE2);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj1"));
-        map = lp1.nodeConflictMap.get(PartialToyBuilder.NODE3);
+        map = lp1.getNodeConflictMap().get(PartialToyBuilder.NODE3);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj2"));
         // JANE not checking weights
 
-        assertEquals(1, lp2.nodeConflictMap.size());
-        map = lp2.nodeConflictMap.get(PartialToyBuilder.NODE1);
+        assertEquals(1, lp2.getNodeConflictMap().size());
+        map = lp2.getNodeConflictMap().get(PartialToyBuilder.NODE1);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj1"));
 
-        assertEquals(1, lp3.nodeConflictMap.size());
-        map = lp3.nodeConflictMap.get(PartialToyBuilder.NODE1);
+        assertEquals(1, lp3.getNodeConflictMap().size());
+        map = lp3.getNodeConflictMap().get(PartialToyBuilder.NODE1);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj2"));
         
@@ -287,7 +287,7 @@ public class TestLPA {
     private void printNodeConflictMap(LabelPropagation lp) {
         
         for (Map.Entry<Long, Map<Object, Integer>> entry :
-             lp.nodeConflictMap.entrySet())
+             lp.getNodeConflictMap().entrySet())
         {
             StringBuilder sb1 = new StringBuilder();
             sb1.append(entry.getKey());

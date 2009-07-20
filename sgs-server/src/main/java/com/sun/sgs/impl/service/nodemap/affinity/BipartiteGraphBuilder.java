@@ -242,7 +242,14 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    /** This will be the implementation of our conflict detection listener */
+    /** 
+     * This will be the implementation of our conflict detection listener.
+     *
+     * @param objId the object that was evicted
+     * @param nodeId the node that caused the eviction
+     * @param forUpdate {@code true} if this eviction was for an update,
+     *                  {@code false} if it was for read only access
+     */
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
@@ -344,7 +351,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             currentPeriodEdgeIncrements.put(edge, v);
         }
 
-        public void updateConflict(Object objId, long nodeId) {
+        public synchronized void updateConflict(Object objId, long nodeId) {
             Map<Object, Integer> periodObjMap =
                     currentPeriodConflicts.get(nodeId);
             if (periodObjMap == null) {

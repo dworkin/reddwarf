@@ -73,8 +73,8 @@ public class LabelPropagation implements LPAClient {
     private final LPAServer server;
     
     // A map of cached nodeId->LPAClient
-    private final Map<Long, LPAClient> nodeProxies = new
-            ConcurrentHashMap<Long, LPAClient>();
+    private final Map<Long, LPAClient> nodeProxies = 
+            new ConcurrentHashMap<Long, LPAClient>();
 
     // The exporter
     private final Exporter<LPAClient> clientExporter;
@@ -116,7 +116,7 @@ public class LabelPropagation implements LPAClient {
     // Weights?
     // nodeid-> objectid, weight
     // public for testing for now
-    public Map<Long, Map<Object, Integer>> nodeConflictMap =
+    private Map<Long, Map<Object, Integer>> nodeConflictMap =
                 new ConcurrentHashMap<Long, Map<Object, Integer>>();
 
     // Map identity -> label and weight
@@ -171,9 +171,13 @@ public class LabelPropagation implements LPAClient {
         // of each iteration.  That would be helpful, because then the
         // server knows when all preliminary information has been exchanged.
         clientExporter = new Exporter<LPAClient>(LPAClient.class);
-        clientExporter.export(this, 0);
-
+        int exportPort = clientExporter.export(this, 0);
         server.register(nodeId, clientExporter.getProxy());
+        if (logger.isLoggable(Level.CONFIG)) {
+            logger.log(Level.CONFIG, "Created label propagation node on {0} " +
+                    " using server on {1}:{2}, and exported self on {3}",
+                    localNodeId, host, port, exportPort);
+        }
     }
     
     // --- implement LPAClient -- //
@@ -185,11 +189,16 @@ public class LabelPropagation implements LPAClient {
         if (vertices == null) {
             initializeLPARun();
         }
+
+        // Log the final graph before calling gatherGroups, which is
+        // also responsible for reinitializing the vertices for the next run
+        // if done is true
         if (done && logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
-                                         localNodeId, graph);
+            logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
+                                     localNodeId, graph);
         }
-        groups = gatherGroups(vertices, done);
+        groups = Graphs.gatherGroups(vertices, done);
+
         if (done) {
             // Clear our maps that are set up as the first step of an
             // algorithm run.  This is done here, rather than when
@@ -199,7 +208,7 @@ public class LabelPropagation implements LPAClient {
             nodeConflictMap.clear();
             remoteLabelMap.clear();
         }
-        logger.log(Level.FINEST, "{0} returning {1} groups",
+        logger.log(Level.FINEST, "{0}: returning {1} groups",
                    localNodeId, groups.size());
         return new HashSet<AffinityGroup>(groups);
     }
@@ -218,6 +227,7 @@ public class LabelPropagation implements LPAClient {
         boolean failed = false;
         // Now, go through the new map, and tell each vertex about the
         // edges we might have in common.
+        assert (nodeConflictMap != null);
         for (Map.Entry<Long, Map<Object, Integer>> entry : 
              nodeConflictMap.entrySet())
         {
@@ -232,12 +242,17 @@ public class LabelPropagation implements LPAClient {
 
             // JANE need retry
             if (proxy != null) {
+                logger.log(Level.FINEST, "{0}: exchanging edges with {1}",
+                           localNodeId, nodeId);
+                Map<Object, Integer> map = entry.getValue();
+                assert (map != null);
                 Collection<Object> objs =
-                    proxy.crossNodeEdges(
-                        new HashSet<Object>(entry.getValue().keySet()),
-                        localNodeId);
+                    proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
+                                         localNodeId);
                 updateNodeConflictMap(objs, nodeId);
             } else {
+                logger.log(Level.FINE, "{0}: could not exchange edges with {1}",
+                           localNodeId, nodeId);
                 failed = true;
                 break;
             }
@@ -252,9 +267,17 @@ public class LabelPropagation implements LPAClient {
                                              long nodeId)
         throws IOException
     {
+        // We might have been called by another node before we got
+        // notification from the server to exchange edges.
         initializeNodeConflictMap();
 
+        assert (nodeConflictMap != null);
         Map<Object, Integer> origConflicts = nodeConflictMap.get(nodeId);
+
+        // Before we update our map, gather what we knew about before
+        // being contacted by the node, which is what we'll return to it.
+        // Both nodes should end up with the same cross node data between
+        // them.
         Collection<Object> retVal;
         if (origConflicts == null) {
             retVal = new HashSet<Object>();
@@ -267,6 +290,8 @@ public class LabelPropagation implements LPAClient {
 
     /** {@inheritDoc} */
     public void removeNode(long nodeId) throws IOException {
+        logger.log(Level.FINEST, "{0}: Removing node {1} from LPA",
+                   localNodeId, nodeId);
         nodeProxies.remove(nodeId);
         nodeConflictMap.remove(nodeId);
     }
@@ -337,7 +362,7 @@ public class LabelPropagation implements LPAClient {
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
                 Collection<AffinityGroup> intermediateGroups =
-                        gatherGroups(vertices, false);
+                        Graphs.gatherGroups(vertices, false);
                 for (AffinityGroup group : intermediateGroups) {
                     StringBuffer logSB = new StringBuffer();
                     for (Identity id : group.getIdentities()) {
@@ -358,7 +383,7 @@ public class LabelPropagation implements LPAClient {
             iterations = iteration;
             // Note that the graph might be changing while we ran
             // the algorithm.
-            groups = gatherGroups(vertices, false);
+            groups = Graphs.gatherGroups(vertices, false);
             // This doesn't make sense in multinode case
             modularity = Graphs.calcModularity(graph, groups);
 
@@ -385,21 +410,41 @@ public class LabelPropagation implements LPAClient {
             throws IOException
     {
         Map<Object, Set<Integer>> retMap = new HashMap<Object, Set<Integer>>();
+        if (objIds == null) {
+            // This is unexpected;  the other node should have passed in an
+            // empty collection
+            logger.log(Level.FINE, "unexpected null objIds");
+            return retMap;
+        }
+        
         Map<Object, Map<Identity, Integer>> objectMap =
                 builder.getObjectUseMap();
+        assert (objectMap != null);
 
         for (Object obj : objIds) {
             // look up the set of identities
             Map<Identity, Integer> idents = objectMap.get(obj);
             Set<Integer> intSet = new HashSet<Integer>();
-            for (Identity id : idents.keySet()) {
-                // JANE not dealing with weights here
-                // Find the label associated with the id in the graph.
-                // We do this by creating vid, a template of the LabelVertex,
-                // and then finding the actual graph vertex with that identity.
-                LabelVertex vid = new LabelVertex(id);
-                int index = vertices.indexOf(vid);
-                intSet.add(vertices.get(index).getLabel());
+            if (idents != null) {
+                for (Identity id : idents.keySet()) {
+                    // JANE not dealing with weights here
+                    // Find the label associated with the id in the graph.
+                    // We do this by creating vid, a template of the
+                    // LabelVertex, and then finding the actual graph
+                    // vertex with that identity.  The current label can
+                    // be found in the actual graph vertex.
+                    LabelVertex vid = new LabelVertex(id);
+                    int index = vertices.indexOf(vid);
+                    if (index != -1) {
+                        // If the vid wasn't found in the vertices list,
+                        // it is a new identity since the vertices were
+                        // captured at the start of this algorithm run,
+                        // and we just ignore the label.
+                        // Otherwise, add the label to set of labels for
+                        // this identity.
+                        intSet.add(vertices.get(index).getLabel());
+                    }
+                }
             }
             retMap.put(obj, intSet);
         }
@@ -415,9 +460,13 @@ public class LabelPropagation implements LPAClient {
     private boolean updateRemoteLabels() throws IOException {
         Map<Object, Map<Identity, Integer>> objectMap =
                 builder.getObjectUseMap();
+        assert (objectMap != null);
+        
+        boolean failed = false;
 
         // Now, go through the new map, asking for its labels
-        for (Map.Entry<Long, Map<Object, Integer>> entry : 
+        assert (nodeConflictMap != null);
+        for (Map.Entry<Long, Map<Object, Integer>> entry :
              nodeConflictMap.entrySet())
         {
             // JANE is it safe to make a remote call from a remote call?
@@ -426,30 +475,52 @@ public class LabelPropagation implements LPAClient {
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
             if (proxy == null) {
-                return true;
+                logger.log(Level.FINE,
+                          "{0}: could not exchange edges with {1}",
+                          localNodeId, nodeId);
+                failed = true;
+                break;
             }
 
             // Tell the other vertex about the conflicts we know of.
             // JANE should this also include counts?  I think so,
             // so both sides are using the same info
+            Map<Object, Integer> map = entry.getValue();
+            assert (map != null);
+            logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
+                       localNodeId, nodeId);
             Map<Object, Set<Integer>> labels =
                     proxy.getRemoteLabels(
-                        new HashSet<Object>(entry.getValue().keySet()));
+                        new HashSet<Object>(map.keySet()));
+            if (labels == null) {
+                // This is unexpected; the other node should have returned
+                // an empty collection.  Log it, but act as if it
+                // was an empty collection.
+                logger.log(Level.FINE, "unexpected null labels");
+                continue;
+            }
             //Map<Identity, Map<Integer, Integer>> remoteLabelMap
             // Process the returned labels
             for (Map.Entry<Object, Set<Integer>> remoteEntry :
                  labels.entrySet())
-            {   
+            {
                 Object remoteObject = remoteEntry.getKey();
                 Set<Integer> remoteLabels = remoteEntry.getValue();
                 Map<Identity, Integer> objUse = objectMap.get(remoteObject);
-                for (Map.Entry<Identity, Integer> objUseId : objUse.entrySet())
+                if (objUse == null) {
+                    // no local uses of this object
+                    continue;
+                }
+                for (Map.Entry<Identity, Integer> objUseId :
+                     objUse.entrySet())
                 {
                     Identity id = objUseId.getKey();
                     Integer weight = objUseId.getValue();
-                    Map<Integer, Integer> labelWeight = remoteLabelMap.get(id);
+                    Map<Integer, Integer> labelWeight =
+                            remoteLabelMap.get(id);
                     if (labelWeight == null) {
-                        labelWeight = new ConcurrentHashMap<Integer, Integer>();
+                        labelWeight =
+                                new ConcurrentHashMap<Integer, Integer>();
                     }
                     for (Integer label : remoteLabels) {
                         labelWeight.put(label, weight);
@@ -458,7 +529,8 @@ public class LabelPropagation implements LPAClient {
                 }
             }
         }
-        return false;
+
+        return failed;
     }
 
     /**
@@ -548,7 +620,7 @@ public class LabelPropagation implements LPAClient {
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
                 Collection<AffinityGroup> intermediateGroups =
-                        gatherGroups(vertices, false);
+                        Graphs.gatherGroups(vertices, false);
                 for (AffinityGroup group : intermediateGroups) {
                     StringBuffer logSB = new StringBuffer();
                     for (Identity id : group.getIdentities()) {
@@ -566,7 +638,7 @@ public class LabelPropagation implements LPAClient {
             logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
                                     localNodeId, graph);
         }
-        groups = gatherGroups(vertices, true);
+        groups = Graphs.gatherGroups(vertices, true);
 
         if (gatherStats) {
             // Record our statistics for this run, used for testing.
@@ -614,12 +686,18 @@ public class LabelPropagation implements LPAClient {
         // Grab the graph (the weighted graph builder returns a pointer
         // to the live graph) and a snapshot of the vertices.
         graph = builder.getAffinityGraph();
+        assert (graph != null);
         
         // The set of vertices we iterate over is fixed (e.g. we don't
         // consider new vertices as we process this graph).  If processing
         // takes a long time, or if we use a more dynamic work queue, we'll
         // want to revisit this.
-        vertices = new ArrayList<LabelVertex>(graph.getVertices());
+        Collection<LabelVertex> graphVertices = graph.getVertices();
+        if (graphVertices == null) {
+            vertices = new ArrayList<LabelVertex>();
+        } else {
+            vertices = new ArrayList<LabelVertex>(graphVertices);
+        }
     }
 
     /**
@@ -635,11 +713,18 @@ public class LabelPropagation implements LPAClient {
         }
 
         // Get conflict information from the graph builder.
-        nodeConflictMap = new ConcurrentHashMap<Long, Map<Object, Integer>>
-                (builder.getConflictMap());
+        nodeConflictMap = 
+            new ConcurrentHashMap<Long, Map<Object, Integer>>(
+                builder.getConflictMap());
     }
 
     private void updateNodeConflictMap(Collection<Object> objIds, long nodeId) {
+        if (objIds == null) {
+            // This is unexpected;  the other node should have returned
+            // an empty collection.
+            logger.log(Level.FINE, "unexpected null objIds");
+            return;
+        }
         /// hmmm... this is just an update conflict information without the
         // prune stuff...
         Map<Object, Integer> conflicts = nodeConflictMap.get(nodeId);
@@ -695,27 +780,30 @@ public class LabelPropagation implements LPAClient {
     private List<Integer> getNeighborCounts(LabelVertex vertex) {
         // A map of labels -> oldWeight, effectively counting how many
         // of our neighbors use a particular label.
-        Map<Integer, Double> labelMap = new HashMap<Integer, Double>();
+        Map<Integer, Long> labelMap = new HashMap<Integer, Long>();
 
         // Put our neighbors vertex into the map.  We allow parallel edges, and
         // use edge weights.
-        // NOTE can remove some code if we decide we don't need parallel edges
-        StringBuffer logSB = new StringBuffer();
+        // NOTE can remove some code if we decide we don't need parallel edges 
         Collection<LabelVertex> neighbors = graph.getNeighbors(vertex);
         if (neighbors == null) {
-            // No neighbors found: return an empty list.
+            // JUNG returns null if vertex is not present
             return new ArrayList<Integer>();
         }
+
+        StringBuffer logSB = new StringBuffer();
         for (LabelVertex neighbor : neighbors) {
             if (logger.isLoggable(Level.FINEST)) {
                 logSB.append(neighbor + " ");
             }
             Integer label = neighbor.getLabel();
-            Double value = labelMap.containsKey(label) ?
-                         labelMap.get(label) : 0.0;
+            Long value = labelMap.containsKey(label) ?
+                            labelMap.get(label) : 0;
             // Use findEdgeSet to allow parallel edges
-            Collection<WeightedEdge> edges = graph.findEdgeSet(vertex, neighbor);
-            // edges will be null if vertex and neighbor are no longer connected;
+            Collection<WeightedEdge> edges =
+                    graph.findEdgeSet(vertex, neighbor);
+            // edges will be null if vertex and neighbor are no longer 
+            // connected or if either vertex is no longer present
             // in that case, do nothing
             if (edges != null) {
                 long edgew = 0;
@@ -725,7 +813,8 @@ public class LabelPropagation implements LPAClient {
                 // Using vertex preference alone causes the single threaded
                 // version to drop quite a bit for Zachary and a oldWeight of
                 // 0.1 or 0.2, and nice modularity boost at -0.1
-//                oldWeight += Math.pow(graph.degree(neighbor), nodePref) * edgew;
+//                oldWeight +=
+//                    Math.pow(graph.degree(neighbor), nodePref) * edgew;
                 value += edgew;
                 labelMap.put(label, value);
             }
@@ -736,16 +825,16 @@ public class LabelPropagation implements LPAClient {
         Map<Integer, Integer> remoteMap =
                 remoteLabelMap.get(vertex.getIdentity());
         if (remoteMap != null) {
-            // The check above is just so I can continue to test in single vertex
-            // mode
+            // The check above is just so I can continue to test in single 
+            // vertex mode
             for (Map.Entry<Integer, Integer> entry : remoteMap.entrySet()) {
                 // want to log this, too!
                 Integer label = entry.getKey();
                 if (logger.isLoggable(Level.FINEST)) {
                     logSB.append("RLabel:" + label + " ");
                 }
-                Double value = labelMap.containsKey(label) ?
-                                labelMap.get(label) : 0.0;
+                Long value = labelMap.containsKey(label) ?
+                                labelMap.get(label) : 0;
                 value += entry.getValue();
                 labelMap.put(label, value);
             }
@@ -757,10 +846,11 @@ public class LabelPropagation implements LPAClient {
                        localNodeId, vertex, logSB.toString());
         }
 
-        double maxValue = -1.0;
+        // Find the set of labels used the max number of times
+        long maxValue = -1L;
         List<Integer> maxLabelSet = new ArrayList<Integer>();
-        for (Map.Entry<Integer, Double> entry : labelMap.entrySet()) {
-            double val = entry.getValue();
+        for (Map.Entry<Integer, Long> entry : labelMap.entrySet()) {
+            long val = entry.getValue();
             if (val > maxValue) {
                 maxValue = val;
                 maxLabelSet.clear();
@@ -770,37 +860,6 @@ public class LabelPropagation implements LPAClient {
             }
         }
         return maxLabelSet;
-    }
-
-    /**
-     * Return the affinity groups found within the given vertices, putting all
-     * nodes with the same label in a group.  The affinity group's id
-     * will be the common label of the group.
-     *
-     * @param vertices the vertices that we gather groups from
-     * @param clean if {@code true}, reinitialize the labels
-     * @return the affinity groups
-     */
-    private Collection<AffinityGroup> gatherGroups(List<LabelVertex> vertices,
-                                                   boolean clean)
-    {
-        // All nodes with the same label are in the same community.
-        Map<Integer, AffinityGroup> groupMap =
-                new HashMap<Integer, AffinityGroup>();
-        for (LabelVertex vertex : vertices) {
-            int label = vertex.getLabel();
-            AffinityGroupImpl ag =
-                    (AffinityGroupImpl) groupMap.get(label);
-            if (ag == null) {
-                ag = new AffinityGroupImpl(label);
-                groupMap.put(label, ag);
-            }
-            ag.addIdentity(vertex.getIdentity());
-            if (clean) {
-                vertex.initializeLabel();
-            }
-        }
-        return groupMap.values();
     }
 
     /**
@@ -862,5 +921,14 @@ public class LabelPropagation implements LPAClient {
             }
             System.out.println(sb1.toString());
         }
+    }
+
+    // For testing
+    /**
+     * Returns the node conflict map.
+     * @return the node conflict map.
+     */
+    public Map<Long, Map<Object, Integer>> getNodeConflictMap() {
+        return nodeConflictMap;
     }
 }
