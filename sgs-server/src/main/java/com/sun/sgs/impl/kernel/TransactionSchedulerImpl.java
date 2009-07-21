@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
@@ -28,7 +27,6 @@ import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.kernel.schedule.SchedulerQueue;
 import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
 
-import com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -51,7 +49,6 @@ import com.sun.sgs.service.Transaction;
 
 import java.beans.PropertyChangeEvent;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
 import java.util.LinkedList;
@@ -60,7 +57,6 @@ import java.util.Queue;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -256,6 +252,10 @@ final class TransactionSchedulerImpl
         for (int i = 0; i < requestedThreads; i++) {
             executor.submit(new TaskConsumer());
         }
+
+        // initialize the default timeout for scheduled tasks
+        ScheduledTaskImpl.Builder.setDefaultTimeout(
+                transactionCoordinator.getDefaultTimeout());
     }
 
     /**
@@ -275,10 +275,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(KernelRunnable task, Identity owner) {
-        ScheduledTaskImpl t =
-            new ScheduledTaskImpl(task, owner, defaultPriority,
-                                  System.currentTimeMillis(),
-                                  transactionCoordinator.getDefaultTimeout());
+        ScheduledTaskImpl t = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).build();
         return backingQueue.reserveTask(t);
     }
 
@@ -288,9 +286,8 @@ final class TransactionSchedulerImpl
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        long startTime) 
     {
-        ScheduledTaskImpl t =
-            new ScheduledTaskImpl(task, owner, defaultPriority, startTime,
-                                  transactionCoordinator.getDefaultTimeout());
+        ScheduledTaskImpl t = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).startTime(startTime).build();
         return backingQueue.reserveTask(t);
     }
 
@@ -298,11 +295,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public void scheduleTask(KernelRunnable task, Identity owner) {
-        backingQueue.
-            addTask(new ScheduledTaskImpl(
-                task, owner, defaultPriority,
-                System.currentTimeMillis(),
-                transactionCoordinator.getDefaultTimeout()));
+        backingQueue.addTask(new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).build());
     }
 
     /**
@@ -311,10 +305,8 @@ final class TransactionSchedulerImpl
     public void scheduleTask(KernelRunnable task, Identity owner,
                              long startTime) 
     {
-        backingQueue.
-            addTask(new ScheduledTaskImpl(
-                task, owner, defaultPriority, startTime,
-                transactionCoordinator.getDefaultTimeout()));
+        backingQueue.addTask(new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).startTime(startTime).build());
     }
 
     /**
@@ -325,10 +317,11 @@ final class TransactionSchedulerImpl
                                                      long startTime,
                                                      long period) 
     {
-        ScheduledTaskImpl scheduledTask =
-            new ScheduledTaskImpl(
-                task, owner, defaultPriority, startTime, period,
-                transactionCoordinator.getDefaultTimeout());
+        ScheduledTaskImpl scheduledTask = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).
+                startTime(startTime).
+                period(period).
+                build();
         RecurringTaskHandle handle =
             backingQueue.createRecurringTaskHandle(scheduledTask);
         scheduledTask.setRecurringTaskHandle(handle);
@@ -357,11 +350,8 @@ final class TransactionSchedulerImpl
             task.run();
         } else {
             // we're starting a new transaction
-            ScheduledTaskImpl scheduledTask =
-                new ScheduledTaskImpl(
-                    task, owner, defaultPriority,
-                    System.currentTimeMillis(),
-                    transactionCoordinator.getDefaultTimeout());
+            ScheduledTaskImpl scheduledTask = new ScheduledTaskImpl.Builder(
+                    task, owner, defaultPriority).build();
             waitForTask(scheduledTask);
         }
     }
@@ -376,9 +366,8 @@ final class TransactionSchedulerImpl
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        Priority priority)
     {
-        ScheduledTaskImpl t = new ScheduledTaskImpl(
-                task, owner, priority, System.currentTimeMillis(),
-                transactionCoordinator.getDefaultTimeout());
+        ScheduledTaskImpl t = new ScheduledTaskImpl.Builder(
+                task, owner, priority).build();
         return backingQueue.reserveTask(t);
     }
 
@@ -388,10 +377,8 @@ final class TransactionSchedulerImpl
     public void scheduleTask(KernelRunnable task, Identity owner,
                              Priority priority)
     {
-        backingQueue.
-            addTask(new ScheduledTaskImpl(
-                task, owner, priority, System.currentTimeMillis(),
-                transactionCoordinator.getDefaultTimeout()));
+        backingQueue.addTask(new ScheduledTaskImpl.Builder(
+                task, owner, priority).build());
     }
 
     /*
@@ -501,10 +488,10 @@ final class TransactionSchedulerImpl
         // this method more broadly, then it should probably use a separate
         // thread-pool so that it doesn't affect transaction latency
 
-        ScheduledTaskImpl scheduledTask =
-            new ScheduledTaskImpl(task, owner, defaultPriority,
-                                  System.currentTimeMillis(),
-                                  ScheduledTask.UNBOUNDED);
+        ScheduledTaskImpl scheduledTask = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).
+                period(ScheduledTask.UNBOUNDED).
+                build();
         waitForTask(scheduledTask);
     }
 
@@ -567,6 +554,13 @@ final class TransactionSchedulerImpl
         }
     }
 
+    /**
+     * Consume a single task by executing it.  If the task completes
+     * successfully, reschedules the task if it is a recurring task and
+     * schedules the next dependent task if it exists.
+     *
+     * @param task the task to consume
+     */
     private void consume(ScheduledTaskImpl task)
             throws InterruptedException {
         // run the task, checking if it completed
@@ -575,7 +569,8 @@ final class TransactionSchedulerImpl
             if (task.isRecurring()) {
                 long nextStart =
                      task.getStartTime() + task.getPeriod();
-                task = new ScheduledTaskImpl(task, nextStart);
+                task = new ScheduledTaskImpl.Builder(task).
+                        startTime(nextStart).build();
                 backingQueue.addTask(task);
             }
             // if it has dependent tasks, schedule the next one
@@ -750,6 +745,12 @@ final class TransactionSchedulerImpl
         }
     }
 
+    /**
+     * Hands off the task to the backing queue.
+     *
+     * @param task the task to handoff
+     * @return {@code true} if handoff was successful, {@code false} otherwise
+     */
     private boolean handoff(ScheduledTaskImpl task) {
         try {
             backingQueue.addTask(task);
@@ -766,10 +767,8 @@ final class TransactionSchedulerImpl
         private boolean inScheduler = false;
         /** {@inheritDoc} */
         public void addTask(KernelRunnable task, Identity owner) {
-            ScheduledTaskImpl schedTask =
-                new ScheduledTaskImpl(
-                    task, owner, defaultPriority, System.currentTimeMillis(),
-                    transactionCoordinator.getDefaultTimeout());
+            ScheduledTaskImpl schedTask = new ScheduledTaskImpl.Builder(
+                    task, owner, defaultPriority).build();
             schedTask.setTaskQueue(this);
 
             synchronized (this) {
