@@ -23,6 +23,9 @@
 
 package com.sun.sgs.kernel.schedule;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TaskManager;
+
 /**
  * This interface is used to define a retry policy for a scheduler when a
  * transactional task fails.
@@ -38,16 +41,22 @@ public interface SchedulerRetryPolicy {
      * <ul>
      * <li>A return value of {@link SchedulerRetryAction#DROP} means that the
      * task should be dropped and not retried.</li>
-     * <li>A return value of {@link SchedulerRetryAction#HANDOFF} means that the
-     * the task should be handed off by the caller to be run by another
-     * usable thread.  The caller may choose to run the task itself if
-     * resource limitations require it.</li>
-     * <li>A return value of {@link SchedulerRetryAction#RETRY} means that
-     * the task should not be handed off, and the caller should attempt to
-     * re-execute it immediately.</li>
+     * <li>A return value of {@link SchedulerRetryAction#RETRY_LATER} means that
+     * the task should be retried by the scheduler at some point in the
+     * future.</li>
+     * <li>A return value of {@link SchedulerRetryAction#RETRY_NOW} means that
+     * the task should be retried immediately.</li>
      * </ul>
-     * Note: This method may modify the given {@code task} in order to affect
-     * how the scheduler behaves when re-executing it.
+     * This method may modify the given {@code task} in order to affect
+     * how the scheduler behaves when re-executing.
+     * <p>
+     * Note: The {@link Throwable} cause of the most recent failure of the given
+     * {@code task} should always be accessible via the
+     * {@link ScheduledTask#getLastFailure()} method.  This {@code Throwable}
+     * <em>may</em> implement {@link ExceptionRetryStatus}.  If it does, care
+     * should be taken to abide by the contract specified by the
+     * {@link TaskManager} with regard to {@code Throwable}s that implement
+     * this interface.
      *
      * @param task the task that has been aborted
      * @return the {@code SchedulerRetryAction} that the scheduler should

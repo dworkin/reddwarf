@@ -35,13 +35,13 @@ public enum SchedulerRetryAction {
     DROP,
 
     /**
-     * Indicates that a task should be handed off to be run by another thread.
+     * Indicates that a task should be retried at some point in the future.
      */
-    HANDOFF,
+    RETRY_LATER,
 
     /**
      * Indicates that a task should be retried immediately.
      */
-    RETRY;
+    RETRY_NOW;
 
 }

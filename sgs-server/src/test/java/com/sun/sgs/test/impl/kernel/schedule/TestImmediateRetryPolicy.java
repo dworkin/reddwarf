@@ -88,7 +88,7 @@ public class TestImmediateRetryPolicy {
 
         // verify
         SchedulerRetryAction action = policy.getRetryAction(task);
-        Assert.assertEquals(SchedulerRetryAction.HANDOFF, action);
+        Assert.assertEquals(SchedulerRetryAction.RETRY_LATER, action);
         verifyMocks();
     }
 
@@ -99,7 +99,7 @@ public class TestImmediateRetryPolicy {
 
         // verify
         SchedulerRetryAction action = policy.getRetryAction(task);
-        Assert.assertEquals(SchedulerRetryAction.RETRY, action);
+        Assert.assertEquals(SchedulerRetryAction.RETRY_NOW, action);
         verifyMocks();
     }
 

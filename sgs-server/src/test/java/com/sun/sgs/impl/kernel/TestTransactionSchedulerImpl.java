@@ -288,7 +288,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void retryInterruptedTask() throws Exception {
         final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_NOW));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -296,19 +296,13 @@ public class TestTransactionSchedulerImpl {
                     throw result;
             }
         };
-        try {
-            txnScheduler.runTask(r, taskOwner);
-            fail("expected InterruptedException");
-        } catch (InterruptedException ie) {
-            assertEquals(result, ie);
-        } finally {
-            assertEquals(i.get(), 1);
-        }
+        txnScheduler.runTask(r, taskOwner);
+        assertEquals(i.get(), 2);
     }
 
     @Test public void handoffInterruptedTask() throws Exception {
         final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.HANDOFF));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_LATER));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -342,7 +336,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void retryFailedTask() throws Exception {
         final Exception result = new Exception("task failed");
-        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_NOW));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -356,7 +350,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void handoffFailedTask() throws Exception {
         final Exception result = new Exception("task failed");
-        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.HANDOFF));
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_LATER));
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
             public void run() throws Exception {

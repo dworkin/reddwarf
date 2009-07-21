@@ -66,7 +66,7 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
 
         // An interrupted task should be handed off
         if (result instanceof InterruptedException) {
-            return SchedulerRetryAction.HANDOFF;
+            return SchedulerRetryAction.RETRY_LATER;
         }
 
         // NOTE: as a first-pass implementation this simply instructs the
@@ -77,7 +77,7 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
 
             // NOTE: this is a very simple initial policy that always causes
             // tasks to re-try "in place"
-            return SchedulerRetryAction.RETRY;
+            return SchedulerRetryAction.RETRY_NOW;
             
         } else {
 

@@ -686,7 +686,8 @@ final class TransactionSchedulerImpl
                             case DROP:
                                 task.setDone(ie);
                                 break;
-                            case HANDOFF:
+                            case RETRY_LATER:
+                            case RETRY_NOW:
                                 if (!handoff(task)) {
                                     if (logger.isLoggable(Level.WARNING)) {
                                         logger.logThrow(Level.WARNING, ie,
@@ -694,16 +695,6 @@ final class TransactionSchedulerImpl
                                                         "interrupted task: {0}",
                                                         task);
                                     }
-                                }
-                                break;
-                            case RETRY:
-                                task.setDone(ie);
-                                if (logger.isLoggable(Level.WARNING)) {
-                                    logger.logThrow(Level.WARNING, ie,
-                                                    "unable to retry a task " +
-                                                    "that has been " +
-                                                    "interrupted : {0}",
-                                                    task);
                                 }
                                 break;
                             default:
@@ -725,13 +716,13 @@ final class TransactionSchedulerImpl
                         case DROP:
                             task.setDone(t);
                             return true;
-                        case HANDOFF:
+                        case RETRY_LATER:
                             task.setRunning(false);
                             if (handoff(task)) {
                                 return false;
                             }
                             break;
-                        case RETRY:
+                        case RETRY_NOW:
                             task.setRunning(false);
                             break;
                         default:
