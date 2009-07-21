@@ -43,8 +43,8 @@ public interface SchedulerRetryPolicy {
      * usable thread.  The caller may choose to run the task itself if
      * resource limitations require it.</li>
      * <li>A return value of {@link SchedulerRetryAction#RETRY} means that
-     * the task should not be handed off, and the caller is responsible for
-     * for executing it immediately.</li>
+     * the task should not be handed off, and the caller should attempt to
+     * re-execute it immediately.</li>
      * </ul>
      * Note: This method may modify the given {@code task} in order to affect
      * how the scheduler behaves when re-executing it.
