@@ -24,6 +24,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.AbstractDataStore;
 import com.sun.sgs.impl.service.data.store.BindingValue;
+import com.sun.sgs.impl.service.data.store.NetworkException;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.cache.BasicCacheEntry.
     AwaitWritableResult;
@@ -45,7 +46,6 @@ import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
     RegisterNodeResult;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
@@ -58,14 +58,13 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.DataStore;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.util.Iterator;
 import java.util.Properties;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -94,27 +93,91 @@ import java.util.logging.Logger;
 public class CachingDataStore extends AbstractDataStore
     implements CallbackServer
 {
-    /** The property for specifying the server host. */
-    public static final String SERVER_HOST_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.server.host";
-
-    /** The property for specifying the server port. */
-    public static final String SERVER_PORT_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.server.port";
-
-    /** The default server port. */
-    public static final int DEFAULT_SERVER_PORT = 44540;
+    /** The current package. */
+    private static final String PKG =
+	"com.sun.sgs.impl.service.data.store.cache";
 
     /** The property for specifying the callback port. */
-    public static final String CALLBACK_PORT_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.callback.port";
+    public static final String CALLBACK_PORT_PROPERTY = PKG + ".callback.port";
 
     /** The default callback port. */
     public static final int DEFAULT_CALLBACK_PORT = 44541;
     
+    /**
+     * The property for specifying the eviction batch size, which specifies the
+     * number of entries to consider when selecting a single candidate for
+     * eviction.
+     */
+    public static final String EVICTION_BATCH_SIZE_PROPERTY =
+	PKG + ".eviction.batch.size";
+
+    /** The default eviction batch size size. */
+    public static final int DEFAULT_EVICTION_BATCH_SIZE = 100;
+
+    /**
+     * The property for specifying the eviction reserve size, which specifies
+     * the number of cache entries to hold in reserve for use while searching
+     * for eviction candidates.
+     */
+    public static final String EVICTION_RESERVE_SIZE_PROPERTY =
+	PKG + ".eviction.reserve.size";
+
+    /** The default eviction reserve size. */
+    public static final int DEFAULT_EVICTION_RESERVE_SIZE = 50;
+
+    /**
+     * The property for specifying the number of milliseconds to wait when
+     * attempting to obtain a lock.
+     */
+    /* FIXME: Same as bdb and locking access coordinator? */
+    public static final String LOCK_TIMEOUT_PROPERTY = PKG + ".lock.timeout";
+    
+    /** The default lock timeout, in milliseconds. */
+    public static final long DEFAULT_LOCK_TIMEOUT = 10;
+
+    /**
+     * The property for specifying the number of milliseconds to continue
+     * retrying I/O operations before determining that the failure is
+     * permanent.
+     */
+    public static final String MAX_RETRY_PROPERTY = PKG + ".max.retry";
+
+    /** The default maximum retry, in milliseconds. */
+    public static final long DEFAULT_MAX_RETRY = 1000;
+
+    /** The property for specifying the number of cache locks. */
+    public static final String NUM_LOCKS_PROPERTY = PKG + ".num.locks";
+
+    /** The default number of cache locks. */
+    public static final int DEFAULT_NUM_LOCKS = 20;
+
+    /** The property for specifying the new object ID allocation batch size. */
+    public static final String OBJECT_ID_BATCH_SIZE_PROPERTY =
+	PKG + ".object.id.batch.size";
+
+    /** The default new object ID allocation batch size. */
+    public static final int DEFAULT_OBJECT_ID_BATCH_SIZE = 1000;
+
+    /**
+     * The property for specifying the number of milliseconds to wait before
+     * retrying a failed I/O operation.
+     */
+    public static final String RETRY_WAIT_PROPERTY = PKG + ".retry.wait";
+
+    /** The default retry wait, in milliseconds. */
+    public static final long DEFAULT_RETRY_WAIT = 10;
+
+    /** The property for specifying the server host. */
+    public static final String SERVER_HOST_PROPERTY = PKG + ".server.host";
+
+    /** The property for specifying the server port. */
+    public static final String SERVER_PORT_PROPERTY = PKG + ".server.port";
+
+    /** The default server port. */
+    public static final int DEFAULT_SERVER_PORT = 44540;
+
     /** The property for specifying the cache size. */
-    public static final String CACHE_SIZE_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.size";
+    public static final String CACHE_SIZE_PROPERTY = PKG + ".size";
 
     /** The default cache size. */
     public static final int DEFAULT_CACHE_SIZE = 5000;
@@ -122,103 +185,72 @@ public class CachingDataStore extends AbstractDataStore
     /** The minimum cache size. */
     public static final int MIN_CACHE_SIZE = 1000;
 
-    /** The property for specifying the number of cache locks. */
-    public static final String NUM_LOCKS_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.num.locks";
-
-    /** The default number of cache locks. */
-    public static final int DEFAULT_NUM_LOCKS = 20;
-
-    /** The property for specifying the eviction batch size. */
-    public static final String EVICTION_BATCH_SIZE_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.eviction.batch.size";
-
-    /** The default cache size. */
-    public static final int DEFAULT_EVICTION_BATCH_SIZE = 100;
-
-    /** The property for specifying the eviction reserve size. */
-    public static final String EVICTION_RESERVE_SIZE_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.eviction.reserve.size";
-
-    /** The default cache size. */
-    public static final int DEFAULT_EVICTION_RESERVE_SIZE = 50;
-
     /** The property for specifying the update queue size. */
     public static final String UPDATE_QUEUE_SIZE_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.update.queue.size";
+	PKG + ".update.queue.size";
 
     /** The default update queue size. */
     public static final int DEFAULT_UPDATE_QUEUE_SIZE = 100;
 
-    /** The property for specifying the new object ID allocation batch size. */
-    public static final String OBJECT_ID_BATCH_SIZE_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.object.id.batch.size";
-
-    /** The default new object ID allocation batch size. */
-    public static final int DEFAULT_OBJECT_ID_BATCH_SIZE = 1000;
-
-    /**
-     * The property for specifying the number of milliseconds to continue
-     * retrying I/O operations before determining that the failure is
-     * permanent.
-     */
-    public static final String MAX_RETRY_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.max.retry";
-
-    /** The default maximum retry, in milliseconds. */
-    /* FIXME: Same as watchdog renew interval? */
-    public static final long DEFAULT_MAX_RETRY = 1000;
-
-    /**
-     * The property for specifying the number of milliseconds to wait when
-     * attempting to obtain a lock.
-     */
-    /* FIXME: Same as bdb and locking access coordinator? */
-    public static final String LOCK_TIMEOUT_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.cache.lock.timeout";
-    
-    /** The default lock timeout, in milliseconds. */
-    public static final long DEFAULT_LOCK_TIMEOUT = 10;
-
     /** The name of this class. */
-    private static final String CLASSNAME =
-	"com.sun.sgs.impl.service.data.store.cache.CachingDataStore";
+    private static final String CLASSNAME = PKG + ".CachingDataStore";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    /** The logger for transaction abort exceptions. */
+    /** The logger for transaction abort exceptions thrown by this class. */
     static final LoggerWrapper abortLogger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort"));
 
-    /** The remote data store server. */
-    final CachingDataStoreServer server;
+    /**
+     * The number of cache entries to consider when looking for a least
+     * recently used entry to evict.
+     */
+    private final int evictionBatchSize;
+
+    /**
+     * The number of cache entries to hold in reserve for use while finding
+     * entries to evict.
+     */
+    private final int evictionReserveSize;
+
+    /** The lock timeout. */
+    private final long lockTimeout;
+
+    /** The maximum retry for I/O operations. */
+    private final long maxRetry;
+
+    /** The retry wait for failed I/O operations. */
+    private final long retryWait;
 
     /** The transaction proxy. */
     final TransactionProxy txnProxy;
 
+    /** The owner for tasks run by the data store. */
+    final Identity taskOwner;
+
+    /** The transaction scheduler. */
+    private final TransactionScheduler txnScheduler;
+
+    /** The watchdog service. */
+    private final WatchdogService watchdogService;
+
     /** The local data store server, if started, else {@code null}. */
     private final CachingDataStoreServerImpl localServer;
+
+    /** The remote data store server. */
+    final CachingDataStoreServer server;
 
     /** The exporter for the callback server. */
     private final Exporter<CallbackServer> callbackExporter =
 	new Exporter<CallbackServer>(CallbackServer.class);
 
-    /** The proxy for the callback server, to send to the data store server. */
-    private final CallbackServer callbackProxy;
-
     /** The node ID for the local node. */
     private final long nodeId;
 
-    /** The maximum retry for I/O operations. */
-    private final long maxRetry;
-
-    /** The lock timeout. */
-    private final long lockTimeout;
-
-    /** The transaction scheduler. */
-    private final TransactionScheduler txnScheduler;
+    /** Manages sending updates to the server. */
+    final UpdateQueue updateQueue;
 
     /** The transaction context map for this class. */
     private final TxnContextMap contextMap;
@@ -229,35 +261,14 @@ public class CachingDataStore extends AbstractDataStore
     /** The cache of object IDs available for new objects. */
     private final NewObjectIdCache newObjectIdCache;
 
-    /** The number of evictions that have been scheduled but not completed. */
-    private final AtomicInteger pendingEvictions = new AtomicInteger();
-
-    /**
-     * The number of cache entries to hold in reserve for use while finding
-     * entries to evict.
-     */
-    private final int evictionReserveSize;
-
-    /**
-     * The number of cache entries to consider when looking for a least
-     * recently used entry to evict.
-     */
-    private final int evictionBatchSize;
-
     /**
      * The thread that evicts least recently used entries from the cache as
      * needed.
      */
     private final Thread evictionThread = new EvictionThread();
 
-    /** Manages sending updates to the server. */
-    final UpdateQueue updateQueue;
-
-    /** The task owner. */
-    final Identity taskOwner;
-
-    /** The watchdog service. */
-    private final WatchdogService watchdogService;
+    /** The number of evictions that have been scheduled but not completed. */
+    private final AtomicInteger pendingEvictions = new AtomicInteger();
 
     /** A thread pool for fetching data from the server. */
     private ExecutorService fetchExecutor =
@@ -299,31 +310,48 @@ public class CachingDataStore extends AbstractDataStore
     /** Synchronizer for {@code shutdownState}. */
     private final Object shutdownSync = new Object();
 
+    /* -- Constructors -- */
+
     /**
      * Creates an instance of this class.
+     *
+     * @param	properties the properties for configuring this instance
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
+     * @throws	Exception if there is a problem creating the data store
      */
     public CachingDataStore(Properties properties,
 			    ComponentRegistry systemRegistry,
 			    TransactionProxy txnProxy)
 	throws Exception
     {
-	this(properties, systemRegistry, txnProxy, null);
-    }
-
-    /**
-     * Creates an instance of this class.
-     */
-    public CachingDataStore(Properties properties,
-			    ComponentRegistry systemRegistry,
-			    TransactionProxy txnProxy,
-			    Scheduler schedulerIgnored)
-	throws Exception
-    {
-	super(/* FIXME: systemRegistry */ null, logger, abortLogger);
+	super(systemRegistry, logger, abortLogger);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	boolean startServer = wrappedProps.getEnumProperty(
 	    StandardProperties.NODE_TYPE, NodeType.class, NodeType.singleNode)
 	    != NodeType.appNode;
+	int callbackPort = wrappedProps.getIntProperty(
+	    CALLBACK_PORT_PROPERTY, DEFAULT_CALLBACK_PORT, 0, 65535);
+	int cacheSize = wrappedProps.getIntProperty(
+	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE, MIN_CACHE_SIZE,
+	    Integer.MAX_VALUE);
+	evictionBatchSize = wrappedProps.getIntProperty(
+	    EVICTION_BATCH_SIZE_PROPERTY, DEFAULT_EVICTION_BATCH_SIZE,
+	    1, cacheSize);
+	evictionReserveSize = wrappedProps.getIntProperty(
+	    EVICTION_RESERVE_SIZE_PROPERTY, DEFAULT_EVICTION_RESERVE_SIZE,
+	    0, cacheSize);
+	lockTimeout = wrappedProps.getLongProperty(
+	    LOCK_TIMEOUT_PROPERTY, DEFAULT_LOCK_TIMEOUT, 0, Long.MAX_VALUE);
+	maxRetry = wrappedProps.getLongProperty(
+	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 0, Long.MAX_VALUE);
+	int numLocks = wrappedProps.getIntProperty(
+	    NUM_LOCKS_PROPERTY, DEFAULT_NUM_LOCKS, 1, Integer.MAX_VALUE);
+	int objectIdBatchSize = wrappedProps.getIntProperty(
+	    OBJECT_ID_BATCH_SIZE_PROPERTY, DEFAULT_OBJECT_ID_BATCH_SIZE,
+	    1, Integer.MAX_VALUE);
+	retryWait = wrappedProps.getLongProperty(
+	    RETRY_WAIT_PROPERTY, DEFAULT_RETRY_WAIT, 0, Long.MAX_VALUE);
 	String serverHost = wrappedProps.getProperty(
 	    SERVER_HOST_PROPERTY,
 	    wrappedProps.getProperty(StandardProperties.SERVER_HOST));
@@ -334,43 +362,24 @@ public class CachingDataStore extends AbstractDataStore
 	int serverPort = wrappedProps.getIntProperty(
 	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, startServer ? 0 : 1,
 	    65535);
-	int callbackPort = wrappedProps.getIntProperty(
-	    CALLBACK_PORT_PROPERTY, DEFAULT_CALLBACK_PORT, 0, 65535);
-	int cacheSize = wrappedProps.getIntProperty(
-	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE, MIN_CACHE_SIZE,
-	    Integer.MAX_VALUE);
-	int numLocks = wrappedProps.getIntProperty(
-	    NUM_LOCKS_PROPERTY, DEFAULT_NUM_LOCKS, 1, Integer.MAX_VALUE);
-	evictionBatchSize = wrappedProps.getIntProperty(
-	    EVICTION_BATCH_SIZE_PROPERTY, DEFAULT_EVICTION_BATCH_SIZE,
-	    1, cacheSize);
-	evictionReserveSize = wrappedProps.getIntProperty(
-	    EVICTION_RESERVE_SIZE_PROPERTY, DEFAULT_EVICTION_RESERVE_SIZE,
-	    0, cacheSize);
 	int updateQueueSize = wrappedProps.getIntProperty(
 	    UPDATE_QUEUE_SIZE_PROPERTY, DEFAULT_UPDATE_QUEUE_SIZE,
 	    1, Integer.MAX_VALUE);
-	int objectIdBatchSize = wrappedProps.getIntProperty(
-	    OBJECT_ID_BATCH_SIZE_PROPERTY, DEFAULT_OBJECT_ID_BATCH_SIZE,
-	    1, Integer.MAX_VALUE);
-	maxRetry = wrappedProps.getLongProperty(
-	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 0, Long.MAX_VALUE);
-	lockTimeout = wrappedProps.getLongProperty(
-	    LOCK_TIMEOUT_PROPERTY, DEFAULT_LOCK_TIMEOUT, 0, Long.MAX_VALUE);
 	if (logger.isLoggable(CONFIG)) {
 	    logger.log(CONFIG,
 		       "Creating CachingDataStore with properties:" +
-		       "\n  startServer: " + startServer +
-		       "\n  serverHost: " + serverHost +
-		       "\n  serverPort: " + serverPort +
-		       "\n  callbackPort: " + callbackPort +
-		       "\n  cacheSize: " + cacheSize +
-		       "\n  evictionBatchSize: " + evictionBatchSize +
-		       "\n  evictionReserveSize: " + evictionReserveSize +
-		       "\n  updateQueueSize: " + updateQueueSize +
-		       "\n  objectIdBatchSize: " + objectIdBatchSize +
-		       "\n  maxRetry: " + maxRetry +
-		       "\n  lockTimeout: " + lockTimeout);
+		       "\n  callback port: " + callbackPort +
+		       "\n  eviction batch size: " + evictionBatchSize +
+		       "\n  eviction reserve size: " + evictionReserveSize +
+		       "\n  lock timeout: " + lockTimeout +
+		       "\n  max retry: " + maxRetry +
+		       "\n  object id batch size: " + objectIdBatchSize +
+		       "\n  retry wait: " + retryWait +
+		       "\n  server host: " + serverHost +
+		       "\n  server port: " + serverPort +
+		       "\n  size: " + cacheSize +
+		       "\n  start server: " + startServer +
+		       "\n  update queue size: " + updateQueueSize);
 	}
 	try {
 	    if (serverHost == null && startServer) {
@@ -378,18 +387,19 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    this.txnProxy = txnProxy;
 	    taskOwner = txnProxy.getCurrentOwner();
+	    txnScheduler =
+		systemRegistry.getComponent(TransactionScheduler.class);
 	    watchdogService =
 		systemRegistry.getComponent(WatchdogService.class);
 	    if (startServer) {
 		try {
 		    localServer = new CachingDataStoreServerImpl(
 			properties, systemRegistry, txnProxy);
-		    serverPort = /* FIXME: localServer.getPort() */ 0;
+		    serverPort = localServer.getServerPort();
 		    logger.log(INFO, "Started server: {0}", localServer);
-// FIXME: Server needs to export and throw IOException
-// 		} catch (IOException t) {
-// 		    logger.logThrow(SEVERE, t, "Problem starting server");
-// 		    throw t;
+		} catch (IOException t) {
+		    logger.logThrow(SEVERE, t, "Problem starting server");
+		    throw t;
 		} catch (RuntimeException t) {
 		    logger.logThrow(SEVERE, t, "Problem starting server");
 		    throw t;
@@ -397,24 +407,70 @@ public class CachingDataStore extends AbstractDataStore
 	    } else {
 		localServer = null;
 	    }
-	    server = new GetServerCallable(serverHost, serverPort).call();
+	    server = lookupServer(serverHost, serverPort);
+	    callbackExporter.export(this, callbackPort);
+	    CallbackServer callbackProxy = callbackExporter.getProxy();
 	    RegisterNodeResult registerNodeResult =
-		new RegisterNodeCallable().call();
+		registerNode(callbackProxy);
 	    nodeId = registerNodeResult.nodeId;
 	    updateQueue = new UpdateQueue(
 		this, serverHost, registerNodeResult.socketPort,
 		updateQueueSize);
-	    txnScheduler =
-		systemRegistry.getComponent(TransactionScheduler.class);
+	    contextMap = new TxnContextMap(this);
 	    cache = new Cache(this, cacheSize, numLocks, evictionThread);
 	    newObjectIdCache = new NewObjectIdCache(this, objectIdBatchSize);
-	    contextMap = new TxnContextMap(this);
 	    evictionThread.start();
-	    callbackExporter.export(this, callbackPort);
-	    callbackProxy = callbackExporter.getProxy();
 	} catch (Exception e) {
 	    shutdownInternal();
 	    throw e;
+	}
+    }
+
+    /**
+     * Returns the server stored in the registry.
+     *
+     * @param	serverHost the server host
+     * @param	serverPort the server port
+     * @return	the server
+     * @throws	IOException if there are too many I/O failures
+     * @throws	NotBoundException if the server is not found in the registry
+     */
+    private CachingDataStoreServer lookupServer(
+	String serverHost, int serverPort)
+	throws IOException, NotBoundException
+    {
+	ShouldRetryIo retry = new ShouldRetryIo(maxRetry, retryWait);
+	while (true) {
+	    try {
+		return (CachingDataStoreServer) LocateRegistry.getRegistry(
+		    serverHost, serverPort).lookup("CachingDataStoreServer");
+	    } catch (IOException e) {
+		if (!retry.shouldRetry()) {
+		    throw e;
+		}
+	    }
+	}
+    }
+
+    /**
+     * Registers this node.
+     *
+     * @param	callbackProxy the callback server for this node
+     * @return	the results of registering this node
+     * @throws	IOException if there are too many I/O failures
+     */
+    private RegisterNodeResult registerNode(CallbackServer callbackProxy)
+	throws IOException
+    {
+	ShouldRetryIo retry = new ShouldRetryIo(maxRetry, retryWait);
+	while (true) {
+	    try {
+		return server.registerNode(callbackProxy);
+	    } catch (IOException e) {
+		if (!retry.shouldRetry()) {
+		    throw e;
+		}
+	    }
 	}
     }
 
@@ -458,6 +514,8 @@ public class CachingDataStore extends AbstractDataStore
 		case WRITABLE:
 		    /* Already cached for write */
 		    break;
+		default:
+		    throw new AssertionError();
 		}
 		context.noteModifiedObject(entry);
 		return;
@@ -474,15 +532,10 @@ public class CachingDataStore extends AbstractDataStore
 	    this.context = context;
 	    this.oid = oid;
 	}
-	Boolean callOnce() throws IOException {
-	    try {
-		return server.upgradeObject(nodeId, oid);
-	    } catch (CacheConsistencyException e) {
-		reportFailure();
-		return false;
-	    }
+	Boolean callOnce() throws CacheConsistencyException, IOException {
+	    return server.upgradeObject(nodeId, oid);
 	}
-	void callWithResult(Boolean callbackEvict) {
+	void runWithResult(Boolean callbackEvict) {
 	    Object lock = cache.getObjectLock(oid);
 	    synchronized (lock) {
 		ObjectCacheEntry entry = cache.getObjectEntry(oid);
@@ -534,6 +587,8 @@ public class CachingDataStore extends AbstractDataStore
 		    case WRITABLE:
 			/* Already cached for write */
 			break;
+		    default:
+			throw new AssertionError();
 		    }
 		}
 		context.noteModifiedObject(entry);
@@ -559,7 +614,7 @@ public class CachingDataStore extends AbstractDataStore
 	GetObjectResults callOnce() throws IOException {
 	    return server.getObject(nodeId, oid);
 	}
-	void callWithResult(GetObjectResults results) {
+	void runWithResult(GetObjectResults results) {
 	    synchronized (cache.getObjectLock(oid)) {
 		context.noteCachedObject(
 		    cache.getObjectEntry(oid), results.data, false);
@@ -584,7 +639,7 @@ public class CachingDataStore extends AbstractDataStore
 	GetObjectForUpdateResults callOnce() throws IOException {
 	    return server.getObjectForUpdate(nodeId, oid);
 	}
-	void callWithResult(GetObjectForUpdateResults results) {
+	void runWithResult(GetObjectForUpdateResults results) {
 	    synchronized (cache.getObjectLock(oid)) {
 		context.noteCachedObject(
 		    cache.getObjectEntry(oid), results.data, true);
@@ -629,6 +684,8 @@ public class CachingDataStore extends AbstractDataStore
 		case WRITABLE:
 		    /* Already cached for write */
 		    break;
+		default:
+		    throw new AssertionError();
 		}
 		context.noteModifiedObject(entry, data);
 		break;
@@ -760,7 +817,7 @@ public class CachingDataStore extends AbstractDataStore
 	GetBindingResults callOnce() throws IOException {
 	    return server.getBinding(nodeId, nameKey.getName());
 	}
-	void callWithResult(GetBindingResults results) {
+	void runWithResult(GetBindingResults results) {
 	    if (results.found) {
 		/* Add new entry for name */
 		Object lock = cache.getBindingLock(nameKey);
@@ -798,7 +855,8 @@ public class CachingDataStore extends AbstractDataStore
 	    if (results.callbackEvict) {
 		scheduleTask(
 		    new EvictBindingTask(
-			results.found ? nameKey.getName() : results.nextName));
+			results.found ? nameKey :
+			BindingKey.get(results.nextName)));
 
 	    }
 	}
@@ -901,14 +959,12 @@ public class CachingDataStore extends AbstractDataStore
 		    /* Found next entry and know name is unbound */
 		    boolean nextWritable = setBindingInternalUnbound(
 			context, lock, entry, nameKey);
-		    if (nextWritable) {
-			/*
-			 * Requested name is still unbound, next name was
-			 * writable, and have marked the next entry pending --
-			 * fall through to create name entry
-			 */
-		    } else {
-			/* Try again */
+		    /*
+		     * If requested name is still unbound, next name was
+		     * writable, and have marked the next entry pending -- fall
+		     * through to create name entry.  Otherwise retry.
+		     */
+		    if (!nextWritable) {
 			continue;
 		    }
 		} else {
@@ -975,6 +1031,8 @@ public class CachingDataStore extends AbstractDataStore
 	case WRITABLE:
 	    /* Already writable */
 	    break;
+	default:
+	    throw new AssertionError();
 	}
 	return true;
     }
@@ -999,7 +1057,7 @@ public class CachingDataStore extends AbstractDataStore
 	GetBindingForUpdateResults callOnce() throws IOException {
 	    return server.getBindingForUpdate(nodeId, nameKey.getName());
 	}
-	void callWithResult(GetBindingForUpdateResults results) {
+	void runWithResult(GetBindingForUpdateResults results) {
 	    assert results.found;
 	    Object lock = cache.getBindingLock(nameKey);
 	    synchronized (lock) {
@@ -1008,11 +1066,11 @@ public class CachingDataStore extends AbstractDataStore
 		entry.setUpgraded(lock);
 	    }
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(nameKey.getName()));
+		scheduleTask(new EvictBindingTask(nameKey));
 
 	    }
 	    if (results.callbackDowngrade) {
-		scheduleTask(new DowngradeBindingTask(nameKey.getName()));
+		scheduleTask(new DowngradeBindingTask(nameKey));
 	    }
 	}
     }
@@ -1057,7 +1115,7 @@ public class CachingDataStore extends AbstractDataStore
 	    entry.setPendingPrevious();
 	    scheduleFetch(
 		new GetBindingForUpdateUpgradeNextRunnable(
-		    context, nameKey.getName(), entry.key));
+		    nameKey.getName(), entry.key));
 	    entry.awaitNotPendingPrevious(lock, stop);
 	    if (entry.getKnownUnbound(nameKey) && entry.getWritable()) {
 		/* Entry is writable and name is unbound -- mark pending */
@@ -1079,21 +1137,19 @@ public class CachingDataStore extends AbstractDataStore
     private class GetBindingForUpdateUpgradeNextRunnable
 	extends RetryIoRunnable<GetBindingForUpdateResults>
     {
-	private final TxnContext context;
 	private final String name;
 	private final BindingKey nextNameKey;
 	GetBindingForUpdateUpgradeNextRunnable(
-	    TxnContext context, String name, BindingKey nextNameKey)
+	    String name, BindingKey nextNameKey)
 	{
 	    super(CachingDataStore.this);
-	    this.context = context;
 	    this.name = name;
 	    this.nextNameKey = nextNameKey;
 	}
 	GetBindingForUpdateResults callOnce() throws IOException {
 	    return server.getBindingForUpdate(nodeId, name);
 	}
-	void callWithResult(GetBindingForUpdateResults results) {
+	void runWithResult(GetBindingForUpdateResults results) {
 	    assert !results.found;
 	    Object lock = cache.getBindingLock(nextNameKey);
 	    synchronized (lock) {
@@ -1103,10 +1159,10 @@ public class CachingDataStore extends AbstractDataStore
 		entry.setNotPendingPrevious(lock);
 	    }
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(nextNameKey.getName()));
+		scheduleTask(new EvictBindingTask(nextNameKey));
 	    }
 	    if (results.callbackDowngrade) {
-		scheduleTask(new DowngradeBindingTask(nextNameKey.getName()));
+		scheduleTask(new DowngradeBindingTask(nextNameKey));
 	    }
 	}
     }
@@ -1156,7 +1212,7 @@ public class CachingDataStore extends AbstractDataStore
 	GetBindingForUpdateResults callOnce() throws IOException {
 	    return server.getBindingForUpdate(nodeId, nameKey.getName());
 	}
-	void callWithResult(GetBindingForUpdateResults results) {
+	void runWithResult(GetBindingForUpdateResults results) {
 	    if (results.found) {
 		/* Add new entry for name */
 		Object lock = cache.getBindingLock(nameKey);
@@ -1191,13 +1247,13 @@ public class CachingDataStore extends AbstractDataStore
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
-	    String evictName =
-		results.found ? nameKey.getName() : results.nextName;
+	    BindingKey evictNameKey =
+		results.found ? nameKey : BindingKey.get(results.nextName);
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(evictName));
+		scheduleTask(new EvictBindingTask(evictNameKey));
 	    }
 	    if (results.callbackDowngrade) {
-		scheduleTask(new DowngradeBindingTask(evictName));
+		scheduleTask(new DowngradeBindingTask(evictNameKey));
 	    }
 	}
     }
@@ -1355,7 +1411,7 @@ public class CachingDataStore extends AbstractDataStore
 	GetBindingForRemoveResults callOnce() throws IOException {
 	    return server.getBindingForRemove(nodeId, nameKey.getName());
 	}
-	void callWithResult(GetBindingForRemoveResults results) {
+	void runWithResult(GetBindingForRemoveResults results) {
 	    if (createName) {
 		synchronized (cache.getBindingLock(nameKey)) {
 		    context.noteCachedReservedBinding(
@@ -1373,10 +1429,10 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    if (results.found) {
 		if (results.callbackEvict) {
-		    scheduleTask(new EvictBindingTask(nameKey.getName()));
+		    scheduleTask(new EvictBindingTask(nameKey));
 		}
 		if (results.callbackDowngrade) {
-		    scheduleTask(new DowngradeBindingTask(nameKey.getName()));
+		    scheduleTask(new DowngradeBindingTask(nameKey));
 		}
 	    }
 	    Object lock = cache.getBindingLock(nextNameKey);
@@ -1398,10 +1454,13 @@ public class CachingDataStore extends AbstractDataStore
 		nextEntry.setNotPendingPrevious(lock);
 	    }
 	    if (results.nextCallbackEvict) {
-		scheduleTask(new EvictBindingTask(results.nextName));
+		scheduleTask(
+		    new EvictBindingTask(BindingKey.get(results.nextName)));
 	    }
 	    if (results.nextCallbackDowngrade) {
-		scheduleTask(new DowngradeBindingTask(results.nextName));
+		scheduleTask(
+		    new DowngradeBindingTask(
+			BindingKey.get(results.nextName)));
 	    }
 	}
     }
@@ -1525,7 +1584,7 @@ public class CachingDataStore extends AbstractDataStore
 	NextBoundNameResults callOnce() throws IOException {
 	    return server.nextBoundName(nodeId, key.getName());
 	}
-	void callWithResult(NextBoundNameResults results) {
+	void runWithResult(NextBoundNameResults results) {
 	    BindingKey realNextKey = BindingKey.get(results.nextName);	    
 	    Object lock = cache.getBindingLock(realNextKey);
 	    synchronized (lock) {
@@ -1542,7 +1601,8 @@ public class CachingDataStore extends AbstractDataStore
 		}
 	    }
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(results.nextName));
+		scheduleTask(
+		    new EvictBindingTask(BindingKey.get(results.nextName)));
 	    }
 	}
     }
@@ -1560,37 +1620,47 @@ public class CachingDataStore extends AbstractDataStore
 	    case TXNS_COMPLETED:
 		do {
 		    try {
-			shutdownState.wait();
+			shutdownSync.wait();
 		    } catch (InterruptedException e) {
 		    }
 		} while (shutdownState != ShutdownState.COMPLETED);
 		return;
 	    case COMPLETED:
 		return;
+	    default:
+		throw new AssertionError();
 	    }
 	}
-	callbackExporter.unexport();
+	/* Prevent new transactions and wait for active ones to complete */
 	contextMap.shutdown();
 	synchronized (shutdownSync) {
 	    shutdownState = ShutdownState.TXNS_COMPLETED;
 	}
-	/* Continue evictions until all transactions are complete */
+	/* Stop facilities used by active transactions */
 	evictionThread.interrupt();
+	try {
+	    evictionThread.join(10000);
+	} catch (InterruptedException e) {
+	}
 	if (newObjectIdCache != null) {
 	    newObjectIdCache.shutdown();
 	}
 	fetchExecutor.shutdownNow();
 	try {
-	    evictionThread.join(10000);
 	    fetchExecutor.awaitTermination(10000, MILLISECONDS);
 	} catch (InterruptedException e) {
 	}
+	/* Stop accepting callbacks */
+	callbackExporter.unexport();
+	/* Finish sending updates */
 	if (updateQueue != null) {
 	    updateQueue.shutdown();
 	}
+	/* Shut down server */
 	if (localServer != null) {
 	    localServer.shutdown();
 	}
+	/* Done */
 	synchronized (shutdownSync) {
 	    shutdownState = ShutdownState.COMPLETED;
 	    shutdownSync.notifyAll();
@@ -1602,17 +1672,10 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     protected int getClassIdInternal(Transaction txn, byte[] classInfo) {
 	contextMap.join(txn);
-	return new GetClassIdCallable(classInfo).call();
-    }
-
-    private class GetClassIdCallable extends RetryIoCallable<Integer> {
-	private final byte[] classInfo;
-	GetClassIdCallable(byte[] classInfo) {
-	    super(CachingDataStore.this);
-	    this.classInfo = classInfo;
-	}
-	Integer callOnce() throws IOException {
+	try {
 	    return server.getClassId(classInfo);
+	} catch (IOException e) {
+	    throw new NetworkException(e.getMessage(), e);
 	}
     }
 
@@ -1623,17 +1686,15 @@ public class CachingDataStore extends AbstractDataStore
 	throws ClassInfoNotFoundException
     {
 	contextMap.join(txn);
-	return new GetClassInfoCallable(classId).call();
-    }
-
-    private class GetClassInfoCallable extends RetryIoCallable<byte[]> {
-	private final int classId;
-	GetClassInfoCallable(int classId) {
-	    super(CachingDataStore.this);
-	    this.classId = classId;
-	}
-	byte[] callOnce() throws IOException {
-	    return server.getClassInfo(classId);
+	try {
+	    byte[] result = server.getClassInfo(classId);
+	    if (result == null) {
+		throw new ClassInfoNotFoundException(
+		    "No information found for class ID " + classId);
+	    }
+	    return result;
+	} catch (IOException e) {
+	    throw new NetworkException(e.getMessage(), e);
 	}
     }
 
@@ -1642,7 +1703,12 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     protected long nextObjectIdInternal(Transaction txn, long oid) {
 	TxnContext context = contextMap.join(txn);
-	NextObjectResults results = new NextObjectIdCallable(oid).call();
+	NextObjectResults results;
+	try {
+	    results = server.nextObjectId(nodeId, oid);
+	} catch (IOException e) {
+	    throw new NetworkException(e.getMessage(), e);
+	}
 	if (results == null) {
 	    return -1;
 	}
@@ -1651,7 +1717,7 @@ public class CachingDataStore extends AbstractDataStore
 	    ObjectCacheEntry entry = cache.getObjectEntry(results.oid);
 	    if (entry == null) {
 		/* No entry -- create it */
-		entry = context.noteCachedObject(results.oid, results.data);
+		context.noteCachedObject(results.oid, results.data);
 	    } else {
 		context.noteAccess(entry);
 	    }
@@ -1660,19 +1726,6 @@ public class CachingDataStore extends AbstractDataStore
 	    scheduleTask(new EvictObjectTask(results.oid));
 	}
 	return results.oid;
-    }
-
-    private class NextObjectIdCallable
-	extends RetryIoCallable<NextObjectResults>
-    {
-	private final long oid;
-	NextObjectIdCallable(long oid) {
-	    super(CachingDataStore.this);
-	    this.oid = oid;
-	}
-	NextObjectResults callOnce() throws IOException {
-	    return server.nextObjectId(nodeId, oid);
-	}
     }
 
     /* -- Implement AbstractDataStore's TransactionParticipant methods -- */
@@ -1731,12 +1784,11 @@ public class CachingDataStore extends AbstractDataStore
      * A {@link KernelRunnable} that downgrades an object after accessing it
      * for read.
      */
-    private class DowngradeObjectTask extends AbstractKernelRunnable
-	implements SimpleCompletionHandler
+    private class DowngradeObjectTask 
+	implements KernelRunnable, SimpleCompletionHandler
     {
 	private final long oid;
 	DowngradeObjectTask(long oid) {
-	    super(String.valueOf(oid));
 	    this.oid = oid;
 	}
 	public void run() {
@@ -1754,6 +1806,9 @@ public class CachingDataStore extends AbstractDataStore
 			entry.getContextId(), oid, this);
 		}
 	    }
+	}
+	public String getBaseTaskType() {
+	    return getClass().getName();
 	}
 	public void completed() {
 	    Object lock = cache.getObjectLock(oid);
@@ -1796,17 +1851,36 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
+     * A {@code SimpleCompletionHandler} that updates the cache for an object
+     * that has been evicted.
+     */
+    private class EvictObjectCompletionHandler
+	implements SimpleCompletionHandler
+    {
+	final long oid;
+	EvictObjectCompletionHandler(long oid) {
+	    this.oid = oid;
+	    pendingEvictions.incrementAndGet();
+	}
+	public void completed() {
+	    Object lock = cache.getObjectLock(oid);
+	    synchronized (lock) {
+		cache.getObjectEntry(oid).setEvicted(lock);
+		cache.removeObjectEntry(oid);
+		pendingEvictions.decrementAndGet();
+	    }
+	}
+    }
+
+    /**
      * A {@link KernelRunnable} that evicts an object after accessing it for
      * write.
      */
-    private class EvictObjectTask extends AbstractKernelRunnable
-	implements SimpleCompletionHandler
+    private class EvictObjectTask extends EvictObjectCompletionHandler
+	implements KernelRunnable
     {
-	private final long oid;
 	EvictObjectTask(long oid) {
-	    super(String.valueOf(oid));
-	    this.oid = oid;
-	    pendingEvictions.incrementAndGet();
+	    super(oid);
 	}
 	public void run() {
 	    reportObjectAccess(txnProxy.getCurrentTransaction(), oid, WRITE);
@@ -1818,22 +1892,13 @@ public class CachingDataStore extends AbstractDataStore
 		    !entry.getDecaching())
 		{
 		    assert !inUse(entry);
-		    if (entry.getWritable()) {
-			entry.setEvictingWrite();
-		    } else {
-			entry.setEvictingRead();
-		    }
+		    entry.setEvicting();
 		    updateQueue.evictObject(entry.getContextId(), oid, this);
 		}
 	    }
 	}
-	public void completed() {
-	    Object lock = cache.getObjectLock(oid);
-	    synchronized (lock) {
-		cache.getObjectEntry(oid).setEvictedRead(lock);
-		cache.removeObjectEntry(oid);
-		pendingEvictions.decrementAndGet();
-	    }
+	public String getBaseTaskType() {
+	    return getClass().getName();
 	}
     }
 
@@ -1866,7 +1931,7 @@ public class CachingDataStore extends AbstractDataStore
 		return true;
 	    } else {
 		/* Downgrade when not in use */
-		scheduleTask(new DowngradeBindingTask(name));
+		scheduleTask(new DowngradeBindingTask(nameKey));
 		return false;
 	    }
 	}
@@ -1876,36 +1941,36 @@ public class CachingDataStore extends AbstractDataStore
      * A {@link KernelRunnable} that downgrades a binding after accessing it
      * for read.
      */
-    private class DowngradeBindingTask extends AbstractKernelRunnable
-	implements SimpleCompletionHandler
+    private class DowngradeBindingTask
+	implements KernelRunnable, SimpleCompletionHandler
     {
-	private final String name;
-	DowngradeBindingTask(String name) {
-	    super(name);
-	    this.name = name;
+	private final BindingKey nameKey;
+	DowngradeBindingTask(BindingKey nameKey) {
+	    this.nameKey = nameKey;
 	}
 	public void run() {
-	    reportNameAccess(txnProxy.getCurrentTransaction(), name, READ);
-	    BindingKey nameKey = BindingKey.get(name);
+	    reportNameAccess(txnProxy.getCurrentTransaction(),
+			     nameKey.getName(), READ);
 	    Object lock = cache.getBindingLock(nameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nameKey);
-		entry.awaitNotPendingPrevious(
-		    lock, System.currentTimeMillis() + lockTimeout);
-		/* Check if cached for write and not downgrading */
-		if (entry != null &&
-		    entry.getWritable() &&
-		    !entry.getDowngrading())
-		{
-		    assert !inUseForWrite(entry);
-		    entry.setEvictingDowngrade();
-		    updateQueue.downgradeBinding(
-			entry.getContextId(), name, this);
+		if (entry != null) {
+		    entry.awaitNotPendingPrevious(
+			lock, System.currentTimeMillis() + lockTimeout);
+		    /* Check if cached for write and not downgrading */
+		    if (entry.getWritable() && !entry.getDowngrading()) {
+			assert !inUseForWrite(entry);
+			entry.setEvictingDowngrade();
+			updateQueue.downgradeBinding(
+			    entry.getContextId(), nameKey.getName(), this);
+		    }
 		}
 	    }
 	}
+	public String getBaseTaskType() {
+	    return getClass().getName();
+	}
 	public void completed() {
-	    BindingKey nameKey = BindingKey.get(name);
 	    Object lock = cache.getBindingLock(nameKey);
 	    synchronized (lock) {
 		cache.getBindingEntry(nameKey).setEvictedDowngrade(lock);
@@ -1940,8 +2005,30 @@ public class CachingDataStore extends AbstractDataStore
 		return true;
 	    } else {
 		/* Evict when not in use */
-		scheduleTask(new EvictBindingTask(name));
+		scheduleTask(new EvictBindingTask(nameKey));
 		return false;
+	    }
+	}
+    }
+
+    /**
+     * A {@code SimpleCompletionHandler} that updates the cache for a binding
+     * that has been evicted.
+     */
+    private class EvictBindingCompletionHandler
+	implements SimpleCompletionHandler
+    {
+	final BindingKey nameKey;
+	EvictBindingCompletionHandler(BindingKey nameKey) {
+	    this.nameKey = nameKey;
+	    pendingEvictions.incrementAndGet();
+	}
+	public void completed() {
+	    Object lock = cache.getBindingLock(nameKey);
+	    synchronized (lock) {
+		cache.getBindingEntry(nameKey).setEvicted(lock);
+		cache.removeBindingEntry(nameKey);
+		pendingEvictions.decrementAndGet();
 	    }
 	}
     }
@@ -1950,46 +2037,33 @@ public class CachingDataStore extends AbstractDataStore
      * A {@link KernelRunnable} that evicts a binding after accessing it for
      * write.
      */
-    private class EvictBindingTask extends AbstractKernelRunnable
-	implements SimpleCompletionHandler
+    private class EvictBindingTask extends EvictBindingCompletionHandler
+	implements KernelRunnable
     {
-	private final String name;
-	EvictBindingTask(String name) {
-	    super(name);
-	    this.name = name;
-	    pendingEvictions.incrementAndGet();
+	EvictBindingTask(BindingKey nameKey) {
+	    super(nameKey);
 	}
 	public void run() {
-	    reportNameAccess(txnProxy.getCurrentTransaction(), name, WRITE);
-	    BindingKey nameKey = BindingKey.get(name);
+	    reportNameAccess(txnProxy.getCurrentTransaction(),
+			     nameKey.getName(), WRITE);
 	    Object lock = cache.getBindingLock(nameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nameKey);
-		entry.awaitNotPendingPrevious(
-		    lock, System.currentTimeMillis() + lockTimeout);
-		/* Check if cached and not evicting */
-		if (entry != null &&
-		    entry.getReadable() &&
-		    !entry.getDecaching())
-		{
-		    assert !inUse(entry);
-		    if (entry.getWritable()) {
-			entry.setEvictingWrite();
-		    } else {
-			entry.setEvictingRead();
+		if (entry != null) {
+		    entry.awaitNotPendingPrevious(
+			lock, System.currentTimeMillis() + lockTimeout);
+		    /* Check if cached and not evicting */
+		    if (entry.getReadable() && !entry.getDecaching()) {
+			assert !inUse(entry);
+			entry.setEvicting();
+			updateQueue.evictBinding(
+			    entry.getContextId(), nameKey.getName(), this);
 		    }
-		    updateQueue.evictBinding(entry.getContextId(), name, this);
 		}
 	    }
 	}
-	public void completed() {
-	    BindingKey nameKey = BindingKey.get(name);
-	    Object lock = cache.getBindingLock(nameKey);
-	    synchronized (lock) {
-		cache.getBindingEntry(nameKey).setEvictedRead(lock);
-		cache.removeBindingEntry(nameKey);
-		pendingEvictions.decrementAndGet();
-	    }
+	public String getBaseTaskType() {
+	    return getClass().getName();
 	}
     }
 
@@ -2028,14 +2102,25 @@ public class CachingDataStore extends AbstractDataStore
     /**
      * Report that the local node should be marked as failed because of a
      * failure within the data store.
+     *
+     * @param	exception the exception that caused the failure, or {@code
+     *		null} if no exception is available
      */
-    void reportFailure() {
-	new Thread("CachingDataStore reportFailure") {
+    void reportFailure(Throwable exception) {
+	if (logger.isLoggable(WARNING)) {
+	    if (exception != null) {
+		logger.logThrow(WARNING, exception, "CachingDataStore failed");
+	    } else {
+		logger.log(WARNING, "CachingDataStore failed");
+	    }
+	}
+	Thread thread = new Thread("CachingDataStore reportFailure") {
 	    public void run() {
 		watchdogService.reportFailure(
 		    nodeId, CachingDataStore.class.getName());
 	    }
-	}.start();
+	};
+	thread.start();
     }
 
     /* -- Other methods -- */
@@ -2068,23 +2153,44 @@ public class CachingDataStore extends AbstractDataStore
 	return maxRetry;
     }
 
-    /* -- Utility methods -- */
-
-    private boolean inUse(BasicCacheEntry<?, ?> cacheEntry) {
-	/* Also consider previousPending */
-	return cacheEntry.getContextId() <
-	    updateQueue.highestPendingContextId();
+    long getRetryWait() {
+	return retryWait;
     }
 
-    private boolean inUseForWrite(BasicCacheEntry<?, ?> cacheEntry) {
-	return inUse(cacheEntry) && cacheEntry.getModified();
+    /**
+     * Checks if an entry is currently in use, either by an active or pending
+     * transaction, or because it is a binding entry that has a pending
+     * operation on a previous entry.  The lock associated with the entry
+     * should be held.
+     *
+     * @param	entry the cache entry
+     * @return	whether the entry is currently in use
+     */
+    boolean inUse(BasicCacheEntry<?, ?> entry) {
+	assert Thread.holdsLock(cache.getEntryLock(entry));
+	return entry.getContextId() < updateQueue.highestPendingContextId() ||
+	    (entry instanceof BindingCacheEntry &&
+	     ((BindingCacheEntry) entry).getPendingPrevious());
+    }
+
+    /**
+     * Checks if an entry is both modified and currently in use, either by an
+     * active or pending transaction, or because it is a binding entry that has
+     * a pending operation on a previous entry.  The lock associated with the
+     * entry should be held.
+     *
+     * @param	entry the cache entry
+     * @return	whether the entry is modified and currently in use
+     */
+    boolean inUseForWrite(BasicCacheEntry<?, ?> entry) {
+	return entry.getModified() && inUse(entry);
     }
 
     /* -- Utility classes -- */
 
     /**
-     * A {@code Runnable} that chooses least recently used entries to evict
-     * from the cache as needed to make space for new entries.
+     * A {@code Thread} that chooses least recently used entries to evict from
+     * the cache as needed to make space for new entries.
      */
     private class EvictionThread extends Thread {
 
@@ -2094,8 +2200,8 @@ public class CachingDataStore extends AbstractDataStore
 	 */
 	private boolean reserved;
 
-	/** A iterator that repeatedly circles over all cache entries. */
-	private final Iterator<BasicCacheEntry<?, ?>> entryIterator =
+	/** An iterator over all cache entries. */
+	private Iterator<BasicCacheEntry<?, ?>> entryIterator =
 	    cache.getEntryIterator(evictionBatchSize);
 
 	/** Creates an instance of this class. */
@@ -2105,8 +2211,6 @@ public class CachingDataStore extends AbstractDataStore
 		reserved = true;
 	    }
 	}
-
-	/* -- Implement Runnable -- */
 
 	@Override
 	public void run() {
@@ -2129,6 +2233,9 @@ public class CachingDataStore extends AbstractDataStore
 		    /* The cache has plenty of space -- set up the reserve */
 		    if (cache.tryReserve(evictionReserveSize)) {
 			reserved = true;
+		    } else {
+			/* Failed to set up reserve -- try again */
+			continue;
 		    }
 		} else if (cache.available() + pendingEvictions.get() <
 			   2 * evictionReserveSize)
@@ -2143,7 +2250,8 @@ public class CachingDataStore extends AbstractDataStore
 		/* Enough space -- wait to get full */
 		try {
 		    synchronized (this) {
-			wait();
+			/* FIXME: How do we know that there is still space? */
+			wait(1000);
 		    }
 		} catch (InterruptedException e) {
 		}
@@ -2157,13 +2265,15 @@ public class CachingDataStore extends AbstractDataStore
 	private void tryEvict() {
 	    BasicCacheEntry<?, ?> bestEntry = null;
 	    EntryInfo bestInfo = null;
-	    int i = 0;
-	    for (Iterator<BasicCacheEntry<?, ?>> iter =
-		     cache.getEntryIterator(evictionBatchSize);
-		 iter.hasNext();
-		 )
-	    {
-		BasicCacheEntry<?, ?> entry = iter.next();
+
+	    for (int i = 0; i < evictionBatchSize; i++) {
+		if (!entryIterator.hasNext()) {
+		    entryIterator = cache.getEntryIterator(evictionBatchSize);
+		    if (!entryIterator.hasNext()) {
+			break;
+		    }
+		}
+		BasicCacheEntry<?, ?> entry = entryIterator.next();
 		if (getShutdownTxnsCompleted()) {
 		    return;
 		} else if (i >= evictionBatchSize) {
@@ -2175,8 +2285,7 @@ public class CachingDataStore extends AbstractDataStore
 			continue;
 		    }
 		    EntryInfo entryInfo = new EntryInfo(
-			inUse(entry),
-			entry.getModified(),
+			inUse(entry), entry.getModified(),
 			entry.getContextId());
 		    if (bestEntry == null || entryInfo.preferTo(bestInfo)) {
 			bestEntry = entry;
@@ -2196,50 +2305,30 @@ public class CachingDataStore extends AbstractDataStore
 			} else {
 			    scheduleTask(
 				(bestEntry instanceof ObjectCacheEntry)
-				? new EvictObjectTask(
-				    ((ObjectCacheEntry) bestEntry).key)
+				? new EvictObjectTask((Long) bestEntry.key)
 				: new EvictBindingTask(
-				    ((BindingCacheEntry) bestEntry)
-				    .key.getName()));
+				    (BindingKey) bestEntry.key));
 			}
 		    }
 		}
 	    }
 	}
 
+	/** Evict a object cache entry that is not in use immediately. */
 	private void evictObjectNow(ObjectCacheEntry entry) {
-	    pendingEvictions.incrementAndGet();
-	    final long oid = entry.key;
+	    entry.setEvicting();
 	    updateQueue.evictObject(
-		entry.getContextId(), oid,
-		new SimpleCompletionHandler() {
-		    public void completed() {
-			Object lock = cache.getObjectLock(oid);
-			synchronized (lock) {
-			    cache.getObjectEntry(oid).setEvictedRead(lock);
-			    cache.removeObjectEntry(oid);
-			    pendingEvictions.decrementAndGet();
-			}
-		    }
-		});
+		entry.getContextId(), entry.key,
+		new EvictObjectCompletionHandler(entry.key));
 	} 
 
+	/** Evict a binding cache entry that is not in use immediately. */
 	private void evictBindingNow(BindingCacheEntry entry) {
+	    entry.setEvicting();
 	    pendingEvictions.incrementAndGet();
-	    final BindingKey nameKey = entry.key;
 	    updateQueue.evictBinding(
-		entry.getContextId(), nameKey.getName(),
-		new SimpleCompletionHandler() {
-		    public void completed() {
-			Object lock = cache.getBindingLock(nameKey);
-			synchronized (lock) {
-			    cache.getBindingEntry(nameKey).setEvictedRead(
-				lock);
-			    cache.removeBindingEntry(nameKey);
-			    pendingEvictions.decrementAndGet();
-			}
-		    }
-		});
+		entry.getContextId(), entry.key.getName(),
+		new EvictBindingCompletionHandler(entry.key));
 	}
     }
 
@@ -2279,87 +2368,6 @@ public class CachingDataStore extends AbstractDataStore
 	    } else {
 		return contextId < other.contextId;
 	    }
-	}
-    }
-
-    /**
-     * A {@link Runnable} that calls {@code registerNode} on the server and
-     * records the result.
-     */
-    private class RegisterNodeCallable
-	extends RetryIoRunnable<RegisterNodeResult>
-	implements Callable<RegisterNodeResult>
-    {
-	/** The result of calling {@code registerNode} on the server. */
-	RegisterNodeResult result;
-
-	/** Creates an instance of this class. */
-	RegisterNodeCallable() {
-	    super(CachingDataStore.this);
-	}
-
-	/** Abandon the call if shutdown is requested. */
-	@Override
-	boolean shouldShutdown() {
-	    return getShutdownRequested();
-	}
-
-	RegisterNodeResult callOnce() throws IOException {
-	    return server.registerNode(callbackProxy);
-	}
-
-	void callWithResult(RegisterNodeResult result) {
-	    this.result = result;
-	}
-
-	public RegisterNodeResult call() {
-	    run();
-	    if (result == null) {
-		throw new IllegalStateException(
-		    "CacingDataStore has been shut down");
-	    }
-	    return result;
-	}
-    }
-
-    private class GetServerCallable
-	extends RetryIoRunnable<CachingDataStoreServer>
-	implements Callable<CachingDataStoreServer>
-    {
-	private final String serverHost;
-	private final int serverPort;
-	private CachingDataStoreServer server;
-	GetServerCallable(String serverHost, int serverPort) {
-	    super(CachingDataStore.this);
-	    this.serverHost = serverHost;
-	    this.serverPort = serverPort;
-	}
-	/** Abandon the call if shutdown is requested. */
-	@Override
-	boolean shouldShutdown() {
-	    return getShutdownRequested();
-	}
-	CachingDataStoreServer callOnce() throws IOException {
-	    Registry registry = LocateRegistry.getRegistry(
-		serverHost, serverPort);
-	    try {
-		return (CachingDataStoreServer) registry.lookup(
-		    "CachingDataStoreServer");
-	    } catch (NotBoundException e) {
-		reportFailure();
-		return null;
-	    }
-	}
-	void callWithResult(CachingDataStoreServer result) {
-	    server = result;
-	}
-	public CachingDataStoreServer call() {
-	    run();
-	    if (server == null) {
-		throw new IllegalStateException(
-		    "CachingDataStore has been shut down");
-	    }
-	    return server;
 	}
     }
 }

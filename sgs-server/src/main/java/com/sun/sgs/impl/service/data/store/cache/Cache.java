@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import static com.sun.sgs.impl.service.data.store.AbstractDataStore.checkOid;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;

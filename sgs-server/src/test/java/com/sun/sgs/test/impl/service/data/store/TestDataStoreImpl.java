@@ -26,20 +26,19 @@ import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
-import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
-import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
+import com.sun.sgs.test.util.DummyTransactionProxy;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.File;
@@ -87,14 +86,20 @@ public class TestDataStoreImpl extends TestCase {
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
 
+    /** The basic test environment. */
+    private static final BasicDataStoreTestEnv env =
+	new BasicDataStoreTestEnv(System.getProperties());
+
     /** The transaction proxy. */
-    protected static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
+    protected static final DummyTransactionProxy txnProxy = env.txnProxy;
 
     /** The access coordinator. */
     protected static final AccessCoordinatorHandle accessCoordinator =
-	new NullAccessCoordinator(System.getProperties(), txnProxy,
-				  new DummyProfileCollectorHandle());
+	env.accessCoordinator;
+
+    /** The system registry. */
+    protected static final ComponentRegistry systemRegistry =
+	env.systemRegistry;
 
     /** An instance of the data store, to test. */
     protected static DataStore store;
@@ -1915,7 +1920,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Creates a DataStore using the specified properties. */
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props, accessCoordinator),
+	    new DataStoreImpl(props, systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;

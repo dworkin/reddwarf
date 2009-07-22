@@ -20,8 +20,9 @@
 package com.sun.sgs.impl.service.data.store;
 
 import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.NEXT_NODE_ID_KEY;
+import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.NEXT_OBJ_ID_KEY;
-import com.sun.sgs.impl.service.data.store.DataEncoding;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.service.store.db.DbCursor;
 import com.sun.sgs.service.store.db.DbDatabase;
@@ -188,6 +189,22 @@ public final class DbUtilities {
     {
 	return DataStoreHeader.getNextId(
 	    NEXT_OBJ_ID_KEY, infoDb, dbTxn, blockSize);
+    }
+
+    /**
+     * Returns the next available node ID and increments the stored value by
+     * the specified amount.
+     *
+     * @param	infoDb the info database
+     * @param	dbTxn the transaction
+     * @param	blockSize the number of node IDs to allocate
+     * @return	the next node ID
+     */
+    public static long getNextNodeId(
+	DbDatabase infoDb, DbTransaction dbTxn, int blockSize)
+    {
+	return DataStoreHeader.getNextId(
+	    NEXT_NODE_ID_KEY, infoDb, dbTxn, blockSize);
     }
 
     /**

@@ -524,7 +524,8 @@ public interface CachingDataStoreServer extends Remote {
 	 *
 	 * @param	nextName the next name or {@code null}
 	 * @param	oid the object ID or {@code -1}
-	 * @param	callback whether there is a conflicting write request
+	 * @param	callbackEvict whether there is a conflicting write
+	 *		request
 	 */
 	public NextBoundNameResults(
 	    String nextName, long oid, boolean callbackEvict)

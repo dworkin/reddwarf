@@ -31,14 +31,15 @@ import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.PLACEHOLDER_OBJ_VALUE;
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.QUOTE_OBJ_VALUE;
-import com.sun.sgs.impl.service.data.store.DataEncoding;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.kernel.AccessCoordinator;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import com.sun.sgs.service.store.db.DbCursor;
 import com.sun.sgs.service.store.db.DbDatabase;
@@ -53,9 +54,6 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -81,8 +79,7 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl(Properties, AccessCoordinator) constructor}
- * supports these public <a
+ * The {@link #DataStoreImpl constructor} supports these public <a
  * href="../../../../impl/kernel/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
  * 
@@ -549,25 +546,6 @@ public class DataStoreImpl extends AbstractDataStore {
 	}
     }
 
-    /** The default implementation of Scheduler. */
-    private static class BasicScheduler implements Scheduler {
-	public TaskHandle scheduleRecurringTask(Runnable task, long period) {
-	    final ScheduledExecutorService executor =
-		Executors.newSingleThreadScheduledExecutor();
-	    executor.scheduleAtFixedRate(
-		task, period, period, TimeUnit.MILLISECONDS);
-	    return new TaskHandle() {
-		public synchronized void cancel() {
-		    if (executor.isShutdown()) {
-			throw new IllegalStateException(
-			    "Task is already cancelled");
-		    }
-		    executor.shutdownNow();
-		}
-	    };
-	}
-    }
-
     /** Stores information about free object IDs. */
     private static final class FreeObjectIds {
 
@@ -747,39 +725,21 @@ public class DataStoreImpl extends AbstractDataStore {
     }
 
     /**
-     * Creates an instance of this class configured with the specified
-     * properties and access coordinator.  See the {@linkplain DataStoreImpl
+     * Creates an instance of this class.  See the {@linkplain DataStoreImpl
      * class documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
-     * @param	accessCoordinator the access coordinator
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if any of the properties are invalid,
      *		as specified in the class documentation
      */
     public DataStoreImpl(Properties properties,
-			 AccessCoordinator accessCoordinator)
+			 ComponentRegistry systemRegistry,
+			 TransactionProxy txnProxy)
     {
-	this(properties, accessCoordinator, new BasicScheduler());
-    }
-
-    /**
-     * Creates an instance of this class configured with the specified
-     * properties, access coordinator, and scheduler.  See the {@linkplain
-     * DataStoreImpl class documentation} for a list of supported properties.
-     *
-     * @param	properties the properties for configuring this instance
-     * @param	accessCoordinator the access coordinator
-     * @param	scheduler the scheduler used to schedule periodic tasks
-     * @throws	DataStoreException if there is a problem with the database
-     * @throws	IllegalArgumentException if any of the properties are invalid,
-     *		as specified in the class documentation}
-     */
-    public DataStoreImpl(Properties properties, 
-			 AccessCoordinator accessCoordinator,
-			 Scheduler scheduler)
-    {
-	super(accessCoordinator, logger, abortLogger);
+	super(systemRegistry, logger, abortLogger);
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -814,6 +774,9 @@ public class DataStoreImpl extends AbstractDataStore {
                                                  directoryFile.getName());
                 }
 	    }
+	    Scheduler scheduler = new DelegatingScheduler(
+		systemRegistry.getComponent(TaskScheduler.class),
+		txnProxy.getCurrentOwner());
             env = wrappedProps.getClassInstanceProperty(
                     ENVIRONMENT_CLASS_PROPERTY,
                     DEFAULT_ENVIRONMENT_CLASS,

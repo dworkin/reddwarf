@@ -23,9 +23,9 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import com.sun.sgs.impl.service.data.store.NetworkException;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
-import com.sun.sgs.impl.service.data.store.net.NetworkException;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
@@ -95,7 +95,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     @Override
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props, accessCoordinator),
+	    new DataStoreClient(props, systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
@@ -292,7 +292,8 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
-	DataStoreServerImpl server = new DataStoreServerImpl(props);
+	DataStoreServerImpl server = new DataStoreServerImpl(
+	    props, systemRegistry, txnProxy);
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(server.getPort()));

@@ -77,6 +77,12 @@ class UpdateQueue {
 
     /**
      * Creates an instance of this class.
+     *
+     * @param	store the data store
+     * @param	host the server host name
+     * @param	port the server port
+     * @param	updateQueueSize the size of the update queue
+     * @throws	IOException if there is an I/O failure
      */
     UpdateQueue(final CachingDataStore store,
 		String host,
@@ -90,7 +96,8 @@ class UpdateQueue {
 	    new RequestQueueClient.BasicSocketFactory(host, port),
 	    new Runnable() {
 		public void run() { 
-		    store.reportFailure();
+		    /* FIXME: Provide way to pass exception? */
+		    store.reportFailure(null);
 		}
 	    },
 	    new Properties());
@@ -147,6 +154,7 @@ class UpdateQueue {
      * contains the new value for the name binding, or {@code -1} if the name
      * binding should be removed.
      *
+     * @param	contextId the transaction context ID
      * @param	oids the object IDs
      * @param	oidValues the associated data values
      * @param	names the names
@@ -167,6 +175,12 @@ class UpdateQueue {
 	    contextId, new Commit(oids, oidValues, names, nameValues));
     }
 
+    /**
+     * Notes that a transaction has been aborted.
+     *
+     * @param	contextId the transaction context ID
+     * @param	prepared whether the transaction had been prepared
+     */
     void abort(long contextId, boolean prepared) {
 	if (prepared) {
 	    commitAvailable.release();
@@ -177,9 +191,10 @@ class UpdateQueue {
 
     /**
      * Evicts an object from the cache.  The {@link
-     * CompletionHandler#completed} method of {@code handler} will be called
-     * with {@code oid} when the eviction has been completed.
+     * SimpleCompletionHandler#completed} method of {@code handler} will be
+     * called with {@code oid} when the eviction has been completed.
      *
+     * @param	contextId the transaction context ID
      * @param	oid the ID of the object to evict
      * @param	completionHandler the handler to notify when the eviction has
      *		been completed 
@@ -193,13 +208,14 @@ class UpdateQueue {
 
     /**
      * Downgrades access to an object in the cache from write access to read
-     * access.  The {@link CompletionHandler#completed} method of {@code
+     * access.  The {@link SimpleCompletionHandler#completed} method of {@code
      * handler} will be called with {@code oid} when the downgrade has been
      * completed.
      *
+     * @param	contextId the transaction context ID
      * @param	oid the object ID to evict
-     * @param	handler the handler to notify when the eviction has been
-     *		completed 
+     * @param	completionhandler the handler to notify when the eviction has
+     *		been completed 
      */
     void downgradeObject(
 	long contextId, long oid, SimpleCompletionHandler completionHandler)
@@ -209,12 +225,13 @@ class UpdateQueue {
 
     /**
      * Evicts a name binding from the cache.  The {@link
-     * CompletionHandler#completed} method of {@code handler} will be called
-     * with {@code name} when the eviction has been completed.
+     * SimpleCompletionHandler#completed} method of {@code handler} will be
+     * called with {@code name} when the eviction has been completed.
      *
+     * @param	contextId the transaction context ID
      * @param	name the name
-     * @param	handler the handler to notify when the eviction has been
-     *		completed 
+     * @param	completionHandler the handler to notify when the eviction has
+     *		been completed 
      */
     void evictBinding(
 	long contextId, String name, SimpleCompletionHandler completionHandler)
@@ -224,13 +241,14 @@ class UpdateQueue {
 
     /**
      * Downgrades access to a name binding in the cache from write access to
-     * read access.  The {@link CompletionHandler#completed} method of {@code
-     * handler} will be called with {@code name} when the downgrade has been
-     * completed.
+     * read access.  The {@link SimpleCompletionHandler#completed} method of
+     * {@code handler} will be called with {@code name} when the downgrade has
+     * been completed.
      *
+     * @param	contextId the transaction context ID
      * @param	name the name
-     * @param	handler the handler to notify when the downgrade has been
-     *		completed 
+     * @param	completionHandler the handler to notify when the downgrade has
+     *		been completed 
      */
     void downgradeBinding(
 	long contextId, String name, SimpleCompletionHandler completionHandler)
@@ -260,12 +278,12 @@ class UpdateQueue {
      * pending.  If the request is not added, then the caller should add the
      * request to the update queue directly.
      *
-     * @param	txnTick the transaction tick of the associated transaction
+     * @param	contextId the transaction context ID
      * @param	request the request
      */
     private void addRequest(long contextId, Request request) {
 	PendingTxnInfo info = pendingMap.get(contextId);
-	if (info == null || ! info.addRequest(request)) {
+	if (info == null || !info.addRequest(request)) {
 	    queue.addRequest(request);
 	}
     }

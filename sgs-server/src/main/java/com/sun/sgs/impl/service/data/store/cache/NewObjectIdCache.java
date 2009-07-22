@@ -126,7 +126,7 @@ class NewObjectIdCache {
 	Long callOnce() throws IOException {
 	    return store.getServer().newObjectIds(batchSize);
 	}
-	void callWithResult(Long result) {
+	void runWithResult(Long result) {
 	    Range range = new Range(result, result + batchSize);
 	    synchronized (NewObjectIdCache.this) {
 		if (currentRange == null) {
@@ -135,7 +135,7 @@ class NewObjectIdCache {
 		    assert nextRange == null;
 		    nextRange = range;
 		}
-		notifyAll();
+		NewObjectIdCache.this.notifyAll();
 	    }
 	}
     }

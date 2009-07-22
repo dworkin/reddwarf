@@ -262,7 +262,7 @@ abstract class BasicCacheEntry<K, V> {
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry is not in state {@link
-     *		State#EVICTING_DOWNGRADE
+     *		State#EVICTING_DOWNGRADE}
      */
     void setEvictedDowngrade(Object lock) {
 	assert Thread.holdsLock(lock);
@@ -278,7 +278,7 @@ abstract class BasicCacheEntry<K, V> {
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry is not in state {@link
-     *		State#CACHED_WRITE
+     *		State#CACHED_WRITE}
      */
     void setEvictedDowngradeImmediate(Object lock) {
 	assert Thread.holdsLock(lock);
@@ -517,27 +517,17 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
-     * Sets this entry's state to {@link State#EVICTING_READ}.
+     * Sets this entry's state to {@link State#EVICTING_READ} or {@link
+     * State#EVICTING_WRITE}, depending on whether it is cached for read or
+     * write.
      *
      * @throws	IllegalStateException if the entry's current state is not
-     *		{@link State#CACHED_READ}
+     *		{@link State#CACHED_READ} or {@link State#CACHED_WRITE}
      */
-    void setEvictingRead() {
-	verifyState(State.CACHED_READ);
-	state = State.EVICTING_READ;
-    }
-
-    /* State.EVICTING_WRITE */
-
-    /**
-     * Sets this entry's state to {@link State#EVICTING_WRITE}.
-     *
-     * @throws	IllegalStateException if the entry's current state is not
-     *		{@link State#CACHED_WRITE}
-     */
-    void setEvictingWrite() {
-	verifyState(State.CACHED_WRITE);
-	state = State.EVICTING_WRITE;
+    void setEvicting() {
+	verifyState(State.CACHED_READ, State.CACHED_WRITE);
+	state = (state == State.CACHED_READ)
+	    ? State.EVICTING_READ : State.EVICTING_WRITE;
     }
 
     /* State.DECACHED */
@@ -570,30 +560,15 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * Sets this entry's state to {@link State#DECACHED} after being evicted
-     * for read, and notifies the lock, which should be held.
+     * for read or write, and notifies the lock, which should be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry's current state is not
-     *		{@link State#EVICTING_READ}
+     *		{@link State#EVICTING_READ} or {@link State#EVICTING_WRITE}
      */
-    void setEvictedRead(Object lock) {
+    void setEvicted(Object lock) {
 	assert Thread.holdsLock(lock);
-	verifyState(State.EVICTING_READ);
-	state = State.DECACHED;
-	lock.notifyAll();
-    }
-
-    /**
-     * Sets this entry's state to {@link State#DECACHED} after being evicted
-     * for write, and notifies the lock, which should be held.
-     *
-     * @param	lock the associated lock
-     * @throws	IllegalStateException if the entry's current state is not
-     *		{@link State#EVICTING_WRITE}
-     */
-    void setEvictedWrite(Object lock) {
-	assert Thread.holdsLock(lock);
-	verifyState(State.EVICTING_WRITE);
+	verifyState(State.EVICTING_READ, State.EVICTING_WRITE);
 	state = State.DECACHED;
 	lock.notifyAll();
     }

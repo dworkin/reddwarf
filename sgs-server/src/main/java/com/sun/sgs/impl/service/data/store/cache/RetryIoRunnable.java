@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.data.store.cache;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
 import static java.util.logging.Level.FINER;
-import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /**
@@ -32,88 +31,87 @@ import java.util.logging.Logger;
  *
  * @param	<R> the type of result of the I/O operation
  */
-abstract class RetryIoRunnable<R> implements Runnable {
+abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(RetryIoRunnable.class.getName()));
 
-    /** Data store, for managing shutdown. */
+    /** The data store. */
     final CachingDataStore store;
 
     /**
-     * The time of the first I/O failure, or {@code -1} if no failures have
-     * been seen.
+     * Creates an instance of this class.
+     *
+     * @param	store the data store, for handling shutdown and failure
      */
-    private long failureStarted = -1;
-
-    /** Creates an instance of this class. */
     RetryIoRunnable(CachingDataStore store) {
+	super(store.getMaxRetry(), store.getRetryWait());
 	this.store = store;
     }
 
     /**
-     * Performs the I/O operation.
+     * Performs the I/O operation.  If the operation throws an {@code
+     * IOException}, then it will be retried until the retry timeout is
+     * reached.  Other exceptions will be treated as a permanent failure.
      *
      * @return	the result of the I/O operation
      * @throws	IOException if the I/O operation fails
+     * @throws	Exception if the operation fails permanently
      */
-    abstract R callOnce() throws IOException;
+    abstract R callOnce() throws Exception;
 
-    /**
-     * Performs remaining operations using the result of a successful call to
-     * {@link #callOnce}.
+    /** 
+     * Checks if the I/O operation should be abandoned due to a shutdown
+     * request. <p>
      *
-     * @param	value the result of the successful call to {@code
-     *		callOnce} 
+     * This implementation returns {@code true} if the data store has completed
+     * shutting down transactions.
      */
-    abstract void callWithResult(R result);
-
-    /**
-     * Checks if the I/O operation should be abandoned due to shutdown of the
-     * data store. <p>
-     *
-     * This implementation checks if all active transactions have completed.
-     */
-    boolean shouldShutdown() {
+    boolean shutdownRequested() {
 	return store.getShutdownTxnsCompleted();
     }
 
     /**
+     * Performs remaining operations using the return value of {@link
+     * #callOnce}.
+     *
+     * @param	result the return value of {@code callOnce}
+     */
+    abstract void runWithResult(R result);
+
+    /**
      * Calls {@link #callOnce} until it succeeds, until it fails for the
      * maximum amount of time allowed for I/O retries, or until {@link
-     * #shutdown} is set to {@code true}.  If {@code callOnce} succeeds, calls
-     * {@link run(V)} with the resulting value and then returns.  If the I/O
-     * operation fails for more than the maximum time, calls {@link
+     * #shutdownRequested} returns {@code true}.  If {@code callOnce} succeeds,
+     * calls {@link #runWithResult} with the resulting value and then returns.
+     * If the I/O operation fails for more than the maximum time, calls {@link
      * CachingDataStore#reportFailure}.
      */
     public void run() {
 	R result;
 	while (true) {
-	    if (shouldShutdown()) {
+	    if (shutdownRequested()) {
 		return;
 	    }
 	    try {
 		result = callOnce();
 		break;
 	    } catch (IOException e) {
-		if (shouldShutdown()) {
-		    return;
-		}
-		long now = System.currentTimeMillis();
-		if (failureStarted == -1) {
-		    failureStarted = now;
-		} else if (now - failureStarted > store.getMaxRetry()) {
-		    logger.logThrow(WARNING, e,
-				    "Requesting shutdown due to" +
-				    " continued I/O failure");
-		    store.reportFailure();
-		    return;
-		} else if (logger.isLoggable(FINER)) {
+		if (logger.isLoggable(FINER)) {
 		    logger.logThrow(FINER, e, "I/O failure");
 		}
+		if (shouldRetry()) {
+		    continue;
+		} else {
+		    store.reportFailure(e);
+		    return;
+		}
+	    } catch (Exception e) {
+		store.reportFailure(e);
+		return;
 	    }
 	}
-	callWithResult(result);
+	runWithResult(result);
     }
 }

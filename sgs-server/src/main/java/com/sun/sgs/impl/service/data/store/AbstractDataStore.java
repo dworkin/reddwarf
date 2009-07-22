@@ -30,6 +30,7 @@ import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
@@ -38,7 +39,6 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
-import java.util.logging.Logger;
 
 /**
  * A skeletal implementation of {@code DataStore} that does logging, checks
@@ -89,11 +89,11 @@ public abstract class AbstractDataStore
     /**
      * Creates an instance of this class.
      *
-     * @param	accessCoordinator the access coordinator
+     * @param	systemRegistry the registry of available system components
      * @param	logger the main logger for this class
      * @param	abortLogger the logger for transaction abort exceptions
      */
-    protected AbstractDataStore(AccessCoordinator accessCoordinator,
+    protected AbstractDataStore(ComponentRegistry systemRegistry,
 				LoggerWrapper logger,
 				LoggerWrapper abortLogger)
     {
@@ -102,6 +102,8 @@ public abstract class AbstractDataStore
 	this.logger = logger;
 	this.abortLogger = logger;
 	String className = getClass().getName();
+	AccessCoordinator accessCoordinator =
+	    systemRegistry.getComponent(AccessCoordinator.class);
 	objectAccesses = accessCoordinator.registerAccessSource(
 	    className + ".objects", Long.class);
 	nameAccesses = accessCoordinator.registerAccessSource(

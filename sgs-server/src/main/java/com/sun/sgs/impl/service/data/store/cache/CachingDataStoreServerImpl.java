@@ -33,10 +33,13 @@ import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
 import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
 import com.sun.sgs.impl.service.data.store.Scheduler;
+import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
+    UpdateQueueRequestHandler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractComponent;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.lock.LockConflict;
 import static com.sun.sgs.impl.util.lock.LockConflictType.DEADLOCK;
@@ -50,13 +53,14 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.db.DbCursor;
 import com.sun.sgs.service.store.db.DbDatabase;
 import com.sun.sgs.service.store.db.DbEnvironment;
 import com.sun.sgs.service.store.db.DbTransaction;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -64,6 +68,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import static java.util.logging.Level.CONFIG;
 import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /*
@@ -85,6 +90,19 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private static final String PKG =
 	"com.sun.sgs.impl.service.data.store.cache";
 
+    /** The property for specifying the server port. */
+    public static final String SERVER_PORT_PROPERTY = PKG + ".server.port";
+
+    /** The default server port. */
+    public static final int DEFAULT_SERVER_PORT = 44540;
+
+    /** The property for specifying the update queue port. */
+    public static final String UPDATE_QUEUE_PORT_PROPERTY =
+	PKG + ".server.update.queue.port";
+
+    /** The default update queue port. */
+    public static final int DEFAULT_UPDATE_QUEUE_PORT = 44542;
+
     /**
      * The property that specifies the directory in which to store database
      * files.
@@ -97,6 +115,12 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG));
+
+    /** The number of node IDs to allocate at once. */
+    private static final int NODE_ID_ALLOCATION_BLOCK_SIZE = 100;
+
+    /** The number of milliseconds to wait when allocating node IDs. */
+    private static final long NODE_ID_ALLOCATION_TIMEOUT = 1000;
 
     /** The directory in which to store database files. */
     private final String directory;
@@ -120,12 +144,19 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
 
+    /** The server port for accepting connections. */
+    private final int serverPort;
+
     /**
      * Maps node IDs to information about the node.  Synchronize on the map
      * when accessing it.
      */
     private final Map<Long, NodeInfo> nodeInfoMap =
 	new HashMap<Long, NodeInfo>();
+
+    /** The exporter for the server. */
+    private final Exporter<CachingDataStoreServer> serverExporter =
+	new Exporter<CachingDataStoreServer>(CachingDataStoreServer.class);
 
     private final MultiLockManager<Object, NodeInfo> lockManager =
 	new MultiLockManager<Object, NodeInfo>(100, 8);
@@ -135,9 +166,31 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     private final long txnTimeout = -1;  //FIXME: from config
 
-    private final int updateQueuePort = 0; //FIXME: from config
+    /** The port for accepting update queue connections. */
+    private final int updateQueuePort;
 
     private boolean shuttingDown = false;
+
+    /** Thread that handles update queue connections. */
+    private final RequestQueueListener requestQueueListener;
+
+    /** The watchdog service. */
+    private final WatchdogService watchdogService;
+
+    /**
+     * The next node ID.  Synchronize on {@link #nextNodeIdSync} when accessing
+     * this field.
+     */
+    private long nextNodeId = 0;
+
+    /**
+     * The last free node ID.  Synchronize on {@link #nextNodeIdSync} when
+     * accessing this field.
+     */
+    private long lastNodeId = -1;
+
+    /** The synchronizer for the {@link #nextNodeId} field. */
+    private final Object nextNodeIdSync = new Object();
 
     /* -- Nested classes -- */
 
@@ -157,9 +210,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    this.nodeId = nodeId;
 	    this.callbackServer = callbackServer;
 	    updateQueue = new RequestQueueServer<UpdateQueueRequest>(
-		nodeId,
-		new UpdateQueueRequest.UpdateQueueRequestHandler(
-		    server, nodeId),
+		nodeId, new UpdateQueueRequestHandler(server, nodeId),
 		new Properties());
 	}
 	@Override
@@ -227,7 +278,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		NodeInfo nodeInfo = request.getLocker();
 		Object key = request.getKey();
 		CallbackTask task = new CallbackTask(
-		    nodeInfo.callbackServer, key, downgrade);
+		    nodeInfo.callbackServer, key, downgrade,
+		    forRequest.getLocker().nodeId);
 		runIoTask(task, nodeInfo.nodeId);
 		if (task.released) {
 		    if (downgrade) {
@@ -244,31 +296,34 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	private final CallbackServer callbackServer;
 	private final Object key;
 	private final boolean downgrade;
+	private final long requesterNodeId;
 	boolean released;
 	CallbackTask(CallbackServer callbackServer,
 		     Object key,
-		     boolean downgrade)
+		     boolean downgrade,
+		     long requesterNodeId)
 	{
 	    this.callbackServer = callbackServer;
 	    this.key = key;
 	    this.downgrade = downgrade;
+	    this.requesterNodeId = requesterNodeId;
 	}
 	public void run() throws IOException {
 	    if (key instanceof String) {
 		if (downgrade) {
 		    released = callbackServer.requestDowngradeBinding(
-			(String) key, /* FIXME: nodeId */ 0);
+			(String) key, requesterNodeId);
 		} else {
 		    released = callbackServer.requestEvictBinding(
-			(String) key, /* FIXME: nodeId */ 0);
+			(String) key, requesterNodeId);
 		}
 	    } else {
 		if (downgrade) {
 		    released = callbackServer.requestDowngradeObject(
-			(Long) key, /* FIXME: nodeId */ 0);
+			(Long) key, requesterNodeId);
 		} else {
 		    released = callbackServer.requestEvictObject(
-			(Long) key, /* FIXME: nodeId */ 0);
+			(Long) key, requesterNodeId);
 		}
 	    }
 	}
@@ -279,12 +334,14 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     public CachingDataStoreServerImpl(Properties properties,
 				      ComponentRegistry systemRegistry,
 				      TransactionProxy txnProxy)
+	throws IOException
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	logger.log(CONFIG,
-		   "Creating CachingDataStoreServerImpl properties:{0}",
-		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	int requestedServerPort = wrappedProps.getIntProperty(
+	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
+	int requestedUpdateQueuePort = wrappedProps.getIntProperty(
+	    UPDATE_QUEUE_PORT_PROPERTY, DEFAULT_UPDATE_QUEUE_PORT, 0, 65535);
 	String specifiedDirectory =
 	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
 	if (specifiedDirectory == null) {
@@ -297,85 +354,108 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    }
 	    specifiedDirectory = rootDir + File.separator + DEFAULT_DIRECTORY;
 	}
-	/* FIXME: Start update queue listener */
-	/*
-	 * Use an absolute path to avoid problems on Windows.
-	 * -tjb@sun.com (02/16/2007)
-	 */
-	directory = new File(specifiedDirectory).getAbsolutePath();
-	Identity taskOwner = txnProxy.getCurrentOwner();
-	TaskScheduler taskScheduler =
-	    systemRegistry.getComponent(TaskScheduler.class);
-	File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
-	if (!directoryFile.exists()) {
-	    logger.log(INFO, "Creating database directory : " +
-		       directoryFile.getAbsolutePath());
-	    if (!directoryFile.mkdirs()) {
-		throw new DataStoreException(
-		    "Unable to create database directory: " +
-		    directoryFile.getName());
-	    }
-	}
-	env = wrappedProps.getClassInstanceProperty(
-	    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY,
-	    DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS,
-	    DbEnvironment.class,
-	    new Class<?>[] {
-		String.class, Properties.class, Scheduler.class },
-	    directory, properties,
-	    new DelegatingScheduler(taskScheduler, taskOwner));
-	boolean done = false;
-	DbTransaction txn = env.beginTransaction(Long.MAX_VALUE);
 	try {
-	    Databases dbs = DbUtilities.getDatabases(env, txn, logger);
-	    infoDb = dbs.info();
-	    classesDb = dbs.classes();
-	    oidsDb = dbs.oids();
-	    namesDb = dbs.names();
-	    done = true;
-	    txn.commit();
-	} finally {
-	    if (!done) {
-		txn.abort();
+	    /*
+	     * Use an absolute path to avoid problems on Windows.
+	     * -tjb@sun.com (02/16/2007)
+	     */
+	    directory = new File(specifiedDirectory).getAbsolutePath();
+	    Identity taskOwner = txnProxy.getCurrentOwner();
+	    TaskScheduler taskScheduler =
+		systemRegistry.getComponent(TaskScheduler.class);
+	    File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
+	    if (!directoryFile.exists()) {
+		logger.log(INFO, "Creating database directory : " +
+			   directoryFile.getAbsolutePath());
+		if (!directoryFile.mkdirs()) {
+		    throw new DataStoreException(
+			"Unable to create database directory: " +
+			directoryFile.getName());
+		}
 	    }
+	    env = wrappedProps.getClassInstanceProperty(
+		DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY,
+		DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS,
+		DbEnvironment.class,
+		new Class<?>[] {
+		    String.class, Properties.class, Scheduler.class },
+		directory, properties,
+		new DelegatingScheduler(taskScheduler, taskOwner));
+	    boolean done = false;
+	    DbTransaction txn = env.beginTransaction(Long.MAX_VALUE);
+	    try {
+		Databases dbs = DbUtilities.getDatabases(env, txn, logger);
+		infoDb = dbs.info();
+		classesDb = dbs.classes();
+		oidsDb = dbs.oids();
+		namesDb = dbs.names();
+		done = true;
+		txn.commit();
+	    } finally {
+		if (!done) {
+		    txn.abort();
+		}
+	    }
+	    watchdogService =
+		systemRegistry.getComponent(WatchdogService.class);
+	    ServerSocket serverSocket =
+		new ServerSocket(requestedUpdateQueuePort);
+	    updateQueuePort = serverSocket.getLocalPort();
+	    requestQueueListener = new RequestQueueListener(
+		serverSocket,
+		new RequestQueueListener.ServerDispatcher() {
+		    public RequestQueueServer<UpdateQueueRequest> getServer(
+			long nodeId)
+		    {
+			return getNodeInfo(nodeId).updateQueue;
+		    }
+		},
+		new Runnable() {
+		    public void run() {
+			reportFailure();
+		    }
+		},
+		properties);
+	    serverPort = serverExporter.export(this, requestedServerPort);
+	} catch (IOException e) {
+	    if (logger.isLoggable(WARNING)) {
+		logger.logThrow(WARNING, e, "Problem starting server");
+	    }
+	    throw e;
 	}
     }
 
     /* -- Implement CachingDataStoreServer -- */
 
+    /** {@inheritDoc} */
     public RegisterNodeResult registerNode(CallbackServer callbackServer) {
 	checkNull("callbackServer", callbackServer);
-// FIXME
-// 	synchronized (nodeInfoMap) {
-// 	    if (nodeInfoMap.containsKey(nodeId)) {
-// 		throw new IllegalArgumentException(
-// 		    "Node " + nodeId + " has already been registered");
-// 	    } else {
-// 		nodeInfoMap.put(
-// 		    nodeId,
-// 		    new NodeInfo(this, lockManager, nodeId, callbackServer));
-// 	    }
-// 	}
-	return new RegisterNodeResult(
-	    /* FIXME: Get node ID */ 0,
-	    updateQueuePort);
+	NodeInfo nodeInfo =
+	    new NodeInfo(this, lockManager, getNextNodeId(), callbackServer);
+	synchronized (nodeInfoMap) {
+	    NodeInfo old = nodeInfoMap.put(nodeInfo.nodeId, nodeInfo);
+	    assert old == null;
+	}
+	return new RegisterNodeResult(nodeInfo.nodeId, updateQueuePort);
     }
 
+    /** {@inheritDoc} */
     public long newObjectIds(int numIds) {
-	boolean done = false;
+	boolean txnDone = false;
 	DbTransaction txn = env.beginTransaction(txnTimeout);
 	try {
 	    long result = DbUtilities.getNextObjectId(infoDb, txn, numIds);
-	    done = true;
+	    txnDone = true;
 	    txn.commit();
 	    return result;
 	} finally {
-	    if (!done) {
+	    if (!txnDone) {
 		txn.abort();
 	    }
 	}
     }
 
+    /** {@inheritDoc} */
     public GetObjectResults getObject(long nodeId, long oid) {
 	checkOid(oid);
 	lock(nodeId, oid, false);
@@ -386,8 +466,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    txnDone = true;
 	    txn.commit();
 	    return (result == null) ? null
-		: new GetObjectResults(
-		    result, getWaiting(oid, false));
+		: new GetObjectResults(result, getWaiting(oid, false));
 	} finally {
 	    if (!txnDone) {
 		txn.abort();
@@ -472,7 +551,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		txn.abort();
 	    }
 	}
-	lock(nodeId, result.oid, false);
+	if (result != null) {
+	    lock(nodeId, result.oid, false);
+	}
 	return result;
     }
 
@@ -754,6 +835,31 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /* -- Other methods -- */
 
+    /**
+     * Returns the port the server is using to accept connections.
+     *
+     * @return	the server port
+     */
+    public int getServerPort() {
+	return serverPort;
+    }
+
+    /**
+     * Report that the local node should be marked as failed because of a
+     * failure within the data store.
+     */
+    void reportFailure() {
+	Thread thread =
+	    new Thread("CachingDataStoreServerImpl reportFailure") {
+		public void run() {
+		    watchdogService.reportFailure(
+			watchdogService.getLocalNodeId(),
+			CachingDataStoreServerImpl.class.getName());
+		}
+	    };
+	thread.start();
+    }
+
     private void lock(long nodeId, Object key, boolean forWrite) {
 	lock(getNodeInfo(nodeId), key, forWrite);
     }
@@ -847,6 +953,33 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	if (oid < 0) {
 	    throw new IllegalArgumentException(
 		"The object ID must not be negative");
+	}
+    }
+
+    /**
+     * Returns an identifier for a new node.
+     *
+     * @return	the new node ID
+     */
+    private long getNextNodeId() {
+	synchronized (nextNodeIdSync) {
+	    if (nextNodeId > lastNodeId) {
+		boolean txnDone = false;
+		DbTransaction txn =
+		    env.beginTransaction(NODE_ID_ALLOCATION_TIMEOUT);
+		try {
+		    nextNodeId = DbUtilities.getNextNodeId(
+			infoDb, txn, NODE_ID_ALLOCATION_BLOCK_SIZE);
+		    txnDone = true;
+		    txn.commit();
+		} finally {
+		    if (!txnDone) {
+			txn.abort();
+		    }
+		}
+		lastNodeId = nextNodeId + NODE_ID_ALLOCATION_BLOCK_SIZE - 1;
+	    }
+	    return nextNodeId++;
 	}
     }
 }

@@ -33,6 +33,6 @@ public class TestAbstractDataStoreTxnIsolation extends BasicTxnIsolationTest {
 
     /** Creates an {@link InMemoryDataStore}. */
     protected DataStore createDataStore() {
-	return new InMemoryDataStore(props, accessCoordinator);
+	return new InMemoryDataStore(props, env.systemRegistry, txnProxy);
     }
 }

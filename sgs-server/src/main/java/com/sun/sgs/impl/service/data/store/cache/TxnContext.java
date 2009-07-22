@@ -57,7 +57,7 @@ class TxnContext {
      * Creates an instance of this class.
      *
      * @param	txn the associated transaction
-     * @param	updateQueue the update queue, to notify of the new transaction
+     * @param	store the data store
      */
     TxnContext(Transaction txn, CachingDataStore store) {
 	this.txn = txn;
@@ -77,8 +77,6 @@ class TxnContext {
     /**
      * Prepares for committing the transaction.
      *
-     * @param	updateQueue the update queue, to reserve a slot for the commit
-     *		request 
      * @return	whether there were no modifications made in this transaction
      * @throws	IllegalStateException if there is a problem with the
      *		transaction 
@@ -100,9 +98,6 @@ class TxnContext {
     /**
      * Prepares and commits the transaction.
      *
-     * @param	updateQueue the update queue, for sending the commit request
-     * @param	cache the client cache, for obtaining the values of modified
-     *		items
      * @throws	IllegalStateException if there is a problem with the
      *		transaction 
      */
@@ -120,9 +115,6 @@ class TxnContext {
     /**
      * Commits the transaction.
      *
-     * @param	updateQueue the update queue, for sending the commit request
-     * @param	cache the client cache, for obtaining the values of modified
-     *		items
      * @throws	IllegalStateException if there is a problem with the
      *		transaction 
      */
@@ -137,12 +129,7 @@ class TxnContext {
 	commitInternal();
     }
 
-    /**
-     * Aborts the transaction.
-     *
-     * @param	updateQueue the update queue, to cancel the reservation for the
-     *		slot for the commit request
-     */
+    /** Aborts the transaction. */
     void abort() {
 	store.getUpdateQueue().abort(contextId, prepared);
 	Cache cache = store.getCache();
@@ -233,7 +220,7 @@ class TxnContext {
      * cache.  The newly created entry will be marked pending previous.  The
      * associated lock should be held.
      *
-     * @param	key the key for the binding
+     * @return the new cache entry
      */
     BindingCacheEntry noteLastBinding() {
 	assert Thread.holdsLock(
@@ -344,7 +331,7 @@ class TxnContext {
     /**
      * Note that a binding has been modified by this transaction.
      *
-     * @param	key the key of the binding
+     * @param	entry the binding entry
      * @param	oid the new object ID
      */
     void noteModifiedBinding(BindingCacheEntry entry, long oid) {

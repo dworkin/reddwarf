@@ -24,6 +24,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
+import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
@@ -62,6 +63,10 @@ public class TestDataStoreServerImpl extends TestCase {
 	suite.addTest(new TestDataStoreServerImpl(testMethod));
 	return suite;
     }
+
+    /** The basic test environment. */
+    private static final BasicDataStoreTestEnv env =
+	new BasicDataStoreTestEnv(System.getProperties());
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
@@ -147,7 +152,8 @@ public class TestDataStoreServerImpl extends TestCase {
      * server, if needed.
      */
     DataStoreServerImpl getDataStoreServer() throws Exception {
-	return new DataStoreServerImpl(props);
+	return new DataStoreServerImpl(
+	    props, env.systemRegistry, env.txnProxy);
     }
 
     /* -- Tests -- */

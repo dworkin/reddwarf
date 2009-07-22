@@ -26,23 +26,17 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
-import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
-import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.NodeType;
-import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
@@ -79,8 +73,8 @@ import javax.management.JMException;
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
  *	DataStore}.  The class should be public, not abstract, and should
- *	provide a public constructor with {@link Properties} and {@link
- *	AccessCoordinator} parameters. <p>
+ *	provide a public constructor with {@link Properties}, {@link
+ *	ComponentRegistry}, and {@link TransactionProxy} parameters. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #DETECT_MODIFICATIONS_PROPERTY}
  *	</b></code> <br>
@@ -368,30 +362,25 @@ public final class DataServiceImpl implements DataService {
 		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
 	    trackStaleObjects = wrappedProps.getBooleanProperty(
 		TRACK_STALE_OBJECTS_PROPERTY, Boolean.FALSE);
-	    TaskScheduler taskScheduler =
-		systemRegistry.getComponent(TaskScheduler.class);
-	    Identity taskOwner = txnProxy.getCurrentOwner();
-	    DelegatingScheduler scheduler =
-		new DelegatingScheduler(taskScheduler, taskOwner);
             NodeType nodeType = 
                 wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
                                              NodeType.class, 
                                              NodeType.singleNode);
 
-	    AccessCoordinator accessCoordinator = 
-		systemRegistry.getComponent(AccessCoordinator.class);	    
 	    DataStore baseStore;
 	    if (dataStoreClassName != null) {
 		baseStore = wrappedProps.getClassInstanceProperty(
 		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
-		    new Class[] { Properties.class, AccessCoordinator.class },
-		    properties, accessCoordinator);
+		    new Class[] { Properties.class, ComponentRegistry.class,
+				  TransactionProxy.class },
+		    properties, systemRegistry, txnProxy);
 		logger.log(Level.CONFIG, "Using data store {0}", baseStore);
 	    } else if (nodeType == NodeType.singleNode) {
 		baseStore = new DataStoreImpl(
-		    properties, accessCoordinator, scheduler);
+		    properties, systemRegistry, txnProxy);
 	    } else {
-		baseStore = new DataStoreClient(properties, accessCoordinator);
+		baseStore = new DataStoreClient(
+		    properties, systemRegistry, txnProxy);
 	    }
             storeToShutdown = baseStore;
             ProfileCollector collector = 
@@ -436,7 +425,7 @@ public final class DataServiceImpl implements DataService {
 			    }
 			}
 		    },
-		taskOwner);
+		    txnProxy.getCurrentOwner());
 	    storeToShutdown = null;
 	} catch (RuntimeException e) {
 	    getExceptionLogger(e).logThrow(

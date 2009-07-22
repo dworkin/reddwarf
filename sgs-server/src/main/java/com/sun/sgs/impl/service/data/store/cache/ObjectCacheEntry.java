@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 /** A cache entry for an object. */
-class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
+final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     /**
      * Creates an object cache entry with the specified object ID and state.

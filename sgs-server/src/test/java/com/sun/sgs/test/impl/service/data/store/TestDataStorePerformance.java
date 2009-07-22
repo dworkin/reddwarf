@@ -20,13 +20,11 @@
 package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
-import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.service.store.DataStore;
-import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -71,9 +69,12 @@ public class TestDataStorePerformance extends TestCase {
     private static final String DataStoreImplClass =
 	DataStoreImpl.class.getName();
 
+    /** The basic test environment. */
+    protected static final BasicDataStoreTestEnv env =
+	new BasicDataStoreTestEnv(System.getProperties());
+
     /** The transaction proxy. */
-    protected static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
+    protected static final DummyTransactionProxy txnProxy = env.txnProxy;
 
     /** The number of objects to read in a transaction. */
     protected int items = Integer.getInteger("test.items", 100);
@@ -105,7 +106,8 @@ public class TestDataStorePerformance extends TestCase {
     protected Properties props;
 
     /** The access coordinator. */
-    protected AccessCoordinatorHandle accessCoordinator;
+    protected AccessCoordinatorHandle accessCoordinator =
+	env.accessCoordinator;
 
     /** The store to test. */
     private DataStore store;
@@ -125,8 +127,6 @@ public class TestDataStorePerformance extends TestCase {
 			   "\n  test.count=" + count);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory());
-	accessCoordinator = new NullAccessCoordinator(
-	    props, txnProxy, new DummyProfileCollectorHandle());
     }
 
     /** Sets passed if the test passes. */
@@ -352,7 +352,7 @@ public class TestDataStorePerformance extends TestCase {
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props, accessCoordinator),
+	    new DataStoreImpl(props, env.systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());
         DummyProfileCoordinator.startProfiling();
 	return store;
