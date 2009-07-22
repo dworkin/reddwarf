@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.Graphs;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAServer;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
@@ -76,6 +77,7 @@ public class TestLPA {
     }
 
     private LabelPropagationServer server;
+    private String localHost;
 
     @Before
     public void setup() throws Exception {
@@ -83,6 +85,7 @@ public class TestLPA {
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(getNextUniquePort()));
         server = new LabelPropagationServer(props);
+        localHost = InetAddress.getLocalHost().getHostName();
     }
 
     @After
@@ -185,7 +188,6 @@ public class TestLPA {
     public void testCrossNodeData() throws Exception {
         // Create our server and three clients.
         int port = nextUniquePort.get();
-        String localHost = InetAddress.getLocalHost().getHostName();
 
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
@@ -305,7 +307,6 @@ public class TestLPA {
     public void testCrossNodeLabels() throws Exception {
         // Create our server and three clients.
         int port = nextUniquePort.get();
-        String localHost = InetAddress.getLocalHost().getHostName();
 
         // These match the ones from the partial toy builder
         Identity id1 = new DummyIdentity("1");
@@ -338,7 +339,6 @@ public class TestLPA {
     public void testLPAAlgorithm() throws Exception {
         // Create our server and three clients.
         int port = nextUniquePort.get();
-        String localHost = InetAddress.getLocalHost().getHostName();
 
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
@@ -350,6 +350,43 @@ public class TestLPA {
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
                     PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
         Collection<AffinityGroup> groups = server.findAffinityGroups();
+    }
+
+    @Test
+    public void testLPADistributedZach() throws Exception {
+        int RUNS = 5;
+        int port = nextUniquePort.get();
+        LabelPropagation lp1 =
+            new LabelPropagation(
+                new DistributedZachBuilder(DistributedZachBuilder.NODE1),
+                    DistributedZachBuilder.NODE1, localHost, port, true, 1, 0);
+        LabelPropagation lp2 =
+            new LabelPropagation(new DistributedZachBuilder(
+                DistributedZachBuilder.NODE2),
+                    DistributedZachBuilder.NODE2, localHost, port, true, 1, 0);
+        LabelPropagation lp3 =
+            new LabelPropagation(new DistributedZachBuilder(
+                DistributedZachBuilder.NODE3),
+                    DistributedZachBuilder.NODE3, localHost, port, true, 1, 0);
+
+        double avgMod  = 0.0;
+        double maxMod = 0.0;
+        double minMod = 1.0;
+        for (int i = 0; i < RUNS; i++) {
+            Collection<AffinityGroup> groups = server.findAffinityGroups();
+            double mod =
+                Graphs.calcModularity(new ZachBuilder().getAffinityGraph(),
+                                      groups);
+            avgMod = avgMod + mod;
+            maxMod = Math.max(maxMod, mod);
+            minMod = Math.min(minMod, mod);
+            System.out.printf("(%d runs): " +
+                      " avg modularity: %.4f, " +
+                      " modularity range [%.4f - %.4f] %n",
+                      RUNS,
+                      avgMod/(double) RUNS,
+                      minMod, maxMod);
+        }
     }
 
     private class TestLPAClient implements LPAClient {
@@ -377,7 +414,9 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Collection<AffinityGroup> affinityGroups(boolean done) throws IOException {
+        public Collection<AffinityGroup> affinityGroups(boolean done) 
+                throws IOException
+        {
             return result;
         }
 
@@ -524,6 +563,177 @@ public class TestLPA {
 
                 // conflicts - data cache evictions due to conflict
                 // none on this node
+            }
+        }
+
+        /** {@inheritDoc} */
+        public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+            return graph;
+        }
+
+        /** {@inheritDoc} */
+        public Runnable getPruneTask() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        /** {@inheritDoc} */
+        public Map<Long, Map<Object, Integer>> getConflictMap() {
+            return conflictMap;
+        }
+
+        /** {@inheritDoc} */
+        public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+            return objUseMap;
+        }
+
+        /** {@inheritDoc} */
+        public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+            return;
+        }
+    }
+
+    // A Zachary karate club which is distributed over 3 nodes, round-robin.
+    private class DistributedZachBuilder implements GraphBuilder {
+        private final Graph<LabelVertex, WeightedEdge> graph;
+        private final Map<Long, Map<Object, Integer>> conflictMap;
+        private final Map<Object, Map<Identity, Integer>> objUseMap;
+
+        static final long NODE1 = 1;
+        static final long NODE2 = 2;
+        static final long NODE3 = 3;
+        // location of identities
+        // node1: 1,4,7,10,13,16,19,22,25,28,31,34
+        // node2: 2,5,8,11,14,17,20,23,26,29,32
+        // node3: 3,6,9,12,15,18,21,24,27,30,33
+        // using 2 objects
+        public DistributedZachBuilder(long node) {
+            super();
+            graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
+            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Integer>>();
+            conflictMap = new ConcurrentHashMap<Long, Map<Object, Integer>>();
+            LabelVertex[] nodes = new LabelVertex[35];
+            DummyIdentity[] idents = new DummyIdentity[35];
+            int nodeAsInt = (int) node;
+            // Create a partial graph
+            for (int i = nodeAsInt; i < nodes.length; i+=3) {
+                // Add identities 1, 4, etc.
+                idents[i] = new DummyIdentity(String.valueOf(i));
+                nodes[i] = new LabelVertex(idents[i]);
+                graph.addVertex(nodes[i]);
+            }
+            // Obj uses
+            Map<Identity, Integer> tempMap = new HashMap<Identity, Integer>();
+            if (node == NODE1) {
+                // Update edges
+                graph.addEdge(new WeightedEdge(), nodes[4], nodes[1]);
+                graph.addEdge(new WeightedEdge(), nodes[7], nodes[1]);
+                graph.addEdge(new WeightedEdge(), nodes[13], nodes[1]);
+                graph.addEdge(new WeightedEdge(), nodes[13], nodes[4]);
+                graph.addEdge(new WeightedEdge(), nodes[22], nodes[1]);
+                graph.addEdge(new WeightedEdge(), nodes[28], nodes[25]);
+                graph.addEdge(new WeightedEdge(), nodes[34], nodes[10]);
+                graph.addEdge(new WeightedEdge(), nodes[34], nodes[16]);
+                graph.addEdge(new WeightedEdge(), nodes[34], nodes[19]);
+                graph.addEdge(new WeightedEdge(), nodes[34], nodes[28]);
+                graph.addEdge(new WeightedEdge(), nodes[34], nodes[31]);
+
+                // Obj uses
+                tempMap.put(idents[1], 15);
+                tempMap.put(idents[4], 6);
+                tempMap.put(idents[7], 4);
+                tempMap.put(idents[10], 2);
+                tempMap.put(idents[13], 2);                          
+                tempMap.put(idents[22], 2);
+                tempMap.put(idents[34], 2);
+                objUseMap.put("blue", tempMap);
+                tempMap.clear();
+                tempMap.put(idents[1], 1);
+                tempMap.put(idents[16], 2);
+                tempMap.put(idents[19], 2);
+                tempMap.put(idents[25], 3);
+                tempMap.put(idents[28], 4);
+                tempMap.put(idents[31], 4);
+                tempMap.put(idents[34], 15);
+                objUseMap.put("red", tempMap);
+ 
+                // conflicts - data cache evictions due to conflict
+                // just guessing
+                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                conflict.put("blue", 1);
+                conflict.put("red", 1);
+                conflictMap.put(NODE2, conflict);
+                conflict = new HashMap<Object, Integer>();
+                conflict.put("red", 1);
+                conflictMap.put(NODE3, conflict);
+            } else if (node == NODE2) {
+                graph.addEdge(new WeightedEdge(), nodes[8], nodes[2]);
+                graph.addEdge(new WeightedEdge(), nodes[11], nodes[5]);
+                graph.addEdge(new WeightedEdge(), nodes[14], nodes[2]);
+                graph.addEdge(new WeightedEdge(), nodes[20], nodes[2]);
+
+                // Obj uses
+                tempMap.put(idents[2], 8);
+                tempMap.put(idents[5], 3);
+                tempMap.put(idents[8], 4);
+                tempMap.put(idents[11], 3);
+                tempMap.put(idents[14], 4);
+                tempMap.put(idents[17], 2);
+                tempMap.put(idents[20], 3);
+                tempMap.put(idents[29], 1);
+                tempMap.put(idents[32], 1);
+                objUseMap.put("blue", tempMap);
+                tempMap.clear();
+                tempMap.put(idents[2], 1);
+                tempMap.put(idents[14], 4);
+                tempMap.put(idents[23], 2);
+                tempMap.put(idents[26], 3);
+                tempMap.put(idents[29], 2);
+                tempMap.put(idents[32], 5);
+                objUseMap.put("red", tempMap);
+
+                // conflicts - data cache evictions due to conflict
+                // just guessing
+                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                conflict.put("blue", 1);
+                conflict.put("red", 1);
+                conflictMap.put(NODE1, conflict);
+                conflict = new HashMap<Object, Integer>();
+                conflict.put("blue", 1);
+                conflictMap.put(NODE3, conflict);
+            } else if (node == NODE3) {
+                graph.addEdge(new WeightedEdge(), nodes[9], nodes[3]);
+                graph.addEdge(new WeightedEdge(), nodes[30], nodes[24]);
+                graph.addEdge(new WeightedEdge(), nodes[30], nodes[27]);
+                graph.addEdge(new WeightedEdge(), nodes[33], nodes[3]);
+                graph.addEdge(new WeightedEdge(), nodes[33], nodes[9]);
+                graph.addEdge(new WeightedEdge(), nodes[33], nodes[15]);
+                graph.addEdge(new WeightedEdge(), nodes[33], nodes[21]);
+                graph.addEdge(new WeightedEdge(), nodes[33], nodes[24]);
+                graph.addEdge(new WeightedEdge(), nodes[33], nodes[30]);
+
+                // Obj uses
+                tempMap.put(idents[3], 8);
+                tempMap.put(idents[6], 4);
+                tempMap.put(idents[9], 1);
+                tempMap.put(idents[12], 1);           
+                tempMap.put(idents[18], 2);                             
+                objUseMap.put("blue", tempMap);
+                tempMap.clear();
+                tempMap.put(idents[3], 2);
+                tempMap.put(idents[9], 4);
+                tempMap.put(idents[15], 2);
+                tempMap.put(idents[21], 2);
+                tempMap.put(idents[24], 5);
+                tempMap.put(idents[27], 2);
+                tempMap.put(idents[30], 4);
+                tempMap.put(idents[33], 12);
+                objUseMap.put("red", tempMap);
+
+                // conflicts - data cache evictions due to conflict
+                // just guessing
+                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                conflict.put("red", 1);
+                conflictMap.put(NODE1, conflict);
             }
         }
 

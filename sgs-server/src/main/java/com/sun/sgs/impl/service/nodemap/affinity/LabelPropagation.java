@@ -377,32 +377,33 @@ public class LabelPropagation implements LPAClient {
         // Tell the server we've finished this iteration
         server.finishedIteration(localNodeId, !changed, failed, iteration);
 
-        if (gatherStats) {
-            // Record our statistics for this run, used for testing.
-            time = System.currentTimeMillis() - startTime;
-            iterations = iteration;
-            // Note that the graph might be changing while we ran
-            // the algorithm.
-            groups = Graphs.gatherGroups(vertices, false);
-            // This doesn't make sense in multinode case
-            modularity = Graphs.calcModularity(graph, groups);
-
-            if (logger.isLoggable(Level.FINE)) {
-                StringBuffer sb = new StringBuffer();
-                sb.append(" LPA (" + numThreads + ") took " +
-                          time + " milliseconds, " +
-                          iterations + " iterations, and found " +
-                          groups.size() + " groups ");
-                sb.append(" modularity " + modularity);
-                for (AffinityGroup group : groups) {
-                    sb.append(" id: " + group.getId() + ": members ");
-                    for (Identity id : group.getIdentities()) {
-                        sb.append(id + " ");
-                    }
-                }
-                logger.log(Level.FINE, sb.toString());
-            }
-        }
+//        if (gatherStats) {
+//            // Record our statistics for this run, used for testing.
+//            time = System.currentTimeMillis() - startTime;
+//            iterations = iteration;
+//            // Note that the graph might be changing while we ran
+//            // the algorithm.
+//            groups = Graphs.gatherGroups(vertices, false);
+//            // This doesn't make sense in multinode case
+//            modularity = Graphs.calcModularity(graph, groups);
+//
+//            if (logger.isLoggable(Level.FINE)) {
+//                StringBuffer sb = new StringBuffer();
+//                sb.append("(" + localNodeId + ")");
+//                sb.append(" LPA (" + numThreads + ") took " +
+//                          time + " milliseconds, " +
+//                          iterations + " iterations, and found " +
+//                          groups.size() + " groups ");
+//                sb.append(" modularity " + modularity);
+//                for (AffinityGroup group : groups) {
+//                    sb.append(" id: " + group.getId() + ": members ");
+//                    for (Identity id : group.getIdentities()) {
+//                        sb.append(id + " ");
+//                    }
+//                }
+//                logger.log(Level.FINE, sb.toString());
+//            }
+//        }
     }
 
     /** {@inheritDoc} */
