@@ -56,16 +56,6 @@ public abstract class Locker<K, L extends Locker<K, L>> {
 	return lockManager;
     }
 
-    /**
-     * The time in milliseconds when the operation associated with this locker
-     * was originally requested to start, or {@code -1} if not specified.
-     *
-     * @return	the time when requested to start, or {@code -1}
-     */
-    public long getRequestedStartTime() {
-	return -1;
-    }
-
     /* -- Protected methods -- */
 
     /**
@@ -88,13 +78,10 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      * @param	key the key that identifies the lock
      * @param	forWrite whether the request is for write
      * @param	upgrade whether the request is for an upgrade
-     * @param	requestedStartTime the time in milliseconds when the operation
-     *		associated with this request was originally requested to start,
-     *		or {@code -1} if not specified
      * @return	the lock request
      */
     protected abstract LockRequest<K, L> newLockRequest(
-	K key, boolean forWrite, boolean upgrade, long requestedStartTime);
+	K key, boolean forWrite, boolean upgrade);
 
     /**
      * Checks if there is a conflict that should cause this locker's

@@ -104,17 +104,4 @@ public class LockRequest<K, L extends Locker<K, L>> {
     public boolean getUpgrade() {
 	return type == Type.UPGRADE;
     }
-
-    /**
-     * Returns the time in milliseconds that the operation associated with this
-     * request was originally requested to start, or {@code -1} if not
-     * specified.
-     *
-     * @return	the time in milliseconds that the operation associated with
-     *		this request was originally requested to start, or {@code -1}
-     *		if not specified
-     */
-    public long getRequestedStartTime() {
-	return locker.getRequestedStartTime();
-    }
 }

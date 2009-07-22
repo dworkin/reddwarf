@@ -215,30 +215,18 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	}
 	@Override
 	protected LockRequest<Object, NodeInfo> newLockRequest(
-	    Object key, boolean forWrite, boolean upgrade,
-	    long requestedStartTime)
+	    Object key, boolean forWrite, boolean upgrade)
 	{
-	    return new NodeRequest(
-		this, key, forWrite, upgrade, requestedStartTime);
+	    return new NodeRequest(this, key, forWrite, upgrade);
 	}
     }
 
     static class NodeRequest extends LockRequest<Object, NodeInfo> {
-	final long requestedStartTime;
 	private boolean calledBack;
-	NodeRequest(NodeInfo nodeInfo,
-		    Object key,
-		    boolean forWrite,
-		    boolean upgrade,
-		    long requestedStartTime)
+	NodeRequest(
+	    NodeInfo nodeInfo, Object key, boolean forWrite, boolean upgrade)
 	{
 	    super(nodeInfo, key, forWrite, upgrade);
-	    this.requestedStartTime = requestedStartTime;
-	    
-	}
-	@Override
-	public long getRequestedStartTime() {
-	    return requestedStartTime;
 	}
 	synchronized boolean noteCallback() {
 	    if (!calledBack) {
@@ -867,7 +855,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private void lock(NodeInfo nodeInfo, Object key, boolean forWrite) {
 	synchronized (nodeInfo) {
 	    LockConflict<Object, NodeInfo> conflict =
-		lockManager.lockNoWait(nodeInfo, key, forWrite, -1);
+		lockManager.lockNoWait(nodeInfo, key, forWrite);
 	    if (conflict != null) {
 		NodeRequest request = (NodeRequest) conflict.getLockRequest();
 		callbackRequests.add(request);

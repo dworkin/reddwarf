@@ -88,14 +88,9 @@ final class Lock<K, L extends Locker<K, L>> {
      * @param	locker the locker requesting the lock
      * @param	forWrite whether a write lock is requested
      * @param	waiting whether the locker is already a waiter
-     * @param	requestedStartTime the time in milliseconds that the operation
-     *		associated with this request was originally requested to start,
-     *		or {@code -1} if not specified
      * @return	a {@code LockAttemptResult} or {@code null}
      */
-    LockAttemptResult<K, L> lock(
-	L locker, boolean forWrite, boolean waiting, long requestedStartTime)
-    {
+    LockAttemptResult<K, L> lock(L locker, boolean forWrite, boolean waiting) {
 	assert checkSync(locker.lockManager);
 	L conflict = null;
 	boolean upgrade = false;
@@ -139,8 +134,7 @@ final class Lock<K, L extends Locker<K, L>> {
 	}
 	LockRequest<K, L> request =
 	    (conflict == null && waiting) ? flushWaiter(locker)
-	    : locker.newLockRequest(
-		key, forWrite, upgrade, requestedStartTime);
+	    : locker.newLockRequest(key, forWrite, upgrade);
 	if (conflict == null) {
 	    owners.add(request);
 	} else if (!waiting) {
@@ -208,8 +202,7 @@ final class Lock<K, L extends Locker<K, L>> {
 			/* FIXME: Note downgrade; what if not supported? */
 			owners.add(
 			    locker.newLockRequest(
-				ownerRequest.key, false, false,
-				ownerRequest.getRequestedStartTime()));
+				ownerRequest.key, false, false));
 		    }
 		}
 		break;
@@ -221,8 +214,7 @@ final class Lock<K, L extends Locker<K, L>> {
 	    for (int i = 0; i < waiters.size(); i++) {
 		LockRequest<K, L> waiter = waiters.get(i);
 		LockAttemptResult<K, L> result =
-		    lock(waiter.locker, waiter.getForWrite(), true,
-			 waiter.getRequestedStartTime());
+		    lock(waiter.locker, waiter.getForWrite(), true);
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST, "attempt to lock waiter {0} returns {1}",

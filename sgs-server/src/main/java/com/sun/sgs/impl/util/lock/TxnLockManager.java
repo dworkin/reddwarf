@@ -49,69 +49,15 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	super(lockTimeout, numKeyMaps);
     }
 
-    /* -- Public methods -- */
-
-    /**
-     * Attempts to acquire a lock, waiting if needed.  Returns information
-     * about conflicts that occurred while attempting to acquire the lock that
-     * prevented the lock from being acquired, or else {@code null} if the lock
-     * was acquired.  If the {@code type} field of the return value is {@link
-     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    public LockConflict<K, L> lock(L locker, K key, boolean forWrite) {
-	return lock(locker, key, forWrite, -1);
-    }
-
-    /**
-     * Attempts to acquire a lock, returning immediately.  Returns information
-     * about any conflict that occurred while attempting to acquire the lock,
-     * or else {@code null} if the lock was acquired.  If the attempt to
-     * acquire the lock was blocked, returns a value with a {@code type} field
-     * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
-     * {@code type} field of the return value is {@link
-     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    public LockConflict<K, L> lockNoWait(L locker, K key, boolean forWrite) {
-	return lockNoWait(locker, key, forWrite, -1);
-    }
-
-    /* -- Other methods -- */
+    /* -- Package access methods -- */
 
     /**
      * This implementation calls the deadlock checker if the request blocks.
      */
     @Override
-    LockConflict<K, L> lockNoWaitInternal(
-	L locker, K key, boolean forWrite, long requestedStartTime)
-    {
-	LockConflict<K, L> conflict = super.lockNoWaitInternal(
-	    locker, key, forWrite, requestedStartTime);
+    LockConflict<K, L> lockNoWaitInternal(L locker, K key, boolean forWrite) {
+	LockConflict<K, L> conflict =
+	    super.lockNoWaitInternal(locker, key, forWrite);
 	if (conflict != null) {
 	    LockConflict<K, L> deadlockConflict =
 		new DeadlockChecker(locker.getWaitingFor().request).check();
@@ -312,8 +258,8 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 		/* We've gone all the way around the circle, so we're done */
 		cycleBoundary = null;
 	    } else if (cycleBoundary != null &&
-		       (request.getRequestedStartTime() >
-			victim.getRequestedStartTime()))
+		       (request.getLocker().getRequestedStartTime() >
+			victim.getLocker().getRequestedStartTime()))
 	    {
 		/*
 		 * We're still within the cycle and this request started later

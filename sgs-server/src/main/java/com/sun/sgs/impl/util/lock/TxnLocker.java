@@ -80,7 +80,6 @@ public abstract class TxnLocker<K, L extends TxnLocker<K, L>>
      *
      * This implementation returns the value specified in the constructor.
      */
-    @Override
     public long getRequestedStartTime() {
 	return requestedStartTime;
     }

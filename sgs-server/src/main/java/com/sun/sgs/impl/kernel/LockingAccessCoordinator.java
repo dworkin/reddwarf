@@ -434,10 +434,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	 */
 	@Override
 	protected LockRequest<Key, LockerImpl> newLockRequest(
-	    Key key,
-	    boolean forWrite,
-	    boolean upgrade,
-	    long requestedStartTime)
+	    Key key, boolean forWrite, boolean upgrade)
 	{
 	    AccessedObjectImpl request =
 		new AccessedObjectImpl(this, key, forWrite, upgrade);

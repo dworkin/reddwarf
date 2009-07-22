@@ -162,6 +162,62 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
     /* -- Public methods -- */
 
     /**
+     * Attempts to acquire a lock, waiting if needed.  Returns information
+     * about conflicts that occurred while attempting to acquire the lock that
+     * prevented the lock from being acquired, or else {@code null} if the lock
+     * was acquired.  If the {@code type} field of the return value is {@link
+     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
+     * transaction, and any subsequent lock or wait requests will throw {@code
+     * IllegalStateException}.
+     *
+     * @param	locker the locker requesting the lock
+     * @param	key the key identifying the lock
+     * @param	forWrite whether to request a write lock
+     * @return	lock conflict information, or {@code null} if there was no
+     *		conflict
+     * @throws	IllegalArgumentException if {@code locker} has a different lock
+     *		manager
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
+     */
+    public LockConflict<K, L> lock(L locker, K key, boolean forWrite) {
+	checkLockManager(locker);
+	checkLockerNotAborted(locker);
+	LockConflict<K, L> conflict =
+	    lockNoWaitInternal(locker, key, forWrite);
+	return (conflict == null) ? null : waitForLockInternal(locker);
+    }
+
+    /**
+     * Attempts to acquire a lock, returning immediately.  Returns information
+     * about any conflict that occurred while attempting to acquire the lock,
+     * or else {@code null} if the lock was acquired.  If the attempt to
+     * acquire the lock was blocked, returns a value with a {@code type} field
+     * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
+     * {@code type} field of the return value is {@link
+     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
+     * transaction, and any subsequent lock or wait requests will throw {@code
+     * IllegalStateException}.
+     *
+     * @param	locker the locker requesting the lock
+     * @param	key the key identifying the lock
+     * @param	forWrite whether to request a write lock
+     * @return	lock conflict information, or {@code null} if there was no
+     *		conflict
+     * @throws	IllegalArgumentException if {@code locker} has a different lock
+     *		manager 
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
+     */
+    public LockConflict<K, L> lockNoWait(L locker, K key, boolean forWrite) {
+	checkLockManager(locker);
+	checkLockerNotAborted(locker);
+	return lockNoWaitInternal(locker, key, forWrite);
+    }
+
+    /**
      * Waits for a previous attempt to obtain a lock that blocked.  Returns
      * information about any conflict that occurred while attempting to acquire
      * the lock, or else {@code null} if the lock was acquired or the
@@ -255,77 +311,6 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
     /* -- Package access methods -- */
 
     /**
-     * Attempts to acquire a lock, waiting if needed, and supplying an optional
-     * timestamp.  Returns information about conflicts that occurred while
-     * attempting to acquire the lock that prevented the lock from being
-     * acquired, or else {@code null} if the lock was acquired.  If the {@code
-     * type} field of the return value is {@link LockConflictType#DEADLOCK
-     * DEADLOCK}, then the caller should abort the transaction, and any
-     * subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.  If the {@code requestedStartTime} is not {@code
-     * -1}, then it specifies the time when the operation that is requesting
-     * the lock was originally requested to start.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @param	requestedStartTime the time in milliseconds that the operation
-     *		associated with this request was originally requested to start,
-     *		or {@code -1} if not specified
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager, or if {@code requestedStartTime} is less than {@code
-     *		-1}
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    LockConflict<K, L> lock(
-	L locker, K key, boolean forWrite, long requestedStartTime)
-    {
-	checkLockManager(locker);
-	checkLockerNotAborted(locker);
-	LockConflict<K, L> conflict =
-	    lockNoWaitInternal(locker, key, forWrite, requestedStartTime);
-	return (conflict == null) ? null : waitForLockInternal(locker);
-    }
-
-    /**
-     * Attempts to acquire a lock, returning immediately, and supplying an
-     * optional timestamp.  Returns information about any conflict that
-     * occurred while attempting to acquire the lock, or else {@code null} if
-     * the lock was acquired.  If the attempt to acquire the lock was blocked,
-     * returns a value with a {@code type} field of {@link
-     * LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the {@code
-     * type} field of the return value is {@link LockConflictType#DEADLOCK
-     * DEADLOCK}, then the caller should abort the transaction, and any
-     * subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
-     *
-     * @param	locker the locker requesting the lock
-     * @param	key the key identifying the lock
-     * @param	forWrite whether to request a write lock
-     * @param	requestedStartTime the time in milliseconds that the operation
-     *		associated with this request was originally requested to start,
-     *		or {@code -1} if not specified
-     * @return	lock conflict information, or {@code null} if there was no
-     *		conflict
-     * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
-     */
-    LockConflict<K, L> lockNoWait(
-	L locker, K key, boolean forWrite, long requestedStartTime)
-    {
-	checkLockManager(locker);
-	checkLockerNotAborted(locker);
-	return lockNoWaitInternal(locker, key, forWrite, requestedStartTime);
-    }
-
-    /**
      * Returns the key map to use for the specified key.
      *
      * @param	key the key
@@ -357,9 +342,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
     }
 
     /** Attempts to acquire a lock, returning immediately. */
-    LockConflict<K, L> lockNoWaitInternal(
-	L locker, K key, boolean forWrite, long requestedStartTime)
-    {
+    LockConflict<K, L> lockNoWaitInternal(L locker, K key, boolean forWrite) {
 	if (locker.getWaitingFor() != null) {
 	    throw new IllegalStateException(
 		"Attempt to obtain a new lock while waiting");
@@ -380,8 +363,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 	try {
 	    synchronized (keyMap) {
 		Lock<K, L> lock = getLock(key, keyMap);
-		result =
-		    lock.lock(locker, forWrite, false, requestedStartTime);
+		result = lock.lock(locker, forWrite, false);
 	    }
 	} finally {
 	    assert Lock.noteUnsync(this, key);
