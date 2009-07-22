@@ -294,11 +294,17 @@ public final class ClientSessionServiceImpl
 	    new ConcurrentHashMap <BigInteger, PrepareRelocationInfo>();
 
     /** The map of relocation information for sessions relocating to
-     * this node, keyed by session ID. */
+     * this node, keyed by relocation key. */
+    private final ConcurrentHashMap<BigInteger, RelocationInfo>
+	relocationKeys =
+	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
+
+    /** The map of relocation information for sessions relocating to this
+     * node, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, RelocationInfo>
 	relocatingSessions =
 	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
-
+    
     /** The set of identities that are relocating to this node. */
     private final Set<Identity> relocatingIdentities =
 	Collections.synchronizedSet(new HashSet<Identity>());
@@ -569,6 +575,11 @@ public final class ClientSessionServiceImpl
 	return handler != null ? handler.getSessionProtocol() : null;
     }
 
+    public boolean isRelocatingToLocalNode(BigInteger sessionRefId) {
+	return relocatingSessions.containsKey(sessionRefId) ||
+	    handlers.containsKey(sessionRefId);
+    }
+
     /* -- Implement IdentityRelocationListener -- */
 
     /**
@@ -664,7 +675,7 @@ public final class ClientSessionServiceImpl
 	    BigInteger relocationKey, SessionProtocol protocol,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 	{
-	    RelocationInfo info = relocatingSessions.remove(relocationKey);
+	    RelocationInfo info = relocationKeys.remove(relocationKey);
 	    if (info == null) {
 		// No information for specified relocation key.
 		// Session is already relocated, or it's a possible
@@ -678,8 +689,7 @@ public final class ClientSessionServiceImpl
 	    }
 	    new ClientSessionHandler(
 		ClientSessionServiceImpl.this, dataService, protocol,
-		info.identity, completionHandler,
-		new BigInteger(1, info.sessionId));
+		info.identity, completionHandler, info.sessionRefId);
 	}
     }
     
@@ -976,15 +986,16 @@ public final class ClientSessionServiceImpl
 		
 		// Cache relocation information.
 		byte[] relocationKey = getNextRelocationKey();
+		final BigInteger sessionRefId = new BigInteger(1, sessionId);
 		RelocationInfo info =
-		    new RelocationInfo(identity, sessionId);
+		    new RelocationInfo(identity, sessionRefId);
 		BigInteger key = new BigInteger(1, relocationKey);
-		relocatingSessions.put(key, info);
+		relocationKeys.put(key, info);
+		relocatingSessions.put(sessionRefId, info);
 		relocatingIdentities.add(identity);
 
 		// Modify ClientSession's state to indicate that it has been
 		// relocated to the local node.
-		final BigInteger sessionRefId = new BigInteger(1, sessionId);
 		try {
 		    transactionScheduler.runTask(
 			new AbstractKernelRunnable(
@@ -1262,6 +1273,7 @@ public final class ClientSessionServiceImpl
     {
         assert handler != null;
 	handlers.put(sessionRefId, handler);
+	relocatingSessions.remove(sessionRefId);
 	if (identity != null) {
 	    relocatingIdentities.remove(identity);
 	    //  Notify status listeners that the specified client session
@@ -1577,11 +1589,11 @@ public final class ClientSessionServiceImpl
      */
     private static class RelocationInfo {
 	final Identity identity;
-	final byte[] sessionId;
+	final BigInteger sessionRefId;
 
-	RelocationInfo(Identity identity, byte[] sessionId) {
+	RelocationInfo(Identity identity, BigInteger sessionRefId) {
 	    this.identity = identity;
-	    this.sessionId = sessionId;
+	    this.sessionRefId = sessionRefId;
 	}
     }
 
@@ -1619,14 +1631,14 @@ public final class ClientSessionServiceImpl
 	 * needs to be removed.
 	 */
 	public void run() {
-	    if (relocatingSessions.remove(relocationKey) != null) {
+	    if (relocationKeys.remove(relocationKey) != null) {
+		relocatingSessions.remove(info.sessionRefId);
 		transactionScheduler.scheduleTask(
  		    new AbstractKernelRunnable("RemoveNonrelocatedSession") {
 			public void run() {
 			    ClientSessionImpl sessionImpl =
 				ClientSessionImpl.getSession(
-				    dataService,
-				    new BigInteger(1, info.sessionId));
+				    dataService, info.sessionRefId);
 			    sessionImpl.notifyListenerAndRemoveSession(
 				dataService, false, true);
 			} }, info.identity);

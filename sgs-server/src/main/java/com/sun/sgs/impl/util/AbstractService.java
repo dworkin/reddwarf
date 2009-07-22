@@ -450,7 +450,7 @@ public abstract class AbstractService implements Service {
      *
      * @return	{@code true} if this service is shutting down
      */
-    protected boolean shuttingDown() {
+    public boolean shuttingDown() {
 	synchronized (lock) {
 	    return
 		state == State.SHUTTING_DOWN ||

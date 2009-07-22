@@ -211,13 +211,17 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 	ClientGroup(String... users) {
 	    this(Arrays.asList(users));
 	}
-	
+
 	ClientGroup(List<String> users) {
+	    this(users, port);
+	}
+	
+	ClientGroup(List<String> users, int connectPort) {
 	    clients = new HashMap<String, DummyClient>();
 	    for (String user : users) {
 		DummyClient client = new DummyClient(user);
 		clients.put(user, client);
-		client.connect(port);
+		client.connect(connectPort);
 		client.login();
 	    }
 	}

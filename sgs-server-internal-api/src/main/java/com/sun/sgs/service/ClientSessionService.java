@@ -62,4 +62,6 @@ public interface ClientSessionService extends Service {
      *		transactional context
      */
     SessionProtocol getSessionProtocol(BigInteger sessionRefId);
+
+    boolean isRelocatingToLocalNode(BigInteger sessionRefId);
 }

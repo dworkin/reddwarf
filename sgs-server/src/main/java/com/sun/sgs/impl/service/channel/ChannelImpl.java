@@ -698,24 +698,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the {@link NodeAssignment} instance for the specified
-     * {@code session}.
-     */
-    private static NodeAssignment getNodeAssignment(ClientSession session) {
-	if (session instanceof NodeAssignment) {
-	    return (NodeAssignment) session;
-	} else {
-	    throw new IllegalArgumentException(
-		"session does not implement NodeAssignment: " +
-		session.getClass());
-	}
-    }
-    
-    /**
      * Returns the node ID for the specified  {@code session}.
      */
-    private static long getNodeId(ClientSession session) {
-	return getNodeAssignment(session).getNodeId();
+    private static long getNodeId(ClientSessionImpl session) {
+	long relocatingToNodeId =
+	    session.getRelocatingToNodeId();
+	boolean relocating = relocatingToNodeId != -1;
+	return relocating ? relocatingToNodeId : session.getNodeId();
     }
 
     /**
@@ -819,7 +808,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * @return	{@code true} if the session was added to the channel,
      *		and {@code false} if the session is already a member
      */
-    private boolean addSession(ClientSession session) {
+    private boolean addSession(ClientSessionImpl session) {
 	boolean sessionAdded = 
 	    getOrCreateSessionSet(getNodeId(session)).
 	        add(getSessionRefId(session));
@@ -1496,6 +1485,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Marks this event as completed.
 	 */
 	boolean completed() {
+	    logger.log(Level.FINEST, "completed event:{0}", this);
 	    // TBD: markForUpdate can throw ONFE if this event has been
 	    // removed.
 	    getDataService().markForUpdate(this);
@@ -1531,6 +1521,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private final BigInteger sessionRefId;
+	
 
 	/**
 	 * Constructs a join event with the specified {@code session}.
@@ -1542,8 +1533,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
 	public boolean serviceEvent(final ChannelImpl channel) {
 	    assert isProcessing() && !isCompleted();
-	    ClientSession session =
-		(ClientSession) getObjectForId(sessionRefId);
+	    ClientSessionImpl session =
+		(ClientSessionImpl) getObjectForId(sessionRefId);
 	    if (session == null) {
 		logger.log(
 		    Level.FINE,
@@ -1552,7 +1543,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    channel.addSession(session);
 
-	    ProcessJoinTask task = new ProcessJoinTask(channel, this);
+	    ProcessJoinTask task =
+		new ProcessJoinTask(channel, this, session);
+	    ChannelServiceImpl.getChannelService().addChannelTask(
+		    channel.channelRefId, task);
 	    return isCompleted();
 	}
 
@@ -1564,149 +1558,237 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
+    /**
+     * A non-transactional task to send a join notification to a session's
+     * node, allowing for the possibility of the session relocating while
+     * the join message is in transit.
+     */
     private static class ProcessJoinTask extends AbstractKernelRunnable {
 
-	private final ChannelImpl channel;
+	private final ChannelServiceImpl channelService;
+	private final String name;
+	private final Delivery delivery;
+	private final BigInteger channelRefId;
 	private final BigInteger eventRefId;
 	private final BigInteger sessionRefId;
-	
-	private volatile long serverNodeId;
-	private volatile ChannelServer server;
-	private volatile boolean relocating;
-	private int tries = 0;
+
+	/** The session's node ID.  Initialized during construction
+	 * and modified by calls to {@code removeMembershipIfNodeUnchanged}
+	 * and {@code remapMembershipIfRelocating} methods.
+	 */
+	private volatile long sessionNodeId;
 
 	/**
 	 * Constructs an instance.  This contructor must be called within a
 	 * transaction.
 	 */
-	ProcessJoinTask(ChannelImpl channel, JoinEvent joinEvent) {
+	ProcessJoinTask(ChannelImpl channel, JoinEvent joinEvent,
+			ClientSessionImpl session)
+	{
 	    super(null);
-	    this.channel = channel;
+	    this.channelService = ChannelServiceImpl.getChannelService();
+	    this.name = channel.name;
+	    this.delivery = channel.delivery;
+	    this.channelRefId = channel.channelRefId;
 	    this.eventRefId =
 		getDataService().createReference(joinEvent).getId();
 	    this.sessionRefId = joinEvent.sessionRefId;
-	    refreshServerInfo();
-	    if (server != null) {	
-		ChannelServiceImpl.getChannelService().addChannelTask(
-		    channel.channelRefId, this);
-	    }
+	    this.sessionNodeId = getNodeId(session);
 	}
 
 	/**
 	 * This must be called outside of a transaction.
 	 */
 	public void run() {
-	    ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
 	    channelService.checkNonTransactionalContext();
-	    while (server != null && tries < 3
-		   // && !isShutdown()
-		   )
-	    {
-		long nodeId = -1;
-		try {
-		    nodeId =
-			server.join(channel.name, channel.channelRefId,
-				    channel.delivery, sessionRefId, relocating);
-		    if (nodeId == serverNodeId) {
-			// Join was successful.
-			break;
-		    }
-		} catch (IOException e) {
-		    tries++;
-		}
-		
-		if (nodeId != -1) {
-		    // Session is relocating to the node with the returned
-		    // nodeId, so retry join request to new node.
-		    serverNodeId = nodeId;
-		    server = getChannelServer(serverNodeId);
-		    relocating = true;
-		    tries = 0;
-		    
-		} else {
-		    // Session is probably relocating to another node,
-		    // recheck session info and try again.
-		    long oldServerNodeId = serverNodeId;
-		    try {
-			channelService.runTransactionalTask(
-			  new AbstractKernelRunnable("RefreshServerInfo") {
-			    public void run() {
-				refreshServerInfo();
-			    } } );
-		    } catch (Exception e) {
-			// TBD: log exception
-		    }
-		    if (serverNodeId != oldServerNodeId) {
-			// The session's server node has changed, so reset the
-			// retry count.
-			tries = 0;
+	    while (!channelService.shuttingDown()) {
+		ChannelServer server = getChannelServer(sessionNodeId);
+		if (server == null) {
+		    // If session's node hasn't changed, then it is
+		    // disconnected and its binding needs to be
+		    // removed.
+		    if (removeMembershipIfNodeUnchanged(sessionNodeId)) {
+			break;	// disconnected
 		    } else {
-			// Server node hasn't changed to wait to give the server
-			// node a chance.
-			try {
-			    // TBD: this should be configurable
-			    Thread.sleep(100);
-			} catch (InterruptedException e) {
+			continue; // relocating
+		    }
+		}
+		try {
+		    long nodeId = server.join(name, channelRefId, delivery,
+					      sessionRefId, false);
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "Sent join, name:{0} channel:{1} session:{2} " +
+			    "relocating:{3} coordinator:{4} returned {5}",
+ 			    name,
+			    HexDumper.toHexString(channelRefId.toByteArray()),
+			    HexDumper.toHexString(sessionRefId.toByteArray()),
+			    false, getLocalNodeId(), nodeId);
+		    }
+		    if (nodeId == sessionNodeId) {
+			// Join was successful
+			break;
+		    } else {
+			// Session is either disconnected or relocating
+			if (remapMembershipIfRelocating(sessionNodeId)) {
+			    continue; // relocating
+			} else {
+			    break; // disconnected
 			}
 		    }
+		    
+		} catch (IOException e) {
+		    if (!channelService.isAlive(sessionNodeId)) {
+			if (removeMembershipIfNodeUnchanged(sessionNodeId)) {
+			    break; // disconnected
+			} else {
+			    continue; // relocating
+			}
+		    }
+		    // Wait for transient situation to resolve.
+		    try {
+			// TBD: make sleep time configurable.
+			Thread.sleep(200);
+		    } catch (InterruptedException ie) {
+		    }
 		}
 	    }
-	    try {
-		channelService.runTransactionalTask(
-		    new AbstractKernelRunnable("MarkJoinEventCompleted") {
-			public void run() {
-			    completed();
-			} } );
-	    } catch (Exception e) {
-		// TBD: log exception
-	    }
-	    channelService.addServiceEventQueueTask(channel.channelRefId);
+
+	    // Mark event as completed and add task to resume
+	    // servicing the event queue.
+	    completed();
 	}
 
 	/**
-	 * This must be called within a transaction.
+	 * Returns the client session associated with this task, or null if
+	 * the session no longer exists.
 	 */
-	private void refreshServerInfo() {
-	    server = null;
-	    ClientSessionImpl session = (ClientSessionImpl)
-		getObjectForId(sessionRefId);
-	    if (session != null) {
-		long relocatingToNodeId =
-		    session.getRelocatingToNodeId();
-		relocating = relocatingToNodeId != -1;
-		serverNodeId =
-		    relocating ?
-		    relocatingToNodeId :
-		    session.getNodeId();
-		server = getChannelServer(serverNodeId);
-	    }
-	    if (server == null) {
-		/*
-		 * If there is no channel server for the session's node,
-		 * then the session or its node has failed and the
-		 * session is now disconnected.  There is no need to send
-		 * a 'join' notification (to update the channel
-		 * membership cache) to a disconnected session.
-		 */
-		completed();
+	private ClientSessionImpl getSession() {
+	    return (ClientSessionImpl) getObjectForId(sessionRefId);
+	}
+
+	/**
+	 * Returns the channel associated with this task, or null if the channel
+	 * no longer exists.
+	 */
+	private ChannelImpl getChannel() {
+	    return (ChannelImpl) getObjectForId(channelRefId);
+	}
+	
+	/**
+	 * If the session is still connected to the node with the
+	 * specified {@code oldSessionNodeId} or the session no longer
+	 * exists, removes the membership binding for the session.  If
+	 * this method returns {@code false}, then this task's {@code
+	 * sessionNodeId} has been updated to the session's new node.
+	 */
+	private boolean removeMembershipIfNodeUnchanged(
+	    final long oldSessionNodeId)
+	{
+	    try {
+		
+	      return channelService.runTransactionalCallable(
+ 		new KernelCallable<Boolean>("removeMembershipIfNodeUnchanged") {
+		    public Boolean call() {
+			ClientSessionImpl session = getSession();
+			if (session != null) {
+			    sessionNodeId = getNodeId(session);
+			}
+			if (session == null ||
+			    sessionNodeId == oldSessionNodeId) {
+			    getChannel().removeSession(
+				oldSessionNodeId, sessionRefId, false);
+			    return true;
+			} else {
+			    return false;
+			}
+		    }
+		});
+
+	    } catch (Exception e) {
+		// TBD: This shouldn't happen, so log message?
+		return false;
 	    }
 	}
 
 	/**
-	 * This must be called within a transaction.
+	 * If the session is relocating, remaps the membership binding
+	 * from {@code oldSessionNodeId} to the new session's node ID
+	 * and returns {@code true}.  Otherwise, the session is
+	 * disconnecting or no longer exists, so removes the membership
+	 * binding and returns {@code false}.  If this method returns
+	 * {@code true}, then this task's {@code sessionNodeId} has
+	 * been updated to the session's new node.
+	 */
+	private boolean remapMembershipIfRelocating(
+	    final long oldSessionNodeId)
+	{
+	    try {
+		
+	      return channelService.runTransactionalCallable(
+ 		new KernelCallable<Boolean>("removeMembershipIfNodeUnchanged") {
+		    public Boolean call() {
+			ClientSessionImpl session = getSession();
+			if (session != null) {
+			    sessionNodeId = getNodeId(session);
+			}
+			ChannelImpl channel = getChannel();
+			if (channel == null) {
+			    return false;
+			}
+			channel.removeSession(
+			    oldSessionNodeId, sessionRefId, false);
+			if (session == null ||
+			    sessionNodeId == oldSessionNodeId)
+			{
+			    // Session no longer exists or is in the process of
+			    // disconnecting, but the binding hasn't been
+			    // removed yet.
+			    return false;
+			} else {
+			    // Session is relocating to a new node
+			    channel.addSession(session);
+			    return true;
+			}
+		    }
+		} );
+	    
+	    } catch (Exception e) {
+		// TBD: This shouldn't happen, so log message?
+		return false;
+	    }
+	}
+	
+	/**
+	 * Marks the associated event complete and adds a task to
+	 * resume servicing the channel's event queue.  This must be
+	 * called outside of a transaction.
 	 */
 	private void completed() {
-	    JoinEvent event = (JoinEvent) getObjectForId(eventRefId);
-	    if (event != null) {
-		event.completed();
-	    } else {
-		// This shouldn't happen
-		logger.log(
- 		    Level.SEVERE,
-		    "channel name:{0} session:{1} join event " +
-		    "removed before completed", channel.name,
-		    HexDumper.toHexString(sessionRefId.toByteArray()));
+	    try {
+	      channelService.runTransactionalTask(
+		new AbstractKernelRunnable("MarkJoinEventCompleted") {
+		    public void run() {
+			JoinEvent event = (JoinEvent)
+			    getObjectForId(eventRefId);
+			if (event != null) {
+			    event.completed();
+			} else {
+			    // This shouldn't happen
+			    logger.log(
+				Level.SEVERE,
+				"channel name:{0} session:{1} join event " +
+				"removed before completed", name,
+				HexDumper.toHexString(
+				    sessionRefId.toByteArray()));
+			}
+		    }
+		} ); 
+	    } catch (Exception e) {
+		// TBD: This shouldn't happen, so log message?
+	    } finally {
+		channelService.addServiceEventQueueTask(channelRefId);
 	    }
 	}
     }
@@ -1730,14 +1812,17 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
 	public boolean serviceEvent(ChannelImpl channel) {
 
-	    ClientSession session =
-		(ClientSession) getObjectForId(sessionRefId);
+	    ClientSessionImpl session =
+		(ClientSessionImpl) getObjectForId(sessionRefId);
 	    if (session == null) {
 		logger.log(
 		    Level.FINE,
 		    "unable to obtain client session for ID:{0}", this);
 		return completed();
 	    }
+	    // TBD: if session is relocating, session may be mapped using
+	    // old and/or new node's ID, so may need to remove session from
+	    // both.
 	    if (!channel.removeSession(
 		    getNodeId(session), sessionRefId, true))
 	    {
@@ -1836,8 +1921,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * channel.
 	     */
 	    if (senderRefId != null) {
-		ClientSession sender =
-		    (ClientSession) getObjectForId(senderRefId);
+		ClientSessionImpl sender =
+		    (ClientSessionImpl) getObjectForId(senderRefId);
+		// TBD: if session is relocating need to check both old and
+		// new node membership bindings.
 		if (sender == null ||
 		    !channel.hasSession(getNodeId(sender), senderRefId))
 		{

@@ -107,7 +107,7 @@ public final class ChannelServiceImpl
 
     /** The channel server map prefix. */
     private static final String CHANNEL_SERVER_MAP_PREFIX =
-	PKG_NAME + "server.";
+	PKG_NAME + ".server.";
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
@@ -628,22 +628,22 @@ public final class ChannelServiceImpl
 		    // new node's ID, so that the join request can be sent
 		    // to the new node.
 		    return info.newNodeId;
+		    
 		}
 		
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
-		if (protocol == null && !relocatingToLocalNode) {
-		    // The session is not locally-connected and is not
-		    // known to be relocating to the local node, so return
-		    // -1 (unknown status).
-		    return -1;
-		}
-
 		ChannelJoinTask joinTask =
 		    new ChannelJoinTask(name, channelRefId, sessionRefId,
 					delivery);
 		if (protocol == null) {
-		    assert relocatingToLocalNode;
+		    if (!sessionService.isRelocatingToLocalNode(sessionRefId)) {
+			// The session is not locally-connected and is not
+			// known to be relocating to the local node, so return
+			// -1 (unknown status).
+			return -1;
+		    }
+		    
 		    // The session is relocating to this node, but the
 		    // session hasn't been established yet, so enqueue the
 		    // join request until relocation is complete.
@@ -1496,6 +1496,12 @@ public final class ChannelServiceImpl
      */
     void runTransactionalTask(KernelRunnable task) throws Exception {
 	transactionScheduler.runTask(task, taskOwner);
+    }
+
+    <R> R runTransactionalCallable(KernelCallable<R> callable)
+	throws Exception
+    {
+	return KernelCallable.call(callable, transactionScheduler, taskOwner);
     }
 
     /**
