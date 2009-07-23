@@ -22,12 +22,10 @@
  */
 
 /**
- * Provides a scheduler queue and retry behavior abstraction layer
- * for use by the default implementation of the
- * {@link com.sun.sgs.kernel.TransactionScheduler} class.  The interfaces in
- * this package are specifically provided to support pluggable behavior for
- * the {@code com.sun.sgs.impl.kernel.TransactionSchedulerImpl} class of the
- * default Project Darkstar implementation.
+ * Provides queue ordering and retry behavior abstractions that may be used
+ * by scheduler implementations. See the
+ * {@code com.sun.sgs.impl.kernel.TransactionSchedulerImpl} class for
+ * details of how the default scheduler uses these interfaces.
  */
 package com.sun.sgs.kernel.schedule;
 

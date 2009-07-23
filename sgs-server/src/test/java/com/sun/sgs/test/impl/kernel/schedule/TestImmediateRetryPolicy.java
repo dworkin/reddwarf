@@ -82,17 +82,6 @@ public class TestImmediateRetryPolicy {
     }
 
     @Test
-    public void testInterruptedResult() {
-        setupTask(new InterruptedException("task interrupted"));
-        replayMocks();
-
-        // verify
-        SchedulerRetryAction action = policy.getRetryAction(task);
-        Assert.assertEquals(SchedulerRetryAction.RETRY_LATER, action);
-        verifyMocks();
-    }
-
-    @Test
     public void testRetryableTrueResult() {
         setupTask(new RetryableException(true));
         replayMocks();

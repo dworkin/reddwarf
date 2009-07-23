@@ -193,8 +193,11 @@ public class TestTransactionSchedulerImpl {
                         throw new InterruptedException("test");
                 }
             };
-        txnScheduler.runTask(r, taskOwner);
-        assertEquals(i.get(), 2);
+        try {
+            txnScheduler.runTask(r, taskOwner);
+            fail("Expected Interrupted Exception");
+        } catch (InterruptedException ie) {}
+        assertEquals(i.get(), 1);
     }
 
     /**
@@ -265,54 +268,6 @@ public class TestTransactionSchedulerImpl {
     /**
      * Test retry policy
      */
-
-    @Test public void dropInterruptedTask() throws Exception {
-        final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.DROP));
-        final AtomicInteger i = new AtomicInteger(0);
-        final KernelRunnable r = new TestAbstractKernelRunnable() {
-            public void run() throws Exception {
-                if (i.getAndIncrement() == 0)
-                    throw result;
-            }
-        };
-        try {
-            txnScheduler.runTask(r, taskOwner);
-            fail("expected InterruptedException");
-        } catch(InterruptedException ie) {
-            assertEquals(result, ie);
-        } finally {
-            assertEquals(i.get(), 1);
-        }
-    }
-
-    @Test public void retryInterruptedTask() throws Exception {
-        final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_NOW));
-        final AtomicInteger i = new AtomicInteger(0);
-        final KernelRunnable r = new TestAbstractKernelRunnable() {
-            public void run() throws Exception {
-                if (i.getAndIncrement() == 0)
-                    throw result;
-            }
-        };
-        txnScheduler.runTask(r, taskOwner);
-        assertEquals(i.get(), 2);
-    }
-
-    @Test public void handoffInterruptedTask() throws Exception {
-        final Exception result = new InterruptedException("task interrupted");
-        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_LATER));
-        final AtomicInteger i = new AtomicInteger(0);
-        final KernelRunnable r = new TestAbstractKernelRunnable() {
-            public void run() throws Exception {
-                if (i.getAndIncrement() == 0)
-                    throw result;
-            }
-        };
-        txnScheduler.runTask(r, taskOwner);
-        assertEquals(i.get(), 2);
-    }
 
     @Test public void dropFailedTask() throws Exception {
         final Exception result = new Exception("task failed");

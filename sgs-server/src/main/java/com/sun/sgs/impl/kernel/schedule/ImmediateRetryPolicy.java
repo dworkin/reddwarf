@@ -31,8 +31,7 @@ import java.util.logging.Logger;
 /**
  * A simple retry "in place" {@code SchedulerRetryPolicy}.  This
  * {@code SchedulerRetryPolicy} always causes a task that throws a
- * retryable exception to retry immediately unless the task was interrupted
- * in which case it is put back onto the scheduler's standard backing queue.
+ * retryable exception to retry immediately.
  */
 public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
 
@@ -62,11 +61,6 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
         if (result == null) {
             throw new IllegalStateException("task's last failure " +
                                             "cannot be null");
-        }
-
-        // An interrupted task should be handed off
-        if (result instanceof InterruptedException) {
-            return SchedulerRetryAction.RETRY_LATER;
         }
 
         // NOTE: as a first-pass implementation this simply instructs the

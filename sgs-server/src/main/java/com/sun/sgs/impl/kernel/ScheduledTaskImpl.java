@@ -40,6 +40,10 @@ import com.sun.sgs.kernel.TaskQueue;
  * completed successfully, or the {@code Throwable} that caused the task
  * to fail permanently in the case of failure. See the documentation on
  * the associated methods for more details on how interruption is handled.
+ * <p>
+ * Note: This class is located in the {@code com.sun.sgs.impl.kernel} package
+ * instead of the {@code com.sun.sgs.impl.kernel.schedule} package because
+ * it needs to be a package-private implementation for use by the schedulers.
  */
 final class ScheduledTaskImpl implements ScheduledTask {
 
@@ -268,11 +272,6 @@ final class ScheduledTaskImpl implements ScheduledTask {
     }
 
     /** {@inheritDoc} */
-    public void setTimeout(long timeout) {
-        this.timeout = timeout;
-    }
-
-    /** {@inheritDoc} */
     public boolean isRecurring() {
         return period != NON_RECURRING;
     }
@@ -324,6 +323,15 @@ final class ScheduledTaskImpl implements ScheduledTask {
     }
 
     /** Package-private utility methods. */
+
+    /**
+     * Sets the transaction timeout for this task.
+     *
+     * @param timeout the new transaction timeout for this task
+     */
+    void setTimeout(long timeout) {
+        this.timeout = timeout;
+    }
 
     /**
      * Returns {@code null} if the task completed successfully, or the

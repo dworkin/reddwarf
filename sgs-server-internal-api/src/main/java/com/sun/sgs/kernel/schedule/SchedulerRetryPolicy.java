@@ -57,6 +57,11 @@ public interface SchedulerRetryPolicy {
      * should be taken to abide by the contract specified by the
      * {@link TaskManager} with regard to {@code Throwable}s that implement
      * this interface.
+     * <p>
+     * Note: The proper way to drop a task with a custom policy is to return
+     * {@code DROP} with this method.  Implementations <em>should not</em>
+     * use a call to {@link ScheduledTask#cancel(boolean) cancel} on the
+     * given task.
      *
      * @param task the task that has been aborted
      * @return the {@code SchedulerRetryAction} that the scheduler should

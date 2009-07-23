@@ -428,11 +428,16 @@ final class TransactionSchedulerImpl
         Throwable t = null;
 
         try {
-            // set the task state for the sake of the calling thread
-            ContextResolver.setTaskState(kernelContext, task.getOwner());
-            // handoff
-            backingQueue.addTask(task);
-            // wait for the task to complete...
+            // NOTE: calling executeTask() directly means that we're trying
+            // to run the transaction in the calling thread, so there are
+            // actually more threads running tasks simulaneously than there
+            // are threads in the scheduler pool. This could be changed to
+            // hand-off the task and wait for the result if we wanted more
+            // direct control over concurrent transactions
+            executeTask(task, false);
+            // wait for the task to complete...at this point it may have
+            // already completed, or else it is being re-tried in a
+            // scheduler thread
             t = task.get();
         } catch (InterruptedException ie) {
             // we were interrupted, so try to cancel the task, re-throwing
@@ -538,7 +543,23 @@ final class TransactionSchedulerImpl
                     ScheduledTaskImpl task =
                         (ScheduledTaskImpl) (backingQueue.getNextTask(true));
 
-                    consume(task);
+                    // run the task, checking if it completed
+                    if (executeTask(task, true)) {
+                        // if it's a recurring task, schedule the next run
+                        if (task.isRecurring()) {
+                            long nextStart =
+                                 task.getStartTime() + task.getPeriod();
+                            task = new ScheduledTaskImpl.Builder(
+                                    task).startTime(nextStart).build();
+                            backingQueue.addTask(task);
+                        }
+                        // if it has dependent tasks, schedule the next one
+                        TaskQueueImpl queue =
+                                      (TaskQueueImpl) (task.getTaskQueue());
+                        if (queue != null) {
+                            queue.scheduleNextTask();
+                        }
+                    }
                 }
             } catch (InterruptedException ie) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -555,43 +576,12 @@ final class TransactionSchedulerImpl
     }
 
     /**
-     * Consume a single task by executing it.  If the task completes
-     * successfully, reschedules the task if it is a recurring task and
-     * schedules the next dependent task if it exists.
-     *
-     * @param task the task to consume
-     */
-    private void consume(ScheduledTaskImpl task)
-            throws InterruptedException {
-        // run the task, checking if it completed
-        if (executeTask(task, false, true)) {
-            // if it's a recurring task, schedule the next run
-            if (task.isRecurring()) {
-                long nextStart =
-                     task.getStartTime() + task.getPeriod();
-                task = new ScheduledTaskImpl.Builder(task).
-                        startTime(nextStart).build();
-                backingQueue.addTask(task);
-            }
-            // if it has dependent tasks, schedule the next one
-            TaskQueueImpl queue =
-                          (TaskQueueImpl) (task.getTaskQueue());
-            if (queue != null) {
-                queue.scheduleNextTask();
-            }
-        }
-    }
-
-    /**
      * Private method that executes a single task, creating the transaction
      * state and handling re-try as appropriate. If the thread calling this
      * method is interrupted before the task can complete then this method
      * attempts to re-schedule the task to run in another thread if
      * {@code retryOnInterruption} is {@code true} and always re-throws
-     * the associated {@code InterruptedException}. Providing {@code true} for
-     * the {@code unbounded} parameter results in a transaction with timeout
-     * value as specified by the value of the
-     * {@code TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY} property.
+     * the associated {@code InterruptedException}.
      * <p>
      * This method returns {@code true} if the task was completed or failed
      * permanently, and {@code false} otherwise. If {@code false} is returned
@@ -600,7 +590,7 @@ final class TransactionSchedulerImpl
      * status of the task and wait for the task to complete or fail permanently
      * through the {@code ScheduledTaskImpl} interface.
      */
-    private boolean executeTask(ScheduledTaskImpl task, boolean unbounded,
+    private boolean executeTask(ScheduledTaskImpl task,
                                 boolean retryOnInterruption)
         throws InterruptedException
     {
@@ -635,8 +625,8 @@ final class TransactionSchedulerImpl
                 try {
                     // setup the transaction state
                     TransactionHandle handle = 
-                            transactionCoordinator.createTransaction(unbounded ?
-                                ScheduledTask.UNBOUNDED : task.getTimeout());
+                            transactionCoordinator.createTransaction(
+                            task.getTimeout());
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
                     
@@ -682,23 +672,16 @@ final class TransactionSchedulerImpl
                     // then we want to note that and possibly re-queue the
                     // task to run in a usable thread
                     if (task.setInterrupted() && retryOnInterruption) {
-                        switch (retryPolicy.getRetryAction(task)) {
-                            case DROP:
-                                task.setDone(ie);
-                                break;
-                            case RETRY_LATER:
-                            case RETRY_NOW:
-                                if (!handoff(task)) {
-                                    if (logger.isLoggable(Level.WARNING)) {
-                                        logger.logThrow(Level.WARNING, ie,
-                                                        "dropping an " +
-                                                        "interrupted task: {0}",
-                                                        task);
-                                    }
-                                }
-                                break;
-                            default:
-                                // we should never get here
+                        if (!handoff(task)) {
+                            // if the task couldn't be re-queued, then there's
+                            // nothing left to do but drop it
+                            task.setDone(ie);
+                            if (logger.isLoggable(Level.WARNING)) {
+                                logger.logThrow(Level.WARNING, ie,
+                                                "dropping an " +
+                                                "interrupted task: {0}",
+                                                task);
+                            }
                         }
                     }
                     // always re-throw the interruption
