@@ -66,7 +66,7 @@ public class LabelPropagation implements LPAClient {
     // The producer of our graphs.
     private final GraphBuilder builder;
 
-    // The local vertex id
+    // The local vertex ident
     private final long localNodeId;
 
     // The server : our master
@@ -100,6 +100,7 @@ public class LabelPropagation implements LPAClient {
     private final boolean gatherStats;
     // Statistics for the last run, only if gatherStats is true.
     private Collection<AffinityGroup> groups;
+    // For single node testing
     private long time;
     private int iterations;
     private double modularity;
@@ -111,8 +112,7 @@ public class LabelPropagation implements LPAClient {
     // start of the algorithm.  This will change. JANE
     private List<LabelVertex> vertices;
 
-    // The map of conflicts in the system.  JANE? Better to have the
-    // graph builder build part of this?
+    // The map of conflicts in the system. 
     // Weights?
     // nodeid-> objectid, weight
     // public for testing for now
@@ -285,6 +285,14 @@ public class LabelPropagation implements LPAClient {
             retVal = new HashSet<Object>(origConflicts.keySet());
         }
         updateNodeConflictMap(objIds, nodeId);
+//        if (logger.isLoggable(Level.FINEST)) {
+//            StringBuffer sb = new StringBuffer();
+//            for (Object o : retVal) {
+//                sb.append(o + " ");
+//            }
+//            logger.log(Level.FINEST, "{0}: returning edges {1} to {2}",
+//                               localNodeId, sb.toString(), nodeId);
+//        }
         return retVal;
     }
 
@@ -377,33 +385,18 @@ public class LabelPropagation implements LPAClient {
         // Tell the server we've finished this iteration
         server.finishedIteration(localNodeId, !changed, failed, iteration);
 
-//        if (gatherStats) {
-//            // Record our statistics for this run, used for testing.
-//            time = System.currentTimeMillis() - startTime;
-//            iterations = iteration;
-//            // Note that the graph might be changing while we ran
-//            // the algorithm.
-//            groups = Graphs.gatherGroups(vertices, false);
-//            // This doesn't make sense in multinode case
-//            modularity = Graphs.calcModularity(graph, groups);
-//
-//            if (logger.isLoggable(Level.FINE)) {
-//                StringBuffer sb = new StringBuffer();
-//                sb.append("(" + localNodeId + ")");
-//                sb.append(" LPA (" + numThreads + ") took " +
-//                          time + " milliseconds, " +
-//                          iterations + " iterations, and found " +
-//                          groups.size() + " groups ");
-//                sb.append(" modularity " + modularity);
-//                for (AffinityGroup group : groups) {
-//                    sb.append(" id: " + group.getId() + ": members ");
-//                    for (Identity id : group.getIdentities()) {
-//                        sb.append(id + " ");
-//                    }
-//                }
-//                logger.log(Level.FINE, sb.toString());
-//            }
-//        }
+        if (gatherStats) {
+            // Record our statistics for this run, used for testing.
+            time = System.currentTimeMillis() - startTime;
+
+            if (logger.isLoggable(Level.FINE)) {
+                StringBuffer sb = new StringBuffer();
+                sb.append("(" + localNodeId + ")");
+                sb.append(" LPA (" + numThreads + ") took " +
+                          time + " milliseconds");
+                logger.log(Level.FINE, sb.toString());
+            }
+        }
     }
 
     /** {@inheritDoc} */
@@ -429,7 +422,7 @@ public class LabelPropagation implements LPAClient {
             if (idents != null) {
                 for (Identity id : idents.keySet()) {
                     // JANE not dealing with weights here
-                    // Find the label associated with the id in the graph.
+                    // Find the label associated with the ident in the graph.
                     // We do this by creating vid, a template of the
                     // LabelVertex, and then finding the actual graph
                     // vertex with that identity.  The current label can
@@ -515,10 +508,10 @@ public class LabelPropagation implements LPAClient {
                 for (Map.Entry<Identity, Integer> objUseId :
                      objUse.entrySet())
                 {
-                    Identity id = objUseId.getKey();
+                    Identity ident = objUseId.getKey();
                     Integer weight = objUseId.getValue();
                     Map<Integer, Integer> labelWeight =
-                            remoteLabelMap.get(id);
+                            remoteLabelMap.get(ident);
                     if (labelWeight == null) {
                         labelWeight =
                                 new ConcurrentHashMap<Integer, Integer>();
@@ -526,7 +519,7 @@ public class LabelPropagation implements LPAClient {
                     for (Integer label : remoteLabels) {
                         labelWeight.put(label, weight);
                     }
-                    remoteLabelMap.put(id, labelWeight);
+                    remoteLabelMap.put(ident, labelWeight);
                 }
             }
         }
@@ -703,9 +696,9 @@ public class LabelPropagation implements LPAClient {
 
     /**
      * Initialize our vertex conflicts.  This needs to happen before
-     * we send our vertex conflict information to other (higher vertex-id)
+     * we send our vertex conflict information to other (higher vertex-ident)
      * nodes in response to an exchangeCrossNodeInfo call from the server,
-     * and before a crossNodeEdges call from a (lower vertex-id) vertex.
+     * and before a crossNodeEdges call from a (lower vertex-ident) vertex.
      */
     private synchronized void initializeNodeConflictMap() {
         if (!nodeConflictMap.isEmpty()) {
@@ -717,6 +710,9 @@ public class LabelPropagation implements LPAClient {
         nodeConflictMap = 
             new ConcurrentHashMap<Long, Map<Object, Integer>>(
                 builder.getConflictMap());
+        logger.log(Level.FINEST,
+                "{0}: initialized node conflict map", localNodeId);
+        printNodeConflictMap();
     }
 
     private void updateNodeConflictMap(Collection<Object> objIds, long nodeId) {
@@ -908,19 +904,22 @@ public class LabelPropagation implements LPAClient {
 
     // For debugging.
     private void printNodeConflictMap() {
-
+        if (!logger.isLoggable(Level.FINEST)) {
+            return;
+        }
         for (Map.Entry<Long, Map<Object, Integer>> entry :
              nodeConflictMap.entrySet())
         {
-            StringBuilder sb1 = new StringBuilder();
-            sb1.append(entry.getKey());
-            sb1.append(":  ");
+            StringBuilder sb = new StringBuilder();
+            sb.append(entry.getKey());
+            sb.append(":  ");
             for (Map.Entry<Object, Integer> subEntry :
                  entry.getValue().entrySet())
             {
-                sb1.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
+                sb.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
             }
-            System.out.println(sb1.toString());
+            logger.log(Level.FINEST, "{0}: nodeConflictMap: {1}",
+                    localNodeId, sb.toString());
         }
     }
 

@@ -80,7 +80,7 @@ public interface LPAClient extends Remote {
      * @param objIds the collection of objects, representing edges, that
      *               probably have endpoints to vertices on this node
      * @param nodeId the node with vertices attached to the edges
-     * @return the edges that {@code nodeId} believes it might have in common
+     * @return the objects that {@code nodeId} believes it might have in common
      *         with this node
      * @throws IOException if there is a communication problem
      */
