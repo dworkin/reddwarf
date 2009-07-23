@@ -340,7 +340,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "join throws");
+	    logger.logThrow(Level.FINE, e, "join throws");
 	    throw e;
 	}
     }
@@ -382,7 +382,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "join throws");
+	    logger.logThrow(Level.FINE, e, "join throws");
 	    throw e;
 	}
     }
@@ -501,7 +501,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "leave throws");
+	    logger.logThrow(Level.FINE, e, "leave throws");
 	    throw e;
 	}
     }
@@ -531,7 +531,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(Level.FINEST, "leave sessions:{0} returns", sessions);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "leave throws");
+	    logger.logThrow(Level.FINE, e, "leave throws");
 	    throw e;
 	}
     }
@@ -552,7 +552,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(Level.FINEST, "leaveAll returns");
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "leave throws");
+	    logger.logThrow(Level.FINE, e, "leave throws");
 	    throw e;
 	}
     }
@@ -592,9 +592,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
+	    if (logger.isLoggable(Level.FINE)) {
 		logger.logThrow(
-		    Level.FINEST, e, "send channel:{0} message:{1} throws",
+		    Level.FINE, e, "send channel:{0} message:{1} throws",
 		    this, HexDumper.format(message, 0x50));
 	    }
 	    throw e;
@@ -896,9 +896,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * coordinator's event queue map.
 	 */
 	coordNodeId = chooseCoordinatorNode();
-	if (logger.isLoggable(Level.FINE)) {
+	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(
-		Level.FINE,
+		Level.FINER,
 		"channel:{0} reassigning coordinator from:{1} to:{2}",
 		HexDumper.toHexString(channelRefId.toByteArray()),
 		failedCoordNodeId,
@@ -1614,19 +1614,19 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		}
 		try {
-		    long nodeId = server.join(name, channelRefId, delivery,
-					      sessionRefId, false);
+		    boolean success =
+			server.join(name, channelRefId, delivery, sessionRefId);
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(
 			    Level.FINEST,
 			    "Sent join, name:{0} channel:{1} session:{2} " +
-			    "relocating:{3} coordinator:{4} returned {5}",
+			    "coordinator:{3} returned {4}",
  			    name,
 			    HexDumper.toHexString(channelRefId.toByteArray()),
 			    HexDumper.toHexString(sessionRefId.toByteArray()),
-			    false, getLocalNodeId(), nodeId);
+			    getLocalNodeId(), success);
 		    }
-		    if (nodeId == sessionNodeId) {
+		    if (success) {
 			// Join was successful
 			break;
 		    } else {
@@ -1752,7 +1752,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    return true;
 			}
 		    }
-		} );
+		});
 	    
 	    } catch (Exception e) {
 		// TBD: This shouldn't happen, so log message?

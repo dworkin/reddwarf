@@ -488,8 +488,8 @@ public final class ChannelServiceImpl
 			    Delivery delivery)
         {
 	    callStarted();
-	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINE, "refreshing channelId:{0}",
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "refreshing channelId:{0}",
 			   HexDumper.toHexString(channelRefId.toByteArray()));
 	    }
 	    try {
@@ -605,9 +605,8 @@ public final class ChannelServiceImpl
 	 * the given channel's local member sessions, and sends a channel join
 	 * message to the session with the corresponding {@code sessionId}.
 	 */
-	public long join(String name, BigInteger channelRefId,
-			 Delivery delivery, BigInteger sessionRefId,
-			 boolean relocatingToLocalNode)
+	public boolean join(String name, BigInteger channelRefId,
+			    Delivery delivery, BigInteger sessionRefId)
 
 	{
 	    callStarted();
@@ -615,11 +614,11 @@ public final class ChannelServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST, "join name:{0} channelId:{1} " +
-			"sessionId:{2} relocatingToNode:{3} localNodeId:{4}",
+			"sessionId:{2} localNodeId:{3}",
 			name,
 			HexDumper.toHexString(channelRefId.toByteArray()),
 			HexDumper.toHexString(sessionRefId.toByteArray()),
-			relocatingToLocalNode, localNodeId);
+			localNodeId);
 		}
 
 		RelocationInfo info = relocatingSessions.get(sessionRefId);
@@ -627,21 +626,24 @@ public final class ChannelServiceImpl
 		    // Session is relocating from this node, so return the
 		    // new node's ID, so that the join request can be sent
 		    // to the new node.
-		    return info.newNodeId;
-		    
+		    return false;
 		}
-		
+
+		// TBD: The following may need to check the data store to
+		// see which node the session is assigned to.
+		boolean relocatingToLocalNode =
+		    sessionService.isRelocatingToLocalNode(sessionRefId);
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
 		ChannelJoinTask joinTask =
 		    new ChannelJoinTask(name, channelRefId, sessionRefId,
 					delivery);
 		if (protocol == null) {
-		    if (!sessionService.isRelocatingToLocalNode(sessionRefId)) {
+		    if (!relocatingToLocalNode) {
 			// The session is not locally-connected and is not
 			// known to be relocating to the local node, so return
 			// -1 (unknown status).
-			return -1;
+			return false;
 		    }
 		    
 		    // The session is relocating to this node, but the
@@ -664,6 +666,7 @@ public final class ChannelServiceImpl
 		    }
 		    
 		    taskQueue.add(joinTask);
+		    // TBD: there still may be a race condition in here...
 		    protocol = sessionService.getSessionProtocol(sessionRefId);
 		    if (protocol != null) {
 			// Client relocated while adding a task to the queue.
@@ -675,7 +678,7 @@ public final class ChannelServiceImpl
 			sessionStatusListener.relocated(sessionRefId);
 		    }
 
-		    return localNodeId;
+		    return true;
 		    
 		} else {
 		    // The session is locally-connected, so process the
@@ -688,7 +691,7 @@ public final class ChannelServiceImpl
 				// If this session is relocating to this node,
 				// wait for all channel requests enqueued during
 				// relocation to be processed.
-				if (! taskQueue.isEmpty()) {
+				if (!taskQueue.isEmpty()) {
 				    try {
 					// TBD: bounded timeout?
 					taskQueue.wait();
@@ -698,12 +701,12 @@ public final class ChannelServiceImpl
 			    }
 			}
 			joinTask.run();
-			return localNodeId;
+			return true;
 			
 		    } catch (RelocatingSessionException e) {
 			// Session is relocating to another node, but its
 			// destination unknown.
-			return -1;
+			return false;
 		    }
 		}
 		
@@ -1447,10 +1450,6 @@ public final class ChannelServiceImpl
      */
     static long getLocalNodeId() {
 	return txnProxy.getService(WatchdogService.class).getLocalNodeId();
-    }
-
-    public void checkNonTransactionalContext() {
-	super.checkNonTransactionalContext();
     }
 
     /**

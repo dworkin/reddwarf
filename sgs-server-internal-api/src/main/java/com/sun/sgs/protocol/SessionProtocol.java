@@ -218,6 +218,8 @@ public interface SessionProtocol extends Channel {
      * @param	reason	the reason for disconnection
      * 
      * @throws	IOException if an I/O error occurs
+     * @throws	RelocatingSessionException if the associated session is
+     *		relocating to another node
      */
     void disconnect(DisconnectReason reason)
 	throws IOException, RelocatingSessionException;

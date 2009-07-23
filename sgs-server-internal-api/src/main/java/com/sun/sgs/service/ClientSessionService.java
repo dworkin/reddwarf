@@ -63,5 +63,15 @@ public interface ClientSessionService extends Service {
      */
     SessionProtocol getSessionProtocol(BigInteger sessionRefId);
 
+    /**
+     * Returns {@code true} if the session with the specified {@code
+     * sessionRefId} is known to be relocating to the local node, and
+     * returns {@code false} otherwise.
+     *
+     * @param	sessionRefId a client session ID, as a {@code BigInteger}
+     * @return	{@code true} if the session with the specified {@code
+     *		sessionRefId} is known to be relocating to the local node,
+     *		and returns {@code false} otherwise 
+     */
     boolean isRelocatingToLocalNode(BigInteger sessionRefId);
 }

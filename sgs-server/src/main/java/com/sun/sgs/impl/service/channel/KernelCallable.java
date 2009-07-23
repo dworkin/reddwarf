@@ -25,32 +25,86 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 
+/**
+ * An abstract utility class to run a transactional task that returns a
+ * value.  A subclass of this class must implement the abstract {@code
+ * call} method which is invoked in a transaction.<p>
+ *
+ * Here's an example of running a {@code KernelCallable} that returns a
+ * boolean value:<p>
+ *
+ * <pre>
+ * boolean result = KernelCallable.call(
+ *	new KernelCallable&lt;Boolean&gt;("MyKernelCallable") {
+ *	    public Boolean call() {
+ *		return ...;
+ *	    }
+ *	},
+ *	txnScheduler, taskOwner);
+ * </pre>
+ * @param R the type of the result (the return value of the {@code call} method)
+ */
 public abstract class KernelCallable<R>
     extends AbstractKernelRunnable
     implements Callable<R>
 {
+    /** The result of invoking the {@code call} method. */
     private R result;
+    /** The flag to indicate whether the {@code call} method is complete. */
     private volatile boolean done;
 
+    /**
+     * Constructs an instance with the specified {@code name}.
+     *
+     * @param	name a descriptive name (or {@code null}) for use in the
+     *		{@code toString} method
+     */
     public KernelCallable(String name) {
 	super(name);
     }
-    
+
+    /**
+     * {@inheritDoc}
+     *
+     * This implementation invokes the {@code call} method of this
+     * instance, sets the result, and marks this {@code KernelCallable} as
+     * completed.
+     */
     public void run()  throws Exception {
 	result = call();
 	done = true;
     }
 
-    public R getResult() {
+    /**
+     * Returns the result, previously set by invoking the {@link #run}
+     * method.
+     *
+     * @return	the result
+     * @throws	IllegalStateException if the {@link #run} method has not
+     *		completed
+     */
+    private R getResult() {
 	if (!done) {
 	    throw new IllegalStateException("not done");
 	}
 	return result;
     }
 
+    /**
+     * Runs the specified {@code callable} (by invoking its {@code call}
+     * method) in a transaction using the specified {@code txnScheduler}
+     * and {@code taskOwner} and returns the result.
+     *
+     * @param	callable a callable to invoke
+     * @param	txnScheduler a transaction scheduler
+     * @param	taskOwner an identity for the task's owner
+     * @return	the result of executing the {@code callable}
+     * @throws	Exception if running the specified {@code callable} throws
+     *		an {@code Exception} 
+     */
     public static <R> R call(KernelCallable<R> callable,
-			   TransactionScheduler txnScheduler,
-			   Identity taskOwner)
+			     TransactionScheduler txnScheduler,
+			     Identity taskOwner)
 	throws Exception
     {
 	txnScheduler.runTask(callable, taskOwner);

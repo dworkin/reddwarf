@@ -510,7 +510,7 @@ public final class ClientSessionServiceImpl
 		exporter.unexport();
 		logger.log(Level.FINEST, "client session server unexported");
 	    } catch (RuntimeException e) {
-		logger.logThrow(Level.FINEST, e, "unexport server throws");
+		logger.logThrow(Level.FINE, e, "unexport server throws");
 		// swallow exception
 	    }
 	}
@@ -575,9 +575,9 @@ public final class ClientSessionServiceImpl
 	return handler != null ? handler.getSessionProtocol() : null;
     }
 
+    /** {@inheritDoc} */
     public boolean isRelocatingToLocalNode(BigInteger sessionRefId) {
-	return relocatingSessions.containsKey(sessionRefId) ||
-	    handlers.containsKey(sessionRefId);
+	return relocatingSessions.containsKey(sessionRefId);
     }
 
     /* -- Implement IdentityRelocationListener -- */
@@ -680,6 +680,13 @@ public final class ClientSessionServiceImpl
 		// No information for specified relocation key.
 		// Session is already relocated, or it's a possible
 		// DOS attack, so notify completion handler of failure.
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Attempt to relocate to node:{0} with " +
+			"invalid relocation key:{1}", localNodeId,
+			HexDumper.toHexString(relocationKey.toByteArray()));
+		}
 		(new SetupCompletionFuture(null, completionHandler)).
 		    setException(
 			new RelocateFailureException(
@@ -1065,8 +1072,8 @@ public final class ClientSessionServiceImpl
 			// relocating.
 			logger.logThrow(
 			    Level.SEVERE, e,
-			    "Attempted send to session:{0} during relocation, " +
-			    "message:{1}",
+			    "Attempted send to session:{0} during " +
+			    "relocation, message:{1}",
 			    HexDumper.toHexString(sessionId),
 			    HexDumper.toHexString(message));
 		    }
@@ -1666,9 +1673,6 @@ public final class ClientSessionServiceImpl
 	private final Set<PrepareCompletionHandler> preparers =
 	    new HashSet<PrepareCompletionHandler>();
 
-	/** Indicates whether preparation is completed. */
-	private boolean completed = false;
-
 	/** Constructs an instance. */
 	PrepareRelocationInfo(BigInteger sessionRefId, long newNodeId,
 			      SimpleCompletionHandler handler)
@@ -1757,7 +1761,7 @@ public final class ClientSessionServiceImpl
 		    }
 		    // Notify NodeMappingService completion handlers that
 		    // preparation is complete.
-		    for (SimpleCompletionHandler nmsCompletionHandler:
+		    for (SimpleCompletionHandler nmsCompletionHandler :
 			     nmsCompletionHandlers)
 		    {
 			nmsCompletionHandler.completed();
@@ -1779,7 +1783,7 @@ public final class ClientSessionServiceImpl
 	    private boolean completed = false;
 
 	    /** Constructs an instance. */
-	    PrepareCompletionHandler() {}
+	    PrepareCompletionHandler() { }
 
 	    /** {@inheritDoc} */
 	    public void completed() {

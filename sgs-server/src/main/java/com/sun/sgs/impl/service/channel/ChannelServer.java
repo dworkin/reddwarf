@@ -70,17 +70,15 @@ public interface ChannelServer extends Remote {
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID
      * @param	delivery the channel's delivery requirement
-     * @param	relocatingToLocalNode {@code true} if the specified session
-     *		is relocating to the local node
-     * @return	the local node ID if the session is still locally
-     *		connected; the new node ID if the session is relocating;
-     *		{@code -1} if the session is not locally connected and is
-     *		not known to be relocating
+     * @return	{@code true} if the join succeeded (either was delivered or
+     *		enqueued for a relocating session), and {@code false} if
+     *		the session is not locally connected and is not known to be
+     *		relocating 
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    long join(String name, BigInteger channelRefId, Delivery delivery,
-	      BigInteger sessionRefId, boolean relocatingToLocalNode)
+    boolean join(String name, BigInteger channelRefId, Delivery delivery,
+		 BigInteger sessionRefId)
 	throws IOException;
 
     /**

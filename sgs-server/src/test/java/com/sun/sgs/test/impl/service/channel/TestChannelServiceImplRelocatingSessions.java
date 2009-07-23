@@ -101,7 +101,7 @@ public class TestChannelServiceImplRelocatingSessions
 	}
     }
 
-    public void testChannelJoinAndRelocateThrice()
+    public void testChannelJoinAndRelocateMultipleTimes()
 	throws Exception
     {
 	String channelName = "foo";
@@ -251,8 +251,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, oneUser);
-	    printServiceBindings("after join");
 	    sendMessagesToChannel(channelName, group, 2);
+	    printServiceBindings("after join");
 
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.
@@ -266,6 +266,102 @@ public class TestChannelServiceImplRelocatingSessions
 	
     }
 
+    public void testChannelJoinToOldNodeAfterRelocate()
+	throws Exception
+    {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	// channel coordinator is on server node
+	createChannel(channelName); 
+	addNodes("oldNode", "newNode");
+	
+	// Client will log into "oldNode"
+	SgsTestNode oldNode = additionalNodes.get("oldNode");
+	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	
+	try {
+	    // Initiate client relocation to new node.
+	    printServiceBindings("before relocate");
+	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    SgsTestNode newNode = additionalNodes.get("newNode");
+	    // Hold up joins send to oldNode
+	    wrapChannelServer(oldNode.getNodeId(), "join");
+	    holdMethod = true;
+	    joinUsers(channelName, oneUser); 
+	    
+	    moveClient(relocatingClient, oldNode, newNode);
+	    // Release "join" to oldNode.
+	    synchronized (invocationHandlerLock) {
+		invocationHandlerLock.notifyAll();
+	    }
+	    holdMethod = false;
+	    
+	    // Make sure all members are joined and can receive messages.
+	    checkUsersJoined(channelName, oneUser);
+	    sendMessagesToChannel(channelName, group, 2);
+	    printServiceBindings("after join");
+
+	    // Disconnect each client and make sure that memberships/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    Thread.sleep(WAIT_TIME);
+	    checkUsersJoined(channelName, new ArrayList<String>());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+	
+    }
+    
+    public void testChannelJoinToOldNodeAfterRelocateTwice()
+	throws Exception
+    {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	// channel coordinator is on server node
+	createChannel(channelName); 
+	addNodes("oldNode", "newNode1", "newNode2");
+	
+	// Client will log into "oldNode"
+	SgsTestNode oldNode = additionalNodes.get("oldNode");
+	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	
+	try {
+	    // Initiate client relocation to new node.
+	    printServiceBindings("before relocate");
+	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    SgsTestNode newNode1 = additionalNodes.get("newNode1");
+	    // Hold up joins send to oldNode
+	    wrapChannelServer(oldNode.getNodeId(), "join");
+	    holdMethod = true;
+	    joinUsers(channelName, oneUser); 
+	    
+	    moveClient(relocatingClient, oldNode, newNode1);
+	    moveClient(relocatingClient, newNode1,
+		       additionalNodes.get("newNode2"));
+	    // Release "join" to oldNode.
+	    synchronized (invocationHandlerLock) {
+		invocationHandlerLock.notifyAll();
+	    }
+	    holdMethod = false;
+	    
+	    // Make sure all members are joined and can receive messages.
+	    checkUsersJoined(channelName, oneUser);
+	    sendMessagesToChannel(channelName, group, 2);
+	    printServiceBindings("after join");
+
+	    // Disconnect each client and make sure that memberships/bindings
+	    // are cleaned up.
+	    group.disconnect(true);
+	    Thread.sleep(WAIT_TIME);
+	    checkUsersJoined(channelName, new ArrayList<String>());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+	
+    }
+    
     public void testChannelJoinDuringRelocatePreparation()
 	throws Exception
     {

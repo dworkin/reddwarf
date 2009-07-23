@@ -664,8 +664,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    GetNodeTask getNodeTask = new GetNodeTask(identity);		
 	    sessionService.runTransactionalTask(getNodeTask, identity);
 	    node = getNodeTask.getNode();
-	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "identity:{0} assigned to node:{1}",
 			   identity, node);
 	    }
 	    
@@ -690,6 +690,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    identity, ClientSessionHandler.this, loggingIn))
 	    {
 		// This client session is not allowed to proceed.
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"{0} rejected to node:{1} identity:{2}",
+			(loggingIn ? "User login" : "Session relocation"),
+			sessionService.getLocalNodeId(), identity);
+		}
 		notifySetupFailureAndDisconnect(
 		    loggingIn ?
 		    new LoginFailureException(
@@ -995,7 +1002,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    new AbstractKernelRunnable("NotifyLoggedIn") {
 			public void run() {
 			    logger.log(
-			        Level.FINE,
+			        Level.FINEST,
 				"calling notifyLoggedIn on identity:{0}",
 				identity);
 			    // notify that this identity logged in,
