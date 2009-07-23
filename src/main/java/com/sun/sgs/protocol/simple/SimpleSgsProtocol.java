@@ -205,37 +205,37 @@ public class SimpleSgsProtocol {
     public static final byte LOGIN_REDIRECT = 0x13;
 
     /**
-     * Pause messages notification. Server to client notification.
+     * Suspend messages notification. Server to client notification.
      * <br>
      * Opcode: {@code 0x14} <br>
      * Payload: (none)
      *
-     * This message notifies a client to pause sending messages to the
+     * This message notifies a client to suspend sending messages to the
      * server until it receives further instruction (such as {@link
      * #RELOCATE_NOTIFICATION} or {@link #RESUME_MESSAGES}). The client
-     * should send the acknowledgment {@link #PAUSE_MESSAGES_COMPLETE} to
-     * the server when it has stopped sending messages.  After the server
-     * sends a {@code PAUSE_MESSAGES} notification to the client, the
+     * should send the acknowledgment {@link #SUSPEND_MESSAGES_COMPLETE} to
+     * the server when it has suspended sending messages.  After the server
+     * sends a {@code SUSPEND_MESSAGES} notification to the client, the
      * server may decide to drop messages from the client if it does not
-     * receive the {@link #PAUSE_MESSAGES_COMPLETE} acknowledgment in a
+     * receive the {@link #SUSPEND_MESSAGES_COMPLETE} acknowledgment in a
      * timely fashion.
      */
-    public static final byte PAUSE_MESSAGES = 0x14;
+    public static final byte SUSPEND_MESSAGES = 0x14;
 
     /**
-     * Acknowledgment of {@link #PAUSE_MESSAGES} notification. Client to
+     * Acknowledgment of {@link #SUSPEND_MESSAGES} notification. Client to
      * server notification. 
      * <br>
      * Opcode: {@code 0x15} <br>
      * Payload: (none)
      *
      * This message notifies the server that the client has received the
-     * {@link #PAUSE_MESSAGES} notification.  Any messages received by the
+     * {@link #SUSPEND_MESSAGES} notification.  Any messages received by the
      * server after this notification will be dropped, unless the server
      * has instructed the client to either resume messages or relocate its
      * client session to another node.
      */
-    public static final byte PAUSE_MESSAGES_COMPLETE = 0x15;
+    public static final byte SUSPEND_MESSAGES_COMPLETE = 0x15;
 
     /**
      * Resume messages notification. Server to client notification. 
