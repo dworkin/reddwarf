@@ -205,9 +205,53 @@ public class SimpleSgsProtocol {
     public static final byte LOGIN_REDIRECT = 0x13;
 
     /**
-     * Relocate session notification. Server to client notification.
+     * Pause messages notification. Server to client notification.
      * <br>
      * Opcode: {@code 0x14} <br>
+     * Payload: (none)
+     *
+     * This message notifies a client to pause sending messages to the
+     * server until it receives further instruction (such as {@link
+     * #RELOCATE_NOTIFICATION} or {@link #RESUME_MESSAGES}). The client
+     * should send the acknowledgment {@link #PAUSE_MESSAGES_COMPLETE} to
+     * the server when it has stopped sending messages.  After the server
+     * sends a {@code PAUSE_MESSAGES} notification to the client, the
+     * server may decide to drop messages from the client if it does not
+     * receive the {@link #PAUSE_MESSAGES_COMPLETE} acknowledgment in a
+     * timely fashion.
+     */
+    public static final byte PAUSE_MESSAGES = 0x14;
+
+    /**
+     * Acknowledgment of {@link #PAUSE_MESSAGES} notification. Client to
+     * server notification. 
+     * <br>
+     * Opcode: {@code 0x15} <br>
+     * Payload: (none)
+     *
+     * This message notifies the server that the client has received the
+     * {@link #PAUSE_MESSAGES} notification.  Any messages received by the
+     * server after this notification will be dropped, unless the server
+     * has instructed the client to either resume messages or relocate its
+     * client session to another node.
+     */
+    public static final byte PAUSE_MESSAGES_COMPLETE = 0x15;
+
+    /**
+     * Resume messages notification. Server to client notification. 
+     * <br>
+     * Opcode: {@code 0x16} <br>
+     * Payload: (none)
+     *
+     * This message notifies the client that it can resume sending messages
+     * to the server.
+     */
+    public static final byte RESUME_MESSAGES = 0x16;
+
+    /**
+     * Relocate session notification. Server to client notification.
+     * <br>
+     * Opcode: {@code 0x17} <br>
      * Payload:
      * <ul>
      * <li> (String) hostname
@@ -223,11 +267,11 @@ public class SimpleSgsProtocol {
      * the client session with the server (without logging in) using the
      * {@code relocationKey} specified in the payload.
      */
-    public static final byte RELOCATE_NOTIFICATION = 0x14;
+    public static final byte RELOCATE_NOTIFICATION = 0x17;
 
     /**
      * Relocation request. Client requesting relocation to a server. <br>
-     * Opcode: {@code 0x15} <br>
+     * Opcode: {@code 0x18} <br>
      * Payload:
      * <ul>
      * <li> (byte) protocol version
@@ -245,13 +289,13 @@ public class SimpleSgsProtocol {
      * client receives a {@code RELOCATE_FAILURE} message, the client
      * should disconnect from the server.
      */
-    public static final byte RELOCATE_REQUEST = 0x15;
+    public static final byte RELOCATE_REQUEST = 0x18;
 
     /**
      * Relocation success. Server response to a client's {@link
      * #RELOCATE_REQUEST}.
      * <br>
-     * Opcode: {@code 0x16} <br>
+     * Opcode: {@code 0x19} <br>
      * Payload:
      * <ul>
      * <li> (ByteArray) reconnectionKey
@@ -261,13 +305,13 @@ public class SimpleSgsProtocol {
      * reconnect to the server with the same identity using a
      * {@link #RECONNECT_REQUEST}.
      */
-    public static final byte RELOCATE_SUCCESS = 0x16;
+    public static final byte RELOCATE_SUCCESS = 0x19;
 
     /**
      * Relocate failure. Server response to a client's {@link
      * #RELOCATE_REQUEST}.
      * <br>
-     * Opcode: {@code 0x17} <br>
+     * Opcode: {@code 0x1a} <br>
      * Payload:
      * <ul>
      * <li> (String) reason
@@ -280,7 +324,7 @@ public class SimpleSgsProtocol {
      * <li> a user with the same identity is already logged in
      * </ul>
      */
-    public static final byte RELOCATE_FAILURE = 0x17;
+    public static final byte RELOCATE_FAILURE = 0x1a;
 
     /**
      * Reconnection request. Client requesting reconnect to a server. <br>
