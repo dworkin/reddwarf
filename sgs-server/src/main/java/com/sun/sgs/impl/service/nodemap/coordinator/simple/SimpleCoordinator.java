@@ -24,8 +24,10 @@ import com.sun.sgs.impl.service.nodemap.IdentityMO;
 import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.TransactionProxy;
 import java.util.Collections;
 import java.util.Properties;
 
@@ -40,10 +42,22 @@ public class SimpleCoordinator implements GroupCoordinator {
 
     public SimpleCoordinator(Properties properties,
                              NodeMappingServerImpl server,
-                             DataService dataService)
+                             ComponentRegistry systemRegistry,
+                             TransactionProxy txnProxy)
     {
         this.server = server;
-        this.dataService = dataService;
+        this.dataService = txnProxy.getService(DataService.class);
+        System.out.println("*** constructing SimpleCoordinator ***");
+    }
+
+    @Override
+    public void start() {
+        // noop
+    }
+
+    @Override
+    public void stop() {
+        // noop
     }
 
     @Override

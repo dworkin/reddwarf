@@ -172,6 +172,18 @@ public class ClientSessionImpl
 		   identity, id);
     }
 
+
+    /**
+     * Get the identity of the client session.
+     *
+     * @param session a client session
+     *
+     * @return the identity of the client session
+     */
+    public static Identity getIdentity(ClientSession session) {
+        return ((ClientSessionWrapper)session).getClientSession().identity;
+    }
+
     /* -- Implement ClientSession -- */
 
     /** {@inheritDoc} */

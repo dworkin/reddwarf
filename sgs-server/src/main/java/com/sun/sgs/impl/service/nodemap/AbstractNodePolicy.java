@@ -26,7 +26,7 @@ import java.util.List;
  * Abstract node policy class. This class manages the list of nodes that
  * are available for assignment. Subclasses must implement the logic for
  * making the assignments.
- * @see NodeAssignPolicy#chooseNode(com.sun.sgs.auth.Identity, long)
+ * @see NodeAssignPolicy#chooseNode(long)
  */
 public abstract class AbstractNodePolicy implements NodeAssignPolicy {
 
@@ -42,10 +42,15 @@ public abstract class AbstractNodePolicy implements NodeAssignPolicy {
     }
 
     /** {@inheritDoc} */
+    public abstract long chooseNode(long requestingNode)
+            throws NoNodesAvailableException;
+
+    /** {@inheritDoc} */
     public synchronized boolean nodesAvailable() {
         return !availableNodes.isEmpty();
     }
 
+    /** {@inheritDoc} */
     public synchronized boolean isNodeAvailable(long nodeId) {
         return availableNodes.contains(nodeId);
     }

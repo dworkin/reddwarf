@@ -294,7 +294,7 @@ public final class NodeMappingServerImpl
                 SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
         
         String policyClassName = wrappedProps.getProperty(
-		ASSIGN_POLICY_CLASS_PROPERTY);	    
+		ASSIGN_POLICY_CLASS_PROPERTY);
         if (policyClassName == null) {
             assignPolicy = new RoundRobinPolicy(properties, this);
         } else {
@@ -340,14 +340,16 @@ public final class NodeMappingServerImpl
 
         if (coordinatorClassName == null) {
             groupCoordinator =
-                        new SimpleCoordinator(properties, this, dataService);
+                  new SimpleCoordinator(properties, this,
+                                        systemRegistry, txnProxy);
         } else {
             groupCoordinator = wrappedProps.getClassInstanceProperty(
                 GROUP_COORDINATOR_CLASS_PROPERTY, GroupCoordinator.class,
                 new Class[] { Properties.class, NodeMappingServerImpl.class,
-                              DataService.class },
-                properties, this, dataService);
+                              ComponentRegistry.class, TransactionProxy.class },
+                properties, this, systemRegistry, txnProxy);
         }
+        groupCoordinator.start();
 
         // Export ourselves.  At this point, this object is public.
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
@@ -355,7 +357,7 @@ public final class NodeMappingServerImpl
         if (requestedPort == 0) {
             logger.log(Level.CONFIG, "Server is using port {0,number,#}", port);
         } 
-        
+
         fullName = "NodeMappingServiceImpl[host:" + 
                    InetAddress.getLocalHost().getHostName() + 
                    ", port:" + port + "]";
@@ -374,7 +376,7 @@ public final class NodeMappingServerImpl
     
     /** {@inheritDoc} */
     protected void doReady() {
-        // Do nothing.
+        // do nothing
     }
     
     /** 
@@ -383,6 +385,7 @@ public final class NodeMappingServerImpl
      */
     protected void doShutdown() {
         exporter.unexport();
+        groupCoordinator.shutdown();
         try {
             if (removeThread != null) {
 		synchronized (removeThread) {

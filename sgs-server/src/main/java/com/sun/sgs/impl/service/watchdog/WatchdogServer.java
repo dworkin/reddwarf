@@ -99,7 +99,7 @@ public interface WatchdogServer extends Remote {
 
     /**
      * Notifies the node with the given ID that its health be set. If the
-     * {@code health} is {@link Node#health#RED RED} it indicates that the
+     * {@code health} is {@code Node.Health.RED} it indicates that the
      * node has failed and should be shutdown. In this case, if the given node
      * is a remote node, this notification is a
      * result of a server running into difficulty communicating with a remote

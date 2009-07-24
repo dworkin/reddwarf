@@ -88,7 +88,7 @@ class NodeImpl
     /**
      * Constructs an instance of this class with the given {@code
      * nodeId}, {@code hostName}, and {@code client}.  
-     * This instance's health is set to {@link Health#RED}.  The expiration
+     * This instance's health is set to {@code Health.RED}.  The expiration
      * time for this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID

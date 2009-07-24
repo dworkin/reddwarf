@@ -23,7 +23,7 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- *  The simpliest node policy possible: always assign to the local requesting
+ *  The simplest node policy possible: always assign to the local requesting
  *  node.  Round robin assignment is used when the server is making the 
  *  request due to node failure.
  */

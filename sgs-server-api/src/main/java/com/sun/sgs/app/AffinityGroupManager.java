@@ -15,27 +15,33 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
-package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
+package com.sun.sgs.app;
 
 /**
- * Thing that finds groups
+ * A manager which allows hits to be provided to the underlying affinity
+ * group mechanism.
  */
-public interface GroupFinder {
+public interface AffinityGroupManager {
 
     /**
-     * Start finding groups.
+     * Create a new group. The group identifier return will be positive.
+     *
+     * @return a positive group identifier
      */
-    void start();
+    long createGroup();
 
     /**
-     * Stop finding groups.
+     * Associate a client session with a group. Previous associations may be
+     * removed.
+     *
+     * @param session a client session
+     * @param groupId a group identifier
      */
-    void stop();
-
-    /**
-     * Shutdown.
-     */
-    void shutdown();
+    void associate(ClientSession session, long groupId);
 }

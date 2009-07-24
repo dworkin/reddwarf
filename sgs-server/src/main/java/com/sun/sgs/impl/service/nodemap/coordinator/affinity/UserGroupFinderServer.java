@@ -19,23 +19,24 @@
 
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
+import com.sun.sgs.auth.Identity;
+import java.io.IOException;
+import java.rmi.Remote;
+import java.util.Map;
+
 /**
- * Thing that finds groups
+ * Remote interface of the user group finder service.
  */
-public interface GroupFinder {
+public interface UserGroupFinderServer extends Remote {
 
     /**
-     * Start finding groups.
+     * Report associations to the server.
+     *
+     * @param associations a map of identity -> group id
+     * @param nodeId a node id
+     *
+     * @throws java.io.IOException
      */
-    void start();
-
-    /**
-     * Stop finding groups.
-     */
-    void stop();
-
-    /**
-     * Shutdown.
-     */
-    void shutdown();
+    void associations(Map<Identity,Long> associations, long nodeId)
+            throws IOException;
 }

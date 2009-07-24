@@ -19,7 +19,9 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import java.util.Properties;
 
 /**
  * Thing that manages groups of identities. The class that implements this
@@ -28,6 +30,16 @@ import com.sun.sgs.service.Node;
  * {@link DataService} parameters.
  */
 public interface GroupCoordinator {
+
+    /**
+     * Stop the coordinator.
+     */
+    void start();
+
+    /**
+     * Start the coordinator.
+     */
+    void stop();
 
     /**
      * Move one or more identities from the old node to the new node. This

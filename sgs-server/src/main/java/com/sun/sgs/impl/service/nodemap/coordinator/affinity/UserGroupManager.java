@@ -19,23 +19,30 @@
 
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
+import com.sun.sgs.app.AffinityGroupManager;
+import com.sun.sgs.app.ClientSession;
+
 /**
- * Thing that finds groups
+ * A manager which allows hits to be provided to the underlying affinity
+ * group mechanism.
+ *
+ * TODO... Could this be generic, and just change the backing service?
  */
-public interface GroupFinder {
+public final class UserGroupManager implements AffinityGroupManager {
 
-    /**
-     * Start finding groups.
-     */
-    void start();
+    private final UserGroupService service;
 
-    /**
-     * Stop finding groups.
-     */
-    void stop();
+    public UserGroupManager(UserGroupService service) {
+        this.service = service;
+    }
 
-    /**
-     * Shutdown.
-     */
-    void shutdown();
+    @Override
+    public long createGroup() {
+        return service.createGroup();
+    }
+
+    @Override
+    public void associate(ClientSession session, long groupId) {
+        service.associate(session, groupId);
+    }
 }
