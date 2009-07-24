@@ -75,17 +75,17 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
             
         } else {
 
-            // we're not re-trying the task, so log that it's being dropped
-            if (logger.isLoggable(Level.WARNING)) {
+            // we're not re-trying the task, so specify reason for dropping it
+            if (logger.isLoggable(Level.FINE)) {
                 if (task.isRecurring()) {
-                    logger.logThrow(Level.WARNING, result, 
-                                    "skipping a recurrence of a task that " +
-                                    "failed with a non-retryable " +
-                                    "exception: {0}", task);
+                    logger.log(Level.FINE,
+                               "skipping a recurrence of a task because it " +
+                               "failed with a non-retryable exception: {0}",
+                               task);
                 } else {
-                    logger.logThrow(Level.WARNING, result, 
-                                    "dropping a task that failed with a " +
-                                    "non-retryable exception: {0}", task);
+                    logger.log(Level.FINE,
+                               "dropping a task because it failed with a " +
+                               "non-retryable exception: {0}", task);
                 }
             }
 

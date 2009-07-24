@@ -698,6 +698,18 @@ final class TransactionSchedulerImpl
                     switch (retryPolicy.getRetryAction(task)) {
                         case DROP:
                             task.setDone(t);
+                            if (logger.isLoggable(Level.WARNING)) {
+                                if (task.isRecurring()) {
+                                    logger.logThrow(Level.WARNING, t,
+                                                    "skipping a recurrence " +
+                                                    "of a task that failed: " +
+                                                    "{0}", task);
+                                } else {
+                                    logger.logThrow(Level.WARNING, t,
+                                                    "dropping a task that " +
+                                                    "failed: {0}", task);
+                                }
+                            }
                             return true;
                         case RETRY_LATER:
                             task.setRunning(false);
