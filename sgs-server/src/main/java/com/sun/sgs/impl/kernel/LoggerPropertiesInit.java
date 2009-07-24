@@ -132,7 +132,6 @@ public class LoggerPropertiesInit {
         InputStream fileStream = null;
         
         try {
-            System.err.println(filename);
             if (filename != null) {
                 fileStream = new FileInputStream(new File(filename));
             }

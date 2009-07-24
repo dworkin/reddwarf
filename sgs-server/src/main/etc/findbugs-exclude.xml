@@ -30,6 +30,22 @@
     <Bug pattern="DM_CONVERT_CASE"/>
   </Match>
   
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.kernel.Kernel$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+  
+  <!-- We call System exit if a shutdown takes too long. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.kernel.Kernel$1"/>
+    </Or>
+    <Bug pattern="DM_EXIT"/>
+  </Match>
+     
   <!-- Findbugs can't tell why we're doing a notify at this point, but
        it is because we have identified new lock owners that need to be
        informed of their new status. -->
@@ -296,7 +312,7 @@
   <!-- OK to declare serializable field as non-serializable interface. -->
   <Match>
     <Class name="com.sun.sgs.impl.service.session.ClientSessionImpl"/>
-    <Field name="sessionServer"/>
+    <Field name="deliveries"/>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
 
@@ -323,6 +339,25 @@
     <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
 
+  <!-- Package com.sun.sgs.impl.service.nodemap -->
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$2"/>
+      <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$3"/>
+      <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$4"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+  <!-- Package com.sun.sgs.impl.service.watchdog -->
+
+  <!-- Access to abortCause is safe due to checking current thread at beginning of method -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.transaction.TransactionImpl"/>
+    <Field name="abortCause"/>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.watchdog -->
 
   <!-- Thread is not created with a default empty run method. -->
@@ -338,13 +373,16 @@
   <!-- OK to declare serializable field as non-serializable interface. -->
   <Match>
     <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
-    <Field name="client"/>
+    <Or>
+      <Field name="client"/>
+      <Field name="primaryIds"/>
+    </Or>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
 
   <!-- Currently unused fields. -->
   <Match>
-    <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl$RecoveryCompleteFutureImpl"/>
+    <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl$RecoveryCompletionHandler"/>
     <Field name="listener"/>
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>
@@ -360,8 +398,33 @@
   <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->
   <Match>
     <Class name="com.sun.sgs.impl.util.BindingKeyedCollectionsImpl"/>
-    <Feild name="txnProxy"/>
+    <Field name="txnProxy"/>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+  </Match>
+
+  <!-- Default value is ok for transient field -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
+    <Field name="expiration"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- Default value is ok for transient field -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
+    <Field name="expiration"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- Synchronization in setFailed method is ok, nodeImpl is retrieved from
+       the DataService -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
+    <Or>
+      <Field name="backupId"/>
+      <Field name="isAlive"/>
+    </Or>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
   
 </FindBugsFilter>

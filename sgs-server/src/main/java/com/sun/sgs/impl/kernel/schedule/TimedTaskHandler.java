@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;

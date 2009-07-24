@@ -23,7 +23,7 @@ import com.sleepycat.db.DatabaseException;
 import com.sleepycat.db.Environment;
 import com.sleepycat.db.Transaction;
 import com.sleepycat.db.TransactionConfig;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.service.store.db.DbTransaction;
 
 /** Provides a transaction implementation using Berkeley DB. */
 class BdbTransaction implements DbTransaction {

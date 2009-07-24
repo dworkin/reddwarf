@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.10-SNAPSHOT</version>
+    <version>0.9.11-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-api</artifactId>
@@ -53,31 +53,27 @@
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-remote-resources-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>include-gpl-classpath-license</id>
+	    <phase>generate-resources</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Activate the license plugin to check for license headers -->
+      <plugin>
+	<groupId>com.google.code.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
       </plugin>
 
     </plugins>
   </build>
 
-  <reporting>
-    <plugins>
-
-      <!-- Configure findbugs to run during site lifecycle -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>findbugs-maven-plugin</artifactId>
-	<configuration>
-	  <effort>Max</effort>
-	  <excludeFilterFile>
-	    ${basedir}/src/main/etc/findbugs-exclude.xml
-	  </excludeFilterFile>
-	  <threshold>Low</threshold>
-	  <xmlOutput>true</xmlOutput>
-	  <findbugsXmlOutput>true</findbugsXmlOutput>
-	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
-	</configuration>
-      </plugin>
-
-    </plugins>
-  </reporting>
+  <properties>
+    <findbugs-exclude.filter>
+      ${basedir}/src/main/etc/findbugs-exclude.xml
+    </findbugs-exclude.filter>
+  </properties>
 
 </project>

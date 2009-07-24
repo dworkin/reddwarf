@@ -107,10 +107,13 @@ public interface ChannelServer extends Remote {
      *
      * @param	channelRefId a channel ID
      * @param	message a channel message
+     * @param	deliveryOrdinal a delivery guarantee (the
+     *		ordinal representing the {@link Delivery} enum)
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void send(BigInteger channelRefId, byte[] message) throws IOException;
+    void send(BigInteger channelRefId, byte[] message, byte deliveryOrdinal)
+	throws IOException;
 
     /**
      * Notifies this server that the channel with the specified {@code

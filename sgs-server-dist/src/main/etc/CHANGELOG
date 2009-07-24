@@ -1,9 +1,26 @@
+Version 0.9.11:
+- Added support for pluggable transaction retry policy (issue #181)
+- Fix issues #168, #169, #171, #173, #178
+
 Version 0.9.10:
+- Add DataManager.getObjectId (issue #99) and
+  DataManager.getBindingForUpdate (issue #120)
+- AppListener no longer extends ManagedObject (issue #108)
+- Split internal API classes used to write custom services, transports,
+  protocols, and authenticators into a separate sgs-server-internal-api.jar
+  file (issue #162)
+- Service startup is modified so a guaranteed set of services is always
+  started, allowing services to use services that are started after them
+  (issue #145)
 - Add a locking AccessCoordinator and add a configuration option for
   specifying the access coordinator (issue #138)
-- AppListener no longer extends ManagedObject (issue #108)
-- Also fix issues #5, #44, #48, #73, #82, #89, #98, #130, #131, #136, #142,
-  #143, #144, #149, #151, #153, #154, #155, #158, #160
+- Update license to GPLv2 + classpath exception.  The classpath exception
+  has been applied to all classes in the sgs-server-api and
+  sgs-server-internal-api modules.  The other modules remain as pure
+  GPLv2 (issue #164)
+- Also fix issues #5, #32, #44, #48, #61, #73, #82, #89, #98, #109, #113,
+  #115, #126, #130, #131, #136, #142, #143, #144, #149, #151, #152,
+  #153, #154, #155, #158, #160, #163, #165, #166, #170
 
 Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)

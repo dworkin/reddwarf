@@ -57,6 +57,11 @@ public class DummyTransactionProxy implements TransactionProxy {
 	return txn;
     }
 
+    public boolean inTransaction() {
+        Transaction txn = threadTxn.get();
+        return (txn != null);
+    }
+    
     public Identity getCurrentOwner() {
 	return taskOwner;
     }

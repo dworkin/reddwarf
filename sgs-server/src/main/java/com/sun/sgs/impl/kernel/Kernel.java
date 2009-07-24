@@ -40,8 +40,6 @@ import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
-import com.sun.sgs.impl.service.data.DataServiceImpl;
-
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -89,23 +87,49 @@ import javax.management.JMException;
  * for creating and initializing all components of the system and the
  * applications configured to run in this system.
  * <p>
- * By default, the minimal amount of profiling which is used internally by
- * the system is enabled.  To enable more profiling, the kernel property
- * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LEVEL_PROPERTY} must be set
- * to a valid level for {@link 
- * com.sun.sgs.profile.ProfileCollector#setDefaultProfileLevel(ProfileLevel)}.
- * By default, no profile listeners are enabled.  Set the 
- * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property with 
- * a colon-separated list of fully-qualified class names, each of which 
- * implements {@link ProfileListener}.
- * <p>
- * By default, creates an instance of {@link TrackingAccessCoordinator} to
- * track access to shared objects.  The {@value #ACCESS_COORDINATOR_PROPERTY}
- * configuration property can be used to specify another implementation.  The
- * value of the property should be the name of a public, non-abstract class
- * that implements the {@link AccessCoordinatorHandle} interface, and that
- * provides a public constructor with the three parameters {@link Properties},
- * {@link TransactionProxy}, and {@link ProfileCollectorHandle}.
+ * The kernel must be configured with certain <a
+ * href="../../impl/kernel/doc-files/config-properties.html#RequiredProperties">
+ * required properties</a> and supports other <a
+ * href="../../impl/kernel/doc-files/config-properties.html#System">public
+ * properties</a>.  It can also be configured with any of the properties
+ * specified in the {@link StandardProperties} class, and supports
+ * the following additional configuration properties:
+ * 
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #PROFILE_LEVEL_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>MIN</code>
+ *
+ * <dd style="padding-top: .5em">By default, the minimal amount of profiling 
+ *      which is used internally by the system is enabled.  To enable more 
+ *      profiling, this property must be set to a valid level for {@link 
+ *      ProfileCollector#setDefaultProfileLevel(ProfileLevel)}. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #PROFILE_LISTENERS}
+ *	</b></code> <br>
+ *	<i>Default:</i> No Default
+ *
+ * <dd style="padding-top: .5em">By default, no profile listeners are enabled.
+ *      To enable a set of listeners, set this property to a colon-separated
+ *      list of fully-qualified class 
+ *      names, each of which implements {@link ProfileListener}.  A number
+ *      of listeners are provided with the system in the
+ *      {@link com.sun.sgs.impl.profile.listener} package.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #ACCESS_COORDINATOR_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@link TrackingAccessCoordinator}</code>
+ *
+ * <dd style="padding-top: .5em">The implementation class used to track
+ *      access to shared objects.  The value of this property should be the
+ *      name of a public, non-abstract class that implements the
+ *      {@link AccessCoordinatorHandle} interface, and that provides a public
+ *      constructor with the three parameters {@link Properties},
+ *      {@link TransactionProxy}, and {@link ProfileCollectorHandle}.<p>
+ *
+ * 
+ * </dl>
  */
 class Kernel {
 
@@ -148,9 +172,9 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
-
+    
     // default timeout the kernel's shutdown method (15 minutes)
-    private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 600000;
+    private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 60000;
     
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
@@ -194,7 +218,12 @@ class Kernel {
         throws Exception 
     {
         logger.log(Level.CONFIG, "Booting the Kernel");
-
+                
+        // filter the properties with appropriate defaults
+        filterProperties(appProperties);
+        
+        // check the standard properties
+        checkProperties(appProperties);
         this.appProperties = appProperties;
 
         try {
@@ -231,7 +260,11 @@ class Kernel {
                 profileCollector.registerMBean(config, 
                                                ConfigManager.MXBEAN_NAME);
             } catch (JMException e) {
-                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+                logger.logThrow(Level.WARNING, e, "Could not register MBean");
+                // Stop bringing up the kernel - the ConfigManager is used
+                // by other parts of the system, who rely on it being 
+                // successfully registered.
+                throw e;
             }
 
             // create the authenticators and identity coordinator
@@ -450,41 +483,29 @@ class Kernel {
     {
         // before we start, figure out if we're running with only a sub-set
         // of services, in which case there should be no external services
-        String finalService =
-            appProperties.getProperty(StandardProperties.FINAL_SERVICE);
+        NodeType type = 
+            NodeType.valueOf(
+                appProperties.getProperty(StandardProperties.NODE_TYPE));
         StandardService finalStandardService = null;
         String externalServices =
             appProperties.getProperty(StandardProperties.SERVICES);
         String externalManagers =
             appProperties.getProperty(StandardProperties.MANAGERS);
-        if (finalService != null) {
-            if ((externalServices != null) || (externalManagers != null)) {
-                throw new IllegalArgumentException(
-                    "Cannot specify external services and a final service");
-            }
-
-            // validate the final service
-            try {
-                finalStandardService =
-                    Enum.valueOf(StandardService.class, finalService);
-            } catch (IllegalArgumentException iae) {
-                if (logger.isLoggable(Level.SEVERE)) {
-                    logger.logThrow(Level.SEVERE, iae, "Invalid final " +
-                                    "service name: {0}", finalService);
+        
+        switch (type) {
+            case appNode:
+            case singleNode:
+            default:
+                finalStandardService = StandardService.LAST_SERVICE;
+                break;
+            case coreServerNode:
+                if ((externalServices != null) || (externalManagers != null)) {
+                    throw new IllegalArgumentException(
+                        "Cannot specify external services for the core server");
                 }
-                throw iae;
-            }
 
-            // make sure we're not running with an application
-            if (!appProperties.getProperty(StandardProperties.APP_LISTENER).
-                equals(StandardProperties.APP_LISTENER_NONE)) 
-            {
-                throw new IllegalArgumentException("Cannot specify an app " +
-                                                   "listener and a final " +
-                                                   "service");
-            }
-        } else {
-            finalStandardService = StandardService.LAST_SERVICE;
+                finalStandardService = StandardService.TaskService;
+                break;
         }
         
         final int finalServiceOrdinal = finalStandardService.ordinal();
@@ -681,8 +702,10 @@ class Kernel {
         // is to initialize the application by running a special
         // KernelRunnable in an unbounded transaction, unless we're
         // running without an application
-        if (!appProperties.getProperty(StandardProperties.APP_LISTENER).
-            equals(StandardProperties.APP_LISTENER_NONE)) {
+        NodeType type = 
+            NodeType.valueOf(
+                appProperties.getProperty(StandardProperties.NODE_TYPE));
+        if (!type.equals(NodeType.coreServerNode)) {
             try {
                 if (logger.isLoggable(Level.CONFIG)) {
                     logger.log(Level.CONFIG, "{0}: starting application",
@@ -817,45 +840,16 @@ class Kernel {
             if (value == null) {
                 // Default is single node
                 value = NodeType.singleNode.name();
+                properties.setProperty(StandardProperties.NODE_TYPE, value);
             }
 
-            NodeType type;
             // Throws IllegalArgumentException if not one of the enum types
             // but let's improve the error message
             try {
-                type = NodeType.valueOf(value);
+                NodeType.valueOf(value);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Illegal value for " +
                         StandardProperties.NODE_TYPE);
-            }
-            
-           
-            switch (type) {
-                case singleNode:
-                default:
-                    break;    // do nothing, this is the default
-                case coreServerNode:
-                    // Don't start an application
-                    properties.setProperty(
-                            StandardProperties.APP_LISTENER,
-                            StandardProperties.APP_LISTENER_NONE);
-                    // Only run basic services
-                    properties.setProperty(StandardProperties.FINAL_SERVICE,
-                                           "NodeMappingService");
-                    // Start servers for services
-                    properties.setProperty(StandardProperties.SERVER_START, 
-                                           "true");
-                    // Start the network server for the data store
-                    properties.setProperty(
-                        DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
-                        "com.sun.sgs.impl.service.data." +
-                        "store.net.DataStoreClient");
-                    break;
-                case appNode:
-                    // Don't start the servers
-                    properties.setProperty(StandardProperties.SERVER_START, 
-                                           "false");
-                    break;
             }
 
             return properties;
@@ -895,14 +889,22 @@ class Kernel {
                        appName);
         }
         
-        if (appProperties.getProperty(StandardProperties.APP_LISTENER) == null) 
-        {
-            logger.log(Level.SEVERE, "Missing required property " +
+        NodeType type = 
+            NodeType.valueOf(
+                appProperties.getProperty(StandardProperties.NODE_TYPE));
+        if (!type.equals(NodeType.coreServerNode)) {
+            if (appProperties.getProperty(StandardProperties.APP_LISTENER) == 
+                null)
+            {
+                logger.log(Level.SEVERE, "Missing required property " +
                        StandardProperties.APP_LISTENER +
-                       "for application: " + appName);
-            throw new IllegalArgumentException("Missing required property " +
+                       " for application: " + appName);
+                throw new IllegalArgumentException(
+                       "Missing required property " +
                        StandardProperties.APP_LISTENER +
-                       "for application: " + appName);
+                       " for application: " + appName);
+                
+            }
         }
     }
     
@@ -1140,12 +1142,6 @@ class Kernel {
         } else {
             appProperties = findProperties(null);
         }
-        
-        // filter the properties with appropriate defaults
-        filterProperties(appProperties);
-        
-        // check the standard properties
-        checkProperties(appProperties);
         
         // boot the kernel
         new Kernel(appProperties);

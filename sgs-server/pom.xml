@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.10-SNAPSHOT</version>
+    <version>0.9.11-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server</artifactId>
@@ -36,6 +36,10 @@
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-internal-api</artifactId>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
@@ -185,6 +189,10 @@
 	      <name>com.sun.sgs.txn.timeout</name>
 	      <value>${com.sun.sgs.txn.timeout}</value>
 	    </property>
+	    <property>
+	      <name>sun.rmi.transport.connectionTimeout</name>
+	      <value>5000</value>
+	    </property>
 	  </systemProperties>
 	  <argLine>
 	    ${test.jvm.args} -Djava.library.path=${run.javapath}
@@ -212,6 +220,18 @@
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-remote-resources-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>include-gpl-license</id>
+	    <phase>generate-resources</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Activate the license plugin to check for license headers -->
+      <plugin>
+	<groupId>com.google.code.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
       </plugin>
 
     </plugins>
@@ -225,28 +245,6 @@
       </resource>
     </resources>
   </build>
-
-  <reporting>
-    <plugins>
-
-      <!-- Configure findbugs to run during site lifecycle -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>findbugs-maven-plugin</artifactId>
-	<configuration>
-	  <effort>Max</effort>
-	  <excludeFilterFile>
-	    ${basedir}/src/main/etc/findbugs-exclude.xml
-	  </excludeFilterFile>
-	  <threshold>Low</threshold>
-	  <xmlOutput>true</xmlOutput>
-	  <findbugsXmlOutput>true</findbugsXmlOutput>
-	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
-	</configuration>
-      </plugin>
-
-    </plugins>
-  </reporting>
 
   <properties>
     <!-- The directory to use as the temporary directory while running
@@ -262,6 +260,10 @@
     </run.logging>
     <!-- The default transaction timeout -->
     <com.sun.sgs.txn.timeout>100</com.sun.sgs.txn.timeout>
+
+    <findbugs-exclude.filter>
+      ${basedir}/src/main/etc/findbugs-exclude.xml
+    </findbugs-exclude.filter>
   </properties>
 
 </project>

@@ -15,6 +15,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
 package com.sun.sgs.app.util;
@@ -1038,14 +1042,12 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	TreeNode(ScalableList<E> list, TreeNode<E> parent, boolean isSplit) {
 	    this(list);
 
-	    ListNode<E> n;
 	    if (!isSplit) {
-		n = new ListNode<E>(this, bucketSize);
+		ListNode<E> n = new ListNode<E>(this, bucketSize);
 		DataManager dm = AppContext.getDataManager();
 		size = n.size();
 		childRef = dm.createReference((Node<E>) n);
 	    } else {
-		n = null;
 		size = 0;
 		childRef = null;
 	    }
@@ -1628,7 +1630,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		entry = currentListNode.remove(null, 0);
 		if (--size == 0 && next != null) {
 		    currentListNode = next;
-		    next = next.next();
 		    size = currentListNode.size();
 		}
 
@@ -2091,7 +2092,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		if (prev != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(prev);
-		    cursor = currentNode.get().size() - 1;
+		    cursor = currentNode.get().size();
 		} else if (next != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(next);
@@ -2295,6 +2296,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		    elements = currentNode.get().getSubList().getElements();
 		    index = currentNode.get().size() - 1;
 		} else {
+                    cannotRemoveOrSet = true;
 		    throw new NoSuchElementException(
 			    "The previous element does not exist");
 		}
@@ -2373,7 +2375,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		} else if (prev != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(prev);
-		    cursor = currentNode.get().size() - 1;
+		    cursor = currentNode.get().size();
 		} else {
 		    cursor = 0;
 		}
@@ -2391,7 +2393,12 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 */
 	public E next() {
 	    cannotRemoveOrSet = false;
-	    return super.next();
+	    try {
+                return super.next();
+            } catch (NoSuchElementException e) {
+                cannotRemoveOrSet = true;
+                throw e;
+            }
 	}
 
 	/**

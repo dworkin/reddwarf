@@ -32,6 +32,8 @@ import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.DataStore;
 import java.util.Arrays;
 import java.util.logging.Level;
 import static java.util.logging.Level.FINER;
@@ -951,7 +953,12 @@ public abstract class AbstractDataStore
 	Transaction txn, long oid, AccessType type)
     {
 	checkOid(oid);
-	objectAccesses.reportObjectAccess(txn, oid, type);
+	try {
+	    objectAccesses.reportObjectAccess(txn, oid, type);
+	} catch (IllegalArgumentException e) {
+	    throw new IllegalStateException(
+	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
+	}
     }
 
     /**
@@ -964,7 +971,12 @@ public abstract class AbstractDataStore
     protected void reportNameAccess(
 	Transaction txn, String name, AccessType type)
     {
-	nameAccesses.reportObjectAccess(txn, getNameForAccess(name), type);
+	try {
+	    nameAccesses.reportObjectAccess(txn, getNameForAccess(name), type);
+	} catch (IllegalArgumentException e) {
+	    throw new IllegalStateException(
+	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
+	}
     }
 
     /**

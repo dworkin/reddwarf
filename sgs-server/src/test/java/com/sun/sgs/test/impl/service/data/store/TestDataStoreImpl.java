@@ -28,13 +28,13 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -144,9 +144,6 @@ public class TestDataStoreImpl extends TestCase {
 	    if (txn != null) {
 		txn.abort(new RuntimeException("abort"));
 	    }
-	    if (!passed && store != null) {
-		new ShutdownAction().waitForDone();
-	    }
 	} catch (RuntimeException e) {
 	    if (passed) {
 		throw e;
@@ -154,10 +151,11 @@ public class TestDataStoreImpl extends TestCase {
 		e.printStackTrace();
 	    }
 	} finally {
-	    txn = null;
-	    if (!passed) {
-		store = null;
-	    }
+            txn = null;
+            if (!passed && store != null) {
+                new ShutdownAction().waitForDone();
+                store = null;
+            }
 	}
     }
 

@@ -63,8 +63,14 @@
        to support random access removals.  This is completely
        hidden from the user and so we are allowing it here -->
   <Match>
-    <Class name="com.sun.sgs.app.util.ScalableDeque$Element"/>
-    <Bug pattern="EC_UNRELATED_TYPES"/>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableDeque$Element"/>
+      <Class name="com.sun.sgs.app.util.ScalableDeque$ElementMatcher"/>
+    </Or>
+    <Or>
+      <Bug pattern="EC_UNRELATED_TYPES"/>
+      <Bug pattern="EQ_CHECK_FOR_OPERAND_NOT_COMPATIBLE_WITH_THIS"/>
+    </Or>
   </Match>
 
 </FindBugsFilter>

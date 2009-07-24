@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.kernel.schedule.ScheduledTask;
+
 /** Defines an interface for managing transactions. */
 public interface TransactionCoordinator {
 
@@ -40,11 +42,23 @@ public interface TransactionCoordinator {
             "com.sun.sgs.txn.disable.prepareandcommit.optimization";
     /**
      * Creates a new transaction, and returns a handle for managing it.
-     * 
-     * @param unbounded <code>true</code> if this transaction's timeout is
-     *                  unbounded, <code>false</code> otherwise
+     * If a timeout of {@link ScheduledTask#UNBOUNDED} is given, a
+     * transaction will be created with the timeout value specified
+     * by the property {@value #TXN_UNBOUNDED_TIMEOUT_PROPERTY}.
+     *
+     * @param timeout the timeout, in milliseconds, to be used for this
+     *        transaction
      *
      * @return	a handle for managing the newly created transaction.
      */
-    TransactionHandle createTransaction(boolean unbounded);
+    TransactionHandle createTransaction(long timeout);
+
+    /**
+     * Returns the default transaction timeout to use for bounded transactions.
+     * This value is specified using the property
+     * {@value #TXN_TIMEOUT_PROPERTY}
+     *
+     * @return the default transaction timeout
+     */
+    long getDefaultTimeout();
 }
