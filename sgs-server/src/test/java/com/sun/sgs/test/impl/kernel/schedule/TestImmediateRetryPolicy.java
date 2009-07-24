@@ -95,7 +95,7 @@ public class TestImmediateRetryPolicy {
     @Test
     public void testRetryableFalseResult() {
         setupTask(new RetryableException(false));
-        EasyMock.expect(task.isRecurring()).andReturn(true);
+        EasyMock.expect(task.isRecurring()).andStubReturn(true);
         replayMocks();
 
         // verify
@@ -108,7 +108,7 @@ public class TestImmediateRetryPolicy {
     public void testNotRetryableExceptionAndRecurringTask() {
         setupTask(new Exception());
         // record recurring task
-        EasyMock.expect(task.isRecurring()).andReturn(true);
+        EasyMock.expect(task.isRecurring()).andStubReturn(true);
         replayMocks();
 
         // verify
@@ -121,7 +121,7 @@ public class TestImmediateRetryPolicy {
     public void testNotRetryableExceptionAndNotRecurringTask() {
         setupTask(new Exception());
         // record recurring task
-        EasyMock.expect(task.isRecurring()).andReturn(false);
+        EasyMock.expect(task.isRecurring()).andStubReturn(false);
         replayMocks();
 
         // verify
