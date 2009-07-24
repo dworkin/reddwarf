@@ -29,6 +29,7 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Action;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
+import com.sun.sgs.impl.util.AbstractCompletionFuture;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -37,7 +38,6 @@ import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.RelocateFailureException;
-import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.RequestFailureException;
 import com.sun.sgs.protocol.SessionProtocol;
@@ -50,10 +50,7 @@ import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -116,8 +113,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private boolean disconnectHandled = false;
 
     /** If non-null, contains the completion handler for
-     * relocating this session to a new node. */
-    private volatile SimpleCompletionHandler relocateCompletionHandler = null;
+     * preparing this session to relocate to a new node. */
+    private volatile SimpleCompletionHandler
+	relocatePrepareCompletionHandler = null;
+
+    /**
+     * If non-null, contains the completion handler for relocating this
+     * session to a new node. */
+    private volatile RelocateCompletionHandler
+	relocateCompletionHandler = null;
     
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
@@ -318,7 +322,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * node.
      */
     boolean isRelocating() {
-	return relocateCompletionHandler != null;
+	return relocatePrepareCompletionHandler != null;
     }
 
     /**
@@ -327,7 +331,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      */    
     void relocatePreparationComplete() {
 	if (isRelocating()) {
-	    relocateCompletionHandler.completed();
+	    relocatePrepareCompletionHandler.completed();
 	}
     }
 
@@ -356,7 +360,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    "session is not logged in",
 		    RequestFailureException.FailureReason.LOGIN_PENDING));
 	    return false;
-	} else if (isRelocating()) {
+	} else if (relocateCompletionHandler != null &&
+		   relocateCompletionHandler.isCompleted()) {
 	    logger.log(
 		Level.FINE,
 		"request received while session is relocating:{0}", this);
@@ -385,7 +390,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * @return	a protocol
      */
     SessionProtocol getSessionProtocol() {
-	return protocol;
+	return isRelocating() ? null : protocol;
     }
  
     /**
@@ -1043,140 +1048,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
     }
 
-    /**
-     * This future is an abstract implementation for the futures
-     * passed to the {@code RequestCompletionHandler} used by the
-     * {@code ProtocolListener} and {@code SessionProtocolHandler}
-     * APIs.
-     */
-    private abstract static class AbstractCompletionFuture<T>
-            implements Future<T>
-    {
-	/** The completion handler for the associated request. */
-	private final RequestCompletionHandler<T>
-	    completionHandler;
-
-	/**
-	 * Indicates whether the operation associated with this future
-	 * is complete.
-	 */
-	private boolean done = false;
-
-	/** Lock for accessing the {@code done} field. */
-	private Object lock = new Object();
-	
-	/** An exception cause, or {@code null}. */
-	private volatile Throwable exceptionCause = null;
-
-	/** Constructs an instance. */
-	protected AbstractCompletionFuture(
-	    RequestCompletionHandler<T> completionHandler)
-	{
-	    checkNull("completionHandler", completionHandler);
-	    this.completionHandler = completionHandler;
-	}
-
-	/**
-	 * Returns the value associated with this future.
-	 *
-	 * @return	the value for this future
-	 */
-	protected abstract T getValue();
-	    
-	/**
-	 * Returns the value associated with this future, or throws
-	 * {@code ExecutionException} if there is a problem
-	 * processing the operation associated with this future.
-	 *
-	 * @return	the value for this future
-	 * @throws	ExecutionException if there is a problem processing
-	 *		the operation associated with this future
-	 */
-	private T getValueInternal() throws ExecutionException {
-	    if (exceptionCause != null) {
-		throw new ExecutionException(exceptionCause);
-	    } else {
-		return getValue();
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public boolean cancel(boolean mayInterruptIfRunning) {
-	    return false;
-	}
-
-	/** {@inheritDoc} */
-	public T get() throws InterruptedException, ExecutionException {
-	    synchronized (lock) {
-		while (!done) {
-		    lock.wait();
-		}
-	    }
-	    return getValueInternal();
-	}
-
-	/** {@inheritDoc} */
-	public T get(long timeout, TimeUnit unit)
-	    throws InterruptedException, ExecutionException, TimeoutException
-	{
-	    synchronized (lock) {
-		if (!done) {
-		    unit.timedWait(lock, timeout);
-		}
-		if (!done) {
-		    throw new TimeoutException();
-		}
-		return getValueInternal();
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public boolean isCancelled() {
-	    return false;
-	}
-
-	/**
-	 * Sets the exception cause for this future to the specified
-	 * {@code throwable}.  The given exception will be used as
-	 * the cause of the {@code ExecutionException} thrown by
-	 * this future's {@code get} methods.
-	 *
-	 * @param	throwable an exception cause
-	 */
-	void setException(Throwable throwable) {
-	    checkNull("throwable", throwable);
-	    exceptionCause = throwable;
-	    done();
-	}
-
-	/** {@inheritDoc} */
-	public boolean isDone() {
-	    synchronized (lock) {
-		return done;
-	    }
-	}
-
-	/**
-	 * Indicates that the operation associated with this future is
-	 * complete and notifies the associated completion
-	 * handler. Subsequent invocations to {@link #isDone isDone}
-	 * will return {@code true}.
-	 */
-	void done() {
-	    synchronized (lock) {
-		done = true;
-		lock.notifyAll();
-	    }	
-	    completionHandler.completed(this);
-	}
-    }
 
     /**
      * This future is constructed with the {@code RequestCompletionHandler}
      * passed to one of the {@link SessionProtocolHandler} methods.
      */
     private static class RequestCompletionFuture
-            extends AbstractCompletionFuture<Void>
+	extends AbstractCompletionFuture<Void>
     {
 	/**
 	 * Constructs an instance with the specified {@code completionHandler}.
@@ -1192,6 +1070,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	/** {@inheritDoc} */
 	protected Void getValue() {
 	    return null;
+	}
+
+	/** {@inheritDoc} */
+	public void setException(Throwable throwable) {
+ 	    super.setException(throwable);
+	}
+
+	public void done() {
+	    super.done();
 	}
     }
 
@@ -1224,6 +1111,16 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	/** {@inheritDoc} */
 	protected SessionProtocolHandler getValue() {
 	    return protocolHandler;
+	}
+
+	/** {@inheritDoc} */
+	public void setException(Throwable throwable) {
+	    super.setException(throwable);
+	}
+
+	/** {@inheritDoc} */
+	public void done() {
+	    super.done();
 	}
     }
 
@@ -1368,7 +1265,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * Notify client to relocate its session to the new node
 		 * specifying the relocation key.
 		 */
-		relocateCompletionHandler = this;
+		relocatePrepareCompletionHandler = this;
 
 		sessionService.notifyPrepareToRelocate(
 		    sessionRefId, newNode.getId());
@@ -1403,8 +1300,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		synchronized (this) {
 		    relocationKey = this.relocationKey;
 		}
+
+		relocateCompletionHandler = new RelocateCompletionHandler();
 		protocol.relocate(
-			newNode, descriptors, ByteBuffer.wrap(relocationKey));
+		    newNode, descriptors, ByteBuffer.wrap(relocationKey),
+		    relocateCompletionHandler);
 
 		/*
 		 * Schedule a task to close the client session if it is not
@@ -1413,6 +1313,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 *
 		 * TBD: is this taken care of by the protocol layer
 		 * already because it monitors disconnecting clients?
+		 *
+		 * TBD: should this be done when the completion handler is
+		 * notified?
 		 */
 		sessionService.getTaskScheduler().scheduleTask(
 		    new AbstractKernelRunnable("CloseMovedClientSession") {
@@ -1420,7 +1323,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 			    handleDisconnect(false, true);
 			} },
 		    identity,
-		    System.currentTimeMillis() + 1000L);
+		    System.currentTimeMillis() + 5000L);
 		
 	    } catch (IOException e) {
 		// If there is a problem contacting the client,
@@ -1431,10 +1334,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 			"relocating client session:{0} throws", this);
 		}
 		handleDisconnect(false, true);
-	    } catch (RelocatingSessionException e) {
+	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.WARNING, e,
+ 			Level.WARNING, e,
 			"relocating client session:{0} throws", this);
 		}
 	    }
@@ -1452,4 +1355,19 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
     }
 
+    private class RelocateCompletionHandler
+	implements RequestCompletionHandler<Void>
+    {
+	private boolean isCompleted = false;
+
+	public synchronized void completed(Future<Void> result) {
+	    // TBD: need to check result for Exception and disconnect if an
+	    // exception is thrown.
+	    isCompleted = true;
+	}
+
+	synchronized boolean isCompleted() {
+	    return isCompleted;
+	}
+    }
 }

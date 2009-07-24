@@ -264,7 +264,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-
+    /*
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -1279,6 +1279,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.checkDisconnectedCallback(true);
     }
 
+    */
     public void testClientSessionReceiveRelocateNotification() throws Exception {
 	DummyClient client = createClientToRelocate("newNode");
 	client.disconnect();

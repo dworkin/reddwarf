@@ -103,14 +103,15 @@ public interface SessionProtocol extends Channel {
      * 
      * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
-     * @throws	RelocatingSessionException if the associated session is
-     *		relocating to another node
      */
     void sessionMessage(ByteBuffer message, Delivery delivery)
-	throws IOException, RelocatingSessionException;
+	throws IOException;
     
     /**
      * Notifies the associated client that it is joined to the channel
@@ -121,14 +122,15 @@ public interface SessionProtocol extends Channel {
      * @param	channelId the channel's ID
      * @param	delivery the channel's delivery guarantee
      *
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
-     * @throws	RelocatingSessionException if the associated session is
-     *		relocating to another node
      */
     void channelJoin(String name, BigInteger channelId, Delivery delivery)
-	throws IOException, RelocatingSessionException;
+	throws IOException;
 
     /**
      * Notifies the associated client that it is no longer a member of
@@ -137,12 +139,13 @@ public interface SessionProtocol extends Channel {
      *
      * @param	channelId a channel ID
      * 
-     * @throws IOException if an I/O error occurs
-     * @throws	RelocatingSessionException if the associated session is
-     *		relocating to another node
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
+     * @throws	IOException if an I/O error occurs
      */
     void channelLeave(BigInteger channelId)
-	throws IOException, RelocatingSessionException;
+	throws IOException;
 
     /**
      * Sends the associated client the specified channel {@code message}
@@ -167,23 +170,41 @@ public interface SessionProtocol extends Channel {
      * @param	message a channel message
      * @param	delivery the channel's delivery guarantee
      *
-     * @throws	DeliveryNotSupportedException if the specified {@code
-     *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
+     * @throws	DeliveryNotSupportedException if the specified {@code
+     *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
-     * @throws	RelocatingSessionException if the associated session is
-     *		relocating to another node
      */
     void channelMessage(
 	BigInteger channelId, ByteBuffer message, Delivery delivery)
-        throws IOException, RelocatingSessionException;
+        throws IOException;
 
     /**
-     * Notifies the associated client to relocate its session to the
-     * specified node using the given relocation key.  The session can be
-     * reestablished on the new node by notifying the {@link
-     * ProtocolListener} of this protocol's corresponding {@link
+     * Notifies the associated client to first suspend sending messages to
+     * the server and wait for interim messages to be processed, notify the
+     * {@code completionHandler} that messages have been suspended, and
+     * <i>then</i> relocate its session to the node specified by the {@code
+     * descriptors} using the given relocation key.  Messages received by
+     * the {@link SessionProtocolHandler} will be received and processed
+     * until the {@code completionHandler}'s {@link
+     * RequestCompletionHandler#completed completed} method is invoked.<p>
+     *
+     * Note: If the session is relocated to the new node before the client
+     * has stopped sending messages and notified the {@code
+     * completionHandler}, messages sent to the server may either get
+     * dropped if the node fails, or messages may be processed out of order
+     * on the old and new nodes. <p>
+     *
+     * Only session messages that have their completion handlers notified
+     * before the specified {@code completionHandler} is notified are
+     * guaranteed to be processed by the server. <p>
+     *
+     * The session can be reestablished on the new node by notifying the
+     * {@link ProtocolListener} of this protocol's corresponding {@link
      * ProtocolAcceptor} on the new node.  The {@link
      * ProtocolListener#relocatedSession ProtocolListener.relocatedSession}
      * method can be invoked on the new node with the given relocation key
@@ -197,14 +218,17 @@ public interface SessionProtocol extends Channel {
      * @param	newNode the new node to establish a connection with
      * @param	descriptors protocol descriptors for {@code newNode}
      * @param	relocationKey the key to be supplied to the new node
+     * @param	completionHandler a completion handler
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
      * @throws	IOException if an I/O error occurs
-     * @throws	RelocatingSessionException if the associated session is
-     *		relocating to another node
      */
     void relocate(Node newNode,
 		  Set<ProtocolDescriptor> descriptors,
-		  ByteBuffer relocationKey)
-	throws IOException, RelocatingSessionException;
+		  ByteBuffer relocationKey,
+		  RequestCompletionHandler<Void> completionHandler)
+	throws IOException;
 
     /**
      * Disconnects the associated session for the specified {@code reason}.
@@ -218,9 +242,7 @@ public interface SessionProtocol extends Channel {
      * @param	reason	the reason for disconnection
      * 
      * @throws	IOException if an I/O error occurs
-     * @throws	RelocatingSessionException if the associated session is
-     *		relocating to another node
      */
     void disconnect(DisconnectReason reason)
-	throws IOException, RelocatingSessionException;
+	throws IOException;
 }

@@ -43,7 +43,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -564,7 +563,7 @@ public final class ChannelServiceImpl
                             } catch (IOException e) {
                                 logger.logThrow(Level.WARNING, e,
                                                 "channelJoin throws");
-                            } catch (RelocatingSessionException e) {
+                            } catch (RuntimeException e) {
 				// TBD
                                 logger.logThrow(Level.WARNING, e,
                                                 "channelJoin throws");
@@ -583,7 +582,7 @@ public final class ChannelServiceImpl
                             } catch (IOException e) {
                                 logger.logThrow(Level.WARNING, e,
                                                 "channelLeave throws");
-                            } catch (RelocatingSessionException e) {
+                            } catch (RuntimeException e) {
 				// TBD
                                 logger.logThrow(Level.WARNING, e,
                                                 "channelLeave throws");
@@ -703,7 +702,7 @@ public final class ChannelServiceImpl
 			joinTask.run();
 			return true;
 			
-		    } catch (RelocatingSessionException e) {
+		    } catch (RuntimeException e) {
 			// Session is relocating to another node, but its
 			// destination unknown.
 			return false;
@@ -756,7 +755,7 @@ public final class ChannelServiceImpl
                     } catch (IOException e) {
                         logger.logThrow(Level.WARNING, e,
                                         "channelLeave throws");
-                    } catch (RelocatingSessionException e) {
+                    } catch (RuntimeException e) {
 			// TBD
                         logger.logThrow(Level.WARNING, e,
                                         "channelLeave throws");
@@ -794,7 +793,7 @@ public final class ChannelServiceImpl
                             } catch (IOException e) {
                                 logger.logThrow(Level.WARNING, e,
                                                 "channelLeave throws");
-                            } catch (RelocatingSessionException e) {
+                            } catch (RuntimeException e) {
 				// TBD
                                 logger.logThrow(Level.WARNING, e,
                                                 "channelLeave throws");
@@ -856,7 +855,7 @@ public final class ChannelServiceImpl
                         } catch (IOException e) {
                             logger.logThrow(Level.WARNING, e,
                                             "channelMessage throws");
-                        } catch (RelocatingSessionException e) {
+                        } catch (RuntimeException e) {
 			    // TBD
                             logger.logThrow(Level.WARNING, e,
                                             "channelMessage throws");
@@ -1824,7 +1823,7 @@ public final class ChannelServiceImpl
 	    this.delivery = delivery;
 	}
 
-	public void run() throws RelocatingSessionException {
+	public void run() {
 	    // Update local channel membership cache.
 	    addLocalChannelMember(channelRefId, sessionRefId);
 

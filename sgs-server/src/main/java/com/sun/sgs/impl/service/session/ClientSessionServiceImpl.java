@@ -50,7 +50,6 @@ import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.RelocateFailureException;
-import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -1066,7 +1065,8 @@ public final class ClientSessionServiceImpl
 				HexDumper.toHexString(message));
 					    
 			}
-		    } catch (RelocatingSessionException e) {
+		    } catch (RuntimeException e) {
+			// i.e., IllegalStateException
 			// This shouldn't happen because client session
 			// events are not processed while a session is
 			// relocating.
@@ -1680,6 +1680,12 @@ public final class ClientSessionServiceImpl
 	    this.sessionRefId = sessionRefId;
 	    this.newNodeId = newNodeId;
 	    nmsCompletionHandlers.add(handler);
+	    for (ClientSessionStatusListener listener :
+		     sessionStatusListeners)
+	    {
+		preparers.add(new PrepareCompletionHandler(listener));
+	    }
+	    
 	}
 
 	/**
@@ -1689,25 +1695,19 @@ public final class ClientSessionServiceImpl
 	synchronized void prepareToRelocate() {
 	    // TBD: check if already preparing?  Is this necessary?
 	
-	    for (ClientSessionStatusListener listener :
-		     sessionStatusListeners)
-	    {
-		final ClientSessionStatusListener statusListener = listener;
-		final PrepareCompletionHandler handler =
-		    new PrepareCompletionHandler();
-		preparers.add(handler);
+	    for (final PrepareCompletionHandler handler : preparers) {
 		taskScheduler.scheduleTask(
 		  new AbstractKernelRunnable("PrepareToRelocateSession") {
 		    public void run() {
 			try {
-			    statusListener.prepareToRelocate(
+			    handler.listener.prepareToRelocate(
 				sessionRefId, newNodeId, handler);
 			} catch (Exception e) {
 			    logger.logThrow(
 			        Level.WARNING, e,
 				"Notifying listener:{0} to prepare " +
 				"session:{1} to relocate to node:{2} throws",
-				statusListener, sessionRefId, newNodeId);
+				handler.listener, sessionRefId, newNodeId);
 			}
 		    }
 		  }, taskOwner);
@@ -1764,6 +1764,13 @@ public final class ClientSessionServiceImpl
 		    for (SimpleCompletionHandler nmsCompletionHandler :
 			     nmsCompletionHandlers)
 		    {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(
+				Level.FINEST,
+				"Notifying NMS relocate preparation complete, " +
+				"session:{0} localNode:{1} newNode{2}",
+				sessionRefId, getLocalNodeId(), newNodeId);
+			}
 			nmsCompletionHandler.completed();
 		    }
 		}
@@ -1779,11 +1786,14 @@ public final class ClientSessionServiceImpl
 	private final class PrepareCompletionHandler
 	    implements SimpleCompletionHandler
 	{
+	    private final ClientSessionStatusListener listener;
 	    /** Indicates whether preparation is completed. */
 	    private boolean completed = false;
 
 	    /** Constructs an instance. */
-	    PrepareCompletionHandler() { }
+	    PrepareCompletionHandler(ClientSessionStatusListener listener) {
+		this.listener = listener;
+	    }
 
 	    /** {@inheritDoc} */
 	    public void completed() {

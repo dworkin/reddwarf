@@ -54,6 +54,7 @@ public abstract class AbstractDummyClient extends Assert {
     private Connection connection;
     private volatile int connectPort = 0;
     private boolean connected = false;
+    private boolean suspendMessages = false;
 
     /* -- login/logout state -- */
     private boolean loginAck = false;
@@ -321,6 +322,7 @@ public abstract class AbstractDummyClient extends Assert {
 	disconnect();
 	relocateAck = false;
 	relocateSuccess = false;
+	suspendMessages = false;
 	connect(relocatePort);
 	byte[] key = useValidKey ? relocateKey : new byte[0];
 	ByteBuffer buf = ByteBuffer.allocate(2 + key.length);
@@ -371,12 +373,17 @@ public abstract class AbstractDummyClient extends Assert {
      * connection.
      */
     protected void sendRaw(byte[] bytes) {
-	try {
-	    connection.sendBytes(bytes);
-	} catch (IOException e) {
-	    throw new RuntimeException(e);
+	synchronized (lock) {
+	    if (suspendMessages) {
+		throw new IllegalStateException("messages suspended");
+	    }
+				  
+	    try {
+		connection.sendBytes(bytes);
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
 	}
-	
     }
 
     /**
@@ -479,7 +486,12 @@ public abstract class AbstractDummyClient extends Assert {
      * logout but does not handle session or channel messages.
      */
     protected void handleOpCode(byte opcode, MessageBuffer buf) {
-	
+
+	System.err.println(
+ 	    AbstractDummyClient.this.toString() +
+	    "handleOpCode: " + String.format("%02x", opcode) +
+	    ", buf: " + HexDumper.toHexString(buf.getBuffer()));
+
 	switch (opcode) {
 	    case SimpleSgsProtocol.LOGIN_SUCCESS:
 		reconnectKey = buf.getBytes(buf.limit() - buf.position());
@@ -516,8 +528,29 @@ public abstract class AbstractDummyClient extends Assert {
 		    lock.notifyAll();
 		}
 		break;
+
+	    case SimpleSgsProtocol.SUSPEND_MESSAGES:
+		System.err.println(
+		    AbstractDummyClient.this.toString() +
+		    "Processing SUSPEND_MESSAGES");
+		synchronized (lock) {
+		    if (suspendMessages) {
+			break;
+		    }
+		    ByteBuffer msg = ByteBuffer.allocate(1);
+		    msg.put(SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE).
+			flip();
+		    sendRaw(msg.array());
+		    suspendMessages = true;
+		}
+		break;
+		
 		    
 	    case SimpleSgsProtocol.RELOCATE_NOTIFICATION:
+		System.err.println(
+		    AbstractDummyClient.this.toString() +
+		    "Processing RELOCATE_NOTIFICATION: " +
+		    HexDumper.toHexString(buf.getBuffer()));
 		relocateHost = buf.getString();
 		relocatePort = buf.getInt();
 		relocateKey = buf.getBytes(buf.limit() - buf.position());
@@ -529,7 +562,8 @@ public abstract class AbstractDummyClient extends Assert {
 			", port:" + relocatePort +
 			", key:" + HexDumper.toHexString(relocateKey));
 		    lock.notifyAll();
-		} break;
+		}
+		break;
 
 	    case SimpleSgsProtocol.RELOCATE_SUCCESS:
 		reconnectKey = buf.getBytes(buf.limit() - buf.position());
@@ -563,7 +597,9 @@ public abstract class AbstractDummyClient extends Assert {
 		break;
 
 	    default:
-		handleOpCode(opcode, buf);
+		System.err.println(
+		    "WARNING: [" + name + "] dropping unknown op code: " +
+		    String.format("%02x", opcode));
 		break;
 	}
     }

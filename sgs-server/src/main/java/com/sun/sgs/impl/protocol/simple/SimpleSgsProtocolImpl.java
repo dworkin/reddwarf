@@ -24,6 +24,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.util.AbstractCompletionFuture;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
@@ -35,7 +36,6 @@ import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.RelocateFailureException;
-import com.sun.sgs.protocol.RelocatingSessionException;
 import com.sun.sgs.protocol.RequestFailureException;
 import com.sun.sgs.protocol.RequestFailureException.FailureReason;
 import com.sun.sgs.protocol.RequestCompletionHandler;
@@ -119,7 +119,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
     /** A lock for {@code loginHandled}, {@code messageQueue}, and
-     * {@code relocating}  fields. */
+     * {@code relocationInfo}  fields. */
     private Object lock = new Object();
 
     /** Indicates whether the client's login ack has been sent. */
@@ -131,10 +131,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The set of supported delivery requirements. */
     protected final Set<Delivery> deliverySet = new HashSet<Delivery>();
 
-    /** Flag to indicate whether the associated client session is relocating to
+    /** The session's relocation information, if this session is relocating to
      * another node. */
-    private boolean relocating = false;
-
+    private RelocationInfo relocationInfo = null;
 
     /**
      * Creates a new instance of this class.
@@ -204,9 +203,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
     
     /** {@inheritDoc} */
-    public void sessionMessage(ByteBuffer message, Delivery delivery)
-	throws RelocatingSessionException
-    {
+    public void sessionMessage(ByteBuffer message, Delivery delivery) {
 	checkRelocating();
 	int messageLength = 1 + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
@@ -219,9 +216,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     
     /** {@inheritDoc} */
     public void channelJoin(
-	String name, BigInteger channelId, Delivery delivery)
-	throws RelocatingSessionException
-    {
+	String name, BigInteger channelId, Delivery delivery) {
 	checkRelocating();
 	byte[] channelIdBytes = channelId.toByteArray();
 	MessageBuffer buf =
@@ -234,9 +229,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void channelLeave(BigInteger channelId)
-	throws RelocatingSessionException
-    {
+    public void channelLeave(BigInteger channelId) {
 	checkRelocating();
 	byte[] channelIdBytes = channelId.toByteArray();
 	ByteBuffer buf =
@@ -260,7 +253,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     public void channelMessage(BigInteger channelId,
                                ByteBuffer message,
                                Delivery delivery)
-	throws RelocatingSessionException
     {
 	checkRelocating();
 	byte[] channelIdBytes = channelId.toByteArray();
@@ -297,34 +289,26 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** {@inheritDoc} */
     public void relocate(Node newNode,
 			 Set<ProtocolDescriptor> descriptors,
-			 ByteBuffer relocationKey)
-	throws RelocatingSessionException
+			 ByteBuffer relocationKey,
+			 RequestCompletionHandler<Void> completionHandler)
     {
 	synchronized (lock) {
-	    if (relocating) {
-		throw new RelocatingSessionException("session already relocating");
+	    if (relocationInfo != null) {
+		throw new IllegalStateException(
+		    "session already relocating");
 	    } else {
-		relocating = true;
+		relocationInfo =
+		    new RelocationInfo(descriptors, relocationKey,
+				       completionHandler);
 	    }
 	}
-        for (ProtocolDescriptor descriptor : descriptors) {
-            if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
-		byte[] redirectionData =
-		    ((SimpleSgsProtocolDescriptor) descriptor).
-		        getConnectionData();
-		ByteBuffer buf =
-		    ByteBuffer.allocate(1 + redirectionData.length +
-					relocationKey.remaining());
-		buf.put(SimpleSgsProtocol.RELOCATE_NOTIFICATION).
-		    put(redirectionData).
-		    put(relocationKey).
-		    flip();
-		writeToWriteHandler(buf);
-		flushMessageQueue();
-		acceptor.monitorDisconnection(this);
-                return;
-            }
-        }
+
+	ByteBuffer buf = ByteBuffer.allocate(1);
+	buf.put(SimpleSgsProtocol.SUSPEND_MESSAGES).
+	    flip();
+	writeToWriteHandler(buf);
+	flushMessageQueue();
+	
     }
     
     /** {@inheritDoc} */
@@ -553,15 +537,15 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Throws {@link RelocatingSessionException} if the client session is
+     * Throws {@link IllegalStateException} if the client session is
      * relocating.
      *
-     * @throws	RelocatingSessionException if the client session is relocating
+     * @throws	IllegalStateException if the client session is relocating
      */
-    private void checkRelocating() throws RelocatingSessionException {
+    private void checkRelocating() {
 	synchronized (lock) {
-	    if (relocating) {
-		throw new RelocatingSessionException("session relocating");
+	    if (relocationInfo != null) {
+		throw new IllegalStateException("session relocating");
 	    }
 	}
     }
@@ -918,6 +902,22 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    channelRefId, channelMessage, new RequestHandler());
 		break;
 
+	    case SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE:
+		System.err.println(
+ 		    "SimpleSgsProtocol: Processing SUSPEND_MESSAGES_COMPLETE");
+		RelocationInfo info = null;
+		synchronized (lock) {
+		    if (relocationInfo == null) {
+			// Right now, we only suspend messages if we're
+			// relocating.
+			return;
+		    }
+		    info = relocationInfo;
+		    relocationInfo = null;
+		}
+		info.completed();
+		break;
+		
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		if (protocolHandler == null) {
@@ -1117,6 +1117,68 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		}
 	    }
 	    logoutSuccess();
+	}
+    }
+    
+    /**
+     * Relocation information.
+     */
+    private class RelocationInfo {
+
+	private final Set<ProtocolDescriptor> descriptors;
+	private final ByteBuffer relocationKey;
+	private final SuspendMessagesCompletionFuture completionFuture;
+
+	RelocationInfo(Set<ProtocolDescriptor> descriptors,
+		       ByteBuffer relocationKey,
+		       RequestCompletionHandler<Void> completionHandler)
+	{
+	    this.descriptors = descriptors;
+	    this.relocationKey = relocationKey;
+	    this.completionFuture =
+		new SuspendMessagesCompletionFuture(completionHandler);
+	}
+
+	void completed() {
+	    completionFuture.done();
+	    for (ProtocolDescriptor descriptor : descriptors) {
+		if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
+		    byte[] redirectionData =
+			((SimpleSgsProtocolDescriptor) descriptor).
+			getConnectionData();
+		    ByteBuffer buf =
+			ByteBuffer.allocate(1 + redirectionData.length +
+					    relocationKey.remaining());
+		    buf.put(SimpleSgsProtocol.RELOCATE_NOTIFICATION).
+			put(redirectionData).
+			put(relocationKey).
+			flip();
+		    System.err.println(
+			"SimpleSgsProtocol: Sending RELOCATE_NOTIFICATION");
+		    writeToWriteHandler(buf);
+		    flushMessageQueue();
+		    acceptor.monitorDisconnection(SimpleSgsProtocolImpl.this);
+		    return;
+		}
+	    }
+	}
+    }
+
+    private static class SuspendMessagesCompletionFuture
+	extends AbstractCompletionFuture<Void>
+    {
+	SuspendMessagesCompletionFuture(RequestCompletionHandler<Void>
+					completionFuture)
+	{
+	    super(completionFuture);
+	}
+
+	/** {@inheritDoc} */
+	protected Void getValue() { return null; }
+	
+	/** {@inheritDoc} */
+	public void done() {
+	    super.done();
 	}
     }
 }
