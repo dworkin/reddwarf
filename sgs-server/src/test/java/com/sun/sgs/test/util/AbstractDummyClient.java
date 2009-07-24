@@ -487,11 +487,6 @@ public abstract class AbstractDummyClient extends Assert {
      */
     protected void handleOpCode(byte opcode, MessageBuffer buf) {
 
-	System.err.println(
- 	    AbstractDummyClient.this.toString() +
-	    "handleOpCode: " + String.format("%02x", opcode) +
-	    ", buf: " + HexDumper.toHexString(buf.getBuffer()));
-
 	switch (opcode) {
 	    case SimpleSgsProtocol.LOGIN_SUCCESS:
 		reconnectKey = buf.getBytes(buf.limit() - buf.position());
@@ -530,9 +525,6 @@ public abstract class AbstractDummyClient extends Assert {
 		break;
 
 	    case SimpleSgsProtocol.SUSPEND_MESSAGES:
-		System.err.println(
-		    AbstractDummyClient.this.toString() +
-		    "Processing SUSPEND_MESSAGES");
 		synchronized (lock) {
 		    if (suspendMessages) {
 			break;
@@ -547,10 +539,6 @@ public abstract class AbstractDummyClient extends Assert {
 		
 		    
 	    case SimpleSgsProtocol.RELOCATE_NOTIFICATION:
-		System.err.println(
-		    AbstractDummyClient.this.toString() +
-		    "Processing RELOCATE_NOTIFICATION: " +
-		    HexDumper.toHexString(buf.getBuffer()));
 		relocateHost = buf.getString();
 		relocatePort = buf.getInt();
 		relocateKey = buf.getBytes(buf.limit() - buf.position());

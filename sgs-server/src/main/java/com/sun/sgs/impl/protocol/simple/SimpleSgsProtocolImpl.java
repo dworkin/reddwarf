@@ -903,8 +903,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		break;
 
 	    case SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE:
-		System.err.println(
- 		    "SimpleSgsProtocol: Processing SUSPEND_MESSAGES_COMPLETE");
 		RelocationInfo info = null;
 		synchronized (lock) {
 		    if (relocationInfo == null) {
@@ -1153,8 +1151,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 			put(redirectionData).
 			put(relocationKey).
 			flip();
-		    System.err.println(
-			"SimpleSgsProtocol: Sending RELOCATE_NOTIFICATION");
 		    writeToWriteHandler(buf);
 		    flushMessageQueue();
 		    acceptor.monitorDisconnection(SimpleSgsProtocolImpl.this);
