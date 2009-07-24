@@ -30,6 +30,7 @@ import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
@@ -119,7 +120,7 @@ public class TestTransactionCoordinatorImpl {
     /** Prints the test case, sets handle and txn */
     @Before
     public void setUp() {
-	handle = coordinator.createTransaction(false);
+	handle = coordinator.createTransaction(coordinator.getDefaultTimeout());
 	txn = handle.getTransaction();
     }
 
@@ -786,7 +787,8 @@ public class TestTransactionCoordinatorImpl {
     @Test
     public void testGetId() {
 	txn.abort(abortXcp);
-	Transaction txn2 = coordinator.createTransaction(false).
+	Transaction txn2 = coordinator.createTransaction(
+                coordinator.getDefaultTimeout()).
 	    getTransaction();
 	assertNotNull(txn.getId());
 	assertNotNull(txn2.getId());
@@ -824,10 +826,12 @@ public class TestTransactionCoordinatorImpl {
     public void testGetCreationTime() throws Exception {
 	long now = System.currentTimeMillis();
 	Thread.sleep(50);
-	Transaction txn1 = coordinator.createTransaction(false).
+	Transaction txn1 = coordinator.createTransaction(
+                coordinator.getDefaultTimeout()).
 	    getTransaction();
 	Thread.sleep(50);
-	Transaction txn2 = coordinator.createTransaction(false).
+	Transaction txn2 = coordinator.createTransaction(
+                coordinator.getDefaultTimeout()).
 	    getTransaction();
 	assertTrue("Transaction creation time is too early: " +
             txn1.getCreationTime(),
@@ -871,12 +875,13 @@ public class TestTransactionCoordinatorImpl {
 		      "100000");
 	TransactionCoordinator coordinator =
 	    new TransactionCoordinatorImpl(p, collectorHandle);
-	Transaction txn = coordinator.createTransaction(false).
-	    getTransaction();
+	Transaction txn = coordinator.createTransaction(
+                coordinator.getDefaultTimeout()).getTransaction();
 	assertTrue("Incorrect bounded Transaction timeout: " +
 		   txn.getTimeout(),
 		   txn.getTimeout() == 5000);
-	txn = coordinator.createTransaction(true).getTransaction();
+	txn = coordinator.createTransaction(
+                ScheduledTask.UNBOUNDED).getTransaction();
 	assertTrue("Incorrect unbounded Transaction timeout: " +
 		   txn.getTimeout(),
 		   txn.getTimeout() == 100000);
@@ -1677,7 +1682,7 @@ public class TestTransactionCoordinatorImpl {
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
-	handle = coordinator.createTransaction(false);
+	handle = coordinator.createTransaction(coordinator.getDefaultTimeout());
 	txn = handle.getTransaction();
 	Thread.sleep(TIMED_OUT);
 	txn.abort(abortXcp);
@@ -1837,7 +1842,7 @@ public class TestTransactionCoordinatorImpl {
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
-	handle = coordinator.createTransaction(false);
+	handle = coordinator.createTransaction(coordinator.getDefaultTimeout());
 	txn = handle.getTransaction();
 	Thread.sleep(TIMED_OUT);
 	handle.commit();
@@ -2209,8 +2214,8 @@ public class TestTransactionCoordinatorImpl {
 
     @Test
     public void testEquals() throws Exception {
-	Transaction txn2 = coordinator.createTransaction(false).
-	    getTransaction();
+	Transaction txn2 = coordinator.createTransaction(
+                coordinator.getDefaultTimeout()).getTransaction();
 	assertFalse(txn.equals(null));
 	assertTrue(txn.equals(txn));
 	assertFalse(txn.equals(txn2));
