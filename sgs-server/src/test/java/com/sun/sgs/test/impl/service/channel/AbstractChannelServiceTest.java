@@ -585,7 +585,7 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 
 	/** {@inheritDoc} */
 	@Override
-	public void sendMessage(byte[] message) {
+	public void sendMessage(byte[] message, boolean checkSuspend) {
 	    checkLoggedIn();
 
 	    // A zero-length message is sent when the superclass processes
@@ -598,7 +598,7 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		new MessageBuffer(1 + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 		putBytes(message);
-	    sendRaw(buf.getBuffer());
+	    sendRaw(buf.getBuffer(), checkSuspend);
 	}
 
 	// Sends a CHANNEL_MESSAGE.
@@ -615,7 +615,7 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		putShort(channelId.length).
 		putBytes(channelId).
 		putInt(seq);
-	    sendRaw(buf.getBuffer());
+	    sendRaw(buf.getBuffer(), true);
 	}
 	
 	MessageInfo nextChannelMessage() {
@@ -639,7 +639,7 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		new MessageBuffer(MessageBuffer.getSize(action) +
 				  MessageBuffer.getSize(channelToJoin));
 	    buf.putString(action).putString(channelToJoin);
-	    sendMessage(buf.getBuffer());
+	    sendMessage(buf.getBuffer(), true);
 	    joinAck = false;
 	    waitForJoin(channelToJoin);
 	}
@@ -673,7 +673,7 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		new MessageBuffer(MessageBuffer.getSize(action) +
 				  MessageBuffer.getSize(channelToLeave));
 	    buf.putString(action).putString(channelToLeave);
-	    sendMessage(buf.getBuffer());
+	    sendMessage(buf.getBuffer(), true);
 	    leaveAck = false;
 	    synchronized (lock) {
 		try {

@@ -264,7 +264,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-    /*
+
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -541,7 +541,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(false);
-	    client.sendMessagesInSequence(1, 0);
+	    client.sendMessagesFromClientInSequence(1, 0);
 	} finally {
             client.disconnect();
 	}
@@ -552,7 +552,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(true);
-	    client.sendMessagesInSequence(1, 1);
+	    client.sendMessagesFromClientInSequence(1, 1);
 	} finally {
             client.disconnect();
 	}
@@ -957,40 +957,47 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
     public void testClientSessionSendUnreliableMessages() throws Exception {
 	DummyClient client = new DummyClient("dummy");
-	int iterations = 3;
-	int numAdditionalNodes = 2;
-	Queue<byte[]> messages =
+	try {
+	    int iterations = 3;
+	    int numAdditionalNodes = 2;
 	    sendMessagesFromNodesToClient(
- 		client, numAdditionalNodes, iterations, Delivery.UNRELIABLE,
+		client, numAdditionalNodes, iterations, Delivery.UNRELIABLE,
 		false);
-	int expectedMessages = (1 + numAdditionalNodes) * iterations;
-	assertEquals(expectedMessages, messages.size());
+	} finally {
+	    client.disconnect();
+	}
     }
 
     public void testClientSessionSendUnreliableMessagesWithFailure()
 	throws Exception
     {
 	DummyClient client = new DummyClient("dummy");
-	int iterations = 3;
-	int numAdditionalNodes = 2;
-	Queue<byte[]> messages =
+	try {
+	    int iterations = 3;
+	    int numAdditionalNodes = 2;
 	    sendMessagesFromNodesToClient(
 		client, numAdditionalNodes, iterations, Delivery.UNRELIABLE,
 		true);
-	int expectedMessages = iterations;
-	assertEquals(expectedMessages, messages.size());
+	} finally {
+	    client.disconnect();
+	}
+	
     }
     
     public void testClientSessionSendSequence() throws Exception {
 	DummyClient client = new DummyClient("dummy");
-	int iterations = 3;
-	int numAdditionalNodes = 2;
-	Queue<byte[]> messages =
+	try {
+	    int iterations = 3;
+	    int numAdditionalNodes = 2;
 	    sendMessagesFromNodesToClient(
 		client, numAdditionalNodes, iterations, Delivery.RELIABLE,
 		false);
-	int expectedMessages = (1 + numAdditionalNodes) * iterations;
-	client.validateMessageSequence(messages, expectedMessages);
+	    int numExpectedMessages = (1 + numAdditionalNodes) * iterations;
+	    client.validateMessageSequence(
+		client.clientReceivedMessages, numExpectedMessages);
+	} finally {
+	    client.disconnect();
+	}
     }
     
     private Queue<byte[]> sendMessagesFromNodesToClient(
@@ -998,7 +1005,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    final Delivery delivery, final boolean oneUnreliableServer)
 	throws Exception
     {
-	try {
 	    final String counterName = "counter";
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
@@ -1009,7 +1015,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    final List<SgsTestNode> nodes = new ArrayList<SgsTestNode>();
 	    nodes.add(serverNode);
 	    nodes.addAll(additionalNodes.values());
-	    int expectedMessages = 
+	    int numExpectedMessages = 
 		oneUnreliableServer ?
 		iterations :
 		nodes.size() * iterations;
@@ -1084,13 +1090,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    AppContext.getDataManager().
 			setBinding(counterName, new Counter());
 		}}, taskOwner);
-
+	    
 	    return client.waitForClientToReceiveExpectedMessages(
-		expectedMessages);
+		numExpectedMessages);
 
-	} finally {
-	    client.disconnect();
-	}
     }
 
     public void testClientSessionSendNullMessage() throws Exception {
@@ -1274,12 +1277,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String user = "foo";
 	DummyClient client = new DummyClient(user);
 	assertTrue(client.connect(serverNode.getAppPort()).login());
-	client.sendMessage(new byte[0]);
+	client.sendMessage(new byte[0], true);
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
 
-    */
     public void testClientSessionReceiveRelocateNotification() throws Exception {
 	DummyClient client = createClientToRelocate("newNode");
 	client.disconnect();
@@ -1450,6 +1452,54 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect();
 	}
     }
+
+    public void testClientSendDuringSuspendMessages() throws Exception {
+	String newNodeHost = "newNode";
+	int numMessages = 4;
+	DummyClient client = createClientAndReassignIdentity(newNodeHost, true);
+	try {
+	    client.waitForSuspendMessages();
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf = new MessageBuffer(4);
+		buf.putInt(i);
+		client.sendMessage(buf.getBuffer(), false);
+	    }
+	    client.sendSuspendMessagesComplete();
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    client.waitForRelocationNotification(newNode.getAppPort());
+	    client.validateMessageSequence(
+		client.sessionListenerReceivedMessages, numMessages);
+	    assertTrue(client.clientReceivedMessages.isEmpty());
+	    client.relocate(newNode.getAppPort(), true, true, numMessages);
+	    client.waitForClientToReceiveExpectedMessages(numMessages);
+	    client.validateMessageSequence(
+		client.clientReceivedMessages, numMessages);
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
+    private DummyClient createClientAndReassignIdentity(
+	String newNodeHost, boolean setWaitForSuspendMessages)
+	throws Exception
+    {
+	final String name = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	addNodes(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	if (setWaitForSuspendMessages) {
+	    client.setWaitForSuspendMessages();
+	}
+	assertTrue(client.connect(serverNode.getAppPort()).login());
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	System.err.println("reassigning identity:" + name +
+			   " from server node to host: " +
+			   newNodeHost);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	System.err.println("(done) reassigning identity");
+	return client;
+    }
     
     /**
      * Performs the following in preparation for a relocation test:
@@ -1465,18 +1515,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     private DummyClient createClientToRelocate(String newNodeHost)
 	throws Exception
     {
-	final String name = "foo";
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
-	addNodes(newNodeHost);
-	DummyClient client = new DummyClient(name);
-	assertTrue(client.connect(serverNode.getAppPort()).login());
+	DummyClient client = createClientAndReassignIdentity(newNodeHost, false);
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	System.err.println("reassigning identity:" + name +
-			   " from server node to host: " +
-			   newNodeHost);
-	DirectiveNodeAssignmentPolicy.instance.
-	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
-	System.err.println("(done) reassigning identity");
 	client.waitForRelocationNotification(newNode.getAppPort());
 	return client;
     }
@@ -1574,7 +1614,7 @@ public class TestClientSessionServiceImpl extends TestCase {
      * receives.
      */
     private void sendMessagesAndCheck(
-	int numMessages, int expectedMessages,
+	int numMessages, int numExpectedMessages,
 	RuntimeException throwException)
 	throws Exception
     {
@@ -1584,7 +1624,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    assertTrue(client.login());
 	    receivedMessageException = throwException;
-	    client.sendMessagesInSequence(numMessages, expectedMessages);
+	    client.sendMessagesFromClientInSequence(numMessages, numExpectedMessages);
 	} finally {
 	    client.disconnect();
 	}
@@ -1786,6 +1826,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    DummyClient client = dummyClients.get(reconnectKey);
 	    System.err.println(
+		"DummyClientSessionListener[" + name + "] " +
 		"receivedMessage: " + HexDumper.toHexString(bytes) + 
 		"\nthrow exception: " + receivedMessageException);
 	    if (receivedMessageException != null) {
@@ -1793,13 +1834,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 		receivedMessageException = null;
 		throw re;
 	    } else {
-		client.messages.add(bytes);
+		client.sessionListenerReceivedMessages.add(bytes);
 	    }
-	    synchronized (client.messages) {
-		if (client.messages.size() == client.expectedMessages0) {
-		    client.messages.notifyAll();
+	    synchronized (client.sessionListenerReceivedMessages) {
+		if (client.sessionListenerReceivedMessages.size() ==
+		    client.numSessionListenerExpectedMessages)
+		{
+		    client.sessionListenerReceivedMessages.notifyAll();
 		}
 	    }
+	    // Echo the received message back to the client
+	    ByteBuffer bbuf = ByteBuffer.allocate(bytes.length);
+	    bbuf.put(bytes).flip();
+	    sessionRef.get().send(bbuf);
 	}
     }
 
@@ -1956,11 +2003,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean receivedDisconnectedCallback = false;
 	private boolean graceful = false;
 
-	public volatile int expectedMessages0;
+	private volatile int numClientExpectedMessages;
+	private volatile int numSessionListenerExpectedMessages;
 	// Messages received by this client's associated ClientSessionListener
-	public Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
-	private int messagesReceivedDuringRelocation = 0;
-	
+	public Queue<byte[]> sessionListenerReceivedMessages =
+	    new ConcurrentLinkedQueue<byte[]>();
 	private final Queue<byte[]> clientReceivedMessages =
 	    new ConcurrentLinkedQueue<byte[]>();
 
@@ -1993,7 +2040,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    System.err.println(
 		    	toString() + " received SESSION_MESSAGE: " +
 			HexDumper.toHexString(message));
-		    if (clientReceivedMessages.size() == expectedMessages0) {
+		    if (clientReceivedMessages.size() ==
+			numClientExpectedMessages)
+		    {
 			clientReceivedMessages.notifyAll();
 		    }
 		}
@@ -2012,13 +2061,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * expect that each message is prefixed with the reconnect key.
 	 */
 	@Override
-	public void sendMessage(byte[] message) {
+        public void sendMessage(byte[] message, boolean checkSuspend) {
 	    MessageBuffer buf =
 		new MessageBuffer(5 + reconnectKey.length + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 		putByteArray(reconnectKey).
 		putByteArray(message);
-	    sendRaw(buf.getBuffer());
+	    sendRaw(buf.getBuffer(), checkSuspend);
 	}
 
 	/**
@@ -2083,16 +2132,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * ClientSessionListener}, and validates the sequence of messages
 	 * received by the listener.  
 	 */
-	public void sendMessagesInSequence(int numMessages, int expectedMessages) {
-	    this.expectedMessages0 = expectedMessages;
+	public void sendMessagesFromClientInSequence(
+	int numMessages, int numExpectedMessages)
+	{
+	    this.numSessionListenerExpectedMessages = numExpectedMessages;
 	    
 	    for (int i = 0; i < numMessages; i++) {
 		MessageBuffer buf = new MessageBuffer(4);
 		buf.putInt(i);
-		sendMessage(buf.getBuffer());
+		sendMessage(buf.getBuffer(), true);
 	    }
-	    
-	    validateMessageSequence(messages, expectedMessages);
+	    waitForSessionListenerToReceiveExpectedMessages(
+		numExpectedMessages);
+	    validateMessageSequence(
+		sessionListenerReceivedMessages, numExpectedMessages);
 	}
 	
 	/**
@@ -2100,9 +2153,25 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * the application.
 	 */
 	public Queue<byte[]>
-	    waitForClientToReceiveExpectedMessages(int expectedMessages)
+	    waitForClientToReceiveExpectedMessages(int numExpectedMessages)
 	{
-	    waitForExpectedMessages(clientReceivedMessages, expectedMessages);
+	    numClientExpectedMessages = numExpectedMessages;
+	    synchronized (clientReceivedMessages) {
+		if (clientReceivedMessages.size() != numExpectedMessages)
+		{
+		    try {
+			clientReceivedMessages.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+	    }
+	    assertEquals(
+		"Client " + toString() +
+		" did not receive expected number of messages",
+		numExpectedMessages, clientReceivedMessages.size());
+	    System.err.println(
+		toString() + " received expected number of messages: " +
+		numExpectedMessages);
 	    return clientReceivedMessages;
 	}
 	
@@ -2110,23 +2179,28 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * Waits for the number of expected messages to be deposited in the
 	 * specified message queue.
 	 */
-	private void waitForExpectedMessages(
-	    Queue<byte[]> messageQueue, int expectedMessages)
+	public Queue<byte[]> waitForSessionListenerToReceiveExpectedMessages(
+	    int numExpectedMessages)
 	{
-	    this.expectedMessages0 = expectedMessages;
-	    synchronized (messageQueue) {
-		if (messageQueue.size() != expectedMessages) {
+	    numSessionListenerExpectedMessages = numExpectedMessages;
+	    synchronized (sessionListenerReceivedMessages) {
+		if (sessionListenerReceivedMessages.size() !=
+		    numExpectedMessages)
+		{
 		    try {
-			messageQueue.wait(WAIT_TIME);
+			sessionListenerReceivedMessages.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
 		}
 	    }
-	    int receivedMessages = messageQueue.size();
-	    if (receivedMessages != expectedMessages) {
-		fail(toString() + " expected " + expectedMessages +
-		     ", received " + receivedMessages);
-	    }
+	    assertEquals(
+		"ClientSessionListener for " + toString() +
+		" did not receive expected number of messages",
+		numExpectedMessages, sessionListenerReceivedMessages.size());
+	    System.err.println(
+		"ClientSessionListener for " + toString() +
+		" received expected number of messages: " + numExpectedMessages);
+	    return sessionListenerReceivedMessages;
 	}
 
 	/**
@@ -2135,16 +2209,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * were received by the ClientSessionListener in the correct sequence.
 	 */
 	public void validateMessageSequence(
-	    Queue<byte[]> messageQueue, int expectedMessages)
+	    Queue<byte[]> messageQueue, int numExpectedMessages)
 	{
-	    waitForExpectedMessages(messageQueue, expectedMessages);
-	    if (expectedMessages != 0) {
+	    assertEquals(
+		"validateMessageSequence: unexpected number of messages",
+		numExpectedMessages, messageQueue.size());
+	    if (numExpectedMessages != 0) {
 		int i = (new MessageBuffer(messageQueue.peek())).getInt();
 		for (byte[] message : messageQueue) {
 		    MessageBuffer buf = new MessageBuffer(message);
 		    int value = buf.getInt();
 		    System.err.println(
-			toString() + " received message " + value);
+			toString() + " validating message sequence: " + value);
 		    if (value != i) {
 			fail("expected message " + i + ", got " + value);
 		    }
@@ -2160,13 +2236,25 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * by this client's associated ClientSessionListener during relocation.
 	 */
 	public void relocate(int newPort, boolean useValidKey,
-			     boolean shouldSucceed)
+			     boolean shouldSucceed, int numExpectedMessages)
 	{
-	    int numMessages = messages.size();
 	    super.relocate(newPort, useValidKey, shouldSucceed);
 	    // verify that no messages were received by this client's
-	    // associated ClientSessionListener during relocation.
-	    assertEquals(numMessages, messages.size());
+	    // associated ClientSessionListener during relocation?
+	    //waitForSessionListenerToReceiveExpectedMessages(numExpectedMessages);
+
+	}
+	
+	public void relocate(int newPort, boolean useValidKey,
+			     boolean shouldSucceed)
+	{
+	    relocate(newPort, useValidKey, shouldSucceed, 0);
+	}
+
+	public void disconnect() {
+	    super.disconnect();
+	    clientReceivedMessages.clear();
+	    sessionListenerReceivedMessages.clear();
 	}
     }
 }

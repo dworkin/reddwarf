@@ -595,6 +595,21 @@ public abstract class AbstractService implements Service {
     }
 
     /**
+     * Returns the caller's stack trace, in the typical format.
+     *
+     * @returns the caller's stack trace, in the typical format
+     */
+    public static String getStackTrace() {
+	Throwable throwable = (new Throwable()).fillInStackTrace();
+	StackTraceElement[] traceElements = throwable.getStackTrace();
+	StringBuffer buf = new StringBuffer(256);
+	for (int i = 1; i < traceElements.length; i++) {
+	    buf.append("\tat " + traceElements[i].toString() + "\n");
+	}
+	return buf.toString();
+    }
+
+    /**
      * An immutable class to hold the current version of the keys
      * and data persisted by a service.
      */   

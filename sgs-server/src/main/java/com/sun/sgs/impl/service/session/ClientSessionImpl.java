@@ -350,7 +350,7 @@ public class ClientSessionImpl
      *		other than the session's local node
      */
     void relocationComplete() {
-	if (!isLocalSession()) {
+	if (relocatingToNode != sessionService.getLocalNodeId()) {
 	    throw new IllegalStateException(
 		"'relocationComplete' can only be invoked on the local node:" +
 		nodeId + " for this session: " + toString());
@@ -796,7 +796,8 @@ public class ClientSessionImpl
      * {@code false} otherwise.
      */
     private boolean isLocalSession() {
-	return nodeId == sessionService.getLocalNodeId();
+	return nodeId == sessionService.getLocalNodeId() &&
+	    relocatingToNode == -1;
     }
 
     /**
@@ -831,6 +832,7 @@ public class ClientSessionImpl
 	 * the client session.
 	 */
 	if (isLocalSession && eventQueue.isEmpty() && !relocating()) {
+	    logger.log(Level.FINEST, "immediately processing event:{0}", event);
 	    event.serviceEvent(
  		eventQueue,
 		sessionService,
@@ -1085,6 +1087,13 @@ public class ClientSessionImpl
 	            "Not enough queue space: " + writeBufferAvailable +
 		    " bytes available, " + cost + " requested");
 	    }
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+ 		    Level.FINEST,
+		    "Adding event:{0} to event queue, localNodeId:{1}",
+		    event, ClientSessionServiceImpl.getInstance().getLocalNodeId());
+	    }
+
 	    boolean success = getQueue().offer(event);
 	    if (success && cost > 0) {
 		ClientSessionServiceImpl.getDataService().markForUpdate(this);
@@ -1145,14 +1154,28 @@ public class ClientSessionImpl
 	    ClientSessionHandler handler =
 		sessionService.getHandler(getSessionRefId());
 	    ClientSessionImpl sessionImpl = getClientSession();
-	    
+
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "Servicing event queue, node:{0} session:{1}",
+			   sessionService.getLocalNodeId(),
+			   getSessionRefId());
+	    }
 	    if (handler == null || !sessionImpl.isLocalSession() ||
 		sessionImpl.relocating())
 	    {
 		// Only service events on the session's local node, so return.
 		// The session may be moving, and this might be a left over
 		// serviceEventQueue request
-		// TBD: should this print a log messaeg?
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Attempt to service event queue, localNodeId:{0} " +
+			"session:{1} handler:{2} sessionNodeId:{3} " +
+			"relocatingToNodeId:{4}",
+			sessionService.getLocalNodeId(), getSessionRefId(),
+			handler, sessionImpl.nodeId, sessionImpl.relocatingToNode);
+		}
 		return;
 	    }
 

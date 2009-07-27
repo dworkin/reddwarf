@@ -54,6 +54,7 @@ public abstract class AbstractDummyClient extends Assert {
     private Connection connection;
     private volatile int connectPort = 0;
     private boolean connected = false;
+    private boolean waitForSuspendMessages = false;
     private boolean suspendMessages = false;
 
     /* -- login/logout state -- */
@@ -366,15 +367,15 @@ public abstract class AbstractDummyClient extends Assert {
     /**
      * Sends a SESSION_MESSAGE with the specified content.
      */
-    public abstract void sendMessage(byte[] message);
+    public abstract void sendMessage(byte[] message, boolean checkSuspend);
 
     /**
      * Writes the specified {@code bytes} directly to the underlying
      * connection.
      */
-    protected void sendRaw(byte[] bytes) {
+    protected void sendRaw(byte[] bytes, boolean checkSuspended) {
 	synchronized (lock) {
-	    if (suspendMessages) {
+	    if (checkSuspended && suspendMessages) {
 		throw new IllegalStateException("messages suspended");
 	    }
 				  
@@ -480,6 +481,37 @@ public abstract class AbstractDummyClient extends Assert {
 	}
     }
 
+    public void setWaitForSuspendMessages() {
+	synchronized (lock) {
+	    waitForSuspendMessages = true;
+	}
+    }
+    
+    public boolean waitForSuspendMessages() {
+	synchronized (lock) {
+	    try {
+		if (!suspendMessages) {
+		    lock.wait(WAIT_TIME);
+		}
+	    } catch (InterruptedException ignore) {
+	    }
+	    return suspendMessages;
+	}
+    }
+
+    public void sendSuspendMessagesComplete() {
+	synchronized (lock) {
+	    ByteBuffer msg = ByteBuffer.allocate(1);
+	    msg.put(SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE).
+		flip();
+	    try {
+		connection.sendBytes(msg.array());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
+	}
+    }
+
     /**
      * Gives a subclass a chance to handle an {@code opcode}.  This
      * implementation handles login, redirection, relocation, and
@@ -497,7 +529,7 @@ public abstract class AbstractDummyClient extends Assert {
 		    System.err.println("login succeeded: " + name);
 		    lock.notifyAll();
 		}
-		sendMessage(new byte[0]);
+		sendMessage(new byte[0], true);
 		break;
 		    
 	    case SimpleSgsProtocol.LOGIN_FAILURE:
@@ -529,11 +561,13 @@ public abstract class AbstractDummyClient extends Assert {
 		    if (suspendMessages) {
 			break;
 		    }
-		    ByteBuffer msg = ByteBuffer.allocate(1);
-		    msg.put(SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE).
-			flip();
-		    sendRaw(msg.array());
 		    suspendMessages = true;
+		    if (waitForSuspendMessages) {
+			waitForSuspendMessages = false;
+			lock.notifyAll();
+		    } else {
+			sendSuspendMessagesComplete();
+		    }
 		}
 		break;
 		
@@ -562,7 +596,7 @@ public abstract class AbstractDummyClient extends Assert {
 		    System.err.println("relocate succeeded: " + name);
 		    lock.notifyAll();
 		}
-		sendMessage(new byte[0]);
+		sendMessage(new byte[0], true);
 		break;
 		    
 	    case SimpleSgsProtocol.RELOCATE_FAILURE:

@@ -683,7 +683,9 @@ public final class WatchdogServiceImpl
 
         logger.log(
 	    Level.SEVERE,
-	    "Node:{0} forced to shutdown due to service failure", localNodeId);
+	    "Local node:{0} forced to shutdown due to service failure\n" +
+	    "Stacktrace:\n{1}", localNodeId, getStackTrace());
+	
 
         shutdownController.shutdownNode(this);
     }
