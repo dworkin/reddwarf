@@ -96,12 +96,10 @@ class UpdateQueue {
 	    new RequestQueueClient.BasicSocketFactory(host, port),
 	    new Runnable() {
 		public void run() { 
-		    /* FIXME: Provide way to pass exception? */
-		    store.reportFailure(null);
+		    store.reportFailure();
 		}
 	    },
 	    new Properties());
-	queue.start();
 	commitAvailable = new Semaphore(updateQueueSize);
     }
 
@@ -214,7 +212,7 @@ class UpdateQueue {
      *
      * @param	contextId the transaction context ID
      * @param	oid the object ID to evict
-     * @param	completionhandler the handler to notify when the eviction has
+     * @param	completionHandler the handler to notify when the eviction has
      *		been completed 
      */
     void downgradeObject(
@@ -301,6 +299,9 @@ class UpdateQueue {
 	    }
 	    while (true) {
 		Entry<Long, PendingTxnInfo> entry = pendingMap.firstEntry();
+		if (entry == null) {
+		    break;
+		}
 		requests = entry.getValue().getRequests();
 		if (requests == null) {
 		    break;

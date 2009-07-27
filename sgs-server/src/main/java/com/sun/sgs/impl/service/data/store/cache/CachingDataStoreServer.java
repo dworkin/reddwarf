@@ -23,7 +23,6 @@ import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import java.io.IOException;
 import java.io.ObjectStreamClass;
 import java.io.Serializable;
-import java.net.InetAddress;
 import java.rmi.Remote;
 
 /** Defines the network interface for the caching data store server. */
@@ -33,10 +32,10 @@ public interface CachingDataStoreServer extends Remote {
      * Registers a node with the data server, supplying a callback server that
      * the data server can use to make callback requests.  Returns the ID for
      * the new node and the socket port that the node should connect to for
-     * sending updates to the data server.
+     * sending updates to the server's update queue.
      *
      * @param	callbackServer the callback server
-     * @return	the node ID and socket port
+     * @return	the node ID and update queue port
      * @throws	IllegalArgumentException if {@code nodeId} has already been
      *		registered
      * @throws	IOException if a network problem occurs
@@ -53,18 +52,18 @@ public interface CachingDataStoreServer extends Remote {
 	/** The node ID for the new node. */
 	public final long nodeId;
 
-	/** The socket port. */
-	public final int socketPort;
+	/** The port for connecting to the update queue. */
+	public final int updateQueuePort;
 
 	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	nodeId the node ID for the new node
-	 * @param	socketPort the socket port for the update queue server
+	 * @param	updateQueuePort the update queue port
 	 */
-	public RegisterNodeResult(long nodeId, int socketPort) {
+	public RegisterNodeResult(long nodeId, int updateQueuePort) {
 	    this.nodeId = nodeId;
-	    this.socketPort = socketPort;
+	    this.updateQueuePort = updateQueuePort;
 	}
     }
 

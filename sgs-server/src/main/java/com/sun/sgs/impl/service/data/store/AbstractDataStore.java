@@ -115,6 +115,13 @@ public abstract class AbstractDataStore
     /**
      * {@inheritDoc} <p>
      *
+     * This implementation does nothing.
+     */
+    public void ready() throws Exception { }
+
+    /**
+     * {@inheritDoc} <p>
+     *
      * This implementation does logging and calls {@link #createObjectInternal
      * createObjectInternal} to perform the actual operation.
      */

@@ -33,7 +33,7 @@ class NewObjectIdCache {
     private final int batchSize;
 
     /** A thread for obtaining new object IDs.  This thread may be dead. */
-    private Thread newObjectsThread = createNewObjectsThread();
+    private Thread newObjectsThread;
 
     /**
      * The current range for allocating IDs, or {@code null} if this instance
@@ -57,6 +57,7 @@ class NewObjectIdCache {
 	synchronized (this) {
 	    this.store = store;
 	    this.batchSize = batchSize;
+	    newObjectsThread = createNewObjectsThread();
 	    newObjectsThread.start();
 	    while (currentRange == null && !store.getShutdownRequested()) {
 		try {
@@ -101,7 +102,7 @@ class NewObjectIdCache {
 
     /** Shuts down this instance. */
     synchronized void shutdown() {
-	if (newObjectsThread.isAlive()) {
+	if (newObjectsThread != null && newObjectsThread.isAlive()) {
 	    newObjectsThread.interrupt();
 	    while (true) {
 		try {

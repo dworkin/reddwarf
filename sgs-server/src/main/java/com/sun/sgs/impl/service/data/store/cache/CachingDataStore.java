@@ -25,7 +25,6 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.AbstractDataStore;
 import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.service.data.store.NetworkException;
-import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.cache.BasicCacheEntry.
     AwaitWritableResult;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
@@ -233,9 +232,6 @@ public class CachingDataStore extends AbstractDataStore
     /** The transaction scheduler. */
     private final TransactionScheduler txnScheduler;
 
-    /** The watchdog service. */
-    private final WatchdogService watchdogService;
-
     /** The local data store server, if started, else {@code null}. */
     private final CachingDataStoreServerImpl localServer;
 
@@ -245,6 +241,12 @@ public class CachingDataStore extends AbstractDataStore
     /** The exporter for the callback server. */
     private final Exporter<CallbackServer> callbackExporter =
 	new Exporter<CallbackServer>(CallbackServer.class);
+
+    /**
+     * The thread that evicts least recently used entries from the cache as
+     * needed.
+     */
+    private final Thread evictionThread = new EvictionThread();
 
     /** The node ID for the local node. */
     private final long nodeId;
@@ -260,12 +262,6 @@ public class CachingDataStore extends AbstractDataStore
 
     /** The cache of object IDs available for new objects. */
     private final NewObjectIdCache newObjectIdCache;
-
-    /**
-     * The thread that evicts least recently used entries from the cache as
-     * needed.
-     */
-    private final Thread evictionThread = new EvictionThread();
 
     /** The number of evictions that have been scheduled but not completed. */
     private final AtomicInteger pendingEvictions = new AtomicInteger();
@@ -309,6 +305,24 @@ public class CachingDataStore extends AbstractDataStore
 
     /** Synchronizer for {@code shutdownState}. */
     private final Object shutdownSync = new Object();
+
+    /**
+     * The watchdog service, or {@code null} if not initialized.  Synchronize
+     * on {@link #watchdogServiceSync} when accessing.
+     */
+    private WatchdogService watchdogService;
+
+    /**
+     * Whether there was a failure before the watchdog service became
+     * available.  Synchronize on {@link #watchdogServiceSync} when accessing.
+     */
+    private boolean failureBeforeWatchdog;
+
+    /**
+     * The synchronizer for {@link #watchdogService} and {@link
+     * #failureBeforeWatchdog}.
+     */
+    private final Object watchdogServiceSync = new Object();
 
     /* -- Constructors -- */
 
@@ -389,8 +403,6 @@ public class CachingDataStore extends AbstractDataStore
 	    taskOwner = txnProxy.getCurrentOwner();
 	    txnScheduler =
 		systemRegistry.getComponent(TransactionScheduler.class);
-	    watchdogService =
-		systemRegistry.getComponent(WatchdogService.class);
 	    if (startServer) {
 		try {
 		    localServer = new CachingDataStoreServerImpl(
@@ -414,7 +426,7 @@ public class CachingDataStore extends AbstractDataStore
 		registerNode(callbackProxy);
 	    nodeId = registerNodeResult.nodeId;
 	    updateQueue = new UpdateQueue(
-		this, serverHost, registerNodeResult.socketPort,
+		this, serverHost, registerNodeResult.updateQueuePort,
 		updateQueueSize);
 	    contextMap = new TxnContextMap(this);
 	    cache = new Cache(this, cacheSize, numLocks, evictionThread);
@@ -475,6 +487,24 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /* -- Implement AbstractDataStore's DataStore methods -- */
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	Exception {@inheritDoc}
+     */
+    @Override
+    public void ready() throws Exception {
+	synchronized (watchdogServiceSync) {
+	    watchdogService = txnProxy.getService(WatchdogService.class);
+	    if (failureBeforeWatchdog) {
+		reportFailure();
+	    }
+	}
+	if (localServer != null) {
+	    localServer.ready();
+	}
+    }
 
     /* DataStore.createObject */
 
@@ -627,7 +657,7 @@ public class CachingDataStore extends AbstractDataStore
 
     /** Gets an object for write. */
     private class GetObjectForUpdateRunnable
-	extends RetryIoRunnable< GetObjectForUpdateResults>
+	extends RetryIoRunnable<GetObjectForUpdateResults>
     {
 	private final TxnContext context;
 	private final long oid;
@@ -1632,7 +1662,9 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	}
 	/* Prevent new transactions and wait for active ones to complete */
-	contextMap.shutdown();
+	if (contextMap != null) {
+	    contextMap.shutdown();
+	}
 	synchronized (shutdownSync) {
 	    shutdownState = ShutdownState.TXNS_COMPLETED;
 	}
@@ -1906,7 +1938,7 @@ public class CachingDataStore extends AbstractDataStore
 
     /** {@inheritDoc} */
     public boolean requestDowngradeBinding(String name, long nodeId) {
-	BindingKey nameKey = BindingKey.get(name);
+	BindingKey nameKey = BindingKey.getAllowLast(name);
 	Object lock = cache.getBindingLock(nameKey);
 	synchronized (lock) {
 	    BindingCacheEntry entry = cache.getBindingEntry(nameKey);
@@ -1982,7 +2014,7 @@ public class CachingDataStore extends AbstractDataStore
 
     /** {@inheritDoc} */
     public boolean requestEvictBinding(String name, long nodeId) {
-	BindingKey nameKey = BindingKey.get(name);
+	BindingKey nameKey = BindingKey.getAllowLast(name);
 	Object lock = cache.getBindingLock(nameKey);
 	synchronized (lock) {
 	    BindingCacheEntry entry = cache.getBindingEntry(nameKey);
@@ -2102,25 +2134,21 @@ public class CachingDataStore extends AbstractDataStore
     /**
      * Report that the local node should be marked as failed because of a
      * failure within the data store.
-     *
-     * @param	exception the exception that caused the failure, or {@code
-     *		null} if no exception is available
      */
-    void reportFailure(Throwable exception) {
-	if (logger.isLoggable(WARNING)) {
-	    if (exception != null) {
-		logger.logThrow(WARNING, exception, "CachingDataStore failed");
+    void reportFailure() {
+	synchronized (watchdogServiceSync) {
+	    if (watchdogService == null) {
+		failureBeforeWatchdog = true;
 	    } else {
-		logger.log(WARNING, "CachingDataStore failed");
+		Thread thread = new Thread("CachingDataStore reportFailure") {
+		    public void run() {
+			watchdogService.reportFailure(
+			    nodeId, CachingDataStore.class.getName());
+		    }
+		};
+		thread.start();
 	    }
 	}
-	Thread thread = new Thread("CachingDataStore reportFailure") {
-	    public void run() {
-		watchdogService.reportFailure(
-		    nodeId, CachingDataStore.class.getName());
-	    }
-	};
-	thread.start();
     }
 
     /* -- Other methods -- */
@@ -2201,19 +2229,19 @@ public class CachingDataStore extends AbstractDataStore
 	private boolean reserved;
 
 	/** An iterator over all cache entries. */
-	private Iterator<BasicCacheEntry<?, ?>> entryIterator =
-	    cache.getEntryIterator(evictionBatchSize);
+	private Iterator<BasicCacheEntry<?, ?>> entryIterator;
 
 	/** Creates an instance of this class. */
 	EvictionThread() {
 	    super("CachingDataStore eviction");
-	    if (cache.tryReserve(evictionReserveSize)) {
-		reserved = true;
-	    }
 	}
 
 	@Override
 	public void run() {
+	    if (cache.tryReserve(evictionReserveSize)) {
+		reserved = true;
+	    }
+	    entryIterator = cache.getEntryIterator(evictionBatchSize);
 	    while (true) {
 		if (getShutdownTxnsCompleted()) {
 		    break;

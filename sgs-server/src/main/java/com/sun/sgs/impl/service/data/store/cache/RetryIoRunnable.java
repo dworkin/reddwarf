@@ -104,11 +104,11 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 		if (shouldRetry()) {
 		    continue;
 		} else {
-		    store.reportFailure(e);
+		    store.reportFailure();
 		    return;
 		}
 	    } catch (Exception e) {
-		store.reportFailure(e);
+		store.reportFailure();
 		return;
 	    }
 	}

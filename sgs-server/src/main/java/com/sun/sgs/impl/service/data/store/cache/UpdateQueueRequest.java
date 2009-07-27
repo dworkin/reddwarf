@@ -139,7 +139,7 @@ abstract class UpdateQueueRequest implements Request {
 	/**
 	 * Creates an instance with the specified completion handler.
 	 *
-	 * @param	handler the completion handler
+	 * @param	completionHandler the completion handler
 	 */
 	UpdateQueueRequestWithCompletion(
 	    SimpleCompletionHandler completionHandler)

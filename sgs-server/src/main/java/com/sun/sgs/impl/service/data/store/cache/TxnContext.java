@@ -133,18 +133,22 @@ class TxnContext {
     void abort() {
 	store.getUpdateQueue().abort(contextId, prepared);
 	Cache cache = store.getCache();
-	for (SavedValue<Long, byte[]> saved : modifiedObjects) {
-	    synchronized (cache.getObjectLock(saved.key)) {
-		ObjectCacheEntry entry = cache.getObjectEntry(saved.key);
-		entry.setValue(saved.value);
-		entry.setNotModified();
+	if (modifiedObjects != null) {
+	    for (SavedValue<Long, byte[]> saved : modifiedObjects) {
+		synchronized (cache.getObjectLock(saved.key)) {
+		    ObjectCacheEntry entry = cache.getObjectEntry(saved.key);
+		    entry.setValue(saved.value);
+		    entry.setNotModified();
+		}
 	    }
 	}
-	for (SavedValue<BindingKey, Long> saved : modifiedBindings) {
-	    synchronized (cache.getBindingLock(saved.key)) {
-		BindingCacheEntry entry = cache.getBindingEntry(saved.key);
-		entry.setValue(saved.value);
-		entry.setNotModified();
+	if (modifiedBindings != null) {
+	    for (SavedValue<BindingKey, Long> saved : modifiedBindings) {
+		synchronized (cache.getBindingLock(saved.key)) {
+		    BindingCacheEntry entry = cache.getBindingEntry(saved.key);
+		    entry.setValue(saved.value);
+		    entry.setNotModified();
+		}
 	    }
 	}
     }

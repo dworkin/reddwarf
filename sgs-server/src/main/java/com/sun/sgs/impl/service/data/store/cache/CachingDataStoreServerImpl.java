@@ -22,23 +22,31 @@ package com.sun.sgs.impl.service.data.store.cache;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.StandardProperties;
+import static com.sun.sgs.impl.kernel.StandardProperties.APP_ROOT;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeLong;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeString;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeLong;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeString;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import static com.sun.sgs.impl.service.data.store.DataStoreImpl.
+    DEFAULT_ENVIRONMENT_CLASS;
+import static com.sun.sgs.impl.service.data.store.DataStoreImpl.
+    ENVIRONMENT_CLASS_PROPERTY;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
 import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
     UpdateQueueRequestHandler;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
+import static com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl.
+    BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractComponent;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.lock.LockConflict;
@@ -48,9 +56,12 @@ import static com.sun.sgs.impl.util.lock.LockConflictType.INTERRUPTED;
 import static com.sun.sgs.impl.util.lock.LockConflictType.TIMEOUT;
 import com.sun.sgs.impl.util.lock.LockRequest;
 import com.sun.sgs.impl.util.lock.MultiLockManager;
-import com.sun.sgs.impl.util.lock.MultiLocker;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeListener;
+import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
@@ -63,6 +74,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.MissingResourceException;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -71,37 +83,20 @@ import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
-/*
- * - Permit waiting for locks in multiple threads for the same locker?  The
- *   current scheme only permits a single waiter, and uses that information to
- *   find deadlocks.  It also stores a value in a single conflict field.  Hmmm.
+/**
+ * An implementation of {@code CachingDataStoreServer}. <p>
+ *
+ * To avoid deadlocks, the implementation needs to insure that operations that
+ * obtain multiple locks from the lock manager grab the lowest key first.  In
+ * particular, the methods that obtain multiple locks are {@link
+ * #getBindingForUpdate} and {@link #getBindingForRemove}.
  */
-
-/*
- * Note that, to avoid deadlocks, operations that grab multiple locks should
- * grab them in key order.  This only applies to getBindingForUpdate and
- * getBindingForRemove.
- */
-
 public class CachingDataStoreServerImpl extends AbstractComponent
-    implements CachingDataStoreServer
+    implements CachingDataStoreServer, NodeListener, UpdateQueueServer
 {
     /** The package for this class. */
     private static final String PKG =
 	"com.sun.sgs.impl.service.data.store.cache";
-
-    /** The property for specifying the server port. */
-    public static final String SERVER_PORT_PROPERTY = PKG + ".server.port";
-
-    /** The default server port. */
-    public static final int DEFAULT_SERVER_PORT = 44540;
-
-    /** The property for specifying the update queue port. */
-    public static final String UPDATE_QUEUE_PORT_PROPERTY =
-	PKG + ".server.update.queue.port";
-
-    /** The default update queue port. */
-    public static final int DEFAULT_UPDATE_QUEUE_PORT = 44542;
 
     /**
      * The property that specifies the directory in which to store database
@@ -111,6 +106,54 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /** The default directory for database files from the app root. */
     private static final String DEFAULT_DIRECTORY = "dsdb";
+
+    /** The property for specifying the server port. */
+    public static final String SERVER_PORT_PROPERTY = PKG + ".server.port";
+
+    /** The default server port. */
+    public static final int DEFAULT_SERVER_PORT = 44540;
+
+    /**
+     * The property for specifying the maximum number of milliseconds to wait
+     * for obtaining a lock.
+     */
+    public static final String LOCK_TIMEOUT_PROPERTY = PKG + ".lock.timeout";
+
+    /**
+     * The proportion of the transaction timeout to use for the lock timeout if
+     * no lock timeout is specified.
+     */
+    public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
+
+    /**
+     * The default value of the lock timeout property, if no transaction
+     * timeout is specified.
+     */
+    public static final long DEFAULT_LOCK_TIMEOUT = 
+	computeLockTimeout(BOUNDED_TIMEOUT_DEFAULT);
+
+    /**
+     * The property for specifying the number of maps to use for associating
+     * keys and maps.  The number of maps controls the amount of concurrency.
+     */
+    public static final String NUM_KEY_MAPS_PROPERTY =
+	PKG + ".num.key.maps";
+
+    /** The default number of key maps. */
+    public static final int NUM_KEY_MAPS_DEFAULT = 8;
+
+    /** The property for specifying the transaction timeout in milliseconds. */
+    public static final String TXN_TIMEOUT_PROPERTY = PKG + ".txn.timeout";
+
+    /** The default transaction timeout in milliseconds. */
+    public static final long DEFAULT_TXN_TIMEOUT = 100;
+
+    /** The property for specifying the update queue port. */
+    public static final String UPDATE_QUEUE_PORT_PROPERTY =
+	PKG + ".update.queue.port";
+
+    /** The default update queue port. */
+    public static final int DEFAULT_UPDATE_QUEUE_PORT = 44542;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -122,8 +165,17 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     /** The number of milliseconds to wait when allocating node IDs. */
     private static final long NODE_ID_ALLOCATION_TIMEOUT = 1000;
 
-    /** The directory in which to store database files. */
-    private final String directory;
+    /** The transaction timeout. */
+    private final long txnTimeout;
+
+    /** The transaction proxy. */
+    private final TransactionProxy txnProxy;
+
+    /** The owner for tasks run by the server. */
+    private final Identity taskOwner;
+
+    /** The task scheduler. */
+    private final TaskScheduler taskScheduler;
 
     /** The database environment. */
     private final DbEnvironment env;
@@ -144,6 +196,18 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
 
+    /**
+     * The lock manager, for managing contended access to name bindings and
+     * objects.
+     */
+    private final MultiLockManager<Object, NodeInfo> lockManager;
+
+    /** The port for accepting update queue connections. */
+    private final int updateQueuePort;
+
+    /** Thread that handles update queue connections. */
+    private final RequestQueueListener requestQueueListener;
+
     /** The server port for accepting connections. */
     private final int serverPort;
 
@@ -158,24 +222,12 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private final Exporter<CachingDataStoreServer> serverExporter =
 	new Exporter<CachingDataStoreServer>(CachingDataStoreServer.class);
 
-    private final MultiLockManager<Object, NodeInfo> lockManager =
-	new MultiLockManager<Object, NodeInfo>(100, 8);
-
+    /**
+     * A queue of node requests that are blocked and need the associated item
+     * to be called back.
+     */
     final BlockingQueue<NodeRequest> callbackRequests =
 	new LinkedBlockingQueue<NodeRequest>();
-
-    private final long txnTimeout = -1;  //FIXME: from config
-
-    /** The port for accepting update queue connections. */
-    private final int updateQueuePort;
-
-    private boolean shuttingDown = false;
-
-    /** Thread that handles update queue connections. */
-    private final RequestQueueListener requestQueueListener;
-
-    /** The watchdog service. */
-    private final WatchdogService watchdogService;
 
     /**
      * The next node ID.  Synchronize on {@link #nextNodeIdSync} when accessing
@@ -189,136 +241,41 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     private long lastNodeId = -1;
 
-    /** The synchronizer for the {@link #nextNodeId} field. */
+    /**
+     * The synchronizer for the {@link #nextNodeId} and {@link #lastNodeId}
+     * fields.
+     */
     private final Object nextNodeIdSync = new Object();
 
-    /* -- Nested classes -- */
+    /**
+     * The watchdog service, or {@code null} if not initialized.  Synchronize
+     * on {@link #watchdogServiceSync} when accessing.
+     */
+    private WatchdogService watchdogService;
 
-    static class NodeInfo extends MultiLocker<Object, NodeInfo> {
-	final long nodeId;
-	final CallbackServer callbackServer;
-	final Map<Object, NodeRequest> locks =
-	    new HashMap<Object, NodeRequest>();
-	final RequestQueueServer<UpdateQueueRequest> updateQueue;
+    /**
+     * Whether there was a failure before the watchdog service became
+     * available.  Synchronize on {@link #watchdogServiceSync} when accessing.
+     */
+    private boolean failureBeforeWatchdog;
 
-	NodeInfo(CachingDataStoreServerImpl server,
-		 MultiLockManager<Object, NodeInfo> lockManager,
-		 long nodeId,
-		 CallbackServer callbackServer)
-	{
-	    super(lockManager);
-	    this.nodeId = nodeId;
-	    this.callbackServer = callbackServer;
-	    updateQueue = new RequestQueueServer<UpdateQueueRequest>(
-		nodeId, new UpdateQueueRequestHandler(server, nodeId),
-		new Properties());
-	}
-	@Override
-	protected LockRequest<Object, NodeInfo> newLockRequest(
-	    Object key, boolean forWrite, boolean upgrade)
-	{
-	    return new NodeRequest(this, key, forWrite, upgrade);
-	}
-    }
-
-    static class NodeRequest extends LockRequest<Object, NodeInfo> {
-	private boolean calledBack;
-	NodeRequest(
-	    NodeInfo nodeInfo, Object key, boolean forWrite, boolean upgrade)
-	{
-	    super(nodeInfo, key, forWrite, upgrade);
-	}
-	synchronized boolean noteCallback() {
-	    if (!calledBack) {
-		calledBack = true;
-		return true;
-	    } else {
-		return false;
-	    }
-	}
-    }
-
-    class CallbackRequester implements Runnable {
-	CallbackRequester() { }
-	public void run() {
-	    while (true) {
-		try {
-		    callbackOwners(callbackRequests.take());
-		} catch (InterruptedException e) {
-		    break;
-		}
-	    }
-	}
-	private void callbackOwners(NodeRequest request) {
-	    NodeInfo nodeInfo = request.getLocker();
-	    for (LockRequest<Object, NodeInfo> owner
-		     : lockManager.getOwners(request.getKey()))
-	    {
-		if (nodeInfo != owner.getLocker()) {
-		    callback((NodeRequest) owner, request);
-		}
-	    }
-	}
-	void callback(NodeRequest request, NodeRequest forRequest) {
-	    if (!request.noteCallback()) {
-		boolean downgrade = request.getForWrite() &&
-		    !forRequest.getForWrite();
-		NodeInfo nodeInfo = request.getLocker();
-		Object key = request.getKey();
-		CallbackTask task = new CallbackTask(
-		    nodeInfo.callbackServer, key, downgrade,
-		    forRequest.getLocker().nodeId);
-		runIoTask(task, nodeInfo.nodeId);
-		if (task.released) {
-		    if (downgrade) {
-			lockManager.downgradeLock(nodeInfo, key);
-		    } else {
-			lockManager.releaseLock(nodeInfo, key);
-		    }
-		}
-	    }
-	}
-    }
-
-    private static class CallbackTask implements IoRunnable {
-	private final CallbackServer callbackServer;
-	private final Object key;
-	private final boolean downgrade;
-	private final long requesterNodeId;
-	boolean released;
-	CallbackTask(CallbackServer callbackServer,
-		     Object key,
-		     boolean downgrade,
-		     long requesterNodeId)
-	{
-	    this.callbackServer = callbackServer;
-	    this.key = key;
-	    this.downgrade = downgrade;
-	    this.requesterNodeId = requesterNodeId;
-	}
-	public void run() throws IOException {
-	    if (key instanceof String) {
-		if (downgrade) {
-		    released = callbackServer.requestDowngradeBinding(
-			(String) key, requesterNodeId);
-		} else {
-		    released = callbackServer.requestEvictBinding(
-			(String) key, requesterNodeId);
-		}
-	    } else {
-		if (downgrade) {
-		    released = callbackServer.requestDowngradeObject(
-			(Long) key, requesterNodeId);
-		} else {
-		    released = callbackServer.requestEvictObject(
-			(Long) key, requesterNodeId);
-		}
-	    }
-	}
-    }
+    /**
+     * Synchronizer for {@link #watchdogService} and {@link
+     * #failureBeforeWatchdog}.
+     */
+    private final Object watchdogServiceSync = new Object();
 
     /* -- Constructor -- */
 
+    /**
+     * Creates an instance of this class.
+     *
+     * @param	properties the properties for configuring this instance
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
+     * @throws	IOException if there is a problem exporting the server or
+     *		update queue
+     */
     public CachingDataStoreServerImpl(Properties properties,
 				      ComponentRegistry systemRegistry,
 				      TransactionProxy txnProxy)
@@ -326,50 +283,69 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     {
 	super(properties, systemRegistry, txnProxy, logger);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	String dbEnvClass = wrappedProps.getProperty(
+	    ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS);	    
+	String directory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
+	if (directory == null) {
+	    String rootDir = properties.getProperty(APP_ROOT);
+	    if (rootDir == null) {
+		throw new IllegalArgumentException(
+		    "A value for the property " + APP_ROOT +
+		    " must be specified");
+	    }
+	    directory = rootDir + File.separator + DEFAULT_DIRECTORY;
+	}
+	/*
+	 * Use an absolute path to avoid problems on Windows.
+	 * -tjb@sun.com (02/16/2007)
+	 */
+	directory = new File(directory).getAbsolutePath();
+	txnTimeout = wrappedProps.getLongProperty(
+	    TXN_TIMEOUT_PROPERTY,
+	    wrappedProps.getLongProperty(
+		TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
+		BOUNDED_TIMEOUT_DEFAULT));
+	long defaultLockTimeout = (txnTimeout < 1)
+	    ? DEFAULT_LOCK_TIMEOUT : computeLockTimeout(txnTimeout);
+	long lockTimeout = wrappedProps.getLongProperty(
+	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
+	int numKeyMaps = wrappedProps.getIntProperty(
+	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
 	int requestedServerPort = wrappedProps.getIntProperty(
 	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	int requestedUpdateQueuePort = wrappedProps.getIntProperty(
 	    UPDATE_QUEUE_PORT_PROPERTY, DEFAULT_UPDATE_QUEUE_PORT, 0, 65535);
-	String specifiedDirectory =
-	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
-	if (specifiedDirectory == null) {
-	    String rootDir =
-		properties.getProperty(StandardProperties.APP_ROOT);
-	    if (rootDir == null) {
-		throw new IllegalArgumentException(
-		    "A value for the property " + StandardProperties.APP_ROOT +
-		    " must be specified");
-	    }
-	    specifiedDirectory = rootDir + File.separator + DEFAULT_DIRECTORY;
+	if (logger.isLoggable(CONFIG)) {
+	    logger.log(CONFIG,
+		       "Creating CachingDataStoreServerImpl with properties:" +
+		       "\n  db environment class: " + dbEnvClass +
+		       "\n  directory: " + directory +
+		       "\n  lock timeout: " + lockTimeout +
+		       "\n  num key maps: " + numKeyMaps +
+		       "\n  server port: " + requestedServerPort +
+		       "\n  txn timeout: " + txnTimeout +
+		       "\n  update queue port: " + requestedUpdateQueuePort);
 	}
+	this.txnProxy = txnProxy;
+	taskOwner = txnProxy.getCurrentOwner();
+	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	try {
-	    /*
-	     * Use an absolute path to avoid problems on Windows.
-	     * -tjb@sun.com (02/16/2007)
-	     */
-	    directory = new File(specifiedDirectory).getAbsolutePath();
-	    Identity taskOwner = txnProxy.getCurrentOwner();
-	    TaskScheduler taskScheduler =
-		systemRegistry.getComponent(TaskScheduler.class);
-	    File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
+	    File directoryFile = new File(directory);
 	    if (!directoryFile.exists()) {
-		logger.log(INFO, "Creating database directory : " +
-			   directoryFile.getAbsolutePath());
+		logger.log(INFO, "Creating database directory: " + directory);
 		if (!directoryFile.mkdirs()) {
 		    throw new DataStoreException(
-			"Unable to create database directory: " +
-			directoryFile.getName());
+			"Unable to create database directory: " + directory);
 		}
 	    }
 	    env = wrappedProps.getClassInstanceProperty(
-		DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY,
-		DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS,
+		ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS,
 		DbEnvironment.class,
 		new Class<?>[] {
 		    String.class, Properties.class, Scheduler.class },
 		directory, properties,
 		new DelegatingScheduler(taskScheduler, taskOwner));
-	    boolean done = false;
+	    boolean txnDone = false;
 	    DbTransaction txn = env.beginTransaction(Long.MAX_VALUE);
 	    try {
 		Databases dbs = DbUtilities.getDatabases(env, txn, logger);
@@ -377,15 +353,15 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		classesDb = dbs.classes();
 		oidsDb = dbs.oids();
 		namesDb = dbs.names();
-		done = true;
+		txnDone = true;
 		txn.commit();
 	    } finally {
-		if (!done) {
+		if (!txnDone) {
 		    txn.abort();
 		}
 	    }
-	    watchdogService =
-		systemRegistry.getComponent(WatchdogService.class);
+	    lockManager = new MultiLockManager<Object, NodeInfo>(
+		lockTimeout, numKeyMaps);
 	    ServerSocket serverSocket =
 		new ServerSocket(requestedUpdateQueuePort);
 	    updateQueuePort = serverSocket.getLocalPort();
@@ -395,7 +371,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    public RequestQueueServer<UpdateQueueRequest> getServer(
 			long nodeId)
 		    {
-			return getNodeInfo(nodeId).updateQueue;
+			return getNodeInfo(nodeId).updateQueueServer;
 		    }
 		},
 		new Runnable() {
@@ -404,7 +380,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    }
 		},
 		properties);
-	    serverPort = serverExporter.export(this, requestedServerPort);
+	    serverPort = serverExporter.export(
+		this, "CachingDataStoreServer", requestedServerPort);
 	} catch (IOException e) {
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, e, "Problem starting server");
@@ -413,294 +390,466 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	}
     }
 
+    /**
+     * Like {@link DataStore#ready DataStore.ready}, this method should be
+     * called when services have been created, in this case to allow the server
+     * to access the watchdog service.
+     *
+     * @throws MissingResourceException if the watchdog service is not found
+     */
+    public void ready() throws MissingResourceException {
+	synchronized (watchdogServiceSync) {
+	    watchdogService = txnProxy.getService(WatchdogService.class);
+	    if (failureBeforeWatchdog) {
+		reportFailure();
+	    }
+	}
+	watchdogService.addNodeListener(this);
+    }
+
     /* -- Implement CachingDataStoreServer -- */
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public RegisterNodeResult registerNode(CallbackServer callbackServer) {
-	checkNull("callbackServer", callbackServer);
-	NodeInfo nodeInfo =
-	    new NodeInfo(this, lockManager, getNextNodeId(), callbackServer);
-	synchronized (nodeInfoMap) {
-	    NodeInfo old = nodeInfoMap.put(nodeInfo.nodeId, nodeInfo);
-	    assert old == null;
+	callStarted();
+	try {
+	    checkNull("callbackServer", callbackServer);
+	    long nodeId = getNextNodeId();
+	    NodeInfo nodeInfo = new NodeInfo(
+		lockManager, nodeId, callbackServer,
+		new RequestQueueServer<UpdateQueueRequest>(
+		    nodeId, new UpdateQueueRequestHandler(this, nodeId),
+		    new Properties()));
+	    synchronized (nodeInfoMap) {
+		assert !nodeInfoMap.containsKey(nodeInfo.nodeId);
+		nodeInfoMap.put(nodeInfo.nodeId, nodeInfo);
+	    }
+	    return new RegisterNodeResult(nodeInfo.nodeId, updateQueuePort);
+	} finally {
+	    callFinished();
 	}
-	return new RegisterNodeResult(nodeInfo.nodeId, updateQueuePort);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public long newObjectIds(int numIds) {
-	boolean txnDone = false;
-	DbTransaction txn = env.beginTransaction(txnTimeout);
+	callStarted();
 	try {
-	    long result = DbUtilities.getNextObjectId(infoDb, txn, numIds);
-	    txnDone = true;
-	    txn.commit();
-	    return result;
-	} finally {
-	    if (!txnDone) {
-		txn.abort();
+	    boolean txnDone = false;
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    try {
+		long result = DbUtilities.getNextObjectId(infoDb, txn, numIds);
+		txnDone = true;
+		txn.commit();
+		return result;
+	    } finally {
+		if (!txnDone) {
+		    txn.abort();
+		}
 	    }
+	} finally {
+	    callFinished();
 	}
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public GetObjectResults getObject(long nodeId, long oid) {
-	checkOid(oid);
-	lock(nodeId, oid, false);
-	DbTransaction txn = env.beginTransaction(txnTimeout);
-	boolean txnDone = false;
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    byte[] result = oidsDb.get(txn, encodeLong(oid), false);
-	    txnDone = true;
-	    txn.commit();
-	    return (result == null) ? null
-		: new GetObjectResults(result, getWaiting(oid, false));
-	} finally {
-	    if (!txnDone) {
-		txn.abort();
+	    checkOid(oid);
+	    lock(nodeInfo, oid, false);
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
+	    try {
+		byte[] result = oidsDb.get(txn, encodeLong(oid), false);
+		txnDone = true;
+		txn.commit();
+		return (result == null) ? null
+		    : new GetObjectResults(result, getWaiting(oid, false));
+	    } finally {
+		if (!txnDone) {
+		    txn.abort();
+		}
 	    }
+	} finally {
+	    nodeCallFinished(nodeInfo);
 	}
     }
 
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public GetObjectForUpdateResults getObjectForUpdate(
 	long nodeId, long oid)
     {
-	checkOid(oid);
-	lock(nodeId, oid, true);
-	DbTransaction txn = env.beginTransaction(txnTimeout);
-	boolean txnDone = false;
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    byte[] result = oidsDb.get(txn, encodeLong(oid), true);
-	    txnDone = true;
-	    txn.commit();
-	    return (result == null) ? null
-		: new GetObjectForUpdateResults(
-		    result, getWaiting(oid, false), getWaiting(oid, true));
-	} finally {
-	    if (!txnDone) {
-		txn.abort();
+	    checkOid(oid);
+	    lock(nodeInfo, oid, true);
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
+	    try {
+		byte[] result = oidsDb.get(txn, encodeLong(oid), true);
+		txnDone = true;
+		txn.commit();
+		return (result == null) ? null
+		    : new GetObjectForUpdateResults(
+			result, getWaiting(oid, false), getWaiting(oid, true));
+	    } finally {
+		if (!txnDone) {
+		    txn.abort();
+		}
 	    }
+	} finally {
+	    nodeCallFinished(nodeInfo);
 	}
     }
 
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public boolean upgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException
     {
-	checkOid(oid);
-	NodeInfo nodeInfo = getNodeInfo(nodeId);
-	boolean found = false;
-	for (LockRequest<Object, NodeInfo> owner :
-		 lockManager.getOwners(oid))
-	{
-	    if (nodeInfo == owner.getLocker()) {
-		if (owner.getForWrite()) {
-		    return false;
-		} else {
-		    found = true;
-		    break;
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
+	try {
+	    checkOid(oid);
+	    boolean found = false;
+	    for (LockRequest<Object, NodeInfo> owner :
+		     lockManager.getOwners(oid))
+	    {
+		if (nodeInfo == owner.getLocker()) {
+		    if (owner.getForWrite()) {
+			/* Already locked for write -- no conflict */
+			return false;
+		    } else {
+			found = true;
+			break;
+		    }
 		}
 	    }
-	}
-	if (!found) {
-	    throw new CacheConsistencyException(
-		"Node " + nodeId + " attempted to upgrade object " + oid +
-		", but does not own that object for read");
-	}
-	lock(nodeInfo, oid, true);
-	return getWaiting(oid, true);
-    }
-
-    public NextObjectResults nextObjectId(long nodeId, long oid) {
-	checkOid(oid);
-	DbTransaction txn = env.beginTransaction(txnTimeout);
-	DbCursor cursor = null;
-	boolean done = false;
-	NextObjectResults result;
-	try {
-	    cursor = oidsDb.openCursor(txn);
-	    boolean found = (oid == -1) ? cursor.findFirst()
-		: cursor.findNext(encodeLong(oid));
 	    if (!found) {
-		result = null;
-	    } else {
-		result = new NextObjectResults(
-		    decodeLong(cursor.getKey()),
-		    cursor.getValue(),
-		    getWaiting(oid, false));
+		throw new CacheConsistencyException(
+		    "Node " + nodeId + " attempted to upgrade object " + oid +
+		    ", but does not own that object for read");
 	    }
-	    done = true;
+	    lock(nodeInfo, oid, true);
+	    return getWaiting(oid, false);
 	} finally {
-	    if (cursor != null) {
-		cursor.close();
-	    }
-	    if (done) {
-		txn.commit();
-	    } else {
-		txn.abort();
-	    }
+	    nodeCallFinished(nodeInfo);
 	}
-	if (result != null) {
-	    lock(nodeId, result.oid, false);
-	}
-	return result;
     }
 
-    public GetBindingResults getBinding(long nodeId, String name) {
-	checkNull("name", name);
-	DbTransaction txn = env.beginTransaction(txnTimeout);
-	boolean done = false;
-	boolean found;
-	long oid;
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
+    public NextObjectResults nextObjectId(long nodeId, long oid) {
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    byte[] encodedName = encodeString(name);
-	    byte[] value = namesDb.get(txn, encodedName, false);
-	    found = (value != null);
-	    if (found) {
-		oid = decodeLong(value);
-	    } else {
-		DbCursor cursor = namesDb.openCursor(txn);
+	    checkOid(oid);
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
+	    NextObjectResults result;
+	    try {
+		DbCursor cursor = oidsDb.openCursor(txn);
 		try {
-		    boolean hasNext = cursor.findNext(encodedName);
-		    name = hasNext ? decodeString(cursor.getKey()) : null;
-		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    boolean found = (oid == -1) ? cursor.findFirst()
+			: cursor.findNext(encodeLong(oid));
+		    result = (!found) ? null
+			: new NextObjectResults(
+			    decodeLong(cursor.getKey()), cursor.getValue(),
+			    getWaiting(oid, false));
 		} finally {
 		    cursor.close();
 		}
+		txnDone = true;
+		txn.commit();
+	    } finally {
+		if (!txnDone) {
+		    txn.abort();
+		}
 	    }
-	    done = true;
-	    txn.commit();
+	    if (result != null) {
+		lock(nodeInfo, result.oid, false);
+	    }
+	    return result;
 	} finally {
-	    if (!done) {
-		txn.abort();
-	    }
+	    nodeCallFinished(nodeInfo);
 	}
-	lock(nodeId, name, false);
-	return new GetBindingResults(
-	    found, found ? null : name, oid,
-	    (oid == -1) ? false : getWaiting(name, false));
     }
 
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
+    public GetBindingResults getBinding(long nodeId, String name) {
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
+	try {
+	    checkNull("name", name);
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
+	    boolean found;
+	    long oid;
+	    try {
+		byte[] encodedName = encodeString(name);
+		byte[] value = namesDb.get(txn, encodedName, false);
+		found = (value != null);
+		if (found) {
+		    oid = decodeLong(value);
+		} else {
+		    DbCursor cursor = namesDb.openCursor(txn);
+		    try {
+			boolean hasNext = cursor.findNext(encodedName);
+			name = hasNext ? decodeString(cursor.getKey()) : null;
+			oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    } finally {
+			cursor.close();
+		    }
+		}
+		txnDone = true;
+		txn.commit();
+	    } finally {
+		if (!txnDone) {
+		    txn.abort();
+		}
+	    }
+	    BindingKey nameKey = BindingKey.get(name);
+	    lock(nodeInfo, nameKey, false);
+	    return new GetBindingResults(
+		found, found ? null : name, oid,
+		(oid == -1) ? false : getWaiting(nameKey, false));
+	} finally {
+	    nodeCallFinished(nodeInfo);
+	}
+    }
+
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public GetBindingForUpdateResults getBindingForUpdate(
 	long nodeId, String name)
     {
-	checkNull("name", name);
-	boolean done = false;
-	DbTransaction txn = env.beginTransaction(txnTimeout);
-	String nextName = null;
-	boolean found;
-	long oid;
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    byte[] encodedName = encodeString(name);
-	    byte[] value = namesDb.get(txn, encodedName, true);
-	    found = (value != null);
-	    if (found) {
-		oid = decodeLong(value);
-	    } else {
+	    checkNull("name", name);
+	    boolean done = false;
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    String nextName = null;
+	    boolean found;
+	    long oid;
+	    try {
+		byte[] encodedName = encodeString(name);
+		byte[] value = namesDb.get(txn, encodedName, true);
+		found = (value != null);
+		if (found) {
+		    oid = decodeLong(value);
+		} else {
+		    DbCursor cursor = namesDb.openCursor(txn);
+		    try {
+			boolean hasNext = cursor.findNext(encodedName);
+			nextName = (hasNext)
+			    ? decodeString(cursor.getKey()) : null;
+			oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    } finally {
+			cursor.close();
+		    }
+		}
+		done = true;
+		txn.commit();
+	    } finally {
+		if (!done) {
+		    txn.abort();
+		}
+	    }
+	    BindingKey nameKey = BindingKey.get(name);
+	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
+	    lock(nodeInfo, nameKey, true);
+	    if (!found) {
+		lock(nodeInfo, nextNameKey, true);
+	    }
+	    return new GetBindingForUpdateResults(
+		found, found ? null : nextName, oid,
+		(oid == -1) ? false : getWaiting(nameKey, true),
+		(oid == -1) ? false : getWaiting(nameKey, false));
+	} finally {
+	    nodeCallFinished(nodeInfo);
+	}
+    }
+
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
+    public GetBindingForRemoveResults getBindingForRemove(
+	long nodeId, String name)
+    {
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
+	try {
+	    checkNull("name", name);
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean done = false;
+	    String nextName;
+	    long oid;
+	    long nextOid;
+	    try {
+		byte[] encodedName = encodeString(name);
+		byte[] value = namesDb.get(txn, encodedName, true);
+		oid = (value == null) ? -1 : decodeLong(value);
 		DbCursor cursor = namesDb.openCursor(txn);
 		try {
 		    boolean hasNext = cursor.findNext(encodedName);
 		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
-		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    nextOid = hasNext ? decodeLong(cursor.getValue()) : -1;
 		} finally {
 		    cursor.close();
 		}
-	    }
-	    done = true;
-	    txn.commit();
-	} finally {
-	    if (!done) {
-		txn.abort();
-	    }
-	}
-	lock(nodeId, name, true);
-	if (!found) {
-	    lock(nodeId, nextName, true);
-	}
-	return new GetBindingForUpdateResults(
-	    found, found ? null : nextName, oid,
-	    (oid == -1) ? false : getWaiting(name, true),
-	    (oid == -1) ? false : getWaiting(name, false));
-    }
-
-    public GetBindingForRemoveResults getBindingForRemove(
-	long nodeId, String name)
-    {
-	checkNull("name", name);
-	DbTransaction txn = env.beginTransaction(txnTimeout);
-	boolean done = false;
-	String nextName;
-	long oid;
-	long nextOid;
-	try {
-	    byte[] encodedName = encodeString(name);
-	    byte[] value = namesDb.get(txn, encodedName, true);
-	    oid = (value == null) ? -1 : decodeLong(value);
-	    DbCursor cursor = namesDb.openCursor(txn);
-	    try {
-		boolean hasNext = cursor.findNext(encodedName);
-		nextName = hasNext ? decodeString(cursor.getKey()) : null;
-		nextOid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		done = true;
+		txn.commit();
 	    } finally {
-		cursor.close();
+		if (!done) {
+		    txn.abort();
+		}
 	    }
-	    done = true;
-	    txn.commit();
+	    BindingKey nameKey = BindingKey.get(name);
+	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
+	    if (oid != -1) {
+		lock(nodeInfo, nameKey, true);
+	    }
+	    lock(nodeInfo, nextNameKey, oid != -1);
+	    return new GetBindingForRemoveResults(
+		oid != -1,
+		nextName,
+		oid,
+		oid == -1 ? false : getWaiting(nameKey, true),
+		oid == -1 ? false : getWaiting(nameKey, false),
+		nextOid,
+		getWaiting(nextNameKey, true),
+		oid == -1 ? false : getWaiting(nextNameKey, false));
 	} finally {
-	    if (!done) {
-		txn.abort();
-	    }
+	    nodeCallFinished(nodeInfo);
 	}
-	if (oid != -1) {
-	    lock(nodeId, name, true);
-	}
-	lock(nodeId, nextName, oid != -1);
-	return new GetBindingForRemoveResults(
-	    oid != -1,
-	    nextName,
-	    oid,
-	    oid == -1 ? false : getWaiting(name, true),
-	    oid == -1 ? false : getWaiting(name, false),
-	    nextOid,
-	    getWaiting(nextName, true),
-	    oid == -1 ? false : getWaiting(nextName, false));
     }
 
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public NextBoundNameResults nextBoundName(long nodeId, String name) {
-	checkNull("name", name);
-	long oid;
-	boolean done = false;
-	DbTransaction txn = env.beginTransaction(txnTimeout);
-	DbCursor cursor = null;
+	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    cursor = namesDb.openCursor(txn);
-	    boolean hasNext = cursor.findNext(encodeString(name));
-	    name = hasNext ? decodeString(cursor.getKey()) : null;
-	    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
-	    done = true;
-	    txn.commit();
+	    checkNull("name", name);
+	    long oid;
+	    boolean done = false;
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    DbCursor cursor = null;
+	    try {
+		cursor = namesDb.openCursor(txn);
+		boolean hasNext = cursor.findNext(encodeString(name));
+		name = hasNext ? decodeString(cursor.getKey()) : null;
+		oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		done = true;
+		txn.commit();
+	    } finally {
+		if (cursor != null) {
+		    cursor.close();
+		}
+		if (!done) {
+		    txn.abort();
+		}
+	    }
+	    BindingKey nameKey = BindingKey.getAllowLast(name);
+	    lock(nodeInfo, nameKey, false);
+	    return new NextBoundNameResults(
+		name, oid, getWaiting(nameKey, false));
 	} finally {
-	    if (cursor != null) {
-		cursor.close();
-	    }
-	    if (!done) {
-		txn.abort();
-	    }
+	    nodeCallFinished(nodeInfo);
 	}
-	lock(nodeId, name, false);
-	return new NextBoundNameResults(
-	    name, oid, getWaiting(name, false));
     }
 
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public int getClassId(byte[] classInfo) {
-	return DbUtilities.getClassId(env, classesDb, classInfo, txnTimeout);
+	callStarted();
+	try {
+	    return DbUtilities.getClassId(
+		env, classesDb, classInfo, txnTimeout);
+	} finally {
+	    callFinished();
+	}
     }
 	    
+    /**
+     * {@inheritDoc} 
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	IOException {@inheritDoc}
+     */
+    @Override
     public byte[] getClassInfo(int classId) {
-	return DbUtilities.getClassInfo(env, classesDb, classId, txnTimeout);
+	callStarted();
+	try {
+	    return DbUtilities.getClassInfo(
+		env, classesDb, classId, txnTimeout);
+	} finally {
+	    callFinished();
+	}
     }
 
-    /* -- UpdateQueue methods -- */
+    /* -- Implement UpdateQueueServer -- */
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	CacheConsistencyException {@inheritDoc}
+     * @throws	IllegalArgumentException {@inheritDoc}
+     */
+    @Override
     public void commit(long nodeId,
 		       long[] oids,
 		       byte[][] oidValues,
@@ -708,115 +857,236 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		       long[] nameValues)
 	throws CacheConsistencyException
     {
-	NodeInfo nodeInfo = getNodeInfo(nodeId);
-	checkNull("oids", oids);
-	checkNull("oidValues", oidValues);
-	if (oids.length != oidValues.length) {
-	    throw new IllegalArgumentException(
-		"The number of object IDs and OID values must be the same");
-	}
-	checkNull("names", names);
-	checkNull("nameValues", nameValues);
-	if (names.length != nameValues.length) {
-	    throw new IllegalArgumentException(
-		"The number of names and name values must be the same");
-	}
-	boolean done = false;
-	DbTransaction txn = env.beginTransaction(txnTimeout);
+	NodeInfo nodeInfo;
 	try {
-	    for (int i = 0; i < oids.length; i++) {
-		long oid = oids[i];
-		if (oid < 0) {
-		    throw new IllegalArgumentException(
-			"The object IDs must not be negative");
+	    nodeInfo = nodeCallStarted(nodeId);
+	} catch (IllegalStateException e) {
+	    throw new CacheConsistencyException(e.getMessage(), e);
+	}
+	try {
+	    checkNull("oids", oids);
+	    checkNull("oidValues", oidValues);
+	    if (oids.length != oidValues.length) {
+		throw new IllegalArgumentException(
+		    "The number of object IDs and OID values" +
+		    " must be the same");
+	    }
+	    checkNull("names", names);
+	    checkNull("nameValues", nameValues);
+	    if (names.length != nameValues.length) {
+		throw new IllegalArgumentException(
+		    "The number of names and name values must be the same");
+	    }
+	    boolean txnDone = false;
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    try {
+		for (int i = 0; i < oids.length; i++) {
+		    long oid = oids[i];
+		    if (oid < 0) {
+			throw new IllegalArgumentException(
+			    "The object IDs must not be negative");
+		    }
+		    checkLocked(nodeInfo, oid, true);
+		    byte[] value = oidValues[i];
+		    if (value == null) {
+			oidsDb.delete(txn, encodeLong(oid));
+		    } else {
+			oidsDb.put(txn, encodeLong(oid), oidValues[i]);
+		    }
 		}
-		checkLocked(nodeInfo, oid, true);
-		byte[] value = oidValues[i];
-		if (value == null) {
-		    oidsDb.delete(txn, encodeLong(oid));
-		} else {
-		    oidsDb.put(txn, encodeLong(oid), oidValues[i]);
+		for (int i = 0; i < names.length; i++) {
+		    String name = names[i];
+		    if (name == null) {
+			throw new IllegalArgumentException(
+			    "The names must not be null");
+		    }
+		    checkLocked(nodeInfo, BindingKey.get(name), true);
+		    long value = nameValues[i];
+		    if (value < -1) {
+			throw new IllegalArgumentException(
+			    "The name values must not be less than -1");
+		    } else if (value == -1) {
+			namesDb.delete(txn, encodeString(name));
+		    } else {
+			namesDb.put(
+			    txn, encodeString(name), encodeLong(value));
+		    }
+		}
+		txnDone = true;
+		txn.commit();
+	    } finally {
+		if (!txnDone) {
+		    txn.abort();
 		}
 	    }
-	    for (int i = 0; i < names.length; i++) {
-		String name = names[i];
-		if (name == null) {
-		    throw new IllegalArgumentException(
-			"The names must not be null");
-		}
-		checkLocked(nodeInfo, name, true);
-		long value = nameValues[i];
-		if (value < -1) {
-		    throw new IllegalArgumentException(
-			"The name values must not be less than -1");
-		} else if (value == -1) {
-		    namesDb.delete(txn, encodeString(name));
-		} else {
-		    namesDb.put(txn, encodeString(name), encodeLong(value));
-		}
-	    }
-	    done = true;
-	    txn.commit();
 	} finally {
-	    if (!done) {
-		txn.abort();
-	    }
+	    nodeCallFinished(nodeInfo);
 	}
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	CacheConsistencyException {@inheritDoc}
+     * @throws	IllegalArgumentException {@inheritDoc}
+     */
+    @Override
     public void evictObject(long nodeId, long oid)
 	throws CacheConsistencyException
     {
-	NodeInfo nodeInfo = getNodeInfo(nodeId);
-	checkOid(oid);
-	checkLocked(nodeInfo, oid, false);
-	lockManager.releaseLock(nodeInfo, oid);
+	NodeInfo nodeInfo;
+	try {
+	    nodeInfo = nodeCallStarted(nodeId);
+	} catch (IllegalStateException e) {
+	    throw new CacheConsistencyException(e.getMessage(), e);
+	}
+	try {
+	    checkOid(oid);
+	    checkLocked(nodeInfo, oid, false);
+	    releaseLock(nodeInfo, oid);
+	} finally {
+	    nodeCallFinished(nodeInfo);
+	}
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	CacheConsistencyException {@inheritDoc}
+     * @throws	IllegalArgumentException {@inheritDoc}
+     */
+    @Override
     public void downgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException
     {
-	NodeInfo nodeInfo = getNodeInfo(nodeId);
-	checkOid(oid);
-	checkLocked(nodeInfo, oid, true);
-	lockManager.downgradeLock(nodeInfo, oid);
+	NodeInfo nodeInfo;
+	try {
+	    nodeInfo = nodeCallStarted(nodeId);
+	} catch (IllegalStateException e) {
+	    throw new CacheConsistencyException(e.getMessage(), e);
+	}
+	try {
+	    checkOid(oid);
+	    checkLocked(nodeInfo, oid, true);
+	    lockManager.downgradeLock(nodeInfo, oid);
+	} finally {
+	    nodeCallFinished(nodeInfo);
+	}
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	CacheConsistencyException {@inheritDoc}
+     * @throws	IllegalArgumentException {@inheritDoc}
+     */
+    @Override
     public void evictBinding(long nodeId, String name)
 	throws CacheConsistencyException
     {
-	NodeInfo nodeInfo = getNodeInfo(nodeId);
-	checkNull("name", name);
-	checkLocked(nodeInfo, name, false);
-	lockManager.releaseLock(nodeInfo, name);
+	NodeInfo nodeInfo;
+	try {
+	    nodeInfo = nodeCallStarted(nodeId);
+	} catch (IllegalStateException e) {
+	    throw new CacheConsistencyException(e.getMessage(), e);
+	}
+	try {
+	    BindingKey nameKey = BindingKey.getAllowLast(name);
+	    checkLocked(nodeInfo, nameKey, false);
+	    releaseLock(nodeInfo, nameKey);
+	} finally {
+	    nodeCallFinished(nodeInfo);
+	}
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	CacheConsistencyException {@inheritDoc}
+     * @throws	IllegalArgumentException {@inheritDoc}
+     */
+    @Override
     public void downgradeBinding(long nodeId, String name)
 	throws CacheConsistencyException
     {
-	NodeInfo nodeInfo = getNodeInfo(nodeId);
-	checkNull("name", name);
-	checkLocked(nodeInfo, name, true);
-	lockManager.downgradeLock(nodeInfo, name);
+	NodeInfo nodeInfo;
+	try {
+	    nodeInfo = nodeCallStarted(nodeId);
+	} catch (IllegalStateException e) {
+	    throw new CacheConsistencyException(e.getMessage(), e);
+	}
+	try {
+	    BindingKey nameKey = BindingKey.getAllowLast(name);
+	    checkLocked(nodeInfo, nameKey, true);
+	    lockManager.downgradeLock(nodeInfo, nameKey);
+	} finally {
+	    nodeCallFinished(nodeInfo);
+	}
     }
+
+    /* -- Implement NodeListener -- */
+
+    /** {@inheritDoc} */
+    @Override
+    public void nodeFailed(Node node) {
+	/*
+	 * Note that we may want to insure that the data store is shutdown for
+	 * a particular node before marking the node as not alive.  That would
+	 * insure that operations for a failed node were not still underway
+	 * even though the watchdog considers it to have failed.
+	 * -tjb@sun.com (07/27/2009)
+	 */
+	shutdownNode(node.getId());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void nodeStarted(Node node) { }
 
     /* -- Other public methods -- */
 
     /**
-     * Returns a string representation of this object.
+     * Mark the node with the specified ID as shutdown and schedule a task to
+     * release all of its locks.  Does nothing if the node is not found.
      *
-     * @return	a string representation of this object
+     * @param	nodeId the ID of the failed node
      */
-    public String toString() {
-	return "CachingDataStoreServerImpl[directory=\"" + directory + "\"]";
+    public void shutdownNode(long nodeId) {
+	NodeInfo nodeInfo;
+	try {
+	    nodeInfo = getNodeInfo(nodeId);
+	} catch (IllegalArgumentException e) {
+	    return;
+	}
+	if (nodeInfo.shutdown()) {
+	    synchronized (nodeInfoMap) {
+		nodeInfoMap.remove(nodeId);
+	    }
+	    scheduleTask(new ReleaseNodeLocksTask(nodeInfo));
+	}
+    }
+
+    /** A {@link KernelRunnable} that releases the locks owned by a node. */
+    private static class ReleaseNodeLocksTask extends AbstractKernelRunnable {
+	private final NodeInfo nodeInfo;
+	ReleaseNodeLocksTask(NodeInfo nodeInfo) {
+	    super(null);
+	    this.nodeInfo = nodeInfo;
+	}
+	@Override
+	public void run() {
+	    nodeInfo.releaseAllLocks();
+	}
     }
 
     /* -- AbstractComponent methods -- */
 
+    /** {@inheritDoc} */
     @Override
     protected void doShutdown() {
 	infoDb.close();
 	classesDb.close();
+	oidsDb.close();
 	namesDb.close();
 	env.close();
     }
@@ -837,22 +1107,34 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * failure within the data store.
      */
     void reportFailure() {
-	Thread thread =
-	    new Thread("CachingDataStoreServerImpl reportFailure") {
-		public void run() {
-		    watchdogService.reportFailure(
-			watchdogService.getLocalNodeId(),
-			CachingDataStoreServerImpl.class.getName());
-		}
-	    };
-	thread.start();
+	synchronized (watchdogServiceSync) {
+	    if (watchdogService == null) {
+		failureBeforeWatchdog = true;
+	    } else {
+		Thread thread =
+		    new Thread("CachingDataStoreServerImpl reportFailure") {
+			public void run() {
+			    watchdogService.reportFailure(
+				watchdogService.getLocalNodeId(),
+				CachingDataStoreServerImpl.class.getName());
+			}
+		    };
+		thread.start();
+	    }
+	}
     }
 
-    private void lock(long nodeId, Object key, boolean forWrite) {
-	lock(getNodeInfo(nodeId), key, forWrite);
-    }
-
+    /**
+     * Obtains a lock on behalf of the node with the specified ID.  Use this
+     * method rather than calling the lock manager to make sure that callbacks
+     * and lock tracking are performed correctly.
+     *
+     * @param	nodeInfo the information for the node
+     * @param	key the key of the item to be locked
+     * @param	forWrite whether the item should be locked for write
+     */
     private void lock(NodeInfo nodeInfo, Object key, boolean forWrite) {
+	assert key instanceof Long || key instanceof BindingKey;
 	synchronized (nodeInfo) {
 	    LockConflict<Object, NodeInfo> conflict =
 		lockManager.lockNoWait(nodeInfo, key, forWrite);
@@ -887,7 +1169,22 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    }
 		}
 	    }
+	    nodeInfo.noteLocked(key);
 	}
+    }
+
+    /**
+     * Releases a lock owned by a node.  Use this method rather than calling
+     * the lock manager directly to make sure that locking tracking is
+     * performed correctly.
+     *
+     * @param	nodeInfo the information for the node
+     * @param	key the key of the item whose lock should be released
+     */
+    private void releaseLock(NodeInfo nodeInfo, Object key) {
+	assert key instanceof Long || key instanceof BindingKey;
+	lockManager.releaseLock(nodeInfo, key);
+	nodeInfo.noteUnlocked(key);
     }
 
     /**
@@ -898,6 +1195,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private void checkLocked(NodeInfo nodeInfo, Object key, boolean forWrite)
 	throws CacheConsistencyException
     {
+	assert key instanceof Long || key instanceof BindingKey;
 	for (LockRequest<Object, NodeInfo> lockRequest :
 		 lockManager.getOwners(key))
 	{
@@ -919,6 +1217,32 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     private boolean getWaiting(Object key, boolean forWrite) {
 	return !lockManager.getWaiters(key).isEmpty();
+    }
+
+    /**
+     * Returns information about the node with the specified ID.  Throws
+     * IllegalArgumentException if the node is not found.  Throws
+     * IllegalStateException if the server is shutdown or if the node is marked
+     * as failed.  Otherwise, increments the call count and the count of calls
+     * active for the node.
+     */
+    private NodeInfo nodeCallStarted(long nodeId) {
+	callStarted();
+	boolean done = false;
+	try {
+	    NodeInfo nodeInfo = getNodeInfo(nodeId);
+	    nodeInfo.nodeCallStarted();
+	    return nodeInfo;
+	} finally {
+	    if (!done) {
+		callFinished();
+	    }
+	}
+    }
+
+    private void nodeCallFinished(NodeInfo nodeInfo) {
+	nodeInfo.nodeCallFinished();
+	callFinished();
     }
 
     /**
@@ -968,6 +1292,170 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		lastNodeId = nextNodeId + NODE_ID_ALLOCATION_BLOCK_SIZE - 1;
 	    }
 	    return nextNodeId++;
+	}
+    }
+
+    /**
+     * Computes the lock timeout based on the specified transaction timeout and
+     * {@link #DEFAULT_LOCK_TIMEOUT_PROPORTION}.
+     */
+    private static long computeLockTimeout(long txnTimeout) {
+	long result = (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
+	/* Lock timeout should be at least 1 */
+	if (result < 1) {
+	    result = 1;
+	}
+	return result;
+    }
+
+    /**
+     * Schedules a task to run immediately.
+     *
+     * @param	task the task
+     */
+    private void scheduleTask(KernelRunnable task) {
+	taskScheduler.scheduleTask(task, taskOwner);
+    }
+
+    /* -- Nested classes -- */
+
+    /**
+     * A {@code Runnable} that carries out callbacks queued to the {@link
+     * #callbackRequests} field.
+     */
+    private class CallbackRequester implements Runnable {
+
+	/** Creates an instance of this class. */
+	CallbackRequester() { }
+
+	@Override
+	public void run() {
+	    while (!shuttingDown()) {
+		try {
+		    callbackOwners(callbackRequests.take());
+		} catch (InterruptedException e) {
+		    continue;
+		}
+	    }
+	}
+
+	/**
+	 * Sends callback requests to all of the owners of the requested lock,
+	 * unless the server is shutting down.  Abandons further callbacks if
+	 * the requesting node is marked as failed.
+	 *
+	 * @param	request the blocked request whose owners should receive
+	 *		callback requests
+	 */
+	private void callbackOwners(NodeRequest request) {
+	    try {
+		callStarted();
+	    } catch (IllegalStateException e) {
+		return;
+	    }
+	    try {
+		NodeInfo nodeInfo = request.getLocker();
+		nodeInfo.nodeCallStarted();
+		try {
+		    for (LockRequest<Object, NodeInfo> owner
+			     : lockManager.getOwners(request.getKey()))
+		    {
+			if (nodeInfo != owner.getLocker()) {
+			    callback((NodeRequest) owner, request);
+			}
+		    }
+		} finally {
+		    nodeInfo.nodeCallFinished();
+		}
+	    } finally {
+		callFinished();
+	    }
+	}
+
+	/**
+	 * Sends a callback request to the owner on behalf of the requester.
+	 */
+	private void callback(NodeRequest owner, NodeRequest request) {
+	    if (owner.noteCallback()) {
+		boolean downgrade =
+		    owner.getForWrite() && !request.getForWrite();
+		NodeInfo ownerNodeInfo = owner.getLocker();
+		Object key = request.getKey();
+		CallbackTask task = new CallbackTask(
+		    ownerNodeInfo.callbackServer, key, downgrade,
+		    request.getLocker().nodeId);
+		runIoTask(task, ownerNodeInfo.nodeId);
+		if (task.released) {
+		    if (downgrade) {
+			lockManager.downgradeLock(ownerNodeInfo, key);
+		    } else {
+			releaseLock(ownerNodeInfo, key);
+		    }
+		}
+	    }
+	}
+    }
+
+    /** Performs a callback. */
+    private static class CallbackTask implements IoRunnable {
+
+	/** The callback server. */
+	private final CallbackServer callbackServer;
+
+	/** The key of the item being called back. */
+	private final Object key;
+
+	/** Whether to perform a downgrade. */
+	private final boolean downgrade;
+
+	/** The node ID of the node requesting the callback. */
+	private final long requesterNodeId;
+
+	/**
+	 * Whether the node released the item immediately in response to the
+	 * callback request.
+	 */
+	boolean released;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	callbackServer the callback server
+	 * @param	key the key of the item being called back
+	 * @param	downgrade whether to perform a downgrade
+	 * @param	node ID the node ID of the node requesting the callback
+	 */
+	CallbackTask(CallbackServer callbackServer,
+		     Object key,
+		     boolean downgrade,
+		     long requesterNodeId)
+	{
+	    this.callbackServer = callbackServer;
+	    this.key = key;
+	    this.downgrade = downgrade;
+	    this.requesterNodeId = requesterNodeId;
+	}
+
+	@Override
+	public void run() throws IOException {
+	    if (key instanceof BindingKey) {
+		String name = ((BindingKey) key).getNameAllowLast();
+		if (downgrade) {
+		    released = callbackServer.requestDowngradeBinding(
+			name, requesterNodeId);
+		} else {
+		    released = callbackServer.requestEvictBinding(
+			name, requesterNodeId);
+		}
+	    } else {
+		if (downgrade) {
+		    released = callbackServer.requestDowngradeObject(
+			(Long) key, requesterNodeId);
+		} else {
+		    released = callbackServer.requestEvictObject(
+			(Long) key, requesterNodeId);
+		}
+	    }
 	}
     }
 }

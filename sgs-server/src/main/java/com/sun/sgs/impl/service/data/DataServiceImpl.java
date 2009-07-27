@@ -450,7 +450,9 @@ public final class DataServiceImpl implements DataService {
     }
 
     /** {@inheritDoc} */
-    public void ready() { }
+    public void ready() throws Exception {
+	store.ready();
+    }
 
     /* -- Implement DataManager -- */
 

@@ -21,11 +21,9 @@ package com.sun.sgs.impl.util.lock;
 
 import static java.util.logging.Level.FINER;
 
-/* FIXME: Implement releasing all locks by marking lockers as dead? */
-
 /**
  * A class for managing lock conflicts where locks are not held by transactions
- * and the locker can make simultaneous request from multiple threads.
+ * and the locker can make simultaneous requests from multiple threads.
  *
  * @param	<K> the type of key
  * @param	<L> the type of locker

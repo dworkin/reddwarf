@@ -82,6 +82,9 @@ class Cache {
 	checkNull("cacheFullNotify", cacheFullNotify);
 	available = new Semaphore(cacheSize);
 	locks = new Object[numLocks];
+	for (int i = 0; i < numLocks; i++) {
+	    locks[i] = new Object();
+	}
 	this.cacheFullNotify = cacheFullNotify;
     }
 

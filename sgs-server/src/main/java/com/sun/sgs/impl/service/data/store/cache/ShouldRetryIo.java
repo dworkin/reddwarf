@@ -68,7 +68,7 @@ class ShouldRetryIo {
 		if (remaining <= 0) {
 		    break;
 		}
-		wait(remaining);
+		Thread.sleep(remaining);
 	    }
 	} catch (InterruptedException e) {
 	}

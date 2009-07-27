@@ -82,12 +82,12 @@ public class TestDataStoreImpl extends TestCase {
 	DataStoreImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static final String dbDirectory =
+    protected static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
 
     /** The basic test environment. */
-    private static final BasicDataStoreTestEnv env =
+    protected static final BasicDataStoreTestEnv env =
 	new BasicDataStoreTestEnv(System.getProperties());
 
     /** The transaction proxy. */

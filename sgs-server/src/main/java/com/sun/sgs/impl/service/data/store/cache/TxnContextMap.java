@@ -232,7 +232,12 @@ class TxnContextMap {
 	void increment() {
 	    count.incrementAndGet();
 	    if (store.getShutdownRequested()) {
-		count.decrementAndGet();
+		int result = count.decrementAndGet();
+		if (result == 0) {
+		    synchronized (this) {
+			notifyAll();
+		    }
+		}
 		throw new IllegalStateException("Node is shut down");
 	    }
 	}

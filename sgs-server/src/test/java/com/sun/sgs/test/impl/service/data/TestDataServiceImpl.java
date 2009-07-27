@@ -5744,6 +5744,7 @@ public class TestDataServiceImpl{
 
     /** A dummy implementation of DataStore. */
     static class DummyDataStore implements DataStore {
+	public void ready() { }
 	public long createObject(Transaction txn) { return 0; }
 	public void markForUpdate(Transaction txn, long oid) { }
 	public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {

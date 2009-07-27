@@ -56,7 +56,7 @@ public abstract class TxnLocker<K, L extends TxnLocker<K, L>>
      * Creates an instance of this class.
      *
      * @param	lockManager the lock manager for this locker
-     * @param	requestedStartTime the time milliseconds that the task
+     * @param	requestedStartTime the time in milliseconds that the task
      *		associated with the transaction was originally
      *		requested to start
      * @throws	IllegalArgumentException if {@code requestedStartTime}
@@ -76,9 +76,11 @@ public abstract class TxnLocker<K, L extends TxnLocker<K, L>>
     /* -- Public methods -- */
 
     /**
-     * {@inheritDoc} <p>
+     * Returns the time in milliseconds that the task associated with the
+     * transaction was originally requested to start, as specified in the
+     * constructor.
      *
-     * This implementation returns the value specified in the constructor.
+     * @return	the requested start time in milliseconds
      */
     public long getRequestedStartTime() {
 	return requestedStartTime;
