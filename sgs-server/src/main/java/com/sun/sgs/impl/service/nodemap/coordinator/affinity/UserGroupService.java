@@ -19,10 +19,8 @@
 
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -124,19 +122,19 @@ public final class UserGroupService extends AbstractService {
     private int count = 0;  // ack!
 
     /**
-     * Make an association between a client session and a group.
+     * Make an association between an identity and a group.
      *
      * TODO groupId <= 0?
      *
-     * @param session a client session
+     * @param identity an identity
      * @param groupId a group id
      */
-    void associate(ClientSession session, long groupId) {
-        if (session == null) {
-            throw new NullPointerException("session can not be null");
+    void associate(Identity identity, long groupId) {
+        if (identity == null) {
+            throw new NullPointerException("identity can not be null");
         }
-        System.out.println("made association between " + session + " and " + groupId);
-        associations.put(ClientSessionImpl.getIdentity(session), groupId);
+        System.out.println("made association between " + identity + " and " + groupId);
+        associations.put(identity, groupId);
         count++;
         if ((count % 10) == 0) {
             System.out.println("Sending associations");

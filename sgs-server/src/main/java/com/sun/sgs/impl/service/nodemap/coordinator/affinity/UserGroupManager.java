@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 import com.sun.sgs.app.AffinityGroupManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.impl.service.session.ClientSessionImpl;
 
 /**
  * A manager which allows hits to be provided to the underlying affinity
@@ -43,6 +44,6 @@ public final class UserGroupManager implements AffinityGroupManager {
 
     @Override
     public void associate(ClientSession session, long groupId) {
-        service.associate(session, groupId);
+        service.associate(ClientSessionImpl.getIdentity(session), groupId);
     }
 }
