@@ -51,10 +51,12 @@ public class TestCachingDataStore extends TestDataStoreImpl {
     private static final int updateQueuePort =
 	Integer.getInteger("test.update.queue.port", 44542);
 
+    /** The network port for the node's callback server. */
+    private static final int nodeCallbackPort =
+	Integer.getInteger("test.callback.port", 44541);
+
     /** Creates an instance of this class. */
-    public TestCachingDataStore(String name) {
-	super(name);
-    }
+    public TestCachingDataStore() { }
 
     /** Add client and server properties. */
     @Override
@@ -63,11 +65,13 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	String host = serverHost;
 	int port = serverPort;
 	int queuePort = updateQueuePort;
+	int callbackPort = nodeCallbackPort;
         String nodeType = NodeType.appNode.toString();
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
 	    queuePort = 0;
+	    callbackPort = 0;
 	    nodeType = NodeType.coreServerNode.toString();
 	}
         props.setProperty(NODE_TYPE, nodeType);
@@ -76,6 +80,8 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 			  String.valueOf(port));
 	props.setProperty(DataStoreCachePackage + ".update.queue.port",
 			  String.valueOf(queuePort));
+	props.setProperty(DataStoreCachePackage + ".callback.port",
+			  String.valueOf(callbackPort));
 	props.setProperty(DataStoreCachePackage + ".directory", dbDirectory);
 	return props;
     }
@@ -91,5 +97,27 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
+    }
+
+    /* -- Tests -- */
+
+    /* -- Skip tests that involve properties that don't apply -- */
+
+    @Override
+    public void testConstructorNoDirectory() throws Exception {
+	System.err.println("Skipping");
+    }
+    @Override
+    public void testConstructorNonexistentDirectory() throws Exception {
+	System.err.println("Skipping");
+    }
+    @Override
+    public void testConstructorDirectoryIsFile() throws Exception {
+	System.err.println("Skipping");
+
+    }
+    @Override
+    public void testConstructorDirectoryNotWritable() throws Exception {
+	System.err.println("Skipping");
     }
 }

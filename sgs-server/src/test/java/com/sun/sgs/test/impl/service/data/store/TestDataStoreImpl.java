@@ -40,7 +40,7 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -48,8 +48,11 @@ import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /*
@@ -58,24 +61,8 @@ import org.junit.runner.RunWith;
  */
 
 /** Test the DataStoreImpl class */
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestDataStoreImpl extends TestCase {
-
-    /** If this property is set, then only run the single named test method. */
-    private static final String testMethod = System.getProperty("test.method");
-
-    /**
-     * Specify the test suite to include all tests, or just a single method if
-     * specified.
-     */
-    public static TestSuite suite() {
-	if (testMethod == null) {
-	    return new TestSuite(TestDataStoreImpl.class);
-	}
-	TestSuite suite = new TestSuite();
-	suite.addTest(new TestDataStoreImpl(testMethod));
-	return suite;
-    }
+@RunWith(FilteredNameRunner.class)
+public class TestDataStoreImpl extends Assert {
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
@@ -104,14 +91,6 @@ public class TestDataStoreImpl extends TestCase {
     /** An instance of the data store, to test. */
     protected static DataStore store;
 
-    /** Make sure an empty version of the directory exists. */
-    static {
-	cleanDirectory(dbDirectory);
-    }
-
-    /** Set when the test passes. */
-    protected boolean passed;
-
     /** Default properties for creating the DataStore. */
     protected Properties props;
 
@@ -122,13 +101,17 @@ public class TestDataStoreImpl extends TestCase {
     protected long id;
 
     /** Creates the test. */
-    public TestDataStoreImpl(String name) {
-	super(name);
+    public TestDataStoreImpl() { }
+
+    /** Make sure an empty version of the directory exists. */
+    @BeforeClass
+    public static void setUpBeforeClass() {
+	cleanDirectory(dbDirectory);
     }
 
-    /** Prints the test case, and creates the data store and an object. */
-    protected void setUp() throws Exception {
-	System.err.println("Testcase: " + getName());
+    /** Creates the data store and an object. */
+    @Before
+    public void setUp() throws Exception {
 	txn = createTransaction(UsePrepareAndCommit.ARBITRARY, 10000);
 	props = getProperties();
 	if (store == null) {
@@ -137,30 +120,18 @@ public class TestDataStoreImpl extends TestCase {
 	id = store.createObject(txn);
     }
 
-    /** Sets passed if the test passes. */
-    protected void runTest() throws Throwable {
-	super.runTest();
-	passed = true;
-    }
-
     /** Abort the current transaction, if non-null, and shutdown the store. */
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
 		txn.abort(new RuntimeException("abort"));
 	    }
 	} catch (RuntimeException e) {
-	    if (passed) {
-		throw e;
-	    } else {
-		e.printStackTrace();
-	    }
+	    e.printStackTrace();
+	    throw e;
 	} finally {
             txn = null;
-            if (!passed && store != null) {
-                new ShutdownAction().waitForDone();
-                store = null;
-            }
 	}
     }
 
@@ -168,6 +139,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test constructor -- */
 
+    @Test
     public void testConstructorNullArg() throws Exception {
 	try {
 	    createDataStore(null);
@@ -183,6 +155,7 @@ public class TestDataStoreImpl extends TestCase {
      *
      * @throws Exception if an unexpected exception occurs
      */
+    @Test
     public void testConstructorNoDirectory() throws Exception {
         String rootDir = createDirectory();
         File dataDir = new File(rootDir, "dsdb");
@@ -196,6 +169,7 @@ public class TestDataStoreImpl extends TestCase {
         testStore.shutdown();
     }
 
+    @Test
     public void testConstructorNoDirectoryNorRoot() throws Exception {
 	Properties props = new Properties();
 	try {
@@ -206,6 +180,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorNonexistentDirectory() throws Exception {
         String directory = createDirectory();
         File dir = new File(directory);
@@ -218,6 +193,7 @@ public class TestDataStoreImpl extends TestCase {
         assertTrue(dir.exists());
     }
 
+    @Test
     public void testConstructorDirectoryIsFile() throws Exception {
 	String file = File.createTempFile("existing", "db").getPath();
 	props.setProperty(
@@ -231,6 +207,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorDirectoryNotWritable() throws Exception {
         String osName = System.getProperty("os.name", "unknown");
 	/*
@@ -259,6 +236,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test createObject -- */
 
+    @Test
     public void testCreateObjectNullTxn() {
 	try {
 	    store.createObject(null);
@@ -272,31 +250,40 @@ public class TestDataStoreImpl extends TestCase {
     private final Action createObject = new Action() {
 	void run() { store.createObject(txn); };
     };
+    @Test
     public void testCreateObjectAborted() throws Exception {
 	testAborted(createObject);
     }
+    @Test
     public void testCreateObjectPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(createObject);
     }
+    @Test
     public void testCreateObjectPreparedModified() throws Exception {
 	testPreparedModified(createObject);
     }
+    @Test
     public void testCreateObjectCommitted() throws Exception {
 	testCommitted(createObject);
     }
+    @Test
     public void testCreateObjectWrongTxn() throws Exception {
 	testWrongTxn(createObject);
     }
+    @Test
     public void testCreateObjectShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(createObject);
     }
+    @Test
     public void testCreateObjectShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(createObject);
     }
+    @Test
     public void testCreateObjectShutdown() throws Exception {
 	testShutdown(createObject);
     }
 
+    @Test
     public void testCreateObjectSuccess() throws Exception {
 	assertTrue(id >= 0);
 	assertTrue(
@@ -312,6 +299,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertTrue(txn.prepare());
     }
 
+    @Test
     public void testCreateObjectMany() throws Exception {
 	for (int i = 0; i < 10; i++) {
 	    if (i != 0) {
@@ -327,6 +315,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test markForUpdate -- */
 
+    @Test
     public void testMarkForUpdateNullTxn() {
 	try {
 	    store.markForUpdate(null, 3);
@@ -336,6 +325,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testMarkForUpdateBadId() {
 	try {
 	    store.markForUpdate(txn, -3);
@@ -345,6 +335,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testMarkForUpdateNotFound() throws Exception {
 	store.markForUpdate(txn, id);
     }
@@ -354,31 +345,40 @@ public class TestDataStoreImpl extends TestCase {
 	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
 	void run() { store.markForUpdate(txn, id); }
     };
+    @Test
     public void testMarkForUpdateAborted() throws Exception {
 	testAborted(markForUpdate);
     }
+    @Test
     public void testMarkForUpdatePreparedReadOnly() throws Exception {
 	testPreparedReadOnly(markForUpdate);
     }
+    @Test
     public void testMarkForUpdatePreparedModified() throws Exception {
 	testPreparedModified(markForUpdate);
     }
+    @Test
     public void testMarkForUpdateCommitted() throws Exception {
 	testCommitted(markForUpdate);
     }
+    @Test
     public void testMarkForUpdateWrongTxn() throws Exception {
 	testWrongTxn(markForUpdate);
     }
+    @Test
     public void testMarkForUpdateShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(markForUpdate);
     }
+    @Test
     public void testMarkForUpdateShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(markForUpdate);
     }
+    @Test
     public void testMarkForUpdateShutdown() throws Exception {
 	testShutdown(markForUpdate);
     }
 
+    @Test
     public void testMarkForUpdateSuccess() throws Exception {
 	store.setObject(txn, id, new byte[] { 0 });
 	txn.commit();
@@ -394,6 +394,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test getObject -- */
 
+    @Test
     public void testGetObjectNullTxn() {
 	try {
 	    store.getObject(null, 3, false);
@@ -403,6 +404,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetObjectBadId() {
 	try {
 	    store.getObject(txn, -3, false);
@@ -412,6 +414,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetObjectNotFound() throws Exception {
 	try {
 	    store.getObject(txn, id, false);
@@ -426,31 +429,40 @@ public class TestDataStoreImpl extends TestCase {
 	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
 	void run() { store.getObject(txn, id, false); };
     };
+    @Test
     public void testGetObjectAborted() throws Exception {
 	testAborted(getObject);
     }
+    @Test
     public void testGetObjectPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(getObject);
     }
+    @Test
     public void testGetObjectPreparedModified() throws Exception {
 	testPreparedModified(getObject);
     }
+    @Test
     public void testGetObjectCommitted() throws Exception {
 	testCommitted(getObject);
     }
+    @Test
     public void testGetObjectWrongTxn() throws Exception {
 	testWrongTxn(getObject);
     }
+    @Test
     public void testGetObjectShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(getObject);
     }
+    @Test
     public void testGetObjectShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(getObject);
     }
+    @Test
     public void testGetObjectShutdown() throws Exception {
 	testShutdown(getObject);
     }
 
+    @Test
     public void testGetObjectSuccess() throws Exception {
 	byte[] data = { 1, 2 };
 	store.setObject(txn, id, data);
@@ -470,6 +482,7 @@ public class TestDataStoreImpl extends TestCase {
      * Test that we can store all values for the first data byte, since we're
      * now using that byte to mark placeholders.
      */
+    @Test
     public void testGetObjectFirstByte() throws Exception {
 	byte[] value = new byte[0];
 	store.setObject(txn, id, value);
@@ -494,6 +507,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test setObject -- */
 
+    @Test
     public void testSetObjectNullTxn() {
 	byte[] data = { 0 };
 	try {
@@ -504,6 +518,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectBadId() {
 	byte[] data = { 0 };
 	try {
@@ -514,6 +529,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectNullData() {
 	try {
 	    store.setObject(txn, id, null);
@@ -523,6 +539,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectEmptyData() throws Exception {
 	byte[] data = { };
 	store.setObject(txn, id, data);
@@ -536,31 +553,40 @@ public class TestDataStoreImpl extends TestCase {
     private final Action setObject = new Action() {
 	void run() { store.setObject(txn, id, new byte[] { 0 }); }
     };
+    @Test
     public void testSetObjectAborted() throws Exception {
 	testAborted(setObject);
     }
+    @Test
     public void testSetObjectPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(setObject);
     }
+    @Test
     public void testSetObjectPreparedModified() throws Exception {
 	testPreparedModified(setObject);
     }
+    @Test
     public void testSetObjectCommitted() throws Exception {
 	testCommitted(setObject);
     }
+    @Test
     public void testSetObjectWrongTxn() throws Exception {
 	testWrongTxn(setObject);
     }
+    @Test
     public void testSetObjectShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(setObject);
     }
+    @Test
     public void testSetObjectShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(setObject);
     }
+    @Test
     public void testSetObjectShutdown() throws Exception {
 	testShutdown(setObject);
     }
 
+    @Test
     public void testSetObjectSuccess() throws Exception {
 	byte[] data = { 1, 2 };
 	store.setObject(txn, id, data);
@@ -583,6 +609,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test setObjects -- */
 
+    @Test
     public void testSetObjectsNullTxn() {
 	long[] ids = { id };
 	byte[][] dataArray = { { 0 } };
@@ -594,6 +621,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectsBadId() {
 	long[] ids = { -3 };
 	byte[][] dataArray = { { 0 } };
@@ -605,6 +633,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectsWrongLengths() {
 	long[] ids = { id };
 	byte[][] dataArray = { { 0 }, { 1 } };
@@ -616,6 +645,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectsNullOids() {
 	byte[][] dataArray = { { 0 } };
 	try {
@@ -626,6 +656,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectsNullDataArray() {
 	long[] ids = { id };
 	try {
@@ -636,6 +667,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectsNullData() {
 	long[] ids = { id };
 	byte[][] dataArray = { null };
@@ -647,6 +679,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetObjectsEmptyData() throws Exception {
 	long[] ids = { id };
 	byte[][] dataArray = { { } };
@@ -663,31 +696,40 @@ public class TestDataStoreImpl extends TestCase {
 	    store.setObjects(txn, new long[] { id }, new byte[][] { { 0 } });
 	}
     };
+    @Test
     public void testSetObjectsAborted() throws Exception {
 	testAborted(setObjects);
     }
+    @Test
     public void testSetObjectsPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(setObjects);
     }
+    @Test
     public void testSetObjectsPreparedModified() throws Exception {
 	testPreparedModified(setObjects);
     }
+    @Test
     public void testSetObjectsCommitted() throws Exception {
 	testCommitted(setObjects);
     }
+    @Test
     public void testSetObjectsWrongTxn() throws Exception {
 	testWrongTxn(setObjects);
     }
+    @Test
     public void testSetObjectsShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(setObjects);
     }
+    @Test
     public void testSetObjectsShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(setObjects);
     }
+    @Test
     public void testSetObjectsShutdown() throws Exception {
 	testShutdown(setObjects);
     }
 
+    @Test
     public void testSetObjectsSuccess() throws Exception {
 	long[] ids = { id, store.createObject(txn) };
 	byte[][] dataArray = { { 1, 2 }, { 3, 4, 5 } };
@@ -715,6 +757,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test removeObject -- */
 
+    @Test
     public void testRemoveObjectNullTxn() {
 	try {
 	    store.removeObject(null, 3);
@@ -724,6 +767,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testRemoveObjectBadId() {
 	try {
 	    store.removeObject(txn, -3);
@@ -733,6 +777,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testRemoveObjectNotFound() {
 	try {
 	    store.removeObject(txn, id);
@@ -747,31 +792,40 @@ public class TestDataStoreImpl extends TestCase {
 	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
 	void run() { store.removeObject(txn, id); }
     };
+    @Test
     public void testRemoveObjectAborted() throws Exception {
 	testAborted(removeObject);
     }
+    @Test
     public void testRemoveObjectPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(removeObject);
     }
+    @Test
     public void testRemoveObjectPreparedModified() throws Exception {
 	testPreparedModified(removeObject);
     }
+    @Test
     public void testRemoveObjectCommitted() throws Exception {
 	testCommitted(removeObject);
     }
+    @Test
     public void testRemoveObjectWrongTxn() throws Exception {
 	testWrongTxn(removeObject);
     }
+    @Test
     public void testRemoveObjectShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(removeObject);
     }
+    @Test
     public void testRemoveObjectShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(removeObject);
     }
+    @Test
     public void testRemoveObjectShutdown() throws Exception {
 	testShutdown(removeObject);
     }
 
+    @Test
     public void testRemoveObjectSuccess() throws Exception {
 	store.setObject(txn, id, new byte[] { 0 });
 	txn.commit();
@@ -797,6 +851,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test getBinding -- */
 
+    @Test
     public void testGetBindingNullTxn() {
 	try {
 	    store.getBinding(null, "foo");
@@ -806,6 +861,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetBindingNullName() {
 	try {
 	    store.getBinding(txn, null);
@@ -815,6 +871,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetBindingEmptyName() throws Exception {
 	store.setObject(txn, id, new byte[] { 0 });
 	store.setBinding(txn, "", id);
@@ -824,6 +881,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals(id, result);
     }
 
+    @Test
     public void testGetBindingNotFound() throws Exception {
 	try {
 	    store.getBinding(txn, "unknown");
@@ -833,6 +891,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetBindingObjectNotFound() throws Exception {
 	store.setBinding(txn, "foo", id);
 	txn.commit();
@@ -846,31 +905,40 @@ public class TestDataStoreImpl extends TestCase {
 	void setUp() { store.setBinding(txn, "foo", id); }
 	void run() { store.getBinding(txn, "foo"); }
     };
+    @Test
     public void testGetBindingAborted() throws Exception {
 	testAborted(getBinding);
     }
+    @Test
     public void testGetBindingPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(getBinding);
     }
+    @Test
     public void testGetBindingPreparedModified() throws Exception {
 	testPreparedModified(getBinding);
     }
+    @Test
     public void testGetBindingCommitted() throws Exception {
 	testCommitted(getBinding);
     }
+    @Test
     public void testGetBindingWrongTxn() throws Exception {
 	testWrongTxn(getBinding);
     }
+    @Test
     public void testGetBindingShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(getBinding);
     }
+    @Test
     public void testGetBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(getBinding);
     }
+    @Test
     public void testGetBindingShutdown() throws Exception {
 	testShutdown(getBinding);
     }
 
+    @Test
     public void testGetBindingSuccess() throws Exception {
 	store.setObject(txn, id, new byte[] { 0 });
 	store.setBinding(txn, "foo", id);
@@ -883,6 +951,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test setBinding -- */
 
+    @Test
     public void testSetBindingNullTxn() {
 	try {
 	    store.setBinding(null, "foo", 3);
@@ -892,6 +961,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testSetBindingNullName() {
 	try {
 	    store.setBinding(txn, null, id);
@@ -905,31 +975,40 @@ public class TestDataStoreImpl extends TestCase {
     private final Action setBinding = new Action() {
 	void run() { store.setBinding(txn, "foo", id); }
     };
+    @Test
     public void testSetBindingAborted() throws Exception {
 	testAborted(setBinding);
     }
+    @Test
     public void testSetBindingPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(setBinding);
     }
+    @Test
     public void testSetBindingPreparedModified() throws Exception {
 	testPreparedModified(setBinding);
     }
+    @Test
     public void testSetBindingCommitted() throws Exception {
 	testCommitted(setBinding);
     }
+    @Test
     public void testSetBindingWrongTxn() throws Exception {
 	testWrongTxn(setBinding);
     }
+    @Test
     public void testSetBindingShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(setBinding);
     }
+    @Test
     public void testSetBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(setBinding);
     }
+    @Test
     public void testSetBindingShutdown() throws Exception {
 	testShutdown(setBinding);
     }
 
+    @Test
     public void testSetBindingSuccess() throws Exception {
 	long newId = store.createObject(txn);
 	store.setObject(txn, id, new byte[] { 0 });
@@ -947,6 +1026,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test removeBinding -- */
 
+    @Test
     public void testRemoveBindingNullTxn() {
 	try {
 	    store.removeBinding(null, "foo");
@@ -956,6 +1036,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testRemoveBindingNullName() {
 	try {
 	    store.removeBinding(txn, null);
@@ -965,6 +1046,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testRemoveBindingNotFound() {
 	try {
 	    store.removeBinding(txn, "unknown");
@@ -979,31 +1061,40 @@ public class TestDataStoreImpl extends TestCase {
 	void setUp() { store.setBinding(txn, "foo", id); }
 	void run() { store.removeBinding(txn, "foo"); }
     };
+    @Test
     public void testRemoveBindingAborted() throws Exception {
 	testAborted(removeBinding);
     }
+    @Test
     public void testRemoveBindingPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(removeBinding);
     }
+    @Test
     public void testRemoveBindingPreparedModified() throws Exception {
 	testPreparedModified(removeBinding);
     }
+    @Test
     public void testRemoveBindingCommitted() throws Exception {
 	testCommitted(removeBinding);
     }
+    @Test
     public void testRemoveBindingWrongTxn() throws Exception {
 	testWrongTxn(removeBinding);
     }
+    @Test
     public void testRemoveBindingShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(removeBinding);
     }
+    @Test
     public void testRemoveBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(removeBinding);
     }
+    @Test
     public void testRemoveBindingShutdown() throws Exception {
 	testShutdown(removeBinding);
     }
 
+    @Test
     public void testRemoveBindingSuccess() throws Exception {
 	store.setObject(txn, id, new byte[] { 0 });
 	store.setBinding(txn, "foo", id);
@@ -1033,6 +1124,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test nextBoundName -- */
 
+    @Test
     public void testNextBoundNameNullTxn() {
 	try {
 	    store.nextBoundName(null, "foo");
@@ -1042,6 +1134,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testNextBoundNameEmpty() {
 	assertEquals(null, store.nextBoundName(txn, ""));
 	store.setBinding(txn, "", id);
@@ -1053,31 +1146,40 @@ public class TestDataStoreImpl extends TestCase {
     private final Action nextBoundName = new Action() {
 	void run() { store.nextBoundName(txn, null); }
     };
+    @Test
     public void testNextBoundNameAborted() throws Exception {
 	testAborted(nextBoundName);
     }
+    @Test
     public void testNextBoundNamePreparedReadOnly() throws Exception {
 	testPreparedReadOnly(nextBoundName);
     }
+    @Test
     public void testNextBoundNamePreparedModified() throws Exception {
 	testPreparedModified(nextBoundName);
     }
+    @Test
     public void testNextBoundNameCommitted() throws Exception {
 	testCommitted(nextBoundName);
     }
+    @Test
     public void testNextBoundNameWrongTxn() throws Exception {
 	testWrongTxn(nextBoundName);
     }
+    @Test
     public void testNextBoundNameShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(nextBoundName);
     }
+    @Test
     public void testNextBoundNameShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(nextBoundName);
     }
+    @Test
     public void testNextBoundNameShutdown() throws Exception {
 	testShutdown(nextBoundName);
     }
 
+    @Test
     public void testNextBoundNameSuccess() throws Exception {
 	for (String name = null;
 	     (name = store.nextBoundName(txn, name)) != null; )
@@ -1129,6 +1231,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals("name-1", store.nextBoundName(txn, null));
     }
 
+    @Test
     public void testNextBoundNameTimeout() throws Exception {
 	final long id2 = store.createObject(txn);
 	for (int i = 100; i < 300; i++) {
@@ -1191,6 +1294,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test abort -- */
 
+    @Test
     public void testAbortNullTxn() throws Exception {
 	store.createObject(txn);
 	TransactionParticipant participant =
@@ -1212,12 +1316,15 @@ public class TestDataStoreImpl extends TestCase {
 	    txn = null;
 	}
     };
+    @Test
     public void testAbortAborted() throws Exception {
 	testAborted(abort, IllegalStateException.class);
     }
+    @Test
     public void testAbortPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(abort);
     }
+    @Test
     public void testAbortPreparedModified() throws Exception {
 	abort.setUp();
 	store.setObject(txn, id, new byte[] { 0 });
@@ -1225,24 +1332,30 @@ public class TestDataStoreImpl extends TestCase {
 	/* Aborting a prepared, modified transaction is OK. */
 	abort.run();
     }
+    @Test
     public void testAbortCommitted() throws Exception {
 	testCommitted(abort);
     }
+    @Test
     public void testAbortWrongTxn() throws Exception {
 	testWrongTxn(abort);
     }
+    @Test
     public void testAbortShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(abort);
     }
+    @Test
     public void testAbortShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(abort);
     }
+    @Test
     public void testAbortShutdown() throws Exception {
 	testShutdown(abort);
     }
 
     /* -- Test prepare -- */
 
+    @Test
     public void testPrepareNullTxn() throws Exception {
 	store.createObject(txn);
 	TransactionParticipant participant =
@@ -1255,6 +1368,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPrepareTimeout() throws Exception {
 	txn.commit();
 	txn = createTransaction(UsePrepareAndCommit.NO, 100);
@@ -1280,33 +1394,42 @@ public class TestDataStoreImpl extends TestCase {
 	    txn = null;
 	}
     };
+    @Test
     public void testPrepareAborted() throws Exception {
 	testAborted(prepare, IllegalStateException.class);
     }
+    @Test
     public void testPreparePreparedReadOnly() throws Exception {
 	testPreparedReadOnly(prepare);
     }
+    @Test
     public void testPreparePreparedModified() throws Exception {
 	testPreparedModified(prepare);
     }
+    @Test
     public void testPrepareCommitted() throws Exception {
 	testCommitted(prepare);
     }
+    @Test
     public void testPrepareWrongTxn() throws Exception {
 	testWrongTxn(prepare);
     }
+    @Test
     public void testPrepareShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(prepare);
     }
+    @Test
     public void testPrepareShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(prepare);
     }
+    @Test
     public void testPrepareShutdown() throws Exception {
 	testShutdown(prepare);
     }
 
     /* -- Test prepareAndCommit -- */
 
+    @Test
     public void testPrepareAndCommitNullTxn() throws Exception {
 	store.createObject(txn);
 	TransactionParticipant participant =
@@ -1319,6 +1442,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPrepareAndCommitTimeout() throws Exception {
 	txn.commit();
 	txn = createTransaction(UsePrepareAndCommit.YES, 100);
@@ -1344,39 +1468,48 @@ public class TestDataStoreImpl extends TestCase {
 	    txn = null;
 	}
     };
+    @Test
     public void testPrepareAndCommitAborted() throws Exception {
 	testAborted(prepareAndCommit, IllegalStateException.class);
     }
+    @Test
     public void testPrepareAndCommitPrepareAndCommitReadOnly()
 	throws Exception
     {
 	testPreparedReadOnly(prepareAndCommit);
     }
+    @Test
     public void testPrepareAndCommitPrepareAndCommitModified()
 	throws Exception
     {
 	testPreparedModified(prepareAndCommit);
     }
+    @Test
     public void testPrepareAndCommitCommitted() throws Exception {
 	testCommitted(prepareAndCommit);
     }
+    @Test
     public void testPrepareAndCommitWrongTxn() throws Exception {
 	testWrongTxn(prepareAndCommit);
     }
+    @Test
     public void testPrepareAndCommitShuttingDownExistingTxn()
 	throws Exception
     {
 	testShuttingDownExistingTxn(prepareAndCommit);
     }
+    @Test
     public void testPrepareAndCommitShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(prepareAndCommit);
     }
+    @Test
     public void testPrepareAndCommitShutdown() throws Exception {
 	testShutdown(prepareAndCommit);
     }
 
     /* -- Test commit -- */
 
+    @Test
     public void testCommitNullTxn() throws Exception {
 	store.createObject(txn);
 	TransactionParticipant participant =
@@ -1390,6 +1523,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     /** Make sure that commits don't timeout. */
+    @Test
     public void testCommitNoTimeout() throws Exception {
 	txn.commit();
 	txn = new DummyTransaction(UsePrepareAndCommit.NO, 1000) {
@@ -1440,12 +1574,15 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
     private final CommitAction commit = new CommitAction();
+    @Test
     public void testCommitAborted() throws Exception {
 	testAborted(commit, IllegalStateException.class);
     }
+    @Test
     public void testCommitPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(commit);
     }
+    @Test
     public void testCommitPreparedModified() throws Exception {
 	commit.setUp();
 	store.setObject(txn, id, new byte[] { 0 });
@@ -1453,12 +1590,15 @@ public class TestDataStoreImpl extends TestCase {
 	/* Committing a prepared, modified transaction is OK. */
 	commit.run();
     }
+    @Test
     public void testCommitCommitted() throws Exception {
 	testCommitted(commit);
     }
+    @Test
     public void testCommitWrongTxn() throws Exception {
 	testWrongTxn(commit);
     }
+    @Test
     public void testCommitShuttingDownExistingTxn() throws Exception {
 	commit.setUp();
 	store.setObject(txn, id, new byte[] { 0 });
@@ -1466,15 +1606,18 @@ public class TestDataStoreImpl extends TestCase {
 	/* Committing a prepared, modified transaction is OK. */
 	testShuttingDownExistingTxn(commit);
     }
+    @Test
     public void testCommitShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(commit);
     }
+    @Test
     public void testCommitShutdown() throws Exception {
 	testShutdown(commit);
     }
 
     /* -- Test shutdown -- */
 
+    @Test
     public void testShutdownAgain() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	txn = null;
@@ -1487,6 +1630,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testShutdownInterrupt() throws Exception {
 	ShutdownAction action = new ShutdownAction();
 	action.assertBlocked();
@@ -1500,6 +1644,7 @@ public class TestDataStoreImpl extends TestCase {
 	store = null;
     }
 
+    @Test
     public void testConcurrentShutdownInterrupt() throws Exception {
 	ShutdownAction action1 = new ShutdownAction();
 	action1.assertBlocked();
@@ -1515,6 +1660,7 @@ public class TestDataStoreImpl extends TestCase {
 	store = null;
     }
 
+    @Test
     public void testConcurrentShutdownRace() throws Exception {
 	ShutdownAction action1 = new ShutdownAction();
 	action1.assertBlocked();
@@ -1527,6 +1673,7 @@ public class TestDataStoreImpl extends TestCase {
 	store = null;
     }
 
+    @Test
     public void testShutdownRestart() throws Exception {
 	store.setBinding(txn, "foo", id);
 	byte[] bytes = { 1 };
@@ -1542,6 +1689,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test getClassId -- */
 
+    @Test
     public void testGetClassIdNullArgs() {
 	byte[] bytes = { 0, 1, 2, 3, 4 };
 	try {
@@ -1558,6 +1706,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetClassIdNonStandardBytes() throws Exception {
 	testGetClassIdBytes();
 	testGetClassIdBytes((byte) 1);
@@ -1579,33 +1728,42 @@ public class TestDataStoreImpl extends TestCase {
     private final Action getClassId = new Action() {
 	void run() { store.getClassId(txn, new byte[0]); };
     };
+    @Test
     public void testGetClassIdAborted() throws Exception {
 	testAborted(getClassId);
     }
+    @Test
     public void testGetClassIdPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(getClassId);
     }
+    @Test
     public void testGetClassIdPreparedModified() throws Exception {
 	testPreparedModified(getClassId);
     }
+    @Test
     public void testGetClassIdCommitted() throws Exception {
 	testCommitted(getClassId);
     }
+    @Test
     public void testGetClassIdWrongTxn() throws Exception {
 	testWrongTxn(getClassId);
     }
+    @Test
     public void testGetClassIdShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(getClassId);
     }
+    @Test
     public void testGetClassIdShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(getClassId);
     }
+    @Test
     public void testGetClassIdShutdown() throws Exception {
 	testShutdown(getClassId);
     }
 
     /* -- Test getClassInfo -- */
 
+    @Test
     public void testGetClassInfoBadArgs() throws Exception {
 	try {
 	    store.getClassInfo(null, 1);
@@ -1627,6 +1785,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetClassInfoNotFound() {
 	try {
 	    store.getClassInfo(txn, 56789);
@@ -1636,6 +1795,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testGetClassInfoAfterRestart() throws Exception {
 	byte[] bytes = { 1, 2, 3, 4, 5, 6 };
 	int id = store.getClassId(txn, bytes);
@@ -1651,33 +1811,42 @@ public class TestDataStoreImpl extends TestCase {
     private final Action getClassInfo = new Action() {
 	void run() throws Exception { store.getClassInfo(txn, 1); };
     };
+    @Test
     public void testGetClassInfoAborted() throws Exception {
 	testAborted(getClassInfo);
     }
+    @Test
     public void testGetClassInfoPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(getClassInfo);
     }
+    @Test
     public void testGetClassInfoPreparedModified() throws Exception {
 	testPreparedModified(getClassInfo);
     }
+    @Test
     public void testGetClassInfoCommitted() throws Exception {
 	testCommitted(getClassInfo);
     }
+    @Test
     public void testGetClassInfoWrongTxn() throws Exception {
 	testWrongTxn(getClassInfo);
     }
+    @Test
     public void testGetClassInfoShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(getClassInfo);
     }
+    @Test
     public void testGetClassInfoShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(getClassInfo);
     }
+    @Test
     public void testGetClassInfoShutdown() throws Exception {
 	testShutdown(getClassInfo);
     }
 
     /* -- Test nextObjectId -- */
 
+    @Test
     public void testNextObjectIdIllegalIds() {
 	long id = Long.MIN_VALUE;
 	try {
@@ -1695,6 +1864,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testNextObjectIdBoundaryIds() {
 	long first = store.nextObjectId(txn, -1);
 	assertEquals(first, store.nextObjectId(txn, -1));
@@ -1711,6 +1881,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals(-1, store.nextObjectId(txn, Long.MAX_VALUE));
     }
 
+    @Test
     public void testNextObjectIdRemoved() throws Exception {
 	long x = -1;
 	while (true) {
@@ -1782,33 +1953,42 @@ public class TestDataStoreImpl extends TestCase {
     private final Action nextObjectId = new Action() {
 	void run() throws Exception { store.nextObjectId(txn, -1); };
     };
+    @Test
     public void testNextObjectIdAborted() throws Exception {
 	testAborted(nextObjectId);
     }
+    @Test
     public void testNextObjectIdPreparedReadOnly() throws Exception {
 	testPreparedReadOnly(nextObjectId);
     }
+    @Test
     public void testNextObjectIdPreparedModified() throws Exception {
 	testPreparedModified(nextObjectId);
     }
+    @Test
     public void testNextObjectIdCommitted() throws Exception {
 	testCommitted(nextObjectId);
     }
+    @Test
     public void testNextObjectIdWrongTxn() throws Exception {
 	testWrongTxn(nextObjectId);
     }
+    @Test
     public void testNextObjectIdShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(nextObjectId);
     }
+    @Test
     public void testNextObjectIdShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(nextObjectId);
     }
+    @Test
     public void testNextObjectIdShutdown() throws Exception {
 	testShutdown(nextObjectId);
     }
 
     /* -- Test deadlock -- */
     @SuppressWarnings("hiding")
+    @Test
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
@@ -1881,7 +2061,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /** Creates a unique directory. */
     private String createDirectory() throws IOException {
-	File dir = File.createTempFile(getName(), "dbdir");
+	File dir = File.createTempFile("TestDataStoreImpl", "dbdir");
 	if (!dir.delete()) {
 	    throw new RuntimeException("Problem deleting file: " + dir);
 	}

@@ -31,26 +31,10 @@ import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import java.util.Properties;
-import junit.framework.TestSuite;
+import org.junit.Test;
 
 /** Test the DataStoreClient class. */
 public class TestDataStoreClient extends TestDataStoreImpl {
-
-    /** If this property is set, then only run the single named test method. */
-    private static final String testMethod = System.getProperty("test.method");
-
-    /**
-     * Specify the test suite to include all tests, or just a single method if
-     * specified.
-     */
-    public static TestSuite suite() {
-	if (testMethod == null) {
-	    return new TestSuite(TestDataStoreClient.class);
-	}
-	TestSuite suite = new TestSuite();
-	suite.addTest(new TestDataStoreClient(testMethod));
-	return suite;
-    }
 
     /**
      * The name of the host running the DataStoreServer, or null to create one
@@ -68,9 +52,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	"com.sun.sgs.impl.service.data.store.net";
 
     /** Creates an instance. */
-    public TestDataStoreClient(String name) {
-	super(name);
-    }
+    public TestDataStoreClient() { }
 
     /** Adds client and server properties. */
     @Override
@@ -141,6 +123,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 
     /* -- Test constructor -- */
 
+    @Test
     public void testConstructorBadPort() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -155,6 +138,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 
+    @Test
     public void testConstructorNegativePort() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -169,6 +153,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 
+    @Test
     public void testConstructorBigPort() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -184,6 +169,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 
+    @Test
     public void testConstructorZeroPort() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -201,6 +187,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 
+    @Test
     public void testConstructorBadMaxTimeout() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -216,6 +203,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 	
+    @Test
     public void testConstructorNegativeMaxTimeout() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -231,6 +219,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 
+    @Test
     public void testConstructorZeroMaxTimeout() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -246,6 +235,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
     
+    @Test
     public void testConstructorAppButNoServerHost() throws Exception {
         txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -268,6 +258,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
      * Test that the maximum transaction timeout overrides the standard
      * timeout.
      */
+    @Test
     public void testGetObjectMaxTxnTimeout() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
@@ -288,6 +279,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     /**
      * Test what happens when joining a transaction when the server has failed.
      */
+    @Test
     public void testJoinTxnServerFailed() throws Exception {
 	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
