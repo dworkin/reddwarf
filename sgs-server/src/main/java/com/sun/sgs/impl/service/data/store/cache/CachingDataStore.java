@@ -72,7 +72,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.util.logging.Level.CONFIG;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
-import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /*
@@ -298,10 +297,16 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * The shutdown state.  Synchronize on {@code shutdownSync} when accessing
+     * The shutdown state.  Synchronize on {@link #shutdownSync} when accessing
      * this field.
      */
     private ShutdownState shutdownState = ShutdownState.NOT_REQUESTED;
+
+    /**
+     * The number of active transactions.  Synchronize on {@link #shutdownSync}
+     * when accessing this field.
+     */
+    private int txnCount = 0;
 
     /** Synchronizer for {@code shutdownState}. */
     private final Object shutdownSync = new Object();
@@ -1665,9 +1670,6 @@ public class CachingDataStore extends AbstractDataStore
 	if (contextMap != null) {
 	    contextMap.shutdown();
 	}
-	synchronized (shutdownSync) {
-	    shutdownState = ShutdownState.TXNS_COMPLETED;
-	}
 	/* Stop facilities used by active transactions */
 	evictionThread.interrupt();
 	try {
@@ -2127,6 +2129,59 @@ public class CachingDataStore extends AbstractDataStore
 		return true;
 	    default:
 		throw new AssertionError();
+	    }
+	}
+    }
+
+    /**
+     * Notes that a transaction is being started.
+     *
+     * @throw	IllegalStateException if shutdown has been requested
+     */
+    void txnStarted() {
+	synchronized (shutdownSync) {
+	    if (getShutdownRequested()) {
+		throw new IllegalStateException(
+		    "Data store is shut down");
+	    }
+	    txnCount++;
+	}
+    }
+
+    /** Notes that a transaction has finished. */
+    void txnFinished() {
+	synchronized (shutdownSync) {
+	    txnCount--;
+	    assert txnCount >= 0;
+	    if (shutdownState == ShutdownState.REQUESTED && txnCount == 0) {
+		shutdownSync.notifyAll();
+	    }
+	}
+    }
+
+    /**
+     * Waits for active transactions to complete, assuming that a shutdown has
+     * been requested.
+     *
+     * @throw	IllegalStateException if shutdown has not been requested
+     */
+    void awaitTxnShutdown() {
+	synchronized (shutdownSync) {
+	    switch (shutdownState) {
+	    case NOT_REQUESTED:
+		throw new IllegalStateException("Shutdown not requested");
+	    case REQUESTED:
+		while (txnCount > 0) {
+		    try {
+			shutdownSync.wait();
+		    } catch (InterruptedException e) {
+		    }
+		}
+		shutdownState = ShutdownState.TXNS_COMPLETED;
+		break;
+	    case TXNS_COMPLETED:
+	    case COMPLETED:
+		return;
 	    }
 	}
     }

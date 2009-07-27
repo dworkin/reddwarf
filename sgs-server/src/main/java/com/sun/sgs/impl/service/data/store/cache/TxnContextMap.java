@@ -35,9 +35,6 @@ class TxnContextMap {
     private final ThreadLocal<TxnContext> currentContext =
 	new ThreadLocal<TxnContext>();
 
-    /** The number of active transactions. */
-    private final TxnCount txnCount = new TxnCount();
-
     /**
      * Creates an instance of this class.
      *
@@ -61,14 +58,14 @@ class TxnContextMap {
 	}
 	TxnContext context = getContext(txn);
 	if (context == null) {
-	    txnCount.increment();
+	    store.txnStarted();
 	    boolean joined = false;
 	    try {
 		txn.join(store);
 		joined = true;
 	    } finally {
 		if (!joined) {
-		    txnCount.decrement();
+		    store.txnFinished();
 		}
 	    }
 	    context = new TxnContext(txn, store);
@@ -93,7 +90,7 @@ class TxnContextMap {
      */
     boolean prepare(Transaction txn) {
 	if (getContextJoined(txn, true).prepare()) {
-	    txnCount.decrement();
+	    store.txnFinished();
 	    currentContext.set(null);
 	    return true;
 	} else {
@@ -114,7 +111,7 @@ class TxnContextMap {
 	    context.prepareAndCommit();
 	} finally {
 	    currentContext.set(null);
-	    txnCount.decrement();
+	    store.txnFinished();
 	}
     }
 
@@ -131,7 +128,7 @@ class TxnContextMap {
 	    context.commit();
 	} finally {
 	    currentContext.set(null);
-	    txnCount.decrement();
+	    store.txnFinished();
 	}
     }
 
@@ -147,7 +144,7 @@ class TxnContextMap {
 	    getContextJoined(txn, false).abort();
 	} finally {
 	    currentContext.set(null);
-	    txnCount.decrement();
+	    store.txnFinished();
 	}
     }
 
@@ -156,7 +153,7 @@ class TxnContextMap {
      * waiting for active transactions to complete.
      */
     void shutdown() {
-	txnCount.awaitTxnShutdown();
+	store.awaitTxnShutdown();
 	store.getUpdateQueue().shutdown();
     }
 
@@ -189,22 +186,16 @@ class TxnContextMap {
 
     /**
      * Returns the context for the specified transaction, which should be found
-     * because it should have already been joined.  If {@code checkContinue} is
-     * {@code true}, then also check that the node is not shutdown and that the
-     * transaction has not timed out.
+     * because it should have already been joined.  If {@code checkTimeout} is
+     * {@code true}, then also check that the transaction has not timed out.
      *
      * @param	txn the transaction
-     * @param	checkContinue whether to check for node shutdown and
-     *		transaction timeout
+     * @param	checkTimeout whether to check for transaction timeout
      */
     private TxnContext getContextJoined(
-	Transaction txn, boolean checkContinue)
+	Transaction txn, boolean checkTimeout)
     {
-	if (checkContinue) {
-	    if (store.getShutdownRequested()) {
-		throw new IllegalStateException(
-		    "CachingDataStore is shut down");
-	    }
+	if (checkTimeout) {
 	    txn.checkTimeout();
 	}
 	TxnContext context = getContext(txn);
@@ -213,60 +204,5 @@ class TxnContextMap {
 		"Transaction is not active: " + txn);
 	}
 	return context;
-    }
-
-    /** Tracks the number of active transactions. */
-    private class TxnCount {
-
-	/** The number of active transactions. */
-	private final AtomicInteger count = new AtomicInteger();
-
-	/** Creates an instance of this class. */
-	TxnCount() { }
-
-	/**
-	 * Increments the number of active transactions.
-	 *
-	 * @throws	IllegalStateException if the node is shut down
-	 */
-	void increment() {
-	    count.incrementAndGet();
-	    if (store.getShutdownRequested()) {
-		int result = count.decrementAndGet();
-		if (result == 0) {
-		    synchronized (this) {
-			notifyAll();
-		    }
-		}
-		throw new IllegalStateException("Node is shut down");
-	    }
-	}
-	
-	/** Decrements the number of active transactions. */
-	void decrement() {
-	    int result = count.decrementAndGet();
-	    assert result >= 0;
-	    if (result == 0) {
-		synchronized (this) {
-		    notifyAll();
-		}
-	    }
-	}
-
-	/**
-	 * Waits for the number of transactions to reach zero after a node
-	 * shutdown has been requested.
-	 */
-	void awaitTxnShutdown() {
-	    assert store.getShutdownRequested();
-	    synchronized (this) {
-		while (count.get() > 0) {
-		    try {
-			wait();
-		    } catch (InterruptedException e) {
-		    }
-		}
-	    }
-	}
     }
 }

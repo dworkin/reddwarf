@@ -2303,7 +2303,10 @@ public class TestDataStoreImpl extends Assert {
 	/** Asserts that the shutdown call is blocked. */
 	public synchronized void assertBlocked() throws InterruptedException {
 	    Thread.sleep(5);
-	    assertEquals("Expected no exception", null, exception);
+	    if (exception != null) {
+		exception.printStackTrace();
+		fail("Unexpected exception: " + exception);
+	    }
 	    assertFalse("Expected shutdown to be blocked", done);
 	}
 	

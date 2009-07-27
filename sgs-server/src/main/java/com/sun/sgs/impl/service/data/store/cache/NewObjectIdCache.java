@@ -19,12 +19,19 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
+import static java.util.logging.Level.FINER;
+import java.util.logging.Logger;
 
 /**
  * Requests and caches new object IDs from the {@link CachingDataStoreServer}.
  */
 class NewObjectIdCache {
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(NewObjectIdCache.class.getName()));
 
     /** The data store */
     private final CachingDataStore store;
@@ -76,9 +83,10 @@ class NewObjectIdCache {
 	if (!currentRange.isEmpty()) {
 	    long result = currentRange.next();
 	    if (currentRange.isHalfEmpty() &&
+		nextRange == null &&
+		!newObjectsThread.isAlive() &&
 		!store.getShutdownTxnsCompleted())
 	    {
-		assert !newObjectsThread.isAlive();
 		newObjectsThread = createNewObjectsThread();
 		newObjectsThread.start();
 	    }
@@ -90,10 +98,18 @@ class NewObjectIdCache {
 		    "DataStoreCache is shutting down");
 	    }
 	    try {
+		if (logger.isLoggable(FINER)) {
+		    logger.log(FINER, "Blocked waiting for new object IDs");
+		}
 		wait();
 	    } catch (InterruptedException e) {
 		continue;
 	    }
+	}
+	if (logger.isLoggable(FINER)) {
+	    logger.log(FINER,
+		       "Switching new object ID blocks from " + currentRange +
+		       " to " + nextRange);
 	}
 	currentRange = nextRange;
 	nextRange = null;
@@ -114,7 +130,8 @@ class NewObjectIdCache {
 	}
     }
 
-    Thread createNewObjectsThread() {
+    /** Creates a thread for obtaining new object IDs. */
+    private Thread createNewObjectsThread() {
 	return new Thread(
 	    new NewObjectsRunnable(store), "CachingDataStore newObjects");
     }
@@ -125,16 +142,20 @@ class NewObjectIdCache {
 	    super(store);
 	}
 	Long callOnce() throws IOException {
+	    logger.log(FINER, "Requesting new object IDs");
 	    return store.getServer().newObjectIds(batchSize);
 	}
 	void runWithResult(Long result) {
-	    Range range = new Range(result, result + batchSize);
+	    Range range = new Range(result, result + batchSize - 1);
 	    synchronized (NewObjectIdCache.this) {
 		if (currentRange == null) {
 		    currentRange = range;
 		} else {
 		    assert nextRange == null;
 		    nextRange = range;
+		}
+		if (logger.isLoggable(FINER)) {
+		    logger.log(FINER, "Obtained new object IDs: " + range);
 		}
 		NewObjectIdCache.this.notifyAll();
 	    }
@@ -158,6 +179,11 @@ class NewObjectIdCache {
 	    this.first = first;
 	    this.last = last;
 	    half = (first + last) / 2;
+	}
+
+	@Override
+	public String toString() {
+	    return "Range[first:" + first + ", last:" + last + "]";
 	}
 
 	/** Checks if the range is empty */
