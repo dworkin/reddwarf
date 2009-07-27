@@ -1000,7 +1000,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
     
-    private Queue<byte[]> sendMessagesFromNodesToClient(
+    private void sendMessagesFromNodesToClient(
 	    final DummyClient client, int numAdditionalNodes, int iterations,
 	    final Delivery delivery, final boolean oneUnreliableServer)
 	throws Exception
@@ -1091,8 +1091,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			setBinding(counterName, new Counter());
 		}}, taskOwner);
 	    
-	    return client.waitForClientToReceiveExpectedMessages(
-		numExpectedMessages);
+	    client.waitForClientToReceiveExpectedMessages(numExpectedMessages);
 
     }
 
@@ -1165,9 +1164,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	
 	    System.err.println("waiting for client to receive messages");
-	    Queue<byte[]> messages =
-		client.waitForClientToReceiveExpectedMessages(numMessages);
-	    for (byte[] message : messages) {
+	    client.waitForClientToReceiveExpectedMessages(numMessages);
+	    for (byte[] message : client.clientReceivedMessages) {
 		if (message.length == 0) {
 		    fail("message buffer emtpy");
 		}
@@ -1558,10 +1556,9 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	System.err.println("waiting for client [" + client.name +
 			   "] to receive messages");
-	Queue<byte[]> messages =
-	    client.waitForClientToReceiveExpectedMessages(numMessages);
+	client.waitForClientToReceiveExpectedMessages(numMessages);
 	int expected = offset;
-	for (byte[] message : messages) {
+	for (byte[] message : client.clientReceivedMessages) {
 	    if (message.length != 4) {
 		fail("message buffer emtpy");
 	    }
@@ -2152,7 +2149,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * Waits for this client to receive the number of messages sent from
 	 * the application.
 	 */
-	public Queue<byte[]>
+	public void
 	    waitForClientToReceiveExpectedMessages(int numExpectedMessages)
 	{
 	    numClientExpectedMessages = numExpectedMessages;
@@ -2179,7 +2176,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * Waits for the number of expected messages to be deposited in the
 	 * specified message queue.
 	 */
-	public Queue<byte[]> waitForSessionListenerToReceiveExpectedMessages(
+	public void waitForSessionListenerToReceiveExpectedMessages(
 	    int numExpectedMessages)
 	{
 	    numSessionListenerExpectedMessages = numExpectedMessages;
