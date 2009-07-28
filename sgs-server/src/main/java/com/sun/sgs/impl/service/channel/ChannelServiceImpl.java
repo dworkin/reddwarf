@@ -1322,7 +1322,7 @@ public final class ChannelServiceImpl
 				"RemoveSessionFromChannel")
 			  {
 			    public void run() {
-				ChannelImpl.removeSessionFromChannel(
+				ChannelImpl.removeDisconnectedSession(
 				    localNodeId, sessionRefId, channelRefId);
 			    }
 			}, taskOwner);

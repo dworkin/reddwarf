@@ -831,27 +831,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * node) to this channel.
      */
     void removeSessionRelocatingFromLocalNode(BigInteger sessionRefId) {
-	removeSession(getLocalNodeId(), sessionRefId, false);
+	removeSession(getLocalNodeId(), sessionRefId);
     }
 
     /**
      * Removes from this channel the member session with the specified
      * {@code sessionRefId} that is connected to the node with the
-     * specified {@code nodeId}, notifies the session's server that the
-     * session left the channel, and returns {@code true} if the
+     * specified {@code nodeId}, and returns {@code true} if the
      * session was a member of this channel when this method was
      * invoked.  If the session is not a member of this channel, then no
      * action is taken and {@code false} is returned.
      */
-    private boolean removeSession(
-	long nodeId, BigInteger sessionRefId, boolean sendLeaveNotification)
-    {
+    private boolean removeSession(long nodeId, BigInteger sessionRefId) {
 	Set<BigInteger> sessionSet = getSessionSet(nodeId);
 	if (sessionSet != null) {
 	    if (sessionSet.remove(sessionRefId)) {
-		if (sendLeaveNotification) {
-		    sendLeaveNotification(nodeId, sessionRefId);
-		}
 		if (sessionSet.isEmpty()) {
 		    removeSessionSet(nodeId);
 		}
@@ -959,12 +953,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      *
      * This method should be called within a transaction.
      */
-    static void removeSessionFromChannel(
+    static void removeDisconnectedSession(
 	long nodeId, BigInteger sessionRefId, BigInteger channelRefId)
     {
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
-	    channel.removeSession(nodeId, sessionRefId, true);
+	    channel.removeSession(nodeId, sessionRefId);
 	} else {
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "channel already removed:{0}",
@@ -1085,7 +1079,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * a member of this channel.  This checks both the old and new
      * nodes' session sets if the session is relocating.
      */
-    private boolean hasSession(ClientSessionImpl session, BigInteger sessionRefId) {
+    private boolean hasSession(
+	ClientSessionImpl session, BigInteger sessionRefId)
+    {
 	Set<BigInteger> sessionSet = getSessionSet(session.getNodeId());
 	boolean hasSession =
 	    sessionSet != null && sessionSet.contains(sessionRefId);
@@ -1718,7 +1714,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			if (session == null ||
 			    sessionNodeId == oldSessionNodeId) {
 			    getChannel().removeSession(
-				oldSessionNodeId, sessionRefId, false);
+				oldSessionNodeId, sessionRefId);
 			    return true;
 			} else {
 			    return false;
@@ -1757,8 +1753,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			if (channel == null) {
 			    return false;
 			}
-			channel.removeSession(
-			    oldSessionNodeId, sessionRefId, false);
+			channel.removeSession(oldSessionNodeId, sessionRefId);
 			if (session == null ||
 			    sessionNodeId == oldSessionNodeId)
 			{
@@ -1831,7 +1826,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	/** {@inheritDoc} */
 	public boolean serviceEvent(ChannelImpl channel) {
-
+	    assert isProcessing() && !isCompleted();
 	    ClientSessionImpl session =
 		(ClientSessionImpl) getObjectForId(sessionRefId);
 	    if (session == null) {
@@ -1840,14 +1835,22 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    "unable to obtain client session for ID:{0}", this);
 		return completed();
 	    }
-	    // TBD: if session is relocating, session may be mapped using
+	    // If session is relocating, the session may be mapped using
 	    // old and/or new node's ID, so may need to remove session from
 	    // both.
-	    if (!channel.removeSession(
-		    getNodeId(session), sessionRefId, true))
-	    {
+	    boolean removed =
+		channel.removeSession(session.getNodeId(), sessionRefId);
+	    long relocatingToNodeId = session.getRelocatingToNodeId();
+	    if (relocatingToNodeId != -1) {
+		removed =
+		    channel.removeSession(
+			relocatingToNodeId, sessionRefId) ||
+		    removed;
+	    }
+	    if (!removed) {
 		return completed();
 	    }
+	    channel.sendLeaveNotification(session.getNodeId(), sessionRefId);
 	    return completed();
 	}
 
