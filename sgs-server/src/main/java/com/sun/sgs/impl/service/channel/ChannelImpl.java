@@ -1082,11 +1082,22 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Returns {@code true} if the specified client {@code session} is
-     * a member of this channel.
+     * a member of this channel.  This checks both the old and new
+     * nodes' session sets if the session is relocating.
      */
-    private boolean hasSession(long nodeId, BigInteger sessionRefId) {
-	Set<BigInteger> sessionSet = getSessionSet(nodeId);
-	return sessionSet != null && sessionSet.contains(sessionRefId);
+    private boolean hasSession(ClientSessionImpl session, BigInteger sessionRefId) {
+	Set<BigInteger> sessionSet = getSessionSet(session.getNodeId());
+	boolean hasSession =
+	    sessionSet != null && sessionSet.contains(sessionRefId);
+	if (!hasSession) {
+	    long relocatingToNodeId = session.getRelocatingToNodeId();
+	    if (relocatingToNodeId != -1) {
+		sessionSet = getSessionSet(relocatingToNodeId);
+		hasSession = 
+		    sessionSet != null && sessionSet.contains(sessionRefId);
+	    }
+	}
+	return hasSession;
     }
 
     /* -- Other classes -- */
@@ -1460,6 +1471,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	private boolean completed = false;
 
+	/** A flag indicating whether this event is being processed. */
 	private boolean processing = false;
 
 	/**
@@ -1493,6 +1505,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    return completed;
 	}
 
+	/**
+	 * Marks this event as being processed.
+	 */
 	void processing() {
 	    logger.log(Level.FINEST, "processing event:{0}", this);
 	    getDataService().markForUpdate(this);
@@ -1508,6 +1523,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    return completed;
 	}
 
+	/**
+	 * Returns {@code true} if this event is being processed, and
+	 * {@code false} otherwise.
+	 */
 	boolean isProcessing() {
 	    return processing;
 	}
@@ -1520,8 +1539,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
+	/** The session ID for the session to join the channel. */
 	private final BigInteger sessionRefId;
-	
 
 	/**
 	 * Constructs a join event with the specified {@code session}.
@@ -1662,7 +1681,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	/**
 	 * Returns the client session associated with this task, or null if
-	 * the session no longer exists.
+	 * the session no longer exists.  This method must be invoked
+	 * within a transaction.
 	 */
 	private ClientSessionImpl getSession() {
 	    return (ClientSessionImpl) getObjectForId(sessionRefId);
@@ -1670,7 +1690,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	/**
 	 * Returns the channel associated with this task, or null if the channel
-	 * no longer exists.
+	 * no longer exists. This method must be invoked within a transaction.
 	 */
 	private ChannelImpl getChannel() {
 	    return (ChannelImpl) getObjectForId(channelRefId);
@@ -1923,10 +1943,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    if (senderRefId != null) {
 		ClientSessionImpl sender =
 		    (ClientSessionImpl) getObjectForId(senderRefId);
-		// TBD: if session is relocating need to check both old and
-		// new node membership bindings.
 		if (sender == null ||
-		    !channel.hasSession(getNodeId(sender), senderRefId))
+		    !channel.hasSession(sender, senderRefId))
 		{
 		    return completed();
 		}
