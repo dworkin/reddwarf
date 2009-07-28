@@ -1517,6 +1517,33 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.waitForClientToReceiveExpectedMessages(numMessages);
 	    client.validateMessageSequence(
 		client.clientReceivedMessages, numMessages, 0);
+	    assertTrue(client.sessionListenerReceivedMessages.isEmpty());
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testClientSendAfterSuspendMessages() throws Exception {
+	String newNodeHost = "newNode";
+	int numMessages = 4;
+	DummyClient client = createClientAndReassignIdentity(newNodeHost, true);
+	try {
+	    client.waitForSuspendMessages();
+	    client.sendSuspendMessagesComplete();
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf = new MessageBuffer(4);
+		buf.putInt(i);
+		client.sendMessage(buf.getBuffer(), false);
+	    }
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    client.waitForRelocationNotification(newNode.getAppPort());
+	    // Make sure that all messages received after the suspend was
+	    // completed have been dropped.
+	    assertTrue(client.sessionListenerReceivedMessages.isEmpty());
+	    assertTrue(client.clientReceivedMessages.isEmpty());
+	    client.relocate(newNode.getAppPort(), true, true);
+	    assertTrue(client.sessionListenerReceivedMessages.isEmpty());
+	    assertTrue(client.clientReceivedMessages.isEmpty());
 	} finally {
 	    client.disconnect();
 	}
@@ -1979,15 +2006,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    dataService.createReferenceForId(next);
 		Object obj = ref.get();
                 String name = obj.getClass().getName();
-                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask") &&
-		    ! name.equals("com.sun.sgs.impl.service.nodemap.IdentityMO"))
+                if (!name.equals("com.sun.sgs.impl.service.task.PendingTask") &&
+		    !name.equals("com.sun.sgs.impl.service.nodemap.IdentityMO"))
 		{
 		    /*
-		    System.err.print(count + "[" + obj.getClass().getName() + "]:");
+		    System.err.print(
+		        count + "[" + obj.getClass().getName() + "]:");
 		    try {
 			System.err.println(obj.toString());
 		    } catch (ObjectNotFoundException e) {
-			System.err.println("<< caught ObjectNotFoundException >>");
+			System.err.println(
+			    "<< caught ObjectNotFoundException >>");
 		    }
 		    */
                     count++;

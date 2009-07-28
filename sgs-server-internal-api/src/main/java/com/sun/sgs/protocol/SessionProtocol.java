@@ -184,14 +184,46 @@ public interface SessionProtocol extends Channel {
         throws IOException;
 
     /**
+     * Notifies the associated client to suspend sending messages to the
+     * server until {@link #resume resume} is invoked.  This method must
+     * notify the {@code completionHandler} when messages have been
+     * suspended.  Messages received by the {@link SessionProtocolHandler}
+     * will be received and processed until the {@code completionHandler}'s
+     * {@link RequestCompletionHandler#completed completed} method is
+     * invoked.  If messages are not suspended in a timely fashion (i.e,
+     * the {@code completionHandler} is not notified), then the server may
+     * disconnect this session.<p>
+     *
+     * Only session messages that have their completion handlers notified
+     * before the specified {@code completionHandler} is notified are
+     * guaranteed to be processed by the server. <p>
+     *
+     * Once this method is invoked, an invocation on a method that sends a
+     * message to the client should throw {@link IllegalStateException}
+     * until messages are resumed.
+     *
+     * @param	completionHandler a completion handler
+     */
+    void suspend(RequestCompletionHandler<Void> completionHandler);
+
+    /**
+     * Notifies the associated client to resume sending messages to the
+     * server.  If messages were not previously suspended, no action is
+     * taken. 
+     */
+    void resume();
+    
+    /**
      * Notifies the associated client to first suspend sending messages to
-     * the server and wait for interim messages to be processed, notify the
-     * {@code completionHandler} that messages have been suspended, and
-     * <i>then</i> relocate its session to the node specified by the {@code
-     * descriptors} using the given relocation key.  Messages received by
-     * the {@link SessionProtocolHandler} will be received and processed
-     * until the {@code completionHandler}'s {@link
-     * RequestCompletionHandler#completed completed} method is invoked.<p>
+     * the server, notify the {@code completionHandler} when messages have
+     * been suspended, and <i>then</i> relocate its session to the node
+     * specified by the {@code descriptors} using the given relocation key.
+     * Messages received by the {@link SessionProtocolHandler} will be
+     * received and processed until the {@code completionHandler}'s {@link
+     * RequestCompletionHandler#completed completed} method is invoked.  If
+     * messages are not suspended in a timely fashion (i.e, the {@code
+     * completionHandler} is not notified), then the server may disconnect
+     * this session.<p>
      *
      * Note: If the session is relocated to the new node before the client
      * has stopped sending messages and notified the {@code
@@ -203,15 +235,15 @@ public interface SessionProtocol extends Channel {
      * before the specified {@code completionHandler} is notified are
      * guaranteed to be processed by the server. <p>
      *
-     * The session can be reestablished on the new node by notifying the
-     * {@link ProtocolListener} of this protocol's corresponding {@link
-     * ProtocolAcceptor} on the new node.  The {@link
+     * The associated client session can be reestablished on the new node
+     * by notifying the {@link ProtocolListener} of this protocol's
+     * corresponding {@link ProtocolAcceptor} on the new node.  The {@link
      * ProtocolListener#relocatedSession ProtocolListener.relocatedSession}
      * method can be invoked on the new node with the given relocation key
      * to reestablish the client session without having to log in again.<p>
      *
      * Once this method is invoked, an invocation on a method that sends a
-     * message to the client should throw {@link RelocatingSessionException}.
+     * message to the client should throw {@link IllegalStateException}.
      * Additionally, the client should close any underlying local
      * connection(s) in a timely fashion.
      *
@@ -219,9 +251,8 @@ public interface SessionProtocol extends Channel {
      * @param	descriptors protocol descriptors for {@code newNode}
      * @param	relocationKey the key to be supplied to the new node
      * @param	completionHandler a completion handler
-     * @throws	IllegalStateException if the associated session was
-     *		requested to suspend messages (explicitly or due to
-     *		relocation) 
+     * @throws	IllegalStateException if the associated session is already
+     *		relocating 
      * @throws	IOException if an I/O error occurs
      */
     void relocate(Node newNode,
@@ -236,8 +267,6 @@ public interface SessionProtocol extends Channel {
      * the reason for the disconnection, or the protocol may close the
      * connection immediately.  Any underlying connection(s) should be
      * closed in a timely fashion.
-     *
-     * <p>TBD: should this throw RelocatingSessionException?
      *
      * @param	reason	the reason for disconnection
      * 

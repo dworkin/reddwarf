@@ -118,8 +118,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The completion handler for writing to the I/O channel. */
     private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
-    /** A lock for {@code loginHandled}, {@code messageQueue}, and
-     * {@code relocationInfo}  fields. */
+    /** A lock for {@code loginHandled}, {@code messageQueue},
+     * {@suspendCompletionFuture}, and {@code relocationInfo}  fields. */
     private Object lock = new Object();
 
     /** Indicates whether the client's login ack has been sent. */
@@ -131,6 +131,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The set of supported delivery requirements. */
     protected final Set<Delivery> deliverySet = new HashSet<Delivery>();
 
+    /** The completion future if suspending messages is in progress, or
+     * null. */
+    private SuspendMessagesCompletionFuture suspendCompletionFuture = null;
+    
     /** The session's relocation information, if this session is relocating to
      * another node. */
     private RelocationInfo relocationInfo = null;
@@ -204,7 +208,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     
     /** {@inheritDoc} */
     public void sessionMessage(ByteBuffer message, Delivery delivery) {
-	checkRelocating();
+	checkSuspend();
 	int messageLength = 1 + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf = ByteBuffer.wrap(new byte[messageLength]);
@@ -217,7 +221,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** {@inheritDoc} */
     public void channelJoin(
 	String name, BigInteger channelId, Delivery delivery) {
-	checkRelocating();
+	checkSuspend();
 	byte[] channelIdBytes = channelId.toByteArray();
 	MessageBuffer buf =
 	    new MessageBuffer(1 + MessageBuffer.getSize(name) +
@@ -230,7 +234,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** {@inheritDoc} */
     public void channelLeave(BigInteger channelId) {
-	checkRelocating();
+	checkSuspend();
 	byte[] channelIdBytes = channelId.toByteArray();
 	ByteBuffer buf =
 	    ByteBuffer.allocate(1 + channelIdBytes.length);
@@ -254,7 +258,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                                ByteBuffer message,
                                Delivery delivery)
     {
-	checkRelocating();
+	checkSuspend();
 	byte[] channelIdBytes = channelId.toByteArray();
 	int messageLength = 3 + channelIdBytes.length + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
@@ -287,6 +291,37 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
+    public void suspend(RequestCompletionHandler<Void> completionHandler) {
+	synchronized (lock) {
+	    if (suspendCompletionFuture != null) {
+		throw new IllegalStateException(
+		    "already suspending messages");
+	    }
+	    suspendCompletionFuture =
+		new SuspendMessagesCompletionFuture(completionHandler);
+	}
+	ByteBuffer buf = ByteBuffer.allocate(1);
+	buf.put(SimpleSgsProtocol.SUSPEND_MESSAGES).
+	    flip();
+	writeToWriteHandler(buf);
+	flushMessageQueue();
+    }
+
+    /** {@inheritDoc} */
+    public void resume() {
+	synchronized (lock) {
+	    if (suspendCompletionFuture != null) {
+		suspendCompletionFuture = null;
+		ByteBuffer buf = ByteBuffer.allocate(1);
+		buf.put(SimpleSgsProtocol.RESUME_MESSAGES).
+		    flip();
+		writeToWriteHandler(buf);
+		flushMessageQueue();
+	    }
+	}
+    }
+
+    /** {@inheritDoc} */
     public void relocate(Node newNode,
 			 Set<ProtocolDescriptor> descriptors,
 			 ByteBuffer relocationKey,
@@ -294,21 +329,14 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     {
 	synchronized (lock) {
 	    if (relocationInfo != null) {
-		throw new IllegalStateException(
-		    "session already relocating");
-	    } else {
-		relocationInfo =
-		    new RelocationInfo(descriptors, relocationKey,
-				       completionHandler);
+		throw new IllegalStateException("session already relocating");
 	    }
+	    if (suspendCompletionFuture == null) {
+		suspend(completionHandler);
+	    }
+	    relocationInfo =
+		new RelocationInfo(descriptors, relocationKey);
 	}
-
-	ByteBuffer buf = ByteBuffer.allocate(1);
-	buf.put(SimpleSgsProtocol.SUSPEND_MESSAGES).
-	    flip();
-	writeToWriteHandler(buf);
-	flushMessageQueue();
-	
     }
     
     /** {@inheritDoc} */
@@ -538,14 +566,16 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /**
      * Throws {@link IllegalStateException} if the client session is
-     * relocating.
+     * relocating or has suspended messages.
      *
      * @throws	IllegalStateException if the client session is relocating
      */
-    private void checkRelocating() {
+    private void checkSuspend() {
 	synchronized (lock) {
 	    if (relocationInfo != null) {
 		throw new IllegalStateException("session relocating");
+	    } else if (suspendCompletionFuture != null) {
+		throw new IllegalStateException("messages suspended");
 	    }
 	}
     }
@@ -903,19 +933,15 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		break;
 
 	    case SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE:
-		RelocationInfo info = null;
 		synchronized (lock) {
-		    if (relocationInfo == null) {
-			// Right now, we only suspend messages if we're
-			// relocating.
-			return;
+		    if (suspendCompletionFuture != null) {
+			suspendCompletionFuture.done();
 		    }
-		    info = relocationInfo;
-		    relocationInfo = null;
+		    if (relocationInfo != null) {
+			relocationInfo.completed();
+		    }
 		}
-		info.completed();
 		break;
-		
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		if (protocolHandler == null) {
@@ -1125,20 +1151,15 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
 	private final Set<ProtocolDescriptor> descriptors;
 	private final ByteBuffer relocationKey;
-	private final SuspendMessagesCompletionFuture completionFuture;
 
 	RelocationInfo(Set<ProtocolDescriptor> descriptors,
-		       ByteBuffer relocationKey,
-		       RequestCompletionHandler<Void> completionHandler)
+		       ByteBuffer relocationKey)
 	{
 	    this.descriptors = descriptors;
 	    this.relocationKey = relocationKey;
-	    this.completionFuture =
-		new SuspendMessagesCompletionFuture(completionHandler);
 	}
 
 	void completed() {
-	    completionFuture.done();
 	    for (ProtocolDescriptor descriptor : descriptors) {
 		if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
 		    byte[] redirectionData =
@@ -1160,6 +1181,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	}
     }
 
+    /**
+     * A completion future for suspending messages.
+     */
     private static class SuspendMessagesCompletionFuture
 	extends AbstractCompletionFuture<Void>
     {
