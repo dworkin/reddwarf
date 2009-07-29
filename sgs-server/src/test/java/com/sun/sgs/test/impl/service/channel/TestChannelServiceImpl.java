@@ -1133,7 +1133,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    DummyClient moe = group.getClient("moe");
-	    moe.waitForJoin(channelName);
+	    moe.assertJoinedChannel(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
 	    Thread.sleep(2000);
@@ -1158,7 +1158,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    DummyClient moe = group.getClient("moe");
-	    moe.waitForJoin(channelName);
+	    moe.assertJoinedChannel(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
 	    Thread.sleep(2000);
@@ -1180,7 +1180,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    DummyClient moe = group.getClient("moe");
-	    moe.waitForJoin(channelName);
+	    moe.assertJoinedChannel(channelName);
 	    moe.sendChannelMessage(channelName, 0);
 	    Thread.sleep(2000);
 	    boolean fail = false;
@@ -1207,7 +1207,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    DummyClient moe = group.getClient("moe");
-	    moe.waitForJoin(channelName);
+	    moe.assertJoinedChannel(channelName);
 	    moe.sendChannelMessage(channelName, 0);
 	    Thread.sleep(2000);
 	    boolean fail = false;
@@ -1234,7 +1234,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    DummyClient moe = group.getClient("moe");
-	    moe.waitForJoin(channelName);
+	    moe.assertJoinedChannel(channelName);
 	    moe.sendChannelMessage(channelName, 0);
 	    Thread.sleep(2000);
 	    boolean fail = false;
@@ -1261,7 +1261,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    DummyClient moe = group.getClient("moe");
-	    moe.waitForJoin(channelName);
+	    moe.assertJoinedChannel(channelName);
 	    int numMessages = 10;
 	    for (int i = 0; i < numMessages; i++) {
 		moe.sendChannelMessage(channelName, i);
@@ -1320,7 +1320,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
 
 	// Wait for the client to join, and then send a channel message.
-	client.waitForJoin(channelName);
+	client.assertJoinedChannel(channelName);
 	client.sendChannelMessage(channelName, 0);
 
 	// Validate that the session passed to the handleChannelMessage

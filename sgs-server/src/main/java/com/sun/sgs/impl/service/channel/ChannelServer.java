@@ -88,10 +88,14 @@ public interface ChannelServer extends Remote {
      *
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID
+     * @return	{@code true} if the leave succeeded (either was delivered or
+     *		enqueued for a relocating session), and {@code false} if
+     *		the session is not locally connected and is not known to be
+     *		relocating 
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void leave(BigInteger channelRefId, BigInteger sessionRefId)
+    boolean leave(BigInteger channelRefId, BigInteger sessionRefId)
 	throws IOException;
 
     /**

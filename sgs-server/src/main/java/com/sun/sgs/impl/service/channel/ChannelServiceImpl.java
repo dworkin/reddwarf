@@ -620,94 +620,10 @@ public final class ChannelServiceImpl
 			localNodeId);
 		}
 
-		RelocationInfo info = relocatingSessions.get(sessionRefId);
-		if (info != null) {
-		    // Session is relocating from this node, so return the
-		    // new node's ID, so that the join request can be sent
-		    // to the new node.
-		    return false;
-		}
-
-		// TBD: The following may need to check the data store to
-		// see which node the session is assigned to.
-		boolean relocatingToLocalNode =
-		    sessionService.isRelocatingToLocalNode(sessionRefId);
-		SessionProtocol protocol =
-		    sessionService.getSessionProtocol(sessionRefId);
-		ChannelJoinTask joinTask =
-		    new ChannelJoinTask(name, channelRefId, sessionRefId,
-					delivery);
-		if (protocol == null) {
-		    if (!relocatingToLocalNode) {
-			// The session is not locally-connected and is not
-			// known to be relocating to the local node, so return
-			// -1 (unknown status).
-			return false;
-		    }
-		    
-		    // The session is relocating to this node, but the
-		    // session hasn't been established yet, so enqueue the
-		    // join request until relocation is complete.
-		    List<KernelRunnable> taskQueue =
-			relocatedSessionTaskQueues.get(sessionRefId);
-		    if (taskQueue == null) {
-			List<KernelRunnable> newTaskQueue =
-			    Collections.synchronizedList(
-				new LinkedList<KernelRunnable>());
-			taskQueue = relocatedSessionTaskQueues.
-			    putIfAbsent(sessionRefId, newTaskQueue);
-			if (taskQueue == null) {
-			    taskQueue = newTaskQueue;
-			    // TBD: schedule task to clean up task queue if
-			    // session doesn't relocate to this node in a
-			    // timely manner.
-			}
-		    }
-		    
-		    taskQueue.add(joinTask);
-		    // TBD: there still may be a race condition in here...
-		    protocol = sessionService.getSessionProtocol(sessionRefId);
-		    if (protocol != null) {
-			// Client relocated while adding a task to the queue.
-			// The task could have been added to the queue after
-			// the 'relocated' notification, so it wouldn't have
-			// been processed.  Therefore notify the channel
-			// service that the session has been relocated so that
-			// it can process the task queue.
-			sessionStatusListener.relocated(sessionRefId);
-		    }
-
-		    return true;
-		    
-		} else {
-		    // The session is locally-connected, so process the
-		    // join request locally.
-		    try {
-			List<KernelRunnable> taskQueue =
-			    relocatedSessionTaskQueues.get(sessionRefId);
-			if (taskQueue != null) {
-			    synchronized (taskQueue) {
-				// If this session is relocating to this node,
-				// wait for all channel requests enqueued during
-				// relocation to be processed.
-				if (!taskQueue.isEmpty()) {
-				    try {
-					// TBD: bounded timeout?
-					taskQueue.wait();
-				    } catch (InterruptedException e) {
-				    }
-				}
-			    }
-			}
-			joinTask.run();
-			return true;
-			
-		    } catch (RuntimeException e) {
-			// Session is relocating to another node, but its
-			// destination unknown.
-			return false;
-		    }
-		}
+		return handleChannelRequest(
+		    sessionRefId,
+		    new ChannelJoinTask(
+			name, channelRefId, sessionRefId, delivery));
 		
 	    } finally {
 		callFinished();
@@ -721,7 +637,7 @@ public final class ChannelServiceImpl
 	 * channel leave message to the session with the corresponding
 	 * {@code sessionRefId}.
 	 */
-	public void leave(BigInteger channelRefId, BigInteger sessionRefId) {
+	public boolean leave(BigInteger channelRefId, BigInteger sessionRefId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -730,37 +646,10 @@ public final class ChannelServiceImpl
 			HexDumper.toHexString(channelRefId.toByteArray()),
 			HexDumper.toHexString(sessionRefId.toByteArray()));
 		}
-
-		// Update local channel membership cache.
-		Set<BigInteger> localMembers;
-		localMembers = localChannelMembersMap.get(channelRefId);
-		if (localMembers == null) {
-		    return;
-		}
-		localMembers.remove(sessionRefId);
-
-		// Update per-session channel set cache.
-		Set<BigInteger> channelSet =
-		    localPerSessionChannelsMap.get(sessionRefId);
-		if (channelSet != null) {
-		    channelSet.remove(channelRefId);
-		}
-
-		// Send channel leave protocol message.
-		SessionProtocol protocol =
-		    sessionService.getSessionProtocol(sessionRefId);
-		if (protocol != null) {
-                    try {
-                        protocol.channelLeave(channelRefId);
-                    } catch (IOException e) {
-                        logger.logThrow(Level.WARNING, e,
-                                        "channelLeave throws");
-                    } catch (RuntimeException e) {
-			// TBD
-                        logger.logThrow(Level.WARNING, e,
-                                        "channelLeave throws");
-		    }
-		}
+		
+		return handleChannelRequest(
+		    sessionRefId,
+		    new ChannelLeaveTask(channelRefId, sessionRefId));
 		
 	    } finally {
 		callFinished();
@@ -974,6 +863,98 @@ public final class ChannelServiceImpl
 
 	    } finally {
 		callFinished();
+	    }
+	}
+
+	private boolean handleChannelRequest(
+	    BigInteger sessionRefId, KernelRunnable task)
+	{
+	    RelocationInfo info = relocatingSessions.get(sessionRefId);
+	    if (info != null) {
+		// Session is relocating from this node, so return the new
+		// node's ID, so that the request can be sent to the new
+		// node.
+		return false;
+	    }
+
+	    // TBD: The following may need to check the data store to
+	    // see which node the session is assigned to.
+	    boolean relocatingToLocalNode =
+		sessionService.isRelocatingToLocalNode(sessionRefId);
+	    SessionProtocol protocol =
+		sessionService.getSessionProtocol(sessionRefId);
+
+	    if (protocol == null) {
+		if (!relocatingToLocalNode) {
+		    // The session is not locally-connected and is not
+		    // known to be relocating to the local node, so return
+		    // -1 (unknown status).
+		    return false;
+		}
+		    
+		// The session is relocating to this node, but the
+		// session hasn't been established yet, so enqueue the
+		// request until relocation is complete.
+		List<KernelRunnable> taskQueue =
+		    relocatedSessionTaskQueues.get(sessionRefId);
+		if (taskQueue == null) {
+		    List<KernelRunnable> newTaskQueue =
+			Collections.synchronizedList(
+			    new LinkedList<KernelRunnable>());
+		    taskQueue = relocatedSessionTaskQueues.
+			putIfAbsent(sessionRefId, newTaskQueue);
+		    if (taskQueue == null) {
+			taskQueue = newTaskQueue;
+			// TBD: schedule task to clean up task queue if
+			// session doesn't relocate to this node in a
+			// timely manner.
+		    }
+		}
+		    
+		taskQueue.add(task);
+		// TBD: there still may be a race condition in here...
+		protocol = sessionService.getSessionProtocol(sessionRefId);
+		if (protocol != null) {
+		    // Client relocated while adding a task to the queue.
+		    // The task could have been added to the queue after
+		    // the 'relocated' notification, so it wouldn't have
+		    // been processed.  Therefore notify the channel
+		    // service that the session has been relocated so that
+		    // it can process the task queue.
+		    sessionStatusListener.relocated(sessionRefId);
+		}
+		
+		return true;
+		
+	    } else {
+		// The session is locally-connected, so process the
+		// request locally.
+		List<KernelRunnable> taskQueue =
+		    relocatedSessionTaskQueues.get(sessionRefId);
+		if (taskQueue != null) {
+		    synchronized (taskQueue) {
+			// If this session is relocating to this node,
+			// wait for all channel requests enqueued during
+			// relocation to be processed.
+			if (!taskQueue.isEmpty()) {
+			    try {
+				// TBD: bounded timeout?
+				taskQueue.wait();
+			    } catch (InterruptedException e) {
+			    }
+			}
+		    }
+		}
+		try {
+		    task.run();
+		    return true;
+		    
+		} catch (Exception e) {
+		    // Session is relocating to another node, but its
+		    // destination unknown.
+		    // TBD: log exception?
+		    return false;
+		}
 	    }
 	}
     }
@@ -1855,11 +1836,61 @@ public final class ChannelServiceImpl
 		    // TBD: session disconnecting?
 		    logger.logThrow(Level.WARNING, e,
 				    "channelJoin throws");
+		} catch (RuntimeException e) {
+		    // TBD
+		    logger.logThrow(Level.WARNING, e,
+				    "channelJoin throws");
 		}
 	    }
 	}
     }
 
+    private class ChannelLeaveTask extends AbstractKernelRunnable {
+
+	private final BigInteger channelRefId;
+	private final BigInteger sessionRefId;
+
+	ChannelLeaveTask(BigInteger channelRefId, BigInteger sessionRefId) {
+	    super(null);
+	    this.channelRefId = channelRefId;
+	    this.sessionRefId = sessionRefId;
+	}
+
+	public void run() {
+
+	    // Update local channel membership cache.
+	    Set<BigInteger> localMembers;
+	    localMembers = localChannelMembersMap.get(channelRefId);
+	    if (localMembers == null) {
+		return;
+	    }
+	    localMembers.remove(sessionRefId);
+	    
+	    // Update per-session channel set cache.
+	    Set<BigInteger> channelSet =
+		localPerSessionChannelsMap.get(sessionRefId);
+	    if (channelSet != null) {
+		channelSet.remove(channelRefId);
+	    }
+
+	    // Send channel leave protocol message.
+	    SessionProtocol protocol =
+		sessionService.getSessionProtocol(sessionRefId);
+	    if (protocol != null) {
+		try {
+		    protocol.channelLeave(channelRefId);
+		} catch (IOException e) {
+		    logger.logThrow(Level.WARNING, e,
+				    "channelLeave throws");
+		} catch (RuntimeException e) {
+		    // TBD
+		    logger.logThrow(Level.WARNING, e,
+				    "channelLeave throws");
+		}
+	    }
+	}
+    }
+    
     /**
      * Information pertaining to a client session relocating from this node.
      */

@@ -561,8 +561,6 @@ public abstract class AbstractChannelServiceTest extends TestCase {
     protected class DummyClient extends AbstractDummyClient {
 
 	private final Object lock = new Object();
-	private boolean joinAck = false;
-	private boolean leaveAck = false;
 	private Set<String> channelNames = new HashSet<String>();
 	private Map<BigInteger, String> channelIdToName =
 	    new HashMap<BigInteger, String>();
@@ -640,29 +638,20 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 				  MessageBuffer.getSize(channelToJoin));
 	    buf.putString(action).putString(channelToJoin);
 	    sendMessage(buf.getBuffer(), true);
-	    joinAck = false;
-	    waitForJoin(channelToJoin);
+	    assertJoinedChannel(channelToJoin);
 	}
-
-	void waitForJoin(String channelToJoin) {
+	
+	void assertJoinedChannel(String channelName) {
 	    synchronized (lock) {
-		try {
-		    if (joinAck == false) {
+		if (!channelNameToId.containsKey(channelName)) {
+		    try {
 			lock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
 		    }
-		    if (joinAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.join timed out: " + channelToJoin);
-		    }
-
-		    if (channelNameToId.get(channelToJoin) == null) {
-			fail("DummyClient.join not joined: " +
-			     channelToJoin);
-		    }
-		    
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			    "DummyClient.join timed out: " + channelToJoin, e);
+		    assertTrue(
+			toString() + "did not receive CHANNEL_JOIN, " +
+			"channel: " + channelName,
+			channelNameToId.containsKey(channelName));
 		}
 	    }
 	}
@@ -674,29 +663,24 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 				  MessageBuffer.getSize(channelToLeave));
 	    buf.putString(action).putString(channelToLeave);
 	    sendMessage(buf.getBuffer(), true);
-	    leaveAck = false;
-	    synchronized (lock) {
-		try {
-		    if (leaveAck == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (leaveAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.leave timed out: " + channelToLeave);
-		    }
+	    assertLeftChannel(channelToLeave);
+	}
 
-		    if (channelNameToId.get(channelToLeave) != null) {
-			fail("DummyClient.leave still joined: " +
-			     channelToLeave);
+	void assertLeftChannel(String channelName) {
+	    synchronized (lock) {
+		if (channelNameToId.containsKey(channelName)) {
+		    try {
+			lock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
 		    }
-		    
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			    "DummyClient.leave timed out: " + channelToLeave, e);
+		    assertFalse(
+			toString() + "did not receive CHANNEL_LEAVE, " +
+			"channel: " + channelName,
+			channelNameToId.containsKey(channelName));
 		}
 	    }
 	}
-
+	
 	/**
 	 * Handles session and channel messages and channel joins and
 	 * leaves, then delegates to the super class to handle those
@@ -710,7 +694,6 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		if (action.equals("join")) {
 		    String channelName = buf.getString();
 		    synchronized (lock) {
-			joinAck = true;
 			channelNames.add(channelName);
 			System.err.println(
 			    name + ": got join ack, channel: " +
@@ -720,7 +703,6 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		} else if (action.equals("leave")) {
 		    String channelName = buf.getString();
 		    synchronized (lock) {
-			leaveAck = true;
 			channelNames.remove(channelName);
 			System.err.println(
 			    name + ": got leave ack, channel: " +
@@ -749,7 +731,6 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		    new BigInteger(1,
 				   buf.getBytes(buf.limit() - buf.position()));
 		synchronized (lock) {
-		    joinAck = true;
 		    channelIdToName.put(channelId, channelName);
 		    channelNameToId.put(channelName, channelId);
 		    printIt("[" + name + "] join succeeded: " +
@@ -764,8 +745,8 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		    new BigInteger(1,
 				   buf.getBytes(buf.limit() - buf.position()));
 		synchronized (lock) {
-		    leaveAck = true;
 		    String channelName = channelIdToName.remove(channelId);
+		    channelNameToId.remove(channelName);
 		    printIt("[" + name + "] leave succeeded: " +
 			    channelName);
 		    lock.notifyAll();
@@ -779,9 +760,17 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 		int seq = buf.getInt();
 		synchronized (lock) {
 		    String channelName = channelIdToName.get(channelId);
-		    System.err.println("[" + name + "] received message: " +
-				       seq + ", channel: " + channelName);
-		    channelMessages.add(new MessageInfo(channelName, seq));
+		    if (channelName != null) {
+			System.err.println(
+			    "[" + name + "] received message: " +
+			    seq + ", channel: " + channelName);
+			channelMessages.add(new MessageInfo(channelName, seq));
+		    } else {
+			System.err.println(
+			    "[" + name + "] received message: " +
+			    seq + ", but not joined to channel: " +
+			    HexDumper.toHexString(channelId.toByteArray()));
+		    }
 		    lock.notifyAll();
 		}
 		break;
