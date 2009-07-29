@@ -76,8 +76,8 @@ public final class RequestQueueListener extends Thread {
     /** The object for finding the {@link RequestQueueServer}. */
     private final ServerDispatcher serverDispatcher;
 
-    /** The runnable to call if the listener fails. */ 
-    private final Runnable failureHandler;
+    /** The object to call if the listener fails. */ 
+    private final FailureReporter failureReporter;
 
     /** The maximum retry time in milliseconds. */
     private final long maxRetry;
@@ -97,31 +97,31 @@ public final class RequestQueueListener extends Thread {
 
     /**
      * Creates an instance of this class and starts the thread.  The {@link
-     * Runnable#run run} method of {@code failureHandler} will be called if the
-     * listener shuts itself down due to repeated failures when attempting to
-     * accept connections.  The failure handler will not be called if a
-     * shutdown is requested explicitly by a call to the {@link #shutdown}
-     * method.  The server socket should already be connected, and will be
-     * closed when the listener shuts down.
+     * FailureReporter#reportFailure reportFailure} method of {@code
+     * failureReporter} will be called if the listener shuts itself down due to
+     * repeated failures when attempting to accept connections.  The failure
+     * reporter will not be called if a shutdown is requested explicitly by a
+     * call to the {@link #shutdown} method.  The server socket should already
+     * be connected, and will be closed when the listener shuts down.
      *
      * @param	serverSocket the server socket for accepting connections
      * @param	serverDispatcher the object for finding the {@link
      *		RequestQueueServer} 
-     * @param	failureHandler the failure handler
+     * @param	failureReporter the failure reporter
      * @param	properties additional configuration properties
      */
     public RequestQueueListener(ServerSocket serverSocket,
 				ServerDispatcher serverDispatcher,
-				Runnable failureHandler,
+				FailureReporter failureReporter,
 				Properties properties)
     {
 	super("RequestQueueListener");
 	checkNull("serverSocket", serverSocket);
 	checkNull("serverDispatcher", serverDispatcher);
-	checkNull("failureHandler", failureHandler);
+	checkNull("failureReporter", failureReporter);
 	this.serverSocket = serverSocket;
 	this.serverDispatcher = serverDispatcher;
-	this.failureHandler = failureHandler;
+	this.failureReporter = failureReporter;
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	maxRetry = wrappedProps.getLongProperty(
 	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 1, Long.MAX_VALUE);
@@ -188,7 +188,7 @@ public final class RequestQueueListener extends Thread {
 			    " socket:" + socket);
 		    }
 		    /* Configure the socket's input stream to timeout */
-		    socket.setSoTimeout((int) maxRetry);
+		    //socket.setSoTimeout((int) maxRetry);
 		    DataInputStream in =
 			new DataInputStream(socket.getInputStream());
 		    nodeId = in.readLong();
@@ -275,7 +275,7 @@ public final class RequestQueueListener extends Thread {
 				"RequestQueueListener shutting down due" +
 				" to failure");
 	    }
-	    failureHandler.run();
+	    failureReporter.reportFailure(exception);
 	} else {
 	    while (System.currentTimeMillis() < now + retryWait) {
 		try {

@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
 import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.FINEST;
 import java.util.logging.Logger;
 
 /**
@@ -89,29 +90,33 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
      * CachingDataStore#reportFailure}.
      */
     public void run() {
-	R result;
-	while (true) {
-	    if (shutdownRequested()) {
-		return;
-	    }
-	    try {
-		result = callOnce();
-		break;
-	    } catch (IOException e) {
-		if (logger.isLoggable(FINER)) {
-		    logger.logThrow(FINER, e, "I/O failure");
-		}
-		if (shouldRetry()) {
-		    continue;
-		} else {
-		    store.reportFailure();
+	try {
+	    R result;
+	    while (true) {
+		if (shutdownRequested()) {
 		    return;
 		}
-	    } catch (Exception e) {
-		store.reportFailure();
-		return;
+		try {
+		    logger.log(FINEST, "Calling {0}", this);
+		    result = callOnce();
+		    break;
+		} catch (IOException e) {
+		    if (shouldRetry()) {
+			logger.logThrow(
+			    FINEST, e, "Retrying I/O failure: {0}", this);
+		    } else {
+			store.reportFailure(e);
+			return;
+		    }
+		}
 	    }
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(FINEST, "Calling {0} returns {1}", this, result);
+	    }
+	    runWithResult(result);
+	} catch (Throwable e) {
+	    store.reportFailure(e);
+	    return;
 	}
-	runWithResult(result);
     }
 }

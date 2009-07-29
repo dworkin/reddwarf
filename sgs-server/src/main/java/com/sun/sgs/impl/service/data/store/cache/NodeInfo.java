@@ -72,6 +72,11 @@ class NodeInfo extends MultiLocker<Object, NodeInfo> {
 	this.updateQueueServer = updateQueueServer;
     }
 
+    @Override
+    public String toString() {
+	return "NodeInfo[nodeId:" + nodeId + "]";
+    }
+
     /**
      * {@inheritDoc} <p>
      *

@@ -38,6 +38,16 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     private boolean pendingPrevious;
 
     /**
+     * Creates a binding cache entry with the specified key and state.
+     *
+     * @param	key the key
+     * @param	state the state
+     */
+    private BindingCacheEntry(BindingKey key, State state) {
+	super(key, state);
+    }
+
+    /**
      * Creates a binding cache entry to represent a name binding being cached
      * on behalf of a transaction.
      *
@@ -46,12 +56,40 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * @param	forUpdate whether the value is cached for update
      * @param	contextId the context ID associated with the transaction
      */
-    BindingCacheEntry(
+    static BindingCacheEntry createCached(
 	BindingKey key, long value, boolean forUpdate, long contextId)
     {
-	super(key, forUpdate ? State.CACHED_WRITE : State.CACHED_READ);
-	setValue(value);
-	noteAccess(contextId);
+	BindingCacheEntry entry = new BindingCacheEntry(
+	    key, forUpdate ? State.CACHED_WRITE : State.CACHED_READ);
+	entry.setValue(value);
+	entry.noteAccess(contextId);
+	return entry;
+    }
+
+    /**
+     * Creates a binding cache entry to represent the last name binding that is
+     * being fetched from the server.
+     *
+     * @param	forUpdate whether the last name is being fetched for update
+     */
+    static BindingCacheEntry createLast(boolean forUpdate) {
+	return new BindingCacheEntry(
+	    BindingKey.LAST,
+	    forUpdate ? State.FETCHING_WRITE : State.FETCHING_READ);
+    }
+
+    @Override
+    public String toString() {
+	return "BindingCacheEntry[" +
+	    "name:" + key +
+	    ", value:" + getValue() +
+	    ", contextId:" + getContextId() +
+	    ", state:" + getState() +
+	    ", previousKey:" + previousKey +
+	    (previousKey == null ? "" :
+	     ", previousKeyUnbound:" + previousKeyUnbound) +
+	    ", pendingPrevious:" + pendingPrevious +
+	    "]";
     }
 
     /**
@@ -137,8 +175,9 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	if (!pendingPrevious) {
 	    return;
 	}
-	long now = System.currentTimeMillis();
-	while (true) {
+	long start = System.currentTimeMillis();
+	long now = start;
+	while (now < stop) {
 	    try {
 		lock.wait(stop - now);
 	    } catch (InterruptedException e) {
@@ -149,11 +188,10 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		return;
 	    }
 	    now = System.currentTimeMillis();
-	    if (now >= stop) {
-		throw new TransactionTimeoutException(
-		    "Timeout waiting for lock: " + this);
-	    }
 	}
+	throw new TransactionTimeoutException(
+	    "Timeout after " + (now - start) +
+	    " ms waiting for lock: " + this);
     }
 
     /**

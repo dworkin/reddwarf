@@ -65,6 +65,11 @@ class TxnContext {
 	contextId = store.getUpdateQueue().beginTxn();
     }
 
+    @Override
+    public String toString() {
+	return "TxnContext[txn:" + txn + "]";
+    }
+
     /**
      * Returns whether the transaction has been prepared.
      *
@@ -84,14 +89,14 @@ class TxnContext {
     boolean prepare() {
 	if (prepared) {
 	    throw new IllegalStateException(
-		"Transaction has been prepared: " + txn);
+		"Transaction has already been prepared: " + txn);
 	} else if (!getModified()) {
 	    store.getUpdateQueue().abort(contextId, false);
-	    return false;
+	    return true;
 	} else {
 	    store.getUpdateQueue().prepare(getStopTime());
 	    prepared = true;
-	    return true;
+	    return false;
 	}
     }
 
@@ -104,8 +109,10 @@ class TxnContext {
     void prepareAndCommit() {
 	if (prepared) {
 	    throw new IllegalStateException(
-		"Transaction has been prepared: " + txn);
-	} else if (getModified()) {
+		"Transaction has already been prepared: " + txn);
+	} else if (!getModified()) {
+	    store.getUpdateQueue().abort(contextId, false);
+	} else {
 	    store.getUpdateQueue().prepare(getStopTime());
 	    prepared = true;
 	    commitInternal();
@@ -160,7 +167,7 @@ class TxnContext {
     long getStopTime() {
 	return Math.min(
 	    addCheckOverflow(System.currentTimeMillis(),
-			     /* FIXME: lockTimeout */ 0),
+			     store.getLockTimeout()),
 	    addCheckOverflow(txn.getCreationTime(), txn.getTimeout()));
     }
 
@@ -185,7 +192,6 @@ class TxnContext {
 	assert Thread.holdsLock(store.getCache().getObjectLock(oid));
 	ObjectCacheEntry entry = ObjectCacheEntry.createNew(oid, contextId);
 	store.getCache().addObjectEntry(entry);
-	addModifiedObject(entry);
     }
 
     /**
@@ -221,17 +227,16 @@ class TxnContext {
 
     /**
      * Adds an entry to the cache that represents the last bound name in the
-     * cache.  The newly created entry will be marked pending previous.  The
+     * cache.  The newly created entry will be marked as being fetched.  The
      * associated lock should be held.
      *
-     * @return the new cache entry
+     * @param	forUpdate whether the last name is being fetched for update
+     * @return	the new cache entry
      */
-    BindingCacheEntry noteLastBinding() {
+    BindingCacheEntry noteLastBinding(boolean forUpdate) {
 	assert Thread.holdsLock(
 	    store.getCache().getBindingLock(BindingKey.LAST));
-	BindingCacheEntry entry = new BindingCacheEntry(
-	    BindingKey.LAST, -1, false, contextId);
-	entry.setPendingPrevious();
+	BindingCacheEntry entry = BindingCacheEntry.createLast(forUpdate);
 	store.getCache().addBindingEntry(entry);
 	return entry;
     }
@@ -248,7 +253,7 @@ class TxnContext {
     {
 	assert Thread.holdsLock(store.getCache().getBindingLock(key));
 	BindingCacheEntry entry =
-	    new BindingCacheEntry(key, value, forUpdate, contextId);
+	    BindingCacheEntry.createCached(key, value, forUpdate, contextId);
 	store.getCache().addBindingEntry(entry);
 	return entry;
     }
@@ -267,7 +272,7 @@ class TxnContext {
     {
 	assert Thread.holdsLock(store.getCache().getBindingLock(key));
 	BindingCacheEntry entry =
-	    new BindingCacheEntry(key, value, forUpdate, contextId);
+	    BindingCacheEntry.createCached(key, value, forUpdate, contextId);
 	store.getCache().addReservedBindingEntry(entry);
 	return entry;
     }
@@ -313,22 +318,15 @@ class TxnContext {
     void noteModifiedObject(ObjectCacheEntry entry, byte[] data) {
 	assert Thread.holdsLock(store.getCache().getObjectLock(entry.key));
 	if (!entry.getModified()) {
-	    addModifiedObject(entry);
+	    if (modifiedObjects == null) {
+		modifiedObjects = new LinkedList<SavedValue<Long, byte[]>>();
+	    }
+	    SavedValue<Long, byte[]> saved = SavedValue.create(entry);
+	    assert !modifiedObjects.contains(saved);
+	    modifiedObjects.add(saved);
+	    entry.setCachedDirty();
 	}
 	entry.setValue(data);
-	entry.noteAccess(contextId);
-    }
-
-    /**
-     * Note that an object has been modified by this transaction.
-     *
-     * @param	entry the cache entry
-     */
-    void noteModifiedObject(ObjectCacheEntry entry) {
-	assert Thread.holdsLock(store.getCache().getObjectLock(entry.key));
-	if (!entry.getModified()) {
-	    addModifiedObject(entry);
-	}
 	entry.noteAccess(contextId);
     }
 
@@ -340,8 +338,15 @@ class TxnContext {
      */
     void noteModifiedBinding(BindingCacheEntry entry, long oid) {
 	assert Thread.holdsLock(store.getCache().getBindingLock(entry.key));
-	if (!entry.getModified()) {
-	    addModifiedBinding(entry);
+	if (!entry.getModified() && entry.key != BindingKey.LAST) {
+	    if (modifiedBindings == null) {
+		modifiedBindings =
+		    new LinkedList<SavedValue<BindingKey, Long>>();
+	    }
+	    SavedValue<BindingKey, Long> saved = SavedValue.create(entry);
+	    assert !modifiedBindings.contains(saved);
+	    modifiedBindings.add(saved);
+	    entry.setCachedDirty();
 	}
 	entry.setValue(oid);
 	entry.noteAccess(contextId);
@@ -355,55 +360,34 @@ class TxnContext {
 	return (result >= 0) ? result : Long.MAX_VALUE;
     }
 
-    /**
-     * Notes that the object with the specified identifier has been modified
-     * for the first time in this transaction.
-     *
-     * @param	oid the identifier of the modified object
-     */
-    private void addModifiedObject(ObjectCacheEntry entry) {
-	if (modifiedObjects == null) {
-	    modifiedObjects = new LinkedList<SavedValue<Long, byte[]>>();
-	}
-	SavedValue<Long, byte[]> saved = SavedValue.create(entry);
-	assert !modifiedObjects.contains(saved);
-	modifiedObjects.add(saved);
-	entry.setCachedDirty();
-    }
-
-    /**
-     * Notes that the binding with the specified key has been modified for the
-     * first time in this transaction.
-     *
-     * @param	oid the key of the modified binding
-     */
-    private void addModifiedBinding(BindingCacheEntry entry) {
-	if (entry.key.getName() != null) {
-	    if (modifiedBindings == null) {
-		modifiedBindings =
-		    new LinkedList<SavedValue<BindingKey, Long>>();
-	    }
-	    SavedValue<BindingKey, Long> saved = SavedValue.create(entry);
-	    assert !modifiedBindings.contains(saved);
-	    modifiedBindings.add(saved);
-	    entry.setCachedDirty();
-	}
-    }
-
     /** Adds the commit request to the update queue. */
     private void commitInternal() {
 	Cache cache = store.getCache();
 	long[] oids = new long[
 	    (modifiedObjects == null) ? 0 : modifiedObjects.size()];
 	byte[][] oidValues = new byte[oids.length][];
-	for (int i = 0; i < oids.length; i++) {
-	    long oid = modifiedObjects.get(i).key;
-	    oids[i] = oid;
-	    Object lock = cache.getObjectLock(oid);
-	    synchronized (lock) {
-		ObjectCacheEntry entry = cache.getObjectEntry(oid);
-		oidValues[i] = entry.getValue();
-		entry.setNotModified();
+	int newOids = 0;
+	if (modifiedObjects != null) {
+	    int i = 0;
+	    for (int pass = 1; pass <= 2; pass++) {
+		boolean includeNew = (pass == 1);
+		for (SavedValue<Long, byte[]> saved : modifiedObjects) {
+		    boolean isNew = (saved.value == null);
+		    if (includeNew == isNew) {
+			if (isNew) {
+			    newOids++;
+			}
+			long oid = saved.key;
+			oids[i] = oid;
+			Object lock = cache.getObjectLock(oid);
+			synchronized (lock) {
+			    ObjectCacheEntry entry = cache.getObjectEntry(oid);
+			    oidValues[i] = entry.getValue();
+			    entry.setNotModified();
+			}
+			i++;
+		    }
+		}
 	    }
 	}
 	String[] names = new String[
@@ -420,7 +404,7 @@ class TxnContext {
 	    }
 	}
 	store.getUpdateQueue().commit(
-	    contextId, oids, oidValues, names, nameValues);
+	    contextId, oids, oidValues, newOids, names, nameValues);
     }
 
     /**

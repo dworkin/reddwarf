@@ -27,7 +27,6 @@ import static com.sun.sgs.impl.util.DataStreamUtil.writeByteArrays;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeLongs;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeString;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeStrings;
-import com.sun.sgs.service.SimpleCompletionHandler;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.EOFException;
@@ -50,6 +49,48 @@ abstract class UpdateQueueRequest implements Request {
 
     /** The identifier for {@link DowngradeBinding} requests. */
     static final byte DOWNGRADE_BINDING = 5;
+
+    /**
+     * The {@code CompletionHandler} to call when the request is completed, or
+     * {@code null} if there is no handler.
+     */
+    private final CompletionHandler completionHandler;
+
+    /** Creates an instance with no completion handler. */
+    UpdateQueueRequest() {
+	completionHandler = null;
+    }
+
+    /**
+     * Creates an instance with the specified completion handler.
+     *
+     * @param	completionHandler the completion handler
+     */
+    UpdateQueueRequest(CompletionHandler completionHandler) {
+	this.completionHandler = completionHandler;
+    }
+
+    @Override
+    public void completed(Throwable exception) {
+	if (completionHandler != null) {
+	    if (exception == null) {
+		completionHandler.completed();
+	    } else {
+		completionHandler.failed(exception);
+	    }
+	}
+    }
+
+    /**
+     * Performs a request using the specified server and node ID.
+     *
+     * @param	server the underlying server
+     * @param	nodeId the node ID associated with the update queue
+     * @throws	Exception if the request fails
+     */
+    abstract void performRequest(
+	CachingDataStoreServerImpl server, long nodeId)
+	throws Exception;
 
     /** The request handler used to implement {@link UpdateQueue}. */
     static class UpdateQueueRequestHandler
@@ -107,66 +148,25 @@ abstract class UpdateQueueRequest implements Request {
 	}
     }
 
-    /**
-     * Performs a request using the specified server and node ID.
-     *
-     * @param	server the underlying server
-     * @param	nodeId the node ID associated with the update queue
-     * @throws	Exception if the request fails
-     */
-    abstract void performRequest(
-	CachingDataStoreServerImpl server, long nodeId)
-	throws Exception;
-
-    /**
-     * A subclass of {@code UpdateQueueRequest} for requests that contain a
-     * completion handler.
-     */
-    abstract static class UpdateQueueRequestWithCompletion
-	extends UpdateQueueRequest
-    {
-	/**
-	 * The {@code SimpleCompletionHandler} to call when the request is
-	 * completed, or {@code null} if there is no handler.
-	 */
-	private final SimpleCompletionHandler completionHandler;
-
-	/** Creates an instance with no completion handler. */
-	UpdateQueueRequestWithCompletion() {
-	    completionHandler = null;
-	}
-
-	/**
-	 * Creates an instance with the specified completion handler.
-	 *
-	 * @param	completionHandler the completion handler
-	 */
-	UpdateQueueRequestWithCompletion(
-	    SimpleCompletionHandler completionHandler)
-	{
-	    this.completionHandler = completionHandler;
-	}
-
-	public void completed(Throwable exception) {
-	    /* FIXME: Need to handle exception, which should cause a shutdown */
-	    if (completionHandler != null) {
-		completionHandler.completed();
-	    }
-	}
-    }
-
     /** Represents a call to {@link UpdateQueue#commit}. */
     static class Commit extends UpdateQueueRequest {
 	private final long[] oids;
 	private final byte[][] oidValues;
+	private final int newOids;
 	private final String[] names;
 	private final long[] nameValues;
 
-	Commit(
-	    long[] oids, byte[][] oidValues, String[] names, long[] nameValues)
+	Commit(long[] oids,
+	       byte[][] oidValues,
+	       int newOids,
+	       String[] names,
+	       long[] nameValues,
+	       CompletionHandler completionHandler)
 	{
+	    super(completionHandler);
 	    this.oids = oids;
 	    this.oidValues = oidValues;
+	    this.newOids = newOids;
 	    this.names = names;
 	    this.nameValues = nameValues;
 	}
@@ -174,41 +174,53 @@ abstract class UpdateQueueRequest implements Request {
 	Commit(DataInput in) throws IOException {
 	    oids = readLongs(in);
 	    oidValues = readByteArrays(in);
+	    newOids = in.readInt();
 	    names = readStrings(in);
 	    nameValues = readLongs(in);
+	}
+
+	@Override
+	public String toString() {
+	    return "Commit[" +
+		"oids:[" + (oids.length == 0 ? "]" : oids[0] + "...]") +
+		", newOids:" + newOids +
+		", names:[" + (names.length == 0 ? "]" : names[0] + "...]") +
+		"]";
 	}
 
 	void performRequest(
 	    CachingDataStoreServerImpl server, long nodeId)
 	    throws CacheConsistencyException
 	{
-	    server.commit(nodeId, oids, oidValues, names, nameValues);
+	    server.commit(nodeId, oids, oidValues, newOids, names, nameValues);
 	}
 
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(COMMIT);
 	    writeLongs(oids, out);
 	    writeByteArrays(oidValues, out);
+	    out.writeInt(newOids);
 	    writeStrings(names, out);
 	    writeLongs(nameValues, out);
-	}
-
-	public void completed(Throwable exception) {
-	    /* FIXME: Need to handle exception, which should cause a shutdown */
 	}
     }
 
     /** Represents a call to {@link UpdateQueue#evictObject}. */
-    static class EvictObject extends UpdateQueueRequestWithCompletion {
+    static class EvictObject extends UpdateQueueRequest {
 	private final long oid;
 
-	EvictObject(long oid, SimpleCompletionHandler completionHandler) {
+	EvictObject(long oid, CompletionHandler completionHandler) {
 	    super(completionHandler);
 	    this.oid = oid;
 	}
 
 	EvictObject(DataInput in) throws IOException {
 	    oid = in.readLong();
+	}
+
+	@Override
+	public String toString() {
+	    return "EvictObject[oid:" + oid + "]";
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId)
@@ -224,18 +236,21 @@ abstract class UpdateQueueRequest implements Request {
     }
 
     /** Represents a call to {@link UpdateQueue#downgradeObject}. */
-    static class DowngradeObject
-	extends UpdateQueueRequestWithCompletion
-    {
+    static class DowngradeObject extends UpdateQueueRequest {
 	private final long oid;
 
-	DowngradeObject(long oid, SimpleCompletionHandler completionHandler) {
+	DowngradeObject(long oid, CompletionHandler completionHandler) {
 	    super(completionHandler);
 	    this.oid = oid;
 	}
 
 	DowngradeObject(DataInput in) throws IOException {
 	    oid = in.readLong();
+	}
+
+	@Override
+	public String toString() {
+	    return "DowngradeObject[oid:" + oid + "]";
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId) 
@@ -251,18 +266,21 @@ abstract class UpdateQueueRequest implements Request {
     }
 
     /** Represents a call to {@link UpdateQueue#evictBinding}. */
-    static class EvictBinding
-	extends UpdateQueueRequestWithCompletion
-    {
+    static class EvictBinding extends UpdateQueueRequest {
 	private final String name;
 
-	EvictBinding(String name, SimpleCompletionHandler completionHandler) {
+	EvictBinding(String name, CompletionHandler completionHandler) {
 	    super(completionHandler);
 	    this.name = name;
 	}
 
 	EvictBinding(DataInput in) throws IOException {
 	    name = readString(in);
+	}
+
+	@Override
+	public String toString() {
+	    return "EvictBinding[name:" + name + "]";
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId)
@@ -278,19 +296,21 @@ abstract class UpdateQueueRequest implements Request {
     }
 
     /** Represents a call to {@link UpdateQueue#downgradeBinding}. */
-    static class DowngradeBinding
-	extends UpdateQueueRequestWithCompletion
-    {
+    static class DowngradeBinding extends UpdateQueueRequest {
 	private final String name;
-	DowngradeBinding(
-	    String name, SimpleCompletionHandler completionHandler)
-	{
+
+	DowngradeBinding(String name, CompletionHandler completionHandler) {
 	    super(completionHandler);
 	    this.name = name;
 	}
 
 	DowngradeBinding(DataInput in) throws IOException {
 	    name = readString(in);
+	}
+
+	@Override
+	public String toString() {
+	    return "DowngradeBinding[name:" + name + "]";
 	}
 
 	void performRequest(CachingDataStoreServerImpl server, long nodeId)

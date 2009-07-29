@@ -29,7 +29,6 @@ import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
 import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
     EvictObject;
 import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.Commit;
-import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionInterruptedException;
 import java.io.IOException;
 import java.util.Collections;
@@ -94,11 +93,8 @@ class UpdateQueue {
 	queue = new RequestQueueClient(
 	    store.getNodeId(),
 	    new RequestQueueClient.BasicSocketFactory(host, port),
-	    new Runnable() {
-		public void run() { 
-		    store.reportFailure();
-		}
-	    },
+	    store,
+	    /* FIXME: Pass properties? */
 	    new Properties());
 	commitAvailable = new Semaphore(updateQueueSize);
     }
@@ -146,31 +142,44 @@ class UpdateQueue {
      * object IDs of the objects that have been changed.  For each element of
      * that array, the element of the {@code oidValues} array in the same
      * position contains the new value for the object ID, or {@code null} if
-     * the object should be removed.  The {@code names} parameter contains the
-     * names whose bindings have been changed.  For each element of that array,
-     * the element of the {@code nameValues} array in the same position
-     * contains the new value for the name binding, or {@code -1} if the name
-     * binding should be removed.
+     * the object should be removed.  If any of the object IDs are for newly
+     * created objects, those IDs will be listed first and the {@code newOids}
+     * parameter specifies how many of them there are.  The {@code names}
+     * parameter contains the names whose bindings have been changed.  For each
+     * element of that array, the element of the {@code nameValues} array in
+     * the same position contains the new value for the name binding, or {@code
+     * -1} if the name binding should be removed.
      *
      * @param	contextId the transaction context ID
      * @param	oids the object IDs
      * @param	oidValues the associated data values
+     * @param	newOids the number of object IDs that are new
      * @param	names the names
      * @param	nameValues the associated name bindings
      * @throws	IllegalArgumentException if {@code oids} and {@code oidValues}
      *		are not the same length, if {@code oids} contains a negative
-     *		value, if {@code names} and {@code nameValues} are not the same
-     *		length, or if {@code nameValues} contains a negative value
+     *		value, if {@code newOids} is negative or greater than the
+     *		length of {@code oids}, if {@code names} and {@code nameValues}
+     *		are not the same length, or if {@code nameValues} contains a
+     *		negative value
      */
     void commit(long contextId,
 		long[] oids,
 		byte[][] oidValues,
+		int newOids,
 		String[] names,
 		long[] nameValues)
     {
 	completed(contextId);
 	addRequest(
-	    contextId, new Commit(oids, oidValues, names, nameValues));
+	    contextId,
+	    new Commit(oids, oidValues, newOids, names, nameValues,
+		       store.new FailingCompletionHandler() {
+			   @Override
+		           public void completed() {
+			       commitAvailable.release();
+			   }
+		       }));
     }
 
     /**
@@ -189,8 +198,8 @@ class UpdateQueue {
 
     /**
      * Evicts an object from the cache.  The {@link
-     * SimpleCompletionHandler#completed} method of {@code handler} will be
-     * called with {@code oid} when the eviction has been completed.
+     * CompletionHandler#completed} method of {@code handler} will be called
+     * with {@code oid} when the eviction has been completed.
      *
      * @param	contextId the transaction context ID
      * @param	oid the ID of the object to evict
@@ -199,14 +208,14 @@ class UpdateQueue {
      * @throws	IllegalArgumentException if {@code oid} is negative
      */
     void evictObject(
-	long contextId, long oid, SimpleCompletionHandler completionHandler)
+	long contextId, long oid, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new EvictObject(oid, completionHandler));
     }
 
     /**
      * Downgrades access to an object in the cache from write access to read
-     * access.  The {@link SimpleCompletionHandler#completed} method of {@code
+     * access.  The {@link CompletionHandler#completed} method of {@code
      * handler} will be called with {@code oid} when the downgrade has been
      * completed.
      *
@@ -216,15 +225,15 @@ class UpdateQueue {
      *		been completed 
      */
     void downgradeObject(
-	long contextId, long oid, SimpleCompletionHandler completionHandler)
+	long contextId, long oid, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new DowngradeObject(oid, completionHandler));
     }
 
     /**
      * Evicts a name binding from the cache.  The {@link
-     * SimpleCompletionHandler#completed} method of {@code handler} will be
-     * called with {@code name} when the eviction has been completed.
+     * CompletionHandler#completed} method of {@code handler} will be called
+     * with {@code name} when the eviction has been completed.
      *
      * @param	contextId the transaction context ID
      * @param	name the name
@@ -232,16 +241,16 @@ class UpdateQueue {
      *		been completed 
      */
     void evictBinding(
-	long contextId, String name, SimpleCompletionHandler completionHandler)
+	long contextId, String name, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new EvictBinding(name, completionHandler));
     }
 
     /**
      * Downgrades access to a name binding in the cache from write access to
-     * read access.  The {@link SimpleCompletionHandler#completed} method of
-     * {@code handler} will be called with {@code name} when the downgrade has
-     * been completed.
+     * read access.  The {@link CompletionHandler#completed} method of {@code
+     * handler} will be called with {@code name} when the downgrade has been
+     * completed.
      *
      * @param	contextId the transaction context ID
      * @param	name the name
@@ -249,7 +258,7 @@ class UpdateQueue {
      *		been completed 
      */
     void downgradeBinding(
-	long contextId, String name, SimpleCompletionHandler completionHandler)
+	long contextId, String name, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new DowngradeBinding(name, completionHandler));
     }

@@ -44,7 +44,7 @@ public interface CachingDataStoreServer extends Remote {
 	throws IOException;
 
     /** The results of a call to {@link #registerNode}. */
-    public static class RegisterNodeResult implements Serializable {
+    final class RegisterNodeResult implements Serializable {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
@@ -64,6 +64,14 @@ public interface CachingDataStoreServer extends Remote {
 	public RegisterNodeResult(long nodeId, int updateQueuePort) {
 	    this.nodeId = nodeId;
 	    this.updateQueuePort = updateQueuePort;
+	}
+
+	@Override
+	public String toString() {
+	    return "RegisterNodeResult[" +
+		"nodeId:" + nodeId +
+		", updateQueuePort:" + updateQueuePort +
+		"]";
 	}
     }
 
@@ -117,6 +125,15 @@ public interface CachingDataStoreServer extends Remote {
 	    this.data = data;
 	    this.callbackEvict = callbackEvict;
 	}
+
+	@Override
+	public String toString() {
+	    return "GetObjectResults[" +
+		"data:" +
+		(data == null ? "null" : "byte[" + data.length + "]") +
+		", callbackEvict:" + callbackEvict +
+		"]";
+	}
     }
 
     /**
@@ -156,6 +173,16 @@ public interface CachingDataStoreServer extends Remote {
 	{
 	    super(data, callbackEvict);
 	    this.callbackDowngrade = callbackDowngrade;
+	}
+
+	@Override
+	public String toString() {
+	    return "GetObjectForUpdateResults[" +
+		"data:" +
+		(data == null ? "null" : "byte[" + data.length + "]") +
+		", callbackEvict:" + callbackEvict +
+		", callbackDowngrade:" + callbackDowngrade +
+		"]";
 	}
     }
 
@@ -227,6 +254,16 @@ public interface CachingDataStoreServer extends Remote {
 	    this.oid = oid;
 	    this.data = data;
 	    this.callbackEvict = callbackEvict;
+	}
+
+	@Override
+	public String toString() {
+	    return "NextObjectResults[" +
+		"oid:" + oid +
+		", data:" +
+		(data == null ? "null" : "byte[" + data.length + "]") +
+		", callbackEvict:" + callbackEvict +
+		"]";
 	}
     }
 
@@ -304,7 +341,17 @@ public interface CachingDataStoreServer extends Remote {
 	    this.nextName = nextName;
 	    this.oid = oid;
 	    this.callbackEvict = callbackEvict;
-	}	    
+	}
+
+	@Override
+	public String toString() {
+	    return "GetBindingResults[" +
+		"found:" + found +
+		", nextName:" + nextName +
+		", oid:" + oid +
+		", callbackEvict:" + callbackEvict +
+		"]";
+	}
     }
 
     /**
@@ -322,7 +369,7 @@ public interface CachingDataStoreServer extends Remote {
 	throws IOException;
 
     /** The results of a call to {@link #getBindingForUpdate}. */
-    final class GetBindingForUpdateResults extends GetBindingResults {
+    class GetBindingForUpdateResults extends GetBindingResults {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
@@ -350,6 +397,17 @@ public interface CachingDataStoreServer extends Remote {
 	    super(found, nextName, oid, callbackEvict);
 	    this.callbackDowngrade = callbackDowngrade;
 	}	    
+
+	@Override
+	public String toString() {
+	    return "GetBindingForUpdateResults[" +
+		"found:" + found +
+		", nextName:" + nextName +
+		", oid:" + oid +
+		", callbackEvict:" + callbackEvict +
+		", callbackDowngrade:" + callbackDowngrade +
+		"]";
+	}
     }
 
     /**
@@ -390,35 +448,10 @@ public interface CachingDataStoreServer extends Remote {
      * case, {@code oid} is {@code -1}, and {@code callbackEvict}, {@code
      * callbackDowngrade}, and {@code nextCallbackDowngrade} are {@code false}.
      */
-    class GetBindingForRemoveResults implements Serializable {
+    final class GetBindingForRemoveResults extends GetBindingForUpdateResults {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
-
-	/** Whether the requested name is bound. */
-	public final boolean found;
-
-	/**
-	 * The next bound name after the requested one, or {@code null} if
-	 * there is no next bound name.
-	 */
-	public final String nextName;
-
-	/**
-	 * The object ID associated with the requested name, if {@code found}
-	 * is {@code true}, else {@code -1}.
-	 */
-	public final long oid;
-
-	/**
-	 * Whether there is a conflicting write request for the requested name.
-	 */
-	public final boolean callbackEvict;
-
-	/**
-	 * Whether there is a conflicting read request for the requested name.
-	 */
-	public final boolean callbackDowngrade;
 
 	/**
 	 * The object ID associated with the next bound name or {@code -1} if
@@ -462,14 +495,24 @@ public interface CachingDataStoreServer extends Remote {
 					  boolean nextCallbackEvict,
 					  boolean nextCallbackDowngrade)
 	{
-	    this.found = found;
-	    this.nextName = nextName;
-	    this.oid = oid;
-	    this.callbackEvict = callbackEvict;
-	    this.callbackDowngrade = callbackDowngrade;
+	    super(found, nextName, oid, callbackEvict, callbackDowngrade);
 	    this.nextOid = nextOid;
 	    this.nextCallbackEvict = nextCallbackEvict;
 	    this.nextCallbackDowngrade = nextCallbackDowngrade;
+	}
+
+	@Override
+	public String toString() {
+	    return "GetBindingForRemoveResults[" +
+		"found:" + found +
+		", nextName:" + nextName +
+		", oid:" + oid +
+		", callbackEvict:" + callbackEvict +
+		", callbackDowngrade:" + callbackDowngrade +
+		", nextOid:" + nextOid +
+		", nextCallbackEvict:" + nextCallbackEvict +
+		", nextCallbackDowngrade:" + nextCallbackDowngrade +
+		"]";
 	}
     }
 
@@ -532,6 +575,15 @@ public interface CachingDataStoreServer extends Remote {
 	    this.nextName = nextName;
 	    this.oid = oid;
 	    this.callbackEvict = callbackEvict;
+	}
+
+	@Override
+	public String toString() {
+	    return "NextBoundNameResults[" +
+		"nextName:" + nextName +
+		", oid:" + oid +
+		", callbackEvict:" + callbackEvict +
+		"]";
 	}
     }
 

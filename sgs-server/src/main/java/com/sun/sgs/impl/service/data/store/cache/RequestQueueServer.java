@@ -159,7 +159,7 @@ public class RequestQueueServer<R extends Request> {
 	    logger.log(FINER,
 		       "Created RequestQueueServer" +
 		       " nodeId:" + nodeId +
-		       " maxRequest:" + maxRequest +
+		       ", maxRequest:" + maxRequest +
 		       ", maxOutstanding:" + maxOutstanding);
 	}
     }
@@ -297,7 +297,7 @@ public class RequestQueueServer<R extends Request> {
 		    if (logger.isLoggable(FINEST)) {
 			logger.log(FINEST,
 				   "RequestQueueServer nodeId:" + nodeId +
-				   " received request" +
+				   " request received" +
 				   " requestNumber:" + requestNumber +
 				   ", request:" + request +
 				   ", newRequest:" + newRequest);

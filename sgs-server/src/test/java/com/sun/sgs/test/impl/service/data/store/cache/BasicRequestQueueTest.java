@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
@@ -40,10 +41,10 @@ class BasicRequestQueueTest extends Assert {
     /** Empty properties. */
     static final Properties emptyProperties = new Properties();
 
-    /** A no-op runnable. */
-    static final Runnable noopRunnable =
-	new Runnable() {
-	    public void run() { }
+    /** A no-op failure reporter. */
+    static final FailureReporter noopFailureReporter =
+	new FailureReporter() {
+	    public void reportFailure(Throwable exception) { }
 	};
 
     /** Slop time when waiting. */
@@ -99,43 +100,45 @@ class BasicRequestQueueTest extends Assert {
     }
 
     /**
-     * A runnable that keeps track of whether its run method has been called.
+     * A failure handler that keeps track of whether its {@code reportFailure}
+     * method has been called.
      */
-    class NoteRun implements Runnable {
-	private boolean run;
+    class NoteFailure implements FailureReporter {
+	private boolean called;
 
-	public synchronized void run() {
-	    run = true;
+	public synchronized void reportFailure(Throwable exception) {
+	    called = true;
 	    notifyAll();
 	}
 
 	/**
-	 * Check that the run method is called no sooner than minTimeout
-	 * milliseconds and no more than extraWait milliseconds after that.
+	 * Check that the run method is called no sooner than {@code
+	 * minTimeout} milliseconds and no more than {@code extraWait}
+	 * milliseconds after that.
 	 */
-	synchronized void checkRun(long minTimeout)
+	synchronized void checkCalled(long minTimeout)
 	    throws InterruptedException
 	{
 	    long start = System.currentTimeMillis();
 	    long wait = minTimeout + extraWait;
-	    while (!run) {
+	    while (!called) {
 		wait(wait);
 		if (System.currentTimeMillis() > start + wait) {
-		    fail("Failed to call run in " + wait + " ms");
+		    fail("Failed to call reportFailure in " + wait + " ms");
 		}
 	    }
 	    long time = System.currentTimeMillis() - start;
-	    assertTrue(run);
-	    assertTrue("Called run earlier than " + minTimeout + " ms: " +
-		       time + " ms",
+	    assertTrue(called);
+	    assertTrue("Called reportFailure earlier than " + minTimeout +
+		       " ms: " + time + " ms",
 		       time >= minTimeout);
-	    System.err.println("NoteRun.checkRun extra wait: " +
+	    System.err.println("NoteFailure.checkCalled extra wait: " +
 			       (time - minTimeout));
 	}
 
-	/** Check that the run method has not been called. */
-	synchronized void checkNotRun() {
-	    assertFalse("Failure handler should not be run", run);
+	/** Check that the {@code reportFailure} method has not been called. */
+	synchronized void checkNotCalled() {
+	    assertFalse("Failure reporter should not be called", called);
 	}
     }
 

@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
@@ -109,17 +110,17 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocket() {
 	new RequestQueueListener(
-	    null, serverDispatcher, noopRunnable, emptyProperties);
+	    null, serverDispatcher, noopFailureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullServerDispatcher() {
 	new RequestQueueListener(
-	    unboundServerSocket, null, noopRunnable, emptyProperties);
+	    unboundServerSocket, null, noopFailureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
-    public void testConstructorNullFailureHandler() {
+    public void testConstructorNullFailureReporter() {
 	new RequestQueueListener(
 	    unboundServerSocket, serverDispatcher, null, emptyProperties);
     }
@@ -127,7 +128,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test(expected=NullPointerException.class)
     public void testConstructorNullProperties() {
 	new RequestQueueListener(
-	    unboundServerSocket, serverDispatcher, noopRunnable, null);
+	    unboundServerSocket, serverDispatcher, noopFailureReporter, null);
     }
 
     /* Test socket accept */
@@ -138,10 +139,10 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
      */
     @Test
     public void testAcceptFails() throws Exception {
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    unboundServerSocket, serverDispatcher, failureHandler, props);
-	failureHandler.checkRun(MAX_RETRY);
+	    unboundServerSocket, serverDispatcher, failureReporter, props);
+	failureReporter.checkCalled(MAX_RETRY);
     }
 
     /**
@@ -151,9 +152,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testAcceptInputDisconnected() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		try {
@@ -164,15 +165,15 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	failureHandler.checkRun(MAX_RETRY);
+	failureReporter.checkCalled(MAX_RETRY);
     }
 
     @Test
     public void testAcceptNoInput() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -185,7 +186,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	failureHandler.checkRun(2 * MAX_RETRY);
+	failureReporter.checkCalled(2 * MAX_RETRY);
     }
 
     /**
@@ -195,9 +196,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testAcceptUnknownNodeId() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -216,7 +217,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	failureHandler.checkRun(MAX_RETRY);
+	failureReporter.checkCalled(MAX_RETRY);
     }
 
     /**
@@ -226,9 +227,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testAcceptIncompleteNodeId() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -246,7 +247,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	failureHandler.checkRun(MAX_RETRY);
+	failureReporter.checkCalled(MAX_RETRY);
     }
 
     /**
@@ -256,7 +257,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testAcceptUnexpectedException() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
 	    serverSocket, 
 	    new ServerDispatcher() {
@@ -266,7 +267,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		    throw new NullPointerException("Whoa!");
 		}
 	    },
-	    failureHandler, props);
+	    failureReporter, props);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -285,7 +286,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	failureHandler.checkRun(MAX_RETRY);
+	failureReporter.checkCalled(MAX_RETRY);
     }
 
     /**
@@ -295,9 +296,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testAcceptAlternatingFailures() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	DummyRequestQueueServer server = new DummyRequestQueueServer(1);
 	serverDispatcher.setServer(1, server);
 	connect = new InterruptableThread() {
@@ -323,7 +324,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	Thread.sleep(MAX_RETRY + extraWait);
 	assertTrue("Expected a non-zero number of connections",
 		   server.connectionCount.get() > 0);
-	failureHandler.checkNotRun();
+	failureReporter.checkNotCalled();
 	listener.shutdown();
     }
 
@@ -331,9 +332,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testAcceptSuccess() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	DummyRequestQueueServer server33 = new DummyRequestQueueServer(33);
 	serverDispatcher.setServer(33, server33);
 	DummyRequestQueueServer server999 = new DummyRequestQueueServer(999);
@@ -357,7 +358,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    Thread.sleep(extraWait);
 	    assertEquals(1, server33.connectionCount.get());
 	    assertEquals(1, server999.connectionCount.get());
-	    failureHandler.checkNotRun();
+	    failureReporter.checkNotCalled();
 	    listener.shutdown();
 	} finally {
 	    forceClose(socket);
@@ -373,9 +374,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testShutdownNoConnections() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	Thread.sleep(extraWait);
 	listener.shutdown();
 	/* Make sure the server socket has been shutdown */
@@ -387,7 +388,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	} finally {
 	    forceClose(socket);
 	}
-	failureHandler.checkNotRun();
+	failureReporter.checkNotCalled();
     }
 
     /**
@@ -397,9 +398,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test
     public void testShutdownWithConnections() throws Exception {
 	serverSocket = new ServerSocket(PORT);
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureHandler, props);
+	    serverSocket, serverDispatcher, failureReporter, props);
 	serverDispatcher.setServer(33, new DummyRequestQueueServer(33));
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
@@ -432,7 +433,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	} finally {
 	    forceClose(socket);
 	}
-	failureHandler.checkNotRun();
+	failureReporter.checkNotCalled();
     }
 
     /* -- Other classes and methods -- */

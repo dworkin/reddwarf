@@ -27,15 +27,19 @@ public interface UpdateQueueServer {
      * The {@code oids} parameter contains the object IDs of the objects that
      * have been changed.  For each element of that array, the element of the
      * {@code oidValues} array in the same position contains the new value for
-     * the object ID, or {@code null} if the object should be removed.  The
-     * {@code names} parameter contains the names whose bindings have been
-     * changed.  For each element of that array, the element of the {@code
-     * nameValues} array in the same position contains the new value for the
-     * name binding, or {@code -1} if the name binding should be removed.
+     * the object ID, or {@code null} if the object should be removed.  If any
+     * of the object IDs are for newly created objects, those IDs will be
+     * listed first and the {@code newOids} parameter specifies how many of
+     * them there are.  The {@code names} parameter contains the names whose
+     * bindings have been changed.  For each element of that array, the element
+     * of the {@code nameValues} array in the same position contains the new
+     * value for the name binding, or {@code -1} if the name binding should be
+     * removed.
      *
      * @param	nodeId the node ID
      * @param	oids the object IDs
      * @param	oidValues the associated data values
+     * @param	newOids the number of object IDs that are new
      * @param	names the names
      * @param	nameValues the associated name bindings
      * @throws	CacheConsistencyException if the node does not have the
@@ -43,12 +47,15 @@ public interface UpdateQueueServer {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered, if {@code oids} and {@code oidValues} are not the
      *		same length, if {@code oids} contains a negative value, if
-     *		{@code names} and {@code nameValues} are not the same length,
-     *		or if {@code nameValues} contains a negative value
+     *		{@code newOids} is negative or greater than the length of
+     *		{@code oids}, if {@code names} and {@code nameValues} are not
+     *		the same length, or if {@code nameValues} contains a negative
+     *		value
      */
     void commit(long nodeId,
 		long[] oids,
 		byte[][] oidValues,
+		int newOids,
 		String[] names,
 		long[] nameValues)
 	throws CacheConsistencyException;

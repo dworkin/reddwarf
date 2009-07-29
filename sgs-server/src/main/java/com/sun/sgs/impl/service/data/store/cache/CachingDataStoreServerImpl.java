@@ -61,7 +61,6 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
@@ -74,11 +73,11 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.MissingResourceException;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import static java.util.logging.Level.CONFIG;
+import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
@@ -92,7 +91,8 @@ import java.util.logging.Logger;
  * #getBindingForUpdate} and {@link #getBindingForRemove}.
  */
 public class CachingDataStoreServerImpl extends AbstractComponent
-    implements CachingDataStoreServer, NodeListener, UpdateQueueServer
+    implements CachingDataStoreServer, NodeListener, UpdateQueueServer,
+    FailureReporter
 {
     /** The package for this class. */
     private static final String PKG =
@@ -157,7 +157,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(PKG));
+	new LoggerWrapper(Logger.getLogger(PKG + ".server"));
 
     /** The number of node IDs to allocate at once. */
     private static final int NODE_ID_ALLOCATION_BLOCK_SIZE = 100;
@@ -254,10 +254,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private WatchdogService watchdogService;
 
     /**
-     * Whether there was a failure before the watchdog service became
-     * available.  Synchronize on {@link #watchdogServiceSync} when accessing.
+     * An exception responsible for a failure before the watchdog service
+     * became available, or {@code null} if there was no failure.  Synchronize
+     * on {@link #watchdogServiceSync} when accessing.
      */
-    private boolean failureBeforeWatchdog;
+    private Throwable failureBeforeWatchdog;
 
     /**
      * Synchronizer for {@link #watchdogService} and {@link
@@ -374,12 +375,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			return getNodeInfo(nodeId).updateQueueServer;
 		    }
 		},
-		new Runnable() {
-		    public void run() {
-			reportFailure();
-		    }
-		},
-		properties);
+		this, properties);
 	    serverPort = serverExporter.export(
 		this, "CachingDataStoreServer", requestedServerPort);
 	} catch (IOException e) {
@@ -395,14 +391,18 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * called when services have been created, in this case to allow the server
      * to access the watchdog service.
      *
-     * @throws MissingResourceException if the watchdog service is not found
+     * @throws	Exception if an error occurs 
      */
-    public void ready() throws MissingResourceException {
+    public void ready() throws Exception {
 	synchronized (watchdogServiceSync) {
-	    watchdogService = txnProxy.getService(WatchdogService.class);
-	    if (failureBeforeWatchdog) {
-		reportFailure();
+	    if (failureBeforeWatchdog != null) {
+		if (failureBeforeWatchdog instanceof Error) {
+		    throw (Error) failureBeforeWatchdog;
+		} else {
+		    throw (Exception) failureBeforeWatchdog;
+		}
 	    }
+	    watchdogService = txnProxy.getService(WatchdogService.class);
 	}
 	watchdogService.addNodeListener(this);
     }
@@ -471,6 +471,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     @Override
     public GetObjectResults getObject(long nodeId, long oid) {
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST, "getObject nodeId:" + nodeId + ", oid:" + oid);
+	}
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkOid(oid);
@@ -478,11 +481,17 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    boolean txnDone = false;
 	    try {
-		byte[] result = oidsDb.get(txn, encodeLong(oid), false);
+		byte[] data = oidsDb.get(txn, encodeLong(oid), false);
 		txnDone = true;
 		txn.commit();
-		return (result == null) ? null
-		    : new GetObjectResults(result, getWaiting(oid, false));
+		GetObjectResults result = (data == null) ? null
+		    : new GetObjectResults(data, getWaiting(oid, false));
+		if (logger.isLoggable(FINEST)) {
+		    logger.log(FINEST,
+			       "getObject nodeId:" + nodeId + ", oid:" + oid +
+			       " returns: " + result);
+		}
+		return result;
 	    } finally {
 		if (!txnDone) {
 		    txn.abort();
@@ -645,7 +654,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    txn.abort();
 		}
 	    }
-	    BindingKey nameKey = BindingKey.get(name);
+	    BindingKey nameKey = BindingKey.getAllowLast(name);
 	    lock(nodeInfo, nameKey, false);
 	    return new GetBindingResults(
 		found, found ? null : name, oid,
@@ -665,6 +674,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     public GetBindingForUpdateResults getBindingForUpdate(
 	long nodeId, String name)
     {
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(
+		FINEST,
+		"getBindingForUpdate nodeId:" + nodeId + ", name:" + name);
+	}
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkNull("name", name);
@@ -703,10 +717,25 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    if (!found) {
 		lock(nodeInfo, nextNameKey, true);
 	    }
-	    return new GetBindingForUpdateResults(
-		found, found ? null : nextName, oid,
-		(oid == -1) ? false : getWaiting(nameKey, true),
-		(oid == -1) ? false : getWaiting(nameKey, false));
+	    GetBindingForUpdateResults result =
+		new GetBindingForUpdateResults(
+		    found, found ? null : nextName, oid,
+		    (oid == -1) ? false : getWaiting(nameKey, true),
+		    (oid == -1) ? false : getWaiting(nameKey, false));
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(
+		    FINEST,
+		    "getBindingForUpdate nodeId:" + nodeId + ", name:" + name +
+		    " returns " + result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(FINEST)) {
+		logger.logThrow(FINEST, e,
+				"getBindingForUpdate nodeId:" + nodeId +
+				", name:" + name + " throws");
+	    }
+	    throw e;
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -781,21 +810,21 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	try {
 	    checkNull("name", name);
 	    long oid;
-	    boolean done = false;
+	    boolean txnDone = false;
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
-	    DbCursor cursor = null;
 	    try {
-		cursor = namesDb.openCursor(txn);
-		boolean hasNext = cursor.findNext(encodeString(name));
-		name = hasNext ? decodeString(cursor.getKey()) : null;
-		oid = hasNext ? decodeLong(cursor.getValue()) : -1;
-		done = true;
-		txn.commit();
-	    } finally {
-		if (cursor != null) {
+		DbCursor cursor = namesDb.openCursor(txn);
+		try {
+		    boolean hasNext = cursor.findNext(encodeString(name));
+		    name = hasNext ? decodeString(cursor.getKey()) : null;
+		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		} finally {
 		    cursor.close();
 		}
-		if (!done) {
+		txnDone = true;
+		txn.commit();
+	    } finally {
+		if (!txnDone) {
 		    txn.abort();
 		}
 	    }
@@ -853,6 +882,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     public void commit(long nodeId,
 		       long[] oids,
 		       byte[][] oidValues,
+		       int newOids,
 		       String[] names,
 		       long[] nameValues)
 	throws CacheConsistencyException
@@ -871,6 +901,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    "The number of object IDs and OID values" +
 		    " must be the same");
 	    }
+	    if (newOids < 0 || newOids > oids.length) {
+		throw new IllegalArgumentException(
+		    "Illegal newOids: " + newOids);
+	    }
 	    checkNull("names", names);
 	    checkNull("nameValues", nameValues);
 	    if (names.length != nameValues.length) {
@@ -886,7 +920,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			throw new IllegalArgumentException(
 			    "The object IDs must not be negative");
 		    }
-		    checkLocked(nodeInfo, oid, true);
+		    if (i < newOids) {
+			lock(nodeInfo, oid, true);
+		    } else {
+			checkLocked(nodeInfo, oid, true);
+		    }
 		    byte[] value = oidValues[i];
 		    if (value == null) {
 			oidsDb.delete(txn, encodeLong(oid));
@@ -1043,6 +1081,32 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     @Override
     public void nodeStarted(Node node) { }
 
+    /* -- Implement FailureReporter -- */
+
+    /** {@inheritDoc} */
+    @Override
+    public void reportFailure(Throwable exception) {
+	logger.logThrow(
+	    WARNING, exception, "CachingDataStoreServerImpl failed");
+	synchronized (watchdogServiceSync) {
+	    if (watchdogService == null) {
+		if (failureBeforeWatchdog != null) {
+		    failureBeforeWatchdog = exception;
+		}
+	    } else {
+		Thread thread =
+		    new Thread("CachingDataStoreServerImpl reportFailure") {
+			public void run() {
+			    watchdogService.reportFailure(
+				watchdogService.getLocalNodeId(),
+				CachingDataStoreServerImpl.class.getName());
+			}
+		    };
+		thread.start();
+	    }
+	}
+    }
+
     /* -- Other public methods -- */
 
     /**
@@ -1100,28 +1164,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     public int getServerPort() {
 	return serverPort;
-    }
-
-    /**
-     * Report that the local node should be marked as failed because of a
-     * failure within the data store.
-     */
-    void reportFailure() {
-	synchronized (watchdogServiceSync) {
-	    if (watchdogService == null) {
-		failureBeforeWatchdog = true;
-	    } else {
-		Thread thread =
-		    new Thread("CachingDataStoreServerImpl reportFailure") {
-			public void run() {
-			    watchdogService.reportFailure(
-				watchdogService.getLocalNodeId(),
-				CachingDataStoreServerImpl.class.getName());
-			}
-		    };
-		thread.start();
-	    }
-	}
     }
 
     /**

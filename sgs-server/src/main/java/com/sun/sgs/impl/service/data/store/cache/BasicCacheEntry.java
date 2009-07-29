@@ -131,13 +131,13 @@ abstract class BasicCacheEntry<K, V> {
 	FETCHING_WRITE(READING | UPGRADING),
 
 	/** The entry is available for read and write. */
-	CACHED_WRITE(WRITABLE),
+	CACHED_WRITE(READABLE | WRITABLE),
 
 	/**
 	 * The entry is available for read and write in the cache, and has been
 	 * modified.
 	 */
-	CACHED_DIRTY(WRITABLE | MODIFIED),
+	CACHED_DIRTY(READABLE | WRITABLE | MODIFIED),
 
 	/**
 	 * The entry is available for read and is being downgraded from write.
@@ -592,6 +592,15 @@ abstract class BasicCacheEntry<K, V> {
     /* -- Other methods -- */
 
     /**
+     * Returns the state of this entry
+     *
+     * @return	the state of this entry
+     */
+    State getState() {
+	return state;
+    }
+
+    /**
      * Notes that this entry has been accessed by a transaction with the
      * specified context ID.
      *
@@ -689,8 +698,9 @@ abstract class BasicCacheEntry<K, V> {
 	if (checkStateValue(desiredStateValue)) {
 	    return;
 	}
-	long now = System.currentTimeMillis();
-	while (true) {
+	long start = System.currentTimeMillis();
+	long now = start;
+	while (now < stop) {
 	    try {
 		lock.wait(stop - now);
 	    } catch (InterruptedException e) {
@@ -701,11 +711,10 @@ abstract class BasicCacheEntry<K, V> {
 		return;
 	    }
 	    now = System.currentTimeMillis();
-	    if (now >= stop) {
-		throw new TransactionTimeoutException(
-		    "Timeout waiting for entry " + this);
-	    }
 	}
+	throw new TransactionTimeoutException(
+	    "Timeout after " + (now - start) +
+	    " ms waiting for entry " + this);
     }
 
     /**
@@ -722,8 +731,9 @@ abstract class BasicCacheEntry<K, V> {
 	if ((state.value & undesiredState) == 0) {
 	    return;
 	}
-	long now = System.currentTimeMillis();
-	while (true) {
+	long start = System.currentTimeMillis();
+	long now = start;
+	while (now < stop) {
 	    try {
 		lock.wait(stop - now);
 	    } catch (InterruptedException e) {
@@ -734,10 +744,9 @@ abstract class BasicCacheEntry<K, V> {
 		return;
 	    }
 	    now = System.currentTimeMillis();
-	    if (now >= stop) {
-		throw new TransactionTimeoutException(
-		    "Timeout waiting for entry " + this);
-	    }
 	}
+	throw new TransactionTimeoutException(
+	    "Timeout after " + (now - start) +
+	    " ms waiting for entry " + this);
     }
 }

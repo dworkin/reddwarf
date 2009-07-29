@@ -76,4 +76,15 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 	entry.noteAccess(contextId);
 	return entry;
     }
+
+    @Override
+    public String toString() {
+	byte[] data = getValue();
+	return "ObjectCacheEntry[" +
+	    "oid:" + key +
+	    ", data:" + (data == null ? "null" : "byte[" + data.length + "]") +
+	    ", contextId:" + getContextId() +
+	    ", state:" + getState() +
+	    "]";
+    }
 }

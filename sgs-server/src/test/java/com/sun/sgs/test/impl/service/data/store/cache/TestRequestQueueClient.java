@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueClient;
@@ -105,7 +106,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     public void beforeTest() throws IOException {
 	serverDispatcher = new SimpleServerDispatcher();
 	listener = new RequestQueueListener(
-	    new ServerSocket(PORT), serverDispatcher, noopRunnable,
+	    new ServerSocket(PORT), serverDispatcher, noopFailureReporter,
 	    emptyProperties);
     }
 
@@ -131,12 +132,12 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test(expected=IllegalArgumentException.class)
     public void testConstructorNegativeNodeId() {
 	new RequestQueueClient(
-	    -1, socketFactory, noopRunnable, emptyProperties);
+	    -1, socketFactory, noopFailureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocketFactory() {
-	new RequestQueueClient(1, null, noopRunnable, emptyProperties);
+	new RequestQueueClient(1, null, noopFailureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
@@ -146,7 +147,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullProperties() {
-	new RequestQueueClient(1, socketFactory, noopRunnable, null);
+	new RequestQueueClient(1, socketFactory, noopFailureReporter, null);
     }
 
     /* Test connection handling */
@@ -154,18 +155,18 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test
     public void testConnectionServerSocketClosed() throws Exception {
 	listener.shutdown();
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureHandler, props);
-	failureHandler.checkRun(MAX_RETRY);	
+	    1, socketFactory, failureReporter, props);
+	failureReporter.checkCalled(MAX_RETRY);	
     }
 
     @Test
     public void testConnectionServerUnknown() throws Exception {
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureHandler, props);
-	failureHandler.checkRun(MAX_RETRY);
+	    1, socketFactory, failureReporter, props);
+	failureReporter.checkCalled(MAX_RETRY);
     }	
 
     /* Test addRequest */
@@ -173,7 +174,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test
     public void testAddRequestNullRequest() {
 	client = new RequestQueueClient(
-	    1, socketFactory, noopRunnable, emptyProperties);
+	    1, socketFactory, noopFailureReporter, emptyProperties);
 	try {
 	    client.addRequest(null);
 	    fail("Expected NullPointerException");
@@ -184,7 +185,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test
     public void testAddRequestShutdown() {
 	client = new RequestQueueClient(
-	    1, socketFactory, noopRunnable, emptyProperties);
+	    1, socketFactory, noopFailureReporter, emptyProperties);
 	client.shutdown();
 	try {
 	    client.addRequest(new DummyRequest());
@@ -201,7 +202,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    new RequestQueueServer<SimpleRequest>(
 		1, new SimpleRequestHandler(), emptyProperties));
 	client = new RequestQueueClient(
-	    1, socketFactory, noopRunnable, emptyProperties);
+	    1, socketFactory, noopFailureReporter, emptyProperties);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
 	assertEquals(null, request.awaitCompleted(extraWait));
@@ -215,12 +216,12 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
 		1, new SimpleRequestHandler(), emptyProperties));
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureHandler, emptyProperties);
+	    1, socketFactory, failureReporter, emptyProperties);
 	client.shutdown();
 	client.shutdown();
-	failureHandler.checkNotRun();
+	failureReporter.checkNotCalled();
     }
 
     @Test
@@ -229,15 +230,15 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
 		1, new SimpleRequestHandler(), emptyProperties));
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureHandler, emptyProperties);
+	    1, socketFactory, failureReporter, emptyProperties);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
 	assertEquals(null, request.awaitCompleted(extraWait));
 	client.shutdown();
 	client.shutdown();
-	failureHandler.checkNotRun();
+	failureReporter.checkNotCalled();
     }
 
     @Test
@@ -246,9 +247,9 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
 		1, new SimpleRequestHandler(), emptyProperties));
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureHandler, emptyProperties);
+	    1, socketFactory, failureReporter, emptyProperties);
 	final SimpleRequest firstRequest = new SimpleRequest(1);
 	clientThread = new InterruptableThread() {
 	    private int next = 1;
@@ -267,7 +268,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	assertEquals(null, firstRequest.awaitCompleted(100000));
 	client.shutdown();
 	client.shutdown();
-	failureHandler.checkNotRun();
+	failureReporter.checkNotCalled();
     }
 
     /* Test sending requests */
@@ -282,7 +283,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    new RequestQueueServer<SimpleRequest>(
 		1, new SimpleRequestHandler(), emptyProperties));
 	client = new RequestQueueClient(
-	    1, socketFactory, noopRunnable, emptyProperties);
+	    1, socketFactory, noopFailureReporter, emptyProperties);
 	clientThread = new InterruptableThread() {
 	    private int count = 0;
 	    boolean runOnce() throws Exception {
@@ -335,8 +336,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 		new FailingRequestHandler(new Random(seed), total - 50),
 		emptyProperties));
 	client = new RequestQueueClient(
-	    1, new FailingSocketFactory(new Random(seed + 1)), noopRunnable,
-	    emptyProperties);
+	    1, new FailingSocketFactory(new Random(seed + 1)),
+	    noopFailureReporter, emptyProperties);
 	clientThread = new InterruptableThread() {
 	    private int count = 0;
 	    boolean runOnce() throws Exception {
@@ -389,11 +390,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 		    }
 		},
 		props));
-	NoteRun failureHandler = new NoteRun();
+	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureHandler, props);
+	    1, socketFactory, failureReporter, props);
 	client.addRequest(new SimpleRequest(1));
-	failureHandler.checkRun(2 * MAX_RETRY);
+	failureReporter.checkCalled(2 * MAX_RETRY);
     }
 
     /* -- Other classes and methods -- */

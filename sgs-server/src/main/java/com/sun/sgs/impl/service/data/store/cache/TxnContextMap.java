@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.service.Transaction;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Maintains the association between transactions and instances of {@link
@@ -90,8 +89,8 @@ class TxnContextMap {
      */
     boolean prepare(Transaction txn) {
 	if (getContextJoined(txn, true).prepare()) {
-	    store.txnFinished();
 	    currentContext.set(null);
+	    store.txnFinished();
 	    return true;
 	} else {
 	    return false;
@@ -107,8 +106,7 @@ class TxnContextMap {
      */
     void prepareAndCommit(Transaction txn) {
 	try {
-	    TxnContext context = getContextJoined(txn, true);
-	    context.prepareAndCommit();
+	    getContextJoined(txn, true).prepareAndCommit();
 	} finally {
 	    currentContext.set(null);
 	    store.txnFinished();
@@ -124,8 +122,7 @@ class TxnContextMap {
      */
     void commit(Transaction txn) {
 	try {
-	    TxnContext context = getContextJoined(txn, false);
-	    context.commit();
+	    getContextJoined(txn, false).commit();
 	} finally {
 	    currentContext.set(null);
 	    store.txnFinished();

@@ -34,14 +34,18 @@ public final class DataStreamUtil {
 
     /**
      * Reads the number of bytes and the byte data from a data input stream and
-     * returns the resulting array.
+     * returns the resulting array.  Returns {@code null} if the length is
+     * {@code -1}.
      *
      * @param	in the data input stream
-     * @return	the byte array
+     * @return	the byte array or {@code null}
      * @throws	IOException if an I/O error occurs
      */
     public static byte[] readBytes(DataInput in) throws IOException {
 	int numBytes = in.readInt();
+	if (numBytes == -1) {
+	    return null;
+	}
 	byte[] result = new byte[numBytes];
 	in.readFully(result);
 	return result;
@@ -49,16 +53,21 @@ public final class DataStreamUtil {
 
     /**
      * Writes the number of bytes and the byte data to a data output stream.
+     * Writes a length of {@code -1} if the bytes are {@code null}
      *
-     * @param	bytes the bytes
+     * @param	bytes the bytes or {@code null}
      * @param	out the data output stream
      * @throws	IOException if an I/O error occurs
      */
     public static void writeBytes(byte[] bytes, DataOutput out)
 	throws IOException
     {
-	out.writeInt(bytes.length);
-	out.write(bytes);
+	if (bytes == null) {
+	    out.writeInt(-1);
+	} else {
+	    out.writeInt(bytes.length);
+	    out.write(bytes);
+	}
     }
 
     /**

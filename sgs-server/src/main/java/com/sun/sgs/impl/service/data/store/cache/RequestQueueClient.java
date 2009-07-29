@@ -102,8 +102,8 @@ public final class RequestQueueClient extends Thread {
     /** The socket factory. */
     private final SocketFactory socketFactory;
 
-    /** A runnable to call if the listener fails. */ 
-    private final Runnable failureHandler;
+    /** The object to call if the listener fails. */ 
+    private final FailureReporter failureReporter;
 
     /** The maximum retry time in milliseconds. */
     private final long maxRetry;
@@ -150,22 +150,22 @@ public final class RequestQueueClient extends Thread {
 
     /**
      * Creates an instance of this class and starts the thread.  The {@link
-     * Runnable#run run} method of {@code failureHandler} will be called if the
-     * listener shuts itself down due to repeated failures when attempting to
-     * connect to the request queue server.  The failure handler will not be
-     * called if a shutdown is requested explicitly by a call to the {@link
-     * #shutdown} method.
+     * FailureReporter#reportFailure reportFailure} method of {@code
+     * failureReporter} will be called if the listener shuts itself down due to
+     * repeated failures when attempting to connect to the request queue
+     * server.  The failure reporter will not be called if a shutdown is
+     * requested explicitly by a call to the {@link #shutdown} method.
      *
      * @param	nodeId the node ID associated with this request queue
      * @param	socketFactory the factory for creating sockets that connect to
      *		the server
-     * @param	failureHandler the failure handler
+     * @param	failureReporter the failure reporter
      * @param	properties additional configuration properties
      * @throws	IllegalArgumentException if {@code nodeId} is negative
      */
     public RequestQueueClient(long nodeId,
 			      SocketFactory socketFactory,
-			      Runnable failureHandler,
+			      FailureReporter failureReporter,
 			      Properties properties)
     {
 	super("RequestQueueClient");
@@ -174,10 +174,10 @@ public final class RequestQueueClient extends Thread {
 		"The nodeId must not be negative: " + nodeId);
 	}
 	checkNull("socketFactory", socketFactory);
-	checkNull("failureHandler", failureHandler);
+	checkNull("failureReporter", failureReporter);
 	this.nodeId = nodeId;
 	this.socketFactory = socketFactory;
-	this.failureHandler = failureHandler;
+	this.failureReporter = failureReporter;
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	maxRetry = wrappedProps.getLongProperty(
 	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 1, Long.MAX_VALUE);
@@ -213,8 +213,11 @@ public final class RequestQueueClient extends Thread {
      */
     public void addRequest(Request request) {
 	checkNull("request", request);
-	logger.log(
-	    FINEST, "RequestQueueClient adding request request:{0}", request);
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST,
+		       "RequestQueueClient nodeId:" + nodeId +
+		       " adding request request:" + request);
+	}
 	boolean done = false;
 	while (true) {
 	    synchronized (this) {
@@ -236,7 +239,11 @@ public final class RequestQueueClient extends Thread {
 
     /** Shuts down the client, closing the existing connection, if any. */
     public void shutdown() {
-	logger.log(FINEST, "RequestQueueClient shutdown requested");	
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST,
+		       "RequestQueueClient nodeId:" + nodeId +
+		       " shutdown requested");
+	}
 	synchronized (this) {
 	    if (!shutdown) {
 		shutdown = true;
@@ -275,7 +282,8 @@ public final class RequestQueueClient extends Thread {
 		noteConnectionException(t);
 	    }
 	}
-	logger.log(FINE, "RequestQueueClient shut down");
+	logger.log(FINE,
+		   "RequestQueueClient nodeId:" + nodeId + " shut down");
     }
 
     /** A factory for creating connected sockets. */
@@ -342,13 +350,13 @@ public final class RequestQueueClient extends Thread {
 	if (exception instanceof IOException) {
 	    if (logger.isLoggable(FINER)) {
 		logger.logThrow(FINER, exception,
-				"RequestQueueClient connection closed" +
-				" for I/O exception");
+				"RequestQueueClient nodeId:" + nodeId + 
+				" connection closed for I/O exception");
 	    }
 	} else if (logger.isLoggable(WARNING)) {
 	    logger.logThrow(WARNING, exception,
-			    "RequestQueueClient connection closed" +
-			    " for unexpected exception");
+			    "RequestQueueClient nodeId:" + nodeId +
+			    " connection closed for unexpected exception");
 	}
 	long now = System.currentTimeMillis();
 	if (failureStarted == -1) {
@@ -358,10 +366,10 @@ public final class RequestQueueClient extends Thread {
 	    shutdown = true;
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, exception,
-				"RequestQueueClient shutting down due" +
-				" to failure");
+				"RequestQueueClient nodeId:" + nodeId +
+				" shutting down due to failure");
 	    }
-	    failureHandler.run();
+	    failureReporter.reportFailure(exception);
 	} else {
 	    while (System.currentTimeMillis() < now + retryWait) {
 		try {
@@ -374,7 +382,11 @@ public final class RequestQueueClient extends Thread {
 
     /** Notes that a connection was made successfully. */
     synchronized void noteConnected() {
-	logger.log(FINER, "RequestQueueClient connected successfully");
+	if (logger.isLoggable(FINER)) {
+	    logger.log(FINER,
+		       "RequestQueueClient nodeId:" + nodeId +
+		       " connected successfully");
+	}
 	failureStarted = -1;
     }
 
@@ -445,8 +457,6 @@ public final class RequestQueueClient extends Thread {
 		resendRequests.add(0, sentRequests.removeLast());
 	    }
 	    socket = socketFactory.createSocket();
-	    /* Configure the socket's input stream to timeout */
-	    socket.setSoTimeout((int) maxRetry);
 	    out = new DataOutputStream(
 		new BufferedOutputStream(
 		    socket.getOutputStream()));
@@ -455,8 +465,11 @@ public final class RequestQueueClient extends Thread {
 		    new BufferedInputStream(
 			socket.getInputStream())));
 	    receiveThread.start();
-	    logger.log(FINER, "RequestQueueClient created connection: {0}",
-		       socket);
+	    if (logger.isLoggable(FINER)) {
+		logger.log(FINER,
+			   "RequestQueueClient nodeId:" + nodeId +
+			   " created connection: " + socket);
+	    }
 	}
 
 	/**
@@ -500,10 +513,9 @@ public final class RequestQueueClient extends Thread {
 			out.flush();
 			first = false;
 			if (logger.isLoggable(FINEST)) {
-			    logger.log(
-				FINEST,
-				"RequestQueueClient sent init connection" +
-				" nodeId:" + nodeId);
+			    logger.log(FINEST,
+				       "RequestQueueClient nodeId:" + nodeId +
+				       " sent init connection");
 			}
 		    }
 		    try {
@@ -519,7 +531,8 @@ public final class RequestQueueClient extends Thread {
 			}
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(FINEST,
-				       "RequestQueueClient sending" +
+				       "RequestQueueClient nodeId:" + nodeId +
+				       " sending" +
 				       " requestNumber:" + requestNumber +
 				       ", request:" + request);
 			}
@@ -593,11 +606,12 @@ public final class RequestQueueClient extends Thread {
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(
 				FINEST,
-				"RequestQueueClient received reply" +
+				"RequestQueueClient nodeId:" + nodeId +
+				" received reply" +
 				" requestNumber:" + holder.requestNumber +
-				", result:" +
-				(requestException == null ? "succeeded"
-				 : requestException.toString()));
+				(requestException == null
+				 ? " succeeded"
+				 : " failed: " + requestException));
 			}
 			holder.request.completed(requestException);
 		    }
