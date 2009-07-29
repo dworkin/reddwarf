@@ -1,4 +1,5 @@
 Version 0.9.11:
+- Added support for pluggable transaction retry policy (issue #181)
 - Fix issues #168, #169, #171, #173, #178
 
 Version 0.9.10:
