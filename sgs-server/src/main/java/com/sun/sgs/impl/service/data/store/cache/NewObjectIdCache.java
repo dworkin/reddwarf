@@ -141,6 +141,10 @@ class NewObjectIdCache {
 	NewObjectsRunnable(CachingDataStore store) {
 	    super(store);
 	}
+	@Override
+	public String toString() {
+	    return "NewObjectsRunnable[]";
+	}
 	Long callOnce() throws IOException {
 	    logger.log(FINER, "Requesting new object IDs");
 	    return store.getServer().newObjectIds(batchSize);

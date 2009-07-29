@@ -25,10 +25,17 @@ import com.sun.sgs.service.TransactionInterruptedException;
 /** A cache entry for a name binding. */
 class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
-    /** The previous key, if known, else {@code null}. */
+    /**
+     * The earliest previous key such that names between that key and this one
+     * are known to be unbound, else {@code null} if no information about
+     * previous keys is known.
+     */
     private BindingKey previousKey;
 
-    /** Whether the previous known key is unbound. */
+    /**
+     * Whether the name specified by {@link #previousKey}, if not {@code null},
+     * is known to be unbound.
+     */
     private boolean previousKeyUnbound;
 
     /**
@@ -93,13 +100,20 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     }
 
     /**
-     * Updates information about the previous known key.
+     * Updates information about previous keys that are known to be unbound.
+     * The {@code newPreviousKey} argument specifies a name for which it is
+     * known that all names between that name and the one associated with this
+     * entry are known to be unbound.  If the {@code newPreviousKeyUnbound} is
+     * {@code true}, then that name is also known to be unbound.
      *
      * @param	newPreviousKey the new previous key
-     * @param	unbound whether {@code newPreviousKey} is unbound
+     * @param	newPreviousKeyUnbound whether {@code newPreviousKey} is known
+     *		to be unbound
      * @return	whether information stored about the previous key was changed
      */
-    boolean updatePreviousKey(BindingKey newPreviousKey, boolean unbound) {
+    boolean updatePreviousKey(
+	BindingKey newPreviousKey, boolean newPreviousKeyUnbound)
+    {
 	if (previousKey == null) {
 	    if (newPreviousKey.compareTo(key) < 0) {
 		/*
@@ -107,7 +121,7 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		 * entry's key.
 		 */
 		previousKey = newPreviousKey;
-		previousKeyUnbound = unbound;
+		previousKeyUnbound = newPreviousKeyUnbound;
 		return true;
 	    }
 	} else {
@@ -115,17 +129,21 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	    if (compareTo < 0) {
 		/* New previous key is earlier than previous one */
 		previousKey = newPreviousKey;
-		previousKeyUnbound = unbound;
+		previousKeyUnbound = newPreviousKeyUnbound;
 		return true;
-	    } else if (compareTo == 0 && previousKeyUnbound != unbound) {
+	    } else if (compareTo == 0 &&
+		       !previousKeyUnbound &&
+		       newPreviousKeyUnbound)
+	    {
 		/*
-		 * Previous key is the same, but whether it is unbound has
-		 * changed
+		 * Previous key is the same, but it was not previously known
+		 * that the previous key itself was unbound
 		 */
-		previousKeyUnbound = unbound;
+		previousKeyUnbound = true;
 		return true;
 	    }
 	}
+	/* No change */
 	return false;
     }
 
@@ -135,10 +153,18 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * @return	whether the specified key is known to be unbound
      */
     boolean getKnownUnbound(BindingKey forKey) {
-	if (previousKey == null || key.compareTo(forKey) <= 0) {
+	if (previousKey == null) {
+	    /* No information about previous keys */
+	    return false;
+	} else if (key.compareTo(forKey) <= 0) {
+	    /* Requested key is greater than or equal to this entry */
 	    return false;
 	}
 	int compare = previousKey.compareTo(forKey);
+	/*
+	 * Check if requested key is greater than the previous key, or equal
+	 * and we know that key is unbound
+	 */
 	return compare < 0 || (compare == 0 && previousKeyUnbound);
     }
 
@@ -156,7 +182,7 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	assert forKey != null;
 	return forKey.compareTo(key) < 0 &&
 	    previousKey != null &&
-	    previousKey.compareTo(forKey) >= 0;
+	    previousKey.compareTo(forKey) <= 0;
     }
 
     /**

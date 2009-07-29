@@ -369,7 +369,7 @@ public interface CachingDataStoreServer extends Remote {
 	throws IOException;
 
     /** The results of a call to {@link #getBindingForUpdate}. */
-    class GetBindingForUpdateResults extends GetBindingResults {
+    final class GetBindingForUpdateResults extends GetBindingResults {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
@@ -448,10 +448,35 @@ public interface CachingDataStoreServer extends Remote {
      * case, {@code oid} is {@code -1}, and {@code callbackEvict}, {@code
      * callbackDowngrade}, and {@code nextCallbackDowngrade} are {@code false}.
      */
-    final class GetBindingForRemoveResults extends GetBindingForUpdateResults {
+    final class GetBindingForRemoveResults implements Serializable {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
+
+	/** Whether the requested name is bound. */
+	public final boolean found;
+
+	/**
+	 * The next bound name after the requested one, or {@code null} if
+	 * there is no next bound name.
+	 */
+	public final String nextName;
+
+	/**
+	 * The object ID associated with the requested name, if {@code found}
+	 * is {@code true}, else {@code -1}.
+	 */
+	public final long oid;
+
+	/**
+	 * Whether there is a conflicting write request for the requested name.
+	 */
+	public final boolean callbackEvict;
+
+	/**
+	 * Whether there is a conflicting read request for the requested name.
+	 */
+	public final boolean callbackDowngrade;
 
 	/**
 	 * The object ID associated with the next bound name or {@code -1} if
@@ -495,7 +520,11 @@ public interface CachingDataStoreServer extends Remote {
 					  boolean nextCallbackEvict,
 					  boolean nextCallbackDowngrade)
 	{
-	    super(found, nextName, oid, callbackEvict, callbackDowngrade);
+	    this.found = found;
+	    this.nextName = nextName;
+	    this.oid = oid;
+	    this.callbackEvict = callbackEvict;
+	    this.callbackDowngrade = callbackDowngrade;
 	    this.nextOid = nextOid;
 	    this.nextCallbackEvict = nextCallbackEvict;
 	    this.nextCallbackDowngrade = nextCallbackDowngrade;

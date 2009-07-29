@@ -580,11 +580,28 @@ abstract class BasicCacheEntry<K, V> {
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry's current state is not
-     *		{@link State#EVICTING_WRITE}
+     *		{@link State#CACHED_READ} or {@link State#CACHED_WRITE}
      */
     void setEvictedImmediate(Object lock) {
 	assert Thread.holdsLock(lock);
 	verifyState(State.CACHED_READ, State.CACHED_WRITE);
+	state = State.DECACHED;
+	lock.notifyAll();
+    }
+
+    /**
+     * Sets this entry's state to {@link State#DECACHED} directly from {@link
+     * State#FETCHING_READ} or {@link State#FETCHING_WRITE} when abandoning the
+     * last binding entry if no information about the last binding was actually
+     * obtained, and notifies the lock, which should be held.
+     *
+     * @param	lock the associated lock
+     * @throws	IllegalStateException if the entry's current state is not
+     *		{@link State#FETCHING_READ} or {@link State#FETCHING_WRITE}
+     */
+    void setEvictedAbandonFetching(Object lock) {
+	assert Thread.holdsLock(lock);
+	verifyState(State.FETCHING_READ, State.FETCHING_WRITE);
 	state = State.DECACHED;
 	lock.notifyAll();
     }
