@@ -109,7 +109,7 @@ public class TestScalableHashMapStress extends Assert {
     ScalableHashMap<Key, Value> map;
 
     /** An iterator over the keys of the map. */
-    Iterator<Key> keys;
+    ManagedSerializable<Iterator<Key>> msKeys;
 
     /** The entries already seen by the keys iterator. */
     final UndoableBitSet keysSeen = new UndoableBitSet(maxEntries);
@@ -118,7 +118,7 @@ public class TestScalableHashMapStress extends Assert {
     int currentKey = -1;
 
     /** An iterator over the values of the map. */
-    Iterator<Value> values;
+    ManagedSerializable<Iterator<Value>> msValues;
 
     /** The entries already seen by the values iterator. */
     final UndoableBitSet valuesSeen = new UndoableBitSet(maxEntries);
@@ -127,7 +127,7 @@ public class TestScalableHashMapStress extends Assert {
     int currentValue = -1;
 
     /** An iterator over the entries of the map. */
-    Iterator<Entry<Key, Value>> entries;
+    ManagedSerializable<Iterator<Entry<Key, Value>>> msEntries;
 
     /** The entries already seen by the entries iterator. */
     final UndoableBitSet entriesSeen = new UndoableBitSet(maxEntries);
@@ -306,20 +306,20 @@ public class TestScalableHashMapStress extends Assert {
 	    super(count);
 	}
 	public void run() {
-	    boolean startAgain = !keys.hasNext();
+	    boolean startAgain = !msKeys.get().hasNext();
 	    if (startAgain) {
-		keys = map.keySet().iterator();
-		ManagedSerializable<Iterator<Key>> ms =
-		    uncheckedCast(dataService.getBinding("keys"));
-		ms.set(keys);
+                Iterator<Key> keys = map.keySet().iterator();
+                dataService.markForUpdate(msKeys);
+		msKeys.set(keys);
 		keysSeen.clear();
 		currentKey = -1;
 	    }
-	    if (keys.hasNext()) {
+	    if (msKeys.get().hasNext()) {
 		if (debug && startAgain) {
 		    System.err.println("keySet new iterator");
 		}
-		Key key = keys.next();
+                dataService.markForUpdate(msKeys);
+		Key key = msKeys.get().next();
 		currentKey = key.i;
 		assertFalse("Already seen " + currentKey,
 			    keysSeen.get(currentKey));
@@ -345,7 +345,8 @@ public class TestScalableHashMapStress extends Assert {
 		System.err.println("keySet next remove " + key.i);
 	    }
 	    Value value = map.get(key);
-	    keys.remove();
+            dataService.markForUpdate(msKeys);
+            msKeys.get().remove();
 	    assertTrue(control.get(key.i));
 	    control.clear(key.i);
 	    maybeRemoveObject(key);
@@ -360,20 +361,20 @@ public class TestScalableHashMapStress extends Assert {
 	    super(count);
 	}
 	public void run() {
-	    boolean startAgain = !values.hasNext();
+	    boolean startAgain = !msValues.get().hasNext();
 	    if (startAgain) {
-		values = map.values().iterator();
-		ManagedSerializable<Iterator<Value>> ms =
-		    uncheckedCast(dataService.getBinding("values"));
-		ms.set(values);
+		Iterator<Value> values = map.values().iterator();
+                dataService.markForUpdate(msValues);
+		msValues.set(values);
 		valuesSeen.clear();
 		currentValue = -1;
 	    }
-	    if (values.hasNext()) {
+	    if (msValues.get().hasNext()) {
 		if (debug && startAgain) {
 		    System.err.println("values new interator");
 		}
-		Value value = values.next();
+                dataService.markForUpdate(msValues);
+		Value value = msValues.get().next();
 		currentValue = value.i;
 		assertFalse("Already seen " + currentValue,
 			    valuesSeen.get(currentValue));
@@ -398,7 +399,8 @@ public class TestScalableHashMapStress extends Assert {
 	    if (debug) {
 		System.err.println("values next remove " + value.i);
 	    }
-	    values.remove();
+            dataService.markForUpdate(msValues);
+	    msValues.get().remove();
 	    assertTrue(control.get(value.i));
 	    control.clear(value.i);
 	    maybeRemoveObject(value.getKey());
@@ -413,20 +415,20 @@ public class TestScalableHashMapStress extends Assert {
 	    super(count);
 	}
 	public void run() {
-	    boolean startAgain = !entries.hasNext();
+	    boolean startAgain = !msEntries.get().hasNext();
 	    if (startAgain) {
-		entries = map.entrySet().iterator();
-		ManagedSerializable<Iterator<Entry<Key, Value>>> ms =
-		    uncheckedCast(dataService.getBinding("entries"));
-		ms.set(entries);
+		Iterator<Entry<Key, Value>> entries = map.entrySet().iterator();
+                dataService.markForUpdate(msEntries);
+		msEntries.set(entries);
 		entriesSeen.clear();
 		currentEntry = -1;
 	    }
-	    if (entries.hasNext()) {
+	    if (msEntries.get().hasNext()) {
 		if (debug && startAgain) {
 		    System.err.println("entrySet new iterator");
 		}
-		Entry<Key, Value> entry = entries.next();
+                dataService.markForUpdate(msEntries);
+		Entry<Key, Value> entry = msEntries.get().next();
 		currentEntry = entry.getKey().i;
 		assertFalse("Already seen " + currentEntry,
 			    entriesSeen.get(currentEntry));
@@ -461,7 +463,8 @@ public class TestScalableHashMapStress extends Assert {
 	    Value value = entry.getValue();
 	    assertTrue(control.get(key.i));
 	    assertEquals(key.i, value.i);
-	    entries.remove();
+            dataService.markForUpdate(msEntries);
+	    msEntries.get().remove();
 	    control.clear(key.i);
 	    maybeRemoveObject(key);
 	    keyRemoved(key.i);
@@ -495,17 +498,18 @@ public class TestScalableHashMapStress extends Assert {
 		    initialObjectCount = getObjectCount();
 		    map = new ScalableHashMap<Key, Value>();
 		    dataService.setBinding("map", map);
-		    keys = map.keySet().iterator();
+		    Iterator<Key> keys = map.keySet().iterator();
 		    dataService.
 			setBinding("keys",
 				   new ManagedSerializable<Iterator<Key>>
 				   (keys));
-		    values = map.values().iterator();
+		    Iterator<Value> values = map.values().iterator();
 		    dataService.
 			setBinding("values",
 				   new ManagedSerializable<Iterator<Value>>
 				   (values));
-		    entries = map.entrySet().iterator();
+		    Iterator<Entry<Key, Value>> entries =
+                            map.entrySet().iterator();
 		    dataService.
 			setBinding("entries",
 				   new ManagedSerializable<Iterator<Entry
@@ -523,7 +527,8 @@ public class TestScalableHashMapStress extends Assert {
 		    initTxnState(++attempts);
 		    dataService.removeObject(
 			dataService.getBinding("entries"));
-		    entries = map.entrySet().iterator();
+		    Iterator<Entry<Key, Value>> entries =
+                            map.entrySet().iterator();
 		    dataService.setBinding("entries",
 		        new ManagedSerializable<Iterator<Entry<Key, Value>>>
 					   (entries));
@@ -538,10 +543,11 @@ public class TestScalableHashMapStress extends Assert {
 		    public void run() throws Exception {
 			initTxnState(++attempts);
 			int count = 0;
-			while (entries.hasNext()) {
-			    if (++count % 100 == 0)
+			while (msEntries.get().hasNext()) {
+			    if (++count % 50 == 0)
 				return;
-			    Entry<Key, Value> entry = entries.next();
+                            dataService.markForUpdate(msEntries);
+			    Entry<Key, Value> entry = msEntries.get().next();
 			    maybeRemoveObject(entry.getKey());
 			    maybeRemoveObject(entry.getValue());
 			}
@@ -591,7 +597,7 @@ public class TestScalableHashMapStress extends Assert {
 		    private int attempts = 0;
 		    public void run() throws Exception {
 			initTxnState(++attempts);
-			getRandomOp().run();
+                        getRandomOp().run();
 			int num;
 			while ((num = opnum.getAndIncrement()) < operations) {
 			    if (num > 0 && num % 5000 == 0) {
@@ -603,7 +609,7 @@ public class TestScalableHashMapStress extends Assert {
 			    } else {
 				opsPerTxn.decrementAndGet();
 			    }
-			    getRandomOp().run();
+                            getRandomOp().run();
 			}
 			isDone.set(true);
 		    }
@@ -628,15 +634,9 @@ public class TestScalableHashMapStress extends Assert {
 	    AbstractUndoable.undoAll();
 	}
 	map = (ScalableHashMap) dataService.getBinding("map");
-	ManagedSerializable<Iterator<Key>> msKeys =
-	    uncheckedCast(dataService.getBinding("keys"));
-	keys = msKeys.get();
-	ManagedSerializable<Iterator<Value>> msValues =
-	    uncheckedCast(dataService.getBinding("values"));
-	values = msValues.get();
-	ManagedSerializable<Iterator<Entry<Key, Value>>> msEntries =
-	    uncheckedCast(dataService.getBinding("entries"));
-	entries = msEntries.get();
+        msKeys = uncheckedCast(dataService.getBinding("keys"));
+        msValues = uncheckedCast(dataService.getBinding("values"));
+        msEntries = uncheckedCast(dataService.getBinding("entries"));
 	if (debug) {
 	    System.err.println("new transaction");
 	}

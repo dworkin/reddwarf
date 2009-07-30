@@ -33,7 +33,8 @@ import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
+import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
@@ -49,35 +50,24 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import junit.framework.TestSuite;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
-@RunWith(FilteredJUnit3TestRunner.class)
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
+
+@RunWith(FilteredNameRunner.class)
 public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     
-    /** If this property is set, then only run the single named test method. */
-    private static final String testMethod = System.getProperty("test.method");
-
-    /**
-     * Specify the test suite to include all tests, or just a single method if
-     * specified.
-     */
-    public static TestSuite suite() throws Exception {
-	if (testMethod == null) {
-	    return new TestSuite(TestChannelServiceImpl.class);
-	}
-	TestSuite suite = new TestSuite();
-	suite.addTest(new TestChannelServiceImpl(testMethod));
-	return suite;
-    }
-
     /** Constructs a test instance. */
-    public TestChannelServiceImpl(String name) throws Exception  {
-	super(name);
+    public TestChannelServiceImpl() throws Exception  {
     }
 
     // -- Test constructor -- 
  
+    @Test
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ChannelServiceImpl(null, serverNode.getSystemRegistry(),
@@ -88,6 +78,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
 	    new ChannelServiceImpl(serviceProps, null, serverNode.getProxy());
@@ -97,6 +88,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
 	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
@@ -107,6 +99,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testConstructorNoAppName() throws Exception {
 	try {
 	    new ChannelServiceImpl(
@@ -118,6 +111,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testConstructedVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -133,6 +127,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		}}, taskOwner);
     }
 
+    @Test
     public void testConstructorWithCurrentVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -153,6 +148,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testConstructorWithMajorVersionMismatch() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -170,6 +166,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testConstructorWithMinorVersionMismatch() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -189,6 +186,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test createChannel --
 
+    @Test
     public void testCreateChannelNullName() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -201,7 +199,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		}
 	    }}, taskOwner);
     }
-    
+
+    @Test
     public void testCreateChannelNullListener() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -214,7 +213,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		}
 	    }}, taskOwner);
     }
-    
+
+    @Test
     public void testCreateChannelNonSerializableListener() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -228,7 +228,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		}
 	    }}, taskOwner);
     }
-    
+
+    @Test
     public void testCreateChannelNoTxn() throws Exception { 
 	try {
 	    channelService.createChannel("x", null, Delivery.RELIABLE);
@@ -238,6 +239,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelToStringNoTxn() throws Exception {
 	final List<Channel> channel = new ArrayList<Channel>();
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -252,6 +254,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     
     // -- Test Channel serialization --
 
+    @Test
     public void testChannelWriteReadObject() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() throws Exception {
@@ -279,6 +282,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     
     // -- Test Channel.getName --
 
+    @Test
     public void testChannelGetNameNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
@@ -289,6 +293,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelGetNameMismatchedTxn() throws Exception {
 	final Channel channel = createChannel();
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -303,6 +308,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelGetName() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -316,6 +322,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelGetNameClosedChannel() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -335,6 +342,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test Channel.getDelivery --
 
+    @Test
     public void testChannelGetDeliveryNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
@@ -345,6 +353,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelGetDeliveryMismatchedTxn() throws Exception {
 	// TBD: should the implementation work this way?
 	final Channel channel = createChannel();
@@ -360,6 +369,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelGetDelivery() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -376,6 +386,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelGetDeliveryClosedChannel() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -397,6 +408,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test Channel.hasSessions --
 
+    @Test
     public void testChannelHasSessionsNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
@@ -407,6 +419,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelHasSessionsMismatchedTxn() throws Exception {
 	final Channel channel = createChannel();
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -421,6 +434,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelHasSessionsNoSessionsJoined() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -435,6 +449,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelHasSessionsWithSessionsJoined() throws Exception {
 	final String channelName = "foo";
 	createChannel(channelName);
@@ -453,7 +468,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    group.disconnect(false);
 	}
     }
-    
+
+    @Test
     public void testChannelHasSessionsClosedChannel() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -473,7 +489,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test Channel.getSessions --
 
-
+    @Test
     public void testChannelGetSessionsNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
@@ -484,6 +500,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelGetSessionsMismatchedTxn() throws Exception {
 	final Channel channel = createChannel();
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -498,6 +515,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelGetSessionsNoSessionsJoined() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -511,7 +529,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    }
 	}, taskOwner);
     }
-    
+
+    @Test
     public void testChannelGetSessionsWithSessionsJoined() throws Exception {
 	final String channelName = "foo";
 	createChannel(channelName);
@@ -547,11 +566,13 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelGetSessionsMultipleNodes() throws Exception {
 	addNodes("a", "b");
 	testChannelGetSessionsWithSessionsJoined();
     }
 
+    @Test
     public void testChannelGetSessionsClosedChannel() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -571,6 +592,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test Channel.join --
 
+    @Test
     public void testChannelJoinNoTxn() throws Exception {
 	Channel channel = createChannel();
 	DummyClient client = newClient();
@@ -586,6 +608,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelJoinClosedChannel() throws Exception {
 	final DummyClient client = newClient();
 	try {
@@ -611,6 +634,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelJoinNullClientSession() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -626,6 +650,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelJoin() throws Exception {
 	String channelName = "joinTest";
 	ClientGroup group = new ClientGroup(someUsers);
@@ -649,6 +675,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test Channel.leave --
 
+    @Test
     public void testChannelLeaveNoTxn() throws Exception {
 	Channel channel = createChannel();
 	DummyClient client = newClient();
@@ -664,6 +691,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelLeaveMismatchedTxn() throws Exception {
 	// TBD: should the implementation work this way?
 	final String channelName = "test";
@@ -687,6 +715,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelLeaveClosedChannel() throws Exception {
 	final String channelName = "leaveClosedChannelTest";
 	final String user = "daffy";
@@ -716,6 +745,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelLeaveNullClientSession() throws Exception {
 	
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -732,6 +762,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelLeaveSessionNotJoined() throws Exception {
 	final String channelName = "leaveTest";
 	createChannel(channelName);
@@ -792,6 +824,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelLeave() throws Exception {
 	final String channelName = "leaveTest";
 	createChannel(channelName);
@@ -848,6 +882,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test Channel.leaveAll --
 
+    @Test
     public void testChannelLeaveAllNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
@@ -858,6 +893,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelLeaveAllClosedChannel() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -874,6 +910,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelLeaveAllNoSessionsJoined() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
@@ -885,7 +922,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    }
 	}, taskOwner);
     }
-    
+
+    @Test
     public void testChannelLeaveAll() throws Exception {
 	final String channelName = "leaveAllTest";
 	createChannel(channelName);
@@ -924,6 +962,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     private static byte[] testMessage = new byte[] {'x'};
 
+    @Test
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
@@ -934,6 +973,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelSendAllClosedChannel() throws Exception {
 	final String channelName = "test";
 	createChannel(channelName);
@@ -951,6 +991,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelSendNullMessage() throws Exception {
 	final String channelName = "test";
 	createChannel(channelName);
@@ -967,6 +1008,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
     public void testChannelSend() throws Exception {
 	
 	String channelName = "test";
@@ -980,11 +1022,14 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testChannelSendMultipleNodes() throws Exception {
 	addNodes("one", "two", "three");
 	testChannelSend();
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelSendToNewMembersAfterAllNodesFail() throws Exception {
 	addNodes("one", "two", "three");
 	String channelName = "test";
@@ -1000,6 +1045,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	System.err.println("simulate watchdog server crash...");
 	tearDown(false);
 	setUp(false);
+        Thread.sleep(1000);
 	addNodes("ay", "bee", "sea");
 	Thread.sleep(2000);
 	int afterCount = getObjectCount();
@@ -1027,6 +1073,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelSendToExistingMembersAfterNodeFailure()
 	throws Exception
     {
@@ -1051,6 +1099,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    System.err.println("shutting down node: " + otherHost);
 	    int otherHostPort = additionalNodes.get(otherHost).getAppPort();
 	    shutdownNode(otherHost);
+            Thread.sleep(1000);
 	    // remove disconnected sessions from client group
 	    System.err.println("remove disconnected sessions");
 	    ClientGroup disconnectedSessionsGroup =
@@ -1074,6 +1123,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelSendToExistingMembersAfterCoordinatorFailure()
 	throws Exception
     {
@@ -1098,6 +1149,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    int coordinatorHostPort =
 		additionalNodes.get(coordinatorHost).getAppPort();
 	    shutdownNode(coordinatorHost);
+            Thread.sleep(1000);
 	    // remove disconnected sessions from client group
 	    System.err.println("remove disconnected sessions");
 	    ClientGroup disconnectedSessionsGroup =
@@ -1123,6 +1175,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test client send to channel (with and without ChannelListener) --
 
+    @Test
+    @IntegrationTest
     public void testNonMemberClientSendToChannelWithNoListener ()
 	throws Exception
     {
@@ -1148,6 +1202,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testNonMemberClientSendToChannelWithForwardingListener ()
 	throws Exception
     {
@@ -1173,6 +1229,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testClientSendToChannelWithNoListener() throws Exception {
 	String channelName = "foo";
 	createChannel(channelName);
@@ -1198,6 +1256,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testClientSendToChannelWithForwardingListener()
 	throws Exception
     {
@@ -1224,7 +1284,9 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    group.disconnect(false);
 	}
     }
-    
+
+    @Test
+    @IntegrationTest
     public void testClientSendToChannelWithRejectingListener()
 	throws Exception
     {
@@ -1252,6 +1314,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
     
+    @Test
+    @IntegrationTest
     public void testClientSendToChannelWithFilteringListener()
 	throws Exception
     {
@@ -1294,6 +1358,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
     public void testClientSendToChannelValidatingWrappedClientSession()
 	throws Exception
     {
@@ -1337,6 +1402,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}, taskOwner);
     }
 
+    @Test
+    @IntegrationTest
     public void testJoinLeavePerformance() throws Exception {
 	final String channelName = "perf";
 	createChannel(channelName);
@@ -1367,6 +1434,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     // -- Test Channel.close --
 
+    @Test
     public void testChannelCloseNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
@@ -1376,7 +1444,9 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    System.err.println(e);
 	}
     }
-    
+
+    @Test
+    @IntegrationTest
     public void testChannelClose() throws Exception {
 	final String channelName = "closeTest";
 	createChannel(channelName);
@@ -1399,6 +1469,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	printServiceBindings("after channel close");
     }
 
+    @Test
+    @IntegrationTest
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);
@@ -1424,6 +1496,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testSessionsRemovedOnRecovery() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);

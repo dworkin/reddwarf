@@ -26,7 +26,8 @@ import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
+import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -38,10 +39,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import junit.framework.TestSuite;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
-@RunWith(FilteredJUnit3TestRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestChannelServiceImplRelocatingSessions
     extends AbstractChannelServiceTest
 {
@@ -52,14 +56,13 @@ public class TestChannelServiceImplRelocatingSessions
     private static final Object invocationHandlerLock = new Object();
     
     /** Constructs a test instance. */
-    public TestChannelServiceImplRelocatingSessions(String name)
-	throws Exception
-    {
-	super(name);
+    public TestChannelServiceImplRelocatingSessions() throws Exception {
     }
 
     // -- Relocation test cases --
 
+    @Test
+    @IntegrationTest
     public void testChannelJoinAndRelocate() throws Exception {
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
@@ -101,6 +104,8 @@ public class TestChannelServiceImplRelocatingSessions
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelJoinAndRelocateMultipleTimes()
 	throws Exception
     {
@@ -148,6 +153,8 @@ public class TestChannelServiceImplRelocatingSessions
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelJoinAndRelocateWithOldNodeFailure()
 	throws Exception
     {
@@ -216,6 +223,8 @@ public class TestChannelServiceImplRelocatingSessions
 	}
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelJoinToOldNodeDuringRelocate()
 	throws Exception
     {
@@ -266,6 +275,8 @@ public class TestChannelServiceImplRelocatingSessions
 	
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelJoinToOldNodeAfterRelocate()
 	throws Exception
     {
@@ -313,6 +324,8 @@ public class TestChannelServiceImplRelocatingSessions
 	
     }
     
+    @Test
+    @IntegrationTest
     public void testChannelJoinToOldNodeAfterRelocateTwice()
 	throws Exception
     {
@@ -362,6 +375,8 @@ public class TestChannelServiceImplRelocatingSessions
 	
     }
     
+    @Test
+    @IntegrationTest
     public void testChannelJoinDuringRelocatePreparation()
 	throws Exception
     {
@@ -422,6 +437,8 @@ public class TestChannelServiceImplRelocatingSessions
 	
     }
 
+    @Test
+    @IntegrationTest
     public void testChannelJoinDuringRelocate() throws Exception {
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);

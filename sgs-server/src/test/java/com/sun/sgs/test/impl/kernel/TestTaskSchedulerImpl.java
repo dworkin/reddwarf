@@ -29,7 +29,7 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.test.impl.kernel.TestTransactionSchedulerImpl.DependentTask;
+import com.sun.sgs.impl.kernel.TestTransactionSchedulerImpl.DependentTask;
 
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
@@ -282,7 +282,7 @@ public class TestTaskSchedulerImpl {
         taskScheduler.scheduleTask(new IncrementRunner(), taskOwner, time);
         taskScheduler.scheduleTask(new IncrementRunner(), taskOwner, time);
         taskScheduler.scheduleTask(new IncrementRunner(), taskOwner, time);
-        Thread.sleep(600L);
+        Thread.sleep(1000L);
         assertEquals(6, taskCount);
     }
 

@@ -122,7 +122,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	    command.add("-D" + name + "=" + system.get(name));
 	}
 	command.add("com.sun.sgs.impl.kernel.Kernel");
-	command.add(configFile.toURI().toURL().getPath());
+	command.add(configFile.getPath());
 	/* Return the process builder */
 	return new ProcessBuilder(command);
     }

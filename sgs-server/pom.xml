@@ -189,6 +189,10 @@
 	      <name>com.sun.sgs.txn.timeout</name>
 	      <value>${com.sun.sgs.txn.timeout}</value>
 	    </property>
+	    <property>
+	      <name>sun.rmi.transport.connectionTimeout</name>
+	      <value>5000</value>
+	    </property>
 	  </systemProperties>
 	  <argLine>
 	    ${test.jvm.args} -Djava.library.path=${run.javapath}

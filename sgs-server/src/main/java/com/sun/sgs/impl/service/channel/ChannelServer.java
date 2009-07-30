@@ -156,11 +156,11 @@ public interface ChannelServer extends Remote {
      * for the client session with the specified {@code sessionRefId} in
      * preparation for the session's relocation to the new node.  This
      * method is invoked when the work associated with a previous
-     * invocation to {@link #relocateSession relocateSession} on the new
-     * node's channel server is complete. This channel server should clean
-     * up any remaining persistent channel membership information for the
-     * session on the old node (i.e., the local node).
-     * any
+     * invocation to {@link #relocateChannelMemberships
+     * relocateChannelMemberships} on the new node's channel server is
+     * complete. This channel server should clean up any remaining
+     * persistent channel membership information for the session on the old
+     * node (i.e., the local node).  any
      *
      * @param	sessionRefId the ID of a relocating client session
      * @param	newNodeId ID of the node the session is relocating to

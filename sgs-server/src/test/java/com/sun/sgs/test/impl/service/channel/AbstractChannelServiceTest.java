@@ -45,7 +45,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.AbstractDummyClient;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
@@ -61,13 +61,16 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
-@RunWith(FilteredJUnit3TestRunner.class)
-public abstract class AbstractChannelServiceTest extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public abstract class AbstractChannelServiceTest extends Assert {
     
     private static final String APP_NAME = "TestChannelServiceImpl";
     
@@ -122,8 +125,7 @@ public abstract class AbstractChannelServiceTest extends TestCase {
     }
     
     /** Constructs a test instance. */
-    public AbstractChannelServiceTest(String name) throws Exception  {
-	super(name);
+    public AbstractChannelServiceTest() throws Exception  {
 	Class cl = ChannelServiceImpl.class;
 	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
 	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
@@ -131,8 +133,8 @@ public abstract class AbstractChannelServiceTest extends TestCase {
     }
 
     /** Creates and configures the channel service. */
-    protected void setUp() throws Exception {
-	System.err.println("Testcase: " + getName());
+    @Before
+    public void setUp() throws Exception {
         setUp(true);
     }
 
@@ -157,14 +159,9 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 	channelService = serverNode.getChannelService();
     }
 
-    /** Sets passed if the test passes. */
-    protected void runTest() throws Throwable {
-	super.runTest();
-        Thread.sleep(100);
-    }
-    
     /** Cleans up the transaction. */
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         tearDown(true);
     }
 
@@ -451,14 +448,8 @@ public abstract class AbstractChannelServiceTest extends TestCase {
 	final String channelName, final List<String> users)
 	throws Exception
     {
-	for (int i = 0; i < 3; i++) {
-	    try {
-		checkUsersJoined0(channelName, users);
-		return;
-	    } catch (junit.framework.AssertionFailedError e) {
-	    }
-	    Thread.sleep(100);
-	}
+	Thread.sleep(600);
+	checkUsersJoined0(channelName, users);
     }
     
     private void checkUsersJoined0(
