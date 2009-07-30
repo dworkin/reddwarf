@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
@@ -28,9 +29,13 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Server side implementation of component that finds groups based on hints
@@ -42,7 +47,17 @@ public class UserGroupFinderServerImpl implements GroupFinder,
     /** Package name for this class. */
     private static final String PKG_NAME =
                         "com.sun.sgs.impl.service.nodemap.coordinator.affinity";
-    
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(PKG_NAME + ".finder"));
+
+    /** The property name for the update period. */
+    static final String UPDATE_PERIOD_PROPERTY = PKG_NAME + ".server.port";
+
+    /** The default value of the update period. */
+    static final int DEFAULT_UPDATE_PERIOD = 30;
+
     /** The property name for the server port. */
     static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
 
@@ -60,9 +75,12 @@ public class UserGroupFinderServerImpl implements GroupFinder,
 
     private final Exporter<UserGroupFinderServer> exporter;
 
-    private Map<Long, AffinityGroup> groups = null;
+    // Map groupId -> map(Identity -> nodeId)
+    private final Map<Long, Map<Identity, Long>> groups =
+                                    new HashMap<Long, Map<Identity, Long>>();
 
-    private RecurringTaskHandle finderTask = null;
+    private final long updatePeriod;
+    private RecurringTaskHandle updateTask = null;
 
     UserGroupFinderServerImpl(Properties properties,
                               AffinityGroupCoordinator coordinator,
@@ -74,16 +92,26 @@ public class UserGroupFinderServerImpl implements GroupFinder,
         this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
 
-        System.out.println("*** constructing UserGroupFinderServerImpl ***");
-
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        int requestedPort = wrappedProps.getIntProperty(
-                SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
+
+        int updateSeconds = wrappedProps.getIntProperty(UPDATE_PERIOD_PROPERTY,
+                                               DEFAULT_UPDATE_PERIOD, 1, 65535);
+        updatePeriod = updateSeconds * 1000;
+
+        int port = wrappedProps.getIntProperty(SERVER_PORT_PROPERTY,
+                                               DEFAULT_SERVER_PORT, 0, 65535);
+
+        logger.log(Level.CONFIG,
+                   "constructing UserGroupFinderServerImpl on port {0}", port);
 
         // Export ourselves.  At this point, this object is public.
         exporter =
                new Exporter<UserGroupFinderServer>(UserGroupFinderServer.class);
-        exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
+        exporter.export(this, SERVER_EXPORT_NAME, port);
+    }
+
+    private boolean started() {
+        return updateTask != null;
     }
 
     /* --- Implement UserGroupFinderServer -- */
@@ -93,27 +121,22 @@ public class UserGroupFinderServerImpl implements GroupFinder,
                                           long nodeId)
         throws IOException
     {
-        System.out.println("received " + associations.size() + " associations from service on node " + nodeId);
-        if (groups == null) return;
+        if (!started()) {
+            throw new IllegalStateException("associations call while stopped");
+        }
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "received {0} associations from node {1}",
+                       associations.size(), nodeId);
+        }
 
         for (Map.Entry<Identity, Long> entry : associations.entrySet()) {
-            AffinityGroup group = groups.get(entry.getValue());
+            Map<Identity, Long> group = groups.get(entry.getValue());
 
             if (group == null) {
-                group = new AffinityGroup(entry.getValue());
+                group = new HashMap<Identity, Long>();
                 groups.put(entry.getValue(), group);
             }
-            group.add(entry.getKey(), nodeId);
-        }
-    }
-
-    private synchronized void updateCoordinator() {
-        System.out.println("updating coordinator, groups = " + groups);
-        if ((groups != null) && !groups.isEmpty()) {
-
-            System.out.println("updating coordinator with " + groups.size() + " groups");
-            coordinator.newGroups(groups.values());
-            groups = new HashMap<Long, AffinityGroup>();
+            group.put(entry.getKey(), nodeId);
         }
     }
 
@@ -121,28 +144,47 @@ public class UserGroupFinderServerImpl implements GroupFinder,
 
     @Override
     public synchronized void start() {
-        System.out.println("starting user group finder task");
-        groups = new HashMap<Long, AffinityGroup>();
-        finderTask = taskScheduler.scheduleRecurringTask(
+        if (started()) return; // already started
+
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "starting update task with period of {0} ms",
+                       updatePeriod);
+        }
+        groups.clear();
+        updateTask = taskScheduler.scheduleRecurringTask(
                                     new AbstractKernelRunnable("FinderTask") {
                                             public void run() {
-                                                System.out.println("user group finder task run");
                                                 updateCoordinator();
                                             }},
                                     taskOwner,
-                                    System.currentTimeMillis(),
-                                    30 * 1000);
-        finderTask.start();
+                                    System.currentTimeMillis() + updatePeriod,
+                                    updatePeriod);
+        updateTask.start();
+    }
+
+    private synchronized void updateCoordinator() {
+        if (started() && !groups.isEmpty()) {
+            List<AffinityGroup> affinityGroups =
+                                    new ArrayList<AffinityGroup>(groups.size());
+
+            for (Map.Entry<Long, Map<Identity, Long>> e : groups.entrySet()) {
+                affinityGroups.add(new AffinityGroup(e.getKey(), e.getValue()));
+            }
+            coordinator.newGroups(affinityGroups);
+            groups.clear();
+        }
     }
 
     @Override
     public synchronized void stop() {
-        System.out.println("stopping user group finder task");
-        if (finderTask != null) {
-            finderTask.cancel();
-            finderTask = null;
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "stopping finder");
         }
-        groups = null;
+        if (updateTask != null) {
+            updateTask.cancel();
+            updateTask = null;
+        }
+        groups.clear();
     }
 
     @Override

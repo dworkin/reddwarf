@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.management.GroupCoordinatorMXBean;
 import com.sun.sgs.management.GroupCoordinatorMXBean.GroupInfo;
@@ -35,6 +36,8 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.TreeSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
@@ -43,6 +46,14 @@ import javax.management.JMException;
  * group.
  */
 public class AffinityGroupCoordinator implements GroupCoordinator {
+
+    /** Package name for this class. */
+    private static final String PKG_NAME =
+                                    "com.sun.sgs.impl.service.nodemap.affinity";
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(PKG_NAME + ".coordinator"));
 
     private final NodeMappingServerImpl server;
     private final GroupFinder finder;
@@ -62,7 +73,7 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
     {
         this.server = server;
 
-        System.out.println("*** constructing AffinityGroupCoordinator ***");
+        logger.log(Level.CONFIG, "constructing AffinityGroupCoordinator");
 
         // TODO - set by property
         finder = new UserGroupFinderServerImpl(properties, this,
@@ -75,18 +86,23 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
             collector.registerMBean(new AffinityGroupCoordinatorMXBean(),
                                     GroupCoordinatorMXBean.MXBEAN_NAME);
         } catch (JMException e) {
-            e.printStackTrace();
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }
     }
 
     @Override
     public void start() {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "starting coordinator");
+        }
         finder.start();
     }
 
     @Override
     public void stop() {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "stopping coordinator");
+        }
         finder.stop();
     }
 
@@ -109,7 +125,10 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
         // Empty group set (?), exit
         if (group == null) return;
 
-        System.out.println("moving " + group);
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "moving group {0} to node {1}",
+                       group, newNodeId);
+        }
 
         // Re-target the group and re-insert into groups map
         group.setTargetNode(newNodeId, server);
@@ -128,25 +147,27 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
      * TODO - synchronization right? or do it better
      */
     synchronized void newGroups(Collection<AffinityGroup> newGroups) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "received {0} new groups",newGroups.size());
+        }
         groups.clear();
         for (AffinityGroup group : newGroups) {
             newGroup(group);
         }
     }
 
-    synchronized private void newGroup(AffinityGroup group) {
-        long targetNodeId = group.setTargetNode(server);
+    private void newGroup(AffinityGroup group) {
+        long targetNodeId = group.findTargetNode(server);
         NavigableSet<AffinityGroup> groupSet = groups.get(targetNodeId);
         if (groupSet == null) {
             groupSet = new TreeSet<AffinityGroup>();
             groups.put(targetNodeId, groupSet);
         }
-        System.out.println("adding " + group);
         groupSet.add(group);
     }
 
     private class AffinityGroupCoordinatorMXBean
-            implements GroupCoordinatorMXBean
+        implements GroupCoordinatorMXBean
     {
 
         @Override
@@ -157,6 +178,9 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
         @Override
         public List<GroupInfo> getGroups(long nodeId) {
             NavigableSet<AffinityGroup> groupSet = groups.get(nodeId);
+
+            if (groupSet == null) return null;
+
             List<GroupInfo> groupInfoList =
                                      new ArrayList<GroupInfo>(groupSet.size());
 
@@ -169,7 +193,7 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
 
         @Override
         public boolean isRunning() {
-            return true;
+            return true;    // todo
         }
 
         @Override

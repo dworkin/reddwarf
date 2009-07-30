@@ -29,12 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-
 /**
- * Affinity group. When a group is constructed the node
- * membership will be checked and the target node for this group will be
- * the node which most members reside on. Then an attempt will be made to
- * move any identity not on the target node to that node.
+ * Affinity group.
  * <p>
  * This object implements Comparable and when placed in an sorted collection
  * these objects will be sorted based on the number of identities in the group.
@@ -44,18 +40,13 @@ class AffinityGroup implements Comparable {
     private final long agid;
 
     // Map Identity -> nodeId
-    private final Map<Identity, Long> identities =
-                                            new HashMap<Identity, Long>();
+    private final Map<Identity, Long> identities;
 
     private long targetNodeId = -1;
 
-    AffinityGroup(long agid) {
+    AffinityGroup(long agid, Map<Identity, Long> identities) {
         this.agid = agid;
-    }
-
-    synchronized void add(Identity identity, long nodeId) {
-        assert targetNodeId < 0;
-        identities.put(identity, nodeId);
+        this.identities = identities;
     }
 
     /**
@@ -66,7 +57,7 @@ class AffinityGroup implements Comparable {
      *
      * @return the target node
      */
-    long setTargetNode(NodeMappingServerImpl server) {
+    long findTargetNode(NodeMappingServerImpl server) {
         // Find the node that most identites belong to, and move any
         // stragglers to that node. TODO - better way to do this???
         HashMap<Long, Integer> foo =
@@ -87,7 +78,8 @@ class AffinityGroup implements Comparable {
                 max = entry.getValue();
             }
         }
-        System.out.println("Found target node to be " + targetNodeId + " with " + max + " count");
+        System.out.println("Found target node to be " + targetNodeId +
+                           " with " + max + " count");
         moveStragglers(server);
         return targetNodeId;
     }
@@ -121,9 +113,6 @@ class AffinityGroup implements Comparable {
         }
     }
 
-    // TODO - this only works if add() is not called once this object has been
-    // placed in a map. Really should re-work this so that the identities are
-    // assembled elsewhere and passed to this constructor.
     @Override
     public int compareTo(Object obj) {
         if (obj == null) {
