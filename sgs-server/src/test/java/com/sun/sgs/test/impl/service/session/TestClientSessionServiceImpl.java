@@ -187,7 +187,7 @@ public class TestClientSessionServiceImpl extends Assert {
 	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
 			  DirectiveNodeAssignmentPolicy.class.getName());
 	props.setProperty("com.sun.sgs.impl.service.watchdog.server.renew.interval",
-			  "100000");
+			  "1000");
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
