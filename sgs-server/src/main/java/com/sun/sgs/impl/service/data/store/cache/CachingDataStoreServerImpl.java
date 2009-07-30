@@ -77,7 +77,6 @@ import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import static java.util.logging.Level.CONFIG;
-import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
@@ -266,6 +265,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     private final Object watchdogServiceSync = new Object();
 
+    /** The update queue server, wrapped for logging. */
+    private final UpdateQueueServer updateQueueServer =
+	new LoggingUpdateQueueServer(this, logger);
+
     /* -- Constructor -- */
 
     /**
@@ -377,7 +380,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		},
 		this, properties);
 	    serverPort = serverExporter.export(
-		this, "CachingDataStoreServer", requestedServerPort);
+		new LoggingCachingDataStoreServer(this, logger),
+		"CachingDataStoreServer", requestedServerPort);
 	} catch (IOException e) {
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, e, "Problem starting server");
@@ -424,7 +428,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    NodeInfo nodeInfo = new NodeInfo(
 		lockManager, nodeId, callbackServer,
 		new RequestQueueServer<UpdateQueueRequest>(
-		    nodeId, new UpdateQueueRequestHandler(this, nodeId),
+		    nodeId,
+		    new UpdateQueueRequestHandler(updateQueueServer, nodeId),
 		    new Properties()));
 	    synchronized (nodeInfoMap) {
 		assert !nodeInfoMap.containsKey(nodeInfo.nodeId);
@@ -471,9 +476,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     @Override
     public GetObjectResults getObject(long nodeId, long oid) {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST, "getObject nodeId:" + nodeId + ", oid:" + oid);
-	}
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkOid(oid);
@@ -484,14 +486,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		byte[] data = oidsDb.get(txn, encodeLong(oid), false);
 		txnDone = true;
 		txn.commit();
-		GetObjectResults result = (data == null) ? null
+		return (data == null) ? null
 		    : new GetObjectResults(data, getWaiting(oid, false));
-		if (logger.isLoggable(FINEST)) {
-		    logger.log(FINEST,
-			       "getObject nodeId:" + nodeId + ", oid:" + oid +
-			       " returns: " + result);
-		}
-		return result;
 	    } finally {
 		if (!txnDone) {
 		    txn.abort();
@@ -674,11 +670,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     public GetBindingForUpdateResults getBindingForUpdate(
 	long nodeId, String name)
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(
-		FINEST,
-		"getBindingForUpdate nodeId:" + nodeId + ", name:" + name);
-	}
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkNull("name", name);
@@ -717,25 +708,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    if (!found) {
 		lock(nodeInfo, nextNameKey, true);
 	    }
-	    GetBindingForUpdateResults result =
-		new GetBindingForUpdateResults(
-		    found, found ? null : nextName, oid,
-		    (oid == -1) ? false : getWaiting(nameKey, true),
-		    (oid == -1) ? false : getWaiting(nameKey, false));
-	    if (logger.isLoggable(FINEST)) {
-		logger.log(
-		    FINEST,
-		    "getBindingForUpdate nodeId:" + nodeId + ", name:" + name +
-		    " returns " + result);
-	    }
-	    return result;
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getBindingForUpdate nodeId:" + nodeId +
-				", name:" + name + " throws");
-	    }
-	    throw e;
+	    return new GetBindingForUpdateResults(
+		found, found ? null : nextName, oid,
+		(oid == -1) ? false : getWaiting(nameKey, true),
+		(oid == -1) ? false : getWaiting(nameKey, false));
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -767,6 +743,12 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		try {
 		    boolean hasNext = cursor.findNext(encodedName);
 		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
+		    if (name.equals(nextName)) {
+			/* Move to name after matching name */
+			hasNext = cursor.findNext();
+			nextName =
+			    hasNext ? decodeString(cursor.getKey()) : null;
+		    }
 		    nextOid = hasNext ? decodeLong(cursor.getValue()) : -1;
 		} finally {
 		    cursor.close();

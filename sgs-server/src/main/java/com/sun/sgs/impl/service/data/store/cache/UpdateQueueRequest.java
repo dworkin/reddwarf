@@ -88,8 +88,7 @@ abstract class UpdateQueueRequest implements Request {
      * @param	nodeId the node ID associated with the update queue
      * @throws	Exception if the request fails
      */
-    abstract void performRequest(
-	CachingDataStoreServerImpl server, long nodeId)
+    abstract void performRequest(UpdateQueueServer server, long nodeId)
 	throws Exception;
 
     /** The request handler used to implement {@link UpdateQueue}. */
@@ -97,7 +96,7 @@ abstract class UpdateQueueRequest implements Request {
 	implements Request.RequestHandler<UpdateQueueRequest>
     {
 	/** The underlying server that handles requests. */
-	private final CachingDataStoreServerImpl server;
+	private final UpdateQueueServer server;
 
 	/** The node ID associated with this queue. */
 	private final long nodeId;
@@ -108,9 +107,7 @@ abstract class UpdateQueueRequest implements Request {
 	 * @param	server the underlying server
 	 * @param	nodeId the node ID associated with this queue
 	 */
-	UpdateQueueRequestHandler(
-	    CachingDataStoreServerImpl server, long nodeId)
-	{
+	UpdateQueueRequestHandler(UpdateQueueServer server, long nodeId) {
 	    this.server = server;
 	    this.nodeId = nodeId;
 	}
@@ -182,14 +179,19 @@ abstract class UpdateQueueRequest implements Request {
 	@Override
 	public String toString() {
 	    return "Commit[" +
-		"oids:[" + (oids.length == 0 ? "]" : oids[0] + "...]") +
+		"oids:" +
+		(oids == null ? "null" :
+		 oids.length == 0 ? "[]" :
+		 "[" + oids[0] + "...]") +
 		", newOids:" + newOids +
-		", names:[" + (names.length == 0 ? "]" : names[0] + "...]") +
+		", names:" +
+		(names == null ? "null" :
+		 names.length == 0 ? "[]" :
+		 "[" + names[0] + "...]") +
 		"]";
 	}
 
-	void performRequest(
-	    CachingDataStoreServerImpl server, long nodeId)
+	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.commit(nodeId, oids, oidValues, newOids, names, nameValues);
@@ -223,7 +225,7 @@ abstract class UpdateQueueRequest implements Request {
 	    return "EvictObject[oid:" + oid + "]";
 	}
 
-	void performRequest(CachingDataStoreServerImpl server, long nodeId)
+	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.evictObject(nodeId, oid);
@@ -253,7 +255,7 @@ abstract class UpdateQueueRequest implements Request {
 	    return "DowngradeObject[oid:" + oid + "]";
 	}
 
-	void performRequest(CachingDataStoreServerImpl server, long nodeId) 
+	void performRequest(UpdateQueueServer server, long nodeId) 
 	    throws CacheConsistencyException
 	{
 	    server.downgradeObject(nodeId, oid);
@@ -283,7 +285,7 @@ abstract class UpdateQueueRequest implements Request {
 	    return "EvictBinding[name:" + name + "]";
 	}
 
-	void performRequest(CachingDataStoreServerImpl server, long nodeId)
+	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.evictBinding(nodeId, name);
@@ -313,7 +315,7 @@ abstract class UpdateQueueRequest implements Request {
 	    return "DowngradeBinding[name:" + name + "]";
 	}
 
-	void performRequest(CachingDataStoreServerImpl server, long nodeId)
+	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.downgradeBinding(nodeId, name);

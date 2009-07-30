@@ -281,7 +281,8 @@ class Cache {
      * @param	entry the new cache entry
      */
     void addReservedBindingEntry(BindingCacheEntry entry) {
-	assert !bindingMap.containsKey(entry.key);
+	assert !bindingMap.containsKey(entry.key)
+	    : "Entry already in cache: " + entry;
 	bindingCount.incrementAndGet();
 	bindingMap.put(entry.key, entry);
     }

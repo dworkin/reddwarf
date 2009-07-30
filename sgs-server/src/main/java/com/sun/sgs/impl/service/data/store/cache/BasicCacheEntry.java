@@ -435,6 +435,23 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * Sets this entry's state to {@link State#CACHED_WRITE} when it was
+     * upgraded because it was the next binding after an entry being
+     * successfully removed, and notifies the associated lock, which should be
+     * held.
+     *
+     * @param	lock the associated lock
+     * @throws	IllegalStateException if the entry's current state is not
+     *		{@link State#CACHED_READ}
+     */
+    void setUpgradedImmediate(Object lock) {
+	assert Thread.holdsLock(lock);
+	verifyState(State.CACHED_READ);
+	state = State.CACHED_WRITE;
+	lock.notifyAll();
+    }
+
+    /**
+     * Sets this entry's state to {@link State#CACHED_WRITE} when it was
      * modified, for use at the end of a transaction.
      *
      * @throws	IllegalStateException if the current state is not {@link
