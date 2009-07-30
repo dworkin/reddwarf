@@ -24,6 +24,7 @@
 package com.sun.sgs.management;
 
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.Node;
 /**
  * The management interface for the client session service.
  * <p>
@@ -43,7 +44,35 @@ public interface ClientSessionServiceMXBean {
     // of connects/disconnects?
     // number of channels a client is connected to
     // amount of communications traffic this client sends/receives?
-    
+
+    /**
+     * Gets the health of the service.
+     *
+     * @return health
+     */
+    Node.Health getSessionServiceHealth();
+
+    /**
+     * Gets the number of clients logged into the session service.
+     *
+     * @return the number of clients logged in
+     */
+    int getNumClients();
+
+    /**
+     * Gets the login high water.
+     *
+     * @return the login high water
+     */
+    int getLoginHighWater();
+
+    /**
+     * Sets the login high water.
+     *
+     * @param highWater
+     */
+    void setLoginHighWater(int highWater);
+
     /**
      * Returns the number of times {@link 
      * ClientSessionService#addSessionStatusListener

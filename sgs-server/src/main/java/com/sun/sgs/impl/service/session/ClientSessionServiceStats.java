@@ -27,6 +27,7 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.service.Node;
 
 /**
  * The Statistics MBean object for the client session service.
@@ -35,8 +36,13 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
 
     final ProfileOperation addSessionStatusListenerOp;
     final ProfileOperation getSessionProtocolOp;
-    
-    ClientSessionServiceStats(ProfileCollector collector) {
+
+    private final ClientSessionServiceImpl service;
+
+    ClientSessionServiceStats(ProfileCollector collector,
+                              ClientSessionServiceImpl service)
+    {
+        this.service = service;
         ProfileConsumer consumer = 
             collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
                                   "ClientSessionService");
@@ -60,5 +66,25 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
     public long getGetSessionProtocolCalls() {
         return ((AggregateProfileOperation) 
                     getSessionProtocolOp).getCount();
+    }
+
+    @Override
+    public Node.Health getSessionServiceHealth() {
+        return service.getHealth();
+    }
+
+    @Override
+    public int getNumClients() {
+        return service.getNumSessions();
+    }
+
+    @Override
+    public int getLoginHighWater() {
+        return service.getLoginHighWater();
+    }
+
+    @Override
+    public void setLoginHighWater(int highWater) {
+        service.setLoginHighWater(highWater);
     }
 }

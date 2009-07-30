@@ -28,6 +28,7 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.service.Node.Health;
 
 /**
  *
@@ -127,5 +128,20 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     /** {@inheritDoc} */
     public NodeInfo getStatusInfo() {
         return watchdog.getNodeStatusInfo();
+    }
+
+    @Override
+    public Health getNodeHealth() {
+        return watchdog.getHealth();
+    }
+
+    @Override
+    public void setNodeHealth(Health health) {
+        watchdog.reportHealth(watchdog.localNodeId, health, "console");
+    }
+
+    @Override
+    public String getReportingComponent() {
+        return watchdog.getReportingComponent();
     }
 }

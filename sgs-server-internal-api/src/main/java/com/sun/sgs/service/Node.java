@@ -34,27 +34,49 @@ public interface Node {
      */
     enum Health {
 
+
         /**
-         * The node is operating normally and is available for additional work.
+         * The component is operating normally and is available for additional
+         * work.
          */
         GREEN,
 
         /**
-         * The node is operating normally but is not available for additional
-         * work.
+         * The component is operating normally but is not available for
+         * additional work.
          */
         YELLOW,
 
         /**
-         * The node is operational, but is in need of attention such as
+         * The component is operational, but is in need of attention such as
          * offloading some of its work.
          */
         ORANGE,
 
         /**
-         * The node has failed, been shutdown, or its state is unknown.
+         * The component has failed, been shutdown, or its state is unknown.
          */
-        RED
+        RED;
+
+        /**
+         * Returns true if the this health is worse then the specified health.
+         *
+         * @param health a health object to compare
+         *
+         * @return true if this health is worse than the specified health
+         */
+        public boolean worseThan(Health health) {
+            return compareTo(health) > 0;
+        }
+
+        /**
+         * Returns true if this health represents an operational state.
+         *
+         * @return true if this health represents an operational state
+         */
+        public boolean isAlive() {
+            return !equals(Health.RED);
+        }
     }
 
     /**

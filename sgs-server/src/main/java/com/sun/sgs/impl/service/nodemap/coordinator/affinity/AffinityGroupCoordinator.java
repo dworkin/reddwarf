@@ -22,14 +22,20 @@ package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.management.GroupCoordinatorMXBean;
+import com.sun.sgs.management.GroupCoordinatorMXBean.GroupInfo;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.TreeSet;
+import javax.management.JMException;
 
 /**
  * Implementation of an group coordinator. This coordinator manages groups
@@ -61,6 +67,17 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
         // TODO - set by property
         finder = new UserGroupFinderServerImpl(properties, this,
                                                systemRegistry, txnProxy);
+
+        // create our profiling info and register our MBean
+        ProfileCollector collector =
+            systemRegistry.getComponent(ProfileCollector.class);
+        try {
+            collector.registerMBean(new AffinityGroupCoordinatorMXBean(),
+                                    GroupCoordinatorMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            e.printStackTrace();
+//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
     }
 
     @Override
@@ -126,5 +143,43 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
         }
         System.out.println("adding " + group);
         groupSet.add(group);
+    }
+
+    private class AffinityGroupCoordinatorMXBean
+            implements GroupCoordinatorMXBean
+    {
+
+        @Override
+        public int getNumGroups() {
+            return groups.size();
+        }
+
+        @Override
+        public List<GroupInfo> getGroups(long nodeId) {
+            NavigableSet<AffinityGroup> groupSet = groups.get(nodeId);
+            List<GroupInfo> groupInfoList =
+                                     new ArrayList<GroupInfo>(groupSet.size());
+
+            // TODO CME potential here
+            for (AffinityGroup group : groupSet) {
+                groupInfoList.add(group.getGroupInfo());
+            }
+            return groupInfoList;
+        }
+
+        @Override
+        public boolean isRunning() {
+            return true;
+        }
+
+        @Override
+        public void start() {
+            AffinityGroupCoordinator.this.start();
+        }
+
+        @Override
+        public void stop() {
+            AffinityGroupCoordinator.this.stop();
+        }
     }
 }

@@ -392,7 +392,7 @@ class NodeImpl
     NodeInfo getNodeInfo() {
         return new NodeInfo(getHostName(),
                             getId(),
-                            isAlive(),
+                            getHealth(),
                             getBackupId(),
                             getJmxPort());
     }

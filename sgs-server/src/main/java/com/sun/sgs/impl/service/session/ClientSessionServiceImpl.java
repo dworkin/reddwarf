@@ -314,7 +314,7 @@ public final class ClientSessionServiceImpl
     final boolean allowNewLogin;
 
     private Health health = Health.GREEN;
-    private final int loginHighWater;
+    private int loginHighWater;
 
     /** Our JMX exposed statistics. */
     final ClientSessionServiceStats serviceStats;
@@ -431,7 +431,7 @@ public final class ClientSessionServiceImpl
             /* Create our service profiling info and register our MBean */
             ProfileCollector collector = 
 		systemRegistry.getComponent(ProfileCollector.class);
-            serviceStats = new ClientSessionServiceStats(collector);
+            serviceStats = new ClientSessionServiceStats(collector, this);
             try {
                 collector.registerMBean(serviceStats,
                                         ClientSessionServiceStats.MXBEAN_NAME);
@@ -1295,7 +1295,24 @@ public final class ClientSessionServiceImpl
         }
     }
 
-    private synchronized void setHealth(Health newHealth) {
+    int getNumSessions() {
+        return handlers.size();
+    }
+
+    int getLoginHighWater() {
+        return loginHighWater;
+    }
+
+    void setLoginHighWater(int highWater) {
+        loginHighWater = highWater;
+        checkHighWater();
+    }
+
+    Health getHealth() {
+        return health;
+    }
+
+    synchronized void setHealth(Health newHealth) {
         if (newHealth == health) return;
         this.health = newHealth;
 

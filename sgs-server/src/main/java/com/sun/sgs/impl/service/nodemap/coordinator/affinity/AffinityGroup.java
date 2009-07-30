@@ -21,8 +21,11 @@ package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
+import com.sun.sgs.management.GroupCoordinatorMXBean.GroupInfo;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,6 +42,8 @@ import java.util.Set;
 class AffinityGroup implements Comparable {
 
     private final long agid;
+
+    // Map Identity -> nodeId
     private final Map<Identity, Long> identities =
                                             new HashMap<Identity, Long>();
 
@@ -116,6 +121,9 @@ class AffinityGroup implements Comparable {
         }
     }
 
+    // TODO - this only works if add() is not called once this object has been
+    // placed in a map. Really should re-work this so that the identities are
+    // assembled elsewhere and passed to this constructor.
     @Override
     public int compareTo(Object obj) {
         if (obj == null) {
@@ -123,7 +131,7 @@ class AffinityGroup implements Comparable {
         }
         if (this.equals(obj)) return 0;
 
-        // Sorting is based on the number of identities.
+        // Sorting is based on the number of identities. (size of group)
         return identities.size() <
                               ((AffinityGroup)obj).identities.size() ? -1 : 1;
     }
@@ -132,5 +140,50 @@ class AffinityGroup implements Comparable {
     public String toString() {
         return "AffinityGroup: " + agid + " targetNodeId: " + targetNodeId +
                " #identities: " + identities.size();
+    }
+
+    /**
+     * Get a group info object for this group.
+     *
+     * @return a group info object for this group
+     */
+    GroupInfo getGroupInfo() {
+        return new GroupInfoImpl(agid, targetNodeId, identities.keySet());
+    }
+
+    /**
+     * Wrapper class for group information.
+     */
+    private static class GroupInfoImpl implements GroupInfo {
+
+        private final long groupId;
+        private final long nodeId;
+        private final List<String> idNames;
+
+        GroupInfoImpl(long groupId, long nodeId, Set<Identity> identities) {
+            this.groupId = groupId;
+            this.nodeId = nodeId;
+            this.idNames = new ArrayList<String>(identities.size());
+
+            // TODO - CME potential
+            for (Identity identity : identities) {
+                idNames.add(identity.getName());
+            }
+        }
+
+        @Override
+        public long getGroupId() {
+            return groupId;
+        }
+
+        @Override
+        public long getTargetNodeId() {
+            return nodeId;
+        }
+
+        @Override
+        public List<String> getIdentities() {
+            return idNames;
+        }
     }
 }

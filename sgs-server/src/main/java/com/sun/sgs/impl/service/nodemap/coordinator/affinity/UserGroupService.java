@@ -136,10 +136,10 @@ public final class UserGroupService extends AbstractService {
         System.out.println("made association between " + identity + " and " + groupId);
         associations.put(identity, groupId);
         count++;
-        if ((count % 10) == 0) {
+//        if ((count % 10) == 0) {
             System.out.println("Sending associations");
             taskService.scheduleNonDurableTask(new UpdateServerTask(), false);
-        }
+//        }
     }
 
     private class UpdateServerTask extends AbstractKernelRunnable {
@@ -151,6 +151,7 @@ public final class UserGroupService extends AbstractService {
         @Override
         public void run() throws Exception {
             try {
+                System.out.println("Sending "+ associations.size() + " associations");
                 server.associations(associations, nodeId);
             } catch (IOException ex) {
                 logger.logThrow(Level.SEVERE, ex, "Exception calling server");

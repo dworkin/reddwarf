@@ -240,8 +240,9 @@ public final class WatchdogServiceImpl
     /** The lock for {@code isAlive} field. */
     private final Object lock = new Object();
 
-    /** The set of health reports for this node. The actual health of this
-     * node is the lowest (worse) condition reported, or GREEN is no
+    /**
+     * The set of health reports for this node by component. The actual health
+     * of this node is the lowest (worse) condition reported, or GREEN is no
      * reports exits.
      */
     private final Map<String, Health> healthReports =
@@ -252,6 +253,11 @@ public final class WatchdogServiceImpl
      * by {@code lock}.
      */
     private Health health = Health.GREEN;
+
+    /**
+     * The last component to report a non-GREEN health.
+     */
+    private String reportingComponent = null;
     
     /** Our profiled data */
     private final WatchdogServiceStats serviceStats;
@@ -470,7 +476,7 @@ public final class WatchdogServiceImpl
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
-        return getLocalNodeHealth() != Health.RED;
+        return getLocalNodeHealth().isAlive();
     }
 
     /** {@inheritDoc} */
@@ -530,8 +536,8 @@ public final class WatchdogServiceImpl
     /**
      * {@inheritDoc}
      */
-    public void reportFailure(long nodeId, String className) {
-        reportHealth(nodeId, Health.RED, className);
+    public void reportFailure(long nodeId, String component) {
+        reportHealth(nodeId, Health.RED, component);
     }
 
     /**
@@ -539,17 +545,17 @@ public final class WatchdogServiceImpl
      */
     public synchronized void reportHealth(long nodeId,
                                           Health newHealth,
-                                          String className)
+                                          String component)
     {
-	checkNull("className", className);
+	checkNull("component", component);
 	checkNonTransactionalContext();
 
         boolean isLocal = (nodeId == localNodeId);
 
-        if (logger.isLoggable(Level.FINER) || (newHealth == Health.RED)) {
-            logger.log((newHealth == Health.RED ? Level.WARNING : Level.FINER),
+        if (logger.isLoggable(Level.FINER) || !newHealth.isAlive()) {
+            logger.log((newHealth.isAlive() ? Level.WARNING : Level.FINER),
                        "{1} reported {2} health in {3} node with id: {0}",
-                       nodeId, className, newHealth,
+                       nodeId, component, newHealth,
                        isLocal ? "local" : "remote");
         }
 
@@ -558,24 +564,22 @@ public final class WatchdogServiceImpl
         }
 
         // If the report is for this node, determine the actual (overall) health
-        if (isLocal && (newHealth != Health.RED)) {
+                
+        if (isLocal && newHealth.isAlive()) {
             if (newHealth == Health.GREEN) {
-                healthReports.remove(className);
+                healthReports.remove(component);
             } else {
-                healthReports.put(className, newHealth);
+                healthReports.put(component, newHealth);
             }
 
-            // If the new health is not the worst, find out what is
-            if (newHealth != Health.ORANGE) {
-                for (Health s : healthReports.values()) {
-                    if (s == Health.ORANGE) {
-                        newHealth = s;
-                        break;
-                    } if (s == Health.YELLOW) {
-                        newHealth = s;
-                    }
+            Health actualHealth = Health.GREEN;
+            for (Map.Entry<String, Health> report : healthReports.entrySet()) {
+                if (report.getValue().worseThan(actualHealth)) {
+                    actualHealth = report.getValue();
+                    component = report.getKey();
                 }
             }
+            newHealth = actualHealth;
         }
 
         /*
@@ -586,7 +590,7 @@ public final class WatchdogServiceImpl
         int retries = maxIoAttempts;
         while (retries-- > 0) {
             try {
-                serverProxy.setNodeHealth(nodeId, newHealth, isLocal, className,
+                serverProxy.setNodeHealth(nodeId, newHealth, isLocal, component,
                                           maxIoAttempts);
                 
                 // Watchdog server knows, now inform any listeners
@@ -604,11 +608,11 @@ public final class WatchdogServiceImpl
         }
         
         if (isLocal) {
-            if (newHealth == Health.RED) {
+            if (!newHealth.isAlive()) {
                 // will call setHealth()
-                setFailedThenNotify(true);
+                setFailedThenNotify(true, component);
             } else {
-                setHealth(newHealth);
+                setHealth(newHealth, component);
             }
         }
     }
@@ -714,21 +718,31 @@ public final class WatchdogServiceImpl
      * considered alive.
      */
     private boolean getIsAlive() {
-	return getHealth() != Health.RED;
+	return getHealth().isAlive();
     }
 
     /**
      * Returns the local node health.
      */
-    private Health getHealth() {
+    Health getHealth() {
 	return health;
     }
 
-    private boolean setHealth(Health newHealth) {
+    String getReportingComponent() {
+        return reportingComponent;
+    }
+
+    private boolean setHealth(Health newHealth, String component) {
         if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "Set local health to {0}", newHealth);
+            logger.log(Level.FINER, "Set local health to {0}, reported by {1}",
+                       newHealth, component);
         }
         synchronized (lock) {
+            if (newHealth != Health.GREEN) {
+                reportingComponent = component;
+            } else {
+                reportingComponent = null;
+            }
 	    if (health == newHealth) {
 		return false;
 	    }
@@ -750,7 +764,11 @@ public final class WatchdogServiceImpl
      *		node listeners of this node's failure
      */
     private void setFailedThenNotify(boolean notify) {
-	if (!setHealth(Health.RED)) return;
+        setFailedThenNotify(notify, CLASSNAME);
+    }
+
+    private void setFailedThenNotify(boolean notify, String component) {
+	if (!setHealth(Health.RED, component)) return;
 
 	if (notify) {
 	    Node node = new NodeImpl(localNodeId, localHost, health);
@@ -881,14 +899,14 @@ public final class WatchdogServiceImpl
 		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
-		if (ids[i] == localNodeId && (health[i] != Health.RED)) {
+		if (ids[i] == localNodeId && health[i].isAlive()) {
 		    /* Don't notify the local node that it is alive. */
 		    continue;
 		}
 		Node node =
                         new NodeImpl(ids[i], hosts[i], health[i], backups[i]);
 		notifyNodeListeners(node);
-		if ((health[i] == Health.RED) && backups[i] == localNodeId) {
+		if (!health[i].isAlive() && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
 		}
 	    }
@@ -897,8 +915,8 @@ public final class WatchdogServiceImpl
 	/**
 	 * {@inheritDoc}
 	 */
-	public void reportFailure(String className) {
-	    setFailedThenNotify(true);
+	public void reportFailure(String component) {
+	    setFailedThenNotify(true, component);
 	}
     }
 

@@ -166,15 +166,16 @@ public interface WatchdogService extends Service {
     /**
      * Informs the watchdog of a node's health. Multiple components may report
      * on a node's health. The watchdog will use these reports to determine the
-     * overall node's health. <p>
+     * overall node's health. The {@code component} parameter may be any
+     * identifying string, but is typically the classname of the component.<p>
      *
      * This method must be invoked outside of a transaction.
      *
      * @param nodeId the id of the node
      * @param health the health
-     * @param className the class name of the service reporting health
+     * @param component the name of the component reporting health
      */
-    void reportHealth(long nodeId, Health health, String className);
+    void reportHealth(long nodeId, Health health, String component);
 
     /**
      * Informs the watchdog that a problem has occurred in a service or

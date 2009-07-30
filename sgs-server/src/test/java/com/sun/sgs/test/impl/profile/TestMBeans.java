@@ -42,6 +42,7 @@ import com.sun.sgs.management.WatchdogServiceMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -351,7 +352,7 @@ public class TestMBeans {
         NodeInfo[] nodes = proxy.getNodes();
         for (NodeInfo n : nodes) {
             System.out.println("found node: " + n + n.getId());
-            assertTrue(n.isLive());
+            assertTrue(n.getHealth().isAlive());
         }
         
         assertEquals(1, bean.getNodes().length);
@@ -364,7 +365,7 @@ public class TestMBeans {
         
         for (NodeInfo n : nodes) {
             System.out.println("found node: " + n + n.getId());
-            assertTrue(n.isLive());
+            assertTrue(n.getHealth().isAlive());
         }
         
         // Test notifications
@@ -708,8 +709,8 @@ public class TestMBeans {
         // And to get the data from the CompositeData, we use more 
         // reflection... another argument for clients using proxies.
         assertTrue((Boolean) getStatusInfo.get("live"));
-        assertTrue(proxy.getStatusInfo().isLive());
-        assertTrue(bean.getStatusInfo().isLive());
+        assertTrue(proxy.getStatusInfo().getHealth().isAlive());
+        assertTrue(bean.getStatusInfo().getHealth().isAlive());
         
         // Test one of the APIs
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
