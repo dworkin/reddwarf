@@ -929,6 +929,7 @@ public class TestNodeMappingServiceImpl {
 
 	long secondNodeId;
 	Node secondNode;
+	long stop = System.currentTimeMillis() + 1000;
 	
 	do {
 	    // Keep getting identity's node assignment until it changes...
@@ -936,7 +937,8 @@ public class TestNodeMappingServiceImpl {
 	    secondNode = task.getNode();
 	    secondNodeId = secondNode.getId();
 	    
-	} while (secondNodeId == firstNodeId);
+	} while (secondNodeId == firstNodeId &&
+		 System.currentTimeMillis() < stop);
 	
         TestListener secondNodeListener = 
 	    nodeListenerMap.get(secondNodeId);

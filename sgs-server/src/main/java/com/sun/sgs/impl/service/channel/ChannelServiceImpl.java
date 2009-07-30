@@ -1871,9 +1871,13 @@ public final class ChannelServiceImpl
 		localPerSessionChannelsMap.get(sessionRefId);
 	    if (channelSet != null) {
 		channelSet.remove(channelRefId);
+		// TBD: may also need to remove membership binding for new
+		// node due to race condition of leave during relocation.
+		// A leaked binding could be removed during channel send.
 	    }
 
 	    // Send channel leave protocol message.
+	    // TBD: does this need to be sent if the channelSet == null?
 	    SessionProtocol protocol =
 		sessionService.getSessionProtocol(sessionRefId);
 	    if (protocol != null) {

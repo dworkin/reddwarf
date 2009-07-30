@@ -1765,8 +1765,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    sessionNodeId = getNodeId(session);
 			}
 			if (session == null ||
-			    sessionNodeId == oldSessionNodeId) {
-			    getChannel().removeSession(
+			    sessionNodeId == oldSessionNodeId)
+			{
+			    ChannelImpl channel = getChannel();
+			    if (channel == null) {
+				// TBD: still may need to remove membership...
+				return true;
+			    }
+			    
+			    channel.removeSession(
 				oldSessionNodeId, sessionRefId);
 			    return true;
 			} else {
@@ -1804,6 +1811,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			}
 			ChannelImpl channel = getChannel();
 			if (channel == null) {
+			    // TBD: may still need to remove membership...
+			    //  not sure that this is correct return value...
 			    return false;
 			}
 			channel.removeSession(oldSessionNodeId, sessionRefId);
@@ -1912,7 +1921,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		if (server == null) {
 		    // If session's node has changed, then the session is
 		    // relocating, otherwise it is disconnecting.
-		    if (updateSessionNodeId()) {
+		    if (removeMembershipIfRelocating()) {
 			continue; // relocating
 		    } else {
 			break;	// disconnected
@@ -1934,7 +1943,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			break;
 		    } else {
 			// Session is either disconnected or relocating
-			if (updateSessionNodeId()) {
+			if (removeMembershipIfRelocating()) {
 			    continue; // relocating
 			} else {
 			    break; // disconnected
@@ -1943,7 +1952,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    
 		} catch (IOException e) {
 		    if (!channelService.isAlive(sessionNodeId)) {
-			if (updateSessionNodeId()) {
+			if (removeMembershipIfRelocating()) {
 			    continue; // relocating
 			} else {
 			    break; // disconnected
@@ -1969,21 +1978,29 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * the session's node ID is unchanged or the session no longer
 	 * exists.
 	 */
-	private boolean updateSessionNodeId() {
+	private boolean removeMembershipIfRelocating() {
 	    
 	    final long oldSessionNodeId = sessionNodeId;
 	    try {
 		
 	      return channelService.runTransactionalCallable(
- 		new KernelCallable<Boolean>("updateSessionNodeId") {
+ 		new KernelCallable<Boolean>("removeMembershipIfRelocating") {
 		    public Boolean call() {
 			ClientSessionImpl session = getSession();
 			if (session != null) {
 			    sessionNodeId = getNodeId(session);
-			    return oldSessionNodeId != sessionNodeId;
-			} else {
-			    return false;
+			    if (oldSessionNodeId != sessionNodeId) {
+				ChannelImpl channel = getChannel();
+				if (channel == null) {
+				    // TBD: may still need to remove membership...
+				    return true;
+				}
+				channel.removeSession(
+				    sessionNodeId, sessionRefId);
+				return true;
+			    }
 			}
+			return false;
 		    }
 		});
 	    

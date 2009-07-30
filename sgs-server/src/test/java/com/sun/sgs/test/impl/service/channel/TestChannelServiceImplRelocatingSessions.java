@@ -37,7 +37,9 @@ import java.lang.reflect.Proxy;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -49,14 +51,24 @@ import org.junit.runner.RunWith;
 public class TestChannelServiceImplRelocatingSessions
     extends AbstractChannelServiceTest
 {
-    protected List<String> oneUser =
+    private final List<String> oneUser =
 	Arrays.asList(new String[] { "rex" });
 
-    private static volatile boolean holdMethod = false;
-    private static final Object invocationHandlerLock = new Object();
+    private final List<String> noUsers =
+	new ArrayList<String>();
+
+    private static Map<Long, MethodInfo> holdMethodMap =
+	new HashMap<Long, MethodInfo>();
     
     /** Constructs a test instance. */
     public TestChannelServiceImplRelocatingSessions() throws Exception {
+    }
+
+    @Before
+    @Override
+    public void setUp() throws Exception {
+	super.setUp();
+	holdMethodMap.clear();
     }
 
     // -- Relocation test cases --
@@ -95,9 +107,45 @@ public class TestChannelServiceImplRelocatingSessions
 	    // are cleaned up.
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME);
-	    checkUsersJoined(channelName, new ArrayList<String>());
+	    checkUsersJoined(channelName, noUsers);
 	    assertEquals(count - someUsers.size(),
 			 getChannelServiceBindingCount());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
+    @Test
+    @IntegrationTest
+    public void testChannelLeaveAfterRelocate() throws Exception {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	createChannel(channelName);
+	// All clients will log into server node.
+	ClientGroup group = new ClientGroup(oneUser);
+	addNodes("host2");
+	
+	try {
+	    // Join all users to channel and send some messages on channel.
+	    joinUsers(channelName, oneUser);
+	    checkUsersJoined(channelName, oneUser);
+	    
+	    int count = getChannelServiceBindingCount();
+	    sendMessagesToChannel(channelName, group, 2);
+	    
+	    // Move clients to new nodes.
+	    printServiceBindings("before relocate");
+	    DummyClient client = group.getClient(oneUser.get(0));
+	    moveClient(client, serverNode, additionalNodes.get("host2"));
+	    printServiceBindings("after relocate");
+	    
+	    // Make sure all members are still joined and can receive messages.
+	    checkUsersJoined(channelName, oneUser);
+	    leaveUsers(channelName, oneUser);
+	    client.assertLeftChannel(channelName);
+	    checkUsersJoined(channelName, noUsers);
+	    assertEquals(count - 1, getChannelServiceBindingCount());
 	    
 	} finally {
 	    group.disconnect(false);
@@ -143,7 +191,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.
 	    group.disconnect(true);
-	    checkUsersJoined(channelName, new ArrayList<String>());
+	    checkUsersJoined(channelName, noUsers);
 	    printServiceBindings("after disconnect");
 	    assertEquals(count - someUsers.size(),
 			 getChannelServiceBindingCount());
@@ -210,7 +258,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Disconnect each client and make sure that membership/bindings
 	    // are cleaned up.
 	    group.disconnect(true);
-	    checkUsersJoined(channelName, new ArrayList<String>());
+	    checkUsersJoined(channelName, noUsers);
 	    printServiceBindings("after group disconnect");
 	    // The bindings should no longer contain any membership
 	    // bindings for client sessions or the binding for channel
@@ -244,17 +292,13 @@ public class TestChannelServiceImplRelocatingSessions
 	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
 	    SgsTestNode newNode = additionalNodes.get("newNode");
 	    // Hold up joins send to oldNode
-	    wrapChannelServer(oldNode.getNodeId(), "join");
-	    holdMethod = true;
+	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
 	    
 	    moveIdentity(relocatingClient, oldNode, newNode);
 	    Thread.sleep(200);
-	    // Release "join" to oldNode.
-	    synchronized (invocationHandlerLock) {
-		invocationHandlerLock.notifyAll();
-	    }
-	    holdMethod = false;
+	    releaseChannelServerMethodHeld(oldNode);
+	    
 	    // Finish relocation.
 	    relocatingClient.relocate(0, true, true);
 	    
@@ -267,13 +311,58 @@ public class TestChannelServiceImplRelocatingSessions
 	    // are cleaned up.
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME);
-	    checkUsersJoined(channelName, new ArrayList<String>());
+	    checkUsersJoined(channelName, noUsers);
 	    
 	} finally {
 	    group.disconnect(false);
 	}
 	
     }
+    @Test
+    @IntegrationTest
+    public void testChannelLeaveToOldNodeDuringRelocate()
+	throws Exception
+    {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	// channel coordinator is on server node
+	createChannel(channelName); 
+	addNodes("oldNode", "newNode");
+	
+	// Client will log into "oldNode"
+	SgsTestNode oldNode = additionalNodes.get("oldNode");
+	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	
+	try {
+	    // Initiate client relocation to new node.
+	    printServiceBindings("before relocate");
+	    int count = getChannelServiceBindingCount();
+	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    SgsTestNode newNode = additionalNodes.get("newNode");
+	    // Hold up "leave" to oldNode
+	    holdChannelServerMethodToNode(oldNode, "leave");
+	    joinUsers(channelName, oneUser);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    checkUsersJoined(channelName, oneUser);
+	    leaveUsers(channelName, oneUser);
+	    moveIdentity(relocatingClient, oldNode, newNode);
+	    Thread.sleep(200);
+	    releaseChannelServerMethodHeld(oldNode);
+	    
+	    // Finish relocation.
+	    relocatingClient.relocate(0, true, true);
+	    
+	    // Make sure all members are joined and can receive messages.
+	    relocatingClient.assertLeftChannel(channelName);
+	    checkUsersJoined(channelName, noUsers);
+	    printServiceBindings("after leave");
+	    assertEquals(count, getChannelServiceBindingCount());
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
 
     @Test
     @IntegrationTest
@@ -295,17 +384,13 @@ public class TestChannelServiceImplRelocatingSessions
 	    printServiceBindings("before relocate");
 	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
 	    SgsTestNode newNode = additionalNodes.get("newNode");
-	    // Hold up joins send to oldNode
-	    wrapChannelServer(oldNode.getNodeId(), "join");
-	    holdMethod = true;
-	    joinUsers(channelName, oneUser); 
-	    
+	    // Hold up "join" to oldNode
+	    holdChannelServerMethodToNode(oldNode, "join");
+	    joinUsers(channelName, oneUser);
+
 	    moveClient(relocatingClient, oldNode, newNode);
 	    // Release "join" to oldNode.
-	    synchronized (invocationHandlerLock) {
-		invocationHandlerLock.notifyAll();
-	    }
-	    holdMethod = false;
+	    releaseChannelServerMethodHeld(oldNode);
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, oneUser);
@@ -316,12 +401,56 @@ public class TestChannelServiceImplRelocatingSessions
 	    // are cleaned up.
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME);
-	    checkUsersJoined(channelName, new ArrayList<String>());
+	    checkUsersJoined(channelName, noUsers);
 	    
 	} finally {
 	    group.disconnect(false);
 	}
+    }
+    
+    @Test
+    @IntegrationTest
+    public void testChannelLeaveToOldNodeAfterRelocate()
+	throws Exception
+    {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	// channel coordinator is on server node
+	createChannel(channelName); 
+	addNodes("oldNode", "newNode");
 	
+	// Client will log into "oldNode"
+	SgsTestNode oldNode = additionalNodes.get("oldNode");
+	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	
+	try {
+	    // Initiate client relocation to new node.
+	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    // Hold up "leave" to oldNode
+	    holdChannelServerMethodToNode(oldNode, "leave");
+	    joinUsers(channelName, oneUser);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    printServiceBindings("before leave");
+	    SgsTestNode newNode = additionalNodes.get("newNode");
+	    leaveUsers(channelName, oneUser);
+	    printServiceBindings("after leave, but method not released yet");
+	    // Relocate client
+	    moveClient(relocatingClient, oldNode, newNode);
+	    // Make sure client hasn't yet received "leave" notification.
+	    relocatingClient.assertJoinedChannel(channelName);
+	    printServiceBindings("after relocate, but method not released yet");
+	    // Release "leave" to oldNode.
+	    releaseChannelServerMethodHeld(oldNode);
+	    
+	    // Check that relocating client received leave message via new
+	    // node. 
+	    relocatingClient.assertLeftChannel(channelName);
+	    printServiceBindings("after leave released");
+	    checkUsersJoined(channelName, noUsers);
+	    
+	} finally {
+	    group.disconnect(false);
+	}
     }
     
     @Test
@@ -345,18 +474,14 @@ public class TestChannelServiceImplRelocatingSessions
 	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
 	    SgsTestNode newNode1 = additionalNodes.get("newNode1");
 	    // Hold up joins send to oldNode
-	    wrapChannelServer(oldNode.getNodeId(), "join");
-	    holdMethod = true;
+	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
 	    
 	    moveClient(relocatingClient, oldNode, newNode1);
 	    moveClient(relocatingClient, newNode1,
 		       additionalNodes.get("newNode2"));
 	    // Release "join" to oldNode.
-	    synchronized (invocationHandlerLock) {
-		invocationHandlerLock.notifyAll();
-	    }
-	    holdMethod = false;
+	    releaseChannelServerMethodHeld(oldNode);
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, oneUser);
@@ -367,7 +492,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    // are cleaned up.
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME);
-	    checkUsersJoined(channelName, new ArrayList<String>());
+	    checkUsersJoined(channelName, noUsers);
 	    
 	} finally {
 	    group.disconnect(false);
@@ -428,8 +553,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    // are cleaned up.
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME);
-	    checkUsersJoined(channelName1, new ArrayList<String>());	    
-	    checkUsersJoined(channelName2, new ArrayList<String>());
+	    checkUsersJoined(channelName1, noUsers);
+	    checkUsersJoined(channelName2, noUsers);
 	    
 	} finally {
 	    group.disconnect(false);
@@ -471,7 +596,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    // are cleaned up.
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME);
-	    checkUsersJoined(channelName, new ArrayList<String>());
+	    checkUsersJoined(channelName, noUsers);
 	    
 	} finally {
 	    group.disconnect(false);
@@ -556,9 +681,27 @@ public class TestChannelServiceImplRelocatingSessions
 	}
     }
 
-    private void wrapChannelServer(final long nodeId, final String methodName)
+    /**
+     * Prevents the specified ChannelServer method sent from a remote node to
+     * the specified node from reaching the specified node.  Note: this
+     * method must be called before any ChannelServer messages are sent so
+     * that the wrapped channel server is installed before first use (when it
+     * is cached internally).
+     */
+    private void holdChannelServerMethodToNode(
+	SgsTestNode node, final String methodName)
 	throws Exception
     {
+	final long nodeId = node.getNodeId();
+	MethodInfo info = holdMethodMap.get(nodeId);
+	if (info != null) {
+	    // just update method info and return.
+	    info.name = methodName;
+	    info.hold = true;
+	    return;
+	}
+	// Store method info in map, and wrap channel server to hold methods
+	holdMethodMap.put(nodeId, new MethodInfo(methodName));
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    @SuppressWarnings("unchecked")
 	    public void run() throws Exception {
@@ -571,8 +714,8 @@ public class TestChannelServiceImplRelocatingSessions
  		    managedServer.getClass().getDeclaredConstructors()[0];
 		constr.setAccessible(true);
 		ChannelServer channelServer = managedServer.get();
-		NotifyingInvocationHandler handler =
-		    new NotifyingInvocationHandler(channelServer, methodName);
+		ControllableInvocationHandler handler =
+		    new ControllableInvocationHandler(channelServer, nodeId);
 		ChannelServer newServer = (ChannelServer)
 		    Proxy.newProxyInstance(
 			ChannelServer.class.getClassLoader(),
@@ -585,31 +728,51 @@ public class TestChannelServiceImplRelocatingSessions
     }
 
     /**
-     * This invocation handler waits to be notified before invoking a
-     * method (on the underlying instance) whose name is specified
-     * during construction.
+     * Releases the channel server method held to the specified node.
      */
-    private static class NotifyingInvocationHandler
+    private void releaseChannelServerMethodHeld(SgsTestNode node) {
+	MethodInfo info = holdMethodMap.get(node.getNodeId());
+	// Release "join" to oldNode.
+	synchronized (info) {
+	    info.hold = false;
+	    info.notifyAll();
+	}
+    }
+
+    /**
+     * This invocation handler waits to be notified before invoking a
+     * method (on the underlying instance) if the method being invoked
+     * matches the method information currently on record for the node and
+     * the method's "hold" status is true.
+     */
+    private static class ControllableInvocationHandler
 	implements InvocationHandler, Serializable
     {
 	private final static long serialVersionUID = 1L;
 	private final Object obj;
-	private final String methodName;
+	private final long nodeId;
 	
-	NotifyingInvocationHandler(Object obj, String methodName) {
+	ControllableInvocationHandler(Object obj, long nodeId) {
 	    this.obj = obj;
-	    this.methodName = methodName;
+	    this.nodeId = nodeId;
 	}
 	
 	public Object invoke(Object proxy, Method method, Object[] args)
 	    throws Exception
 	{
-	    if (holdMethod && method.getName().equals(methodName)) {
-		synchronized (invocationHandlerLock) {
+	    MethodInfo info = holdMethodMap.get(nodeId);
+	    synchronized (info) {
+		if (info.hold && method.getName().equals(info.name)) {
 		    try {
-			invocationHandlerLock.wait();
+			System.err.println(
+			    ">>HOLD method: " + info.name +
+			    " to node: " + nodeId);
+			info.wait();
 		    } catch (InterruptedException e) {
 		    }
+		    System.err.println(
+			">>RELEASE method: " + info.name +
+			" to node: " + nodeId);
 		}
 	    }
 		    
@@ -626,6 +789,21 @@ public class TestChannelServiceImplRelocatingSessions
 			"Unexpected exception:" + cause, cause);
 		}
 	    }
+	}
+    }
+
+    /**
+     * Method information used to hold and release methods invoked on a
+     * ChannelServer. If a method is being held, the instance can be used as
+     * the lock to wait for notification. The instance is also used as a lock
+     * to notify when the method is released.
+     */
+    private static class MethodInfo {
+	volatile String name;
+	volatile boolean hold = true;
+
+	MethodInfo(String name) {
+	    this.name = name;
 	}
     }
 }
