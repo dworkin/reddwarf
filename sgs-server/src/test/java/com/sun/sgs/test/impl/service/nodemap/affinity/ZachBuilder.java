@@ -27,6 +27,7 @@ import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.Assert;
 
 /**
@@ -143,7 +144,9 @@ class ZachBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Long, Map<Object, Integer>> getConflictMap() {
+    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            getConflictMap()
+    {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

@@ -33,6 +33,7 @@ import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import junit.framework.Assert;
 import org.junit.Test;
 
@@ -222,7 +223,9 @@ public class TestGraphs {
         }
 
         /** {@inheritDoc} */
-        public Map<Long, Map<Object, Integer>> getConflictMap() {
+        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+                getConflictMap() 
+        {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 

@@ -288,7 +288,7 @@ public class TestLPA {
 
     private void printNodeConflictMap(LabelPropagation lp) {
         
-        for (Map.Entry<Long, Map<Object, Integer>> entry :
+        for (Map.Entry<Long, ConcurrentHashMap<Object, Integer>> entry :
              lp.getNodeConflictMap().entrySet())
         {
             StringBuilder sb1 = new StringBuilder();
@@ -325,13 +325,15 @@ public class TestLPA {
         Set<Integer> obj1Set = labels.get("obj1");
         assertEquals(2, obj1Set.size());
         for (Integer label : obj1Set) {
-            assertTrue(label.equals(id1.getName().hashCode()) ||
-                       label.equals(id2.getName().hashCode()));
+            assertTrue(label.equals(1) || label.equals(2));
+//            assertTrue(label.equals(id1.getName().hashCode()) ||
+//                       label.equals(id2.getName().hashCode()));
         }
         Set<Integer> obj2Set = labels.get("obj2");
         assertEquals(1, obj2Set.size());
         for (Integer label : obj2Set) {
-            assertTrue(label.equals(id2.getName().hashCode()));
+            assertTrue(label.equals(2));
+//            assertTrue(label.equals(id2.getName().hashCode()));
         }
     }
 
@@ -354,7 +356,7 @@ public class TestLPA {
 
     @Test
     public void testLPADistributedZach() throws Exception {
-        int RUNS = 1;
+        int RUNS = 500;
         int port = nextUniquePort.get();
         LabelPropagation lp1 =
             new LabelPropagation(
@@ -478,7 +480,9 @@ public class TestLPA {
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements GraphBuilder {
         private final Graph<LabelVertex, WeightedEdge> graph;
-        private final Map<Long, Map<Object, Integer>> conflictMap;
+        private final 
+            ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            conflictMap;
         private final Map<Object, Map<Identity, Integer>> objUseMap;
 
         static final long NODE1 = 1;
@@ -496,7 +500,8 @@ public class TestLPA {
             super();
             graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Integer>>();
-            conflictMap = new ConcurrentHashMap<Long, Map<Object, Integer>>();
+            conflictMap = new ConcurrentHashMap<Long, 
+                                    ConcurrentHashMap<Object, Integer>>();
 
             if (node == NODE1) {
                 // Create a partial graph
@@ -520,10 +525,11 @@ public class TestLPA {
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                ConcurrentHashMap<Object, Integer> conflict =
+                        new ConcurrentHashMap<Object, Integer>();
                 conflict.put("obj1", 1);
                 conflictMap.put(NODE2, conflict);
-                conflict = new HashMap<Object, Integer>();
+                conflict = new ConcurrentHashMap<Object, Integer>();
                 conflict.put("obj2", 1);
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
@@ -539,7 +545,8 @@ public class TestLPA {
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                ConcurrentHashMap<Object, Integer> conflict =
+                        new ConcurrentHashMap<Object, Integer>();
                 conflict.put("obj1", 1);
                 conflictMap.put(NODE1, conflict);
             } else if (node == NODE3) {
@@ -578,7 +585,9 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Long, Map<Object, Integer>> getConflictMap() {
+        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+                getConflictMap()
+        {
             return conflictMap;
         }
 
@@ -596,7 +605,9 @@ public class TestLPA {
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
     private class DistributedZachBuilder implements GraphBuilder {
         private final Graph<LabelVertex, WeightedEdge> graph;
-        private final Map<Long, Map<Object, Integer>> conflictMap;
+        private final 
+            ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            conflictMap;
         private final Map<Object, Map<Identity, Integer>> objUseMap;
 
         static final long NODE1 = 1;
@@ -613,7 +624,8 @@ public class TestLPA {
             super();
             graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Integer>>();
-            conflictMap = new ConcurrentHashMap<Long, Map<Object, Integer>>();
+            conflictMap = new ConcurrentHashMap<Long,
+                                    ConcurrentHashMap<Object, Integer>>();
             LabelVertex[] nodes = new LabelVertex[35];
             DummyIdentity[] idents = new DummyIdentity[35];
             int nodeAsInt = (int) node;
@@ -772,7 +784,8 @@ public class TestLPA {
  
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                ConcurrentHashMap<Object, Integer> conflict =
+                        new ConcurrentHashMap<Object, Integer>();
                 conflict.put("o1", 1);
                 conflict.put("o2", 1);
                 conflict.put("o18", 1);
@@ -781,7 +794,7 @@ public class TestLPA {
                 conflict.put("o45", 1);
                 conflict.put("o47", 1);
                 conflictMap.put(NODE2, conflict);
-                conflict = new HashMap<Object, Integer>();
+                conflict = new ConcurrentHashMap<Object, Integer>();
                 conflict.put("o1", 1);
                 conflict.put("o5", 1);
                 conflict.put("o7", 1);
@@ -885,7 +898,8 @@ public class TestLPA {
 
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                ConcurrentHashMap<Object, Integer> conflict =
+                        new ConcurrentHashMap<Object, Integer>();
                 conflict.put("o2", 1);
                 conflict.put("o8", 1);
                 conflict.put("o15", 1);
@@ -895,7 +909,7 @@ public class TestLPA {
                 conflict.put("o51", 1);
                 conflict.put("o53", 1);
                 conflictMap.put(NODE1, conflict);
-                conflict = new HashMap<Object, Integer>();
+                conflict = new ConcurrentHashMap<Object, Integer>();
                 conflict.put("o1", 1);
                 conflict.put("o10", 1);
                 conflict.put("o14", 1);
@@ -1012,7 +1026,8 @@ public class TestLPA {
 
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                Map<Object, Integer> conflict = new HashMap<Object, Integer>();
+                ConcurrentHashMap<Object, Integer> conflict =
+                        new ConcurrentHashMap<Object, Integer>();
                 conflict.put("o3", 1);
                 conflict.put("o4", 1);
                 conflict.put("o12", 1);
@@ -1022,7 +1037,7 @@ public class TestLPA {
                 conflict.put("o31", 1);
                 conflict.put("o52", 1);
                 conflictMap.put(NODE1, conflict);
-                conflict = new HashMap<Object, Integer>();
+                conflict = new ConcurrentHashMap<Object, Integer>();
                 conflict.put("o17", 1);
                 conflict.put("o26", 1);
                 conflict.put("o27", 1);
@@ -1043,7 +1058,9 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Long, Map<Object, Integer>> getConflictMap() {
+        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+                getConflictMap()
+        {
             return conflictMap;
         }
 

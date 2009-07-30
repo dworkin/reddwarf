@@ -58,8 +58,9 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of object to map of remote nodes it was accessed on, with a weight
     // for each node.
-    private final Map<Long, Map<Object, Integer>> conflictMap =
-            new ConcurrentHashMap<Long, Map<Object, Integer>>();
+    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+        conflictMap =
+            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -233,7 +234,9 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Long, Map<Object, Integer>> getConflictMap() {
+    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            getConflictMap()
+    {
         return conflictMap;
     }
 
@@ -253,7 +256,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        Map<Object, Integer> objMap = conflictMap.get(nodeId);
+        ConcurrentHashMap<Object, Integer> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
             objMap = new ConcurrentHashMap<Object, Integer>();
         }

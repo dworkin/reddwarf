@@ -63,6 +63,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     /** The name we export ourselves under. */
     public static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
 
+    public static final int TIMEOUT = 10;  // minutes
+
     // The exporter for this server
     private final Exporter<LPAServer> exporter;
     
@@ -361,8 +363,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     
     private void waitOnLatch() {
         try {
-            // Completely arbitrary timeout!
-            latch.await(10, TimeUnit.MINUTES);
+            latch.await(TIMEOUT, TimeUnit.MINUTES);
         } catch (InterruptedException ex) {
             failed = true;
         }

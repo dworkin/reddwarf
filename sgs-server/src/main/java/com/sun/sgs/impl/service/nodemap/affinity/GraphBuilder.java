@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Graph builder interface.  Graph builder objects take task access information
@@ -118,5 +119,6 @@ public interface GraphBuilder {
      * 
      * @return the map of detected cross node data conflicts
      */
-    Map<Long, Map<Object, Integer>> getConflictMap();
+    ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            getConflictMap();
 }

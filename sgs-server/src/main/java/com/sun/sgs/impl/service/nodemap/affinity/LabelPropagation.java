@@ -106,22 +106,24 @@ public class LabelPropagation implements LPAClient {
     private double modularity;
 
     // The graph in which we're finding communities.  This is a live
-    // graph.
-    private Graph<LabelVertex, WeightedEdge> graph;
+    // graph for some graph builders;  we have to be able to handle changes.
+    private volatile Graph<LabelVertex, WeightedEdge> graph;
+
     // For now, we're only grabbing the vertices of interest at the
     // start of the algorithm.  This will change. JANE
-    private List<LabelVertex> vertices;
+    private volatile List<LabelVertex> vertices;
 
     // The map of conflicts in the system. 
     // Weights?
     // nodeid-> objectid, weight
     // public for testing for now
-    private Map<Long, Map<Object, Integer>> nodeConflictMap =
-                new ConcurrentHashMap<Long, Map<Object, Integer>>();
+    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+        nodeConflictMap =
+            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>();
 
     // Map identity -> label and weight
     // This sums all uses of that identity on other nodes
-    private Map<Identity, Map<Integer, Integer>> remoteLabelMap =
+    private final Map<Identity, Map<Integer, Integer>> remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Integer>>();
 
     /**
@@ -207,6 +209,7 @@ public class LabelPropagation implements LPAClient {
             // signal that it needs to be initialized.
             nodeConflictMap.clear();
             remoteLabelMap.clear();
+            vertices = null;
         }
         logger.log(Level.FINEST, "{0}: returning {1} groups",
                    localNodeId, groups.size());
@@ -228,12 +231,9 @@ public class LabelPropagation implements LPAClient {
         // Now, go through the new map, and tell each vertex about the
         // edges we might have in common.
         assert (nodeConflictMap != null);
-        for (Map.Entry<Long, Map<Object, Integer>> entry : 
+        for (Map.Entry<Long, ConcurrentHashMap<Object, Integer>> entry :
              nodeConflictMap.entrySet())
         {
-            // JANE is it safe to make a remote call from a remote call?
-            // Are there any timing errors or deadlock conditions I should
-            // think about?
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
             // Tell the other vertex about the conflicts we know of.
@@ -343,7 +343,7 @@ public class LabelPropagation implements LPAClient {
                 for (final LabelVertex vertex : vertices) {
                     tasks.add(new Callable<Void>() {
                         public Void call() {
-                            abool.set(setMostFrequentLabel(vertex) ||
+                            abool.set(setMostFrequentLabel(vertex, false) ||
                                       abool.get());
                             return null;
                         }
@@ -363,7 +363,7 @@ public class LabelPropagation implements LPAClient {
 
             } else {
                 for (LabelVertex vertex : vertices) {
-                    changed = setMostFrequentLabel(vertex) || changed;
+                    changed = setMostFrequentLabel(vertex, false) || changed;
                 }
             }
 
@@ -400,9 +400,13 @@ public class LabelPropagation implements LPAClient {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Set<Integer>> getRemoteLabels(Collection<Object> objIds) 
+    public Map<Object, Set<Integer>> getRemoteLabels(Collection<Object> objIds)
             throws IOException
     {
+        if (vertices == null) {
+            // We can be called before our own initialization is done
+            initializeLPARun();
+        }
         Map<Object, Set<Integer>> retMap = new HashMap<Object, Set<Integer>>();
         if (objIds == null) {
             // This is unexpected;  the other node should have passed in an
@@ -460,12 +464,9 @@ public class LabelPropagation implements LPAClient {
 
         // Now, go through the new map, asking for its labels
         assert (nodeConflictMap != null);
-        for (Map.Entry<Long, Map<Object, Integer>> entry :
+        for (Map.Entry<Long, ConcurrentHashMap<Object, Integer>> entry :
              nodeConflictMap.entrySet())
         {
-            // JANE is it safe to make a remote call from a remote call?
-            // Are there any timing errors or deadlock conditions I should
-            // think about?
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
             if (proxy == null) {
@@ -577,7 +578,7 @@ public class LabelPropagation implements LPAClient {
                 for (final LabelVertex vertex : vertices) {
                     tasks.add(new Callable<Void>() {
                         public Void call() {
-                            abool.set(setMostFrequentLabel(vertex) ||
+                            abool.set(setMostFrequentLabel(vertex, true) ||
                                       abool.get());
                             return null;
                         }
@@ -597,7 +598,7 @@ public class LabelPropagation implements LPAClient {
 
             } else {
                 for (LabelVertex vertex : vertices) {
-                    changed = setMostFrequentLabel(vertex) || changed;
+                    changed = setMostFrequentLabel(vertex, true) || changed;
                 }
             }
 
@@ -676,7 +677,13 @@ public class LabelPropagation implements LPAClient {
      * Initialize ourselves for a run of the algorithm.
      * This is public for testing.
      */
-    public void initializeLPARun() {
+    public synchronized void initializeLPARun() {
+        if (vertices != null) {
+            // Someone beat us to it
+            return;
+        }
+        logger.log(Level.FINEST,
+                "{0}: initializing LPA run", localNodeId);
         // Grab the graph (the weighted graph builder returns a pointer
         // to the live graph) and a snapshot of the vertices.
         graph = builder.getAffinityGraph();
@@ -692,6 +699,9 @@ public class LabelPropagation implements LPAClient {
         } else {
             vertices = new ArrayList<LabelVertex>(graphVertices);
         }
+        logger.log(Level.FINEST, "{0}: vertices is {1}", localNodeId, vertices);
+        logger.log(Level.FINEST,
+                "{0}: finished initializing LPA run", localNodeId);
     }
 
     /**
@@ -707,9 +717,7 @@ public class LabelPropagation implements LPAClient {
         }
 
         // Get conflict information from the graph builder.
-        nodeConflictMap = 
-            new ConcurrentHashMap<Long, Map<Object, Integer>>(
-                builder.getConflictMap());
+        nodeConflictMap.putAll(builder.getConflictMap());
         logger.log(Level.FINEST,
                 "{0}: initialized node conflict map", localNodeId);
         printNodeConflictMap();
@@ -724,7 +732,8 @@ public class LabelPropagation implements LPAClient {
         }
         /// hmmm... this is just an update conflict information without the
         // prune stuff...
-        Map<Object, Integer> conflicts = nodeConflictMap.get(nodeId);
+        ConcurrentHashMap<Object, Integer> conflicts =
+                nodeConflictMap.get(nodeId);
         if (conflicts == null) {
             conflicts = new ConcurrentHashMap<Object, Integer>();
         }
@@ -744,10 +753,12 @@ public class LabelPropagation implements LPAClient {
      * label changed.
      *
      * @param vertex a vertex in the graph
+     * @param self {@code true} if we should pick our own label if it is
+     *             in the set of highest labels
      * @return {@code true} if {@code vertex}'s label is changed, {@code false}
      *        if it is not changed
      */
-    private boolean setMostFrequentLabel(LabelVertex vertex) {
+    private boolean setMostFrequentLabel(LabelVertex vertex, boolean self) {
         List<Integer> highestSet = getNeighborCounts(vertex);
 
         // If we got back an empty set, no neighbors were found and we're done.
@@ -756,7 +767,7 @@ public class LabelPropagation implements LPAClient {
         }
         
         // If our current label is in the set of highest labels, we're done.
-        if (highestSet.contains(vertex.getLabel())) {
+        if (self && highestSet.contains(vertex.getLabel())) {
             return false;
         }
 
@@ -907,7 +918,7 @@ public class LabelPropagation implements LPAClient {
         if (!logger.isLoggable(Level.FINEST)) {
             return;
         }
-        for (Map.Entry<Long, Map<Object, Integer>> entry :
+        for (Map.Entry<Long, ConcurrentHashMap<Object, Integer>> entry :
              nodeConflictMap.entrySet())
         {
             StringBuilder sb = new StringBuilder();
@@ -928,7 +939,9 @@ public class LabelPropagation implements LPAClient {
      * Returns the node conflict map.
      * @return the node conflict map.
      */
-    public Map<Long, Map<Object, Integer>> getNodeConflictMap() {
+    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            getNodeConflictMap()
+    {
         return nodeConflictMap;
     }
 }

@@ -69,8 +69,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of nodes to objects that were evicted to go to that node, with a
     // count.
-    private final Map<Long, Map<Object, Integer>> conflictMap =
-            new ConcurrentHashMap<Long, Map<Object, Integer>>();
+    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+        conflictMap =
+            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -193,7 +194,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Long, Map<Object, Integer>> getConflictMap() {
+    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            getConflictMap()
+    {
         return conflictMap;
     }
 
@@ -209,7 +212,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        Map<Object, Integer> objMap = conflictMap.get(nodeId);
+        ConcurrentHashMap<Object, Integer> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
             objMap = new ConcurrentHashMap<Object, Integer>();
         }
