@@ -1284,6 +1284,7 @@ public class TestDataStoreImpl extends Assert {
 	    System.err.println("txn: " + e);
 	    txn = null;
 	} catch (Exception e) {
+	    e.printStackTrace();
 	    fail("Unexpected exception: " + e);
 	} finally {
 	    flag2.release();

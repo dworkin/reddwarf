@@ -48,7 +48,7 @@ class TxnContext {
      * A list of the bindings modified in this transaction and their previous
      * values, or {@code null} if no bindings have been modified.
      */
-    private List<SavedValue<BindingKey, Long>> modifiedBindings = null;
+    private List<SavedBindingValue> modifiedBindings = null;
 
     /** Whether the transaction has been prepared. */
     private boolean prepared;
@@ -144,17 +144,19 @@ class TxnContext {
 	    for (SavedValue<Long, byte[]> saved : modifiedObjects) {
 		synchronized (cache.getObjectLock(saved.key)) {
 		    ObjectCacheEntry entry = cache.getObjectEntry(saved.key);
-		    entry.setValue(saved.value);
+		    entry.setValue(saved.restoreValue);
 		    entry.setNotModified();
 		}
 	    }
 	}
 	if (modifiedBindings != null) {
-	    for (SavedValue<BindingKey, Long> saved : modifiedBindings) {
+	    for (SavedBindingValue saved : modifiedBindings) {
 		synchronized (cache.getBindingLock(saved.key)) {
 		    BindingCacheEntry entry = cache.getBindingEntry(saved.key);
-		    entry.setValue(saved.value);
+		    entry.setValue(saved.restoreValue);
 		    entry.setNotModified();
+		    entry.setPreviousKey(saved.restorePreviousKey,
+					 saved.restorePreviousKeyUnbound);
 		}
 	    }
 	}
@@ -321,7 +323,8 @@ class TxnContext {
 	    if (modifiedObjects == null) {
 		modifiedObjects = new LinkedList<SavedValue<Long, byte[]>>();
 	    }
-	    SavedValue<Long, byte[]> saved = SavedValue.create(entry);
+	    SavedValue<Long, byte[]> saved =
+		new SavedValue<Long, byte[]>(entry);
 	    assert !modifiedObjects.contains(saved);
 	    modifiedObjects.add(saved);
 	    entry.setCachedDirty();
@@ -340,10 +343,9 @@ class TxnContext {
 	assert Thread.holdsLock(store.getCache().getBindingLock(entry.key));
 	if (!entry.getModified() && entry.key != BindingKey.LAST) {
 	    if (modifiedBindings == null) {
-		modifiedBindings =
-		    new LinkedList<SavedValue<BindingKey, Long>>();
+		modifiedBindings = new LinkedList<SavedBindingValue>();
 	    }
-	    SavedValue<BindingKey, Long> saved = SavedValue.create(entry);
+	    SavedBindingValue saved = new SavedBindingValue(entry);
 	    assert !modifiedBindings.contains(saved);
 	    modifiedBindings.add(saved);
 	    entry.setCachedDirty();
@@ -372,7 +374,7 @@ class TxnContext {
 	    for (int pass = 1; pass <= 2; pass++) {
 		boolean includeNew = (pass == 1);
 		for (SavedValue<Long, byte[]> saved : modifiedObjects) {
-		    boolean isNew = (saved.value == null);
+		    boolean isNew = (saved.restoreValue == null);
 		    if (includeNew == isNew) {
 			if (isNew) {
 			    newOids++;
@@ -416,40 +418,28 @@ class TxnContext {
     }
 
     /**
-     * Stores an entry key and the value that was previously cached for that
+     * Stores an entry key and the value that was formerly cached for that
      * entry, for use in commit and abort.
      *
      * @param	<K> the key type
      * @param	<V> the value type
      */
-    private static final class SavedValue<K, V> {
+    private static class SavedValue<K, V> {
 
 	/** The key. */
 	final K key;
 
-	/** The value. */
-	final V value;
-
-	/**
-	 * Creates an instance with the key and value from a cache entry.
-	 *
-	 * @param	<K> the key type
-	 * @param	<V> the value type
-	 * @param	entry the cache entry
-	 * @return	the new instance
-	 */
-	static <K, V> SavedValue<K, V> create(BasicCacheEntry<K, V> entry) {
-	    return new SavedValue<K, V>(entry);
-	}
+	/** The value to restore on abort. */
+	final V restoreValue;
 
 	/**
 	 * Creates an instance with the key and value from a cache entry.
 	 *
 	 * @param	entry the cache entry
 	 */
-	private SavedValue(BasicCacheEntry<K, V> entry) {
+	SavedValue(BasicCacheEntry<K, V> entry) {
 	    key = entry.key;
-	    value = entry.getValue();
+	    restoreValue = entry.getValue();
 	}
 
 	/**
@@ -465,6 +455,32 @@ class TxnContext {
 	@Override
 	public int hashCode() {
 	    return key.hashCode();
+	}
+    }
+
+    /**
+     * Stores a binding entry key, the value that was formerly cached for that
+     * entry, and the formerly cached previous key information, for use in
+     * commit and abort.
+     */
+    private static class SavedBindingValue
+	extends SavedValue<BindingKey, Long>
+    {
+	/** The previous key to restore on abort. */
+	final BindingKey restorePreviousKey;
+
+	/** Whether the previous key was unbound, to restore on abort. */
+	final boolean restorePreviousKeyUnbound;
+
+	/**
+	 * Creates an instance with information from a binding cache entry.
+	 *
+	 * @param	entry the binding cache entry
+	 */
+	SavedBindingValue(BindingCacheEntry entry) {
+	    super(entry);
+	    restorePreviousKey = entry.getPreviousKey();
+	    restorePreviousKeyUnbound = entry.getPreviousKeyUnbound();
 	}
     }
 }

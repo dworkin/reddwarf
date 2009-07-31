@@ -22,13 +22,17 @@ package com.sun.sgs.impl.service.data.store.cache;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.service.TransactionInterruptedException;
 
-/** A cache entry for a name binding. */
+/**
+ * A cache entry for a name binding.  Only the {@link #key} field may be
+ * accessed without holding the associated lock.  For all other fields and
+ * methods, the lock should be held.
+ */
 class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
-     * The earliest previous key such that names between that key and this one
-     * are known to be unbound, else {@code null} if no information about
-     * previous keys is known.
+     * The earliest previous key such that names between that key and this
+     * entry's key are known to be unbound, else {@code null} if no information
+     * about previous keys is known.
      */
     private BindingKey previousKey;
 
@@ -183,6 +187,40 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	return forKey.compareTo(key) < 0 &&
 	    previousKey != null &&
 	    previousKey.compareTo(forKey) <= 0;
+    }
+
+    /**
+     * Returns the earliest previous key such that names between that key and
+     * this entry's key are known to be unbound, else {@code null} if no
+     * information about previous keys is known.
+     *
+     * @return	the previous key or {@code null}
+     */
+    BindingKey getPreviousKey() {
+	return previousKey;
+    }
+
+    /**
+     * Returns whether the name for the key returned by {@link
+     * #getPreviousKey}, if not {@code null}, is known to be unbound.
+     *
+     * @return	whether the previous key is known to be unbound
+     */
+    boolean getPreviousKeyUnbound() {
+	return previousKeyUnbound;
+    }
+
+    /**
+     * Sets information about previous known unbound keys, ignoring any
+     * currently stored information.
+     *
+     * @param	previousKey the new previous key
+     * @param	previousKeyUnbound whether the new previous key is known to be
+     *		unbound
+     */
+    void setPreviousKey(BindingKey previousKey, boolean previousKeyUnbound) {
+	this.previousKey = previousKey;
+	this.previousKeyUnbound = previousKeyUnbound;
     }
 
     /**

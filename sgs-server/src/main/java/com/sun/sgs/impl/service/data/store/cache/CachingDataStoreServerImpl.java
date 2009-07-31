@@ -589,10 +589,14 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		try {
 		    boolean found = (oid == -1) ? cursor.findFirst()
 			: cursor.findNext(encodeLong(oid));
-		    result = (!found) ? null
-			: new NextObjectResults(
-			    decodeLong(cursor.getKey()), cursor.getValue(),
-			    getWaiting(oid, false));
+		    long nextOid = !found ? -1 : decodeLong(cursor.getKey());
+		    if (oid != -1 && oid == nextOid) {
+			found = cursor.findNext(encodeLong(oid));
+			nextOid = !found ? -1 : decodeLong(cursor.getKey());
+		    }
+		    result = !found ? null
+			: new NextObjectResults(nextOid, cursor.getValue(),
+						getWaiting(oid, false));
 		} finally {
 		    cursor.close();
 		}
@@ -625,24 +629,19 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    checkNull("name", name);
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    boolean txnDone = false;
+	    String nextName;
 	    boolean found;
 	    long oid;
 	    try {
-		byte[] encodedName = encodeString(name);
-		byte[] value = namesDb.get(txn, encodedName, false);
-		found = (value != null);
-		if (found) {
-		    oid = decodeLong(value);
-		} else {
-		    DbCursor cursor = namesDb.openCursor(txn);
-		    try {
-			boolean hasNext = cursor.findNext(encodedName);
-			name = hasNext ? decodeString(cursor.getKey()) : null;
-			oid = hasNext ? decodeLong(cursor.getValue()) : -1;
-		    } finally {
-			cursor.close();
-		    }
-		}
+		DbCursor cursor = namesDb.openCursor(txn);
+		try {
+		    boolean hasNext = cursor.findNext(encodeString(name));
+		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
+		    found = hasNext && name.equals(nextName);
+		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		} finally {
+		    cursor.close();
+		} 
 		txnDone = true;
 		txn.commit();
 	    } finally {
@@ -650,11 +649,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    txn.abort();
 		}
 	    }
-	    BindingKey nameKey = BindingKey.getAllowLast(name);
-	    lock(nodeInfo, nameKey, false);
+	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
+	    lock(nodeInfo, nextNameKey, false);
 	    return new GetBindingResults(
-		found, found ? null : name, oid,
-		(oid == -1) ? false : getWaiting(nameKey, false));
+		found, found ? null : nextName, oid,
+		getWaiting(nextNameKey, false));
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -673,32 +672,25 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkNull("name", name);
-	    boolean done = false;
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
 	    String nextName = null;
 	    boolean found;
 	    long oid;
 	    try {
-		byte[] encodedName = encodeString(name);
-		byte[] value = namesDb.get(txn, encodedName, true);
-		found = (value != null);
-		if (found) {
-		    oid = decodeLong(value);
-		} else {
-		    DbCursor cursor = namesDb.openCursor(txn);
-		    try {
-			boolean hasNext = cursor.findNext(encodedName);
-			nextName = (hasNext)
-			    ? decodeString(cursor.getKey()) : null;
-			oid = hasNext ? decodeLong(cursor.getValue()) : -1;
-		    } finally {
-			cursor.close();
-		    }
+		DbCursor cursor = namesDb.openCursor(txn);
+		try {
+		    boolean hasNext = cursor.findNext(encodeString(name));
+		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
+		    found = hasNext && name.equals(nextName);
+		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		} finally {
+		    cursor.close();
 		}
-		done = true;
+		txnDone = true;
 		txn.commit();
 	    } finally {
-		if (!done) {
+		if (!txnDone) {
 		    txn.abort();
 		}
 	    }
@@ -710,8 +702,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    }
 	    return new GetBindingForUpdateResults(
 		found, found ? null : nextName, oid,
-		(oid == -1) ? false : getWaiting(nameKey, true),
-		(oid == -1) ? false : getWaiting(nameKey, false));
+		getWaiting(found ? nameKey : nextNameKey, true),
+		getWaiting(found ? nameKey : nextNameKey, false));
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -731,50 +723,49 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	try {
 	    checkNull("name", name);
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
-	    boolean done = false;
+	    boolean txnDone = false;
 	    String nextName;
 	    long oid;
 	    long nextOid;
 	    try {
-		byte[] encodedName = encodeString(name);
-		byte[] value = namesDb.get(txn, encodedName, true);
-		oid = (value == null) ? -1 : decodeLong(value);
 		DbCursor cursor = namesDb.openCursor(txn);
 		try {
-		    boolean hasNext = cursor.findNext(encodedName);
+		    boolean hasNext = cursor.findNext(encodeString(name));
 		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
-		    if (name.equals(nextName)) {
+		    if (hasNext && name.equals(nextName)) {
+			oid = decodeLong(cursor.getValue());
 			/* Move to name after matching name */
 			hasNext = cursor.findNext();
 			nextName =
 			    hasNext ? decodeString(cursor.getKey()) : null;
+		    } else {
+			oid = -1;
 		    }
 		    nextOid = hasNext ? decodeLong(cursor.getValue()) : -1;
 		} finally {
 		    cursor.close();
 		}
-		done = true;
+		txnDone = true;
 		txn.commit();
 	    } finally {
-		if (!done) {
+		if (!txnDone) {
 		    txn.abort();
 		}
 	    }
 	    BindingKey nameKey = BindingKey.get(name);
 	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    if (oid != -1) {
+	    boolean found = (oid != -1);
+	    if (found) {
 		lock(nodeInfo, nameKey, true);
 	    }
 	    lock(nodeInfo, nextNameKey, oid != -1);
 	    return new GetBindingForRemoveResults(
-		oid != -1,
-		nextName,
-		oid,
-		oid == -1 ? false : getWaiting(nameKey, true),
-		oid == -1 ? false : getWaiting(nameKey, false),
+		found, nextName, oid,
+		found && getWaiting(nameKey, true),
+		found && getWaiting(nameKey, false),
 		nextOid,
 		getWaiting(nextNameKey, true),
-		oid == -1 ? false : getWaiting(nextNameKey, false));
+		getWaiting(nextNameKey, false));
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -790,15 +781,21 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     public NextBoundNameResults nextBoundName(long nodeId, String name) {
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    checkNull("name", name);
 	    long oid;
+	    String nextName;
 	    boolean txnDone = false;
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    try {
 		DbCursor cursor = namesDb.openCursor(txn);
 		try {
-		    boolean hasNext = cursor.findNext(encodeString(name));
-		    name = hasNext ? decodeString(cursor.getKey()) : null;
+		    boolean hasNext = (name == null) ? cursor.findFirst()
+			: cursor.findNext(encodeString(name));
+		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
+		    if ((name != null) && name.equals(nextName)) {
+			hasNext = cursor.findNext(encodeString(name));
+			nextName = (hasNext) ? decodeString(cursor.getKey())
+			    : null;
+		    }   
 		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
 		} finally {
 		    cursor.close();
@@ -810,10 +807,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    txn.abort();
 		}
 	    }
-	    BindingKey nameKey = BindingKey.getAllowLast(name);
-	    lock(nodeInfo, nameKey, false);
+	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
+	    lock(nodeInfo, nextNameKey, false);
 	    return new NextBoundNameResults(
-		name, oid, getWaiting(nameKey, false));
+		nextName, oid, getWaiting(nextNameKey, false));
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}

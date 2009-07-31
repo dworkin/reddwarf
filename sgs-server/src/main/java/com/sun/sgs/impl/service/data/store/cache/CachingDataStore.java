@@ -891,57 +891,95 @@ public class CachingDataStore extends AbstractDataStore
 	    return server.getBinding(nodeId, nameKey.getName());
 	}
 	void runWithResult(GetBindingResults results) {
+	    if (results.found) {
+		handleFound(results);
+	    } else {
+		handleNotFound(results);
+	    }
+	}
+	private void handleFound(GetBindingResults results) {
+	    /* Create entry for name */
+	    synchronized (cache.getBindingLock(nameKey)) {
+		context.noteCachedReservedBinding(nameKey, results.oid, false);
+		usedCacheEntry();
+	    }
+	    Object lock = cache.getBindingLock(nextNameKey);
+	    synchronized (lock) {
+		BindingCacheEntry entry = cache.getBindingEntry(nextNameKey);
+		if (entry.getReading()) {
+		    /* Remove temporary last entry that was not used */
+		    entry.setEvictedAbandonFetching(lock);
+		    cache.removeBindingEntry(nextNameKey);
+		}
+		entry.setNotPendingPrevious(lock);
+	    }
+	    if (results.callbackEvict) {
+		scheduleTask(new EvictBindingTask(nameKey));
+	    }
+	}
+	private void handleNotFound(GetBindingResults results) {
 	    BindingKey realNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
-	    if (results.found) {
-		/* Add new entry for name */
-		Object lock = cache.getBindingLock(nameKey);
-		synchronized (lock) {
-		    context.noteCachedReservedBinding(
-			nameKey, results.oid, false);
-		    usedCacheEntry();
-		}
-	    } else if (!nextNameKey.equals(realNextNameKey)) {
+	    int compareRealNextName = realNextNameKey.compareTo(nextNameKey);
+	    if (compareRealNextName != 0) {
 		Object lock = cache.getBindingLock(realNextNameKey);
 		synchronized (lock) {
-		    /* Add new entry for real next name */
 		    BindingCacheEntry entry =
-			context.noteCachedReservedBinding(
+			cache.getBindingEntry(realNextNameKey);
+		    if (entry == null) {
+			/* Add new entry for real, lower next name */
+			assert compareRealNextName < 0;
+			entry = context.noteCachedReservedBinding(
 			    realNextNameKey, results.oid, false);
+			usedCacheEntry();
+		    } else {
+			/* Next entry was already present and lower */
+			assert compareRealNextName > 0;
+			context.noteAccess(entry);
+		    }
 		    entry.updatePreviousKey(nameKey, true);
-		    usedCacheEntry();
 		}
 	    }
 	    Object lock = cache.getBindingLock(nextNameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nextNameKey);
-		if (!results.found) {
-		    if (nextNameKey.equals(realNextNameKey)) {
-			/* Update existing next entry */
-			context.noteAccess(entry);
-			boolean updated =
-			    entry.updatePreviousKey(nameKey, true);
-			assert updated;
-			if (entry.getReading()) {
-			    entry.setCachedRead(lock);
-			}
-		    }
-		}
-		if (results.found || !nextNameKey.equals(realNextNameKey)) {
+		if (compareRealNextName == 0) {
+		    /* Update existing next entry */
+		    boolean updated = entry.updatePreviousKey(nameKey, true);
+		    assert updated;
+		    context.noteAccess(entry);
 		    if (entry.getReading()) {
-			/* Remove temporary last entry that was not used */
-			entry.setEvictedAbandonFetching(lock);
+			/* Make temporary last entry permanent */
+			assert nextNameKey == BindingKey.LAST;
+			entry.setCachedRead(lock);
+		    }
+		} else if (compareRealNextName > 0) {
+		    if (entry.getValue() != -1) {
+			/*
+			 * The cache contains an earlier entry that hasn't been
+			 * committed to the server yet.
+			 */
+			entry.updatePreviousKey(nameKey, true);
+			context.noteAccess(entry);
+		    } else {
+			/*
+			 * Remove the old next name key, which should be
+			 * unbound and is now subsumed by the higher next name
+			 * returned by the server
+			 */
+			entry.setEvictedImmediate(lock);
 			cache.removeBindingEntry(nextNameKey);
 		    }
+		} else if (entry.getReading()) {
+		    /* Remove temporary last entry that was not used */
+		    entry.setEvictedAbandonFetching(lock);
+		    cache.removeBindingEntry(nextNameKey);
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
+	    /* Schedule eviction */
 	    if (results.callbackEvict) {
-		scheduleTask(
-		    new EvictBindingTask(
-			results.found ? nameKey :
-			BindingKey.getAllowLast(results.nextName)));
-
+		scheduleTask(new EvictBindingTask(realNextNameKey));
 	    }
 	}
     }
@@ -1326,7 +1364,7 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	}
 	private void handleFound(GetBindingForUpdateResults results) {
-	    /* Add new entry for name */
+	    /* Create entry for name */
 	    synchronized (cache.getBindingLock(nameKey)) {
 		context.noteCachedReservedBinding(nameKey, results.oid, true);
 		usedCacheEntry();
@@ -1351,45 +1389,57 @@ public class CachingDataStore extends AbstractDataStore
 	private void handleNotFound(GetBindingForUpdateResults results) {
 	    BindingKey realNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
-	    int compare = nextNameKey.compareTo(realNextNameKey);
-	    if (compare != 0) {
+	    int compareRealNextName = realNextNameKey.compareTo(nextNameKey);
+	    if (compareRealNextName != 0) {
 		Object lock = cache.getBindingLock(realNextNameKey);
 		synchronized (lock) {
 		    BindingCacheEntry entry =
 			cache.getBindingEntry(realNextNameKey);
 		    if (entry == null) {
-			/* Add new entry for real next name */
-			assert compare > 0 : "Existing next should be higher";
+			/* Add new entry for real, lower next name */
+			assert compareRealNextName < 0;
 			entry = context.noteCachedReservedBinding(
 			    realNextNameKey, results.oid, true);
-			entry.updatePreviousKey(nameKey, true);
 			usedCacheEntry();
 		    } else {
-			/* Entry was already present */
-			assert compare < 0 : "Existing next should be lower";
-			entry.updatePreviousKey(nameKey, true);
+			/* Next entry was already present and lower */
+			assert compareRealNextName > 0;
 			context.noteAccess(entry);
 		    }
+		    entry.updatePreviousKey(nameKey, true);
 		}
 	    }
 	    Object lock = cache.getBindingLock(nextNameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nextNameKey);
-		if (compare == 0) {
+		if (compareRealNextName == 0) {
 		    /* Update existing next entry */
 		    boolean updated = entry.updatePreviousKey(nameKey, true);
 		    assert updated;
 		    context.noteAccess(entry);
-		    entry.setCachedWrite(lock);
-		} else if (compare < 0) {
-		    /*
-		     * Remove the old next name key, which should be unbound
-		     * and is now subsumed by the higher next name returned by
-		     * the server
-		     */
-		    assert entry.getValue() == -1;
-		    entry.setEvictedImmediate(lock);
-		    cache.removeBindingEntry(nextNameKey);
+		    if (entry.getUpgrading()) {
+			/* Make temporary last entry permanent */
+			assert nextNameKey == BindingKey.LAST;
+			entry.setCachedWrite(lock);
+		    }
+		} else if (compareRealNextName > 0) {
+		    if (entry.getValue() != -1) {
+			/*
+			 * The cache contains an earlier entry that hasn't been
+			 * committed to the server yet.
+			 */
+			entry.updatePreviousKey(nameKey, true);
+			context.noteAccess(entry);
+		    } else {
+			/*
+			 * Remove the old next name key, which should be
+			 * unbound and is now subsumed by the higher next name
+			 * returned by the server
+			 */
+			assert entry.getValue() == -1;
+			entry.setEvictedImmediate(lock);
+			cache.removeBindingEntry(nextNameKey);
+		    }
 		} else if (entry.getUpgrading()) {
 		    /* Remove temporary last entry that was not used */
 		    entry.setEvictedAbandonFetching(lock);
@@ -1397,7 +1447,7 @@ public class CachingDataStore extends AbstractDataStore
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
-	    /* Evict or downgrade */
+	    /* Schedule evictions and downgrades */
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(realNextNameKey));
 	    }
@@ -1601,51 +1651,59 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    BindingKey realNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
-	    int compare = nextNameKey.compareTo(realNextNameKey);
-	    if (compare != 0) {
+	    int compareRealNextName = realNextNameKey.compareTo(nextNameKey);
+	    if (compareRealNextName != 0) {
 		Object lock = cache.getBindingLock(realNextNameKey);
 		synchronized (lock) {
 		    BindingCacheEntry entry =
 			cache.getBindingEntry(realNextNameKey);
 		    if (entry == null) {
-			/* Add new entry for real next name */
-			assert compare > 0 : "Existing next should be higher";
+			/* Add new entry for real, lower next name */
+			assert compareRealNextName < 0;
 			entry = context.noteCachedReservedBinding(
 			    realNextNameKey, results.nextOid, true);
-			entry.updatePreviousKey(nameKey, !results.found);
 			usedCacheEntry();
 		    } else {
-			/* Entry was already present */
-			assert compare < 0 : "Existing next should be lower";
-			entry.updatePreviousKey(nameKey, false);
+			/* Next entry was already present and lower */
+			assert compareRealNextName > 0;
 			context.noteAccess(entry);
 		    }
+		    entry.updatePreviousKey(nameKey, !results.found);
 		}
 	    }
 	    Object lock = cache.getBindingLock(nextNameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nextNameKey);
-		if (compare == 0) {
+		if (compareRealNextName == 0) {
 		    /* Update existing next entry */
 		    entry.updatePreviousKey(nameKey, !results.found);
 		    context.noteAccess(entry);
 		    if (entry.getReading()) {
 			/* Make temporary last entry permanent */
+			assert nextNameKey == BindingKey.LAST;
 			entry.setCachedRead(lock);
 		    }
 		    if (results.found && !entry.getWritable()) {
 			/* Upgraded to write access for the next key */
 			entry.setUpgradedImmediate(lock);
 		    }
-		} else if (compare < 0) {
-		    /*
-		     * Remove the old next name key, which should be unbound
-		     * and is now subsumed by the higher next name returned by
-		     * the server
-		     */
-		    assert entry.getValue() == -1;
-		    entry.setEvictedImmediate(lock);
-		    cache.removeBindingEntry(nextNameKey);
+		} else if (compareRealNextName > 0) {
+		    if (entry.getValue() != -1) {
+			/*
+			 * The cache contains an earlier entry that hasn't been
+			 * committed to the server yet.
+			 */
+			entry.updatePreviousKey(nameKey, !results.found);
+			context.noteAccess(entry);
+		    } else {
+			/*
+			 * Remove the old next name key, which should be
+			 * unbound and is now subsumed by the higher next name
+			 * returned by the server
+			 */
+			entry.setEvictedImmediate(lock);
+			cache.removeBindingEntry(nextNameKey);
+		    }
 		} else if (entry.getReading()) {
 		    /* Remove temporary last entry that was not used */
 		    entry.setEvictedAbandonFetching(lock);
@@ -1730,7 +1788,7 @@ public class CachingDataStore extends AbstractDataStore
     protected String nextBoundNameInternal(Transaction txn, String name) {
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
-	BindingKey nameKey = BindingKey.get(name);
+	BindingKey nameKey = BindingKey.getAllowFirst(name);
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
 	    /* Find next entry */
@@ -1800,32 +1858,60 @@ public class CachingDataStore extends AbstractDataStore
 		"]";
 	}
 	NextBoundNameResults callOnce() throws IOException {
-	    return server.nextBoundName(nodeId, nameKey.getName());
+	    return server.nextBoundName(nodeId, nameKey.getNameAllowFirst());
 	}
 	void runWithResult(NextBoundNameResults results) {
 	    BindingKey realNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
-	    if (!nextNameKey.equals(realNextNameKey)) {
+	    int compareRealNextName = realNextNameKey.compareTo(nextNameKey);
+	    if (compareRealNextName != 0) {
 		Object lock = cache.getBindingLock(realNextNameKey);
 		synchronized (lock) {
-		    /* Add a new entry for the real next name */
 		    BindingCacheEntry entry =
-			context.noteCachedReservedBinding(
+			cache.getBindingEntry(realNextNameKey);
+		    if (entry == null) {
+			/* Add new entry for real, lower next name */
+			assert compareRealNextName < 0;
+			entry = context.noteCachedReservedBinding(
 			    realNextNameKey, results.oid, false);
+			usedCacheEntry();
+		    } else {
+			/* Next entry was already present and lower */
+			assert compareRealNextName > 0;
+			context.noteAccess(entry);
+		    }
 		    entry.updatePreviousKey(nameKey, false);
-		    usedCacheEntry();
 		}
 	    }
 	    Object lock = cache.getBindingLock(nextNameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry =
 		    cache.getBindingEntry(nextNameKey);
-		if (nextNameKey.equals(realNextNameKey)) {
+		if (compareRealNextName == 0) {
 		    /* Update existing next entry */
-		    context.noteAccess(entry);
 		    entry.updatePreviousKey(nameKey, false);
+		    context.noteAccess(entry);
 		    if (entry.getReading()) {
+			/* Make temporary last entry permanent */
+			assert nextNameKey == BindingKey.LAST;
 			entry.setCachedRead(lock);
+		    }
+		} else if (compareRealNextName > 0) {
+		    if (entry.getValue() != -1) {
+			/*
+			 * The cache contains an earlier entry that hasn't been
+			 * committed to the server yet.
+			 */
+			entry.updatePreviousKey(nameKey, false);
+			context.noteAccess(entry);
+		    } else {
+			/*
+			 * Remove the old next name key, which should be
+			 * unbound and is now subsumed by the higher next name
+			 * returned by the server
+			 */
+			entry.setEvictedImmediate(lock);
+			cache.removeBindingEntry(nextNameKey);
 		    }
 		} else if (entry.getReading()) {
 		    /* Remove temporary last entry that was not used */
@@ -1834,10 +1920,9 @@ public class CachingDataStore extends AbstractDataStore
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
+	    /* Schedule eviction */
 	    if (results.callbackEvict) {
-		scheduleTask(
-		    new EvictBindingTask(
-			BindingKey.getAllowLast(results.nextName)));
+		scheduleTask(new EvictBindingTask(realNextNameKey));
 	    }
 	}
     }

@@ -23,7 +23,7 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.service.TransactionInterruptedException;
 
 /**
- * A cache entry.  Only the {@code key} field may be accessed without holding
+ * A cache entry.  Only the {@link #key} field may be accessed without holding
  * the associated lock.  For all other fields and methods, the lock should be
  * held.
  *
