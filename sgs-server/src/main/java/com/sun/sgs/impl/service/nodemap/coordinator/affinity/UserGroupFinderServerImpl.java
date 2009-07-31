@@ -129,6 +129,7 @@ public class UserGroupFinderServerImpl implements GroupFinder,
                        associations.size(), nodeId);
         }
 
+        // Identity -> groupdId
         for (Map.Entry<Identity, Long> entry : associations.entrySet()) {
             Map<Identity, Long> group = groups.get(entry.getValue());
 
@@ -152,7 +153,7 @@ public class UserGroupFinderServerImpl implements GroupFinder,
         }
         groups.clear();
         updateTask = taskScheduler.scheduleRecurringTask(
-                                    new AbstractKernelRunnable("FinderTask") {
+                                    new AbstractKernelRunnable("UpdateTask") {
                                             public void run() {
                                                 updateCoordinator();
                                             }},

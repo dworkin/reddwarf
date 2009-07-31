@@ -163,6 +163,9 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
             groupSet = new TreeSet<AffinityGroup>();
             groups.put(targetNodeId, groupSet);
         }
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "adding {0}", group);
+        }
         groupSet.add(group);
     }
 

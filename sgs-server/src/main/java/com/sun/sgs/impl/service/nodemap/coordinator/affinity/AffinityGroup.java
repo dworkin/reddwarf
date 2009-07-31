@@ -45,8 +45,13 @@ class AffinityGroup implements Comparable {
     private long targetNodeId = -1;
 
     AffinityGroup(long agid, Map<Identity, Long> identities) {
+        assert identities.size() > 0;
         this.agid = agid;
         this.identities = identities;
+        System.out.println("group: " + agid);
+        for (Map.Entry<Identity, Long> e : identities.entrySet()) {
+            System.out.println("Identity: " + e.getKey().getName() + " on node " + e.getValue());
+        }
     }
 
     /**
@@ -60,26 +65,27 @@ class AffinityGroup implements Comparable {
     long findTargetNode(NodeMappingServerImpl server) {
         // Find the node that most identites belong to, and move any
         // stragglers to that node. TODO - better way to do this???
+
+        int leadingCount = 0;
+
+        // nodeId -> count of members on that node
         HashMap<Long, Integer> foo =
                                   new HashMap<Long, Integer>(identities.size());
         for (long nodeId : identities.values()) {
             Integer count = foo.get(nodeId);
             if (count == null) {
-                foo.put(nodeId, 1);
-            } else {
-                count++;
-                foo.put(nodeId, count);
+                count = new Integer(0);
+            } 
+            count++;
+            foo.put(nodeId, count);
+
+            if (count > leadingCount) {
+                leadingCount = count;
+                targetNodeId = nodeId;
             }
         }
-        int max = 0;
-        for (Map.Entry<Long, Integer> entry : foo.entrySet()) {
-            if (entry.getValue() > max) {
-                targetNodeId = entry.getKey();
-                max = entry.getValue();
-            }
-        }
-        System.out.println("Found target node to be " + targetNodeId +
-                           " with " + max + " count");
+        System.out.println("group: " + agid + " found target node to be " + targetNodeId +
+                           " with " + leadingCount + " of " + identities.size() + " members");
         moveStragglers(server);
         return targetNodeId;
     }
@@ -107,7 +113,7 @@ class AffinityGroup implements Comparable {
                 entry.setValue(targetNodeId);
             }
         }
-        System.out.println("Found " + stragglers.size() + " stragglers");
+        System.out.println("group: " + agid + " found " + stragglers.size() + " stragglers");
         if (!stragglers.isEmpty()) {
             server.moveIdentities(stragglers, null, targetNodeId);
         }
