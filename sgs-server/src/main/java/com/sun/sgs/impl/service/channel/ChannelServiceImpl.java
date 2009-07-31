@@ -27,6 +27,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -34,6 +35,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BindingKeyedCollections;
 import com.sun.sgs.impl.util.BindingKeyedMap;
+import com.sun.sgs.impl.util.CacheMap;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.TransactionContext;
@@ -184,12 +186,19 @@ public final class ChannelServiceImpl
     private final ConcurrentHashMap<Long, ChannelServer>
 	channelServerCache = new ConcurrentHashMap<Long, ChannelServer>();
 
-    /** The cache of local channel membership lists, keyed by channel ID. */
+    /** The cache of channel membership lists, keyed by channel ID.  The
+     * cache entry timeout is one second.
+     */
+    private final CacheMap<BigInteger, Set<BigInteger>>
+	channelMembershipCache =
+	    new CacheMap<BigInteger, Set<BigInteger>>(1000);
+    
+    /** The local channel membership lists, keyed by channel ID. */
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
 	localChannelMembersMap =
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
 
-    /** The cache of local per-session channel sets, keyed by session ID. */
+    /** The local per-session channel sets, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
 	localPerSessionChannelsMap =
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
@@ -478,7 +487,7 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Reads the local membership list for the specified
-	 * {@code channelRefId}, and updates the local membership cache
+	 * {@code channelRefId}, and updates the local membership set
 	 * for that channel.  If any join or leave notifications were
 	 * missed, then send the appropriate channel join or channel leave
 	 * message to the effected session(s).
@@ -599,10 +608,11 @@ public final class ChannelServiceImpl
 	
 	/** {@inheritDoc}
 	 *
-	 * If the session is locally-connected and not relocating, this method
-	 * adds the specified {@code sessionRefId} to the per-channel cache for
-	 * the given channel's local member sessions, and sends a channel join
-	 * message to the session with the corresponding {@code sessionId}.
+	 * If the session is locally-connected and not relocating, this
+	 * method adds the specified {@code sessionRefId} to the
+	 * per-channel local membership set for the given channel, and
+	 * sends a channel join message to the session with the
+	 * corresponding {@code sessionId}.
 	 */
 	public boolean join(String name, BigInteger channelRefId,
 			    Delivery delivery, BigInteger sessionRefId)
@@ -633,9 +643,9 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Removes the specified {@code sessionRefId} from the per-channel
-	 * cache for the given channel's local member sessions, and sends a
-	 * channel leave message to the session with the corresponding
-	 * {@code sessionRefId}.
+	 * local membership set for the given channel, and sends a channel
+	 * leave message to the session with the corresponding {@code
+	 * sessionRefId}.
 	 */
 	public boolean leave(BigInteger channelRefId, BigInteger sessionRefId) {
 	    callStarted();
@@ -656,11 +666,43 @@ public final class ChannelServiceImpl
 	    }
 	}
 
+	/** {@inheritDoc} */
+	public BigInteger[] getSessions(BigInteger channelRefId) {
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST, "getSessions channelId:{0} localNodeId:{1}",
+			HexDumper.toHexString(channelRefId.toByteArray()),
+			localNodeId);
+		}
+		
+		Set<BigInteger> localMembers =
+		    localChannelMembersMap.get(channelRefId);
+		
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST, "getSessions channelId:{0} localNodeId:{1} returns:{2}",
+			HexDumper.toHexString(channelRefId.toByteArray()),
+			localNodeId,
+			localMembers);
+		}
+		
+		return
+		    localMembers != null ?
+		    localMembers.toArray(new BigInteger[localMembers.size()]) :
+		    new BigInteger[0];
+		
+	    } finally {
+		callFinished();
+	    }
+	}
+	
 	/** {@inheritDoc}
 	 *
-	 * Removes the channel from the per-channel cache of local member
-	 * sessions, and sends a channel leave message to the
-	 * channel's local member sessions.
+	 * Removes the channel from the per-channel local membership set,
+	 * and sends a channel leave message to the channel's local member
+	 * sessions.
 	 */
 	public void leaveAll(BigInteger channelRefId) {
 	    callStarted();
@@ -765,8 +807,8 @@ public final class ChannelServiceImpl
 	    BigInteger[] channelRefIds)
 	{
 	    /*
-	     * Update the local per-session channel set and channel
-	     * membership caches with the session's channel memberships.
+	     * Update the local per-session channel set and local channel
+	     * membership with the session's channel memberships.
 	     */
 	    Set<BigInteger> channelSet =
 		Collections.synchronizedSet(new HashSet<BigInteger>());
@@ -791,7 +833,7 @@ public final class ChannelServiceImpl
 	     * it assumes that the session is disconnected and invokes the
 	     * 'disconnected' method of this channel service's
 	     * ClientSessionStatusListener so that the session's channel
-	     * memberships (persistent and cached) can be cleaned up.
+	     * memberships (persistent and transient) can be cleaned up.
 	     */
 	    taskScheduler.scheduleTask(
  		new AbstractKernelRunnable("CheckSessionRelocation") {
@@ -817,8 +859,8 @@ public final class ChannelServiceImpl
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);
 	    
-	    // Remove session from locally cached channel membership lists
-	    // TBD: Are channel caches updated before channel membership cache
+	    // Remove session from local channel membership lists TBD: Are
+	    // channel membership set updated before channel membership set
 	    // is xferred to new node?  Or should this be done here?
 	    if (channelSet != null) {
 		synchronized (channelSet) {
@@ -853,7 +895,7 @@ public final class ChannelServiceImpl
 	
 	/** {@inheritDoc}
 	 *
-	 * Removes the specified channel from the per-channel cache of
+	 * Removes the specified channel from the per-channel set of
 	 * local members.
 	 */
 	public void close(BigInteger channelRefId) {
@@ -1000,7 +1042,7 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Updates the local channel members cache by adding the specified
+     * Updates the local channel members set by adding the specified
      * {@code sessionRefId} as a local member of the channel with the
      * specified {@code channelRefId}.
      *
@@ -1022,6 +1064,68 @@ public final class ChannelServiceImpl
 	    }
 	}
 	localMembers.add(sessionRefId);
+    }
+
+    /**
+     * Returns a new set containing a session ID for each local member of
+     * the channel with the specified {@code channelRefId}, or null if the
+     * channel has no local members.
+     */
+    Set<BigInteger> getLocalChannelMembers(BigInteger channelRefId) {
+	Set<BigInteger> localMembers =
+	    localChannelMembersMap.get(channelRefId);
+	    
+	if (localMembers != null) {
+	    synchronized (localMembers) {
+		return new HashSet<BigInteger>(localMembers);
+	    }
+	} else {
+	    return null;
+	}
+    }
+
+    Set<BigInteger> collectChannelMembership(
+	Transaction txn, BigInteger channelRefId, Set<Long> nodeIds)
+    {
+	if (nodeIds.size() == 1 && nodeIds.contains(getLocalNodeId())) {
+	    return getLocalChannelMembers(channelRefId);
+	} else {
+	    synchronized (channelMembershipCache) {
+		Set<BigInteger> members =
+		    channelMembershipCache.get(channelRefId);
+		if (members != null) {
+		    return members;
+		}
+	    }
+
+	    long stopTime = txn.getCreationTime() + txn.getTimeout();
+	    long timeLeft = stopTime - System.currentTimeMillis();
+	    CollectChannelMembershipTask task =
+		new CollectChannelMembershipTask(channelRefId, nodeIds);
+	    taskScheduler.scheduleTask(task, taskOwner);
+	    synchronized (task) {
+		if (!task.completed && timeLeft > 0) {
+		    try {
+			task.wait(timeLeft);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		if (task.completed) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST, "channelId:{0} nodeIds:{1} " +
+			    "members:{2}",
+			    HexDumper.toHexString(channelRefId.toByteArray()),
+			    nodeIds, task.getMembers());
+		    }
+		    return task.getMembers();
+		} else {
+		    throw new TransactionTimeoutException(
+			"transaction timeout: " + txn.getTimeout());
+		}
+
+	    }
+	}
     }
 
     /* -- Implement TransactionContextFactory -- */
@@ -1307,7 +1411,7 @@ public final class ChannelServiceImpl
 				    localNodeId, sessionRefId, channelRefId);
 			    }
 			}, taskOwner);
-			// Remove session from channel membership cache
+			// Remove session from local channel membership set
 			// NOTE: THIS FIXES A MEMORY LEAK!
 			Set<BigInteger> localMembers =
 			    localChannelMembersMap.get(channelRefId);
@@ -1335,7 +1439,7 @@ public final class ChannelServiceImpl
 		// The session is not a member of any channel.
 		handler.completed();
 	    } else {
-		// Transfer the session's channel membership cache to new node.
+		// Transfer the session's channel membership set to new node.
 		relocatingSessions.put(sessionRefId,
 				       new RelocationInfo(newNodeId, handler));
 		try {
@@ -1783,8 +1887,8 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * A task to update local caches and send a join request to a client
-     * session.
+     * A task to update local channel membership set and send a join
+     * request to a client session.
      */
     private class ChannelJoinTask extends AbstractKernelRunnable {
 
@@ -1805,10 +1909,10 @@ public final class ChannelServiceImpl
 	}
 
 	public void run() {
-	    // Update local channel membership cache.
+	    // Update local channel membership set.
 	    addLocalChannelMember(channelRefId, sessionRefId);
 
-	    // Update per-session channel set cache.
+	    // Update per-session channel set.
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.get(sessionRefId);
 	    if (channelSet == null) {
@@ -1858,7 +1962,7 @@ public final class ChannelServiceImpl
 
 	public void run() {
 
-	    // Update local channel membership cache.
+	    // Update local channel membership set.
 	    Set<BigInteger> localMembers;
 	    localMembers = localChannelMembersMap.get(channelRefId);
 	    if (localMembers == null) {
@@ -1866,7 +1970,7 @@ public final class ChannelServiceImpl
 	    }
 	    localMembers.remove(sessionRefId);
 	    
-	    // Update per-session channel set cache.
+	    // Update per-session channel set.
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.get(sessionRefId);
 	    if (channelSet != null) {
@@ -1906,6 +2010,60 @@ public final class ChannelServiceImpl
 	RelocationInfo(long newNodeId, SimpleCompletionHandler handler) {
 	    this.newNodeId = newNodeId;
 	    this.handler = handler;
+	}
+    }
+
+    private class CollectChannelMembershipTask extends AbstractKernelRunnable {
+
+	private final BigInteger channelRefId;
+	private final Set<Long> nodeIds;
+	private final Set<BigInteger> allMembers = new HashSet<BigInteger>();
+	private boolean completed = false;
+
+	CollectChannelMembershipTask(BigInteger channelRefId, Set<Long> nodeIds) {
+	    super(null);
+	    this.channelRefId = channelRefId;
+	    this.nodeIds = nodeIds;
+	}
+	
+	public void run() {
+
+	    for (long nodeId : nodeIds) {
+		try {
+		    ChannelServer server = getChannelServer(nodeId);
+		    if (server != null) {
+			BigInteger[] nodeMembers =
+			    server.getSessions(channelRefId);
+			for (BigInteger member : nodeMembers) {
+			    allMembers.add(member);
+			}
+		    }
+		} catch (Exception e) {
+		    // problem contacting server; continue
+		    // TBD: log exception?
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.logThrow(
+			    Level.FINE, e,
+			    "getSessions nodeId:{0} channelId:{1} throws",
+			    nodeId, channelRefId);
+		    }
+		}
+	    }
+	    synchronized (channelMembershipCache) {
+		channelMembershipCache.put(channelRefId, allMembers);
+	    }
+	    synchronized (this) {
+		completed = true;
+		notifyAll();
+	    }
+	    
+	}
+
+	synchronized Set<BigInteger> getMembers() {
+	    if (!completed) {
+		throw new IllegalStateException("not completed");
+	    }
+	    return allMembers;
 	}
     }
 }

@@ -56,6 +56,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -319,7 +320,27 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** Implements {@link Channel#getSessions}. */
     Iterator<ClientSession> getSessions() {
 	checkClosed();
-	return new ClientSessionIterator(channelRefId);
+
+	Set<BigInteger> channelMembers = null;
+	ChannelServiceImpl channelService =
+	    ChannelServiceImpl.getChannelService();
+	
+	if (!servers.isEmpty()) {
+	    channelMembers =
+		channelService.collectChannelMembership(
+		    txn, channelRefId, servers);
+	}
+
+	return
+	    new ClientSessionIterator(
+		channelMembers != null ?
+		channelMembers :
+		new HashSet<BigInteger>());
+    }
+
+    private Set<BigInteger> collectChannelMembership() {
+	
+	return new HashSet<BigInteger>();
     }
 
     /** Implements {@link Channel#join(ClientSession)}. */
@@ -1114,10 +1135,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance of this class with the specified
 	 * {@code channelRefId}.
 	 */
-	ClientSessionIterator(BigInteger channelRefId) {
-	    Set<BigInteger> sessionSet =
-		newSet(SESSION_SET_PREFIX + channelRefId.toString() + ".");
-	    iterator = sessionSet.iterator();
+	ClientSessionIterator(Set<BigInteger> channelMembers) {
+	    iterator = channelMembers.iterator();
 	}
 
 	/** {@inheritDoc} */

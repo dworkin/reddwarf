@@ -99,6 +99,14 @@ public interface ChannelServer extends Remote {
 	throws IOException;
 
     /**
+     * Returns an array containing the client session ID of each client
+     * session on this node that is a member of the channel with the
+     * specified {@code channelRefId}.
+     */
+    BigInteger[] getSessions(BigInteger channelRefId)
+	throws IOException;
+    
+    /**
      * Notifies this server that all locally-connected member sessions
      * have left the channel with the specified {@code channelRefId}.
      *
