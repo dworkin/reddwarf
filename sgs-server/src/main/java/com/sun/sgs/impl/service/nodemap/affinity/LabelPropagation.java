@@ -121,7 +121,7 @@ public class LabelPropagation implements LPAClient {
         nodeConflictMap =
             new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>();
 
-    // Map identity -> label and weight
+    // Map identity -> label and count
     // This sums all uses of that identity on other nodes
     private final Map<Identity, Map<Integer, Integer>> remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Integer>>();
@@ -208,7 +208,6 @@ public class LabelPropagation implements LPAClient {
             // map is properly initialized.  We use an empty map as a
             // signal that it needs to be initialized.
             nodeConflictMap.clear();
-            remoteLabelMap.clear();
             vertices = null;
         }
         logger.log(Level.FINEST, "{0}: returning {1} groups",
@@ -461,6 +460,8 @@ public class LabelPropagation implements LPAClient {
      * @throws IOException if there is a communication problem
      */
     private boolean updateRemoteLabels() throws IOException {
+        // reinitialize the remote label map
+        remoteLabelMap.clear();
         Map<Object, Map<Identity, Integer>> objectMap =
                 builder.getObjectUseMap();
         assert (objectMap != null);
@@ -499,7 +500,7 @@ public class LabelPropagation implements LPAClient {
                 logger.log(Level.FINE, "unexpected null labels");
                 continue;
             }
-            //Map<Identity, Map<Integer, Integer>> remoteLabelMap
+
             // Process the returned labels
             for (Map.Entry<Object, Set<Integer>> remoteEntry :
                  labels.entrySet())
@@ -516,16 +517,19 @@ public class LabelPropagation implements LPAClient {
                 {
                     Identity ident = objUseId.getKey();
                     Integer weight = objUseId.getValue();
-                    Map<Integer, Integer> labelWeight =
+                    Map<Integer, Integer> labelCount =
                             remoteLabelMap.get(ident);
-                    if (labelWeight == null) {
-                        labelWeight =
+                    if (labelCount == null) {
+                        labelCount =
                                 new ConcurrentHashMap<Integer, Integer>();
                     }
                     for (Integer label : remoteLabels) {
-                        labelWeight.put(label, weight);
+                        Integer oldCount = labelCount.get(label);
+                        Integer updateCount = (oldCount == null) ? weight :
+                                                weight + oldCount;
+                        labelCount.put(label, updateCount);
                     }
-                    remoteLabelMap.put(ident, labelWeight);
+                    remoteLabelMap.put(ident, labelCount);
                 }
             }
         }
@@ -791,7 +795,7 @@ public class LabelPropagation implements LPAClient {
      * @return a list of labels with the higest counts
      */
     private List<Integer> getNeighborCounts(LabelVertex vertex) {
-        // A map of labels -> oldWeight, effectively counting how many
+        // A map of labels -> counts, counting how many
         // of our neighbors use a particular label.
         Map<Integer, Long> labelMap = new HashMap<Integer, Long>();
 
@@ -824,7 +828,7 @@ public class LabelPropagation implements LPAClient {
                     edgew += edge.getWeight();
                 }
                 // Using vertex preference alone causes the single threaded
-                // version to drop quite a bit for Zachary and a oldWeight of
+                // version to drop quite a bit for Zachary and a preference of
                 // 0.1 or 0.2, and nice modularity boost at -0.1
 //                oldWeight +=
 //                    Math.pow(graph.degree(neighbor), nodePref) * edgew;
@@ -841,10 +845,10 @@ public class LabelPropagation implements LPAClient {
             // The check above is just so I can continue to test in single 
             // vertex mode
             for (Map.Entry<Integer, Integer> entry : remoteMap.entrySet()) {
-                // want to log this, too!
                 Integer label = entry.getKey();
                 if (logger.isLoggable(Level.FINEST)) {
-                    logSB.append("RLabel:" + label + " ");
+                    logSB.append("RLabel:" + label + 
+                                 "(" + entry.getValue() + ") ");
                 }
                 Long value = labelMap.containsKey(label) ?
                                 labelMap.get(label) : 0;
