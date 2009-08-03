@@ -152,8 +152,10 @@ public class CacheMap<K, V> {
     */
     private static final class Value<K, V> extends SoftReference<V> {
 
-	private final long expirationTime;
+	/** The value's associated key. */
 	private final K key;
+	/** The value's expiration time. */
+	private final long expirationTime;
 
 	/**
 	 * Creates an instance of this class and registers it with the

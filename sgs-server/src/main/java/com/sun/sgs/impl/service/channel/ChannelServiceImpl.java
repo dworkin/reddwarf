@@ -1067,28 +1067,28 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Returns a new set containing a session ID for each local member of
-     * the channel with the specified {@code channelRefId}, or null if the
-     * channel has no local members.
+     * Collects a snapshot of the channel membership for the channel with
+     * the specified {@code channelRefId} and set of member {@code
+     * nodeIds} and returns an unmodifiable set containing the channel
+     * membership. 
+     *
+     * @returns	an unmodifiable set containing the channel membership
      */
-    Set<BigInteger> getLocalChannelMembers(BigInteger channelRefId) {
-	Set<BigInteger> localMembers =
-	    localChannelMembersMap.get(channelRefId);
-	    
-	if (localMembers != null) {
-	    synchronized (localMembers) {
-		return new HashSet<BigInteger>(localMembers);
-	    }
-	} else {
-	    return null;
-	}
-    }
-
     Set<BigInteger> collectChannelMembership(
 	Transaction txn, BigInteger channelRefId, Set<Long> nodeIds)
     {
 	if (nodeIds.size() == 1 && nodeIds.contains(getLocalNodeId())) {
-	    return getLocalChannelMembers(channelRefId);
+	    Set<BigInteger> localMembers =
+		localChannelMembersMap.get(channelRefId);
+	    
+	    if (localMembers != null) {
+		synchronized (localMembers) {
+		    return Collections.unmodifiableSet(localMembers);
+		}
+	    } else {
+		return ChannelImpl.EMPTY_CHANNEL_MEMBERSHIP;
+	    }
+
 	} else {
 	    synchronized (channelMembershipCache) {
 		Set<BigInteger> members =
@@ -1949,6 +1949,10 @@ public final class ChannelServiceImpl
 	}
     }
 
+    /**
+     * A task to update local channel membership set and send a leave
+     * request to a client session.
+     */
     private class ChannelLeaveTask extends AbstractKernelRunnable {
 
 	private final BigInteger channelRefId;
@@ -2013,6 +2017,9 @@ public final class ChannelServiceImpl
 	}
     }
 
+    /**
+     * A task to collect a snapshot of the channel membership for a given channel.
+     */
     private class CollectChannelMembershipTask extends AbstractKernelRunnable {
 
 	private final BigInteger channelRefId;
@@ -2025,7 +2032,8 @@ public final class ChannelServiceImpl
 	    this.channelRefId = channelRefId;
 	    this.nodeIds = nodeIds;
 	}
-	
+
+	/** {@inheritDoc} */
 	public void run() {
 
 	    for (long nodeId : nodeIds) {
@@ -2056,14 +2064,20 @@ public final class ChannelServiceImpl
 		completed = true;
 		notifyAll();
 	    }
-	    
 	}
 
+	/**
+	 * Returns an unmodifiable set containing a snapshot of all the
+	 * members of the channel specified during construction.
+	 *
+	 * @throws IllegalStateException if the task to collect the the
+	 *	   channel membership has not completed
+	 */
 	synchronized Set<BigInteger> getMembers() {
 	    if (!completed) {
 		throw new IllegalStateException("not completed");
 	    }
-	    return allMembers;
+	    return Collections.unmodifiableSet(allMembers);
 	}
     }
 }

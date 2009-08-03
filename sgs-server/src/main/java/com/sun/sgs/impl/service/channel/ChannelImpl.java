@@ -128,6 +128,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** A prefix for a channel's session set. */
     static final String SESSION_SET_PREFIX = PKG_NAME + "session.";
 
+    /** The empty channel membership set. */
+    @SuppressWarnings("unchecked")
+    static final Set<BigInteger> EMPTY_CHANNEL_MEMBERSHIP =
+	(Set<BigInteger>) Collections.EMPTY_SET;
+
     /** The random number generator for choosing a new coordinator. */
     private static final Random random = new Random();
 
@@ -335,12 +340,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    new ClientSessionIterator(
 		channelMembers != null ?
 		channelMembers :
-		new HashSet<BigInteger>());
-    }
-
-    private Set<BigInteger> collectChannelMembership() {
-	
-	return new HashSet<BigInteger>();
+		EMPTY_CHANNEL_MEMBERSHIP);
     }
 
     /** Implements {@link Channel#join(ClientSession)}. */
