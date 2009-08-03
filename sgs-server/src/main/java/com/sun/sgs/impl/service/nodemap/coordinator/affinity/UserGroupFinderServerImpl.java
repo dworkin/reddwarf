@@ -31,6 +31,7 @@ import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -75,9 +76,9 @@ public class UserGroupFinderServerImpl implements GroupFinder,
 
     private final Exporter<UserGroupFinderServer> exporter;
 
-    // Map groupId -> map(Identity -> nodeId)
-    private final Map<Long, Map<Identity, Long>> groups =
-                                    new HashMap<Long, Map<Identity, Long>>();
+    // Map nodeId -> source
+    private final Map<Long, UserGroupSource> sources =
+                                        new HashMap<Long, UserGroupSource>();
 
     private final long updatePeriod;
     private RecurringTaskHandle updateTask = null;
@@ -117,13 +118,125 @@ public class UserGroupFinderServerImpl implements GroupFinder,
     /* --- Implement UserGroupFinderServer -- */
 
     @Override
-    public synchronized void associations(Map<Identity, Long> associations,
-                                          long nodeId)
+    public void registerUserGroupSource(UserGroupSource source, long nodeId)
         throws IOException
     {
-        if (!started()) {
-            throw new IllegalStateException("associations call while stopped");
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "registering source from node {0}", nodeId);
         }
+
+        sources.put(nodeId, source);
+        if (started()) {
+            source.start();
+        }
+    }
+
+    /* --- Implement GroupFinder -- */
+
+    @Override
+    public synchronized void start() {
+        if (started()) return; // already started
+
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "starting update task with period of {0} ms",
+                       updatePeriod);
+        }
+        callSources(true);
+        updateTask = taskScheduler.scheduleRecurringTask(
+                                    new AbstractKernelRunnable("UpdateTask") {
+                                            public void run() {
+                                                updateCoordinator();
+                                            }},
+                                    taskOwner,
+                                    System.currentTimeMillis() + updatePeriod,
+                                    updatePeriod);
+        updateTask.start();
+    }
+
+    @Override
+    public synchronized void stop() {
+        if (started()) {
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "stopping finder");
+            }
+            if (updateTask != null) {
+                updateTask.cancel();
+                updateTask = null;
+            }
+            callSources(false);
+        }
+    }
+
+    @Override
+    public void shutdown() {
+        stop();
+        exporter.unexport();
+    }
+    
+    /* --- private methods -- */
+    
+    private void callSources(boolean start) {
+        Iterator<UserGroupSource> iter = sources.values().iterator();
+        while (iter.hasNext()) {
+            UserGroupSource source = iter.next();
+            try {
+                if (start) {
+                    source.start();
+                } else {
+                    source.stop();
+                }
+            } catch (IOException ioe) {
+                logger.logThrow(Level.WARNING, ioe,
+                                "exception contacting source, removing it");
+                iter.remove();
+            }
+        }
+    }
+        
+    // Collect associations from the sources, assemble the groups, and update
+    // the coordinator.
+    private synchronized void updateCoordinator() {
+        if (!started()) return;
+        
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "starting update");
+        }
+        
+        // Map groupId -> map(Identity -> nodeId)
+        final Map<Long, Map<Identity, Long>> groups =
+                                    new HashMap<Long, Map<Identity, Long>>();
+        
+        Iterator<Map.Entry<Long, UserGroupSource>> iter =
+                                                sources.entrySet().iterator();
+        
+        while (iter.hasNext()) {
+            Map.Entry<Long, UserGroupSource> entry = iter.next();
+            try {
+                associations(groups,
+                             entry.getValue().getAssociations(),
+                             entry.getKey());
+            } catch (IOException ioe) {
+                logger.logThrow(Level.WARNING, ioe,
+                                "exception contacting source, removing it");
+                iter.remove();
+            }
+        }
+        
+        if (!groups.isEmpty()) {
+            List<AffinityGroup> affinityGroups =
+                                    new ArrayList<AffinityGroup>(groups.size());
+
+            for (Map.Entry<Long, Map<Identity, Long>> e : groups.entrySet()) {
+                affinityGroups.add(new AffinityGroup(e.getKey(), e.getValue()));
+            }
+            coordinator.newGroups(affinityGroups);
+        }
+    }
+    
+    private void associations(Map<Long, Map<Identity, Long>> groups,
+                              Map<Identity, Long> associations,
+                              long nodeId)
+    {
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER, "received {0} associations from node {1}",
                        associations.size(), nodeId);
@@ -139,58 +252,5 @@ public class UserGroupFinderServerImpl implements GroupFinder,
             }
             group.put(entry.getKey(), nodeId);
         }
-    }
-
-    /* --- Implement GroupFinder -- */
-
-    @Override
-    public synchronized void start() {
-        if (started()) return; // already started
-
-        if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "starting update task with period of {0} ms",
-                       updatePeriod);
-        }
-        groups.clear();
-        updateTask = taskScheduler.scheduleRecurringTask(
-                                    new AbstractKernelRunnable("UpdateTask") {
-                                            public void run() {
-                                                updateCoordinator();
-                                            }},
-                                    taskOwner,
-                                    System.currentTimeMillis() + updatePeriod,
-                                    updatePeriod);
-        updateTask.start();
-    }
-
-    private synchronized void updateCoordinator() {
-        if (started() && !groups.isEmpty()) {
-            List<AffinityGroup> affinityGroups =
-                                    new ArrayList<AffinityGroup>(groups.size());
-
-            for (Map.Entry<Long, Map<Identity, Long>> e : groups.entrySet()) {
-                affinityGroups.add(new AffinityGroup(e.getKey(), e.getValue()));
-            }
-            coordinator.newGroups(affinityGroups);
-            groups.clear();
-        }
-    }
-
-    @Override
-    public synchronized void stop() {
-        if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "stopping finder");
-        }
-        if (updateTask != null) {
-            updateTask.cancel();
-            updateTask = null;
-        }
-        groups.clear();
-    }
-
-    @Override
-    public void shutdown() {
-        stop();
-        exporter.unexport();
     }
 }
