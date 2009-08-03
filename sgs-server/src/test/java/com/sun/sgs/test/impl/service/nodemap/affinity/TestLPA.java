@@ -199,9 +199,9 @@ public class TestLPA {
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
                     PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
 
-        lp1.exchangeCrossNodeInfo();
-        lp2.exchangeCrossNodeInfo();
-        lp3.exchangeCrossNodeInfo();
+        lp1.prepareAlgorithm();
+        lp2.prepareAlgorithm();
+        lp3.prepareAlgorithm();
 
         // Wait an appropriate time - want server to be called back 3 times
         Thread.sleep(1000);
@@ -245,9 +245,9 @@ public class TestLPA {
         lp3.affinityGroups(true);
 
         System.out.println("Exchanging info a second time");
-        lp3.exchangeCrossNodeInfo();
-        lp2.exchangeCrossNodeInfo();
-        lp1.exchangeCrossNodeInfo();
+        lp3.prepareAlgorithm();
+        lp2.prepareAlgorithm();
+        lp1.prepareAlgorithm();
 
         // Wait an appropriate time - want server to be called back 3 times
         Thread.sleep(1000);
@@ -424,7 +424,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public void exchangeCrossNodeInfo() throws IOException {
+        public void prepareAlgorithm() throws IOException {
             startedExchangeInfo = true;
             try {
                 Thread.sleep(sleepTime);

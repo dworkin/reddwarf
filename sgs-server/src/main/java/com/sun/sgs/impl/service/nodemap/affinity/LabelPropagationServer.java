@@ -63,7 +63,15 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     /** The name we export ourselves under. */
     public static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
 
-    public static final int TIMEOUT = 10;  // minutes
+    // The time, in minutes, to wait for all nodes to respond asynchronously
+    private static final int TIMEOUT = 10;  // minutes
+
+    // The maximum number of iterations we will run.  Interesting to set high
+    // for testing, but 5 has been shown to be adequate in most papers.
+    // For distributed case, seem to always converge within 10, and setting
+    // to 5 cuts off some of the highest modularity solutions (running
+    // distributed Zachary test network).
+    private static final int MAX_ITERATIONS = 10;
 
     // The exporter for this server
     private final Exporter<LPAServer> exporter;
@@ -118,7 +126,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // This server controls the running of the distributed label
         // propagation algorithm, using the LPAServer and LPAClient
         // interfaces.  The protocol is:
-        // Server calls each LPAClient.exchangeCrossNodeInfo().
+        // Server calls each LPAClient.prepareAlgorithm().
         //     Nodes contact other nodes which their graphs might be
         //     connected to, using LPAClient.crossNodeEdges.
         //     Nodes can find the appropriate LPAClient by calling
@@ -215,10 +223,11 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         for (AffinityGroupImpl agi : groupMap.values()) {
             retVal.add(agi);
         }
-        
+
         if (logger.isLoggable(Level.FINE)) {
             long time = System.currentTimeMillis() - startTime;
-            logger.log(Level.FINE, "Algorithm took {0} milliseconds", time);
+            logger.log(Level.FINE, "Algorithm took {0} milliseconds and {1} " +
+                    "iterations", time, currentIteration);
             StringBuffer sb = new StringBuffer();
             sb.append(" LPA found " +  retVal.size() + " groups ");
 
@@ -293,10 +302,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      * @param clientProxies a map of node ids to LPAClient proxies
      */
     private void prepareAlgorithm(Map<Long, LPAClient> clientProxies) {
-        // Tell each node to exchange their cross node information.  This
-        // allows each node to have symmetric information:  e.g. if node 1
-        // has a data conflict on obj1 with node 2, it lets node 2 know it
-        // has a similar confict with node 1.
+        // Tell each node to prepare for an algorithm run.
         final Set<Long> clean =
                 Collections.unmodifiableSet(clientProxies.keySet());
         nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
@@ -306,7 +312,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        ce.getValue().exchangeCrossNodeInfo();
+                        ce.getValue().prepareAlgorithm();
                     } catch (IOException ioe) {
                         failed = true;
                         // NEED retry logic here.  If we cannot reach
@@ -354,8 +360,11 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             }
             // Wait for all nodes to complete this iteration
             waitOnLatch();
-            // Completely arbitrary number to ensure we actually converge
-            if (++currentIteration > 10) {
+            // Papers show most work is done after 5 iterations
+            if (++currentIteration > MAX_ITERATIONS) {
+                // JANE - warning should be Level.FINE
+                logger.log(Level.WARNING, "exceeded {0} iterations, stopping",
+                        MAX_ITERATIONS);
                 break;
             }
         }

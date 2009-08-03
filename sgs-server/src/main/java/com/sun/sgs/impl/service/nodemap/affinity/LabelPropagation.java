@@ -204,7 +204,7 @@ public class LabelPropagation implements LPAClient {
         if (done) {
             // Clear our maps that are set up as the first step of an
             // algorithm run.  This is done here, rather than when
-            // exchangeCrossNodeInfo is called, to ensure the vertex conflict
+            // prepareAlgorithm is called, to ensure the vertex conflict
             // map is properly initialized.  We use an empty map as a
             // signal that it needs to be initialized.
             nodeConflictMap.clear();
@@ -219,12 +219,15 @@ public class LabelPropagation implements LPAClient {
     /** 
      * {@inheritDoc}
      * <p>
+     * 
      * Each pair of nodes needs to exchange conflict information to ensure
-     * that both pairs know the complete set for both.  It might be better
-     * to just let the server ask each vertex for its information and merge
-     * it there.
+     * that both pairs know the complete set for both (e.g. if node 1 has a
+     * data conflict on obj1 with node 2, it lets node 2 know.
+     * <p>
+     * It might be better to just let the server ask each vertex for its
+     * information and merge it there.
      */
-    public void exchangeCrossNodeInfo() throws IOException {
+    public void prepareAlgorithm() throws IOException {
         initializeNodeConflictMap();
 
         boolean failed = false;
@@ -325,7 +328,9 @@ public class LabelPropagation implements LPAClient {
         // Gather the remote labels from each node.
         boolean failed = updateRemoteLabels();
 
-        // JANE still not happy with this stopping criteria
+        // We include the current label when calculating the most frequent
+        // label, so no labels changing indicates the algorithm has converged
+        // and we can stop.
         boolean changed = false;
 
         if (!failed) {
@@ -343,7 +348,7 @@ public class LabelPropagation implements LPAClient {
                 for (final LabelVertex vertex : vertices) {
                     tasks.add(new Callable<Void>() {
                         public Void call() {
-                            abool.set(setMostFrequentLabel(vertex, false) ||
+                            abool.set(setMostFrequentLabel(vertex, true) ||
                                       abool.get());
                             return null;
                         }
@@ -363,7 +368,7 @@ public class LabelPropagation implements LPAClient {
 
             } else {
                 for (LabelVertex vertex : vertices) {
-                    changed = setMostFrequentLabel(vertex, false) || changed;
+                    changed = setMostFrequentLabel(vertex, true) || changed;
                 }
             }
 
@@ -707,7 +712,7 @@ public class LabelPropagation implements LPAClient {
     /**
      * Initialize our vertex conflicts.  This needs to happen before
      * we send our vertex conflict information to other (higher vertex-ident)
-     * nodes in response to an exchangeCrossNodeInfo call from the server,
+     * nodes in response to an prepareAlgorithm call from the server,
      * and before a crossNodeEdges call from a (lower vertex-ident) vertex.
      */
     private synchronized void initializeNodeConflictMap() {

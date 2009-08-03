@@ -34,12 +34,12 @@ public interface LPAClient extends Remote {
 
     /**
      * A new run of the algorithm is about to start, so the client nodes
-     * should exchange any cross-node information in their graph.  When
+     * should do whatever is necessary to set up for that run.  When
      * finished, {@link LPAServer#readyToBegin} should be called.
      * Called by the LPAServer.
      * @throws IOException if there is a communication problem
      */
-    void exchangeCrossNodeInfo() throws IOException;
+    void prepareAlgorithm() throws IOException;
 
     /**
      * Start an iteration of the algorithm.  When finished,
