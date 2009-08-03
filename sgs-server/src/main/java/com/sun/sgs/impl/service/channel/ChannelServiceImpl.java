@@ -226,15 +226,14 @@ public final class ChannelServiceImpl
 	coordinatorTaskQueues =
 	    new ConcurrentHashMap<BigInteger, TaskQueue>();
 
-    /** The map of channel task queues, keyed by channel ID.  A
-     * channel's task queue orders the execution of tasks in which the
-     * channel's coordinator sends notifications (join, leave, send,
-     * refresh, etc.) to the channel servers for the channel.  The tasks
-     * in these queues execute outside of a transaction.  This map must
-     * be accessed while synchronized on {@code contextList}. A task
-     * queue is added when the first committed context having to do with
-     * the channel is flushed, and is removed when the channel is
-     * closed.
+    /** The map of channel task queues, keyed by channel ID.  A channel's
+     * task queue orders the execution of tasks in which the channel's
+     * coordinator sends notifications (join, leave, send, etc.) to the
+     * channel servers for the channel.  The tasks in these queues execute
+     * outside of a transaction.  This map must be accessed while
+     * synchronized on {@code contextList}. A task queue is added when the
+     * first committed context having to do with the channel is flushed,
+     * and is removed when the channel is closed.
      */
     private final Map<BigInteger, TaskQueue> channelTaskQueues =
 	new HashMap<BigInteger, TaskQueue>();
@@ -483,128 +482,6 @@ public final class ChannelServiceImpl
 		callFinished();
 	    }
 	}
-
-	/** {@inheritDoc}
-	 *
-	 * Reads the local membership list for the specified
-	 * {@code channelRefId}, and updates the local membership set
-	 * for that channel.  If any join or leave notifications were
-	 * missed, then send the appropriate channel join or channel leave
-	 * message to the effected session(s).
-	 */
-	public void refresh(String name, final BigInteger channelRefId,
-			    Delivery delivery)
-        {
-	    callStarted();
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "refreshing channelId:{0}",
-			   HexDumper.toHexString(channelRefId.toByteArray()));
-	    }
-	    try {
-		/*
-		 * Read list of local members of the channel.
-		 */
-		final Set<BigInteger> newLocalMembers =
-		    Collections.synchronizedSet(new HashSet<BigInteger>());
-		try {
-		    transactionScheduler.runTask(
-			new AbstractKernelRunnable("getNewLocalMembers") {
-			    public void run() {
-				newLocalMembers.addAll(
-				    ChannelImpl.getSessionRefIdsForNode(
-					channelRefId, localNodeId));
-			    } }, taskOwner);
-
-		} catch (Exception e) {
-		    // FIXME: what is the right thing to do here?
-		    logger.logThrow(
- 			Level.WARNING, e,
-			"obtaining members of channel:{0} throws",
-			HexDumper.toHexString(channelRefId.toByteArray()));
-		}
-
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST, "newLocalMembers for channel:{0}",
-			HexDumper.toHexString(channelRefId.toByteArray()));
-		    for (BigInteger sessionRefId : newLocalMembers) {
-			logger.log(
-			   Level.FINEST, "member:{0}",
-			   HexDumper.toHexString(sessionRefId.toByteArray()));
-		    }
-		}
-
-		/*
-		 * Determine which join and leave events were missed and
-		 * send protocol messages to clients accordingly.
-		 */
-		Set<BigInteger> oldLocalMembers =
-		    newLocalMembers.isEmpty() ?
-		    localChannelMembersMap.remove(channelRefId) :
-		    localChannelMembersMap.put(channelRefId, newLocalMembers);
-		Set<BigInteger> joiners = null;
-		Set<BigInteger> leavers = null;
-		if (oldLocalMembers == null) {
-		    joiners = newLocalMembers;
-		} else {
-		    for (BigInteger sessionRefId : newLocalMembers) {
-			if (oldLocalMembers.contains(sessionRefId)) {
-			    oldLocalMembers.remove(sessionRefId);
-			} else {
-			    if (joiners == null) {
-				joiners = new HashSet<BigInteger>();
-			    }
-			    joiners.add(sessionRefId);
-			}
-		    }
-		    if (!oldLocalMembers.isEmpty()) {
-			leavers = oldLocalMembers;
-		    }
-		}
-		if (joiners != null) {
-		    for (BigInteger sessionRefId : joiners) {
-			SessionProtocol protocol =
-			    sessionService.getSessionProtocol(sessionRefId);
-			if (protocol != null) {
-                            try {
-                                protocol.channelJoin(name, channelRefId,
-                                                     delivery);
-                            } catch (IOException e) {
-                                logger.logThrow(Level.WARNING, e,
-                                                "channelJoin throws");
-                            } catch (RuntimeException e) {
-				// TBD
-                                logger.logThrow(Level.WARNING, e,
-                                                "channelJoin throws");
-			    }
-			}
-			// FIXME: update per-session channel set.
-		    }
-		}
-		if (leavers != null) {
-		    for (BigInteger sessionRefId : leavers) {
-			SessionProtocol protocol =
-			    sessionService.getSessionProtocol(sessionRefId);
-			if (protocol != null) {
-                            try {
-                                protocol.channelLeave(channelRefId);
-                            } catch (IOException e) {
-                                logger.logThrow(Level.WARNING, e,
-                                                "channelLeave throws");
-                            } catch (RuntimeException e) {
-				// TBD
-                                logger.logThrow(Level.WARNING, e,
-                                                "channelLeave throws");
-                            }
-			}
-		    }
-		    // FIXME: update per-session channel set.
-		}
-
-	    } finally {
-		callFinished();
-	    }
-	}
 	
 	/** {@inheritDoc}
 	 *
@@ -672,7 +549,8 @@ public final class ChannelServiceImpl
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
-			Level.FINEST, "getSessions channelId:{0} localNodeId:{1}",
+			Level.FINEST,
+			"getSessions channelId:{0} localNodeId:{1}",
 			HexDumper.toHexString(channelRefId.toByteArray()),
 			localNodeId);
 		}
@@ -682,7 +560,8 @@ public final class ChannelServiceImpl
 		
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
-			Level.FINEST, "getSessions channelId:{0} localNodeId:{1} returns:{2}",
+			Level.FINEST,
+			"getSessions channelId:{0} localNodeId:{1} returns:{2}",
 			HexDumper.toHexString(channelRefId.toByteArray()),
 			localNodeId,
 			localMembers);
@@ -819,11 +698,11 @@ public final class ChannelServiceImpl
 	    }
 
 	    /*
-	     * Schedule task to add the session's channel memberships to
-	     * the new node (the local node).
+	     * Schedule task to add the session's new node (the local
+	     * node) to each of its channels.
 	     */
 	    taskScheduler.scheduleTask(
- 		new AddRelocatingSessionToChannels(
+		new AddRelocatingSessionNodeToChannels(
 		    sessionRefId, oldNodeId, channelSet),
 		taskOwner);
 
@@ -859,9 +738,7 @@ public final class ChannelServiceImpl
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);
 	    
-	    // Remove session from local channel membership lists TBD: Are
-	    // channel membership set updated before channel membership set
-	    // is xferred to new node?  Or should this be done here?
+	    // Remove session from local channel membership lists
 	    if (channelSet != null) {
 		synchronized (channelSet) {
 		    for (BigInteger channelRefId : channelSet) {
@@ -879,17 +756,6 @@ public final class ChannelServiceImpl
 		relocatingSessions.get(sessionRefId);
 	    if (info != null) {
 		info.handler.completed();
-	    }
-
-	    /*
-	     * Schedule task to remove channel memberships from old node
-	     * (the local node).
-	     */
-	    if (channelSet != null) {
-		taskScheduler.scheduleTask(
-		    new RemoveRelocatingSessionFromChannels(
-			sessionRefId, channelSet),
-		    taskOwner);
 	    }
 	}
 	
@@ -1395,24 +1261,13 @@ public final class ChannelServiceImpl
 		localPerSessionChannelsMap.remove(sessionRefId);		
 
 	    /*
-	     * Schedule transactional task(s) to remove the
-	     * disconnected session from each channel that it is
+	     * Remove the disconnected session from each channel that it is
 	     * currently a member of.
 	     */
 	    if (channelSet != null) {
 		synchronized (channelSet) {
 		    for (final BigInteger channelRefId : channelSet) {
-			transactionScheduler.scheduleTask(
-			  new AbstractKernelRunnable(
-				"RemoveSessionFromChannel")
-			  {
-			    public void run() {
-				ChannelImpl.removeDisconnectedSession(
-				    localNodeId, sessionRefId, channelRefId);
-			    }
-			}, taskOwner);
 			// Remove session from local channel membership set
-			// NOTE: THIS FIXES A MEMORY LEAK!
 			Set<BigInteger> localMembers =
 			    localChannelMembersMap.get(channelRefId);
 			if (localMembers != null) {
@@ -1642,9 +1497,8 @@ public final class ChannelServiceImpl
      * notifications.  When a node's fails, {@code ChannelService}
      * recovery is distributed.  One node recovers for all the
      * failed coordinators (via the {@code RecoveryListener}),
-     * and each node removes sessions, disconnected from the
-     * failed node, from all the channels for which the node
-     * coordinates.
+     * and each node removes the failed server node IDs
+     * from all the channels for which the node coordinates.
      */
     private class ChannelServiceNodeListener
 	implements NodeListener
@@ -1667,17 +1521,17 @@ public final class ChannelServiceImpl
 		}
 
 		/*
-		 * Schedule persistent task to remove the failed sessions of
-		 * locally coordinated channels.
+		 * Schedule persistent task to remove the failed server's node
+		 * ID from locally coordinated channels.
 		 */
 		transactionScheduler.runTask(
 		    new AbstractKernelRunnable(
-			"ScheduleRemoveFailedSessionsFromLocalChannelsTask")
+			"ScheduleRemoveFailedNodeFromLocalChannelsTask")
 		    {
 			public void run() {
 			    taskService.scheduleTask(
 				new ChannelImpl.
-				    RemoveFailedSessionsFromLocalChannelsTask(
+				    RemoveFailedNodeFromLocalChannelsTask(
 					localNodeId, nodeId));
 			}
 		    }, taskOwner);
@@ -1758,13 +1612,13 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * A task that adds a relocating session to the next channel in the
-     * channel membership set (specified during construction) and then
-     * reschedules itself to handle the next channel.  If there are no
-     * more channels to handle, this task notifies the old node that the
-     * relocating session's channel memberships have been updated.
+     * A task that adds a relocating session's node to the next channel
+     * in the channel membership set (specified during construction) and
+     * then reschedules itself to handle the next channel.  If there are
+     * no more channels to handle, this task notifies the old node that
+     * preparation is completed.
      */
-    private class AddRelocatingSessionToChannels
+    private class AddRelocatingSessionNodeToChannels
 	extends AbstractKernelRunnable
     {
 	private final BigInteger sessionRefId;
@@ -1773,7 +1627,7 @@ public final class ChannelServiceImpl
 	    new LinkedList<BigInteger>();
 
 	/** Constructs an instance. */
-	AddRelocatingSessionToChannels(
+	AddRelocatingSessionNodeToChannels(
 	    BigInteger sessionRefId, long oldNodeId, Set<BigInteger> channelSet)
 	{
 	    super(null);
@@ -1783,9 +1637,9 @@ public final class ChannelServiceImpl
 	}
 
 	/**
-	 * Adds the session to the next channel (if any) in the queue, or
-	 * if the queue is empty, notifies the old node's server that the
-	 * channel memberships have been updated.
+	 * Adds the local node ID to the next channel (if any) in the
+	 * queue, or if the queue is empty, notifies the old node's
+	 * server that preparation is complete.
 	 */
 	public void run() {
 	    final BigInteger channelRefId = channels.poll();
@@ -1800,8 +1654,7 @@ public final class ChannelServiceImpl
 			    ChannelImpl channelImpl = (ChannelImpl)
 				getObjectForId(channelRefId);
 			    if (channelImpl != null) {
-				channelImpl.addSessionRelocatingToLocalNode(
-				    sessionRefId);
+				channelImpl.addServerNodeId(localNodeId);
 			    } else {
 				// TBD: throw Exception to indicate that
 				// channel has been closed so session
@@ -1825,63 +1678,6 @@ public final class ChannelServiceImpl
 		} catch (IOException e) {
 		    // TBD: exception handling...
 		}
-	    }
-	}	
-    }
-
-    /**
-     * A task that removes a relocating session from the next channel
-     * in the channel membership set (specified during construction)
-     * and then reschedules itself to handle the next channel (if
-     * any).
-     */
-    private class RemoveRelocatingSessionFromChannels
-	extends AbstractKernelRunnable
-    {
-	private final BigInteger sessionRefId;
-	private final Queue<BigInteger> channels =
-	    new LinkedList<BigInteger>();
-
-	/** Constructs an instance. */
-	RemoveRelocatingSessionFromChannels(
-	    BigInteger sessionRefId, Set<BigInteger> channelSet)
-	{
-	    super(null);
-	    this.sessionRefId = sessionRefId;
-	    this.channels.addAll(channelSet);
-	}
-
-	/**
-	 * Removes the session from the next channel (if any) in the
-	 * queue.
-	 */
-	public void run() {
-	    final BigInteger channelRefId = channels.poll();
-	    if (channelRefId != null) {
-		try {
-		    // Remove relocating client session from channel
-		    transactionScheduler.runTask(
-		      new AbstractKernelRunnable(
-			    "removeRelocatingSessionFromChannel")
-		      {
-			public void run() {
-			    ChannelImpl channelImpl = (ChannelImpl)
-				getObjectForId(channelRefId);
-			    if (channelImpl != null) {
-				channelImpl.
-				    removeSessionRelocatingFromLocalNode(
-				        sessionRefId);
-			    }
-			}
-		    }, taskOwner);
-		} catch (Exception e) {
-		    // TBD: exception handling...
-		}
-	    }
-	    if (!channels.isEmpty()) {
-		taskScheduler.scheduleTask(this, taskOwner);
-	    } else {
-		relocatingSessions.remove(sessionRefId);
 	    }
 	}	
     }
@@ -1979,9 +1775,6 @@ public final class ChannelServiceImpl
 		localPerSessionChannelsMap.get(sessionRefId);
 	    if (channelSet != null) {
 		channelSet.remove(channelRefId);
-		// TBD: may also need to remove membership binding for new
-		// node due to race condition of leave during relocation.
-		// A leaked binding could be removed during channel send.
 	    }
 
 	    // Send channel leave protocol message.
@@ -2027,7 +1820,9 @@ public final class ChannelServiceImpl
 	private final Set<BigInteger> allMembers = new HashSet<BigInteger>();
 	private boolean completed = false;
 
-	CollectChannelMembershipTask(BigInteger channelRefId, Set<Long> nodeIds) {
+	CollectChannelMembershipTask(
+	    BigInteger channelRefId, Set<Long> nodeIds)
+	{
 	    super(null);
 	    this.channelRefId = channelRefId;
 	    this.nodeIds = nodeIds;

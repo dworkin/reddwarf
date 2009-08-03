@@ -41,27 +41,6 @@ public interface ChannelServer extends Remote {
     void serviceEventQueue(BigInteger channelRefId) throws IOException;
 
     /**
-     * Notifies this server that it should reread the channel
-     * membership list of the specified {@code channelRefId} for
-     * sessions connected to this node before processing any other
-     * events on the channel.  {@code refresh} requests are sent
-     * when a node performs recovery operations for a channel
-     * coordinator failure.  When a channel coordinator fails, a
-     * {@code join}, {@code leave}, or other event notification may
-     * be lost, so any local channel membership information that is
-     * cached may be stale and needs to be reread before processing
-     * any more events.
-     *
-     * @param	name a channel name
-     * @param	channelRefId a channel ID
-     * @param	delivery the channel's delivery requirement
-     * @throws	IOException if a communication problem occurs while
-     * 		invoking this method
-     */
-    void refresh(String name, BigInteger channelRefId, Delivery delivery)
-	throws IOException;
-
-    /**
      * Notifies this server that the locally-connected session with
      * the specified {@code sessionRefId} has joined the channel with
      * the specified {@code name} and {@code channelRefId}.
