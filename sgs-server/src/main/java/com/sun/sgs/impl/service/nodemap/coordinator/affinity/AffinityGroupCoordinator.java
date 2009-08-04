@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
+import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -58,7 +59,7 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
     private final NodeMappingServerImpl server;
     private final GroupFinder finder;
     
-    // Map nodeID -> groupSet
+    // Map nodeID -> groupSet where groupSet is groupId -> group
     private final Map<Long, NavigableSet<AffinityGroup>> groups =
                                new HashMap<Long, NavigableSet<AffinityGroup>>();
 
@@ -106,13 +107,13 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
         finder.stop();
     }
 
+    // TODO - do a better job with locking
     @Override
-    public synchronized void offload(Node oldNode, long newNodeId) {
+    public synchronized void offload(Node oldNode)
+        throws NoNodesAvailableException
+    {
         if (oldNode == null) {
             throw new NullPointerException("oldNode can not be null");
-        }
-        if (newNodeId <= 0) {
-            throw new IllegalArgumentException("invalid node id");
         }
 
         NavigableSet<AffinityGroup> groupSet = groups.get(oldNode.getId());
@@ -120,19 +121,24 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
         // No groups on old node, exit
         if (groupSet == null) return;
 
-        AffinityGroup group = groupSet.pollFirst();
+        for (AffinityGroup group : groupSet) {
 
-        // Empty group set (?), exit
-        if (group == null) return;
+            long newNodeId = server.chooseNode();
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "moving group {0} to node {1}",
-                       group, newNodeId);
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "moving group {0} to node {1}",
+                           group, newNodeId);
+            }
+
+            // Re-target the group and re-insert into groups map
+            group.setTargetNode(newNodeId, server);
+            newGroup(group);
+            
+            // If the node is alive, then just move off one group
+            if (oldNode.isAlive()) {
+                break;
+            }
         }
-
-        // Re-target the group and re-insert into groups map
-        group.setTargetNode(newNodeId, server);
-        newGroup(group);
     }
 
     @Override

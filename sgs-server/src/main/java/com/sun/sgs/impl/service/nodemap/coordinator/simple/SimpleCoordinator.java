@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.nodemap.coordinator.simple;
 
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.IdentityMO;
+import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
 import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -30,7 +31,6 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.Collections;
 import java.util.Properties;
-
 
 /**
  * Simple group coordinator which only deals with single identities.
@@ -47,7 +47,6 @@ public class SimpleCoordinator implements GroupCoordinator {
     {
         this.server = server;
         this.dataService = txnProxy.getService(DataService.class);
-        System.out.println("*** constructing SimpleCoordinator ***");
     }
 
     @Override
@@ -60,8 +59,10 @@ public class SimpleCoordinator implements GroupCoordinator {
         // noop
     }
 
+    // Note that this method will only ever offload a single identity. If the
+    // node is deal, the node mapping server will remove the rest.
     @Override
-    public void offload(Node oldNode, long newNodeId) {
+    public void offload(Node oldNode) throws NoNodesAvailableException {
         GetIdTask task =
                   new GetIdTask(NodeMapUtil.getPartialNodeKey(oldNode.getId()));
         try {
@@ -74,7 +75,7 @@ public class SimpleCoordinator implements GroupCoordinator {
 
         if (idmo != null) {
             server.moveIdentities(Collections.singleton(idmo.getIdentity()),
-                                  oldNode, newNodeId);
+                                  oldNode, server.chooseNode());
         }
     }
 

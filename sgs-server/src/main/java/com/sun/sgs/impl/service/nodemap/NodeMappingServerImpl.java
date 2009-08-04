@@ -847,7 +847,6 @@ public final class NodeMappingServerImpl
         // Create a new task with the move information.
         moveTask = new MoveIdTask(id, oldNode, newNodeId, serviceName);
 
-        System.out.println("mapToNewNode moving id " + id.getName() + " from " + oldNode + " to " + newNodeId);
         if (oldNode != null && oldNode.isAlive()) {
             // Tell the id's old node, so it can tell the id relocation
             // listeners.  We won't actually move the identity until the
@@ -856,7 +855,6 @@ public final class NodeMappingServerImpl
             long oldId = oldNode.getId();
             final NotifyClient oldClient = notifyMap.get(oldId);
             if (oldClient != null) {
-                System.out.println("running IO task");
                 runIoTask(
                     new IoRunnable() {
                         public void run() throws IOException {
@@ -865,7 +863,6 @@ public final class NodeMappingServerImpl
                     }, oldId);
             }
         } else {
-            System.out.println("moving now???");
             // Go ahead and make the move now.
             moveIdAndNotifyListeners(moveTask);
         }
@@ -1109,6 +1106,9 @@ public final class NodeMappingServerImpl
 
                 case ORANGE:
                     assignPolicy.nodeUnavailable(nodeId);
+
+                    // TODO - should schedule a periodic task to offload
+                    // unhealthly node until its health improves??
                     offloadNode(node);
                     break;
 
@@ -1134,19 +1134,16 @@ public final class NodeMappingServerImpl
                 logger.log(Level.FINER, "Offload request for {0}", node);
             }
 
-            // If node is alive we are just offloading due to bad health
-            if (node.isAlive()) {
-                try {
-                    // TODO - should schedule a periodic task to offload
-                    // unhealthly node until its health improves??
-                    groupCoordinator.offload(node,
-                         assignPolicy.chooseNode(NodeAssignPolicy.SERVER_NODE));
-                } catch (NoNodesAvailableException ex) {
-                    logger.log(Level.WARNING,
-                            "Unable to offload node, no other nodes available");
-                }
-            } else {
-                // TODO - realy want to move idententies off in groups...
+            try {
+                groupCoordinator.offload(node);
+            } catch (NoNodesAvailableException ex) {
+                logger.log(Level.WARNING,
+                           "Unable to offload node, no other nodes available");
+            }
+
+            // if the node is dead, offload any identities that are left
+            if (!node.isAlive()) {
+                
                 // Look up each identity on the failed node and move it
                 String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
                 Iterator<Identity> identities =
@@ -1157,6 +1154,17 @@ public final class NodeMappingServerImpl
                 }
             }
         }
+    }
+
+    /**
+     * Choose a node based on the assignment policy.
+     * 
+     * @return a node id
+     * 
+     * @throws com.sun.sgs.impl.service.nodemap.NoNodesAvailableException
+     */
+    public long chooseNode() throws NoNodesAvailableException {
+        return assignPolicy.chooseNode(NodeAssignPolicy.SERVER_NODE);
     }
 
     /**
@@ -1186,8 +1194,10 @@ public final class NodeMappingServerImpl
     private void moveIdentity(Identity identity,
                               Node oldNode, long targetNodeId)
     {
-        System.out.println("moveIdenity: " + identity.getName() +
-                           " from " + oldNode + " to  " + targetNodeId);
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "move {0} from {1} to {2}",
+                       identity.getName(), oldNode, targetNodeId);
+        }
 
         try {
             // If we're already trying to move the identity,
@@ -1203,10 +1213,11 @@ public final class NodeMappingServerImpl
                              NodeAssignPolicy.SERVER_NODE);
             }
         } catch (NoNodesAvailableException e) {
-            // This can be thrown from mapToNewNode if there are
-            // no live nodes or the target node is unavailable.
-            // Stop our loop.
-            //
+            logger.log(Level.WARNING,
+                       "Unable to move identity {0} from node {1}, " +
+                       "no other nodes available",
+                       identity, oldNode);
+
             // TODO - not convinced this is correct.
             // I think the task service needs a positive
             // action here.  I think I need to keep a list

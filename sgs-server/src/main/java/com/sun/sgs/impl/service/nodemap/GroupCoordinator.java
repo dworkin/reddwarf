@@ -42,17 +42,18 @@ public interface GroupCoordinator {
     void stop();
 
     /**
-     * Move one or more identities from the old node to the new node. This
-     * method will select a single group of identities to move. How the group
-     * is selected is implementation dependent.
+     * Move one or more identities off of the old node. If the old node is alive
+     * a single group of identities will be selected to move. How the group
+     * is selected is implementation dependent. If the node is not alive,
+     * all groups will be moved. Note that is this does not guarantee that all
+     * identities will be moved.
      *
      * @param oldNode the node to offload identities
-     * @param newNodeId the id of the node to move identities to
      *
      * @throws NullPointerException if {@code oldNode} is {@code null}
-     * @throws IllegalArgumentException if {@code newNodeId} is <= 0
+     * @throws NoNodesAvailableException if no nodes are available
      */
-    void offload(Node oldNode, long newNodeId);
+    void offload(Node oldNode) throws NoNodesAvailableException;
 
     /**
      * Guess...
