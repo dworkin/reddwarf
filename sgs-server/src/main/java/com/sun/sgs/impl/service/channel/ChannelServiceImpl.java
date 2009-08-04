@@ -192,6 +192,11 @@ public final class ChannelServiceImpl
     private final CacheMap<BigInteger, Set<BigInteger>>
 	channelMembershipCache =
 	    new CacheMap<BigInteger, Set<BigInteger>>(1000);
+
+    /** The cache of event queues, keyed by channel ID. */ 
+    private final ConcurrentHashMap<BigInteger, Queue<ChannelEventInfo>>
+	eventQueueCache =
+	    new ConcurrentHashMap<BigInteger, Queue<ChannelEventInfo>>();
     
     /** The local channel membership lists, keyed by channel ID. */
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
@@ -933,6 +938,107 @@ public final class ChannelServiceImpl
     }
 
     /**
+     * Returns {@code true} if the session with the specified
+     * {@code sessionRefId} is a local member of the channel with
+     * the specified {@code channelRefId}.
+     *
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
+     * @return	{@code true} if the session with the specified
+     *		{@code sessionRefId} is a local member of the
+     *		channel with the specified {@code channelRefId}
+     */
+    boolean isLocalChannelMember(BigInteger channelRefId,
+				 BigInteger sessionRefId)
+    {
+	Set<BigInteger> localMembers =
+	    localChannelMembersMap.get(channelRefId);
+	return localMembers != null && localMembers.contains(sessionRefId);
+    }
+
+    /**
+     * Adds a channel event for the specified channel to its cached
+     * event queue.
+     *
+     * @param	eventType an event type
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID, or {@code null}
+     * @param	timestamp a timestamp for how long to keep this event
+     */
+    void cacheEvent(ChannelEventType eventType,
+		    BigInteger channelRefId,
+		    BigInteger sessionRefId,
+		    long eventTimestamp,
+		    long eventQueueTimestamp)
+    {
+	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
+	if (queue == null) {
+	    Queue<ChannelEventInfo> newQueue =
+	       new LinkedList<ChannelEventInfo>();
+	    queue = eventQueueCache.putIfAbsent(channelRefId, newQueue);
+	    if (queue == null) {
+		queue = newQueue;
+	    }
+	}
+	synchronized (queue) {
+	    // remove events with timestamp < eventTimestamp.
+	    while (!queue.isEmpty()) {
+		ChannelEventInfo info = queue.peek();
+		if (info.timestamp < eventTimestamp) {
+		    queue.poll();
+		} else {
+		    break;
+		}
+	    }
+	    // cache event.
+	    queue.offer(
+	        new ChannelEventInfo(eventType, channelRefId,
+				     sessionRefId, eventQueueTimestamp));
+	}
+    }
+
+    boolean isChannelMember(BigInteger channelRefId,
+			    BigInteger sessionRefId,
+			    boolean isChannelMember,
+			    long timestamp)
+    {
+	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
+	if (queue != null) {
+	    synchronized (queue) {
+		for (ChannelEventInfo info : queue) {
+		    if (info.timestamp > timestamp) {
+			break;
+		    }
+		    
+		    if (info.eventType.equals(ChannelEventType.LEAVE_ALL)) {
+			isChannelMember = false;
+			
+		    } else if (info.sessionRefId.equals(sessionRefId)) {
+			switch (info.eventType) {
+			    
+			case JOIN:
+			    isChannelMember =
+				isChannelMember ||
+				(info.sessionRefId == sessionRefId);
+			    break;
+			    
+			case LEAVE:
+			    isChannelMember =
+				isChannelMember &&
+				(info.sessionRefId != sessionRefId);
+
+			default:
+			    break;
+			}
+		    }
+		}
+	    }		
+	}
+	
+	return isChannelMember;
+    }
+    
+    /**
      * Collects a snapshot of the channel membership for the channel with
      * the specified {@code channelRefId} and set of member {@code
      * nodeIds} and returns an unmodifiable set containing the channel
@@ -1243,6 +1349,7 @@ public final class ChannelServiceImpl
      */
     void closedChannel(BigInteger channelRefId) {
 	coordinatorTaskQueues.remove(channelRefId);
+	eventQueueCache.remove(channelRefId);
 	synchronized (contextList) {
 	    channelTaskQueues.remove(channelRefId);
 	}
@@ -1873,6 +1980,25 @@ public final class ChannelServiceImpl
 		throw new IllegalStateException("not completed");
 	    }
 	    return Collections.unmodifiableSet(allMembers);
+	}
+    }
+
+    enum ChannelEventType { JOIN, LEAVE, LEAVE_ALL };
+    
+    private class ChannelEventInfo {
+
+	final ChannelEventType eventType;
+	final BigInteger channelRefId;
+	final BigInteger sessionRefId;
+	final long timestamp;
+	
+	ChannelEventInfo(ChannelEventType eventType, BigInteger channelRefId,
+			 BigInteger sessionRefId, long timestamp)
+	{
+	    this.eventType = eventType;
+	    this.channelRefId = channelRefId;
+	    this.sessionRefId = sessionRefId;
+	    this.timestamp = timestamp;
 	}
     }
 }
