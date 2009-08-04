@@ -51,6 +51,9 @@ class TransactionListenerDetailImpl implements TransactionListenerDetail {
      * @oaram listenerName the name of the listener associated with this detail
      */
     TransactionListenerDetailImpl(String listenerName) {
+        if (listenerName == null) {
+            throw new NullPointerException("name must not be null");
+        }
         this.name = listenerName;
     }
 
@@ -84,7 +87,7 @@ class TransactionListenerDetailImpl implements TransactionListenerDetail {
     /* Package-private modifier methods. */
 
     /**
-     * Sets that the lister's {@code beforeCompletion} method was called,
+     * Sets that the listener's {@code beforeCompletion} method was called,
      * whether it failed, and how long the call took
      */
     void setCalledBeforeCompletion(boolean failed, long time) {

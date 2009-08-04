@@ -36,7 +36,15 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Provides an implementation of Transaction. */
+/**
+ * Provides an implementation of Transaction. <p>
+ *
+ * Note that this implementation does not check that each joining
+ * {@code TransactionParticipant} has a unique value for {@code getTypeName}.
+ * Nor is this check done for {@code TransactionListener}s. If two
+ * participants or listeners have the same type name then their
+ * profiling data will be aggregated and reported as a single result.
+ */
 final class TransactionImpl implements Transaction {
 
     /** Logger for this class. */
@@ -314,7 +322,7 @@ final class TransactionImpl implements Transaction {
 	    listeners.add(listener);
 	}
         if (listenerDetailMap != null) {
-            String name = listener.getClass().getName();
+            String name = listener.getTypeName();
             listenerDetailMap.put(name,
                                   new TransactionListenerDetailImpl(name));
         }
@@ -499,8 +507,7 @@ final class TransactionImpl implements Transaction {
 		TransactionListener listener = listeners.get(i);
 		try {
                     if (listenerDetailMap != null) {
-                        detail = listenerDetailMap.
-                            get(listener.getClass().getName());
+                        detail = listenerDetailMap.get(listener.getTypeName());
                         startTime = System.currentTimeMillis();
                     }
 		    listener.beforeCompletion();
@@ -541,8 +548,7 @@ final class TransactionImpl implements Transaction {
 	    for (TransactionListener listener : listeners) {
 		try {
                     if (listenerDetailMap != null) {
-                        detail = listenerDetailMap.
-                            get(listener.getClass().getName());
+                        detail = listenerDetailMap.get(listener.getTypeName());
                         startTime = System.currentTimeMillis();
                     }
 		    listener.afterCompletion(commited);

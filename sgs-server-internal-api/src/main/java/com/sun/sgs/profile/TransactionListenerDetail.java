@@ -32,7 +32,7 @@ public interface TransactionListenerDetail {
     /**
      * Returns the name of the listener.
      *
-     * @return the listener's name.
+     * @return the listener's name
      */
     String getListenerName();
 

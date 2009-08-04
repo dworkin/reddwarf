@@ -71,4 +71,14 @@ public interface TransactionListener {
      *		{@code false} if it aborted
      */
     void afterCompletion(boolean committed);
+
+    /**
+     * Returns the fully qualified type name of the listener. Typically this
+     * is the implementing class or some other distinguishing name that will
+     * remain constant between transactions.
+     * 
+     * @return the name of the listener
+     */
+    String getTypeName();
+
 }
