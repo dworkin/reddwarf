@@ -97,12 +97,19 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     // Set to true if something has gone wrong and the results from
     // this algorithm run should be ignored
-    private boolean failed;
+    private boolean runFailed;
     
     // A thread pool.  Will create as many threads as needed (I was having
     // starvation problems using a fixed thread pool - JANE?), with a timeout
     // of 60 sec before unused threads are reaped.
     private final ExecutorService executor = Executors.newCachedThreadPool();
+
+    // A lock to ensure we block a run of the algorithm if a current run
+    // is still going.  TBD:  what behavior do we want?  Throw an exception?
+    // "merge" the two run attempts - e.g. second run just returns the result
+    // of the ongoing first one?  Abort the first one?
+    private final Object runningLock = new Object();
+    private boolean running = false;
 
     /**
      * Constructs a new label propagation server. Only one should exist
@@ -123,6 +130,18 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     /** {@inheritDoc} */
     public Collection<AffinityGroup> findAffinityGroups() {
+        // Our return value, initally empty
+        Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
+        synchronized (runningLock) {
+            while (running) {
+                try {
+                    runningLock.wait();
+                } catch (InterruptedException e) {
+                    return retVal;
+                }
+            }
+            running = true;
+        }
         // This server controls the running of the distributed label
         // propagation algorithm, using the LPAServer and LPAClient
         // interfaces.  The protocol is:
@@ -149,12 +168,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
         // Don't pay any attention to changes while we're running, at least
         // to start with.  If a node fails, we'll stop and return no information
-        // for now.  JANE does that make sense?  If a node fails, a lot of
-        // churn will be created.
+        // for now.  When a node fails, a lot of changes will occur in the
+        // graphs as we move identities from the failed node to new nodes.
         final Map<Long, LPAClient> clientProxyCopy =
                 new HashMap<Long, LPAClient>(clientProxyMap);
         
-        failed = false;
+        runFailed = false;
         nodesConverged = false;
 
         // Tell each node to prepare for the algorithm to start
@@ -166,13 +185,17 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                        "Algorithm prepare took {0} milliseconds", time);
         }
 
-        // Run the algorithm in multiple iterations, until it has failed
+        // Run the algorithm in multiple iterations, until it has runFailed
         // or converged
         runIterations(clientProxyCopy);
 
         // Now, gather up our results
-        if (failed) {
-            return new HashSet<AffinityGroup>();
+        if (runFailed) {
+            synchronized (runningLock) {
+                running = false;
+                runningLock.notifyAll();
+            }
+            return retVal;
         }
 
         // If, after this point, we cannot contact a node, simply
@@ -182,20 +205,30 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         final Set<AffinityGroup> returnedGroups =
                 Collections.synchronizedSet(new HashSet<AffinityGroup>());
         latch = new CountDownLatch(clientProxyCopy.keySet().size());
-        for (final LPAClient proxy : clientProxyCopy.values()) {
+        for (final Map.Entry<Long, LPAClient> ce :
+                       clientProxyCopy.entrySet())
+        {
+            final LPAClient proxy = ce.getValue();
             executor.execute(new Runnable() {
                 public void run() {
                     try {
                         returnedGroups.addAll(proxy.affinityGroups(true));
-                    } catch (IOException ioe) {
-                        failed = true;
-                        ioe.printStackTrace();
-                        // NEED retry here.
-                    } catch (Exception e) {
-                        failed = true;
-                    } finally {
-                        // this will need to change when we have retries
                         latch.countDown();
+                    } catch (IOException ioe) {
+                        ioe.printStackTrace();
+                        // JANE NEED retry here.  If the retries fail,
+                        // be sure to count down the latch
+                        if (nodeBarrier.remove(ce.getKey())) {
+                            latch.countDown();
+                        }
+                        removeNode(ce.getKey());
+                    } catch (Exception e) {
+                        logger.logThrow(Level.INFO, e,
+                            "exception from node {0} while returning groups",
+                            ce.getKey());
+                        if (nodeBarrier.remove(ce.getKey())) {
+                            latch.countDown();
+                        }
                     }
                 }
             });
@@ -219,7 +252,6 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
 
         // convert our types
-        Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
         for (AffinityGroupImpl agi : groupMap.values()) {
             retVal.add(agi);
         }
@@ -240,6 +272,10 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             logger.log(Level.FINE, sb.toString());
         }
 
+        synchronized (runningLock) {
+            running = false;
+            runningLock.notifyAll();
+        }
         return retVal;
     }
 
@@ -260,10 +296,13 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     /** {@inheritDoc} */
     public void readyToBegin(long nodeId, boolean failed) throws IOException {
+        if (failed) {
+            logger.log(Level.INFO, "node {0} reports failure", nodeId);
+        }
+        runFailed = runFailed || failed;
         if (nodeBarrier.remove(nodeId)) {
             latch.countDown();
         }
-        this.failed = this.failed || failed;
     }
 
     /** {@inheritDoc} */
@@ -271,10 +310,15 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                                   boolean failed, int iteration)
             throws IOException
     {
-        this.failed = this.failed || failed;
+        if (failed) {
+            logger.log(Level.INFO, "node {0} reports failure", nodeId);
+        }
+        runFailed = runFailed || failed;
         if (iteration != currentIteration) {
-            // THINGS ARE VERY CONFUSED - need to log this
-            failed = true;
+            logger.log(Level.INFO, "unexpected iteration: {0} on node {1}, " +
+                    "expected {2}, marking run failed",
+                    iteration, nodeId, currentIteration);
+            runFailed = true;
         }
         nodesConverged = converged && nodesConverged;
 
@@ -314,11 +358,21 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                     try {
                         ce.getValue().prepareAlgorithm();
                     } catch (IOException ioe) {
-                        failed = true;
-                        // NEED retry logic here.  If we cannot reach
-                        // the proxy, we need to remove it from the
+                        runFailed = true;
+                        ioe.printStackTrace();
+                        // JANE NEED retry here.  If the retries fail,
+                        // be sure to count down the latch
+                        latch.countDown();
+                        // If we cannot reach the proxy after retries, we need
+                        // to remove it from the
                         // clientProxyMap.
                         removeNode(ce.getKey());
+                    } catch (Exception e) {
+                        logger.logThrow(Level.INFO, e,
+                            "exception from node {0} while preparing",
+                            ce.getKey());
+                        runFailed = true;
+                        latch.countDown();
                     }
                 }
             });
@@ -333,7 +387,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 Collections.unmodifiableSet(clientProxies.keySet());
         final int cleanSize = clean.size();
         currentIteration = 1;
-        while (!failed && !nodesConverged) {
+        while (!runFailed && !nodesConverged) {
             // Assume we'll converge unless told otherwise; all nodes must
             // say we've converged for nodesConverged to remain true in
             // this iteration
@@ -349,11 +403,21 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                         try {
                             ce.getValue().startIteration(currentIteration);
                         } catch (IOException ioe) {
-                            failed = true;
-                            // NEED retry logic here.  If we cannot reach
-                            // the proxy, we need to remove it from the
-                            // clientProxyMap.
+                            runFailed = true;
+                            ioe.printStackTrace();
+                            // JANE NEED retry here.  If the retries fail,
+                            // be sure to count down the latch
+                            latch.countDown();
+                            // If we cannot reach the proxy after retries,
+                            // we need to remove it from the clientProxyMap.
                             removeNode(ce.getKey());
+                        } catch (Exception e) {
+                            logger.logThrow(Level.INFO, e,
+                                "exception from node {0} while running " +
+                                "iteration {1}",
+                                ce.getKey(), currentIteration);
+                            runFailed = true;
+                            latch.countDown();
                         }
                     }
                 });
@@ -374,7 +438,11 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         try {
             latch.await(TIMEOUT, TimeUnit.MINUTES);
         } catch (InterruptedException ex) {
-            failed = true;
+            runFailed = true;
         }
+        // Prepare for next phase of the algorithm.  This ensures that
+        // we remember to create a new count down latch for each phase,
+        // as count down latches cannot be reused.
+        latch = null;
     }
 }

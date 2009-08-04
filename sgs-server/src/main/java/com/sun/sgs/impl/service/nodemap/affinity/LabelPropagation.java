@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -404,14 +403,16 @@ public class LabelPropagation implements LPAClient {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Set<Integer>> getRemoteLabels(Collection<Object> objIds)
+    public Map<Object, Map<Integer, Integer>> getRemoteLabels(
+                Collection<Object> objIds)
             throws IOException
     {
         if (vertices == null) {
             // We can be called before our own initialization is done
             initializeLPARun();
         }
-        Map<Object, Set<Integer>> retMap = new HashMap<Object, Set<Integer>>();
+        Map<Object, Map<Integer, Integer>> retMap =
+                new HashMap<Object, Map<Integer, Integer>>();
         if (objIds == null) {
             // This is unexpected;  the other node should have passed in an
             // empty collection
@@ -426,7 +427,7 @@ public class LabelPropagation implements LPAClient {
         for (Object obj : objIds) {
             // look up the set of identities
             Map<Identity, Integer> idents = objectMap.get(obj);
-            Set<Integer> intSet = new HashSet<Integer>();
+            Map<Integer, Integer> intMap = new HashMap<Integer, Integer>();
             if (idents != null) {
                 for (Identity id : idents.keySet()) {
                     // JANE not dealing with weights here
@@ -444,11 +445,17 @@ public class LabelPropagation implements LPAClient {
                         // and we just ignore the label.
                         // Otherwise, add the label to set of labels for
                         // this identity.
-                        intSet.add(vertices.get(index).getLabel());
+
+                        // not yet taking weights into account
+                        Integer label = vertices.get(index).getLabel();
+                        Integer oldCount = intMap.get(label);
+                        Integer updateCount = (oldCount == null) ? 1 :
+                                                1 + oldCount;
+                        intMap.put(label, updateCount);
                     }
                 }
             }
-            retMap.put(obj, intSet);
+            retMap.put(obj, intMap);
         }
         return retMap;
     }
@@ -490,7 +497,7 @@ public class LabelPropagation implements LPAClient {
             assert (map != null);
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
                        localNodeId, nodeId);
-            Map<Object, Set<Integer>> labels =
+            Map<Object, Map<Integer, Integer>> labels =
                     proxy.getRemoteLabels(
                         new HashSet<Object>(map.keySet()));
             if (labels == null) {
@@ -502,11 +509,11 @@ public class LabelPropagation implements LPAClient {
             }
 
             // Process the returned labels
-            for (Map.Entry<Object, Set<Integer>> remoteEntry :
+            for (Map.Entry<Object, Map<Integer, Integer>> remoteEntry :
                  labels.entrySet())
             {
                 Object remoteObject = remoteEntry.getKey();
-                Set<Integer> remoteLabels = remoteEntry.getValue();
+                Map<Integer, Integer> remoteLabels = remoteEntry.getValue();
                 Map<Identity, Integer> objUse = objectMap.get(remoteObject);
                 if (objUse == null) {
                     // no local uses of this object
@@ -523,11 +530,22 @@ public class LabelPropagation implements LPAClient {
                         labelCount =
                                 new ConcurrentHashMap<Integer, Integer>();
                     }
-                    for (Integer label : remoteLabels) {
-                        Integer oldCount = labelCount.get(label);
-                        Integer updateCount = (oldCount == null) ? weight :
-                                                weight + oldCount;
-                        labelCount.put(label, updateCount);
+                    for (Map.Entry<Integer, Integer> rLabelCount : 
+                        remoteLabels.entrySet())
+                    {
+                        Integer rlabel = rLabelCount.getKey();
+                        Integer rcount = rLabelCount.getValue();
+                        int newWeight = Math.min(weight, rcount);
+
+                        Integer oldCount = labelCount.get(rlabel);
+                        Integer updateCount = (oldCount == null) ? newWeight :
+                                                newWeight + oldCount;
+                        labelCount.put(rlabel, updateCount);
+                        logger.log(Level.FINEST,
+                                "{0}: label {1}, updateCount {2}, " +
+                                "newWeight {3} : ident {4}",
+                                localNodeId, rlabel, updateCount,
+                                newWeight, ident);
                     }
                     remoteLabelMap.put(ident, labelCount);
                 }
@@ -708,7 +726,6 @@ public class LabelPropagation implements LPAClient {
         } else {
             vertices = new ArrayList<LabelVertex>(graphVertices);
         }
-        logger.log(Level.FINEST, "{0}: vertices is {1}", localNodeId, vertices);
         logger.log(Level.FINEST,
                 "{0}: finished initializing LPA run", localNodeId);
     }
@@ -810,9 +827,6 @@ public class LabelPropagation implements LPAClient {
 
         StringBuffer logSB = new StringBuffer();
         for (LabelVertex neighbor : neighbors) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logSB.append(neighbor + " ");
-            }
             Integer label = neighbor.getLabel();
             Long value = labelMap.containsKey(label) ?
                             labelMap.get(label) : 0;
@@ -826,6 +840,9 @@ public class LabelPropagation implements LPAClient {
                 long edgew = 0;
                 for (WeightedEdge edge : edges) {
                     edgew += edge.getWeight();
+                }
+                if (logger.isLoggable(Level.FINEST)) {
+                    logSB.append(neighbor + "(" + edgew + ") ");
                 }
                 // Using vertex preference alone causes the single threaded
                 // version to drop quite a bit for Zachary and a preference of

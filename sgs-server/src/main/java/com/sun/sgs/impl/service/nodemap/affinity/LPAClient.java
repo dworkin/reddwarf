@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * The label propagation algorithm clients, which can be called by
@@ -94,9 +93,10 @@ public interface LPAClient extends Remote {
      * @param objIds the collection of objects, representing edges, that
      *               we want neighbor node information for
      * @return a map of Objects (one for each element of {@code objIds}) to
-     *               neighbor labels
+     *               neighbor labels, with a count
      * @throws IOException if there is a communication problem
      */
-    Map<Object, Set<Integer>> getRemoteLabels(Collection<Object> objIds)
+    Map<Object, Map<Integer, Integer>> getRemoteLabels(
+                Collection<Object> objIds)
             throws IOException;
 }

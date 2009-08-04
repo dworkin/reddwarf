@@ -319,19 +319,21 @@ public class TestLPA {
         Set<Object> objIds = new HashSet<Object>();
         objIds.add("obj1");
         objIds.add("obj2");
-        Map<Object, Set<Integer>> labels = lp1.getRemoteLabels(objIds);
-        assertEquals(2, labels.size());
-        assertTrue(labels.keySet().equals(objIds));
-        Set<Integer> obj1Set = labels.get("obj1");
-        assertEquals(2, obj1Set.size());
-        for (Integer label : obj1Set) {
+
+        Map<Object, Map<Integer, Integer>> labelMap =
+                lp1.getRemoteLabels(objIds);
+        assertEquals(2, labelMap.size());
+        assertTrue(labelMap.keySet().equals(objIds));
+        Map<Integer, Integer> obj1Map = labelMap.get("obj1");
+        assertEquals(2, obj1Map.size());
+        for (Integer label : obj1Map.keySet()) {
             assertTrue(label.equals(1) || label.equals(2));
 //            assertTrue(label.equals(id1.getName().hashCode()) ||
 //                       label.equals(id2.getName().hashCode()));
         }
-        Set<Integer> obj2Set = labels.get("obj2");
-        assertEquals(1, obj2Set.size());
-        for (Integer label : obj2Set) {
+        Map<Integer, Integer> obj2Map = labelMap.get("obj2");
+        assertEquals(1, obj2Map.size());
+        for (Integer label : obj2Map.keySet()) {
             assertTrue(label.equals(2));
 //            assertTrue(label.equals(id2.getName().hashCode()));
         }
@@ -470,7 +472,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Set<Integer>> getRemoteLabels(
+        public Map<Object, Map<Integer, Integer>> getRemoteLabels(
                 Collection<Object> objIds) throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
@@ -512,7 +514,8 @@ public class TestLPA {
                     nodes[i] = new LabelVertex(idents[i]);
                     graph.addVertex(nodes[i]);
                 }
-                graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
+                graph.addEdge(new WeightedEdge(2), nodes[0], nodes[1]);
+
 
                 // Obj uses
                 Map<Identity, Integer> tempMap =
