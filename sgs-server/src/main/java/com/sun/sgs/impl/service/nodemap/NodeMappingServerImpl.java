@@ -797,7 +797,7 @@ public final class NodeMappingServerImpl
         throws NoNodesAvailableException
     {
         assert (id != null);
-        
+
         // First, check to see if we're already trying to move this identity
         // and we haven't gone past the expire time.
         // If so, just return the node we're trying to move it to.
@@ -812,7 +812,7 @@ public final class NodeMappingServerImpl
                 moveMap.remove(id);
             }
         }
-        
+
         // Choose the node.  This needs to occur outside of a transaction,
         // as it could take a while.  
         final long newNodeId;
@@ -832,7 +832,7 @@ public final class NodeMappingServerImpl
             }
             newNodeId = targetNodeId;
         }
-        
+
         if (oldNode != null && newNodeId == oldNode.getId()) {
             // We picked the same node.  This might be OK - the system might
             // only have one node, or the current node might simply be the
@@ -1137,20 +1137,24 @@ public final class NodeMappingServerImpl
             // If node is alive we are just offloading due to bad health
             if (node.isAlive()) {
                 try {
-                    // TODO - should schedule a periodic offload task to offload
-                    // unhealth node until it reaches a better condition??
+                    // TODO - should schedule a periodic task to offload
+                    // unhealthly node until its health improves??
                     groupCoordinator.offload(node,
                          assignPolicy.chooseNode(NodeAssignPolicy.SERVER_NODE));
                 } catch (NoNodesAvailableException ex) {
-                    logger.logThrow(Level.FINEST, ex, "Exception ignored");
+                    logger.log(Level.WARNING,
+                            "Unable to offload node, no other nodes available");
                 }
             } else {
+                // TODO - realy want to move idententies off in groups...
                 // Look up each identity on the failed node and move it
                 String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
                 Iterator<Identity> identities =
                             new GetIdOnNodeTask(dataService, nodekey, logger);
                 // Node is dead, move everyone
-                moveIdentities(identities, node, -1);
+                while (identities.hasNext() && !shuttingDown()) {
+                    moveIdentity(identities.next(), node, -1);
+                }
             }
         }
     }
@@ -1170,56 +1174,54 @@ public final class NodeMappingServerImpl
     public void moveIdentities(Set<Identity> identities,
                                Node oldNode, long targetNodeId)
     {
-        moveIdentities(identities.iterator(), oldNode, targetNodeId);
-    }
-
-    private void moveIdentities(Iterator<Identity> identities,
-                                Node oldNode, long targetNodeId)
-    {
-        System.out.println("moveIdenities " + oldNode + "  " + targetNodeId);
-        while (identities.hasNext()) {
+        for (Identity identity : identities) {
             // Break out of the loop if we're shutting down.
             if (shuttingDown()) {
                 break;
             }
-            Identity id = identities.next();
-             System.out.println("moveing " + id.getName());
-            try {
-                // If we're already trying to move the identity,
-                // but the old node failed before preparations are
-                // complete, just make the move now.
-                MoveIdTask moveTask = moveMap.remove(id);
-                if (moveTask != null) {
-                    moveIdAndNotifyListeners(moveTask);
-                } else {
-                    mapToNewNode(id, null,
-                                 oldNode == null ? getNode(id) : oldNode,
-                                 targetNodeId,
-                                 NodeAssignPolicy.SERVER_NODE);
-                }
-            } catch (NoNodesAvailableException e) {
-                // This can be thrown from mapToNewNode if there are
-                // no live nodes or the target node is unavailable.
-                // Stop our loop.
-                //
-                // TODO - not convinced this is correct.
-                // I think the task service needs a positive
-                // action here.  I think I need to keep a list
-                // somewhere of failed nodes, and have a background
-                // thread that tries to move them.
-                if ((oldNode != null) && !oldNode.isAlive()) {
-                    removeQueue.add(new RemoveInfo(id));
-                }
-                break;
-            } catch (Exception ex) {
-                logger.logThrow(Level.WARNING, ex,
-                    "Failed to move identity {0} from node {1}",
-                    id, oldNode);
-                break;
-            }
+            moveIdentity(identity, oldNode, targetNodeId);
         }
     }
-    
+
+    private void moveIdentity(Identity identity,
+                              Node oldNode, long targetNodeId)
+    {
+        System.out.println("moveIdenity: " + identity.getName() +
+                           " from " + oldNode + " to  " + targetNodeId);
+
+        try {
+            // If we're already trying to move the identity,
+            // but the old node failed before preparations are
+            // complete, just make the move now.
+            MoveIdTask moveTask = moveMap.remove(identity);
+            if (moveTask != null) {
+                moveIdAndNotifyListeners(moveTask);
+            } else {
+                mapToNewNode(identity, null,
+                             oldNode == null ? getNode(identity) : oldNode,
+                             targetNodeId,
+                             NodeAssignPolicy.SERVER_NODE);
+            }
+        } catch (NoNodesAvailableException e) {
+            // This can be thrown from mapToNewNode if there are
+            // no live nodes or the target node is unavailable.
+            // Stop our loop.
+            //
+            // TODO - not convinced this is correct.
+            // I think the task service needs a positive
+            // action here.  I think I need to keep a list
+            // somewhere of failed nodes, and have a background
+            // thread that tries to move them.
+            if ((oldNode != null) && !oldNode.isAlive()) {
+                removeQueue.add(new RemoveInfo(identity));
+            }
+        } catch (Exception ex) {
+            logger.logThrow(Level.WARNING, ex,
+                "Failed to move identity {0} from node {1}",
+                identity, oldNode);
+        }
+    }
+
     /**
      *  Task to support offloading a node, run under a transaction.
      *  Finds the identities that are on the specified node and makes them

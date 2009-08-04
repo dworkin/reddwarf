@@ -222,15 +222,13 @@ public class UserGroupFinderServerImpl implements GroupFinder,
             }
         }
         
-        if (!groups.isEmpty()) {
-            List<AffinityGroup> affinityGroups =
-                                    new ArrayList<AffinityGroup>(groups.size());
+        List<AffinityGroup> affinityGroups =
+                                new ArrayList<AffinityGroup>(groups.size());
 
-            for (Map.Entry<Long, Map<Identity, Long>> e : groups.entrySet()) {
-                affinityGroups.add(new AffinityGroup(e.getKey(), e.getValue()));
-            }
-            coordinator.newGroups(affinityGroups);
+        for (Map.Entry<Long, Map<Identity, Long>> e : groups.entrySet()) {
+            affinityGroups.add(new AffinityGroup(e.getKey(), e.getValue()));
         }
+        coordinator.newGroups(affinityGroups);
     }
     
     private void associations(Map<Long, Map<Identity, Long>> groups,

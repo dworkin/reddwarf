@@ -157,6 +157,8 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
     }
 
     private void newGroup(AffinityGroup group) {
+
+        // The findTargetNode call may cause client sessions to move
         long targetNodeId = group.findTargetNode(server);
         NavigableSet<AffinityGroup> groupSet = groups.get(targetNodeId);
         if (groupSet == null) {
