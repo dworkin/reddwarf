@@ -184,7 +184,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         return affinityGraph;
     }
 

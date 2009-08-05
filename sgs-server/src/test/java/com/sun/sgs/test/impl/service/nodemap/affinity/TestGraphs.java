@@ -28,8 +28,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
-import edu.uci.ics.jung.graph.Graph;
-import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -190,10 +189,10 @@ public class TestGraphs {
      * graph.
      */
     private static class TestToyBuilder implements GraphBuilder {
-        private final Graph<LabelVertex, WeightedEdge> graph;
+        private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
         public TestToyBuilder() {
-            graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
+            graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
             LabelVertex[] nodes = new LabelVertex[6];
             for (int i = 1; i < nodes.length; i++) {
@@ -214,7 +213,9 @@ public class TestGraphs {
         }
 
         /** {@inheritDoc} */
-        public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+        public UndirectedSparseGraph<LabelVertex, WeightedEdge>
+                getAffinityGraph()
+        {
             return graph;
         }
         /** {@inheritDoc} */

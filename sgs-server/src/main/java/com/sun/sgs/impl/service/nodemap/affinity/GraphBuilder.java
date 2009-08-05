@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -100,7 +100,7 @@ public interface GraphBuilder {
      *
      * @return the graph of access information
      */
-    Graph<LabelVertex, WeightedEdge> getAffinityGraph();
+    UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph();
 
     /**
      * Returns a map of local object uses to the identities that used

@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.Exporter;
-import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -106,7 +106,7 @@ public class LabelPropagation implements LPAClient {
 
     // The graph in which we're finding communities.  This is a live
     // graph for some graph builders;  we have to be able to handle changes.
-    private volatile Graph<LabelVertex, WeightedEdge> graph;
+    private volatile UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
     // For now, we're only grabbing the vertices of interest at the
     // start of the algorithm.  This will change. JANE
@@ -833,26 +833,17 @@ public class LabelPropagation implements LPAClient {
             Integer label = neighbor.getLabel();
             Long value = labelMap.containsKey(label) ?
                             labelMap.get(label) : 0;
-            // Use findEdgeSet to allow parallel edges
-            Collection<WeightedEdge> edges =
-                    graph.findEdgeSet(vertex, neighbor);
-            // edges will be null if vertex and neighbor are no longer 
-            // connected or if either vertex is no longer present
-            // in that case, do nothing
-            if (edges != null) {
-                long edgew = 0;
-                for (WeightedEdge edge : edges) {
-                    edgew += edge.getWeight();
-                }
+            WeightedEdge edge = graph.findEdge(vertex, neighbor);
+            if (edge != null) {
                 if (logger.isLoggable(Level.FINEST)) {
-                    logSB.append(neighbor + "(" + edgew + ") ");
+                    logSB.append(neighbor + "(" + edge.getWeight() + ") ");
                 }
                 // Using vertex preference alone causes the single threaded
                 // version to drop quite a bit for Zachary and a preference of
                 // 0.1 or 0.2, and nice modularity boost at -0.1
 //                oldWeight +=
 //                    Math.pow(graph.degree(neighbor), nodePref) * edgew;
-                value += edgew;
+                value += edge.getWeight();
                 labelMap.put(label, value);
             }
         }

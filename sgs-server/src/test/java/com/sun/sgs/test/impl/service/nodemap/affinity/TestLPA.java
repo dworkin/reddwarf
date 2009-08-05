@@ -34,6 +34,7 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -481,8 +482,8 @@ public class TestLPA {
 
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements GraphBuilder {
-        private final Graph<LabelVertex, WeightedEdge> graph;
-        private final  ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
+        private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
+        private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
                 conflictMap;
         private final Map<Object, Map<Identity, Long>> objUseMap;
 
@@ -499,7 +500,7 @@ public class TestLPA {
         // ids 4,5 used obj3
         public PartialToyBuilder(long node) {
             super();
-            graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
+            graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
             conflictMap = new ConcurrentHashMap<Long, 
                                     ConcurrentHashMap<Object, Long>>();
@@ -577,7 +578,9 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+        public UndirectedSparseGraph<LabelVertex, WeightedEdge>
+                getAffinityGraph()
+        {
             return graph;
         }
 
@@ -606,7 +609,7 @@ public class TestLPA {
 
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
     private class DistributedZachBuilder implements GraphBuilder {
-        private final Graph<LabelVertex, WeightedEdge> graph;
+        private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
         private final 
             ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
             conflictMap;
@@ -624,7 +627,7 @@ public class TestLPA {
 
         public DistributedZachBuilder(long node) {
             super();
-            graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
+            graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
             conflictMap = new ConcurrentHashMap<Long,
                                     ConcurrentHashMap<Object, Long>>();
@@ -1050,7 +1053,9 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+        public UndirectedSparseGraph<LabelVertex, WeightedEdge>
+                getAffinityGraph()
+        {
             return graph;
         }
 

@@ -24,6 +24,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.Collection;
@@ -142,7 +143,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
 
         // Copy our input graph
@@ -161,9 +162,10 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         // vertices in the affinity graph
         Collection<Identity> vertices = new HashSet<Identity>();
         
-        // Our final, folded graph.
-        Graph<LabelVertex, WeightedEdge> foldedGraph =
-            new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
+        // Our final, folded graph.  No parallel edges;  they have been
+        // collapsed into a single weighted edge.
+        UndirectedSparseGraph<LabelVertex, WeightedEdge> foldedGraph =
+            new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
         
         // Separate out the vertex set for our new folded graph.
         for (Object vert : graphCopy.getVertices()) {
@@ -453,8 +455,8 @@ public class BipartiteGraphBuilder implements GraphBuilder {
      * @param <V>  the vertex type
      * @param <E>  the edge type
      */
-    private static class CopyableGraph<V, E> extends
-            UndirectedSparseMultigraph<V, E>
+    private static class CopyableGraph<V, E> 
+            extends UndirectedSparseGraph<V, E>
     {
 
         /** Serialization version. */
@@ -474,7 +476,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         public CopyableGraph(CopyableGraph<V, E> other) {
             super();
             synchronized (other) {
-                vertices = new HashMap<V, Set<E>>(other.vertices);
+                vertices = new HashMap<V, Map<V, E>>(other.vertices);
                 edges = new HashMap<E, Pair<V>>(other.edges);
             }
         }

@@ -24,8 +24,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
-import edu.uci.ics.jung.graph.Graph;
-import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.Assert;
@@ -36,11 +35,11 @@ import org.junit.Assert;
  */
 class ZachBuilder implements GraphBuilder {
 
-    private final Graph<LabelVertex, WeightedEdge> graph;
+    private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
     public ZachBuilder() {
         super();
-        graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
+        graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
         // Create a graph for the Zachary network:
         // W. W. Zachary, An information flow model for conflict and
         // fission in small group,
@@ -134,7 +133,7 @@ class ZachBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Graph<LabelVertex, WeightedEdge> getAffinityGraph() {
+    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         return graph;
     }
 
