@@ -38,6 +38,7 @@ import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.TransactionListenerDetail;
 
 import java.beans.PropertyChangeEvent;
 
@@ -472,6 +473,31 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                                             "to a non-transactional task");
         }
         profileReport.addParticipant(participantDetail);
+    }
+
+    /**
+     * Tells the collector about a listener of a transaction when that
+     * listener is finished with its work (i.e., after its afterCompletion
+     * method has been called).
+     *
+     * @param listenerDetail the detail associated with the listener
+     */
+    void addTransactionListener(TransactionListenerDetail listenerDetail) {
+        if (listenerDetail == null) {
+            throw new NullPointerException("Listener detail cannot be null");
+        }
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().peek();
+        } catch (EmptyStackException ese) {
+            throw new IllegalStateException("No task is being profiled in " +
+                                            "this thread");
+        }
+        if (!profileReport.wasTaskTransactional()) {
+            throw new IllegalStateException("Listeners cannot be added " +
+                                            "to a non-transactional task");
+        }
+        profileReport.addListener(listenerDetail);
     }
 
     /**

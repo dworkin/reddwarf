@@ -269,6 +269,11 @@ final class Context extends TransactionContext implements TransactionListener {
      */
     public void afterCompletion(boolean commit) { }
 
+    /** {@inheritDoc} */
+    public String getTypeName() {
+        return Context.class.getName();
+    }
+
     /* -- Other methods -- */
 
     /**

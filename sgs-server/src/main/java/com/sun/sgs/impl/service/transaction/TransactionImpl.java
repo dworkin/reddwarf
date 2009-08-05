@@ -36,7 +36,15 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Provides an implementation of Transaction. */
+/**
+ * Provides an implementation of Transaction. <p>
+ *
+ * Note that this implementation does not check that each joining
+ * {@code TransactionParticipant} has a unique value for {@code getTypeName}.
+ * Nor is this check done for {@code TransactionListener}s. If two
+ * participants or listeners have the same type name then their
+ * profiling data will be aggregated and reported as a single result.
+ */
 final class TransactionImpl implements Transaction {
 
     /** Logger for this class. */
@@ -102,7 +110,14 @@ final class TransactionImpl implements Transaction {
     /** Collected profiling data on each participant, created only if
      *  global profiling is set to MEDIUM at the start of the transaction.
      */
-    private final HashMap<String, ProfileParticipantDetailImpl> detailMap;
+    private final HashMap<String, ProfileParticipantDetailImpl>
+        participantDetailMap;
+
+    /** Collected profiling data on each listener, created only if
+     *  global profiling is set to MEDIUM at the start of the transaction.
+     */
+    private final HashMap<String, TransactionListenerDetailImpl>
+        listenerDetailMap;
 
     /**
      * The registered {@code TransactionListener}s, or {@code null}.  The
@@ -129,9 +144,13 @@ final class TransactionImpl implements Transaction {
                 getDefaultProfileLevel().ordinal() >= 
                 ProfileLevel.MEDIUM.ordinal()) 
         {
-	    detailMap = new HashMap<String, ProfileParticipantDetailImpl>();
+	    participantDetailMap =
+                new HashMap<String, ProfileParticipantDetailImpl>();
+            listenerDetailMap =
+                new HashMap<String, TransactionListenerDetailImpl>();
 	} else {
-	    detailMap = null;
+	    participantDetailMap = null;
+            listenerDetailMap = null;
 	}
 	logger.log(Level.FINER, "create {0}", this);
     }
@@ -211,9 +230,10 @@ final class TransactionImpl implements Transaction {
 		throw new UnsupportedOperationException(
 		    "Attempt to add multiple durable participants");
 	    }
-	    if (detailMap != null) {
+	    if (participantDetailMap != null) {
 		String name = participant.getTypeName();
-		detailMap.put(name, new ProfileParticipantDetailImpl(name));
+		participantDetailMap.
+                    put(name, new ProfileParticipantDetailImpl(name));
 	    }
 	}
     }
@@ -251,7 +271,7 @@ final class TransactionImpl implements Transaction {
 		logger.log(Level.FINEST, "abort {0} participant:{1}",
 			   this, getParticipantInfo(participant));
 	    }
-	    if (detailMap != null) {
+	    if (participantDetailMap != null) {
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
@@ -264,10 +284,10 @@ final class TransactionImpl implements Transaction {
 			this, getParticipantInfo(participant));
 		}
 	    }
-	    if (detailMap != null) {
+	    if (participantDetailMap != null) {
 		long finishTime = System.currentTimeMillis();
 		ProfileParticipantDetailImpl detail =
-		    detailMap.get(participant.getTypeName());
+		    participantDetailMap.get(participant.getTypeName());
 		detail.setAborted(finishTime - startTime);
 		collectorHandle.addParticipant(detail);
 	    }
@@ -301,6 +321,11 @@ final class TransactionImpl implements Transaction {
 	} else if (!listeners.contains(listener)) {
 	    listeners.add(listener);
 	}
+        if (listenerDetailMap != null) {
+            String name = listener.getTypeName();
+            listenerDetailMap.put(name,
+                                  new TransactionListenerDetailImpl(name));
+        }
     }
 
     /* -- Object methods -- */
@@ -376,8 +401,8 @@ final class TransactionImpl implements Transaction {
 	     iter.hasNext(); )
 	{
 	    TransactionParticipant participant = iter.next();
-	    if (detailMap != null) {
-		detail = detailMap.get(participant.getTypeName());
+	    if (participantDetailMap != null) {
+		detail = participantDetailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
@@ -438,8 +463,8 @@ final class TransactionImpl implements Transaction {
 		logger.log(Level.FINEST, "commit {0} participant:{1}",
 			   this, getParticipantInfo(participant));
 	    }
-	    if (detailMap != null) {
-		detail = detailMap.get(participant.getTypeName());
+	    if (participantDetailMap != null) {
+		detail = participantDetailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
@@ -471,6 +496,8 @@ final class TransactionImpl implements Transaction {
 
     /** Notify any listeners before preparing the transaction. */
     private void notifyListenersBefore() {
+        TransactionListenerDetailImpl detail = null;
+        long startTime = 0;
 	if (listeners != null) {
 	    /*
 	     * Don't use foreach iteration here, so that we can handle the
@@ -479,8 +506,20 @@ final class TransactionImpl implements Transaction {
 	    for (int i = 0; i < listeners.size(); i++) {
 		TransactionListener listener = listeners.get(i);
 		try {
+                    if (listenerDetailMap != null) {
+                        detail = listenerDetailMap.get(listener.getTypeName());
+                        startTime = System.currentTimeMillis();
+                    }
 		    listener.beforeCompletion();
+                    if (detail != null) {
+                        long time = System.currentTimeMillis() - startTime;
+                        detail.setCalledBeforeCompletion(false, time);
+                    }
 		} catch (RuntimeException e) {
+                    if (detail != null) {
+                        long time = System.currentTimeMillis() - startTime;
+                        detail.setCalledBeforeCompletion(true, time);
+                    }
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.logThrow(
 			    Level.FINEST, e,
@@ -503,10 +542,21 @@ final class TransactionImpl implements Transaction {
 
     /** Notify any listeners after completing the transaction. */
     private void notifyListenersAfter(boolean commited) {
+        TransactionListenerDetailImpl detail = null;
+        long startTime = 0;
 	if (listeners != null) {
 	    for (TransactionListener listener : listeners) {
 		try {
+                    if (listenerDetailMap != null) {
+                        detail = listenerDetailMap.get(listener.getTypeName());
+                        startTime = System.currentTimeMillis();
+                    }
 		    listener.afterCompletion(commited);
+                    if (detail != null) {
+                        long time = System.currentTimeMillis() - startTime;
+                        detail.setCalledAfterCompletion(time);
+                        collectorHandle.addListener(detail);
+                    }
 		} catch (RuntimeException e) {
 		    if (logger.isLoggable(Level.WARNING)) {
 			logger.logThrow(

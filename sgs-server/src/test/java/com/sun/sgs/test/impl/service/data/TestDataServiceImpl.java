@@ -5363,6 +5363,9 @@ public class TestDataServiceImpl{
 	    synchronized RuntimeException getException() {
 		return exception;
 	    }
+            public String getTypeName() {
+                return "MyTransactionListener";
+            }
 	}
 	final MyTransactionListener listener = new MyTransactionListener();
 	txnScheduler.runTask(new InitialTestRunnable() {
