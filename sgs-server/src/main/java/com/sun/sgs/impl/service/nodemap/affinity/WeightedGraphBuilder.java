@@ -56,8 +56,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // Map for tracking object-> map of identity-> number accesses
     // (thus we keep track of the number of accesses each identity has made
     // for an object, to aid maintaining weighted edges)
-    private final Map<Object, Map<Identity, Integer>> objectMap =
-            new HashMap<Object, Map<Identity, Integer>>();
+    private final Map<Object, Map<Identity, Long>> objectMap =
+            new HashMap<Object, Map<Identity, Long>>();
     
     // Our graph of object accesses
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
@@ -69,9 +69,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of nodes to objects that were evicted to go to that node, with a
     // count.
-    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
         conflictMap =
-            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>();
+            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -116,23 +116,23 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 Object objId = obj.getObjectId();
 
                 // find the identities that have already used this object
-                Map<Identity, Integer> idMap = objectMap.get(objId);
+                Map<Identity, Long> idMap = objectMap.get(objId);
                 if (idMap == null) {
                     // first time we've seen this object
-                    idMap = new HashMap<Identity, Integer>();
+                    idMap = new HashMap<Identity, Long>();
                 }
 
-                int value = idMap.containsKey(owner) ? idMap.get(owner) : 0;
+                long value = idMap.containsKey(owner) ? idMap.get(owner) : 0;
                 value++;
 
                 // add or update edges between task owner and identities
-                for (Map.Entry<Identity, Integer> entry : idMap.entrySet()) {
+                for (Map.Entry<Identity, Long> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
 
                     // Our folded graph has no self-loops:  only add an
                     // edge if the identity isn't the owner
                     if (!ident.equals(owner)) {
-                        int otherValue = entry.getValue();
+                        long otherValue = entry.getValue();
                         LabelVertex vident = new LabelVertex(ident);
                         // Check to see if we already have an edge between
                         // the two vertices.  If so, update its weight.
@@ -189,12 +189,12 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
         return objectMap;
     }
 
     /** {@inheritDoc} */
-    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
             getConflictMap()
     {
         return conflictMap;
@@ -212,11 +212,11 @@ public class WeightedGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        ConcurrentHashMap<Object, Integer> objMap = conflictMap.get(nodeId);
+        ConcurrentHashMap<Object, Long> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
-            objMap = new ConcurrentHashMap<Object, Integer>();
+            objMap = new ConcurrentHashMap<Object, Long>();
         }
-        int value = objMap.containsKey(objId) ? objMap.get(objId) : 0;
+        long value = objMap.containsKey(objId) ? objMap.get(objId) : 0;
         value++;
         objMap.put(objId, value);
         conflictMap.put(nodeId, objMap);
@@ -280,13 +280,13 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 for (Map.Entry<Object, Map<Identity, Integer>> entry :
                      periodObject.entrySet())
                 {
-                    Map<Identity, Integer> idMap =
+                    Map<Identity, Long> idMap =
                             objectMap.get(entry.getKey());
                     for (Map.Entry<Identity, Integer> updateEntry :
                          entry.getValue().entrySet())
                     {
                         Identity idUpdate = updateEntry.getKey();
-                        int newVal =
+                        long newVal =
                             idMap.get(idUpdate) - updateEntry.getValue();
                         if (newVal == 0) {
                             idMap.remove(idUpdate);
@@ -304,7 +304,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
                      periodEdgeIncrements.entrySet())
                 {
                     WeightedEdge edge = entry.getKey();
-                    long weight = entry.getValue();
+                    int weight = entry.getValue();
                     if (edge.getWeight() == weight) {
                         Pair<LabelVertex> endpts =
                                 affinityGraph.getEndpoints(edge);
@@ -325,12 +325,13 @@ public class WeightedGraphBuilder implements GraphBuilder {
                      periodConflicts.entrySet())
                 {
                      Long nodeId = entry.getKey();
-                     Map<Object, Integer> objMap = conflictMap.get(nodeId);
+                     Map<Object, Long> objMap = conflictMap.get(nodeId);
                      for (Map.Entry<Object, Integer> updateEntry :
                           entry.getValue().entrySet())
                      {
                         Object objId = updateEntry.getKey();
-                        int newVal = objMap.get(objId) - updateEntry.getValue();
+                        long newVal =
+                                objMap.get(objId) - updateEntry.getValue();
                         if (newVal <= 0) {
                             objMap.remove(objId);
                         } else {

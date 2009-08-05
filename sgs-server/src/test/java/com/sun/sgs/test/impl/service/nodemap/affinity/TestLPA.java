@@ -320,18 +320,18 @@ public class TestLPA {
         objIds.add("obj1");
         objIds.add("obj2");
 
-        Map<Object, Map<Integer, Integer>> labelMap =
+        Map<Object, Map<Integer, Long>> labelMap =
                 lp1.getRemoteLabels(objIds);
         assertEquals(2, labelMap.size());
         assertTrue(labelMap.keySet().equals(objIds));
-        Map<Integer, Integer> obj1Map = labelMap.get("obj1");
+        Map<Integer, Long> obj1Map = labelMap.get("obj1");
         assertEquals(2, obj1Map.size());
         for (Integer label : obj1Map.keySet()) {
             assertTrue(label.equals(1) || label.equals(2));
 //            assertTrue(label.equals(id1.getName().hashCode()) ||
 //                       label.equals(id2.getName().hashCode()));
         }
-        Map<Integer, Integer> obj2Map = labelMap.get("obj2");
+        Map<Integer, Long> obj2Map = labelMap.get("obj2");
         assertEquals(1, obj2Map.size());
         for (Integer label : obj2Map.keySet()) {
             assertTrue(label.equals(2));
@@ -472,7 +472,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Map<Integer, Integer>> getRemoteLabels(
+        public Map<Object, Map<Integer, Long>> getRemoteLabels(
                 Collection<Object> objIds) throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
@@ -485,7 +485,7 @@ public class TestLPA {
         private final 
             ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
             conflictMap;
-        private final Map<Object, Map<Identity, Integer>> objUseMap;
+        private final Map<Object, Map<Identity, Long>> objUseMap;
 
         static final long NODE1 = 1;
         static final long NODE2 = 2;
@@ -501,7 +501,7 @@ public class TestLPA {
         public PartialToyBuilder(long node) {
             super();
             graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
-            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Integer>>();
+            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
             conflictMap = new ConcurrentHashMap<Long, 
                                     ConcurrentHashMap<Object, Integer>>();
 
@@ -518,13 +518,13 @@ public class TestLPA {
 
 
                 // Obj uses
-                Map<Identity, Integer> tempMap =
-                        new HashMap<Identity, Integer>();
-                tempMap.put(idents[0], 2);
-                tempMap.put(idents[1], 2);
+                Map<Identity, Long> tempMap =
+                        new HashMap<Identity, Long>();
+                tempMap.put(idents[0], 2L);
+                tempMap.put(idents[1], 2L);
                 objUseMap.put("obj1", tempMap);
-                tempMap =  new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap =  new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
@@ -542,9 +542,9 @@ public class TestLPA {
                 graph.addVertex(ver);
 
                 // Obj uses
-                Map<Identity, Integer> tempMap =
-                        new HashMap<Identity, Integer>();
-                tempMap.put(ident, 2);
+                Map<Identity, Long> tempMap =
+                        new HashMap<Identity, Long>();
+                tempMap.put(ident, 2L);
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
@@ -563,13 +563,13 @@ public class TestLPA {
                 graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
 
                 // Obj uses
-                Map<Identity, Integer> tempMap =
-                        new HashMap<Identity, Integer>();
-                tempMap.put(idents[0], 1);
-                tempMap.put(idents[1], 1);
+                Map<Identity, Long> tempMap =
+                        new HashMap<Identity, Long>();
+                tempMap.put(idents[0], 1L);
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("obj3", tempMap);
-                tempMap =  new HashMap<Identity, Integer>();
-                tempMap.put(idents[0], 1);
+                tempMap =  new HashMap<Identity, Long>();
+                tempMap.put(idents[0], 1L);
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
@@ -595,7 +595,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+        public Map<Object, Map<Identity, Long>> getObjectUseMap() {
             return objUseMap;
         }
 
@@ -611,7 +611,7 @@ public class TestLPA {
         private final 
             ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
             conflictMap;
-        private final Map<Object, Map<Identity, Integer>> objUseMap;
+        private final Map<Object, Map<Identity, Long>> objUseMap;
 
         static final long NODE1 = 1;
         static final long NODE2 = 2;
@@ -626,7 +626,7 @@ public class TestLPA {
         public DistributedZachBuilder(long node) {
             super();
             graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
-            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Integer>>();
+            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
             conflictMap = new ConcurrentHashMap<Long,
                                     ConcurrentHashMap<Object, Integer>>();
             LabelVertex[] nodes = new LabelVertex[35];
@@ -640,7 +640,7 @@ public class TestLPA {
                 graph.addVertex(nodes[i]);
             }
             // Obj uses
-            Map<Identity, Integer> tempMap = new HashMap<Identity, Integer>();
+            Map<Identity, Long> tempMap = new HashMap<Identity, Long>();
             if (node == NODE1) {
                 // Update edges
                 graph.addEdge(new WeightedEdge(), nodes[4], nodes[1]);
@@ -656,132 +656,132 @@ public class TestLPA {
                 graph.addEdge(new WeightedEdge(), nodes[34], nodes[31]);
 
                 // Obj uses
-                tempMap.put(idents[1], 1);
-                tempMap.put(idents[4], 4);
+                tempMap.put(idents[1], 1L);
+                tempMap.put(idents[4], 4L);
                 objUseMap.put("o1", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
-                tempMap.put(idents[7], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
+                tempMap.put(idents[7], 1L);
                 objUseMap.put("o2", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o3", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[7], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[7], 1L);
                 objUseMap.put("o4", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o5", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o6", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[10], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[10], 1L);
                 objUseMap.put("o7", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o8", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o11", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
-                tempMap.put(idents[13], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
+                tempMap.put(idents[13], 1L);
                 objUseMap.put("o12", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[4], 1);
-                tempMap.put(idents[13], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[4], 1L);
+                tempMap.put(idents[13], 1L);
                 objUseMap.put("o13", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[7], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[7], 1L);
                 objUseMap.put("o15", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o16", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o18", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[22], 1);
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[22], 1L);
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o20", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[22], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[22], 1L);
                 objUseMap.put("o21", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[25], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[25], 1L);
                 objUseMap.put("o23", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[28], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[28], 1L);
                 objUseMap.put("o24", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[28], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[28], 1L);
                 objUseMap.put("o25", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[28], 1);
-                tempMap.put(idents[25], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[28], 1L);
+                tempMap.put(idents[25], 1L);
                 objUseMap.put("o26", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[31], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[31], 1L);
                 objUseMap.put("o30", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[31], 1);
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[31], 1L);
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o31", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[1], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("o32", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[16], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[16], 1L);
                 objUseMap.put("o35", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[19], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[19], 1L);
                 objUseMap.put("o36", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
-                tempMap.put(idents[10], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
+                tempMap.put(idents[10], 1L);
                 objUseMap.put("o40", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o41", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o42", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
-                tempMap.put(idents[16], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
+                tempMap.put(idents[16], 1L);
                 objUseMap.put("o43", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
-                tempMap.put(idents[19], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
+                tempMap.put(idents[19], 1L);
                 objUseMap.put("o44", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o45", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o46", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o47", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o48", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o49", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
-                tempMap.put(idents[28], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
+                tempMap.put(idents[28], 1L);
                 objUseMap.put("o50", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o51", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o52", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
                 objUseMap.put("o53", tempMap);
 
  
@@ -804,7 +804,7 @@ public class TestLPA {
                 conflict.put("o11", 1);
                 conflict.put("o31", 1);
                 conflict.put("o35", 1);
-                conflict.put("o36",1);
+                conflict.put("o36", 1);
                 conflict.put("o42", 1);
                 conflict.put("o46", 1);
                 conflict.put("o48", 1);
@@ -819,83 +819,83 @@ public class TestLPA {
                 graph.addEdge(new WeightedEdge(), nodes[32], nodes[29]);
 
                 // Obj uses
-                tempMap.put(idents[2], 1);
-                tempMap.put(idents[8], 1);
-                tempMap.put(idents[14], 1);
+                tempMap.put(idents[2], 1L);
+                tempMap.put(idents[8], 1L);
+                tempMap.put(idents[14], 1L);
                 objUseMap.put("o1", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[5], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[5], 1L);
                 objUseMap.put("o2", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[11], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[11], 1L);
                 objUseMap.put("o8", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[11], 1);
-                tempMap.put(idents[5], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[11], 1L);
+                tempMap.put(idents[5], 1L);
                 objUseMap.put("o9", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[11], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[11], 1L);
                 objUseMap.put("o10", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[17], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[17], 1L);
                 objUseMap.put("o14", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[17], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[17], 1L);
                 objUseMap.put("o15", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[2], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[2], 1L);
                 objUseMap.put("o17", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[20], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[20], 1L);
                 objUseMap.put("o18", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[20], 1);
-                tempMap.put(idents[2], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[20], 1L);
+                tempMap.put(idents[2], 1L);
                 objUseMap.put("o19", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[2], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[2], 1L);
                 objUseMap.put("o21", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[26], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[26], 1L);
                 objUseMap.put("o22", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[26], 1);
-                tempMap.put(idents[32], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[26], 1L);
+                tempMap.put(idents[32], 1L);
                 objUseMap.put("o23", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[29], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[29], 1L);
                 objUseMap.put("o27", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[2], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[2], 1L);
                 objUseMap.put("o30", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[32], 1);
-                tempMap.put(idents[29], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[32], 1L);
+                tempMap.put(idents[29], 1L);
                 objUseMap.put("o66", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[23], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[23], 1L);
                 objUseMap.put("o38", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[32], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[32], 1L);
                 objUseMap.put("o39", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[34], 1);
-                tempMap.put(idents[31], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[34], 1L);
+                tempMap.put(idents[31], 1L);
                 objUseMap.put("o31", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[14], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[14], 1L);
                 objUseMap.put("o41", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[20], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[20], 1L);
                 objUseMap.put("o45", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[23], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[23], 1L);
                 objUseMap.put("o47", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[29], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[29], 1L);
                 objUseMap.put("o51", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[32], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[32], 1L);
                 objUseMap.put("o53", tempMap);
 
 
@@ -929,102 +929,102 @@ public class TestLPA {
                 graph.addEdge(new WeightedEdge(), nodes[33], nodes[24]);
                 graph.addEdge(new WeightedEdge(), nodes[33], nodes[30]);
 
-                tempMap.put(idents[3], 1);
+                tempMap.put(idents[3], 1L);
                 objUseMap.put("o1", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[6], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[6], 1L);
                 objUseMap.put("o3", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[6], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[6], 1L);
                 objUseMap.put("o4", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[9], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[9], 1L);
                 objUseMap.put("o5", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[9], 1);
-                tempMap.put(idents[3], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[9], 1L);
+                tempMap.put(idents[3], 1L);
                 objUseMap.put("o6", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[3], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[3], 1L);
                 objUseMap.put("o7", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[6], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[6], 1L);
                 objUseMap.put("o10", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[12], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[12], 1L);
                 objUseMap.put("o11", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[6], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[6], 1L);
                 objUseMap.put("o14", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[18], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[18], 1L);
                 objUseMap.put("o16", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[18], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[18], 1L);
                 objUseMap.put("o17", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[24], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[24], 1L);
                 objUseMap.put("o22", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[3], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[3], 1L);
                 objUseMap.put("o24", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[24], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[24], 1L);
                 objUseMap.put("o25", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[3], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[3], 1L);
                 objUseMap.put("o27", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[30], 1);
-                tempMap.put(idents[24], 1);
-                tempMap.put(idents[33], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[30], 1L);
+                tempMap.put(idents[24], 1L);
+                tempMap.put(idents[33], 1L);
                 objUseMap.put("o28", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[30], 1);
-                tempMap.put(idents[27], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[30], 1L);
+                tempMap.put(idents[27], 1L);
                 objUseMap.put("o29", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[9], 1);
-                tempMap.put(idents[33], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[9], 1L);
+                tempMap.put(idents[33], 1L);
                 objUseMap.put("o31", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[33], 1);
-                tempMap.put(idents[3], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[33], 1L);
+                tempMap.put(idents[3], 1L);
                 objUseMap.put("o33", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[33], 1);
-                tempMap.put(idents[15], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[33], 1L);
+                tempMap.put(idents[15], 1L);
                 objUseMap.put("o34", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[33], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[33], 1L);
                 objUseMap.put("o35", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[33], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[33], 1L);
                 objUseMap.put("o36", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[33], 1);
-                tempMap.put(idents[21], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[33], 1L);
+                tempMap.put(idents[21], 1L);
                 objUseMap.put("o37", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[33], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[33], 1L);
                 objUseMap.put("o38", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[33], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[33], 1L);
                 objUseMap.put("o39", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[15], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[15], 1L);
                 objUseMap.put("o42", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[21], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[21], 1L);
                 objUseMap.put("o46", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[24], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[24], 1L);
                 objUseMap.put("o48", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[27], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[27], 1L);
                 objUseMap.put("o49", tempMap);
-                tempMap = new HashMap<Identity, Integer>();
-                tempMap.put(idents[30], 1);
+                tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[30], 1L);
                 objUseMap.put("o52", tempMap);
 
                 // conflicts - data cache evictions due to conflict
@@ -1068,7 +1068,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+        public Map<Object, Map<Identity, Long>> getObjectUseMap() {
             return objUseMap;
         }
 

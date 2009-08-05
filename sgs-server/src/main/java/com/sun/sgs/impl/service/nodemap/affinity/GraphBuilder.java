@@ -109,7 +109,7 @@ public interface GraphBuilder {
      *
      * @return the map of local object uses
      */
-    Map<Object, Map<Identity, Integer>> getObjectUseMap();
+    Map<Object, Map<Identity, Long>> getObjectUseMap();
 
     /**
      * Returns a map of detected cross node data conflicts.  This is a map 
@@ -119,6 +119,5 @@ public interface GraphBuilder {
      * 
      * @return the map of detected cross node data conflicts
      */
-    ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
-            getConflictMap();
+    ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>> getConflictMap();
 }

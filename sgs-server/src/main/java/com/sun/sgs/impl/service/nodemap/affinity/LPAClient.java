@@ -96,7 +96,7 @@ public interface LPAClient extends Remote {
      *               neighbor labels, with a count
      * @throws IOException if there is a communication problem
      */
-    Map<Object, Map<Integer, Integer>> getRemoteLabels(
+    Map<Object, Map<Integer, Long>> getRemoteLabels(
                 Collection<Object> objIds)
             throws IOException;
 }

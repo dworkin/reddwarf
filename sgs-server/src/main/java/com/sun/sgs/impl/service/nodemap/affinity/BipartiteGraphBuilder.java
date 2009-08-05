@@ -58,9 +58,9 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of object to map of remote nodes it was accessed on, with a weight
     // for each node.
-    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
         conflictMap =
-            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>();
+            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -234,15 +234,37 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
             getConflictMap()
     {
         return conflictMap;
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
+        Map<Object, Map<Identity, Long>> retMap =
+            new HashMap<Object, Map<Identity, Long>>();
+        // Copy our input graph
+        CopyableGraph<Object, WeightedEdge> graphCopy =
+            new CopyableGraph<Object, WeightedEdge>(bipartiteGraph);
+
+        for (Object vert : graphCopy.getVertices()) {
+            if (!(vert instanceof Identity)) {
+                Map<Identity, Long> idMap = new HashMap<Identity, Long>();
+                for (WeightedEdge edge : graphCopy.getIncidentEdges(vert)) {
+                    Object v1 = graphCopy.getOpposite(vert, edge);
+                    if (v1 instanceof Identity) {
+                        long val = (int) edge.getWeight();
+                        idMap.put((Identity) v1, val);
+                    } else {
+                        // our graph is messed up
+                        System.out.println("unexpected vertex type " + v1);
+                    }
+                }
+                retMap.put(vert, idMap);
+            }
+        }
+        return retMap;
     }
 
     /** 
@@ -256,11 +278,11 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        ConcurrentHashMap<Object, Integer> objMap = conflictMap.get(nodeId);
+        ConcurrentHashMap<Object, Long> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
-            objMap = new ConcurrentHashMap<Object, Integer>();
+            objMap = new ConcurrentHashMap<Object, Long>();
         }
-        int value = objMap.containsKey(objId) ? objMap.get(objId) : 0;
+        long value = objMap.containsKey(objId) ? objMap.get(objId) : 0;
         value++;
         objMap.put(objId, value);
         conflictMap.put(nodeId, objMap);
@@ -322,29 +344,29 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 }
             }
 
-                            // For each conflict, update values
-                // JANE need to lock map?
-                for (Map.Entry<Long, Map<Object, Integer>> entry :
-                     periodConflicts.entrySet())
-                {
-                     Long nodeId = entry.getKey();
-                     Map<Object, Integer> objMap = conflictMap.get(nodeId);
-                     for (Map.Entry<Object, Integer> updateEntry :
-                          entry.getValue().entrySet())
-                     {
-                        Object objId = updateEntry.getKey();
-                        int newVal = objMap.get(objId) - updateEntry.getValue();
-                        if (newVal <= 0) {
-                            objMap.remove(objId);
-                        } else {
-                            objMap.put(objId, newVal);
-                        }
-                     }
-                     if (objMap.isEmpty()) {
-                         conflictMap.remove(nodeId);
-                     }
+            // For each conflict, update values
+            // JANE need to lock map?
+            for (Map.Entry<Long, Map<Object, Integer>> entry :
+                 periodConflicts.entrySet())
+            {
+                 Long nodeId = entry.getKey();
+                 Map<Object, Long> objMap = conflictMap.get(nodeId);
+                 for (Map.Entry<Object, Integer> updateEntry :
+                      entry.getValue().entrySet())
+                 {
+                    Object objId = updateEntry.getKey();
+                    long newVal = objMap.get(objId) - updateEntry.getValue();
+                    if (newVal <= 0) {
+                        objMap.remove(objId);
+                    } else {
+                        objMap.put(objId, newVal);
+                    }
+                 }
+                 if (objMap.isEmpty()) {
+                     conflictMap.remove(nodeId);
+                 }
 
-                }
+            }
         }
 
         public synchronized void incrementEdge(WeightedEdge edge) {

@@ -122,8 +122,8 @@ public class LabelPropagation implements LPAClient {
 
     // Map identity -> label and count
     // This sums all uses of that identity on other nodes
-    private final Map<Identity, Map<Integer, Integer>> remoteLabelMap =
-            new ConcurrentHashMap<Identity, Map<Integer, Integer>>();
+    private final Map<Identity, Map<Integer, Long>> remoteLabelMap =
+            new ConcurrentHashMap<Identity, Map<Integer, Long>>();
 
     /**
      * Constructs a new instance of the label propagation algorithm.
@@ -403,7 +403,7 @@ public class LabelPropagation implements LPAClient {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Integer, Integer>> getRemoteLabels(
+    public Map<Object, Map<Integer, Long>> getRemoteLabels(
                 Collection<Object> objIds)
             throws IOException
     {
@@ -411,8 +411,8 @@ public class LabelPropagation implements LPAClient {
             // We can be called before our own initialization is done
             initializeLPARun();
         }
-        Map<Object, Map<Integer, Integer>> retMap =
-                new HashMap<Object, Map<Integer, Integer>>();
+        Map<Object, Map<Integer, Long>> retMap =
+                new HashMap<Object, Map<Integer, Long>>();
         if (objIds == null) {
             // This is unexpected;  the other node should have passed in an
             // empty collection
@@ -420,14 +420,14 @@ public class LabelPropagation implements LPAClient {
             return retMap;
         }
         
-        Map<Object, Map<Identity, Integer>> objectMap =
+        Map<Object, Map<Identity, Long>> objectMap =
                 builder.getObjectUseMap();
         assert (objectMap != null);
 
         for (Object obj : objIds) {
             // look up the set of identities
-            Map<Identity, Integer> idents = objectMap.get(obj);
-            Map<Integer, Integer> intMap = new HashMap<Integer, Integer>();
+            Map<Identity, Long> idents = objectMap.get(obj);
+            Map<Integer, Long> countMap = new HashMap<Integer, Long>();
             if (idents != null) {
                 for (Identity id : idents.keySet()) {
                     // JANE not dealing with weights here
@@ -448,14 +448,14 @@ public class LabelPropagation implements LPAClient {
 
                         // not yet taking weights into account
                         Integer label = vertices.get(index).getLabel();
-                        Integer oldCount = intMap.get(label);
-                        Integer updateCount = (oldCount == null) ? 1 :
+                        Long oldCount = countMap.get(label);
+                        Long updateCount = (oldCount == null) ? 1 :
                                                 1 + oldCount;
-                        intMap.put(label, updateCount);
+                        countMap.put(label, updateCount);
                     }
                 }
             }
-            retMap.put(obj, intMap);
+            retMap.put(obj, countMap);
         }
         return retMap;
     }
@@ -469,7 +469,7 @@ public class LabelPropagation implements LPAClient {
     private boolean updateRemoteLabels() throws IOException {
         // reinitialize the remote label map
         remoteLabelMap.clear();
-        Map<Object, Map<Identity, Integer>> objectMap =
+        Map<Object, Map<Identity, Long>> objectMap =
                 builder.getObjectUseMap();
         assert (objectMap != null);
         
@@ -497,7 +497,7 @@ public class LabelPropagation implements LPAClient {
             assert (map != null);
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
                        localNodeId, nodeId);
-            Map<Object, Map<Integer, Integer>> labels =
+            Map<Object, Map<Integer, Long>> labels =
                     proxy.getRemoteLabels(
                         new HashSet<Object>(map.keySet()));
             if (labels == null) {
@@ -509,36 +509,36 @@ public class LabelPropagation implements LPAClient {
             }
 
             // Process the returned labels
-            for (Map.Entry<Object, Map<Integer, Integer>> remoteEntry :
+            for (Map.Entry<Object, Map<Integer, Long>> remoteEntry :
                  labels.entrySet())
             {
                 Object remoteObject = remoteEntry.getKey();
-                Map<Integer, Integer> remoteLabels = remoteEntry.getValue();
-                Map<Identity, Integer> objUse = objectMap.get(remoteObject);
+                Map<Integer, Long> remoteLabels = remoteEntry.getValue();
+                Map<Identity, Long> objUse = objectMap.get(remoteObject);
                 if (objUse == null) {
                     // no local uses of this object
                     continue;
                 }
-                for (Map.Entry<Identity, Integer> objUseId :
+                for (Map.Entry<Identity, Long> objUseId :
                      objUse.entrySet())
                 {
                     Identity ident = objUseId.getKey();
-                    Integer weight = objUseId.getValue();
-                    Map<Integer, Integer> labelCount =
+                    Long weight = objUseId.getValue();
+                    Map<Integer, Long> labelCount =
                             remoteLabelMap.get(ident);
                     if (labelCount == null) {
                         labelCount =
-                                new ConcurrentHashMap<Integer, Integer>();
+                                new ConcurrentHashMap<Integer, Long>();
                     }
-                    for (Map.Entry<Integer, Integer> rLabelCount : 
+                    for (Map.Entry<Integer, Long> rLabelCount :
                         remoteLabels.entrySet())
                     {
                         Integer rlabel = rLabelCount.getKey();
-                        Integer rcount = rLabelCount.getValue();
-                        int newWeight = Math.min(weight, rcount);
+                        Long rcount = rLabelCount.getValue();
+                        long newWeight = Math.min(weight, rcount);
 
-                        Integer oldCount = labelCount.get(rlabel);
-                        Integer updateCount = (oldCount == null) ? newWeight :
+                        Long oldCount = labelCount.get(rlabel);
+                        Long updateCount = (oldCount == null) ? newWeight :
                                                 newWeight + oldCount;
                         labelCount.put(rlabel, updateCount);
                         logger.log(Level.FINEST,
@@ -564,7 +564,9 @@ public class LabelPropagation implements LPAClient {
      * or edges, but it will modify the labels in the vertices.
      * <p>
      * This implementation is for graphs on a single node only, and is useful
-     * for testing algorithm optimizations.
+     * for testing algorithm optimizations.  Finding affinity groups on a
+     * single node is, in general, not useful (the affinity groups are used
+     * for load balancing, and no load balancing is required on a single node).
      *
      * @return the affinity groups
      */
@@ -856,12 +858,12 @@ public class LabelPropagation implements LPAClient {
 
         // Account for the remote neighbors:  look up this LabelVertex in
         // the remoteNeighborMap
-        Map<Integer, Integer> remoteMap =
+        Map<Integer, Long> remoteMap =
                 remoteLabelMap.get(vertex.getIdentity());
         if (remoteMap != null) {
             // The check above is just so I can continue to test in single 
             // vertex mode
-            for (Map.Entry<Integer, Integer> entry : remoteMap.entrySet()) {
+            for (Map.Entry<Integer, Long> entry : remoteMap.entrySet()) {
                 Integer label = entry.getKey();
                 if (logger.isLoggable(Level.FINEST)) {
                     logSB.append("RLabel:" + label + 
