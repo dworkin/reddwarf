@@ -618,6 +618,7 @@ abstract class BasicCacheEntry<K, V> {
      */
     void setEvictedAbandonFetching(Object lock) {
 	assert Thread.holdsLock(lock);
+	assert key == BindingKey.LAST;
 	verifyState(State.FETCHING_READ, State.FETCHING_WRITE);
 	state = State.DECACHED;
 	lock.notifyAll();
@@ -698,7 +699,8 @@ abstract class BasicCacheEntry<K, V> {
     private void verifyState(State expected) {
 	if (state != expected) {
 	    throw new IllegalStateException(
-		"Invalid state, expected " + expected + ", found " + state);
+		"Invalid state, expected " + expected + ", found " + state +
+		", entry:" + this);
 	}
     }
 
@@ -714,7 +716,7 @@ abstract class BasicCacheEntry<K, V> {
 	if (state != expected1 && state != expected2) {
 	    throw new IllegalStateException(
 		"Invalid state, expected " + expected1 + " or " +
-		expected2 + ", found " + state);
+		expected2 + ", found " + state + ", entry:" + this);
 	}
     }
 

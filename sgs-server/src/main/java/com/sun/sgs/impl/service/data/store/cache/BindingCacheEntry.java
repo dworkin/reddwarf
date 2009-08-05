@@ -30,9 +30,9 @@ import com.sun.sgs.service.TransactionInterruptedException;
 class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
-     * The earliest previous key such that names between that key and this
-     * entry's key are known to be unbound, else {@code null} if no information
-     * about previous keys is known.
+     * The lowest-valued previous key known such that names between that key
+     * and this entry's key are known to be unbound, else {@code null} if no
+     * information about previous keys is known.
      */
     private BindingKey previousKey;
 
@@ -103,26 +103,63 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	    "]";
     }
 
+
     /**
-     * Updates information about previous keys that are known to be unbound.
-     * The {@code newPreviousKey} argument specifies a name for which it is
-     * known that all names between that name and the one associated with this
-     * entry are known to be unbound.  If the {@code newPreviousKeyUnbound} is
-     * {@code true}, then that name is also known to be unbound.
+     * Updates information about previous names known to be unbound given that
+     * the given name is bound and that all names between that name and the one
+     * for this entry are unbound.
+     *
+     * @param	previousKey a previous key
+     * @return	whether this entry's previous key information was changed
+     */
+    boolean updatePreviousKeyBound(BindingKey previousKey) {
+	return updatePreviousKey(previousKey, true, false);
+    }
+
+    /**
+     * Updates information about previous names known to be unbound given that
+     * the given name is unbound and that all names between that name and the
+     * one for this entry are unbound.
+     *
+     * @param	previousKey a previous key known
+     * @return	whether this entry's previous key information was changed
+     */
+    boolean updatePreviousKeyUnbound(BindingKey previousKey) {
+	return updatePreviousKey(previousKey, true, true);
+    }
+
+    /**
+     * Updates information about previous names known to be unbound given that
+     * all names between the given name and the one for this entry are unbound.
+     *
+     * @param	previousKey the previous key
+     * @return	whether this entry's previous key information was changed
+     */
+    boolean updatePreviousKeyUnknown(BindingKey previousKey) {
+	return updatePreviousKey(previousKey, false, false);
+    }
+
+    /**
+     * Updates information about previous names that are known to be unbound
+     * given that the status of a particular name is known and that it is known
+     * that all names between that name and the one for this entry are unbound.
      *
      * @param	newPreviousKey the new previous key
-     * @param	newPreviousKeyUnbound whether {@code newPreviousKey} is known
-     *		to be unbound
-     * @return	whether information stored about the previous key was changed
+     * @param	newPreviousKeyKnown whether the binding status of
+     *		{@code previousKey} is known
+     * @param	newPreviousKeyUnbound if {@code newPreviousKeyKnown} is
+     *		{@code true}, whether {@code newPreviousKey} is unbound
+     * @return	whether this entry's previous key information was changed
      */
-    boolean updatePreviousKey(
-	BindingKey newPreviousKey, boolean newPreviousKeyUnbound)
+    boolean updatePreviousKey(BindingKey newPreviousKey,
+			      boolean newPreviousKeyKnown,
+			      boolean newPreviousKeyUnbound)
     {
 	if (previousKey == null) {
 	    if (newPreviousKey.compareTo(key) < 0) {
 		/*
-		 * No previous key was known, and the argument is before this
-		 * entry's key.
+		 * No previous key was known, and the new previous key is
+		 * before this entry's key.
 		 */
 		previousKey = newPreviousKey;
 		previousKeyUnbound = newPreviousKeyUnbound;
@@ -144,6 +181,10 @@ class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		 * that the previous key itself was unbound
 		 */
 		previousKeyUnbound = true;
+		return true;
+	    } else if (newPreviousKeyKnown && !newPreviousKeyUnbound) {
+		previousKey = newPreviousKey;
+		previousKeyUnbound = false;
 		return true;
 	    }
 	}

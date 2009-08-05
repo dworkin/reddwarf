@@ -87,4 +87,23 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 	    ", state:" + getState() +
 	    "]";
     }
+
+    /**
+     * Returns the hash code for this entry's key.
+     *
+     * @return	the hash code for the key
+     */
+    int keyHashCode() {
+	return keyHashCode(key);
+    }
+
+    /**
+     * Returns the hash code for an object ID.
+     *
+     * @param	oid the object ID
+     * @return	the hash code for the object ID
+     */
+    static int keyHashCode(long oid) {
+	return (int) (oid ^ (oid >>> 32));
+    }
 }

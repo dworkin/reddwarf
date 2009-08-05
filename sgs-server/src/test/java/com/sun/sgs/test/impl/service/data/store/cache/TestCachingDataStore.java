@@ -19,12 +19,14 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import static com.sun.sgs.impl.kernel.StandardProperties.NODE_TYPE;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.DataStore;
+import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import java.util.Properties;
@@ -55,8 +57,17 @@ public class TestCachingDataStore extends TestDataStoreImpl {
     private static final int nodeCallbackPort =
 	Integer.getInteger("test.callback.port", 44541);
 
+    /** The basic test environment, or {@code null} if not set. */
+    private static BasicDataStoreTestEnv staticEnv = null;
+
     /** Creates an instance of this class. */
-    public TestCachingDataStore() { }
+    public TestCachingDataStore() {
+	super(staticEnv == null
+	      ? staticEnv = new BasicDataStoreTestEnv(
+		  System.getProperties(),
+		  LockingAccessCoordinator.class.getName())
+	      : staticEnv);
+    }
 
     /** Add client and server properties. */
     @Override

@@ -26,6 +26,7 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -40,6 +41,10 @@ import org.junit.Assert;
  * components.
  */
 public class BasicDataStoreTestEnv extends Assert {
+
+    /** The property for overriding the default access coordinator. */
+    public final static String ACCESS_COORDINATOR_PROPERTY =
+	"test.access.coordinator";
 
     /** The transaction proxy. */
     public final DummyTransactionProxy txnProxy =
@@ -65,14 +70,39 @@ public class BasicDataStoreTestEnv extends Assert {
     public final ComponentRegistry systemRegistry;
     
     /**
-     * Creates a basic environment for running a {@code DataStore} test.
+     * Creates a basic environment for running a {@code DataStore} test, using
+     * a {@link NullAccessCoordinator} by default.
      *
      * @param	properties the configuration properties
      */
     public BasicDataStoreTestEnv(Properties properties) {
+	this(properties, NullAccessCoordinator.class.getName());
+    }
+    
+    /**
+     * Creates a basic environment for running a {@code DataStore} test, using
+     * an access coordinator of the specified class by default.
+     *
+     * @param	properties the configuration properties
+     * @param	accessCoordinatorClassName the class name of the access
+     *		coordinator to use by default
+     */
+    public BasicDataStoreTestEnv(Properties properties,
+				 String accessCoordinatorClassName)
+    {
 	try {
 	    /* Access coordinator */
-	    accessCoordinator = createAccessCoordinator(
+	    accessCoordinatorClassName =
+		properties.getProperty(ACCESS_COORDINATOR_PROPERTY,
+				       accessCoordinatorClassName);
+	    Constructor<? extends AccessCoordinatorHandle> accessCoordCons =
+		Class.forName(accessCoordinatorClassName)
+		.asSubclass(AccessCoordinatorHandle.class)
+		.getDeclaredConstructor(Properties.class,
+					TransactionProxy.class,
+					ProfileCollectorHandle.class);
+	    accessCoordCons.setAccessible(true);
+	    accessCoordinator = accessCoordCons.newInstance(
 		properties, txnProxy, profileCollectorHandle);
 	    /* Transaction scheduler */
 	    Constructor<? extends TransactionScheduler> txnSchedCons =
@@ -114,25 +144,5 @@ public class BasicDataStoreTestEnv extends Assert {
 	} catch (Exception e) {
 	    throw new RuntimeException("Unexpected exception: " + e, e);
 	}
-    }
-
-    /**
-     * Creates the access coordinator.  Subclasses can override this method to
-     * supply a particular implementation. <p>
-     *
-     * This implementation returns a {@link NullAccessCoordinator}.
-     *
-     * @param	properties the configuration properties
-     * @param	txnProxy the transaction proxy
-     * @param	profileCollectorHandle the profile collector handle
-     * @return	the access coordinator
-     */
-    protected AccessCoordinatorHandle createAccessCoordinator(
-	Properties properties,
-	DummyTransactionProxy txnProxy,
-	DummyProfileCollectorHandle profileCollectorHandle)
-    {
-	return new NullAccessCoordinator(
-	    properties, txnProxy, profileCollectorHandle);
     }
 }

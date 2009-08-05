@@ -792,7 +792,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			: cursor.findNext(encodeString(name));
 		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
 		    if ((name != null) && name.equals(nextName)) {
-			hasNext = cursor.findNext(encodeString(name));
+			hasNext = cursor.findNext();
 			nextName = (hasNext) ? decodeString(cursor.getKey())
 			    : null;
 		    }   
@@ -863,7 +863,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		       byte[][] oidValues,
 		       int newOids,
 		       String[] names,
-		       long[] nameValues)
+		       long[] nameValues,
+		       int newNames)
 	throws CacheConsistencyException
     {
 	NodeInfo nodeInfo;
@@ -889,6 +890,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    if (names.length != nameValues.length) {
 		throw new IllegalArgumentException(
 		    "The number of names and name values must be the same");
+	    }
+	    if (newNames < 0 || newNames > names.length) {
+		throw new IllegalArgumentException(
+		    "Illegal newNames: " + newNames);
 	    }
 	    boolean txnDone = false;
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
@@ -917,7 +922,12 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			throw new IllegalArgumentException(
 			    "The names must not be null");
 		    }
-		    checkLocked(nodeInfo, BindingKey.get(name), true);
+		    BindingKey key = BindingKey.get(name);
+		    if (i < newNames) {
+			lock(nodeInfo, key, true);
+		    } else {
+			checkLocked(nodeInfo, key, true);
+		    }
 		    long value = nameValues[i];
 		    if (value < -1) {
 			throw new IllegalArgumentException(

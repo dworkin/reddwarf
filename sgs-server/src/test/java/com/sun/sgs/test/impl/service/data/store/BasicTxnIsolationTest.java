@@ -24,7 +24,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.service.store.DataStore;
-import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.UtilProperties;
@@ -72,17 +71,8 @@ public abstract class BasicTxnIsolationTest extends Assert {
 
     /** The test environment, using a locking access coordinator. */
     protected static final BasicDataStoreTestEnv env =
-	new BasicDataStoreTestEnv(props) {
-	    @Override
-	    protected AccessCoordinatorHandle createAccessCoordinator(
-		Properties props,
-		DummyTransactionProxy txnProxy,
-		DummyProfileCollectorHandle profileCollectorHandle)
-	    {
-		return new LockingAccessCoordinator(
-		    props, txnProxy, profileCollectorHandle);
-	    }
-	};
+	new BasicDataStoreTestEnv(
+	    props, LockingAccessCoordinator.class.getName());
 
     /** The transaction proxy. */
     protected static final DummyTransactionProxy txnProxy = env.txnProxy;

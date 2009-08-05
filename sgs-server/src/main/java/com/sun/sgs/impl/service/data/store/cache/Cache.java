@@ -108,7 +108,7 @@ class Cache {
      */
     Object getObjectLock(long oid) {
 	/* Use the same value as new Long(oid).hashCode */
-	return getEntryLock((int) (oid ^ (oid >>> 32)));
+	return getEntryLock(ObjectCacheEntry.keyHashCode(oid));
     }
 
     /**
@@ -334,7 +334,7 @@ class Cache {
 	return new EntryIterator(batchSize);
     }
 
-    /** Implementation iteration over cache entries. */
+    /** Implement iteration over cache entries. */
     private class EntryIterator implements Iterator<BasicCacheEntry<?, ?>> {
 
 	/** The batch size. */

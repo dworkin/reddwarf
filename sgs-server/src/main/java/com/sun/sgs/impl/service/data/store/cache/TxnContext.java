@@ -20,8 +20,11 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.service.Transaction;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 /** Maintains state associated with a transaction. */
 class TxnContext {
@@ -39,16 +42,17 @@ class TxnContext {
     private final long contextId;
 
     /**
-     * A list of the objects modified in this transaction and their previous
-     * values, or {@code null} if no objects have been modified.
+     * A list of information about objects modified in this transaction and
+     * their previous values, or {@code null} if no objects have been modified.
      */
-    private List<SavedValue<Long, byte[]>> modifiedObjects = null;
+    private List<SavedObjectValue> modifiedObjects = null;
 
     /**
-     * A list of the bindings modified in this transaction and their previous
-     * values, or {@code null} if no bindings have been modified.
+     * A map from binding keys to information about their previous values for
+     * bindings modified in this transaction, or {@code null} if no bindings
+     * have been modified.
      */
-    private List<SavedBindingValue> modifiedBindings = null;
+    private Map<BindingKey, SavedBindingValue> modifiedBindings = null;
 
     /** Whether the transaction has been prepared. */
     private boolean prepared;
@@ -141,22 +145,44 @@ class TxnContext {
 	store.getUpdateQueue().abort(contextId, prepared);
 	Cache cache = store.getCache();
 	if (modifiedObjects != null) {
-	    for (SavedValue<Long, byte[]> saved : modifiedObjects) {
-		synchronized (cache.getObjectLock(saved.key)) {
+	    for (SavedObjectValue saved : modifiedObjects) {
+		Object lock = cache.getObjectLock(saved.key);
+		synchronized (lock) {
 		    ObjectCacheEntry entry = cache.getObjectEntry(saved.key);
 		    entry.setValue(saved.restoreValue);
 		    entry.setNotModified();
+		    if (saved.restoreValue == null) {
+			entry.setEvictedImmediate(lock);
+			cache.removeObjectEntry(saved.key);
+		    }
 		}
 	    }
 	}
 	if (modifiedBindings != null) {
-	    for (SavedBindingValue saved : modifiedBindings) {
-		synchronized (cache.getBindingLock(saved.key)) {
-		    BindingCacheEntry entry = cache.getBindingEntry(saved.key);
-		    entry.setValue(saved.restoreValue);
-		    entry.setNotModified();
-		    entry.setPreviousKey(saved.restorePreviousKey,
-					 saved.restorePreviousKeyUnbound);
+	    for (Entry<BindingKey, SavedBindingValue> savedEntry :
+		     modifiedBindings.entrySet())
+	    {
+		BindingKey key = savedEntry.getKey();
+		SavedBindingValue saved = savedEntry.getValue();
+		Object lock = cache.getBindingLock(key);
+		synchronized (lock) {
+		    BindingCacheEntry entry = cache.getBindingEntry(key);
+		    if (entry == null && saved.restoreValue != -1) {
+			entry = noteCachedBinding(
+			    key, saved.restoreValue, true);
+		    }
+		    if (entry != null) {
+			entry.setValue(saved.restoreValue);
+			//if (entry.getModified()) {
+			    entry.setNotModified();
+			    //}
+			entry.setPreviousKey(saved.restorePreviousKey,
+					     saved.restorePreviousKeyUnbound);
+			if (saved.restoreValue == -1) {
+			    entry.setEvictedImmediate(lock);
+			    cache.removeBindingEntry(key);
+			}
+		    }
 		}
 	    }
 	}
@@ -273,6 +299,7 @@ class TxnContext {
 	BindingKey key, long value, boolean forUpdate)
     {
 	assert Thread.holdsLock(store.getCache().getBindingLock(key));
+	assert key != BindingKey.LAST;
 	BindingCacheEntry entry =
 	    BindingCacheEntry.createCached(key, value, forUpdate, contextId);
 	store.getCache().addReservedBindingEntry(entry);
@@ -321,10 +348,9 @@ class TxnContext {
 	assert Thread.holdsLock(store.getCache().getObjectLock(entry.key));
 	if (!entry.getModified()) {
 	    if (modifiedObjects == null) {
-		modifiedObjects = new LinkedList<SavedValue<Long, byte[]>>();
+		modifiedObjects = new LinkedList<SavedObjectValue>();
 	    }
-	    SavedValue<Long, byte[]> saved =
-		new SavedValue<Long, byte[]>(entry);
+	    SavedObjectValue saved = new SavedObjectValue(entry);
 	    assert !modifiedObjects.contains(saved);
 	    modifiedObjects.add(saved);
 	    entry.setCachedDirty();
@@ -341,17 +367,28 @@ class TxnContext {
      */
     void noteModifiedBinding(BindingCacheEntry entry, long oid) {
 	assert Thread.holdsLock(store.getCache().getBindingLock(entry.key));
-	if (!entry.getModified() && entry.key != BindingKey.LAST) {
-	    if (modifiedBindings == null) {
-		modifiedBindings = new LinkedList<SavedBindingValue>();
+	if (entry.key != BindingKey.LAST) {
+	    if (!entry.getModified() &&
+		(modifiedBindings == null ||
+		 !modifiedBindings.containsKey(entry.key)))
+	    {
+		if (modifiedBindings == null) {
+		    modifiedBindings =
+			new HashMap<BindingKey, SavedBindingValue>();
+		}
+		SavedBindingValue saved = new SavedBindingValue(entry);
+		modifiedBindings.put(entry.key, saved);
+		entry.setCachedDirty();
 	    }
-	    SavedBindingValue saved = new SavedBindingValue(entry);
-	    assert !modifiedBindings.contains(saved);
-	    modifiedBindings.add(saved);
-	    entry.setCachedDirty();
+	    entry.setValue(oid);
+	    entry.noteAccess(contextId);
+	    if (oid == -1) {
+		entry.setNotModified();
+		entry.setEvictedImmediate(
+		    store.getCache().getBindingLock(entry.key));
+		store.getCache().removeBindingEntry(entry.key);
+	    }
 	}
-	entry.setValue(oid);
-	entry.noteAccess(contextId);
     }
 
     /* -- Private methods and classes -- */
@@ -373,7 +410,7 @@ class TxnContext {
 	    int i = 0;
 	    for (int pass = 1; pass <= 2; pass++) {
 		boolean includeNew = (pass == 1);
-		for (SavedValue<Long, byte[]> saved : modifiedObjects) {
+		for (SavedObjectValue saved : modifiedObjects) {
 		    boolean isNew = (saved.restoreValue == null);
 		    if (includeNew == isNew) {
 			if (isNew) {
@@ -381,8 +418,7 @@ class TxnContext {
 			}
 			long oid = saved.key;
 			oids[i] = oid;
-			Object lock = cache.getObjectLock(oid);
-			synchronized (lock) {
+			synchronized (cache.getObjectLock(oid)) {
 			    ObjectCacheEntry entry = cache.getObjectEntry(oid);
 			    oidValues[i] = entry.getValue();
 			    entry.setNotModified();
@@ -395,18 +431,38 @@ class TxnContext {
 	String[] names = new String[
 	    (modifiedBindings == null) ? 0 : modifiedBindings.size()];
 	long[] nameValues = new long[names.length];
-	for (int i = 0; i < names.length; i++) {
-	    BindingKey key = modifiedBindings.get(i).key;
-	    names[i] = key.getName();
-	    Object lock = cache.getBindingLock(key);
-	    synchronized (lock) {
-		BindingCacheEntry entry = cache.getBindingEntry(key);
-		nameValues[i] = entry.getValue();
-		entry.setNotModified();
+	int newNames = 0;
+	if (modifiedBindings != null) {
+	    int i = 0;
+	    for (int pass = 1; pass <= 2; pass++) {
+		boolean includeNew = (pass == 1);
+		for (Entry<BindingKey, SavedBindingValue> mapEntry :
+			 modifiedBindings.entrySet())
+		{
+		    SavedBindingValue saved = mapEntry.getValue();
+		    boolean isNew = (saved.restoreValue == -1);
+		    if (includeNew == isNew) {
+			if (isNew) {
+			    newNames++;
+			}
+			BindingKey key = mapEntry.getKey();
+			names[i] = key.getName();
+			synchronized (cache.getBindingLock(key)) {
+			    BindingCacheEntry entry =
+				cache.getBindingEntry(key);
+			    nameValues[i] =
+				(entry == null) ? -1 : entry.getValue();
+			    if (entry != null) {
+				entry.setNotModified();
+			    }
+			}
+			i++;
+		    }
+		}
 	    }
 	}
 	store.getUpdateQueue().commit(
-	    contextId, oids, oidValues, newOids, names, nameValues);
+	    contextId, oids, oidValues, newOids, names, nameValues, newNames);
     }
 
     /**
@@ -418,26 +474,23 @@ class TxnContext {
     }
 
     /**
-     * Stores an entry key and the value that was formerly cached for that
-     * entry, for use in commit and abort.
-     *
-     * @param	<K> the key type
-     * @param	<V> the value type
+     * Stores an OID and the data value that was formerly cached for that OID,
+     * for use in commit and abort.
      */
-    private static class SavedValue<K, V> {
+    private static class SavedObjectValue {
 
-	/** The key. */
-	final K key;
+	/** The object ID. */
+	final long key;
 
-	/** The value to restore on abort. */
-	final V restoreValue;
+	/** The data value to restore on abort. */
+	final byte[] restoreValue;
 
 	/**
 	 * Creates an instance with the key and value from a cache entry.
 	 *
 	 * @param	entry the cache entry
 	 */
-	SavedValue(BasicCacheEntry<K, V> entry) {
+	SavedObjectValue(ObjectCacheEntry entry) {
 	    key = entry.key;
 	    restoreValue = entry.getValue();
 	}
@@ -448,13 +501,13 @@ class TxnContext {
 	 */
 	@Override
 	public boolean equals(Object object) {
-	    return object instanceof SavedValue<?, ?> &&
-		key.equals(((SavedValue<?, ?>) object).key);
+	    return object instanceof SavedObjectValue &&
+		key == ((SavedObjectValue) object).key;
 	}
 
 	@Override
 	public int hashCode() {
-	    return key.hashCode();
+	    return ObjectCacheEntry.keyHashCode(key);
 	}
     }
 
@@ -463,9 +516,11 @@ class TxnContext {
      * entry, and the formerly cached previous key information, for use in
      * commit and abort.
      */
-    private static class SavedBindingValue
-	extends SavedValue<BindingKey, Long>
-    {
+    private static class SavedBindingValue {
+
+	/** The value to restore on abort. */
+	final long restoreValue;
+
 	/** The previous key to restore on abort. */
 	final BindingKey restorePreviousKey;
 
@@ -478,7 +533,7 @@ class TxnContext {
 	 * @param	entry the binding cache entry
 	 */
 	SavedBindingValue(BindingCacheEntry entry) {
-	    super(entry);
+	    restoreValue = entry.getValue();
 	    restorePreviousKey = entry.getPreviousKey();
 	    restorePreviousKeyUnbound = entry.getPreviousKeyUnbound();
 	}

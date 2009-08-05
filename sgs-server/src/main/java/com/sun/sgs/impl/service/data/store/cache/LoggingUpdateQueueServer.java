@@ -51,7 +51,8 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		       byte[][] oidValues,
 		       int newOids,
 		       String[] names,
-		       long[] nameValues)
+		       long[] nameValues,
+		       int newNames)
 	throws CacheConsistencyException
     {
 	if (logger.isLoggable(FINEST)) {
@@ -65,10 +66,12 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		       ", names:" +
 		       (names == null ? "null" :
 			names.length == 0 ? "[]" :
-			"[" + names[0] + "...]"));
+			"[" + names[0] + "...]") +
+		       ", newNames:" + newNames);
 	}
 	try {
-	    server.commit(nodeId, oids, oidValues, newOids, names, nameValues);
+	    server.commit(
+		nodeId, oids, oidValues, newOids, names, nameValues, newNames);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "commit nodeId:" + nodeId +
@@ -81,6 +84,7 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 			   (names == null ? "null" :
 			    names.length == 0 ? "[]" :
 			    "[" + names[0] + "...]") +
+			   ", newNames:" + newNames +
 			   " returns");
 	    }
 	} catch (Throwable e) {
@@ -96,6 +100,7 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 				(names == null ? "null" :
 				 names.length == 0 ? "[]" :
 				 "[" + names[0] + "...]") +
+				", newNames:" + newNames +
 				" throws");
 	    }
 	    if (e instanceof CacheConsistencyException) {

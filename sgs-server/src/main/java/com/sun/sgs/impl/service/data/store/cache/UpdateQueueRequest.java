@@ -152,12 +152,14 @@ abstract class UpdateQueueRequest implements Request {
 	private final int newOids;
 	private final String[] names;
 	private final long[] nameValues;
+	private final int newNames;
 
 	Commit(long[] oids,
 	       byte[][] oidValues,
 	       int newOids,
 	       String[] names,
 	       long[] nameValues,
+	       int newNames,
 	       CompletionHandler completionHandler)
 	{
 	    super(completionHandler);
@@ -166,6 +168,7 @@ abstract class UpdateQueueRequest implements Request {
 	    this.newOids = newOids;
 	    this.names = names;
 	    this.nameValues = nameValues;
+	    this.newNames = newNames;
 	}
 
 	Commit(DataInput in) throws IOException {
@@ -174,6 +177,7 @@ abstract class UpdateQueueRequest implements Request {
 	    newOids = in.readInt();
 	    names = readStrings(in);
 	    nameValues = readLongs(in);
+	    newNames = in.readInt();
 	}
 
 	@Override
@@ -188,13 +192,15 @@ abstract class UpdateQueueRequest implements Request {
 		(names == null ? "null" :
 		 names.length == 0 ? "[]" :
 		 "[" + names[0] + "...]") +
+		", newNames:" + newNames +
 		"]";
 	}
 
 	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
-	    server.commit(nodeId, oids, oidValues, newOids, names, nameValues);
+	    server.commit(
+		nodeId, oids, oidValues, newOids, names, nameValues, newNames);
 	}
 
 	public void writeRequest(DataOutput out) throws IOException {
@@ -204,6 +210,7 @@ abstract class UpdateQueueRequest implements Request {
 	    out.writeInt(newOids);
 	    writeStrings(names, out);
 	    writeLongs(nameValues, out);
+	    out.writeInt(newNames);
 	}
     }
 

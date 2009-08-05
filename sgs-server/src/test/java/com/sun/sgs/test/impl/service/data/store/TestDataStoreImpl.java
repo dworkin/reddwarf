@@ -73,20 +73,20 @@ public class TestDataStoreImpl extends Assert {
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
 
+    /** The default basic test environment, or {@code null} if not set. */
+    private static BasicDataStoreTestEnv defaultEnv = null;
+
     /** The basic test environment. */
-    protected static final BasicDataStoreTestEnv env =
-	new BasicDataStoreTestEnv(System.getProperties());
+    protected final BasicDataStoreTestEnv env;
 
     /** The transaction proxy. */
-    protected static final DummyTransactionProxy txnProxy = env.txnProxy;
+    protected final DummyTransactionProxy txnProxy;
 
     /** The access coordinator. */
-    protected static final AccessCoordinatorHandle accessCoordinator =
-	env.accessCoordinator;
+    protected final AccessCoordinatorHandle accessCoordinator;
 
     /** The system registry. */
-    protected static final ComponentRegistry systemRegistry =
-	env.systemRegistry;
+    protected final ComponentRegistry systemRegistry;
 
     /** An instance of the data store, to test. */
     protected static DataStore store;
@@ -101,7 +101,19 @@ public class TestDataStoreImpl extends Assert {
     protected long id;
 
     /** Creates the test. */
-    public TestDataStoreImpl() { }
+    public TestDataStoreImpl() {
+	this(defaultEnv == null
+	     ? defaultEnv = new BasicDataStoreTestEnv(System.getProperties())
+	     : defaultEnv);
+    }
+
+    /** Creates the test using the specified basic test environment. */
+    protected TestDataStoreImpl(BasicDataStoreTestEnv env) {
+	this.env = env;
+	txnProxy = env.txnProxy;
+	accessCoordinator = env.accessCoordinator;	
+	systemRegistry = env.systemRegistry;
+    }	
 
     /** Make sure an empty version of the directory exists. */
     @BeforeClass
@@ -342,7 +354,14 @@ public class TestDataStoreImpl extends Assert {
 
     /* -- Unusual states -- */
     private final Action markForUpdate = new Action() {
-	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void setUp() throws Exception {
+	    store.setObject(txn, id, new byte[] { 0 });
+	    long id2 = store.createObject(txn);
+	    store.setObject(txn, id2, new byte[] { 0 });
+	    txn.commit();
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
+	    store.getObject(txn, id2, false);
+	}
 	void run() { store.markForUpdate(txn, id); }
     };
     @Test
@@ -426,7 +445,12 @@ public class TestDataStoreImpl extends Assert {
 
     /* -- Unusual states -- */
     private final Action getObject = new Action() {
-	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void setUp() throws Exception {
+	    store.setObject(txn, id, new byte[] { 0 });
+	    txn.commit();
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
+	    store.getObject(txn, id, false);
+	}
 	void run() { store.getObject(txn, id, false); };
     };
     @Test
@@ -789,7 +813,14 @@ public class TestDataStoreImpl extends Assert {
 
     /* -- Unusual states -- */
     private final Action removeObject = new Action() {
-	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void setUp() throws Exception {
+	    store.setObject(txn, id, new byte[] { 0 });
+	    long id2 = store.createObject(txn);
+	    store.setObject(txn, id2, new byte[] { 0 });
+	    txn.commit();
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
+	    store.getObject(txn, id2, false);
+	}
 	void run() { store.removeObject(txn, id); }
     };
     @Test
@@ -902,7 +933,12 @@ public class TestDataStoreImpl extends Assert {
 
     /* -- Unusual states -- */
     private final Action getBinding = new Action() {
-	void setUp() { store.setBinding(txn, "foo", id); }
+	void setUp() throws Exception {
+	    store.setBinding(txn, "foo", id);
+	    txn.commit();
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
+	    store.getBinding(txn, "foo");
+	}
 	void run() { store.getBinding(txn, "foo"); }
     };
     @Test
@@ -1058,7 +1094,13 @@ public class TestDataStoreImpl extends Assert {
 
     /* -- Unusual states -- */
     private final Action removeBinding = new Action() {
-	void setUp() { store.setBinding(txn, "foo", id); }
+	void setUp() throws Exception {
+	    store.setBinding(txn, "foo", id); 
+	    store.setObject(txn, id, new byte[] { 0 });
+	    txn.commit();
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
+	    store.getObject(txn, id, false);
+	}
 	void run() { store.removeBinding(txn, "foo"); }
     };
     @Test
@@ -1248,12 +1290,12 @@ public class TestDataStoreImpl extends Assert {
 		DummyTransaction txn2 = null;
 		try {
 		    txn2 = createTransaction(
-			UsePrepareAndCommit.ARBITRARY, 2000);
+			UsePrepareAndCommit.ARBITRARY, 20000);
 		    /* Get write lock on name-299 and notify txn */
 		    store.setBinding(txn2, "name-299", id2);
 		    flag.release();
 		    /* Wait for txn, then commit */
-		    flag2.tryAcquire(1000, TimeUnit.MILLISECONDS);
+		    flag2.tryAcquire(10000, TimeUnit.MILLISECONDS);
 		    txn2.commit();
 		} catch (TransactionAbortedException e) {
 		    System.err.println("txn2: " + e);
@@ -1571,7 +1613,6 @@ public class TestDataStoreImpl extends Assert {
 	void setUp() { participant = txn.participants.iterator().next(); }
 	void run() throws Exception {
 	    participant.commit(txn);
-	    txn = null;
 	}
     }
     private final CommitAction commit = new CommitAction();
@@ -2349,12 +2390,12 @@ public class TestDataStoreImpl extends Assert {
     }
 
     /** Creates a transaction. */
-    protected static DummyTransaction createTransaction() {
+    protected DummyTransaction createTransaction() {
 	return initTransaction(new DummyTransaction());
     }
 
     /** Creates a transaction with explicit use of prepareAndCommit. */
-    protected static DummyTransaction createTransaction(
+    protected DummyTransaction createTransaction(
 	UsePrepareAndCommit usePrepareAndCommit)
     {
 	return initTransaction(new DummyTransaction(usePrepareAndCommit));
@@ -2364,7 +2405,7 @@ public class TestDataStoreImpl extends Assert {
      * Creates a transaction with explicit use of prepareAndCommit and a
      * non-standard timeout.
      */
-    protected static DummyTransaction createTransaction(
+    protected DummyTransaction createTransaction(
 	UsePrepareAndCommit usePrepareAndCommit, long timeout)
     {
 	return initTransaction(
@@ -2372,7 +2413,7 @@ public class TestDataStoreImpl extends Assert {
     }
 
     /** Initializes a new transaction. */
-    protected static DummyTransaction initTransaction(DummyTransaction txn) {
+    protected DummyTransaction initTransaction(DummyTransaction txn) {
 	txnProxy.setCurrentTransaction(txn);
 	accessCoordinator.notifyNewTransaction(txn, 0, 1);
 	return txn;

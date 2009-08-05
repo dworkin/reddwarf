@@ -965,7 +965,7 @@ public abstract class AbstractDataStore
 	try {
 	    objectAccesses.reportObjectAccess(txn, oid, type);
 	} catch (IllegalArgumentException e) {
-	    throw new IllegalStateException(
+	    throw new TransactionNotActiveException(
 	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
 	}
     }
@@ -983,7 +983,7 @@ public abstract class AbstractDataStore
 	try {
 	    nameAccesses.reportObjectAccess(txn, getNameForAccess(name), type);
 	} catch (IllegalArgumentException e) {
-	    throw new IllegalStateException(
+	    throw new TransactionNotActiveException(
 	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
 	}
     }

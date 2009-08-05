@@ -52,7 +52,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
+import static java.util.logging.Level.CONFIG;
+import static java.util.logging.Level.FINER;
 import java.util.logging.Logger;
 
 /**
@@ -182,6 +183,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
 	lockManager =
 	    new TxnLockManager<Key, LockerImpl>(lockTimeout, numKeyMaps);
+	if (logger.isLoggable(CONFIG)) {
+	    logger.log(CONFIG,
+		       "Created LockingAccessCoordinator with properties:" +
+		       "\n  txn timeout: " + txnTimeout +
+		       "\n  lock timeout: " + lockTimeout +
+		       "\n  num key maps: " + numKeyMaps);
+	}
     }
 
     /* -- Implement AccessCoordinator -- */
@@ -221,9 +229,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	if (existing != null) {
 	    throw new IllegalStateException("Transaction already started");
 	}
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER,
-		       "begin {0}, requestedStartTime:{1,number,#}",
+	if (logger.isLoggable(FINER)) {
+	    logger.log(FINER, "begin {0}, requestedStartTime:{1,number,#}",
 		       locker, requestedStartTime);
 	}
 	txn.registerListener(new TxnListener(txn));
@@ -355,7 +362,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
      */
     private void endTransaction(Transaction txn) {
 	LockerImpl locker = getLocker(txn);
-	logger.log(Level.FINER, "end {0}", locker);
+	logger.log(FINER, "end {0}", locker);
 	locker.releaseAll();
 	txnMap.remove(txn);
 	profileCollectorHandle.setAccessedObjectsDetail(locker);
