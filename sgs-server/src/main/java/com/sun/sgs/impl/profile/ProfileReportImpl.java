@@ -26,6 +26,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileReport;
+import com.sun.sgs.profile.TransactionListenerDetail;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,6 +77,7 @@ class ProfileReportImpl implements ProfileReport {
     private AccessedObjectsDetail accessedObjectsDetail = null;
 
     private Set<ProfileParticipantDetail> participants;
+    private Set<TransactionListenerDetail> txnListeners;
 
     // counters that are updated through methods on this class
     private Map<String, Long> taskCounters;
@@ -107,6 +109,7 @@ class ProfileReportImpl implements ProfileReport {
         this.actualStartTime = System.currentTimeMillis();
 
 	participants = new HashSet<ProfileParticipantDetail>();
+        txnListeners = new HashSet<TransactionListenerDetail>();
 
 	taskCounters = null;
         ops = null;
@@ -175,6 +178,10 @@ class ProfileReportImpl implements ProfileReport {
         participants.add(participantDetail);
     }
     
+    void addListener(TransactionListenerDetail listenerDetail) {
+        txnListeners.add(listenerDetail);
+    }
+
     void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
         accessedObjectsDetail = detail;
     }
@@ -212,6 +219,13 @@ class ProfileReportImpl implements ProfileReport {
      */
     public Set<ProfileParticipantDetail> getParticipantDetails() {
         return participants;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Set<TransactionListenerDetail> getListenerDetails() {
+        return txnListeners;
     }
 
     /**
@@ -352,7 +366,7 @@ class ProfileReportImpl implements ProfileReport {
 	    }
 	}
 
-	// NOTE: we do not include the the participants information
+	// NOTE: we do not include the the participant or listener detail
 	//       since this is specific to a task and not to its
 	//       children.
     }
@@ -373,5 +387,7 @@ class ProfileReportImpl implements ProfileReport {
         }
         
         participants = Collections.unmodifiableSet(participants);
+        txnListeners = Collections.unmodifiableSet(txnListeners);
     }
+
 }
