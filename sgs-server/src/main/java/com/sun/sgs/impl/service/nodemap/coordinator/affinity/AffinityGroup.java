@@ -68,16 +68,16 @@ class AffinityGroup implements Comparable {
 
         int leadingCount = 0;
 
-        // nodeId -> count of members on that node
-        HashMap<Long, Integer> foo =
-                                  new HashMap<Long, Integer>(identities.size());
+        // Map nodeId -> count of members on that node
+        Map<Long, Integer> map = new HashMap<Long, Integer>(identities.size());
+
         for (long nodeId : identities.values()) {
-            Integer count = foo.get(nodeId);
+            Integer count = map.get(nodeId);
             if (count == null) {
                 count = new Integer(0);
             } 
             count++;
-            foo.put(nodeId, count);
+            map.put(nodeId, count);
 
             if (count > leadingCount) {
                 leadingCount = count;

@@ -33,6 +33,7 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -42,6 +43,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -262,6 +264,13 @@ public final class NodeMappingServerImpl
             new ConcurrentHashMap<Identity, MoveIdTask>();
     
     /**
+     * Active tasks offloading nodes. Map nodeId -> taskHandle. Access
+     * must be synchronized on the map object.
+     */
+    private final Map<Long, RecurringTaskHandle> offloadTasks =
+                                    new HashMap<Long, RecurringTaskHandle>();
+
+    /**
      * Creates a new instance of NodeMappingServerImpl, called from the
      * local NodeMappingService.
      * <p>
@@ -386,6 +395,12 @@ public final class NodeMappingServerImpl
     protected void doShutdown() {
         exporter.unexport();
         groupCoordinator.shutdown();
+        synchronized (offloadTasks) {
+            for (RecurringTaskHandle handle : offloadTasks.values()) {
+                handle.cancel();
+            }
+            offloadTasks.clear();
+        }
         try {
             if (removeThread != null) {
 		synchronized (removeThread) {
@@ -1074,7 +1089,7 @@ public final class NodeMappingServerImpl
 
     /** 
      * The listener registered with the watchdog service.  These methods
-     * will be notified if a node starts or stops.
+     * will be notified if a node starts and for any change in health.
      */
     private class Listener implements NodeListener {    
         Listener() {
@@ -1084,7 +1099,7 @@ public final class NodeMappingServerImpl
         /** {@inheritDoc} */
         public void nodeStarted(Node node) {
             // Do nothing.  We find out about nodes being available when
-            // our client services register with us.     
+            // our client services register with us. See registerNodeListener()
         }
 
         /** {@inheritDoc} */
@@ -1106,10 +1121,7 @@ public final class NodeMappingServerImpl
 
                 case ORANGE:
                     assignPolicy.nodeUnavailable(nodeId);
-
-                    // TODO - should schedule a periodic task to offload
-                    // unhealthly node until its health improves??
-                    offloadNode(node);
+                    scheduleOffload(nodeId);
                     break;
 
                 case RED:
@@ -1122,36 +1134,112 @@ public final class NodeMappingServerImpl
                     } catch (IOException ex) {
                         // won't happen, this is a local call
                     }
+                    // This is unlikely to work since the node is dead.
                     offloadNode(node);
                     break;
             }
         }
+    }
 
-        private void offloadNode(Node node) {
-            long nodeId = node.getId();
+    /**
+     *
+     * Schedule a task to offload identities from a node.
+     *
+     * @param nodeId a node ID
+     */
+    private void scheduleOffload(long nodeId) {
+        synchronized (offloadTasks) {
 
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "Offload request for {0}", node);
+            RecurringTaskHandle handle = offloadTasks.get(nodeId);
+
+            // If a task already exists, just let it work
+            if (handle == null) {
+                handle = taskScheduler.scheduleRecurringTask(
+                                            new OffloadTask(nodeId),
+                                            taskOwner,
+                                            0,
+                                            10 * 1000);
+                handle.start();
+                offloadTasks.put(nodeId, handle);
             }
+        }
+    }
 
-            try {
-                groupCoordinator.offload(node);
-            } catch (NoNodesAvailableException ex) {
-                logger.log(Level.WARNING,
-                           "Unable to offload node, no other nodes available");
+    /**
+     * Cancel an offload task.
+     *
+     * @param nodeId a node ID
+     */
+    private void cancelOffload(long nodeId) {
+        synchronized (offloadTasks) {
+            RecurringTaskHandle handle = offloadTasks.remove(nodeId);
+
+            if (handle != null) {
+                handle.cancel();
             }
+        }
+    }
 
-            // if the node is dead, offload any identities that are left
-            if (!node.isAlive()) {
-                
-                // Look up each identity on the failed node and move it
-                String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
-                Iterator<Identity> identities =
-                            new GetIdOnNodeTask(dataService, nodekey, logger);
-                // Node is dead, move everyone
-                while (identities.hasNext() && !shuttingDown()) {
-                    moveIdentity(identities.next(), node, -1);
-                }
+    /**
+     * Task to offload identities from a node.
+     */
+    private final class OffloadTask extends AbstractKernelRunnable {
+
+        final long nodeId;
+
+        OffloadTask(long nodeId) {
+            super("OffloadTask for node " + nodeId);
+            this.nodeId = nodeId;
+        }
+
+        @Override
+        public void run() throws Exception {
+
+            // If shoutdown just exit, this task will be canceled by shutdown
+            if (shuttingDown()) return;
+
+            Node node = getNode(nodeId);
+
+            // Only offload while health is poor
+            if ((node != null) && node.getHealth().equals(Node.Health.ORANGE)) {
+                offloadNode(node);
+            } else {
+                // If things have gotten better (or very worse), we are done
+                cancelOffload(nodeId);
+            }
+        }
+    }
+
+    /**
+     * Offload identities from a node. If the node is alive, an attempt is
+     * made to move a group of identities from the node. If the node is dead
+     * everything is moved off (though unlikely that will work since the
+     * node is dead).
+     *
+     * @param node the node to offload.
+     */
+    private void offloadNode(Node node) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "Offload request for {0}", node);
+        }
+
+        try {
+            groupCoordinator.offload(node);
+        } catch (NoNodesAvailableException ex) {
+            logger.log(Level.WARNING,
+                       "Unable to offload node, no other nodes available");
+        }
+
+        // if the node is dead, offload any identities that are left
+        if (!node.isAlive()) {
+
+            // Look up each identity on the failed node and move it
+            String nodekey = NodeMapUtil.getPartialNodeKey(node.getId());
+            Iterator<Identity> identities =
+                        new GetIdOnNodeTask(dataService, nodekey, logger);
+            // Node is dead, move everyone
+            while (identities.hasNext() && !shuttingDown()) {
+                moveIdentity(identities.next(), node, -1);
             }
         }
     }
