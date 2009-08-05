@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -395,6 +396,87 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             currentPeriodConflicts =
                     new ConcurrentHashMap<Long, Map<Object, Integer>>();
             periodConflictQueue.add(currentPeriodConflicts);
+        }
+    }
+
+    /**
+     * Weighted edges in our affinity graph.  Edges are between two vertices,
+     * and contain a weight for the number of times both vertices (identities)
+     * have accessed the object this edge represents.
+     */
+    private static class AffinityEdge extends WeightedEdge {
+        // the object this edge represents
+        private final Object objId;
+
+        /**
+         * Create a new edge with initial weight {@code 1}.
+         *
+         * @param id  the object id of the object this edge represents
+         */
+        AffinityEdge(Object id) {
+            this(id, 1);
+        }
+
+        /**
+         * Create a new edge with the given initial weight.
+         *
+         * @param id  the object id of the object this edge represents
+         * @param value the initial weight value
+         */
+        AffinityEdge(Object id, long value) {
+            super(value);
+            if (id == null) {
+                throw new NullPointerException("id must not be null");
+            }
+            objId = id;
+        }
+
+        /**
+         * Returns the object id of the object this edge represents.
+         *
+         * @return the object id of the object this edge represents
+         */
+        public Object getId() {
+            return objId;
+        }
+
+        /** {@inheritDoc} */
+        public String toString() {
+            return "E:" + objId + ":" + getWeight();
+        }
+    }
+
+    /**
+     * A version of undirected sparse multigraph which has a copy
+     * constructor.
+     *
+     * @param <V>  the vertex type
+     * @param <E>  the edge type
+     */
+    private static class CopyableGraph<V, E> extends
+            UndirectedSparseMultigraph<V, E>
+    {
+
+        /** Serialization version. */
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Creates an empty copyable graph.
+         */
+        public CopyableGraph() {
+            super();
+        }
+
+        /**
+         * Creates a copy of {@code other}.
+         * @param other the graph to copy
+         */
+        public CopyableGraph(CopyableGraph<V, E> other) {
+            super();
+            synchronized (other) {
+                vertices = new HashMap<V, Set<E>>(other.vertices);
+                edges = new HashMap<E, Pair<V>>(other.edges);
+            }
         }
     }
 }

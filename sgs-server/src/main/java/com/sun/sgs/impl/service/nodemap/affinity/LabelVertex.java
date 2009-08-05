@@ -32,8 +32,13 @@ import com.sun.sgs.auth.Identity;
  * that actually are not related, because hash codes are not guaranteed
  * to be unique.
  */
-public final class LabelVertex extends AffinityVertex {
+public final class LabelVertex {
+    /** The label for this vertex. */
     private volatile int label;
+    /** The identity this vertex represents.  */
+    private final Identity id;
+    /** The cached hashcode for this object. */
+    private volatile int hashCode = 0;
 
     /**
      * Constructs a new vertex repesenting the given {@code id} and
@@ -41,7 +46,7 @@ public final class LabelVertex extends AffinityVertex {
      * @param id the identity this vertex represents
      */
     public LabelVertex(Identity id) {
-        super(id);
+        this.id = id;
         initializeLabel();
     }
 
@@ -58,16 +63,36 @@ public final class LabelVertex extends AffinityVertex {
      * We do no take the current label into account when calculating equals.
      */
     public boolean equals(Object o) {
-        return super.equals(o);
+        if (o ==  this) {
+            return true;
+        }
+        if (!(o instanceof LabelVertex)) {
+            return false;
+        }
+        LabelVertex oVertex = (LabelVertex) o;
+        return id.equals(oVertex.getIdentity());
     }
+
     /** {@inheritDoc} */
     public int hashCode() {
-        return super.hashCode();
+//        if (hashCode == 0) {
+//            hashCode = id.hashCode();
+//        }
+        // If the id is simply a number, it's very useful for testing/debugging
+        // to use that number as the label.
+        if (hashCode == 0) {
+            try {
+                hashCode = Integer.valueOf(id.getName());
+            } catch (NumberFormatException e) {
+                hashCode = id.hashCode();
+            }
+        }
+        return hashCode;
     }
 
     /** {@inheritDoc} */
     public String toString() {
-        return "[" + getIdentity().toString() + ":" + label + "]";
+        return "[" + id.toString() + ":" + label + "]";
     }
 
     // Package private methods, used by the label propagation algorithm.
@@ -85,5 +110,13 @@ public final class LabelVertex extends AffinityVertex {
      */
     int getLabel() {
         return label;
+    }
+
+    /**
+     * Returns the identity this vertex represents.
+     * @return the identity this vertex represents
+     */
+    public Identity getIdentity() {
+        return id;
     }
 }
