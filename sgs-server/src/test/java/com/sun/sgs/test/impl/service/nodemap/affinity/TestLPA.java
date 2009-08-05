@@ -212,7 +212,7 @@ public class TestLPA {
         expected.add(PartialToyBuilder.NODE2);
         expected.add(PartialToyBuilder.NODE3);
         assertTrue(expected.containsAll(lp1.getNodeConflictMap().keySet()));
-        Map<Object, Integer> map =
+        Map<Object, Long> map =
                 lp1.getNodeConflictMap().get(PartialToyBuilder.NODE2);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj1"));
@@ -288,13 +288,13 @@ public class TestLPA {
 
     private void printNodeConflictMap(LabelPropagation lp) {
         
-        for (Map.Entry<Long, ConcurrentHashMap<Object, Integer>> entry :
+        for (Map.Entry<Long, ConcurrentHashMap<Object, Long>> entry :
              lp.getNodeConflictMap().entrySet())
         {
             StringBuilder sb1 = new StringBuilder();
             sb1.append(entry.getKey());
             sb1.append(":  ");
-            for (Map.Entry<Object, Integer> subEntry :
+            for (Map.Entry<Object, Long> subEntry :
                  entry.getValue().entrySet())
             {
                 sb1.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
@@ -482,9 +482,8 @@ public class TestLPA {
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements GraphBuilder {
         private final Graph<LabelVertex, WeightedEdge> graph;
-        private final 
-            ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
-            conflictMap;
+        private final  ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
+                conflictMap;
         private final Map<Object, Map<Identity, Long>> objUseMap;
 
         static final long NODE1 = 1;
@@ -503,7 +502,7 @@ public class TestLPA {
             graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
             conflictMap = new ConcurrentHashMap<Long, 
-                                    ConcurrentHashMap<Object, Integer>>();
+                                    ConcurrentHashMap<Object, Long>>();
 
             if (node == NODE1) {
                 // Create a partial graph
@@ -528,12 +527,12 @@ public class TestLPA {
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                ConcurrentHashMap<Object, Integer> conflict =
-                        new ConcurrentHashMap<Object, Integer>();
-                conflict.put("obj1", 1);
+                ConcurrentHashMap<Object, Long> conflict =
+                        new ConcurrentHashMap<Object, Long>();
+                conflict.put("obj1", 1L);
                 conflictMap.put(NODE2, conflict);
-                conflict = new ConcurrentHashMap<Object, Integer>();
-                conflict.put("obj2", 1);
+                conflict = new ConcurrentHashMap<Object, Long>();
+                conflict.put("obj2", 1L);
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
                 // Create a partial graph
@@ -548,9 +547,9 @@ public class TestLPA {
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                ConcurrentHashMap<Object, Integer> conflict =
-                        new ConcurrentHashMap<Object, Integer>();
-                conflict.put("obj1", 1);
+                ConcurrentHashMap<Object, Long> conflict =
+                        new ConcurrentHashMap<Object, Long>();
+                conflict.put("obj1", 1L);
                 conflictMap.put(NODE1, conflict);
             } else if (node == NODE3) {
                 Identity[] idents = {new DummyIdentity("4"),
@@ -588,7 +587,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
                 getConflictMap()
         {
             return conflictMap;
@@ -609,7 +608,7 @@ public class TestLPA {
     private class DistributedZachBuilder implements GraphBuilder {
         private final Graph<LabelVertex, WeightedEdge> graph;
         private final 
-            ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+            ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
             conflictMap;
         private final Map<Object, Map<Identity, Long>> objUseMap;
 
@@ -628,7 +627,7 @@ public class TestLPA {
             graph = new UndirectedSparseMultigraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
             conflictMap = new ConcurrentHashMap<Long,
-                                    ConcurrentHashMap<Object, Integer>>();
+                                    ConcurrentHashMap<Object, Long>>();
             LabelVertex[] nodes = new LabelVertex[35];
             DummyIdentity[] idents = new DummyIdentity[35];
             int nodeAsInt = (int) node;
@@ -787,28 +786,28 @@ public class TestLPA {
  
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                ConcurrentHashMap<Object, Integer> conflict =
-                        new ConcurrentHashMap<Object, Integer>();
-                conflict.put("o1", 1);
-                conflict.put("o2", 1);
-                conflict.put("o18", 1);
-                conflict.put("o21", 1);
-                conflict.put("o41", 1);
-                conflict.put("o45", 1);
-                conflict.put("o47", 1);
+                ConcurrentHashMap<Object, Long> conflict =
+                        new ConcurrentHashMap<Object, Long>();
+                conflict.put("o1", 1L);
+                conflict.put("o2", 1L);
+                conflict.put("o18", 1L);
+                conflict.put("o21", 1L);
+                conflict.put("o41", 1L);
+                conflict.put("o45", 1L);
+                conflict.put("o47", 1L);
                 conflictMap.put(NODE2, conflict);
-                conflict = new ConcurrentHashMap<Object, Integer>();
-                conflict.put("o1", 1);
-                conflict.put("o5", 1);
-                conflict.put("o7", 1);
-                conflict.put("o11", 1);
-                conflict.put("o31", 1);
-                conflict.put("o35", 1);
-                conflict.put("o36", 1);
-                conflict.put("o42", 1);
-                conflict.put("o46", 1);
-                conflict.put("o48", 1);
-                conflict.put("o49", 1);
+                conflict = new ConcurrentHashMap<Object, Long>();
+                conflict.put("o1", 1L);
+                conflict.put("o5", 1L);
+                conflict.put("o7", 1L);
+                conflict.put("o11", 1L);
+                conflict.put("o31", 1L);
+                conflict.put("o35", 1L);
+                conflict.put("o36", 1L);
+                conflict.put("o42", 1L);
+                conflict.put("o46", 1L);
+                conflict.put("o48", 1L);
+                conflict.put("o49", 1L);
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
                 graph.addEdge(new WeightedEdge(), nodes[8], nodes[2]);
@@ -901,22 +900,22 @@ public class TestLPA {
 
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                ConcurrentHashMap<Object, Integer> conflict =
-                        new ConcurrentHashMap<Object, Integer>();
-                conflict.put("o2", 1);
-                conflict.put("o8", 1);
-                conflict.put("o15", 1);
-                conflict.put("o23", 1);
-                conflict.put("o30", 1);
-                conflict.put("o32", 1);
-                conflict.put("o51", 1);
-                conflict.put("o53", 1);
+                ConcurrentHashMap<Object, Long> conflict =
+                        new ConcurrentHashMap<Object, Long>();
+                conflict.put("o2", 1L);
+                conflict.put("o8", 1L);
+                conflict.put("o15", 1L);
+                conflict.put("o23", 1L);
+                conflict.put("o30", 1L);
+                conflict.put("o32", 1L);
+                conflict.put("o51", 1L);
+                conflict.put("o53", 1L);
                 conflictMap.put(NODE1, conflict);
-                conflict = new ConcurrentHashMap<Object, Integer>();
-                conflict.put("o1", 1);
-                conflict.put("o10", 1);
-                conflict.put("o14", 1);
-                conflict.put("o22", 1);
+                conflict = new ConcurrentHashMap<Object, Long>();
+                conflict.put("o1", 1L);
+                conflict.put("o10", 1L);
+                conflict.put("o14", 1L);
+                conflict.put("o22", 1L);
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE3) {
                 graph.addEdge(new WeightedEdge(), nodes[9], nodes[3]);
@@ -1029,23 +1028,23 @@ public class TestLPA {
 
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                ConcurrentHashMap<Object, Integer> conflict =
-                        new ConcurrentHashMap<Object, Integer>();
-                conflict.put("o3", 1);
-                conflict.put("o4", 1);
-                conflict.put("o12", 1);
-                conflict.put("o16", 1);
-                conflict.put("o24", 1);
-                conflict.put("o25", 1);
-                conflict.put("o31", 1);
-                conflict.put("o52", 1);
+                ConcurrentHashMap<Object, Long> conflict =
+                        new ConcurrentHashMap<Object, Long>();
+                conflict.put("o3", 1L);
+                conflict.put("o4", 1L);
+                conflict.put("o12", 1L);
+                conflict.put("o16", 1L);
+                conflict.put("o24", 1L);
+                conflict.put("o25", 1L);
+                conflict.put("o31", 1L);
+                conflict.put("o52", 1L);
                 conflictMap.put(NODE1, conflict);
-                conflict = new ConcurrentHashMap<Object, Integer>();
-                conflict.put("o17", 1);
-                conflict.put("o26", 1);
-                conflict.put("o27", 1);
-                conflict.put("o38", 1);
-                conflict.put("o39", 1);
+                conflict = new ConcurrentHashMap<Object, Long>();
+                conflict.put("o17", 1L);
+                conflict.put("o26", 1L);
+                conflict.put("o27", 1L);
+                conflict.put("o38", 1L);
+                conflict.put("o39", 1L);
                 conflictMap.put(NODE2, conflict);
             }
         }
@@ -1061,7 +1060,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
                 getConflictMap()
         {
             return conflictMap;

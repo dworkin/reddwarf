@@ -144,14 +144,14 @@ class ZachBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Integer>>
+    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
             getConflictMap()
     {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Identity, Integer>> getObjectUseMap() {
+    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
