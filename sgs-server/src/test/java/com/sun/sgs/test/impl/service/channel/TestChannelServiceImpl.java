@@ -30,6 +30,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
+import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -542,7 +543,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = channelService.getChannel(channelName);
-		    Set<String> users = new HashSet<String>(someUsers);
+		    List<String> users = new ArrayList(Arrays.asList(someUsers));
 		    Iterator<ClientSession> iter = channel.getSessions();
 		    while (iter.hasNext()) {
 			ClientSession session = iter.next();
@@ -720,9 +721,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     public void testChannelLeaveClosedChannel() throws Exception {
 	final String channelName = "leaveClosedChannelTest";
 	final String user = "daffy";
-	final List<String> users = Arrays.asList(new String[] { user });
 	createChannel(channelName);
-	ClientGroup group = new ClientGroup(users);
+	ClientGroup group = new ClientGroup(user);
 
 	try {
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -776,12 +776,12 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		    Channel channel = getChannel(channelName);
 	
 		    ClientSession moe =
-			(ClientSession) dataService.getBinding("moe");
+			(ClientSession) dataService.getBinding(MOE);
 		    channel.join(moe);
 
 		    try {
 			ClientSession larry =
-			    (ClientSession) dataService.getBinding("larry");
+			    (ClientSession) dataService.getBinding(LARRY);
 			channel.leave(larry);
 			System.err.println("leave of non-member session returned");
 			
@@ -800,10 +800,10 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		    Channel channel = getChannel(channelName);
 	
 		    ClientSession moe =
-			(ClientSession) dataService.getBinding("moe");
+			(ClientSession) dataService.getBinding(MOE);
 
 		    ClientSession larry =
-			(ClientSession) dataService.getBinding("larry");
+			(ClientSession) dataService.getBinding(LARRY);
 		    
 		    Set<ClientSession> sessions = getSessions(channel);
 		    System.err.println(
@@ -1017,7 +1017,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    joinUsers(channelName, sevenDwarfs);
-	    sendMessagesToChannel(channelName, group, 3);
+	    sendMessagesToChannel(channelName, 3);
+	    checkChannelMessagesReceived(group, channelName, 3);
 	} finally {
 	    group.disconnect(false);
 	}
@@ -1040,10 +1041,10 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	Thread.sleep(1000);
 	int count = getObjectCount();
 	printServiceBindings("after channel create");
-	List<String> users =  sevenDwarfs;
-	ClientGroup group1 = new ClientGroup(users);
-	joinUsers(channelName, users);
-	sendMessagesToChannel(channelName, group1, 3);
+	ClientGroup group1 = new ClientGroup(sevenDwarfs);
+	joinUsers(channelName, sevenDwarfs);
+	sendMessagesToChannel(channelName, 3);
+	checkChannelMessagesReceived(group1, channelName, 3);
 	printServiceBindings("after users joined");
 	System.err.println("simulate watchdog server crash...");
 	tearDown(false);
@@ -1064,11 +1065,11 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 			       ", afterCount: " + afterCount);
 	}
 	printServiceBindings("after recovery");
-	users =  someUsers;
-	ClientGroup group2 = new ClientGroup(users);
+	ClientGroup group2 = new ClientGroup(someUsers);
 	try {
-	    joinUsers(channelName, users);
-	    sendMessagesToChannel(channelName, group2, 2);
+	    joinUsers(channelName, someUsers);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group2, channelName, 2);
 	    group1.checkMembership(channelName, false);
 	    assertEquals(count, afterCount);
 	} finally {
@@ -1094,7 +1095,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    for (String channelName : channelNames) {
 		joinUsers(channelName, sevenDwarfs);
-		sendMessagesToChannel(channelName, group, 2);
+		sendMessagesToChannel(channelName, 2);
+		checkChannelMessagesReceived(group, channelName, 2);
 	    }
 	    printServiceBindings("after users joined");
 	    // nuke non-coordinator node
@@ -1109,7 +1111,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    // send messages to sessions that are left
 	    System.err.println("send messages to remaining members");
 	    for (String channelName : channelNames) {
-		sendMessagesToChannel(channelName, group, 2);
+		sendMessagesToChannel(channelName, 2);
+		checkChannelMessagesReceived(group, channelName, 2);
 	    }
 	    if (!disconnectedSessionsGroup.isDisconnectedGroup()) {
 		fail("expected disconnected client(s)");
@@ -1143,7 +1146,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    for (String channelName : channelNames) {
 		joinUsers(channelName, sevenDwarfs);
-		sendMessagesToChannel(channelName, group, 2);
+		sendMessagesToChannel(channelName, 2);
+		checkChannelMessagesReceived(group, channelName, 2);
 	    }
 	    printServiceBindings("after users joined");
 	    // nuke coordinator node
@@ -1158,7 +1162,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    // send messages to sessions that are left
 	    System.err.println("send messages to remaining members");
 	    for (String channelName : channelNames) {
-		sendMessagesToChannel(channelName, group, 2);
+		sendMessagesToChannel(channelName, 2);
+		checkChannelMessagesReceived(group, channelName, 2);
 	    }
 	    if (!disconnectedSessionsGroup.isDisconnectedGroup()) {
 		fail("expected disconnected client(s)");
@@ -1187,7 +1192,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	DummyClient nonMember = newClient();
 	try {
 	    joinUsers(channelName, someUsers);
-	    DummyClient moe = group.getClient("moe");
+	    DummyClient moe = group.getClient(MOE);
 	    moe.assertJoinedChannel(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
@@ -1214,7 +1219,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	DummyClient nonMember = newClient();
 	try {
 	    joinUsers(channelName, someUsers);
-	    DummyClient moe = group.getClient("moe");
+	    DummyClient moe = group.getClient(MOE);
 	    moe.assertJoinedChannel(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
@@ -1238,7 +1243,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	ClientGroup group = new ClientGroup(someUsers);
 	try {
 	    joinUsers(channelName, someUsers);
-	    DummyClient moe = group.getClient("moe");
+	    DummyClient moe = group.getClient(MOE);
 	    moe.assertJoinedChannel(channelName);
 	    moe.sendChannelMessage(channelName, 0);
 	    Thread.sleep(2000);
@@ -1267,7 +1272,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	ClientGroup group = new ClientGroup(someUsers);
 	try {
 	    joinUsers(channelName, someUsers);
-	    DummyClient moe = group.getClient("moe");
+	    DummyClient moe = group.getClient(MOE);
 	    moe.assertJoinedChannel(channelName);
 	    moe.sendChannelMessage(channelName, 0);
 	    Thread.sleep(2000);
@@ -1296,7 +1301,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	ClientGroup group = new ClientGroup(someUsers);
 	try {
 	    joinUsers(channelName, someUsers);
-	    DummyClient moe = group.getClient("moe");
+	    DummyClient moe = group.getClient(MOE);
 	    moe.assertJoinedChannel(channelName);
 	    moe.sendChannelMessage(channelName, 0);
 	    Thread.sleep(2000);
@@ -1325,7 +1330,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	ClientGroup group = new ClientGroup(someUsers);
 	try {
 	    joinUsers(channelName, someUsers);
-	    DummyClient moe = group.getClient("moe");
+	    DummyClient moe = group.getClient(MOE);
 	    moe.assertJoinedChannel(channelName);
 	    int numMessages = 10;
 	    for (int i = 0; i < numMessages; i++) {
@@ -1530,6 +1535,28 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    group.disconnect(false);
 	}
 	
+    }
+
+    @Test
+    @IntegrationTest
+    public void testSendFromClientSessionWithDelayedJoin() throws Exception {
+	String user = "user";
+	String channelName = "test";
+	// Create channel with coordinator on server node.
+	createChannel(channelName);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    holdChannelServerMethodToNode(userNode, "join");
+	    joinUsers(channelName, user);
+	    sendMessagesToChannel(channelName, 3);
+	    releaseChannelServerMethodHeld(userNode);
+	    checkChannelMessagesReceived(client, channelName, 3);
+	} finally {
+	    client.disconnect();
+	}
     }
 
     // -- other classes --

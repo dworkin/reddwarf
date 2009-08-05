@@ -45,11 +45,9 @@ import org.junit.runner.RunWith;
 public class TestChannelServiceImplRelocatingSessions
     extends AbstractChannelServiceTest
 {
-    private final List<String> oneUser =
-	Arrays.asList(new String[] { "rex" });
-
-    private final List<String> noUsers =
-	new ArrayList<String>();
+    private final static String REX = "rex";
+    
+    private final String[] oneUser = new String[] { REX };
 
     /** Constructs a test instance. */
     public TestChannelServiceImplRelocatingSessions() throws Exception {
@@ -72,15 +70,17 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Join all users to channel and send some messages on channel.
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 	    
 	    // Move clients to new nodes.
-	    moveClient(group.getClient(someUsers.get(0)), serverNode, node1);
-	    moveClient(group.getClient(someUsers.get(1)), serverNode, node2);
+	    moveClient(group.getClient(MOE), serverNode, node1);
+	    moveClient(group.getClient(LARRY), serverNode, node2);
 	    
 	    // Make sure all members are still joined and can receive messages.
 	    checkUsersJoined(channelName, someUsers);
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.
@@ -99,8 +99,9 @@ public class TestChannelServiceImplRelocatingSessions
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	createChannel(channelName);
-	// All clients will log into server node.
-	ClientGroup group = new ClientGroup(oneUser);
+	// Client will log into server node.
+	DummyClient client = new DummyClient(REX);
+	client.connect(port).login();
 	SgsTestNode node1 = addNode();
 	
 	try {
@@ -108,20 +109,21 @@ public class TestChannelServiceImplRelocatingSessions
 	    joinUsers(channelName, oneUser);
 	    checkUsersJoined(channelName, oneUser);
 	    
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(client, channelName, 2);
 	    
 	    // Move clients to new nodes.
-	    DummyClient client = group.getClient(oneUser.get(0));
 	    moveClient(client, serverNode, node1);
 	    
-	    // Make sure all members are still joined and can receive messages.
+	    // Make sure all members are still joined and leave after
+	    // relocation works correctly.
 	    checkUsersJoined(channelName, oneUser);
 	    leaveUsers(channelName, oneUser);
 	    client.assertLeftChannel(channelName);
 	    checkUsersJoined(channelName, noUsers);
 	    
 	} finally {
-	    group.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -141,18 +143,19 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Join all users to channel and send some messages on channel.
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 	    
 	    // Move clients to new nodes.
-	    DummyClient relocatingClient =
-		group.getClient(someUsers.get(0));
+	    DummyClient relocatingClient = group.getClient(MOE);
 	    SgsTestNode oldNode = serverNode;
 	    for (SgsTestNode newNode : nodes) {
 		moveClient(relocatingClient, oldNode, newNode);
 		// Make sure all members are still joined and can receive
 		// messages. 
 		checkUsersJoined(channelName, someUsers);
-		sendMessagesToChannel(channelName, group, 2);
+		sendMessagesToChannel(channelName, 2);
+		checkChannelMessagesReceived(group, channelName, 2);
 		oldNode = newNode;
 	    }
 	    // Disconnect each client and make sure that memberships/bindings
@@ -170,24 +173,25 @@ public class TestChannelServiceImplRelocatingSessions
     public void testChannelJoinAndRelocateWithOldNodeFailure()
 	throws Exception
     {
-	List<String> users = new ArrayList<String>(someUsers);
 	String channelName = "foo";
+	
 	createChannel(channelName);
 	// All clients will log into the server node.
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
-	ClientGroup group = new ClientGroup(users);
+	ClientGroup group = new ClientGroup(someUsers);
 	SgsTestNode node1 = addNode();
 	SgsTestNode node2 = addNode();
 	
 	try {
 	    // Join all users to channel and send some messages on channel.
-	    joinUsers(channelName, users);
-	    checkUsersJoined(channelName, users);
-	    sendMessagesToChannel(channelName, group, 2);
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 	    
 	    // move client to node1
 	    DummyClient relocatingClient =
-		group.getClient(users.get(0));
+		group.getClient(MOE);
 	    moveClient(relocatingClient, serverNode, node1);
 	    // notify client to move to node2, but don't relocate yet.
 	    moveIdentityAndWaitForRelocationNotification(
@@ -196,12 +200,12 @@ public class TestChannelServiceImplRelocatingSessions
 	    node1.shutdown(false);
 	    // give recovery a chance.
 	    Thread.sleep(WAIT_TIME*3);
-	    users.remove(relocatingClient.name);
 	    group.removeSessionsFromGroup(node1.getAppPort());
-	    checkUsersJoined(channelName, users);
-	    sendMessagesToChannel(channelName, group, 2);
-	    // Disconnect each client and make sure that membership/bindings
-	    // are cleaned up.
+	    checkUsersJoined(channelName, LARRY, CURLY);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
+	    // Disconnect each client and make sure that membership
+	    // is cleaned up.
 	    group.disconnect(true);
 	    checkUsersJoined(channelName, noUsers);
 	    
@@ -223,11 +227,11 @@ public class TestChannelServiceImplRelocatingSessions
 	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	ClientGroup group = new ClientGroup(oldNode.getAppPort(), oneUser);
 	
 	try {
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    DummyClient relocatingClient = group.getClient(REX);
 	    // Hold up joins send to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
@@ -241,7 +245,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, oneUser);
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.
@@ -267,11 +272,11 @@ public class TestChannelServiceImplRelocatingSessions
 	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	ClientGroup group = new ClientGroup(oldNode.getAppPort(), oneUser);
 	
 	try {
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    DummyClient relocatingClient = group.getClient(REX);
 	    // Hold up "leave" to oldNode
 	    holdChannelServerMethodToNode(oldNode, "leave");
 	    joinUsers(channelName, oneUser);
@@ -308,11 +313,11 @@ public class TestChannelServiceImplRelocatingSessions
 	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	ClientGroup group = new ClientGroup(oldNode.getAppPort(), oneUser);
 	
 	try {
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    DummyClient relocatingClient = group.getClient(REX);
 	    // Hold up "join" to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser);
@@ -323,7 +328,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, oneUser);
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.
@@ -349,11 +355,11 @@ public class TestChannelServiceImplRelocatingSessions
 	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	ClientGroup group = new ClientGroup(oldNode.getAppPort(), oneUser);
 	
 	try {
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    DummyClient relocatingClient = group.getClient(REX);
 	    // Hold up "leave" to oldNode
 	    holdChannelServerMethodToNode(oldNode, "leave");
 	    joinUsers(channelName, oneUser);
@@ -391,11 +397,11 @@ public class TestChannelServiceImplRelocatingSessions
 	SgsTestNode newNode2 = addNode();
 	
 	// Client will log into "oldNode"
-	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
+	ClientGroup group = new ClientGroup(oldNode.getAppPort(), oneUser);
 	
 	try {
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
+	    DummyClient relocatingClient = group.getClient(REX);
 	    // Hold up joins send to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
@@ -407,7 +413,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, oneUser);
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.
@@ -445,7 +452,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    checkUsersJoined(channelName1, someUsers);
 	    
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(someUsers.get(0));
+	    DummyClient relocatingClient = group.getClient(REX);
 	    moveIdentity(relocatingClient, serverNode, newNode);
 	    SimpleCompletionHandler handler =
 		mySessionStatusListener.waitForPrepare();
@@ -463,8 +470,10 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName2, someUsers);
-	    sendMessagesToChannel(channelName2, group, 2);
-	    sendMessagesToChannel(channelName1, group, 2);
+	    sendMessagesToChannel(channelName2, 2);
+	    checkChannelMessagesReceived(group, channelName2, 2);
+	    sendMessagesToChannel(channelName1, 2);
+	    checkChannelMessagesReceived(group, channelName1, 2);
 
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.
@@ -492,7 +501,7 @@ public class TestChannelServiceImplRelocatingSessions
 	
 	try {
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(someUsers.get(0));
+	    DummyClient relocatingClient = group.getClient(MOE);
 	    moveIdentityAndWaitForRelocationNotification(
 		relocatingClient, serverNode, newNode);
 	    
@@ -504,7 +513,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, someUsers);
-	    sendMessagesToChannel(channelName, group, 2);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
 
 	    // Disconnect each client and make sure that memberships/bindings
 	    // are cleaned up.

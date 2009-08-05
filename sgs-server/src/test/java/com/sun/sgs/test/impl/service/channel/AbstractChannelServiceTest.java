@@ -83,10 +83,19 @@ public abstract class AbstractChannelServiceTest extends Assert {
     
     protected static final int WAIT_TIME = 2000;
     
-    protected static final List<String> sevenDwarfs =
-	Arrays.asList(new String[] {
-			  "bashful", "doc", "dopey", "grumpy",
-			  "happy", "sleepy", "sneezy"});
+    /** A list of users for test purposes. */
+    protected static final String MOE = "moe";
+    protected static final String LARRY = "larry";
+    protected static final String CURLY = "curly";
+    protected static final String[] someUsers = new String[] { MOE, LARRY, CURLY };
+
+    /** A longer list of users for test purposes. */
+    protected static final String[] sevenDwarfs =
+	new String[] {"bashful", "doc", "dopey", "grumpy",
+		      "happy", "sleepy", "sneezy"};
+
+    /** No users. */
+    protected static final String[] noUsers = new String[0];
 
     /** The Channel service properties. */
     protected static final Properties serviceProps =
@@ -124,9 +133,6 @@ public abstract class AbstractChannelServiceTest extends Assert {
     /** The listen port for the client session service. */
     protected int port;
 
-    /** A list of users for test purposes. */
-    protected List<String> someUsers =
-	Arrays.asList(new String[] { "moe", "larry", "curly" });
 
     protected boolean isPerformanceTest = false;
 
@@ -227,14 +233,10 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	Map<String, DummyClient> clients;
 
 	ClientGroup(String... users) {
-	    this(Arrays.asList(users));
+	    this(port, users);
 	}
 
-	ClientGroup(List<String> users) {
-	    this(users, port);
-	}
-	
-	ClientGroup(List<String> users, int connectPort) {
+	ClientGroup(int connectPort, String... users) {
 	    clients = new HashMap<String, DummyClient>();
 	    for (String user : users) {
 		DummyClient client = new DummyClient(user);
@@ -448,7 +450,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
     
     protected void joinUsers(
-	final String channelName, final List<String> users)
+	final String channelName, final String... users)
 	throws Exception
     {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -464,7 +466,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
 
     protected void leaveUsers(
-	final String channelName, final List<String> users)
+ 	final String channelName, final String... users)
 	throws Exception
     {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -480,7 +482,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
 
     protected void checkUsersJoined(
-	final String channelName, final List<String> users)
+	final String channelName, final String... users)
 	throws Exception
     {
 	Thread.sleep(600);
@@ -488,7 +490,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
     
     private void checkUsersJoined0(
-	final String channelName, final List<String> users)
+	final String channelName, final String... users)
 	throws Exception
     {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -496,12 +498,13 @@ public abstract class AbstractChannelServiceTest extends Assert {
 		Channel channel = getChannel(channelName);
 		Set<ClientSession> sessions = getSessions(channel);
 		System.err.println("Sessions joined:" + sessions);
-		if (sessions.size() != users.size()) {
-		    fail("Expected " + users.size() + " sessions, got " +
+		if (sessions.size() != users.length) {
+		    fail("Expected " + users.length + " sessions, got " +
 			 sessions.size());
 		}
+		List<String> userList = Arrays.asList(users);
 		for (ClientSession session : sessions) {
-		    if (!users.contains(session.getName())) {
+		    if (!userList.contains(session.getName())) {
 			fail("Expected session: " + session);
 		    }
 		}
@@ -522,64 +525,54 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
     
     protected void sendMessagesToChannel(
-	final String channelName, ClientGroup group, int numMessages)
+	final String channelName, int numMessages)
 	throws Exception
     {
-	try {
-	    boolean failed = false;
-	    String messageString = "message";
-
-	    for (int i = 0; i < numMessages; i++) {
-		final MessageBuffer buf = (new MessageBuffer(4)).putInt(i);
-		System.err.println("Sending message: " +
-				   HexDumper.format(buf.getBuffer()));
-
-		txnScheduler.runTask(
-		    new TestAbstractKernelRunnable() {
-			public void run() {
-			    Channel channel = getChannel(channelName);
-			    channel.send(null, ByteBuffer.wrap(buf.getBuffer()));
-			}
-		    }, taskOwner);
-	    }
-
-	    Thread.sleep(3000);
-	    for (DummyClient client : group.getClients()) {
-		for (int i = 0; i < numMessages; i++) {
-		    MessageInfo info = client.nextChannelMessage();
-		    if (info == null) {
-			failed = true;
-			System.err.println(
-			    "FAILURE: " + client.name +
-			    " did not get message: " + i);
-			continue;
-		    } else {
-			if (! info.channelName.equals(channelName)) {
-			    fail("Got channel name: " + info.channelName +
-				 ", Expected: " + channelName);
-			}
-			System.err.println(
-			    client.name + " got channel message: " + info.seq);
-			if (info.seq != i) {
-			    failed = true;
-			    System.err.println(
-				"\tFAILURE: expected sequence number: " + i);
-			}
-		    }
-		}
-	    }
-
-	    if (failed) {
-		fail("test failed: see output");
-	    }
+	for (int i = 0; i < numMessages; i++) {
+	    final MessageBuffer buf = (new MessageBuffer(4)).putInt(i);
+	    System.err.println("Sending message: " +
+			       HexDumper.format(buf.getBuffer()));
 	    
-	} catch (RuntimeException e) {
-	    System.err.println("unexpected failure");
-	    e.printStackTrace();
-	    printServiceBindings("after exception");
-	    fail("unexpected failure: " + e);
+	    txnScheduler.runTask(
+		new TestAbstractKernelRunnable() {
+		    public void run() {
+			Channel channel = getChannel(channelName);
+			channel.send(null, ByteBuffer.wrap(buf.getBuffer()));
+		    }
+		}, taskOwner);
 	}
     }
+
+    protected void checkChannelMessagesReceived(
+	DummyClient client, String channelName, int numMessages)
+    {
+	for (int i = 0; i < numMessages; i++) {
+	    checkNextChannelMessage(client, channelName, i);
+	}
+    }
+
+    protected void checkChannelMessagesReceived(
+	ClientGroup group, String channelName, int numMessages)
+	throws InterruptedException
+    {
+	Thread.sleep(3000);
+	for (DummyClient client : group.getClients()) {
+	    checkChannelMessagesReceived(client, channelName, numMessages);
+	}
+    }
+
+    protected void checkNextChannelMessage(
+	DummyClient client, String channelName, int value)
+    {
+	MessageInfo info = client.nextChannelMessage();
+	if (info == null) {
+	    fail("FAILURE: " + client.name +
+		 " did not get any message for channel: " + channelName);
+	}
+	assertEquals("Mismatched channel names", channelName, info.channelName);
+	assertEquals("Unexpected channel message sequence", value, info.seq);
+    }
+    
 
     // -- other classes --
 
@@ -643,11 +636,17 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	}
 	
 	MessageInfo nextChannelMessage() {
+	    int totalWaitTime = WAIT_TIME * 2;
+	    int waitInterval = totalWaitTime / 10;
 	    synchronized (lock) {
-		if (channelMessages.isEmpty()) {
+		while (channelMessages.isEmpty()) {
 		    try {
-			lock.wait(WAIT_TIME);
+			lock.wait(waitInterval);
 		    } catch (InterruptedException e) {
+		    }
+		    totalWaitTime -= waitInterval;
+		    if (totalWaitTime <= 0) {
+			break;
 		    }
 		}
 		return
@@ -821,7 +820,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
 
     public static class DummyAppListener implements AppListener, Serializable {
 
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	public DummyAppListener() { }
 
@@ -846,7 +845,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     private static class DummyClientSessionListener
 	implements ClientSessionListener, Serializable, ManagedObject
     {
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 	private final String name;
 	
 	private final ManagedReference<ClientSession> sessionRef;
@@ -1088,7 +1087,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     private static class ControllableInvocationHandler
 	implements InvocationHandler, Serializable
     {
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 	private final Object obj;
 	private final long nodeId;
 	
