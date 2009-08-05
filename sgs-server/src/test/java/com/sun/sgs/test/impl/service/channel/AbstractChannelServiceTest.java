@@ -31,8 +31,10 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.channel.ChannelServer;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -47,6 +49,11 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -84,13 +91,18 @@ public abstract class AbstractChannelServiceTest extends Assert {
     /** The Channel service properties. */
     protected static final Properties serviceProps =
 	createProperties(StandardProperties.APP_NAME, APP_NAME);
+
+    private static Map<Long, MethodInfo> holdMethodMap =
+	new HashMap<Long, MethodInfo>();
+    
+    /** The number for creating host names. */
+    private int hostNum = 1;
     
     /** The node that creates the servers. */
     protected SgsTestNode serverNode;
 
-    /** Any additional nodes, keyed by node hostname (for tests
-     * needing more than one node). */
-    protected Map<String,SgsTestNode> additionalNodes;
+    /** Any additional nodes created by a test. */
+    private Set<SgsTestNode> additionalNodes = new HashSet<SgsTestNode>();
 
     /** Version information from ChannelServiceImpl class. */
     protected final String VERSION_KEY;
@@ -136,6 +148,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     @Before
     public void setUp() throws Exception {
         setUp(true);
+	holdMethodMap.clear();
     }
 
     protected void setUp(boolean clean) throws Exception {
@@ -157,6 +170,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
 
         dataService = serverNode.getDataService();
 	channelService = serverNode.getChannelService();
+	wrapChannelServerProxy(serverNode);
     }
 
     /** Cleans up the transaction. */
@@ -166,39 +180,46 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
 
     protected void tearDown(boolean clean) throws Exception {
-	// This sleep cuts down on the exceptions output due to shutdwon.
+	// This sleep cuts down on the exceptions output due to shutdown.
 	Thread.sleep(500);
-	if (additionalNodes != null) {
-            for (SgsTestNode node : additionalNodes.values()) {
-                node.shutdown(false);
-            }
-            additionalNodes = null;
-        }
+	for (SgsTestNode node : additionalNodes) {
+	    node.shutdown(false);
+	}
+	additionalNodes.clear();
         serverNode.shutdown(clean);
         serverNode = null;
     }
-
-    /** 
-     * Add additional nodes.  We only do this as required by the tests. 
-     *
-     * @param hosts contains a host name for each additional node
+    
+    /**
+     * Creates a new test node, and returns it.
      */
-    protected void addNodes(String... hosts) throws Exception {
-        // Create the other nodes
+    protected SgsTestNode addNode() throws Exception {
+	String host = "node" + hostNum++;
+	Properties props = SgsTestNode.getDefaultProperties(
+	    APP_NAME, serverNode, DummyAppListener.class);
+	props.setProperty(StandardProperties.AUTHENTICATORS, 
+	    "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+	SgsTestNode node = 
+	    new SgsTestNode(serverNode, DummyAppListener.class, props);
+	wrapChannelServerProxy(node);
+	additionalNodes.add(node);
+	return node;
+    }
+
+    /**
+     * Creates the specified number of test nodes, and returns a set
+     * containing the constructed nodes.
+     */
+    protected Set<SgsTestNode> addNodes(int numNodes) throws Exception {
 	if (additionalNodes == null) {
-	    additionalNodes = new HashMap<String, SgsTestNode>();
 	}
 
-        for (String host : hosts) {
-	    Properties props = SgsTestNode.getDefaultProperties(
-	        APP_NAME, serverNode, DummyAppListener.class);
-	    props.setProperty(StandardProperties.AUTHENTICATORS, 
-                "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
-	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
-            SgsTestNode node = 
-                    new SgsTestNode(serverNode, DummyAppListener.class, props);
-	    additionalNodes.put(host, node);
+	Set<SgsTestNode> nodes = new HashSet<SgsTestNode>();
+        for (int i = 0; i < numNodes; i++) {
+	    nodes.add(addNode());
         }
+	return nodes;
     }
 
     protected class ClientGroup {
@@ -345,7 +366,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
 
     protected Channel createChannel(String name) throws Exception {
-	return createChannel(name,  null, null);
+	return createChannel(name, null, null);
     }
 
     protected Channel createChannel(String name, ChannelListener listener)
@@ -356,21 +377,21 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
     
     protected Channel createChannel(
-	String name, ChannelListener listener, String host) throws Exception
+	String name, ChannelListener listener, SgsTestNode node)
+	throws Exception
     {
 	CreateChannelTask createChannelTask =
-	    new CreateChannelTask(name, listener, host);
-	runTransactionalTask(createChannelTask, host);
+	    new CreateChannelTask(name, listener);
+	runTransactionalTask(createChannelTask, node);
 	return createChannelTask.getChannel();
     }
 
-    private void runTransactionalTask(TestAbstractKernelRunnable task, String host)
+    private void runTransactionalTask(
+	TestAbstractKernelRunnable task, SgsTestNode node)
 	throws Exception
     {
-	SgsTestNode node =
-	    host == null ? serverNode : additionalNodes.get(host);
 	if (node == null) {
-	    throw new NullPointerException("no node for host: " + host);
+	    node = serverNode;
 	}
 	TransactionScheduler nodeTxnScheduler =
 	    node.getSystemRegistry().getComponent(TransactionScheduler.class);
@@ -382,13 +403,11 @@ public abstract class AbstractChannelServiceTest extends Assert {
     private static class CreateChannelTask extends TestAbstractKernelRunnable {
 	private final String name;
 	private final ChannelListener listener;
-	private final String host;
 	private Channel channel;
 	
-	CreateChannelTask(String name, ChannelListener listener, String host) {
+	CreateChannelTask(String name, ChannelListener listener) {
 	    this.name = name;
 	    this.listener = listener;
-	    this.host = host;
 	}
 	
 	public void run() throws Exception {
@@ -497,9 +516,9 @@ public abstract class AbstractChannelServiceTest extends Assert {
     }
     
     // Shuts down the node with the specified host.
-    protected void shutdownNode(String host) throws Exception {
-	additionalNodes.get(host).shutdown(false);
-	additionalNodes.remove(host);
+    protected void shutdownNode(SgsTestNode node) throws Exception {
+	node.shutdown(false);
+	additionalNodes.remove(node);
     }
     
     protected void sendMessagesToChannel(
@@ -975,11 +994,158 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	}
     }
 
+    /**
+     * Returns the client session with the specified {@code name} by
+     * looking it up in the data service.
+     */
     private ClientSession getClientSession(String name) {
 	try {
 	    return (ClientSession) dataService.getBinding(name);
 	} catch (ObjectNotFoundException e) {
 	    return null;
+	}
+    }
+
+    /**
+     * Holds the next invocation of the specified {@code ChannelServer}
+     * {@code methodName} from a remote node to the specified {@code node},
+     * until the "{@link #releaseChannelServerMethodHeld
+     * releaseChannelServerMethodHeld} method is invoke with the specified
+     * {@code node}.  Invocations to a {@code ChannelServer} on a local
+     * node will not be held because such invocations are made directly and
+     * not through a proxy.
+     */
+    protected void holdChannelServerMethodToNode(
+	SgsTestNode node, final String methodName)
+	throws Exception
+    {
+	final long nodeId = node.getNodeId();
+	MethodInfo info = holdMethodMap.get(nodeId);
+	if (info != null) {
+	    // just update method info and return.
+	    info.name = methodName;
+	    info.hold = true;
+	    return;
+	}
+	// Store method info in map, and wrap channel server to hold methods
+	holdMethodMap.put(nodeId, new MethodInfo(methodName));
+    }
+
+    /**
+     * Releases the {@code ChannelServer} method to the specified {@code
+     * node} that is currently being held.
+     */
+    protected void releaseChannelServerMethodHeld(SgsTestNode node) {
+	MethodInfo info = holdMethodMap.get(node.getNodeId());
+	// Release "join" to oldNode.
+	synchronized (info) {
+	    info.hold = false;
+	    info.notifyAll();
+	}
+    }
+
+    /**
+     * Wraps the {@code ChannelServer} proxy to the specified {@code node}
+     * with a proxy that enables tests to hold and release specified method
+     * invocations through the proxy.
+     */
+    private void wrapChannelServerProxy(SgsTestNode node)
+	throws Exception
+    {
+	final long nodeId = node.getNodeId();
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    @SuppressWarnings("unchecked")
+	    public void run() throws Exception {
+		String key =
+		    "com.sun.sgs.impl.service.channel.server." + nodeId;
+		ManagedSerializable<ChannelServer> managedServer =
+		    (ManagedSerializable<ChannelServer>)
+		    dataService.getServiceBinding(key);
+		Constructor constr =
+ 		    managedServer.getClass().getDeclaredConstructors()[0];
+		constr.setAccessible(true);
+		ChannelServer channelServer = managedServer.get();
+		ControllableInvocationHandler handler =
+		    new ControllableInvocationHandler(channelServer, nodeId);
+		ChannelServer newServer = (ChannelServer)
+		    Proxy.newProxyInstance(
+			ChannelServer.class.getClassLoader(),
+			new Class[] { ChannelServer.class },
+			handler);
+		dataService.setServiceBinding(
+ 		    key, constr.newInstance(newServer));
+		dataService.removeObject(managedServer);
+		
+	    }}, taskOwner);
+    }
+
+    /**
+     * This invocation handler waits to be notified before invoking a
+     * method (on the underlying instance) if the method being invoked
+     * matches the method information currently on record for the node and
+     * the method's "hold" status is true.
+     */
+    private static class ControllableInvocationHandler
+	implements InvocationHandler, Serializable
+    {
+	private final static long serialVersionUID = 1L;
+	private final Object obj;
+	private final long nodeId;
+	
+	ControllableInvocationHandler(Object obj, long nodeId) {
+	    this.obj = obj;
+	    this.nodeId = nodeId;
+	}
+	
+	public Object invoke(Object proxy, Method method, Object[] args)
+	    throws Exception
+	{
+	    MethodInfo info = holdMethodMap.get(nodeId);
+	    if (info != null) {
+		synchronized (info) {
+		    if (info.hold && method.getName().equals(info.name)) {
+			try {
+			    System.err.println(
+				">>HOLD ChannelServer method: " + info.name +
+				" to node: " + nodeId);
+			    info.wait();
+			} catch (InterruptedException e) {
+			}
+			System.err.println(
+			    ">>RELEASE ChannelServer method: " + info.name +
+			    " to node: " + nodeId);
+		    }
+		}
+	    }
+		    
+	    try {
+		return method.invoke(obj, args);
+	    } catch (InvocationTargetException e) {
+		Throwable cause = e.getCause();
+		if (cause instanceof Exception) {
+		    throw (Exception) cause;
+		} else if (cause instanceof Error) {
+		    throw (Error) cause;
+		} else {
+		    throw new RuntimeException(
+			"Unexpected exception:" + cause, cause);
+		}
+	    }
+	}
+    }
+
+    /**
+     * Method information used to hold and release methods invoked on a
+     * ChannelServer. If a method is being held, the instance can be used
+     * as the lock to wait for notification. The instance is notified when
+     * the method is released.
+     */
+    private static class MethodInfo {
+	volatile String name;
+	volatile boolean hold = true;
+
+	MethodInfo(String name) {
+	    this.name = name;
 	}
     }
 }

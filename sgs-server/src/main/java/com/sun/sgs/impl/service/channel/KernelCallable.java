@@ -51,7 +51,7 @@ public abstract class KernelCallable<R>
     /** The result of invoking the {@code call} method. */
     private R result;
     /** The flag to indicate whether the {@code call} method is complete. */
-    private volatile boolean done;
+    private boolean done;
 
     /**
      * Constructs an instance with the specified {@code name}.
@@ -70,7 +70,10 @@ public abstract class KernelCallable<R>
      * instance, sets the result, and marks this {@code KernelCallable} as
      * completed.
      */
-    public void run()  throws Exception {
+    public synchronized void run()  throws Exception {
+	if (done) {
+	    throw new IllegalStateException("already completed");
+	}
 	result = call();
 	done = true;
     }
@@ -83,7 +86,7 @@ public abstract class KernelCallable<R>
      * @throws	IllegalStateException if the {@link #run} method has not
      *		completed
      */
-    private R getResult() {
+    private synchronized R getResult() {
 	if (!done) {
 	    throw new IllegalStateException("not done");
 	}

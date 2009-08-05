@@ -19,8 +19,6 @@
 
 package com.sun.sgs.test.impl.service.channel;
 
-import com.sun.sgs.app.util.ManagedSerializable;
-import com.sun.sgs.impl.service.channel.ChannelServer;
 import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -29,17 +27,13 @@ import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.Serializable;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -57,20 +51,10 @@ public class TestChannelServiceImplRelocatingSessions
     private final List<String> noUsers =
 	new ArrayList<String>();
 
-    private static Map<Long, MethodInfo> holdMethodMap =
-	new HashMap<Long, MethodInfo>();
-    
     /** Constructs a test instance. */
     public TestChannelServiceImplRelocatingSessions() throws Exception {
     }
-
-    @Before
-    @Override
-    public void setUp() throws Exception {
-	super.setUp();
-	holdMethodMap.clear();
-    }
-
+    
     // -- Relocation test cases --
 
     @Test
@@ -81,7 +65,8 @@ public class TestChannelServiceImplRelocatingSessions
 	createChannel(channelName);
 	// All clients will log into server node.
 	ClientGroup group = new ClientGroup(someUsers);
-	addNodes("host2", "host3");
+	SgsTestNode node1 = addNode();
+	SgsTestNode node2 = addNode();
 	
 	try {
 	    // Join all users to channel and send some messages on channel.
@@ -90,10 +75,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    sendMessagesToChannel(channelName, group, 2);
 	    
 	    // Move clients to new nodes.
-	    moveClient(group.getClient(someUsers.get(0)), serverNode,
-		       additionalNodes.get("host2"));
-	    moveClient(group.getClient(someUsers.get(1)), serverNode,
-		       additionalNodes.get("host3"));	    
+	    moveClient(group.getClient(someUsers.get(0)), serverNode, node1);
+	    moveClient(group.getClient(someUsers.get(1)), serverNode, node2);
 	    
 	    // Make sure all members are still joined and can receive messages.
 	    checkUsersJoined(channelName, someUsers);
@@ -118,7 +101,7 @@ public class TestChannelServiceImplRelocatingSessions
 	createChannel(channelName);
 	// All clients will log into server node.
 	ClientGroup group = new ClientGroup(oneUser);
-	addNodes("host2");
+	SgsTestNode node1 = addNode();
 	
 	try {
 	    // Join all users to channel and send some messages on channel.
@@ -129,7 +112,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Move clients to new nodes.
 	    DummyClient client = group.getClient(oneUser.get(0));
-	    moveClient(client, serverNode, additionalNodes.get("host2"));
+	    moveClient(client, serverNode, node1);
 	    
 	    // Make sure all members are still joined and can receive messages.
 	    checkUsersJoined(channelName, oneUser);
@@ -152,8 +135,7 @@ public class TestChannelServiceImplRelocatingSessions
 	// All clients will log into the server node.
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	ClientGroup group = new ClientGroup(someUsers);
-	String[] hosts = new String[] {"host2", "host3", "host4"};
-	addNodes(hosts);
+	Set<SgsTestNode> nodes = addNodes(3);
 	
 	try {
 	    // Join all users to channel and send some messages on channel.
@@ -165,8 +147,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    DummyClient relocatingClient =
 		group.getClient(someUsers.get(0));
 	    SgsTestNode oldNode = serverNode;
-	    for (String host : hosts) {
-		SgsTestNode newNode = additionalNodes.get(host);
+	    for (SgsTestNode newNode : nodes) {
 		moveClient(relocatingClient, oldNode, newNode);
 		// Make sure all members are still joined and can receive
 		// messages. 
@@ -195,8 +176,8 @@ public class TestChannelServiceImplRelocatingSessions
 	// All clients will log into the server node.
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	ClientGroup group = new ClientGroup(users);
-	String[] hosts = new String[] {"host2", "host3", "host4"};
-	addNodes(hosts);
+	SgsTestNode node1 = addNode();
+	SgsTestNode node2 = addNode();
 	
 	try {
 	    // Join all users to channel and send some messages on channel.
@@ -204,20 +185,19 @@ public class TestChannelServiceImplRelocatingSessions
 	    checkUsersJoined(channelName, users);
 	    sendMessagesToChannel(channelName, group, 2);
 	    
-	    // move client to host2
+	    // move client to node1
 	    DummyClient relocatingClient =
 		group.getClient(users.get(0));
-	    SgsTestNode node = additionalNodes.get(hosts[0]);
-	    moveClient(relocatingClient, serverNode, node);
-	    // notify client to move to host3, but don't relocate yet.
+	    moveClient(relocatingClient, serverNode, node1);
+	    // notify client to move to node2, but don't relocate yet.
 	    moveIdentityAndWaitForRelocationNotification(
-		relocatingClient, node, additionalNodes.get(hosts[1]));
-	    // crash host2.
-	    node.shutdown(false);
+		relocatingClient, node1, node2);
+	    // crash node1.
+	    node1.shutdown(false);
 	    // give recovery a chance.
 	    Thread.sleep(WAIT_TIME*3);
 	    users.remove(relocatingClient.name);
-	    group.removeSessionsFromGroup(node.getAppPort());
+	    group.removeSessionsFromGroup(node1.getAppPort());
 	    checkUsersJoined(channelName, users);
 	    sendMessagesToChannel(channelName, group, 2);
 	    // Disconnect each client and make sure that membership/bindings
@@ -238,17 +218,16 @@ public class TestChannelServiceImplRelocatingSessions
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	// channel coordinator is on server node
-	createChannel(channelName); 
-	addNodes("oldNode", "newNode");
+	createChannel(channelName);
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	SgsTestNode oldNode = additionalNodes.get("oldNode");
 	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
 	
 	try {
 	    // Initiate client relocation to new node.
 	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
-	    SgsTestNode newNode = additionalNodes.get("newNode");
 	    // Hold up joins send to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
@@ -283,17 +262,16 @@ public class TestChannelServiceImplRelocatingSessions
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	// channel coordinator is on server node
-	createChannel(channelName); 
-	addNodes("oldNode", "newNode");
+	createChannel(channelName);
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	SgsTestNode oldNode = additionalNodes.get("oldNode");
 	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
 	
 	try {
 	    // Initiate client relocation to new node.
 	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
-	    SgsTestNode newNode = additionalNodes.get("newNode");
 	    // Hold up "leave" to oldNode
 	    holdChannelServerMethodToNode(oldNode, "leave");
 	    joinUsers(channelName, oneUser);
@@ -325,17 +303,16 @@ public class TestChannelServiceImplRelocatingSessions
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	// channel coordinator is on server node
-	createChannel(channelName); 
-	addNodes("oldNode", "newNode");
+	createChannel(channelName);
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	SgsTestNode oldNode = additionalNodes.get("oldNode");
 	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
 	
 	try {
 	    // Initiate client relocation to new node.
 	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
-	    SgsTestNode newNode = additionalNodes.get("newNode");
 	    // Hold up "join" to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser);
@@ -367,11 +344,11 @@ public class TestChannelServiceImplRelocatingSessions
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	// channel coordinator is on server node
-	createChannel(channelName); 
-	addNodes("oldNode", "newNode");
+	createChannel(channelName);
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
 	
 	// Client will log into "oldNode"
-	SgsTestNode oldNode = additionalNodes.get("oldNode");
 	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
 	
 	try {
@@ -381,8 +358,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    holdChannelServerMethodToNode(oldNode, "leave");
 	    joinUsers(channelName, oneUser);
 	    relocatingClient.assertJoinedChannel(channelName);
-	    SgsTestNode newNode = additionalNodes.get("newNode");
 	    leaveUsers(channelName, oneUser);
+	    Thread.sleep(200);
 	    // Relocate client
 	    moveClient(relocatingClient, oldNode, newNode);
 	    // Make sure client hasn't yet received "leave" notification.
@@ -408,24 +385,23 @@ public class TestChannelServiceImplRelocatingSessions
 	String channelName = "foo";
 	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	// channel coordinator is on server node
-	createChannel(channelName); 
-	addNodes("oldNode", "newNode1", "newNode2");
+	createChannel(channelName);
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode1 = addNode();
+	SgsTestNode newNode2 = addNode();
 	
 	// Client will log into "oldNode"
-	SgsTestNode oldNode = additionalNodes.get("oldNode");
 	ClientGroup group = new ClientGroup(oneUser, oldNode.getAppPort());
 	
 	try {
 	    // Initiate client relocation to new node.
 	    DummyClient relocatingClient = group.getClient(oneUser.get(0));
-	    SgsTestNode newNode1 = additionalNodes.get("newNode1");
 	    // Hold up joins send to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
 	    
 	    moveClient(relocatingClient, oldNode, newNode1);
-	    moveClient(relocatingClient, newNode1,
-		       additionalNodes.get("newNode2"));
+	    moveClient(relocatingClient, newNode1, newNode2);
 	    // Release "join" to oldNode.
 	    releaseChannelServerMethodHeld(oldNode);
 	    
@@ -457,7 +433,7 @@ public class TestChannelServiceImplRelocatingSessions
 	createChannel(channelName2);
 	// All clients will log into server node.
 	ClientGroup group = new ClientGroup(someUsers);
-	addNodes("host2");
+	SgsTestNode newNode = addNode();
 	MySessionStatusListener mySessionStatusListener =
 	    new MySessionStatusListener();
 	serverNode.getClientSessionService().
@@ -470,7 +446,6 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Initiate client relocation to new node.
 	    DummyClient relocatingClient = group.getClient(someUsers.get(0));
-	    SgsTestNode newNode = additionalNodes.get("host2");
 	    moveIdentity(relocatingClient, serverNode, newNode);
 	    SimpleCompletionHandler handler =
 		mySessionStatusListener.waitForPrepare();
@@ -513,13 +488,13 @@ public class TestChannelServiceImplRelocatingSessions
 	// All clients will log into server node.
 	ClientGroup
 	    group = new ClientGroup(someUsers);
-	addNodes("host2");
+	SgsTestNode newNode = addNode();
 	
 	try {
 	    // Initiate client relocation to new node.
 	    DummyClient relocatingClient = group.getClient(someUsers.get(0));
 	    moveIdentityAndWaitForRelocationNotification(
-		relocatingClient, serverNode, additionalNodes.get("host2"));
+		relocatingClient, serverNode, newNode);
 	    
 	    // Join all users (including relocating client) to channel.
 	    joinUsers(channelName, someUsers);
@@ -617,132 +592,6 @@ public class TestChannelServiceImplRelocatingSessions
 	
 	void setPrepared() {
 	    handler.completed();
-	}
-    }
-
-    /**
-     * Prevents the specified ChannelServer method sent from a remote node to
-     * the specified node from reaching the specified node.  Note: this
-     * method must be called before any ChannelServer messages are sent so
-     * that the wrapped channel server is installed before first use (when it
-     * is cached internally).
-     */
-    private void holdChannelServerMethodToNode(
-	SgsTestNode node, final String methodName)
-	throws Exception
-    {
-	final long nodeId = node.getNodeId();
-	MethodInfo info = holdMethodMap.get(nodeId);
-	if (info != null) {
-	    // just update method info and return.
-	    info.name = methodName;
-	    info.hold = true;
-	    return;
-	}
-	// Store method info in map, and wrap channel server to hold methods
-	holdMethodMap.put(nodeId, new MethodInfo(methodName));
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    @SuppressWarnings("unchecked")
-	    public void run() throws Exception {
-		String key =
-		    "com.sun.sgs.impl.service.channel.server." + nodeId;
-		ManagedSerializable<ChannelServer> managedServer =
-		    (ManagedSerializable<ChannelServer>)
-		    dataService.getServiceBinding(key);
-		Constructor constr =
- 		    managedServer.getClass().getDeclaredConstructors()[0];
-		constr.setAccessible(true);
-		ChannelServer channelServer = managedServer.get();
-		ControllableInvocationHandler handler =
-		    new ControllableInvocationHandler(channelServer, nodeId);
-		ChannelServer newServer = (ChannelServer)
-		    Proxy.newProxyInstance(
-			ChannelServer.class.getClassLoader(),
-			new Class[] { ChannelServer.class },
-			handler);
-		dataService.setServiceBinding(
- 		    key, constr.newInstance(newServer));
-		
-	    }}, taskOwner);
-    }
-
-    /**
-     * Releases the channel server method held to the specified node.
-     */
-    private void releaseChannelServerMethodHeld(SgsTestNode node) {
-	MethodInfo info = holdMethodMap.get(node.getNodeId());
-	// Release "join" to oldNode.
-	synchronized (info) {
-	    info.hold = false;
-	    info.notifyAll();
-	}
-    }
-
-    /**
-     * This invocation handler waits to be notified before invoking a
-     * method (on the underlying instance) if the method being invoked
-     * matches the method information currently on record for the node and
-     * the method's "hold" status is true.
-     */
-    private static class ControllableInvocationHandler
-	implements InvocationHandler, Serializable
-    {
-	private final static long serialVersionUID = 1L;
-	private final Object obj;
-	private final long nodeId;
-	
-	ControllableInvocationHandler(Object obj, long nodeId) {
-	    this.obj = obj;
-	    this.nodeId = nodeId;
-	}
-	
-	public Object invoke(Object proxy, Method method, Object[] args)
-	    throws Exception
-	{
-	    MethodInfo info = holdMethodMap.get(nodeId);
-	    synchronized (info) {
-		if (info.hold && method.getName().equals(info.name)) {
-		    try {
-			System.err.println(
-			    ">>HOLD method: " + info.name +
-			    " to node: " + nodeId);
-			info.wait();
-		    } catch (InterruptedException e) {
-		    }
-		    System.err.println(
-			">>RELEASE method: " + info.name +
-			" to node: " + nodeId);
-		}
-	    }
-		    
-	    try {
-		return method.invoke(obj, args);
-	    } catch (InvocationTargetException e) {
-		Throwable cause = e.getCause();
-		if (cause instanceof Exception) {
-		    throw (Exception) cause;
-		} else if (cause instanceof Error) {
-		    throw (Error) cause;
-		} else {
-		    throw new RuntimeException(
-			"Unexpected exception:" + cause, cause);
-		}
-	    }
-	}
-    }
-
-    /**
-     * Method information used to hold and release methods invoked on a
-     * ChannelServer. If a method is being held, the instance can be used as
-     * the lock to wait for notification. The instance is also used as a lock
-     * to notify when the method is released.
-     */
-    private static class MethodInfo {
-	volatile String name;
-	volatile boolean hold = true;
-
-	MethodInfo(String name) {
-	    this.name = name;
 	}
     }
 }

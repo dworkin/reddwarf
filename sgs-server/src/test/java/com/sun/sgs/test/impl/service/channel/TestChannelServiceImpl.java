@@ -32,6 +32,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.util.AbstractService.Version;
+import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
@@ -568,7 +569,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     @Test
     public void testChannelGetSessionsMultipleNodes() throws Exception {
-	addNodes("a", "b");
+	addNodes(2);
 	testChannelGetSessionsWithSessionsJoined();
     }
 
@@ -1024,14 +1025,16 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 
     @Test
     public void testChannelSendMultipleNodes() throws Exception {
-	addNodes("one", "two", "three");
+	addNodes(3);
 	testChannelSend();
     }
 
     @Test
     @IntegrationTest
-    public void testChannelSendToNewMembersAfterAllNodesFail() throws Exception {
-	addNodes("one", "two", "three");
+    public void testChannelSendToNewMembersAfterAllNodesFail()
+	throws Exception
+    {
+	addNodes(3);
 	String channelName = "test";
 	createChannel(channelName);
 	Thread.sleep(1000);
@@ -1046,7 +1049,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	tearDown(false);
 	setUp(false);
         Thread.sleep(1000);
-	addNodes("ay", "bee", "sea");
+	addNodes(3);
 	Thread.sleep(2000);
 	int afterCount = getObjectCount();
 	for (int i = 0; i < 2; i++) {
@@ -1078,14 +1081,13 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     public void testChannelSendToExistingMembersAfterNodeFailure()
 	throws Exception
     {
-	String coordinatorHost = "coordinatorNode";
-	String otherHost = "otherNode";
-	addNodes(coordinatorHost, otherHost);
+	SgsTestNode coordinatorNode = addNode();
+	SgsTestNode otherNode = addNode();
 	
 	// create channels on specific node which will be the coordinator node
 	String[] channelNames = new String[] {"channel1", "channel2"};
 	for (String channelName : channelNames) {
-	    createChannel(channelName, null, coordinatorHost);
+	    createChannel(channelName, null, coordinatorNode);
 	}
 	
 	ClientGroup group = new ClientGroup(sevenDwarfs);
@@ -1096,14 +1098,14 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    }
 	    printServiceBindings("after users joined");
 	    // nuke non-coordinator node
-	    System.err.println("shutting down node: " + otherHost);
-	    int otherHostPort = additionalNodes.get(otherHost).getAppPort();
-	    shutdownNode(otherHost);
+	    System.err.println("shutting down other node: " + otherNode);
+	    int otherNodePort = otherNode.getAppPort();
+	    shutdownNode(otherNode);
             Thread.sleep(1000);
 	    // remove disconnected sessions from client group
 	    System.err.println("remove disconnected sessions");
 	    ClientGroup disconnectedSessionsGroup =
-		group.removeSessionsFromGroup(otherHostPort);
+		group.removeSessionsFromGroup(otherNodePort);
 	    // send messages to sessions that are left
 	    System.err.println("send messages to remaining members");
 	    for (String channelName : channelNames) {
@@ -1128,13 +1130,13 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     public void testChannelSendToExistingMembersAfterCoordinatorFailure()
 	throws Exception
     {
-	String coordinatorHost = "coordinator";
-	addNodes(coordinatorHost, "otherNode");
+	SgsTestNode coordinatorNode = addNode();
+	SgsTestNode otherNode = addNode();
 	
 	// create channels on specific node which will be the coordinator node
 	String[] channelNames = new String[] {"channel1", "channel2"};
 	for (String channelName : channelNames) {
-	    createChannel(channelName, null, coordinatorHost);
+	    createChannel(channelName, null, coordinatorNode);
 	}
 
 	ClientGroup group = new ClientGroup(sevenDwarfs);
@@ -1145,15 +1147,14 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    }
 	    printServiceBindings("after users joined");
 	    // nuke coordinator node
-	    System.err.println("shutting down node: " + coordinatorHost);
-	    int coordinatorHostPort =
-		additionalNodes.get(coordinatorHost).getAppPort();
-	    shutdownNode(coordinatorHost);
+	    System.err.println("shutting down coordinator: " + coordinatorNode);
+	    int coordinatorNodePort = coordinatorNode.getAppPort();
+	    shutdownNode(coordinatorNode);
             Thread.sleep(1000);
 	    // remove disconnected sessions from client group
 	    System.err.println("remove disconnected sessions");
 	    ClientGroup disconnectedSessionsGroup =
-		group.removeSessionsFromGroup(coordinatorHostPort);
+		group.removeSessionsFromGroup(coordinatorNodePort);
 	    // send messages to sessions that are left
 	    System.err.println("send messages to remaining members");
 	    for (String channelName : channelNames) {
