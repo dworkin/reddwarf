@@ -543,7 +543,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = channelService.getChannel(channelName);
-		    List<String> users = new ArrayList(Arrays.asList(someUsers));
+		    List<String> users =
+			new ArrayList<String>(Arrays.asList(someUsers));
 		    Iterator<ClientSession> iter = channel.getSessions();
 		    while (iter.hasNext()) {
 			ClientSession session = iter.next();
@@ -1559,6 +1560,89 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    @IntegrationTest
+    public void testSendFromClientSessionWithDelayedLeave() throws Exception {
+	String user = "user";
+	String channelName = "test";
+	// Create channel with coordinator on server node.
+	createChannel(channelName);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    joinUsers(channelName, user);
+	    client.assertJoinedChannel(channelName);
+	    sendMessagesToChannel(channelName, 1);
+	    checkChannelMessagesReceived(client, channelName, 1);
+	    holdChannelServerMethodToNode(userNode, "leave");
+	    leaveUsers(channelName, user);
+	    sendMessagesToChannel(channelName, 1);	    
+	    releaseChannelServerMethodHeld(userNode);
+	    client.assertLeftChannel(channelName);
+	    Thread.sleep(3000);
+	    assertNull(client.nextChannelMessage());
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    @Test
+    @IntegrationTest
+    public void testSendFromClientSessionWithDelayedJoinLeave()
+	throws Exception
+    {
+	String user = "user";
+	String channelName = "test";
+	// Create channel with coordinator on server node.
+	createChannel(channelName);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    holdChannelServerMethodToNode(userNode, "join");
+	    joinUsers(channelName, user);
+	    leaveUsers(channelName, user);
+	    sendMessagesToChannel(channelName, 1);
+	    releaseChannelServerMethodHeld(userNode);
+	    client.assertLeftChannel(channelName);
+	    Thread.sleep(3000);
+	    assertNull(client.nextChannelMessage());
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
+    @Test
+    @IntegrationTest
+    public void testSendFromClientSessionWithDelayedJoinLeaveJoin()
+	throws Exception
+    {
+	String user = "user";
+	String channelName = "test";
+	// Create channel with coordinator on server node.
+	createChannel(channelName);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    holdChannelServerMethodToNode(userNode, "join");
+	    joinUsers(channelName, user);
+	    leaveUsers(channelName, user);
+	    joinUsers(channelName, user);
+	    sendMessagesToChannel(channelName, 2);
+	    releaseChannelServerMethodHeld(userNode);
+	    Thread.sleep(3000);
+	    client.assertJoinedChannel(channelName);
+	    checkChannelMessagesReceived(client, channelName, 2);
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
     // -- other classes --
 
     private static class NonSerializableChannelListener
