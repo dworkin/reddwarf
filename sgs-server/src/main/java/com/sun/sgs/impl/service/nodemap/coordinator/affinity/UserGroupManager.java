@@ -24,7 +24,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 
 /**
- * A manager which allows hits to be provided to the underlying affinity
+ * A manager through which hints can be provided to the underlying affinity
  * group mechanism.
  *
  * TODO... Could this be generic, and just change the backing service?

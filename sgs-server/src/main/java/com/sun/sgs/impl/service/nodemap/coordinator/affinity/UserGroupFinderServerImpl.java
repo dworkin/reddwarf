@@ -56,7 +56,7 @@ public class UserGroupFinderServerImpl implements GroupFinder,
     /** The property name for the update period. */
     static final String UPDATE_PERIOD_PROPERTY = PKG_NAME + ".server.port";
 
-    /** The default value of the update period. */
+    /** The default value of the update period, in seconds. */
     static final int DEFAULT_UPDATE_PERIOD = 30;
 
     /** The property name for the server port. */
@@ -89,26 +89,33 @@ public class UserGroupFinderServerImpl implements GroupFinder,
                               TransactionProxy txnProxy)
         throws Exception
     {
+        logger.log(Level.CONFIG, "Creating UserGroupFinderServerImpl");
+
         this.coordinator = coordinator;
-        this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         int updateSeconds = wrappedProps.getIntProperty(UPDATE_PERIOD_PROPERTY,
-                                               DEFAULT_UPDATE_PERIOD, 1, 65535);
+                                               DEFAULT_UPDATE_PERIOD, 5, 65535);
         updatePeriod = updateSeconds * 1000;
 
-        int port = wrappedProps.getIntProperty(SERVER_PORT_PROPERTY,
-                                               DEFAULT_SERVER_PORT, 0, 65535);
+        int requestedPort = wrappedProps.getIntProperty(SERVER_PORT_PROPERTY,
+                                                        DEFAULT_SERVER_PORT,
+                                                        0, 65535);
 
-        logger.log(Level.CONFIG,
-                   "constructing UserGroupFinderServerImpl on port {0}", port);
+        logger.log(Level.CONFIG, "UserGroupFinderServerImpl, " +
+                   "requested port: {0,number,#}, update period: {1} ms",
+                   requestedPort, updatePeriod);
 
         // Export ourselves.  At this point, this object is public.
         exporter =
                new Exporter<UserGroupFinderServer>(UserGroupFinderServer.class);
-        exporter.export(this, SERVER_EXPORT_NAME, port);
+        int port = exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
+        if (requestedPort == 0) {
+            logger.log(Level.CONFIG, "Server is using port {0,number,#}", port);
+        }
     }
 
     private boolean started() {

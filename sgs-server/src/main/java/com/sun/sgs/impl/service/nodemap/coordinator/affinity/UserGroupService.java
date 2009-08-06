@@ -42,8 +42,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Backing service for the UserGroupManager. This service uses hits, provided
- * by the application, to create affinity groups.
+ * Backing service for the UserGroupManager. This service collects associations
+ * made on this node and exports them through the {@link UserGroupSource}
+ * interface.
  */
 public final class UserGroupService extends AbstractService
                                     implements NodeMappingListener
@@ -82,12 +83,10 @@ public final class UserGroupService extends AbstractService
 			    TransactionProxy txnProxy)
         throws Exception
     {
-        super(properties, systemRegistry,
-              txnProxy, new LoggerWrapper(Logger.getLogger(PKG_NAME)));
+        super(properties, systemRegistry, txnProxy,
+              new LoggerWrapper(Logger.getLogger(PKG_NAME)));
 
         logger.log(Level.CONFIG, "Creating UserGroupService service");
-
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         WatchdogService watchdogService =
                                     txnProxy.getService(WatchdogService.class);
@@ -102,6 +101,8 @@ public final class UserGroupService extends AbstractService
         assert nodeId > 0;
         nextId = new AtomicLong(nodeId << 48);
 
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+
         String host =
                 wrappedProps.getProperty(SERVER_HOST_PROPERTY,
                                          wrappedProps.getProperty(
@@ -110,21 +111,30 @@ public final class UserGroupService extends AbstractService
             throw new IllegalArgumentException(
                                    "A server host must be specified");
         }
-        int port = wrappedProps.getIntProperty(
+        int serverPort = wrappedProps.getIntProperty(
                     UserGroupFinderServerImpl.SERVER_PORT_PROPERTY,
                     UserGroupFinderServerImpl.DEFAULT_SERVER_PORT, 0, 65535);
 
-        Registry registry = LocateRegistry.getRegistry(host, port);
+        Registry registry = LocateRegistry.getRegistry(host, serverPort);
         server = (UserGroupFinderServer)registry.lookup(
                                 UserGroupFinderServerImpl.SERVER_EXPORT_NAME);
 
         int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
 
+        logger.log(Level.CONFIG,
+                   "UserGroupService, server host: {0}, port: {1,number,#}, " +
+                   "requested client port: {2,number,#}",
+                   host, serverPort, clientPort);
+
         UserGroupSourceImpl sourceImpl = new UserGroupSourceImpl();
 	Exporter<UserGroupSource> exporter =
                         new Exporter<UserGroupSource>(UserGroupSource.class);
-	exporter.export(sourceImpl, clientPort);
+	int port = exporter.export(sourceImpl, clientPort);
+        if (clientPort == 0) {
+            logger.log(Level.CONFIG, "Client port is {0,number,#}", port);
+        }
+
 	UserGroupSource  sourceProxy = exporter.getProxy();
         server.registerUserGroupSource(sourceProxy, nodeId);
 

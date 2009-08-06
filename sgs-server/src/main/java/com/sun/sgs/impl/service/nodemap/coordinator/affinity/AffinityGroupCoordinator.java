@@ -23,6 +23,7 @@ import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.management.GroupCoordinatorMXBean;
 import com.sun.sgs.management.GroupCoordinatorMXBean.GroupInfo;
@@ -52,6 +53,9 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
     private static final String PKG_NAME =
                                     "com.sun.sgs.impl.service.nodemap.affinity";
 
+    private static final String FINDER_CLASS_PROPERTY =
+            PKG_NAME + ".finder.class";
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".coordinator"));
@@ -72,14 +76,28 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
                                     TransactionProxy txnProxy)
         throws Exception
     {
+        logger.log(Level.CONFIG, "Creating AffinityGroupCoordinator");
+
         this.server = server;
 
-        logger.log(Level.CONFIG, "constructing AffinityGroupCoordinator");
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
-        // TODO - set by property
-        finder = new UserGroupFinderServerImpl(properties, this,
-                                               systemRegistry, txnProxy);
+        if (wrappedProps.getProperty(FINDER_CLASS_PROPERTY) == null) {
+            finder = new UserGroupFinderServerImpl(properties, this,
+                                                   systemRegistry, txnProxy);
+        } else {
+            finder = wrappedProps.getClassInstanceProperty(
+                                FINDER_CLASS_PROPERTY, GroupFinder.class,
+                                new Class[] { Properties.class,
+                                              AffinityGroupCoordinator.class,
+                                              ComponentRegistry.class,
+                                              TransactionProxy.class },
+                                properties, this, systemRegistry, txnProxy);
+        }
+        logger.log(Level.CONFIG, "Group finder: {0}",
+                   finder.getClass().getName());
 
+        
         // create our profiling info and register our MBean
         ProfileCollector collector =
             systemRegistry.getComponent(ProfileCollector.class);

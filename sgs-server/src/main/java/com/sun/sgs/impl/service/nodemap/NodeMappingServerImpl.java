@@ -206,6 +206,16 @@ public final class NodeMappingServerImpl
     //        (StandardProperties?) so we can ensure this one is larger.
     private static final int DEFAULT_RELOCATION_EXPIRE_TIME = 10000;
 
+    /** The property name for the amount of time to wait between offloading
+     * identities from an unhealthy node.
+     */
+    private static final String OFFLOAD_DELAY_PROPERTY =
+            PKG_NAME + ".offload.delay";
+
+    /** Default time to wait between offloading identities, in milliseconds.
+     */
+    private static final int DEFAULT_OFFLOAD_DELAY = 10 * 1000;
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".server"));
@@ -263,6 +273,9 @@ public final class NodeMappingServerImpl
     private final Map<Identity, MoveIdTask> moveMap =
             new ConcurrentHashMap<Identity, MoveIdTask>();
     
+    /** Time to wait between offloading identities, in milliseconds */
+    private final long offloadDelay;
+
     /**
      * Active tasks offloading nodes. Map nodeId -> taskHandle. Access
      * must be synchronized on the map object.
@@ -312,7 +325,9 @@ public final class NodeMappingServerImpl
                 new Class[] { Properties.class, NodeMappingServerImpl.class }, 
                 properties, this);
         }
-        
+        logger.log(Level.CONFIG, "Node assign policy: {0}",
+                   assignPolicy.getClass().getName());
+
         /*
          * Check service version.
          */
@@ -340,6 +355,16 @@ public final class NodeMappingServerImpl
                 RELOCATION_EXPIRE_PROPERTY, DEFAULT_RELOCATION_EXPIRE_TIME,
                 1, Long.MAX_VALUE);
 
+        /// Don't allow offloading below every half second
+        offloadDelay = wrappedProps.getLongProperty(OFFLOAD_DELAY_PROPERTY,
+                                                    DEFAULT_OFFLOAD_DELAY,
+                                                    500, Long.MAX_VALUE);
+
+        logger.log(Level.CONFIG,
+                   "NodeMappingServerImpl, requested port: {0,number,#}, " +
+                   "relocation expire time: {1} ms, offload delay: {2} ms",
+                   requestedPort, relocationExpireTime, offloadDelay);
+
         // Register our node listener with the watchdog service.
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
@@ -359,6 +384,9 @@ public final class NodeMappingServerImpl
                 properties, this, systemRegistry, txnProxy);
         }
         groupCoordinator.start();
+
+        logger.log(Level.CONFIG, "Group coordinator: {0}",
+                   groupCoordinator.getClass().getName());
 
         // Export ourselves.  At this point, this object is public.
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
@@ -1157,8 +1185,7 @@ public final class NodeMappingServerImpl
                 handle = taskScheduler.scheduleRecurringTask(
                                             new OffloadTask(nodeId),
                                             taskOwner,
-                                            0,
-                                            10 * 1000);
+                                            0, offloadDelay);
                 handle.start();
                 offloadTasks.put(nodeId, handle);
             }
