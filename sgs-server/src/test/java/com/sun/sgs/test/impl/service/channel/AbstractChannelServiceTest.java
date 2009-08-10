@@ -36,6 +36,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServer;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
+import com.sun.sgs.impl.service.channel.KernelCallable;
 import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -619,12 +620,16 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	}
 
 	// Sends a CHANNEL_MESSAGE.
-	void sendChannelMessage(String channelName, int seq) {
+	void sendChannelMessage(String channelName, int seq)
+	    throws Exception
+	{
 	    checkLoggedIn();
-	    sendChannelMessage(channelNameToId.get(channelName), seq);
-	}
-
-	void sendChannelMessage(BigInteger channelRefId, int seq) {
+	    BigInteger channelRefId = channelNameToId.get(channelName);
+	    if (channelRefId == null) {
+		channelRefId = getChannelId(channelName);
+	    }
+	    System.err.println(toString() + " sending message:" + seq +
+			       " to channel:" + channelName);
 	    byte[] channelId = channelRefId.toByteArray();
 	    MessageBuffer buf =
 		new MessageBuffer(3 + channelId.length + 4);
@@ -1078,6 +1083,25 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	    }}, taskOwner);
     }
 
+    /**
+     * Returns the channel ID for the channel with the specified name.
+     */
+    protected BigInteger getChannelId(final String channelName)
+	throws Exception
+    {
+	return KernelCallable.call(
+	    new KernelCallable<BigInteger>("getChannelId") {
+		public BigInteger call() throws Exception {
+		Channel channel =
+		    AppContext.getChannelManager().getChannel(channelName);
+		Field field = getField(channel.getClass(), "channelRef");
+		ManagedReference channelRef =
+		    (ManagedReference) field.get(channel);
+		return channelRef.getId();
+		}
+	    }, txnScheduler, taskOwner);
+    }
+    
     /**
      * This invocation handler waits to be notified before invoking a
      * method (on the underlying instance) if the method being invoked

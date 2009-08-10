@@ -1903,6 +1903,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    !channel.hasSession(
 			sender, senderRefId, isChannelMember, timestamp))
 		{
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "send attempt by non-member:{0} to channel:{1}",
+			    HexDumper.toHexString(senderRefId.toByteArray()),
+			    channel);
+		    }
 		    return completed();
 		}
 	    }

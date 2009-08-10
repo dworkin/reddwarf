@@ -963,7 +963,8 @@ public final class ChannelServiceImpl
      * @param	eventType an event type
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID, or {@code null}
-     * @param	timestamp a timestamp for how long to keep this event
+     * @param	eventTimestamp the event's timestamp
+     * @param	eventQueueTimestamp the event queue's timestamp
      */
     void cacheEvent(ChannelEventType eventType,
 		    BigInteger channelRefId,
@@ -971,6 +972,14 @@ public final class ChannelServiceImpl
 		    long eventTimestamp,
 		    long eventQueueTimestamp)
     {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST, "CACHE eventType:{0}, channelRefId:{1}, " +
+		"sessionRefId:{2}, eventTimestamp:{3}, eventQueueTimestamp:{4}",
+		eventType, HexDumper.toHexString(channelRefId.toByteArray()),
+		HexDumper.toHexString(sessionRefId.toByteArray()),
+		eventTimestamp, eventQueueTimestamp);
+	}
 	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
 	if (queue == null) {
 	    Queue<ChannelEventInfo> newQueue =
@@ -981,51 +990,99 @@ public final class ChannelServiceImpl
 	    }
 	}
 	synchronized (queue) {
-	    // remove events with timestamp < eventTimestamp.
-	    while (!queue.isEmpty()) {
-		ChannelEventInfo info = queue.peek();
-		if (info.timestamp < eventTimestamp) {
-		    queue.poll();
-		} else {
-		    break;
-		}
-	    }
+	    // remove events with timestamp <= eventTimestamp.
+	    removeExpiredChannelEvents(queue, eventTimestamp);
 	    // cache event.
 	    queue.offer(
-	        new ChannelEventInfo(eventType, channelRefId,
-				     sessionRefId, eventQueueTimestamp));
+		new ChannelEventInfo(eventType, sessionRefId,
+				     eventTimestamp,
+				     eventQueueTimestamp));
 	}
     }
 
+    /**
+     * Returns {@code true} if the session with the specified {@code
+     * sessionRefId} is a member of the channel with the specified {@code
+     * channelRefId}, and {@code false} otherwise. Membership is determined
+     * as follows:<p>
+     *
+     * The {@code isChannelMember} argument indicates whether the specified
+     * session was a member of the channel at the time the event being
+     * processed (that is now checking membership) was added to the event
+     * queue.
+     *
+     * In order to determine channel membership, this method considers the
+     * initial known membership status, {@code isChannelMember}, and then
+     * checks the cached event queue for the specified channel for
+     * join/leave requests for the specified session with timestamps less
+     * than or equal to the specified timestamp. <p>
+     *
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
+     * @param	isChannelMember if {@code true}, the specified session is
+     *		considered to be a member when current event was added to
+     *		the event queue
+     * @param	timestamp the timestamp of the currently executing event,
+     *		beyond which join/leave requests should not be considered
+     *		in determining channel membership
+     * @return	{@code true} if the session with the specified {@code
+     *		sessionRefId} is a member of the channel with the specified
+     *		{@code channelRefId}, and {@code false} otherwise
+     */
     boolean isChannelMember(BigInteger channelRefId,
 			    BigInteger sessionRefId,
 			    boolean isChannelMember,
 			    long timestamp)
     {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST,
+		       "channel:{0}, session:{1}, isChannelMember:{2}, " +
+		       "timestamp:{3}",
+		       HexDumper.toHexString(channelRefId.toByteArray()),
+		       HexDumper.toHexString(sessionRefId.toByteArray()),
+		       isChannelMember, timestamp);
+	}
 	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
 	if (queue != null) {
 	    synchronized (queue) {
+		// remove events with timestamp <= eventTimestamp.
+		removeExpiredChannelEvents(queue, timestamp);
 		for (ChannelEventInfo info : queue) {
-		    if (info.timestamp > timestamp) {
+		    if (info.eventTimestamp > timestamp) {
 			break;
 		    }
 		    
 		    if (info.eventType.equals(ChannelEventType.LEAVE_ALL)) {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(Level.FINEST, "leaveAll");
+			    }
 			isChannelMember = false;
 			
 		    } else if (info.sessionRefId.equals(sessionRefId)) {
 			switch (info.eventType) {
 			    
 			case JOIN:
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.log(
+				    Level.FINEST, "join:{0}",
+				    HexDumper.toHexString(
+					info.sessionRefId.toByteArray()));
+			    }
 			    isChannelMember =
 				isChannelMember ||
-				(info.sessionRefId == sessionRefId);
+				(info.sessionRefId.equals(sessionRefId));
 			    break;
 			    
 			case LEAVE:
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.log(
+				    Level.FINEST, "leave:{0}",
+				    HexDumper.toHexString(
+					info.sessionRefId.toByteArray()));
+			    }
 			    isChannelMember =
 				isChannelMember &&
-				(info.sessionRefId != sessionRefId);
+				(!info.sessionRefId.equals(sessionRefId));
 
 			default:
 			    break;
@@ -1034,8 +1091,42 @@ public final class ChannelServiceImpl
 		}
 	    }		
 	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "isChannelMember returns: {0}",
+		       isChannelMember);
+	}
 	
 	return isChannelMember;
+    }
+
+    /**
+     * Removes from the specified channel event {@code queue}, each cached
+     * channel event with a timestamp less than or equal to the specified
+     * {@code timestamp}.
+     */
+    private void removeExpiredChannelEvents(
+	Queue<ChannelEventInfo> queue, long timestamp)
+    {
+	assert Thread.holdsLock(queue);
+	
+	while (!queue.isEmpty()) {
+	    ChannelEventInfo info = queue.peek();
+	    if (info.eventQueueTimestamp > timestamp) {
+		return;
+	    }
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "REMOVE eventType:{0}, sessionRefId:{1}, " +
+		    "eventTimestamp:{2}, eventQueueTimestamp:{3}",
+		    info.eventType,
+		    (info.sessionRefId != null ?
+		     HexDumper.toHexString(info.sessionRefId.toByteArray()) :
+		     "null"), 
+		    info.eventTimestamp, info.eventQueueTimestamp);
+	    }
+	    queue.poll();
+	}
     }
     
     /**
@@ -1988,17 +2079,19 @@ public final class ChannelServiceImpl
     private class ChannelEventInfo {
 
 	final ChannelEventType eventType;
-	final BigInteger channelRefId;
 	final BigInteger sessionRefId;
-	final long timestamp;
+	final long eventTimestamp;
+	final long eventQueueTimestamp;
 	
-	ChannelEventInfo(ChannelEventType eventType, BigInteger channelRefId,
-			 BigInteger sessionRefId, long timestamp)
+	ChannelEventInfo(ChannelEventType eventType,
+			 BigInteger sessionRefId,
+			 long eventTimestamp,
+			 long eventQueueTimestamp)
 	{
 	    this.eventType = eventType;
-	    this.channelRefId = channelRefId;
 	    this.sessionRefId = sessionRefId;
-	    this.timestamp = timestamp;
+	    this.eventTimestamp = eventTimestamp;
+	    this.eventQueueTimestamp = eventQueueTimestamp;
 	}
     }
 }
