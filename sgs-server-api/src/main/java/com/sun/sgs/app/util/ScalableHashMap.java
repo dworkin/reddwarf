@@ -288,12 +288,6 @@ public class ScalableHashMap<K, V>
     private static final int MAX_DEPTH = INT_SIZE - 1;
 
     /**
-     * The maximum number of entries to remove in a single run of tasks that
-     * asynchronously remove nodes and entries.
-     */
-    private static final int MAX_REMOVE_ENTRIES = 100;
-
-    /**
      * If non-null, a runnable to call when a task that asynchronously removes
      * nodes is done -- used for testing.  Note that this method is called
      * during the transaction that completes the removal.
@@ -1545,7 +1539,7 @@ public class ScalableHashMap<K, V>
     }
 
     /**
-     * Removes up to MAX_REMOVE_ENTRIES entries from this leaf node, returning
+     * Removes some entries from this leaf node, returning
      * true if they were all removed.
      */
     boolean removeSomeLeafEntries() {
@@ -1563,7 +1557,7 @@ public class ScalableHashMap<K, V>
     }
 
     /**
-     * Removes up to MAX_REMOVE_ENTRIES entries from the specified array of
+     * Removes some entries from the specified array of
      * entries, returning true if they were all removed.
      */
     static boolean removeSomeLeafEntries(PrefixEntry[] table) {
@@ -1581,7 +1575,8 @@ public class ScalableHashMap<K, V>
 		PrefixEntry next = table[i].next;
 		table[i].unmanage();
 		table[i] = next;
-		if (++count >= MAX_REMOVE_ENTRIES) {
+                count++;
+		if (!AppContext.getTaskManager().shouldContinue()) {
 		    return count;
 		}
 	    }

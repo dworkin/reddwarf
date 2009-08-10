@@ -207,6 +207,19 @@ public class TaskServiceImpl
     // a handle to the periodic hand-off task
     private RecurringTaskHandle handoffTaskHandle = null;
 
+    /**
+     * The property key to set how long a task should run before
+     * {@link #shouldContinue() shouldContinue} returns false.
+     */
+    public static final String CONTINUE_THRESHOLD_PROPERTY =
+            NAME + ".continue.threshold";
+
+    /** The default continue threshold. */
+    public static final long CONTINUE_THRESHOLD_DEFAULT = 10L;
+
+    // the actual value of the continue threshold
+    private final long continueThreshold;
+
     // the internal value used to represent a task with no delay
     private static final long START_NOW = 0;
 
@@ -312,6 +325,14 @@ public class TaskServiceImpl
         if (handoffPeriod < 0) {
             throw new IllegalStateException("Handoff Period property must " +
                                             "be non-negative");
+        }
+
+        // get the continue threshold
+        continueThreshold = wrappedProps.getLongProperty(
+                CONTINUE_THRESHOLD_PROPERTY, CONTINUE_THRESHOLD_DEFAULT);
+        if (continueThreshold < 0) {
+            throw new IllegalStateException("Continue threshold property " +
+                                            "must be non-negative");
         }
 
         // create our profiling info and register our MBean
@@ -547,6 +568,15 @@ public class TaskServiceImpl
                                                        startTime, period);
         ctxFactory.joinTransaction().addRecurringTask(objId, handle, owner);
         return new PeriodicTaskHandleImpl(generateObjName(owner, objId));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean shouldContinue() {
+        Transaction txn = txnProxy.getCurrentTransaction();
+        return System.currentTimeMillis() - txn.getCreationTime() <
+               continueThreshold;
     }
 
     /**
