@@ -36,6 +36,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -64,7 +65,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     public static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
 
     // The time, in minutes, to wait for all nodes to respond asynchronously
-    private static final int TIMEOUT = 10;  // minutes
+    private static final int TIMEOUT = 1;  // minutes
 
     // The maximum number of iterations we will run.  Interesting to set high
     // for testing, but 5 has been shown to be adequate in most papers.
@@ -111,6 +112,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     private final Object runningLock = new Object();
     private boolean running = false;
 
+    private final AtomicLong runNumber = new AtomicLong();
     /**
      * Constructs a new label propagation server. Only one should exist
      * within a Darkstar cluster.
@@ -300,11 +302,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
         latch = new CountDownLatch(clean.size());
 
+        final long runNum = runNumber.incrementAndGet();
         for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        ce.getValue().prepareAlgorithm();
+                        ce.getValue().prepareAlgorithm(runNum);
                     } catch (IOException ioe) {
                         runFailed = true;
                         ioe.printStackTrace();
@@ -392,13 +395,15 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         final Map<Long, Collection<AffinityGroup>> returnedGroups =
             new ConcurrentHashMap<Long, Collection<AffinityGroup>>();
         latch = new CountDownLatch(clientProxies.keySet().size());
+        final long runNum = runNumber.get();
         for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
             final Long nodeId = ce.getKey();
             final LPAClient proxy = ce.getValue();
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        returnedGroups.put(nodeId, proxy.affinityGroups(true));
+                        returnedGroups.put(nodeId, 
+                                           proxy.affinityGroups(runNum, true));
                         latch.countDown();
                     } catch (IOException ioe) {
                         ioe.printStackTrace();

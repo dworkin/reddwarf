@@ -33,9 +33,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.FilteredNameRunner;
-import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
-import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Collection;
@@ -200,9 +198,10 @@ public class TestLPA {
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
                     PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
 
-        lp1.prepareAlgorithm();
-        lp2.prepareAlgorithm();
-        lp3.prepareAlgorithm();
+        long run = 1;
+        lp1.prepareAlgorithm(run);
+        lp2.prepareAlgorithm(run);
+        lp3.prepareAlgorithm(run);
 
         // Wait an appropriate time - want server to be called back 3 times
         Thread.sleep(1000);
@@ -241,14 +240,15 @@ public class TestLPA {
         printNodeConflictMap(lp3);
 
         // Clear out old information
-        lp1.affinityGroups(true);
-        lp2.affinityGroups(true);
-        lp3.affinityGroups(true);
+        lp1.affinityGroups(run, true);
+        lp2.affinityGroups(run, true);
+        lp3.affinityGroups(run, true);
 
         System.out.println("Exchanging info a second time");
-        lp3.prepareAlgorithm();
-        lp2.prepareAlgorithm();
-        lp1.prepareAlgorithm();
+        run++;
+        lp3.prepareAlgorithm(run);
+        lp2.prepareAlgorithm(run);
+        lp1.prepareAlgorithm(run);
 
         // Wait an appropriate time - want server to be called back 3 times
         Thread.sleep(1000);
@@ -358,6 +358,58 @@ public class TestLPA {
     }
 
     @Test
+    public void testLPAAlgorithmTwice() throws Exception {
+        // Create our server and three clients.
+        int port = nextUniquePort.get();
+
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        LabelPropagation lp2 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
+                    PartialToyBuilder.NODE2, localHost, port, true, 1, 0);
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
+        Collection<AffinityGroup> groups = server.findAffinityGroups();
+        groups = server.findAffinityGroups();
+    }
+
+    @Test
+    public void testAffinityGroupsTwice() throws Exception {
+        // Create our server and three clients.
+        int port = nextUniquePort.get();
+
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        lp1.prepareAlgorithm(1);
+        Collection<AffinityGroup> groups1 = lp1.affinityGroups(1, true);
+        Collection<AffinityGroup> groups2 = lp1.affinityGroups(1, true);
+        assertEquals(groups1.size(), groups2.size());
+        // Because we haven't actually run the algorithm, I know the groups
+        // correspond to the vertices on the node
+        for (AffinityGroup g : groups1) {
+            assertTrue(g.getId() == 1 || g.getId() == 2);
+        }
+        for (AffinityGroup g : groups2) {
+            assertTrue(g.getId() == 1 || g.getId() == 2);
+        }
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAffinityGroupsRunMismatch() throws Exception {
+        // Create our server and three clients.
+        int port = nextUniquePort.get();
+
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        lp1.prepareAlgorithm(1);
+        Collection<AffinityGroup> groups1 = lp1.affinityGroups(2, false);
+    }
+
+    @Test
     public void testLPADistributedZach() throws Exception {
         int RUNS = 500;
         int port = nextUniquePort.get();
@@ -420,14 +472,15 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Collection<AffinityGroup> affinityGroups(boolean done) 
+        public Collection<AffinityGroup> affinityGroups(long runNumber,
+                                                        boolean done)
                 throws IOException
         {
             return result;
         }
 
         /** {@inheritDoc} */
-        public void prepareAlgorithm() throws IOException {
+        public void prepareAlgorithm(long runNumber) throws IOException {
             startedExchangeInfo = true;
             try {
                 Thread.sleep(sleepTime);

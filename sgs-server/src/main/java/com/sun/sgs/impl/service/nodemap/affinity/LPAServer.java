@@ -44,7 +44,7 @@ public interface LPAServer extends Remote {
      * @param nodeId the node that has finished an iteration
      * @param converged {@code true} if the node believes the algorithm has
      *     converged and can be stopped
-     * @param failed {@code true} if there was a problem while setting up
+     * @param failed {@code true} if there was a problem while running
      * @param iteration the iteration that has finished
      * @throws IOException if there is a communication problem
      */

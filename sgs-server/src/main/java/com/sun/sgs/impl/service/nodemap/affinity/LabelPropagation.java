@@ -87,6 +87,15 @@ public class LabelPropagation implements LPAClient {
     // The number of threads this algorithm should use.
     private final int numThreads;
 
+    // The current algorithm run number, used to ensure we're returning
+    // values for the correct algorithm run.
+    private volatile long runNumber = -1;
+
+    // The current iteration being run, used to detect multiple calls
+    // for an iteration.
+    private volatile int iteration = -1;
+
+
     // The vertex preference factor.  Zero means no vertex preference, a small
     // positive number means a slight preference to nodes with higher degrees,
     // and a small negative number means a slight preference to nodes with
@@ -125,6 +134,26 @@ public class LabelPropagation implements LPAClient {
     private final Map<Identity, Map<Integer, Long>> remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Long>>();
 
+    // Synchronization for state
+    private final Object stateLock = new Object();
+
+    // States of this instance, ensuring that calls from the server are
+    // idempotent
+    private enum State {
+	// Preparing for an algorithm run
+	PREPARING,
+	// In the midst of an iteration
+	IN_ITERATION,
+	// Gathering up the final groups
+	GATHERING_GROUPS,
+        // Completed gathering groups
+        GATHERED_GROUPS,
+	// Idle (none of the above)
+	IDLE
+    }
+
+    /** The current state of this instance. */
+    private State state = State.IDLE;
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -183,9 +212,40 @@ public class LabelPropagation implements LPAClient {
     
     // --- implement LPAClient -- //
     /** {@inheritDoc} */
-    public Collection<AffinityGroup> affinityGroups(boolean done)
+    public Collection<AffinityGroup> affinityGroups(long runNumber,
+                                                    boolean done)
         throws IOException
     {
+        synchronized (stateLock) {
+            if (done) {
+                // If done is true, we will be initializing the graph for
+                // our next iteration as we gather the final group data,
+                // making it impossible for us to gather the data again.
+                while (state == State.GATHERING_GROUPS) {
+                    try {
+                        stateLock.wait();
+                    } catch (InterruptedException e) {
+                        // Do nothing - ignore until state changes
+                    }
+                }
+                if (done && state == State.GATHERED_GROUPS &&
+                        runNumber == this.runNumber)
+                {
+                    // We have collected data for this run already, just return
+                    // them.
+                    logger.log(Level.SEVERE,
+                            "{0}: returning {1} precalculated groups",
+                            localNodeId, groups.size());
+                    new HashSet<AffinityGroup>(groups);
+                }
+                state = State.GATHERING_GROUPS;
+            }
+        }
+
+        if (this.runNumber != runNumber) {
+            throw new IllegalArgumentException("bad run number " + runNumber +
+                    ", expected " + this.runNumber);
+        }
         // This can happen in testing - JANE probably will change
         if (vertices == null) {
             initializeLPARun();
@@ -209,6 +269,12 @@ public class LabelPropagation implements LPAClient {
             nodeConflictMap.clear();
             vertices = null;
         }
+        synchronized (stateLock) {
+            if (done) {
+                state = State.GATHERED_GROUPS;
+                stateLock.notifyAll();
+            }
+        }
         logger.log(Level.FINEST, "{0}: returning {1} groups",
                    localNodeId, groups.size());
         return new HashSet<AffinityGroup>(groups);
@@ -225,7 +291,24 @@ public class LabelPropagation implements LPAClient {
      * It might be better to just let the server ask each vertex for its
      * information and merge it there.
      */
-    public void prepareAlgorithm() throws IOException {
+    public void prepareAlgorithm(long runNumber) throws IOException {
+        synchronized (stateLock) {
+            while (state == State.PREPARING) {
+                try {
+                    stateLock.wait();
+                } catch (InterruptedException e) {
+                    // Do nothing - ignore until state changes
+                }
+            }
+            if (runNumber == this.runNumber) {
+                // We assume this happened if the server called us twice
+                // due to IO retries.
+                return;
+            }
+            state = State.PREPARING;
+        }
+        this.runNumber = runNumber;
+        iteration = -1;
         initializeNodeConflictMap();
 
         boolean failed = false;
@@ -260,7 +343,12 @@ public class LabelPropagation implements LPAClient {
         }
 
         // Tell the server we're ready for the iterations to begin
+        // JANE need retry
         server.readyToBegin(localNodeId, failed);
+        synchronized (stateLock) {
+            state = State.IDLE;
+            stateLock.notifyAll();
+        }
     }
 
     /** {@inheritDoc} */
@@ -313,6 +401,32 @@ public class LabelPropagation implements LPAClient {
      */
     public void startIteration(int iteration) throws IOException {
         long startTime = System.currentTimeMillis();
+       
+        // Block any additional threads entering this iteration
+        synchronized (stateLock) {
+            while (state == State.IN_ITERATION) {
+                try {
+                    stateLock.wait();
+                } catch (InterruptedException e) {
+                    // Do nothing - ignore until state changes
+                }
+            }
+            if (this.iteration > iteration) {
+                // things are very confused
+                // JANE need retry
+                server.finishedIteration(localNodeId, true, true, iteration);
+            } else if (this.iteration == iteration) {
+                // We have been called more than once by the server. Assume this
+                // is due to IO retries, so no action is needed.
+                return;
+            }
+
+            // Otherwise, run the iteration
+            state = State.IN_ITERATION;
+        }
+
+        // Record the current iteration so we can use it for error checks above.
+        this.iteration = iteration;
 
         if (iteration == 1) {
             initializeLPARun();
@@ -386,8 +500,13 @@ public class LabelPropagation implements LPAClient {
             }
         }
         // Tell the server we've finished this iteration
+        // JANE need retry
         server.finishedIteration(localNodeId, !changed, failed, iteration);
 
+        synchronized (stateLock) {
+            state = State.IDLE;
+            stateLock.notifyAll();
+        }
         if (gatherStats) {
             // Record our statistics for this run, used for testing.
             time = System.currentTimeMillis() - startTime;

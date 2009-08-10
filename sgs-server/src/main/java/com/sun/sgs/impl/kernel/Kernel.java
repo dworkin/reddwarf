@@ -395,8 +395,14 @@ class Kernel {
             }
         }
 
-        // Add the affinity graph listener
-        profileCollector.addListener(new GraphListener(appProperties), false);
+        // Add the affinity graph listener if we are an app node
+        NodeType type =
+            NodeType.valueOf(
+                appProperties.getProperty(StandardProperties.NODE_TYPE));
+        if (type == NodeType.appNode) {
+            profileCollector.addListener(
+                    new GraphListener(appProperties), false);
+        }
         
         // finally, register the scheduler as a listener too
         // NOTE: if we make the schedulers pluggable, or add other components

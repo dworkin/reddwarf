@@ -36,9 +36,10 @@ public interface LPAClient extends Remote {
      * should do whatever is necessary to set up for that run.  When
      * finished, {@link LPAServer#readyToBegin} should be called.
      * Called by the LPAServer.
+     * @param runNumber the number of this algorithm run
      * @throws IOException if there is a communication problem
      */
-    void prepareAlgorithm() throws IOException;
+    void prepareAlgorithm(long runNumber) throws IOException;
 
     /**
      * Start an iteration of the algorithm.  When finished,
@@ -51,15 +52,19 @@ public interface LPAClient extends Remote {
 
     /**
      * Returns the affinity groups found on this node.
-     * Called by the LPAServer.  The LPAServer must call this with an
-     * argument of {@code true} if it intends to start another algorithm
+     * Called by the LPAServer.  The LPAServer must call this with
+     * {@code done} set to {@code true} if it intends to start another algorithm
      * run at any time in the future, even if the current run fails.
-     * <p>
+     * @param runNumber the run number provided to the last
+     *                  {@link #prepareAlgorithm} call
      * @param done {@code true} if all iterations are done, allowing cleanup
      * @return the affinity groups on this node
+     * @throws IllegalArgumentException if runNumber does not match the last
+     *         call to {@code prepareAlgorithm}
      * @throws IOException if there is a communication problem
      */
-    Collection<AffinityGroup> affinityGroups(boolean done) throws IOException;
+    Collection<AffinityGroup> affinityGroups(long runNumber, boolean done)
+            throws IOException;
 
     /**
      * Remove any cached information about a node.
