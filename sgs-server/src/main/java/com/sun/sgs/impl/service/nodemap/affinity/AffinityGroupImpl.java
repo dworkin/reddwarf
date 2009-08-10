@@ -26,8 +26,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- *
- *  This will need to change, of couse, for multinode.
+ * The affinity group information for a single node, in a format which
+ * can be sent between nodes and the server.
  */
 public class AffinityGroupImpl implements AffinityGroup, Serializable {
     /** Serialization version. */

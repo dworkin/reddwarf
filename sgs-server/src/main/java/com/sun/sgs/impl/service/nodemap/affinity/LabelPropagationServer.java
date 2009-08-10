@@ -201,60 +201,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // If, after this point, we cannot contact a node, simply
         // return the information that we have.
         // Assuming a node has failed, we won't report the identities
-        // on the failed node as being part of any group.  
-        final Set<AffinityGroup> returnedGroups =
-                Collections.synchronizedSet(new HashSet<AffinityGroup>());
-        latch = new CountDownLatch(clientProxyCopy.keySet().size());
-        for (final Map.Entry<Long, LPAClient> ce :
-                       clientProxyCopy.entrySet())
-        {
-            final LPAClient proxy = ce.getValue();
-            executor.execute(new Runnable() {
-                public void run() {
-                    try {
-                        returnedGroups.addAll(proxy.affinityGroups(true));
-                        latch.countDown();
-                    } catch (IOException ioe) {
-                        ioe.printStackTrace();
-                        // JANE NEED retry here.  If the retries fail,
-                        // be sure to count down the latch
-                        if (nodeBarrier.remove(ce.getKey())) {
-                            latch.countDown();
-                        }
-                        removeNode(ce.getKey());
-                    } catch (Exception e) {
-                        logger.logThrow(Level.INFO, e,
-                            "exception from node {0} while returning groups",
-                            ce.getKey());
-                        if (nodeBarrier.remove(ce.getKey())) {
-                            latch.countDown();
-                        }
-                    }
-                }
-            });
-        }
-
-        // Wait for the calls to complete on all nodes
-        waitOnLatch();
-
-        Map<Long, AffinityGroupImpl> groupMap =
-                new HashMap<Long, AffinityGroupImpl>();
-        for (AffinityGroup ag : returnedGroups) {
-            long id = ag.getId();
-            AffinityGroupImpl group = groupMap.get(id);
-            if (group == null) {
-                group = new AffinityGroupImpl(id);
-                groupMap.put(id, group);
-            }
-            for (Identity gid : ag.getIdentities()) {
-                group.addIdentity(gid);
-            }
-        }
-
-        // convert our types
-        for (AffinityGroupImpl agi : groupMap.values()) {
-            retVal.add(agi);
-        }
+        // on the failed node as being part of any group.
+        retVal = gatherFinalGroups(clientProxyCopy);
 
         if (logger.isLoggable(Level.FINE)) {
             long time = System.currentTimeMillis() - startTime;
@@ -433,16 +381,96 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             }
         }
     }
-    
+
+    private Collection<AffinityGroup> gatherFinalGroups(
+            Map<Long, LPAClient> clientProxies)
+    {
+        // If, after this point, we cannot contact a node, simply
+        // return the information that we have.
+        // Assuming a node has failed, we won't report the identities
+        // on the failed node as being part of any group.
+        final Map<Long, Collection<AffinityGroup>> returnedGroups =
+            new ConcurrentHashMap<Long, Collection<AffinityGroup>>();
+        latch = new CountDownLatch(clientProxies.keySet().size());
+        for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
+            final Long nodeId = ce.getKey();
+            final LPAClient proxy = ce.getValue();
+            executor.execute(new Runnable() {
+                public void run() {
+                    try {
+                        returnedGroups.put(nodeId, proxy.affinityGroups(true));
+                        latch.countDown();
+                    } catch (IOException ioe) {
+                        ioe.printStackTrace();
+                        // JANE NEED retry here.  If the retries fail,
+                        // be sure to count down the latch
+                        if (nodeBarrier.remove(nodeId)) {
+                            latch.countDown();
+                        }
+                        removeNode(ce.getKey());
+                    } catch (Exception e) {
+                        logger.logThrow(Level.INFO, e,
+                            "exception from node {0} while returning groups",
+                            ce.getKey());
+                        if (nodeBarrier.remove(nodeId)) {
+                            latch.countDown();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Wait for the calls to complete on all nodes
+        waitOnLatch();
+
+        // Map of group id -> identity, node
+        Map<Long, Map<Identity, Long>> groupMap =
+                new HashMap<Long, Map<Identity, Long>>();
+        // Ensure that each identity is only assigned to a single group
+        Set<Identity> idSet = new HashSet<Identity>();
+        for (Map.Entry<Long, Collection<AffinityGroup>> e :
+            returnedGroups.entrySet())
+        {
+            Long nodeId = e.getKey();
+            for (AffinityGroup ag : e.getValue()) {
+                long id = ag.getId();
+                Map<Identity, Long> idNodeMap = groupMap.get(id);
+                if (idNodeMap == null) {
+                    idNodeMap = new HashMap<Identity, Long>();
+                    groupMap.put(id, idNodeMap);
+                }
+                for (Identity gid : ag.getIdentities()) {
+                    if (idSet.add(gid)) {
+                        // Only add if this is the first time we've seen
+                        // the identity.  The group selected is the first
+                        // one seen, as added to the returnedGroups from
+                        // the proxy calls.
+                        idNodeMap.put(gid, nodeId);
+                    }
+                }
+            }
+        }
+
+        // Create our final return values
+        Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
+        for (Map.Entry<Long, Map<Identity, Long>> e :
+            groupMap.entrySet())
+        {
+            retVal.add(new MultiAffinityGroup(e.getKey(), e.getValue()));
+        }
+
+        return retVal;
+    }
+
     private void waitOnLatch() {
         try {
-            latch.await(TIMEOUT, TimeUnit.MINUTES);
+            boolean ok = latch.await(TIMEOUT, TimeUnit.MINUTES);
+            if (!ok) {
+                // We timed out on the latch, invalidating this run.
+                runFailed = true;
+            }
         } catch (InterruptedException ex) {
             runFailed = true;
         }
-        // Prepare for next phase of the algorithm.  This ensures that
-        // we remember to create a new count down latch for each phase,
-        // as count down latches cannot be reused.
-        latch = null;
     }
 }

@@ -36,7 +36,7 @@ public interface AffinityGroup {
 
     /**
      * Returns the set of {@code Identities} which are members of this group.
-     * @return the set of {@code Identities} iwhich are members of this group
+     * @return the set of {@code Identities} which are members of this group
      */
     Set<Identity> getIdentities();
 }
