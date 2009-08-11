@@ -77,12 +77,14 @@ public class TestLPA {
 
     private LabelPropagationServer server;
     private String localHost;
+    private int serverPort;
 
     @Before
     public void setup() throws Exception {
         Properties props = new Properties();
+        serverPort = getNextUniquePort();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
-                   String.valueOf(getNextUniquePort()));
+                   String.valueOf(serverPort));
         server = new LabelPropagationServer(props);
         localHost = InetAddress.getLocalHost().getHostName();
     }
@@ -102,10 +104,9 @@ public class TestLPA {
         return nextUniquePort.incrementAndGet();
     }
 
-    
+    /* -- Server tests -- */
     @Test
     public void testDistributedFramework() throws Exception {
-        // Create a server, and add a few "nodes"
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         {
             AffinityGroupImpl a = new AffinityGroupImpl(1);
@@ -184,10 +185,161 @@ public class TestLPA {
     }
 
     @Test
-    public void testCrossNodeData() throws Exception {
-        // Create our server and three clients.
-        int port = nextUniquePort.get();
+    public void testLPAAlgorithm() throws Exception {
+        // Create three clients.
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+        LabelPropagation lp2 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
+                    PartialToyBuilder.NODE2, localHost, serverPort, true, 1, 0);
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1, 0);
+        Collection<AffinityGroup> groups = server.findAffinityGroups();
+    }
 
+    @Test
+    public void testLPAAlgorithmTwice() throws Exception {
+        // Create three clients.
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+        LabelPropagation lp2 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
+                    PartialToyBuilder.NODE2, localHost, serverPort, true, 1, 0);
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1, 0);
+        Collection<AffinityGroup> groups = server.findAffinityGroups();
+        groups = server.findAffinityGroups();
+    }
+
+    @Test(expected = IOException.class)
+    public void testServerShutdown() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+        server.shutdown();
+        // Expect that the node won't be able to reach the server
+        lp1.prepareAlgorithm(1);
+    }
+
+    @Test
+    public void testServerShutdownTwice() throws Exception {
+        // Should be no problem to call shutdown twice
+        server.shutdown();
+        server.shutdown();
+    }
+
+    /* -- Client tests -- */
+    // Tests for idempotent behavior when key LPAClient methods are called
+    // more than once by the server.
+    @Test
+    public void testAffinityGroupsTwice() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+        lp1.prepareAlgorithm(1);
+        Collection<AffinityGroup> groups1 = lp1.affinityGroups(1, true);
+        Collection<AffinityGroup> groups2 = lp1.affinityGroups(1, true);
+        assertEquals(groups1.size(), groups2.size());
+        // Because we haven't actually run the algorithm, I know the groups
+        // correspond to the vertices on the node
+        for (AffinityGroup g : groups1) {
+            assertTrue(g.getId() == 1 || g.getId() == 2);
+        }
+        for (AffinityGroup g : groups2) {
+            assertTrue(g.getId() == 1 || g.getId() == 2);
+        }
+    }
+
+    @Test
+    public void testPrepareTwice() throws Exception {
+        // Create our server
+        server.shutdown();
+        server = null;
+        int port = getNextUniquePort();
+        Properties props = new Properties();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(port));
+        TestLPAServer testServer = new TestLPAServer(props);
+
+        try {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        lp1.prepareAlgorithm(1);
+        lp1.prepareAlgorithm(1);
+        assertEquals(1, testServer.readyToBeginCount());
+        } finally {
+            testServer.shutdown();
+        }
+    }
+
+    @Test
+    public void testIterationTwice() throws Exception {
+        // Create our server
+        server.shutdown();
+        server = null;
+        int port = getNextUniquePort();
+        Properties props = new Properties();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(port));
+        TestLPAServer testServer = new TestLPAServer(props);
+
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        lp1.prepareAlgorithm(1);
+        lp1.startIteration(1);
+        lp1.startIteration(1);
+        assertEquals(1, testServer.finishedIterationCount());
+    }
+
+    // Client test:  run mismatch
+    @Test(expected = IllegalArgumentException.class)
+    public void testAffinityGroupsRunMismatch() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+        lp1.prepareAlgorithm(1);
+        Collection<AffinityGroup> groups1 = lp1.affinityGroups(2, false);
+    }
+
+    // Client test: iteration mismatch
+    @Test
+    public void testIterationMismatch() throws Exception {
+        // Create our server
+        server.shutdown();
+        server = null;
+        int port = getNextUniquePort();
+        Properties props = new Properties();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(port));
+        TestLPAServer testServer = new TestLPAServer(props);
+
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+        lp1.prepareAlgorithm(1);
+        lp1.startIteration(1);
+        lp1.startIteration(2);
+        // this one should be ignored
+        lp1.startIteration(1);
+        assertEquals(2, testServer.finishedIterationCount());
+    }
+
+    @Test
+    public void testCrossNodeData() throws Exception {
+        // Create our server
+        server.shutdown();
+        server = null;
+        int port = getNextUniquePort();
+        Properties props = new Properties();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(port));
+        TestLPAServer testServer = new TestLPAServer(props);
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
                     PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
@@ -203,8 +355,10 @@ public class TestLPA {
         lp2.prepareAlgorithm(run);
         lp3.prepareAlgorithm(run);
 
-        // Wait an appropriate time - want server to be called back 3 times
-        Thread.sleep(1000);
+        // Wait until all 3 callbacks have occurred
+        while (testServer.readyToBeginCount() < 3) {
+            wait(5);
+        }
 
         // examine the node conflict map -it is public so I can get it here
         assertEquals(2, lp1.getNodeConflictMap().size());
@@ -250,8 +404,10 @@ public class TestLPA {
         lp2.prepareAlgorithm(run);
         lp1.prepareAlgorithm(run);
 
-        // Wait an appropriate time - want server to be called back 3 times
-        Thread.sleep(1000);
+        // Wait until all 3 callbacks have occurred
+        while (testServer.readyToBeginCount() < 3) {
+            wait(5);
+        }
 
         // examine the node conflict map -it is public so I can get it here
         // Expect same result as above
@@ -277,7 +433,7 @@ public class TestLPA {
         map = lp3.getNodeConflictMap().get(PartialToyBuilder.NODE1);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj2"));
-        
+
         //public Map<Long, Map<Object, Integer>> nodeConflictMap
         System.out.println("NODE1 nodeConflictMap");
         printNodeConflictMap(lp1);
@@ -288,7 +444,7 @@ public class TestLPA {
     }
 
     private void printNodeConflictMap(LabelPropagation lp) {
-        
+
         for (Map.Entry<Long, ConcurrentHashMap<Object, Long>> entry :
              lp.getNodeConflictMap().entrySet())
         {
@@ -306,15 +462,12 @@ public class TestLPA {
 
     @Test
     public void testCrossNodeLabels() throws Exception {
-        // Create our server and three clients.
-        int port = nextUniquePort.get();
-
         // These match the ones from the partial toy builder
         Identity id1 = new DummyIdentity("1");
         Identity id2 = new DummyIdentity("2");
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
         lp1.initializeLPARun();
 
         Set<Object> objIds = new HashSet<Object>();
@@ -340,91 +493,27 @@ public class TestLPA {
         }
     }
 
-    @Test
-    public void testLPAAlgorithm() throws Exception {
-        // Create our server and three clients.
-        int port = nextUniquePort.get();
 
-        LabelPropagation lp1 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
-        LabelPropagation lp2 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, localHost, port, true, 1, 0);
-        LabelPropagation lp3 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
-        Collection<AffinityGroup> groups = server.findAffinityGroups();
-    }
-
-    @Test
-    public void testLPAAlgorithmTwice() throws Exception {
-        // Create our server and three clients.
-        int port = nextUniquePort.get();
-
-        LabelPropagation lp1 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
-        LabelPropagation lp2 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, localHost, port, true, 1, 0);
-        LabelPropagation lp3 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
-        Collection<AffinityGroup> groups = server.findAffinityGroups();
-        groups = server.findAffinityGroups();
-    }
-
-    @Test
-    public void testAffinityGroupsTwice() throws Exception {
-        // Create our server and three clients.
-        int port = nextUniquePort.get();
-
-        LabelPropagation lp1 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
-        lp1.prepareAlgorithm(1);
-        Collection<AffinityGroup> groups1 = lp1.affinityGroups(1, true);
-        Collection<AffinityGroup> groups2 = lp1.affinityGroups(1, true);
-        assertEquals(groups1.size(), groups2.size());
-        // Because we haven't actually run the algorithm, I know the groups
-        // correspond to the vertices on the node
-        for (AffinityGroup g : groups1) {
-            assertTrue(g.getId() == 1 || g.getId() == 2);
-        }
-        for (AffinityGroup g : groups2) {
-            assertTrue(g.getId() == 1 || g.getId() == 2);
-        }
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testAffinityGroupsRunMismatch() throws Exception {
-        // Create our server and three clients.
-        int port = nextUniquePort.get();
-
-        LabelPropagation lp1 =
-            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
-        lp1.prepareAlgorithm(1);
-        Collection<AffinityGroup> groups1 = lp1.affinityGroups(2, false);
-    }
-
+    // This is more of an integration test!
     @Test
     public void testLPADistributedZach() throws Exception {
         int RUNS = 500;
-        int port = nextUniquePort.get();
+
         LabelPropagation lp1 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                    DistributedZachBuilder.NODE1, localHost, port, true, 1, 0);
+                    DistributedZachBuilder.NODE1, localHost, serverPort,
+                        true, 1, 0);
         LabelPropagation lp2 =
             new LabelPropagation(new DistributedZachBuilder(
                 DistributedZachBuilder.NODE2),
-                    DistributedZachBuilder.NODE2, localHost, port, true, 1, 0);
+                    DistributedZachBuilder.NODE2, localHost, serverPort,
+                        true, 1, 0);
         LabelPropagation lp3 =
             new LabelPropagation(new DistributedZachBuilder(
                 DistributedZachBuilder.NODE3),
-                    DistributedZachBuilder.NODE3, localHost, port, true, 1, 0);
+                    DistributedZachBuilder.NODE3, localHost, serverPort,
+                        true, 1, 0);
 
         double avgMod  = 0.0;
         double maxMod = 0.0;
@@ -519,7 +608,8 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Collection<Object> crossNodeEdges(Collection<Object> objIds, long nodeId)
+        public Collection<Object> crossNodeEdges(Collection<Object> objIds,
+                                                 long nodeId)
                 throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
@@ -533,6 +623,44 @@ public class TestLPA {
         }
     }
 
+    /**
+     * A very simple test server that counts the number of client callbacks
+     * for preparation completed and finished iterations.
+     */
+    private static class TestLPAServer extends LabelPropagationServer {
+        private AtomicInteger finishedIterationCount = new AtomicInteger(0);
+        private AtomicInteger readyToBeginCount = new AtomicInteger(0);
+
+        public TestLPAServer(Properties properties) throws IOException {
+            super(properties);
+        }
+
+        /** {@inheritDoc} */
+        public void finishedIteration(long nodeId, boolean converged,
+                boolean failed, int iteration) throws IOException
+        {
+            finishedIterationCount.incrementAndGet();
+            super.finishedIteration(nodeId, converged, failed, iteration);
+        }
+
+        /** {@inheritDoc} */
+        public void readyToBegin(long nodeId, boolean failed) throws IOException
+        {
+            readyToBeginCount.incrementAndGet();
+            super.readyToBegin(nodeId, failed);
+        }
+
+        public int finishedIterationCount() {
+            return finishedIterationCount.get();
+        }
+        public int readyToBeginCount() {
+            return readyToBeginCount.get();
+        }
+        public void clear() {
+            finishedIterationCount.getAndSet(0);
+            readyToBeginCount.getAndSet(0);
+        }
+    }
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements GraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;

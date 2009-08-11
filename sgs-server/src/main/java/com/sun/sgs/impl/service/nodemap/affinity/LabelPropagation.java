@@ -87,15 +87,6 @@ public class LabelPropagation implements LPAClient {
     // The number of threads this algorithm should use.
     private final int numThreads;
 
-    // The current algorithm run number, used to ensure we're returning
-    // values for the correct algorithm run.
-    private volatile long runNumber = -1;
-
-    // The current iteration being run, used to detect multiple calls
-    // for an iteration.
-    private volatile int iteration = -1;
-
-
     // The vertex preference factor.  Zero means no vertex preference, a small
     // positive number means a slight preference to nodes with higher degrees,
     // and a small negative number means a slight preference to nodes with
@@ -134,7 +125,7 @@ public class LabelPropagation implements LPAClient {
     private final Map<Identity, Map<Integer, Long>> remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Long>>();
 
-    // Synchronization for state
+    // Synchronization for state, runNumber, and iteration
     private final Object stateLock = new Object();
 
     // States of this instance, ensuring that calls from the server are
@@ -154,6 +145,14 @@ public class LabelPropagation implements LPAClient {
 
     /** The current state of this instance. */
     private State state = State.IDLE;
+
+    // The current algorithm run number, used to ensure we're returning
+    // values for the correct algorithm run.
+    private volatile long runNumber = -1;
+
+    // The current iteration being run, used to detect multiple calls
+    // for an iteration.
+    private volatile int iteration = -1;
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -217,6 +216,11 @@ public class LabelPropagation implements LPAClient {
         throws IOException
     {
         synchronized (stateLock) {
+            if (this.runNumber != runNumber) {
+                throw new IllegalArgumentException(
+                    "bad run number " + runNumber +
+                    ", expected " + this.runNumber);
+            }
             if (done) {
                 // If done is true, we will be initializing the graph for
                 // our next iteration as we gather the final group data,
@@ -228,12 +232,10 @@ public class LabelPropagation implements LPAClient {
                         // Do nothing - ignore until state changes
                     }
                 }
-                if (done && state == State.GATHERED_GROUPS &&
-                        runNumber == this.runNumber)
-                {
+                if (state == State.GATHERED_GROUPS) {
                     // We have collected data for this run already, just return
                     // them.
-                    logger.log(Level.SEVERE,
+                    logger.log(Level.FINE,
                             "{0}: returning {1} precalculated groups",
                             localNodeId, groups.size());
                     new HashSet<AffinityGroup>(groups);
@@ -242,10 +244,6 @@ public class LabelPropagation implements LPAClient {
             }
         }
 
-        if (this.runNumber != runNumber) {
-            throw new IllegalArgumentException("bad run number " + runNumber +
-                    ", expected " + this.runNumber);
-        }
         // This can happen in testing - JANE probably will change
         if (vertices == null) {
             initializeLPARun();
@@ -268,9 +266,8 @@ public class LabelPropagation implements LPAClient {
             // signal that it needs to be initialized.
             nodeConflictMap.clear();
             vertices = null;
-        }
-        synchronized (stateLock) {
-            if (done) {
+
+            synchronized (stateLock) {
                 state = State.GATHERED_GROUPS;
                 stateLock.notifyAll();
             }
@@ -305,10 +302,11 @@ public class LabelPropagation implements LPAClient {
                 // due to IO retries.
                 return;
             }
+            this.runNumber = runNumber;
+            iteration = 0;
             state = State.PREPARING;
         }
-        this.runNumber = runNumber;
-        iteration = -1;
+
         initializeNodeConflictMap();
 
         boolean failed = false;
@@ -412,21 +410,24 @@ public class LabelPropagation implements LPAClient {
                 }
             }
             if (this.iteration > iteration) {
-                // things are very confused
-                // JANE need retry
-                server.finishedIteration(localNodeId, true, true, iteration);
+                // Things are confused;  we should have already performed
+                // the iteration.  Do nothing.
+                logger.log(Level.FINE,
+                            "{0}: bad iteration number {1}, " +
+                            " we are on iteration {2}.  Returning.",
+                            localNodeId, iteration, this.iteration);
+                return;
             } else if (this.iteration == iteration) {
                 // We have been called more than once by the server. Assume this
                 // is due to IO retries, so no action is needed.
                 return;
             }
 
+            // Record the current iteration so we can use it for error checks.
+            this.iteration = iteration;
             // Otherwise, run the iteration
             state = State.IN_ITERATION;
         }
-
-        // Record the current iteration so we can use it for error checks above.
-        this.iteration = iteration;
 
         if (iteration == 1) {
             initializeLPARun();
