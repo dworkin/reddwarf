@@ -63,4 +63,14 @@ public interface ClientSessionServiceMXBean {
      *         has been called
      */
     long getGetSessionProtocolCalls();
+
+    /**
+     * Returns the number of times {@link 
+     * ClientSessionService#isConnected isConnected}
+     * has been called.
+     * 
+     * @return the number of times {@code isConnected} 
+     *         has been called
+     */
+    long getIsConnectedCalls();
 }

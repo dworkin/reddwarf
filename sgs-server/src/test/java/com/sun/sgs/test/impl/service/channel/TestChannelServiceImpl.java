@@ -1649,6 +1649,136 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    client.disconnect();
 	}
     }
+
+    @Test
+    @IntegrationTest
+    public void testSendFromClientSessionWithDelayedJoinAndCoordinatorCrash()
+	throws Exception
+    {
+	String user = "user";
+	String channelName = "test";
+	SgsTestNode coordinatorNode = addNode();
+	// Create channel with coordinator on coordinator node.
+	createChannel(channelName, null, coordinatorNode);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    holdChannelServerMethodToNode(userNode, "join");
+	    joinUsers(channelName, user);
+	    for (int i = 0; i < 3; i++) {
+		client.sendChannelMessage(channelName, i);
+	    }
+	    Thread.sleep(1000);
+	    // Shutdown coordinator node.
+	    coordinatorNode.shutdown(false);
+	    Thread.sleep(3000);
+	    checkChannelMessagesReceived(client, channelName, 3);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    @Test
+    @IntegrationTest
+    public void
+	testSendFromClientSessionWithDelayedLeaveAndCoordinatorCrash()
+	    throws Exception
+    {
+	String user = "user";
+	String channelName = "test";
+	SgsTestNode coordinatorNode = addNode();
+	// Create channel with coordinator on server node.
+	createChannel(channelName, null, coordinatorNode);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    joinUsers(channelName, user);
+	    client.assertJoinedChannel(channelName);
+	    client.sendChannelMessage(channelName, 0);
+	    checkChannelMessagesReceived(client, channelName, 1);
+	    holdChannelServerMethodToNode(userNode, "leave");
+	    leaveUsers(channelName, user);	
+	    client.sendChannelMessage(channelName, 0);
+	    Thread.sleep(1000);
+	    coordinatorNode.shutdown(false);
+	    Thread.sleep(3000);
+	    client.assertLeftChannel(channelName);
+	    assertNull(client.nextChannelMessage());
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    @Test
+    @IntegrationTest
+    public void
+	testSendFromClientSessionWithDelayedJoinLeaveAndCoordinatorCrash()
+	    throws Exception
+    {
+	String user = "user";
+	String channelName = "test";
+	SgsTestNode coordinatorNode = addNode();
+	// Create channel with coordinator on coordinator node.
+	createChannel(channelName, null, coordinatorNode);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    holdChannelServerMethodToNode(userNode, "join");
+	    joinUsers(channelName, user);
+	    leaveUsers(channelName, user);
+	    client.sendChannelMessage(channelName, 0);
+	    Thread.sleep(1000);
+	    coordinatorNode.shutdown(false);
+	    Thread.sleep(3000);
+	    client.assertLeftChannel(channelName);
+	    assertNull(client.nextChannelMessage());
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
+    @Test
+    @IntegrationTest
+    public void
+	testSendFromClientSessionWithDelayedJoinLeaveJoinAndCoordinatorCrash()
+	    throws Exception
+    {
+	String user = "user";
+	String channelName = "test";
+	SgsTestNode coordinatorNode = addNode();
+	// Create channel with coordinator on server node.
+	createChannel(channelName, null, coordinatorNode);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    holdChannelServerMethodToNode(userNode, "join");
+	    joinUsers(channelName, user);
+	    leaveUsers(channelName, user);
+	    joinUsers(channelName, user);
+	    for (int i = 0; i < 2; i++) {
+		client.sendChannelMessage(channelName, i);
+	    }
+	    Thread.sleep(1000);
+	    coordinatorNode.shutdown(false);
+	    Thread.sleep(3000);
+	    client.assertJoinedChannel(channelName);
+	    checkChannelMessagesReceived(client, channelName, 2);
+	    for (int i = 0; i < 2; i++) {
+		client.sendChannelMessage(channelName, i);
+	    }
+	    checkChannelMessagesReceived(client, channelName, 2);
+	} finally {
+	    client.disconnect();
+	}
+    }
     
     // -- other classes --
 

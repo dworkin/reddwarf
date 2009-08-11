@@ -452,7 +452,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    checkUsersJoined(channelName1, someUsers);
 	    
 	    // Initiate client relocation to new node.
-	    DummyClient relocatingClient = group.getClient(REX);
+	    DummyClient relocatingClient = group.getClient(MOE);
 	    moveIdentity(relocatingClient, serverNode, newNode);
 	    SimpleCompletionHandler handler =
 		mySessionStatusListener.waitForPrepare();

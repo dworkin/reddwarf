@@ -35,6 +35,7 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
 
     final ProfileOperation addSessionStatusListenerOp;
     final ProfileOperation getSessionProtocolOp;
+    final ProfileOperation isConnectedOp;
     
     ClientSessionServiceStats(ProfileCollector collector) {
         ProfileConsumer consumer = 
@@ -48,6 +49,8 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
                                      type, level);
         getSessionProtocolOp =
             consumer.createOperation("getSessionProtocol", type, level);
+        isConnectedOp =
+            consumer.createOperation("isConnectedOp", type, level);
     }
 
     /** {@inheritDoc} */
@@ -60,5 +63,10 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
     public long getGetSessionProtocolCalls() {
         return ((AggregateProfileOperation) 
                     getSessionProtocolOp).getCount();
+    }
+
+    /** {@inheritDoc} */
+    public long getIsConnectedCalls() {
+        return ((AggregateProfileOperation) isConnectedOp).getCount();
     }
 }

@@ -575,6 +575,15 @@ public final class ClientSessionServiceImpl
     }
 
     /** {@inheritDoc} */
+    public boolean isConnected(BigInteger sessionRefId) {
+	if (sessionRefId == null) {
+	    throw new NullPointerException("null sessionRefId");
+	}
+        serviceStats.isConnectedOp.report();
+	return handlers.get(sessionRefId) != null;
+    }
+
+    /** {@inheritDoc} */
     public boolean isRelocatingToLocalNode(BigInteger sessionRefId) {
 	return relocatingSessions.containsKey(sessionRefId);
     }
@@ -1358,8 +1367,6 @@ public final class ClientSessionServiceImpl
      *
      * @param	sessionRefId the ID for the relocating client session
      * @param	newNodeId the ID of the new node for the client session
-     * @param	handler the completion handler to notify when preparation
-     *		is complete
      */
     void notifyPrepareToRelocate(final BigInteger sessionRefId,
 				 final long newNodeId)

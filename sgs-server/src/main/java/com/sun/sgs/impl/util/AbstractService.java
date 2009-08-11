@@ -597,7 +597,7 @@ public abstract class AbstractService implements Service {
     /**
      * Returns the caller's stack trace, in the typical format.
      *
-     * @returns the caller's stack trace, in the typical format
+     * @return	the caller's stack trace, in the typical format
      */
     public static String getStackTrace() {
 	Throwable throwable = (new Throwable()).fillInStackTrace();

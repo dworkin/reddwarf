@@ -30,6 +30,16 @@ import java.rmi.Remote;
  */
 public interface ChannelServer extends Remote {
 
+    /** Membership status. */
+    public enum MembershipStatus {
+	/** Member. */
+	MEMBER,
+	/** Non-member. */
+	NON_MEMBER,
+	/** Unknown (because session is non-local). */
+	UNKNOWN;
+    };
+
     /**
      * Notifies this server that it should service the event queue of
      * the channel with the specified {@code channelRefId}.
@@ -40,6 +50,23 @@ public interface ChannelServer extends Remote {
      */
     void serviceEventQueue(BigInteger channelRefId) throws IOException;
 
+    /**
+     * If the session with the specified {@code sessionRefId} is connected to
+     * the local node, returns {@link MembershipStatus#MEMBER} if the session
+     * is a member of the channel with the specified {@code channelRefId} and
+     * returns {@link MembershipStatus#NON_MEMBER} if the session is not a
+     * member of the channel.  If the session is not connected to the local
+     * node, then this method returns {@link MembershipStatus#UNKNOWN}.
+     *
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
+     * @return	the membership status of the session with the
+     *		specified {@code sessionRefId} for the channel with
+     *		the specified {@code channelRefId}
+     */
+    MembershipStatus isMember(BigInteger channelRefId, BigInteger sessionRefId)
+	throws IOException;
+    
     /**
      * Notifies this server that the locally-connected session with
      * the specified {@code sessionRefId} has joined the channel with

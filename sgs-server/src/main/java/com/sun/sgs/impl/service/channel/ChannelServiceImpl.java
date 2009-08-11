@@ -28,6 +28,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -487,6 +488,20 @@ public final class ChannelServiceImpl
 		callFinished();
 	    }
 	}
+
+	/** {@inheritDoc} */
+	public MembershipStatus isMember(
+	    BigInteger channelRefId, BigInteger sessionRefId)
+	{
+	    if (!sessionService.isConnected(sessionRefId)) {
+		return MembershipStatus.UNKNOWN;
+	    } else {
+		return
+		    isLocalChannelMember(channelRefId, sessionRefId) ?
+		    MembershipStatus.MEMBER :
+		    MembershipStatus.NON_MEMBER;
+	    }
+	}
 	
 	/** {@inheritDoc}
 	 *
@@ -890,7 +905,8 @@ public final class ChannelServiceImpl
 	checkNonTransactionalContext();
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
-		Level.FINEST, "serviceEventQueue channelId:{0}",
+		Level.FINEST,
+		"add task to service event queue, channelId:{0}",
 		HexDumper.toHexString(channelRefId.toByteArray()));
 	}
 
@@ -957,28 +973,34 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Adds a channel event for the specified channel to its cached
-     * event queue.
+     * Caches the channel event with the specified {@code eventType}, {@code
+     * channelRefId}, {@code sessionRefId}, and {@code eventTimestamp}.  The
+     * event will remain cached until its corresponding event queue reaches
+     * the specified {@code expirationTimestamp}. <p>
+     *
+     * Note: this method removes any expired events (those with an {@code
+     * expirationTimestamp} less than the specified {@code eventTimestamp}
+     * from the specified channel's queue of cached events.
      *
      * @param	eventType an event type
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID, or {@code null}
      * @param	eventTimestamp the event's timestamp
-     * @param	eventQueueTimestamp the event queue's timestamp
+     * @param	expirationTimestamp the event queue's timestamp
      */
     void cacheEvent(ChannelEventType eventType,
 		    BigInteger channelRefId,
 		    BigInteger sessionRefId,
 		    long eventTimestamp,
-		    long eventQueueTimestamp)
+		    long expirationTimestamp)
     {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
 		Level.FINEST, "CACHE eventType:{0}, channelRefId:{1}, " +
-		"sessionRefId:{2}, eventTimestamp:{3}, eventQueueTimestamp:{4}",
+		"sessionRefId:{2}, eventTimestamp:{3}, expirationTimestamp:{4}",
 		eventType, HexDumper.toHexString(channelRefId.toByteArray()),
 		HexDumper.toHexString(sessionRefId.toByteArray()),
-		eventTimestamp, eventQueueTimestamp);
+		eventTimestamp, expirationTimestamp);
 	}
 	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
 	if (queue == null) {
@@ -990,16 +1012,16 @@ public final class ChannelServiceImpl
 	    }
 	}
 	synchronized (queue) {
-	    // remove events with timestamp <= eventTimestamp.
+	    // remove events with expirationTimestamp <= eventTimestamp.
 	    removeExpiredChannelEvents(queue, eventTimestamp);
 	    // cache event.
 	    queue.offer(
 		new ChannelEventInfo(eventType, sessionRefId,
 				     eventTimestamp,
-				     eventQueueTimestamp));
+				     expirationTimestamp));
 	}
     }
-
+    
     /**
      * Returns {@code true} if the session with the specified {@code
      * sessionRefId} is a member of the channel with the specified {@code
@@ -1013,9 +1035,13 @@ public final class ChannelServiceImpl
      *
      * In order to determine channel membership, this method considers the
      * initial known membership status, {@code isChannelMember}, and then
-     * checks the cached event queue for the specified channel for
-     * join/leave requests for the specified session with timestamps less
-     * than or equal to the specified timestamp. <p>
+     * checks the specified channel's queue of cached events for join/leave
+     * requests for the specified session with timestamps less than or equal
+     * to the specified timestamp. <p>
+     *
+     * Note: this method removes any expired events (those with an {@code
+     * expirationTimestamp} less than the specified {@code eventTimestamp}
+     * from the specified channel's queue of cached events.
      *
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID
@@ -1101,8 +1127,8 @@ public final class ChannelServiceImpl
 
     /**
      * Removes from the specified channel event {@code queue}, each cached
-     * channel event with a timestamp less than or equal to the specified
-     * {@code timestamp}.
+     * channel event with an {@code expirationTimestamp} less than or equal
+     * to the specified {@code timestamp}.
      */
     private void removeExpiredChannelEvents(
 	Queue<ChannelEventInfo> queue, long timestamp)
@@ -1111,19 +1137,19 @@ public final class ChannelServiceImpl
 	
 	while (!queue.isEmpty()) {
 	    ChannelEventInfo info = queue.peek();
-	    if (info.eventQueueTimestamp > timestamp) {
+	    if (info.expirationTimestamp > timestamp) {
 		return;
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
 		    "REMOVE eventType:{0}, sessionRefId:{1}, " +
-		    "eventTimestamp:{2}, eventQueueTimestamp:{3}",
+		    "eventTimestamp:{2}, expirationTimestamp:{3}",
 		    info.eventType,
 		    (info.sessionRefId != null ?
 		     HexDumper.toHexString(info.sessionRefId.toByteArray()) :
 		     "null"), 
-		    info.eventTimestamp, info.eventQueueTimestamp);
+		    info.eventTimestamp, info.expirationTimestamp);
 	    }
 	    queue.poll();
 	}
@@ -1135,7 +1161,7 @@ public final class ChannelServiceImpl
      * nodeIds} and returns an unmodifiable set containing the channel
      * membership. 
      *
-     * @returns	an unmodifiable set containing the channel membership
+     * @return	an unmodifiable set containing the channel membership
      */
     Set<BigInteger> collectChannelMembership(
 	Transaction txn, BigInteger channelRefId, Set<Long> nodeIds)
@@ -2081,17 +2107,17 @@ public final class ChannelServiceImpl
 	final ChannelEventType eventType;
 	final BigInteger sessionRefId;
 	final long eventTimestamp;
-	final long eventQueueTimestamp;
+	final long expirationTimestamp;
 	
 	ChannelEventInfo(ChannelEventType eventType,
 			 BigInteger sessionRefId,
 			 long eventTimestamp,
-			 long eventQueueTimestamp)
+			 long expirationTimestamp)
 	{
 	    this.eventType = eventType;
 	    this.sessionRefId = sessionRefId;
 	    this.eventTimestamp = eventTimestamp;
-	    this.eventQueueTimestamp = eventQueueTimestamp;
+	    this.expirationTimestamp = expirationTimestamp;
 	}
     }
 }
