@@ -34,10 +34,12 @@ import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
 /**
- *
+ * Test of single node performance of label propagation.
+ * This is useful for modifying parameters before integrating
+ * into the distributed version of the algorithm.
  *
  */
-//@RunWith(FilteredNameRunner.class)
+
 @IntegrationTest
 @RunWith(ParameterizedFilteredNameRunner.class)
 public class TestLPAPerf {
@@ -47,22 +49,17 @@ public class TestLPAPerf {
 
     // Number of threads, set with data below for each run
     private int numThreads;
-    private double nodePref;
 
     private static LabelPropagationServer lpaServer;
 
     @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(new Object[][]
-            {{1, 0.00}, {2, 0.00}, {4, 0.00}, {8, 0.00}, {16, 0.00},
-             {1, 0.1}, {2, 0.1}, {4, 0.1}, {8, 0.1}, {16, 0.1},
-             {1, 0.2}, {2, 0.2}, {4, 0.2}, {8, 0.2}, {16, 0.2},
-             {1, -0.1}, {2, -0.1}, {4, -0.1}, {8, -0.1}, {16, -0.1}});
+            {{1}, {2}, {4}, {8}, {16}});
     }
 
-    public TestLPAPerf(int numThreads, double nodePref) {
+    public TestLPAPerf(int numThreads) {
         this.numThreads = numThreads;
-        this.nodePref = nodePref;
     }
 
     @BeforeClass
@@ -84,7 +81,7 @@ public class TestLPAPerf {
                                 "localhost",
                                 LabelPropagationServer.DEFAULT_SERVER_PORT,
                                 false,
-                                numThreads, nodePref);
+                                numThreads);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.singleNodeFindCommunities();
@@ -102,7 +99,7 @@ public class TestLPAPerf {
             new LabelPropagation(builder, node,
                                  "localhost",
                                  LabelPropagationServer.DEFAULT_SERVER_PORT,
-                                 true, numThreads, nodePref);
+                                 true, numThreads);
 
         long avgTime = 0;
         int avgIter = 0;
@@ -124,12 +121,12 @@ public class TestLPAPerf {
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
         }
-        System.out.printf("XXX (%d runs, %d threads, %.4f): " +
+        System.out.printf("XXX (%d runs, %d threads): " +
                           "avg time : %4.2f ms, " +
                           " time range [%d - %d ms] " +
                           " avg iters : %4.2f, avg modularity: %.4f, " +
                           " modularity range [%.4f - %.4f] %n",
-                          RUNS, numThreads, nodePref,
+                          RUNS, numThreads,
                           avgTime/(double) RUNS,
                           minTime, maxTime,
                           avgIter/(double) RUNS,

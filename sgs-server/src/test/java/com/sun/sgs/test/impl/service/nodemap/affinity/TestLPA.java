@@ -189,13 +189,13 @@ public class TestLPA {
         // Create three clients.
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE2, localHost, serverPort, true, 1);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1);
         Collection<AffinityGroup> groups = server.findAffinityGroups();
     }
 
@@ -204,13 +204,13 @@ public class TestLPA {
         // Create three clients.
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE2, localHost, serverPort, true, 1);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1);
         Collection<AffinityGroup> groups = server.findAffinityGroups();
         groups = server.findAffinityGroups();
     }
@@ -219,7 +219,7 @@ public class TestLPA {
     public void testServerShutdown() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
         server.shutdown();
         // Expect that the node won't be able to reach the server
         lp1.prepareAlgorithm(1);
@@ -239,7 +239,7 @@ public class TestLPA {
     public void testAffinityGroupsTwice() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
         lp1.prepareAlgorithm(1);
         Collection<AffinityGroup> groups1 = lp1.affinityGroups(1, true);
         Collection<AffinityGroup> groups2 = lp1.affinityGroups(1, true);
@@ -268,7 +268,7 @@ public class TestLPA {
         try {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, port, true, 1);
         lp1.prepareAlgorithm(1);
         lp1.prepareAlgorithm(1);
         assertEquals(1, testServer.readyToBeginCount());
@@ -290,7 +290,7 @@ public class TestLPA {
 
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, port, true, 1);
         lp1.prepareAlgorithm(1);
         lp1.startIteration(1);
         lp1.startIteration(1);
@@ -302,7 +302,7 @@ public class TestLPA {
     public void testAffinityGroupsRunMismatch() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
         lp1.prepareAlgorithm(1);
         Collection<AffinityGroup> groups1 = lp1.affinityGroups(2, false);
     }
@@ -321,7 +321,7 @@ public class TestLPA {
 
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, port, true, 1);
         lp1.prepareAlgorithm(1);
         lp1.startIteration(1);
         lp1.startIteration(2);
@@ -342,13 +342,13 @@ public class TestLPA {
         TestLPAServer testServer = new TestLPAServer(props);
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, port, true, 1, 0);
+                    PartialToyBuilder.NODE1, localHost, port, true, 1);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, localHost, port, true, 1, 0);
+                    PartialToyBuilder.NODE2, localHost, port, true, 1);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, localHost, port, true, 1, 0);
+                    PartialToyBuilder.NODE3, localHost, port, true, 1);
 
         long run = 1;
         lp1.prepareAlgorithm(run);
@@ -467,8 +467,7 @@ public class TestLPA {
         Identity id2 = new DummyIdentity("2");
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1, 0);
-        lp1.initializeLPARun();
+                    PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
 
         Set<Object> objIds = new HashSet<Object>();
         objIds.add("obj1");
@@ -503,17 +502,17 @@ public class TestLPA {
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE1),
                     DistributedZachBuilder.NODE1, localHost, serverPort,
-                        true, 1, 0);
+                        true, 1);
         LabelPropagation lp2 =
-            new LabelPropagation(new DistributedZachBuilder(
-                DistributedZachBuilder.NODE2),
+            new LabelPropagation(
+                new DistributedZachBuilder(DistributedZachBuilder.NODE2),
                     DistributedZachBuilder.NODE2, localHost, serverPort,
-                        true, 1, 0);
+                        true, 1);
         LabelPropagation lp3 =
-            new LabelPropagation(new DistributedZachBuilder(
-                DistributedZachBuilder.NODE3),
+            new LabelPropagation(
+                new DistributedZachBuilder(DistributedZachBuilder.NODE3),
                     DistributedZachBuilder.NODE3, localHost, serverPort,
-                        true, 1, 0);
+                        true, 1);
 
         double avgMod  = 0.0;
         double maxMod = 0.0;

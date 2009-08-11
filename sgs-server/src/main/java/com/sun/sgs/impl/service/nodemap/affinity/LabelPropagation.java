@@ -87,14 +87,6 @@ public class LabelPropagation implements LPAClient {
     // The number of threads this algorithm should use.
     private final int numThreads;
 
-    // The vertex preference factor.  Zero means no vertex preference, a small
-    // positive number means a slight preference to nodes with higher degrees,
-    // and a small negative number means a slight preference to nodes with
-    // lower degrees.
-    // See Towards Real-Time Community Detection in Large Networks, 2009,
-    // Leung, Hui, Lio, Crowcroft.
-    private final double nodePref;
-
     // If true, gather statistics for each run.
     private final boolean gatherStats;
     // Statistics for the last run, only if gatherStats is true.
@@ -164,7 +156,6 @@ public class LabelPropagation implements LPAClient {
      * @param numThreads number of threads, for TESTING.
      *      If 1, use the sequential asynchronous version.
      *      If >1, use the parallel version, with that number of threads.
-     * @param nodePref vertex preference factor
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
@@ -173,7 +164,7 @@ public class LabelPropagation implements LPAClient {
     public LabelPropagation(GraphBuilder builder, long nodeId,
                             String host, int port,
                             boolean gatherStats,
-                            int numThreads, double nodePref)
+                            int numThreads)
         throws Exception
     {
         if (numThreads < 1) {
@@ -188,7 +179,6 @@ public class LabelPropagation implements LPAClient {
         } else {
             executor = null;
         }
-        this.nodePref = nodePref;
 
         // Look up our server
         Registry registry = LocateRegistry.getRegistry(host, port);
@@ -824,9 +814,8 @@ public class LabelPropagation implements LPAClient {
 
     /**
      * Initialize ourselves for a run of the algorithm.
-     * This is public for testing.
      */
-    public synchronized void initializeLPARun() {
+    private synchronized void initializeLPARun() {
         if (vertices != null) {
             // Someone beat us to it
             return;
@@ -958,11 +947,6 @@ public class LabelPropagation implements LPAClient {
                 if (logger.isLoggable(Level.FINEST)) {
                     logSB.append(neighbor + "(" + edge.getWeight() + ") ");
                 }
-                // Using vertex preference alone causes the single threaded
-                // version to drop quite a bit for Zachary and a preference of
-                // 0.1 or 0.2, and nice modularity boost at -0.1
-//                oldWeight +=
-//                    Math.pow(graph.degree(neighbor), nodePref) * edgew;
                 value += edge.getWeight();
                 labelMap.put(label, value);
             }
