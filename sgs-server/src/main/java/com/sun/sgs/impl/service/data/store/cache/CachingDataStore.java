@@ -615,8 +615,9 @@ public class CachingDataStore extends AbstractDataStore
 		if (entry == null) {
 		    entry = context.noteFetchingObject(oid, forUpdate);
 		    scheduleFetch(
-			forUpdate ? new GetObjectRunnable(context, oid)
-			: new GetObjectForUpdateRunnable(context, oid));
+			forUpdate
+			? new GetObjectForUpdateRunnable(context, oid)
+			: new GetObjectRunnable(context, oid));
 		}
 		if (!forUpdate) {
 		    if (!entry.awaitReadable(lock, stop)) {
@@ -1068,6 +1069,8 @@ public class CachingDataStore extends AbstractDataStore
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
+	    BindingKey entryPreviousKey;
+	    boolean entryPreviousKeyUnbound;
 	    Object lock = cache.getBindingLock(
 		(entry != null) ? entry.key : BindingKey.LAST);
 	    synchronized (lock) {
@@ -1102,6 +1105,8 @@ public class CachingDataStore extends AbstractDataStore
 		     * binding
 		     */
 		    entry.setPendingPrevious();
+		    entryPreviousKey = entry.getPreviousKey();
+		    entryPreviousKeyUnbound = entry.getPreviousKeyUnbound();
 		} else {
 		    /* Need to get information about name and try again */
 		    setBindingInternalUnknown(context, lock, entry, nameKey);
@@ -1113,10 +1118,14 @@ public class CachingDataStore extends AbstractDataStore
 		BindingCacheEntry nameEntry =
 		    context.noteCachedBinding(nameKey, -1, true);
 		context.noteModifiedBinding(nameEntry, oid);
+		nameEntry.updatePreviousKey(
+		    entryPreviousKey, entryPreviousKeyUnbound, true);
 	    }
 	    /* Mark the next entry as not pending */
 	    synchronized (lock) {
-		cache.getBindingEntry(entry.key).setNotPendingPrevious(lock);
+		entry = cache.getBindingEntry(entry.key);
+		entry.setNotPendingPrevious(lock);
+		entry.updatePreviousKeyBound(nameKey);
 	    }
 	    /* Name was unbound */
 	    return new BindingValue(-1, entry.key.getNameAllowLast());
@@ -1465,7 +1474,7 @@ public class CachingDataStore extends AbstractDataStore
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    Object lock = cache.getBindingLock(
-		entry != null ? entry.key : BindingKey.LAST);
+		(entry != null) ? entry.key : BindingKey.LAST);
 	    boolean nameWritable;
 	    synchronized (lock) {
 		if (entry == null) {
@@ -1676,7 +1685,11 @@ public class CachingDataStore extends AbstractDataStore
 		    }
 		    if (results.found && !entry.getWritable()) {
 			/* Upgraded to write access for the next key */
-			entry.setUpgradedImmediate(lock);
+			if (entry.getUpgrading()) {
+			    entry.setUpgraded(lock);
+			} else {
+			    entry.setUpgradedImmediate(lock);
+			}
 		    }
 		} else if (entry.getReading()) {
 		    /* Remove temporary last entry that was not used */
@@ -1724,10 +1737,15 @@ public class CachingDataStore extends AbstractDataStore
     {
 	long stop = context.getStopTime();
 	BindingCacheEntry entry = cache.getHigherBindingEntry(nameKey);
-	BindingKey nextKey = entry.key;
+	BindingKey nextKey = (entry != null) ? entry.key : BindingKey.LAST;
 	Object lock = cache.getBindingLock(nextKey);
 	synchronized (lock) {
-	    if (nameWritable &&
+	    boolean callServer = false;
+	    if (entry == null) {
+		/* No next entry -- create it */
+		entry = context.noteLastBinding(false);
+		callServer = true;
+	    } else if (nameWritable &&
 		entry.getIsNextEntry(nameKey) &&
 		entry.getWritable())
 	    {
@@ -1738,6 +1756,9 @@ public class CachingDataStore extends AbstractDataStore
 		/* Don't have the next entry -- try again */
 		return null;
 	    } else {
+		callServer = true;
+	    }
+	    if (callServer) {
 		/* Make request to server */
 		if (!nameWritable) {
 		    if (nextKey == BindingKey.LAST && entry.getReading()) {
@@ -1769,7 +1790,7 @@ public class CachingDataStore extends AbstractDataStore
 	    entry = cache.getBindingEntry(nextKey);
 	    if (previousKey == null) {
 		entry.updatePreviousKeyUnbound(nameKey);
-	    } else if (previousKeyUnbound) {
+	    } else {
 		entry.updatePreviousKey(previousKey, previousKeyUnbound, true);
 	    }
 	    entry.setNotPendingPrevious(lock);
@@ -2007,29 +2028,41 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     protected long nextObjectIdInternal(Transaction txn, long oid) {
 	TxnContext context = contextMap.join(txn);
-	NextObjectResults results;
-	try {
-	    results = server.nextObjectId(nodeId, oid);
-	} catch (IOException e) {
-	    throw new NetworkException(e.getMessage(), e);
-	}
-	if (results == null) {
-	    return -1;
-	}
-	Object lock = cache.getObjectLock(results.oid);
-	synchronized (lock) {
-	    ObjectCacheEntry entry = cache.getObjectEntry(results.oid);
-	    if (entry == null) {
-		/* No entry -- create it */
-		context.noteCachedObject(results.oid, results.data);
-	    } else {
-		context.noteAccess(entry);
+	long nextNew = context.nextNewObjectId(oid);
+	long last = oid;
+	while (true) {
+	    NextObjectResults results;
+	    try {
+		results = server.nextObjectId(nodeId, last);
+	    } catch (IOException e) {
+		throw new NetworkException(e.getMessage(), e);
+	    }
+	    if (results != null && results.callbackEvict) {
+		scheduleTask(new EvictObjectTask(results.oid));
+	    }
+	    if (results == null || (nextNew != -1 && results.oid > nextNew)) {
+		/*
+		 * Either no next on the server or the next is greater than the
+		 * one allocated in this transaction
+		 */
+		return nextNew;
+	    }
+	    synchronized (cache.getObjectLock(results.oid)) {
+		ObjectCacheEntry entry = cache.getObjectEntry(results.oid);
+		if (entry == null) {
+		    /* No entry -- create it */
+		    context.noteCachedObject(results.oid, results.data);
+		    return results.oid;
+		} else if (entry.getValue() != null) {
+		    /* Object was not removed */
+		    context.noteAccess(entry);
+		    return results.oid;
+		} else {
+		    /* Object was removed -- try again */
+		    last = results.oid;
+		}
 	    }
 	}
-	if (results.callbackEvict) {
-	    scheduleTask(new EvictObjectTask(results.oid));
-	}
-	return results.oid;
     }
 
     /* -- Implement AbstractDataStore's TransactionParticipant methods -- */

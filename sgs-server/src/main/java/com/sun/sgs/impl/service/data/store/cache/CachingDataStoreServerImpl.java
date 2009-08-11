@@ -580,7 +580,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     public NextObjectResults nextObjectId(long nodeId, long oid) {
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    checkOid(oid);
+	    if (oid < -1) {
+		throw new IllegalArgumentException(
+		    "Object ID must not be less than -1");
+	    }
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    boolean txnDone = false;
 	    NextObjectResults result;
@@ -591,7 +594,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			: cursor.findNext(encodeLong(oid));
 		    long nextOid = !found ? -1 : decodeLong(cursor.getKey());
 		    if (oid != -1 && oid == nextOid) {
-			found = cursor.findNext(encodeLong(oid));
+			found = cursor.findNext();
 			nextOid = !found ? -1 : decodeLong(cursor.getKey());
 		    }
 		    result = !found ? null

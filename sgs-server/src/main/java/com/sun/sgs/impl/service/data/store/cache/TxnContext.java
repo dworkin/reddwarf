@@ -150,7 +150,9 @@ class TxnContext {
 		synchronized (lock) {
 		    ObjectCacheEntry entry = cache.getObjectEntry(saved.key);
 		    entry.setValue(saved.restoreValue);
-		    entry.setNotModified();
+		    if (entry.getModified()) {
+			entry.setNotModified();
+		    }
 		    if (saved.restoreValue == null) {
 			entry.setEvictedImmediate(lock);
 			cache.removeObjectEntry(saved.key);
@@ -173,9 +175,9 @@ class TxnContext {
 		    }
 		    if (entry != null) {
 			entry.setValue(saved.restoreValue);
-			//if (entry.getModified()) {
+			if (entry.getModified()) {
 			    entry.setNotModified();
-			    //}
+			}
 			entry.setPreviousKey(saved.restorePreviousKey,
 					     saved.restorePreviousKeyUnbound);
 			if (saved.restoreValue == -1) {
@@ -206,6 +208,39 @@ class TxnContext {
      */
     long getContextId() {
 	return contextId;
+    }
+
+    /**
+     * Returns the next object ID for this transaction of a newly created
+     * object, or {@code -1} if none is found.  Does not return IDs for removed
+     * objects.  Specifying {@code -1} requests the first ID.
+     *
+     * @param	oid the identifier of the object to search after, or
+     *		{@code -1} to request the first object
+     * @return	the identifier of the next newly created object following the
+     *		object with identifier {@code oid}, or {@code -1} if there are
+     *		no more objects
+     */
+    long nextNewObjectId(long oid) {
+	Cache cache = store.getCache();
+	long result = -1;
+	if (modifiedObjects != null) {
+	    for (SavedObjectValue saved : modifiedObjects) {
+		if (saved.key > oid &&
+		    (result == -1 || saved.key < result) &&
+		    saved.restoreValue == null)
+		{
+		    synchronized (cache.getObjectLock(saved.key)) {
+			ObjectCacheEntry entry =
+			    cache.getObjectEntry(saved.key);
+			if (entry.getValue() != null) {
+			    result = saved.key;
+			}
+		    }
+		}
+	    }
+	}
+	return result;
     }
 
     /* -- Entry methods -- */
@@ -378,8 +413,8 @@ class TxnContext {
 		}
 		SavedBindingValue saved = new SavedBindingValue(entry);
 		modifiedBindings.put(entry.key, saved);
-		entry.setCachedDirty();
 	    }
+	    entry.setCachedDirty();
 	    entry.setValue(oid);
 	    entry.noteAccess(contextId);
 	    if (oid == -1) {

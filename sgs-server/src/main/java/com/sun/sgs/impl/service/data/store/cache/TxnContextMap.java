@@ -105,8 +105,9 @@ class TxnContextMap {
      *		transaction
      */
     void prepareAndCommit(Transaction txn) {
+	TxnContext context = getContextJoined(txn, true);
 	try {
-	    getContextJoined(txn, true).prepareAndCommit();
+	    context.prepareAndCommit();
 	} finally {
 	    currentContext.set(null);
 	    store.txnFinished();
@@ -121,8 +122,9 @@ class TxnContextMap {
      *		transaction
      */
     void commit(Transaction txn) {
+	TxnContext context = getContextJoined(txn, false);
 	try {
-	    getContextJoined(txn, false).commit();
+	    context.commit();
 	} finally {
 	    currentContext.set(null);
 	    store.txnFinished();
@@ -137,8 +139,9 @@ class TxnContextMap {
      *		transaction
      */
     void abort(Transaction txn) {
+	TxnContext context = getContextJoined(txn, false);
 	try {
-	    getContextJoined(txn, false).abort();
+	    context.abort();
 	} finally {
 	    currentContext.set(null);
 	    store.txnFinished();
@@ -192,13 +195,13 @@ class TxnContextMap {
     private TxnContext getContextJoined(
 	Transaction txn, boolean checkTimeout)
     {
-	if (checkTimeout) {
-	    txn.checkTimeout();
-	}
 	TxnContext context = getContext(txn);
 	if (context == null) {
 	    throw new IllegalStateException(
 		"Transaction is not active: " + txn);
+	}
+	if (checkTimeout) {
+	    txn.checkTimeout();
 	}
 	return context;
     }
