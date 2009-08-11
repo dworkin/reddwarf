@@ -238,6 +238,14 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     /** {@inheritDoc} */
     public void shutdown() {
+        for (LPAClient client : clientProxyMap.values()) {
+            try {
+                client.shutdown();
+            } catch (IOException e) {
+                // JANE retry?  But it's OK if we cannot reach the client,
+                // as the entire system might be coming down.
+            }
+        }
         executor.shutdownNow();
         exporter.unexport();
     }

@@ -65,7 +65,7 @@ public class LabelPropagation implements LPAClient {
     // The producer of our graphs.
     private final GraphBuilder builder;
 
-    // The local vertex ident
+    // The local node id
     private final long localNodeId;
 
     // The server : our master
@@ -569,6 +569,14 @@ public class LabelPropagation implements LPAClient {
         }
         return retMap;
     }
+    
+    /** {@inheritDoc} */
+    public void shutdown() {
+        clientExporter.unexport();
+        if (executor != null) {
+            executor.shutdown();
+        }
+    }
 
     /**
      * Exchanges information with other nodes in the system to fill in the
@@ -803,16 +811,6 @@ public class LabelPropagation implements LPAClient {
     }
 
     /**
-     * Shut down any resources used by this algorithm.
-     */
-    public void shutdown() {
-        clientExporter.unexport();
-        if (executor != null) {
-            executor.shutdown();
-        }
-    }
-
-    /**
      * Initialize ourselves for a run of the algorithm.
      */
     private synchronized void initializeLPARun() {
@@ -1002,7 +1000,7 @@ public class LabelPropagation implements LPAClient {
     private LPAClient getProxy(long nodeId) throws IOException {
         LPAClient proxy = nodeProxies.get(nodeId);
         if (proxy == null) {
-            // Ask the server for it. Retries?
+            // Ask the server for it. JANE Retries?
             proxy = server.getLPAClientProxy(nodeId);
             if (proxy != null) {
                 nodeProxies.put(nodeId, proxy);

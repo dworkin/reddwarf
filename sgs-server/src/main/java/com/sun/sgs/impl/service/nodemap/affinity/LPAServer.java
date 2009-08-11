@@ -53,7 +53,8 @@ public interface LPAServer extends Remote {
         throws IOException;
 
     /**
-     * Registers the given proxies for the node.
+     * Registers the given proxies for the node. If a client has already
+     * been registered for the node, it is replaced.
      *
      * @param nodeId the node the proxies represent
      * @param client the client proxy, which this server and other nodes

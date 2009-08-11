@@ -104,4 +104,11 @@ public interface LPAClient extends Remote {
     Map<Object, Map<Integer, Long>> getRemoteLabels(
                 Collection<Object> objIds)
             throws IOException;
+
+    /**
+     * Indicates that the affinity group finding system is shutting down,
+     * and all local resources should be cleaned up.
+     * @throws IOException if there is a communication problem
+     */
+    void shutdown() throws IOException;
 }

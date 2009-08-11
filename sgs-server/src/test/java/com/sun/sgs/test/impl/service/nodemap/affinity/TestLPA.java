@@ -30,6 +30,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -50,6 +51,7 @@ import org.junit.runner.RunWith;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -225,6 +227,59 @@ public class TestLPA {
         lp1.prepareAlgorithm(1);
     }
 
+    @Test
+    public void testRegister() throws Exception {
+        final int nodeId = 10;
+        TestLPAClient client1 = new TestLPAClient(server, nodeId, 10, 3,
+               new HashSet<AffinityGroup>());
+        Exporter<TestLPAClientIface> exporter =
+                new Exporter<TestLPAClientIface>(TestLPAClientIface.class);
+        exporter.export(client1, 0);
+        try {
+            server.register(nodeId, exporter.getProxy());
+
+            TestLPAClientIface proxy =
+                    (TestLPAClientIface) server.getLPAClientProxy(nodeId);
+            assertFalse(proxy.finishedExchangeInfo());
+            assertFalse(client1.finishedExchangeInfo);
+            proxy.prepareAlgorithm(1);
+            assertTrue(proxy.finishedExchangeInfo());
+            assertTrue(client1.finishedExchangeInfo);
+        } finally {
+            exporter.unexport();
+        }
+    }
+
+    @Test
+    public void testRegisterTwice() throws Exception {
+        final int nodeId = 10;
+        TestLPAClient client1 = new TestLPAClient(server, nodeId, 10, 3,
+               new HashSet<AffinityGroup>());
+        Exporter<TestLPAClientIface> exporter =
+                new Exporter<TestLPAClientIface>(TestLPAClientIface.class);
+        exporter.export(client1, 0);
+        try {
+            server.register(nodeId, exporter.getProxy());
+            // Should be harmless to register a second time
+            server.register(nodeId, exporter.getProxy());
+            TestLPAClientIface proxy =
+                    (TestLPAClientIface) server.getLPAClientProxy(nodeId);
+            assertFalse(proxy.finishedExchangeInfo());
+            assertFalse(client1.finishedExchangeInfo);
+            proxy.prepareAlgorithm(1);
+            assertTrue(proxy.finishedExchangeInfo());
+            assertTrue(client1.finishedExchangeInfo);
+        } finally {
+            exporter.unexport();
+        }
+    }
+
+    @Test
+    public void testGetUnknownClient() throws Exception {
+        LPAClient proxy = server.getLPAClientProxy(222);
+        assertNull(proxy);
+    }
+    
     @Test
     public void testServerShutdownTwice() throws Exception {
         // Should be no problem to call shutdown twice
@@ -535,7 +590,10 @@ public class TestLPA {
           minMod, maxMod);
     }
 
-    private class TestLPAClient implements LPAClient {
+    public interface TestLPAClientIface extends LPAClient {
+        boolean finishedExchangeInfo() throws IOException;
+    }
+    private class TestLPAClient implements TestLPAClientIface {
         private final long sleepTime;
         private final long nodeId;
         private final int convergeCount;
@@ -559,6 +617,9 @@ public class TestLPA {
             this.result = result;
         }
 
+        public boolean finishedExchangeInfo() {
+            return finishedExchangeInfo;
+        }
         /** {@inheritDoc} */
         public Collection<AffinityGroup> affinityGroups(long runNumber,
                                                         boolean done)
@@ -619,6 +680,11 @@ public class TestLPA {
                 Collection<Object> objIds) throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
+        }
+        
+        /** {@inheritDoc} */
+        public void shutdown() throws IOException {
+            return;
         }
     }
 
