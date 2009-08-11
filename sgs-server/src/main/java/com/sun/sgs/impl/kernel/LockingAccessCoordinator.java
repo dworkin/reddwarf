@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
 import static java.util.logging.Level.CONFIG;
 import static java.util.logging.Level.FINER;
 import java.util.logging.Logger;

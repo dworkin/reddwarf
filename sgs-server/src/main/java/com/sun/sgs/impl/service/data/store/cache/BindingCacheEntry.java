@@ -27,7 +27,7 @@ import com.sun.sgs.service.TransactionInterruptedException;
  * accessed without holding the associated lock.  For all other fields and
  * methods, the lock should be held.
  */
-class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
+final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
      * The lowest-valued previous key known such that names between that key

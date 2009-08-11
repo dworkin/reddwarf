@@ -47,7 +47,7 @@ class Cache {
     private final Object[] locks;
 
     /** The object to notify when the cache becomes full. */
-    private final Object cacheFullNotify;
+    private final FullNotifier cacheFullNotify;
 
     /** Maps object IDs to object cache entries. */
     private final Map<Long, ObjectCacheEntry> objectMap =
@@ -75,7 +75,7 @@ class Cache {
     Cache(CachingDataStore store,
 	  int cacheSize,
 	  int numLocks,
-	  Object cacheFullNotify)
+	  FullNotifier cacheFullNotify)
     {
 	this.store = store;
 	this.cacheSize = cacheSize;
@@ -86,6 +86,13 @@ class Cache {
 	    locks[i] = new Object();
 	}
 	this.cacheFullNotify = cacheFullNotify;
+    }
+
+    /** An interface for receiving notifications that the cache is full. */
+    public interface FullNotifier {
+
+	/** Provides notification that the cache is full. */
+	void cacheIsFull();
     }
 
     /**
@@ -219,9 +226,7 @@ class Cache {
      */
     void reserve(int count) {
 	if (!tryReserve(count)) {
-	    synchronized (cacheFullNotify) {
-		cacheFullNotify.notifyAll();
-	    }
+	    cacheFullNotify.cacheIsFull();
 	    while (!store.getShutdownRequested()) {
 		try {
 		    available.acquire(count);

@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
 import java.util.logging.Logger;
@@ -36,9 +37,9 @@ import java.util.logging.Logger;
  * to log information at the following logging levels: <p>
  *
  * <ul>
- * <li> {@link #FINER FINER} - Releasing locks; requesting, waiting for, and
- *	returning from lock requests
- * <li> {@link #FINEST FINEST} - Notifying new lock owners, results of
+ * <li> {@link Level#FINER FINER} - Releasing locks; requesting, waiting for,
+ *	and returning from lock requests
+ * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
  *	requesting locks before waiting, releasing locks, results of attempting
  *	to assign locks to waiters
  * </ul> <p>

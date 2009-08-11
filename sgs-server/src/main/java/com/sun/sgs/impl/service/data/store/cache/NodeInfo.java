@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.util.lock.LockManager;
 import com.sun.sgs.impl.util.lock.LockRequest;
+import com.sun.sgs.impl.util.lock.Locker;
 import com.sun.sgs.impl.util.lock.MultiLockManager;
 import com.sun.sgs.impl.util.lock.MultiLocker;
 import java.util.HashSet;

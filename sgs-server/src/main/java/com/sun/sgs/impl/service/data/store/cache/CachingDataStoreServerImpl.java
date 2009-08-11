@@ -64,6 +64,7 @@ import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.service.store.db.DbCursor;
 import com.sun.sgs.service.store.db.DbDatabase;
 import com.sun.sgs.service.store.db.DbEnvironment;
@@ -417,7 +418,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public RegisterNodeResult registerNode(CallbackServer callbackServer) {
@@ -445,7 +445,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public long newObjectIds(int numIds) {
@@ -472,7 +471,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public GetObjectResults getObject(long nodeId, long oid) {
@@ -502,7 +500,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public GetObjectForUpdateResults getObjectForUpdate(
@@ -535,7 +532,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public boolean upgradeObject(long nodeId, long oid)
@@ -574,7 +570,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public NextObjectResults nextObjectId(long nodeId, long oid) {
@@ -623,7 +618,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public GetBindingResults getBinding(long nodeId, String name) {
@@ -666,7 +660,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public GetBindingForUpdateResults getBindingForUpdate(
@@ -716,7 +709,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public GetBindingForRemoveResults getBindingForRemove(
@@ -778,7 +770,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public NextBoundNameResults nextBoundName(long nodeId, String name) {
@@ -819,11 +810,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	}
     }
 
-    /**
-     * {@inheritDoc} 
-     *
-     * @throws	IOException {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public int getClassId(byte[] classInfo) {
 	callStarted();
@@ -839,7 +826,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * {@inheritDoc} 
      *
      * @throws	IllegalArgumentException {@inheritDoc}
-     * @throws	IOException {@inheritDoc}
      */
     @Override
     public byte[] getClassInfo(int classId) {

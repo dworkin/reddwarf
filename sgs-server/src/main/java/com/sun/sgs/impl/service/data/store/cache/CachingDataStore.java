@@ -127,11 +127,11 @@ public class CachingDataStore extends AbstractDataStore
     /** The default eviction reserve size. */
     public static final int DEFAULT_EVICTION_RESERVE_SIZE = 50;
 
+    /* FIXME: Same as bdb and locking access coordinator? */
     /**
      * The property for specifying the number of milliseconds to wait when
      * attempting to obtain a lock.
      */
-    /* FIXME: Same as bdb and locking access coordinator? */
     public static final String LOCK_TIMEOUT_PROPERTY = PKG + ".lock.timeout";
     
     /** The default lock timeout, in milliseconds. */
@@ -249,7 +249,7 @@ public class CachingDataStore extends AbstractDataStore
      * The thread that evicts least recently used entries from the cache as
      * needed.
      */
-    private final Thread evictionThread = new EvictionThread();
+    private final EvictionThread evictionThread = new EvictionThread();
 
     /** The node ID for the local node. */
     private final long nodeId;
@@ -352,9 +352,9 @@ public class CachingDataStore extends AbstractDataStore
     {
 	super(systemRegistry, logger, abortLogger);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	boolean startServer = wrappedProps.getEnumProperty(
-	    StandardProperties.NODE_TYPE, NodeType.class, NodeType.singleNode)
-	    != NodeType.appNode;
+	NodeType nodeType = wrappedProps.getEnumProperty(
+	    StandardProperties.NODE_TYPE, NodeType.class, NodeType.singleNode);
+	boolean startServer = (nodeType != NodeType.appNode);
 	int callbackPort = wrappedProps.getIntProperty(
 	    CALLBACK_PORT_PROPERTY, DEFAULT_CALLBACK_PORT, 0, 65535);
 	int cacheSize = wrappedProps.getIntProperty(
@@ -867,11 +867,9 @@ public class CachingDataStore extends AbstractDataStore
 	     * entry and when we locked it -- try again
 	     */
 	    return false;
-	} else if (!checkEntry.getReadable() && !checkEntry.getReading()) {
-	    /* Entry got decached -- try again */
-	    return false;
 	} else {
-	    return true;
+	    /* Check that entry is readable or being read */
+	    return checkEntry.getReadable() || checkEntry.getReading();
 	}
     }
 
@@ -2473,7 +2471,7 @@ public class CachingDataStore extends AbstractDataStore
     /**
      * Notes that a transaction is being started.
      *
-     * @throw	IllegalStateException if shutdown has been requested
+     * @throws	IllegalStateException if shutdown has been requested
      */
     void txnStarted() {
 	synchronized (shutdownSync) {
@@ -2500,7 +2498,7 @@ public class CachingDataStore extends AbstractDataStore
      * Waits for active transactions to complete, assuming that a shutdown has
      * been requested.
      *
-     * @throw	IllegalStateException if shutdown has not been requested
+     * @throws	IllegalStateException if shutdown has not been requested
      */
     void awaitTxnShutdown() {
 	synchronized (shutdownSync) {
@@ -2519,6 +2517,8 @@ public class CachingDataStore extends AbstractDataStore
 	    case TXNS_COMPLETED:
 	    case COMPLETED:
 		return;
+	    default:
+		throw new AssertionError();
 	    }
 	}
     }
@@ -2596,7 +2596,12 @@ public class CachingDataStore extends AbstractDataStore
      * A {@code Thread} that chooses least recently used entries to evict from
      * the cache as needed to make space for new entries.
      */
-    private class EvictionThread extends Thread {
+    private class EvictionThread extends Thread
+	implements Cache.FullNotifier
+    {
+
+	/** Whether the cache is full. */
+	private boolean cacheIsFull;
 
 	/**
 	 * Whether the evictor has reserved cache entries for use during
@@ -2612,52 +2617,57 @@ public class CachingDataStore extends AbstractDataStore
 	    super("CachingDataStore eviction");
 	}
 
+	/* -- Implement Cache.FullNotifier -- */
+	public synchronized void cacheIsFull() {
+	    cacheIsFull = true;
+	    notifyAll();
+	}
+
+	/* -- Implement Runnable -- */
+
 	@Override
 	public void run() {
+	    /* Set up the initial reserve */
 	    if (cache.tryReserve(evictionReserveSize)) {
 		reserved = true;
 	    }
 	    entryIterator = cache.getEntryIterator(evictionBatchSize);
-	    while (true) {
-		if (getShutdownTxnsCompleted()) {
-		    break;
-		}
+	    while (!getShutdownTxnsCompleted()) {
 		if (reserved) {
-		    if (cache.available() == 0) {
-			/*
-			 * The cache is full -- release the reserve and start
-			 * evicting
-			 */
-			cache.release(evictionReserveSize);
-			reserved = false;
-			tryEvict();
-			continue;
+		    synchronized (this) {
+			if (!cacheIsFull) {
+			    /* Enough space -- wait to get full */
+			    try {
+				wait();
+			    } catch (InterruptedException e) {
+			    }
+			    continue;
+			} else {
+			    cacheIsFull = false;
+			}
 		    }
-		} else if (cache.available() >= 2 * evictionReserveSize) {
-		    /* The cache has plenty of space -- set up the reserve */
-		    if (cache.tryReserve(evictionReserveSize)) {
-			reserved = true;
-		    } else {
-			/* Failed to set up reserve -- try again */
-			continue;
-		    }
-		} else if (cache.available() + pendingEvictions.get() <
+		    /*
+		     * The cache is full -- release the reserve and start
+		     * evicting
+		     */
+		    cache.release(evictionReserveSize);
+		    reserved = false;
+		} else if (cache.available() + pendingEvictions.get() >=
 			   2 * evictionReserveSize)
 		{
+		    /*
+		     * The cache has plenty of space -- try to set up the
+		     * reserve
+		     */
+		    if (cache.tryReserve(evictionReserveSize)) {
+			reserved = true;
+		    }
+		} else {
 		    /*
 		     * Need to initiate more evictions to be on target for
 		     * obtaining two times the reserve size of free entries
 		     */
 		    tryEvict();
-		    continue;
-		}
-		/* Enough space -- wait to get full */
-		try {
-		    synchronized (this) {
-			/* FIXME: How do we know that there is still space? */
-			wait(1000);
-		    }
-		} catch (InterruptedException e) {
 		}
 	    }
 	}
