@@ -1265,26 +1265,26 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    if (event == null) {
 			return;
 		    }
-		}
-		if (event.isProcessing()) {
+		} else if (event.isProcessing()) {
 		    return;
-		} else {
-		    int cost = event.getCost();
-		    if (cost > 0) {
-			dataService.markForUpdate(this);
-			writeBufferAvailable += cost;
-			
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.log(Level.FINEST,
-				       "{0} cleared reservation of " +
-				       "{1,number,#} bytes, leaving " +
-				       "{2,number,#}",
-				       this, cost, writeBufferAvailable);
-			}
+		} 
+
+		int cost = event.getCost();
+		if (cost > 0) {
+		    dataService.markForUpdate(this);
+		    writeBufferAvailable += cost;
+		    
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "{0} cleared reservation of {1,number,#} bytes, " +
+			    "leaving {2,number,#}",
+			    this, cost, writeBufferAvailable);
 		    }
-		    // Mark event as processing.
-		    event.processing();
 		}
+		
+		// Mark event as processing and service event.
+		event.processing();
 		completed = event.serviceEvent(getChannel());
 		if (completed) {
 		    eventQueue.poll();
@@ -1329,8 +1329,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private boolean completed = false;
 
 	/** The ID of the coordinator node on which this event is being
-	 * processed. */
-	long processingOnNodeId = -1;
+	 * processed. -1 indicates that event hasn't ever started
+	 * processing. */
+	protected long processingOnNodeId = -1;
 
 	/** Constructs an instance with the specified {@code timestamp} */
 	ChannelEvent(long timestamp) {

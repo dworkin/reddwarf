@@ -64,7 +64,7 @@ public interface ClientSessionService extends Service {
     SessionProtocol getSessionProtocol(BigInteger sessionRefId);
 
     /**
-     * Returns{@code true} if the session with the specified {@code
+     * Returns {@code true} if the session with the specified {@code
      * sessionRefId} is connected to the local node, and {@code false}
      * otherwise.
      *
