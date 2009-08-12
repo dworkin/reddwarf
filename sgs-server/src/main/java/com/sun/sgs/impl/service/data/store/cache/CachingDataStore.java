@@ -1116,8 +1116,8 @@ public class CachingDataStore extends AbstractDataStore
 		BindingCacheEntry nameEntry =
 		    context.noteCachedBinding(nameKey, -1, true);
 		context.noteModifiedBinding(nameEntry, oid);
-		nameEntry.updatePreviousKey(
-		    entryPreviousKey, entryPreviousKeyUnbound, true);
+  		nameEntry.updatePreviousKeyMaybeUnbound(
+  		    entryPreviousKey, entryPreviousKeyUnbound);
 	    }
 	    /* Mark the next entry as not pending */
 	    synchronized (lock) {
@@ -1664,7 +1664,7 @@ public class CachingDataStore extends AbstractDataStore
 			    serverNextNameKey, results.nextOid, true);
 			usedCacheEntry();
 		    }
-		    entry.updatePreviousKey(nameKey, true, !results.found);
+ 		    entry.updatePreviousKeyKnown(nameKey, results.found);
 		}
 	    }
 	    /* Update cached next name entry */
@@ -1674,7 +1674,7 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.getBindingEntry(cachedNextNameKey);
 		if (compareServer >= 0) {
 		    /* No entries between the name and the cached next entry */
-		    entry.updatePreviousKey(nameKey, true, !results.found);
+ 		    entry.updatePreviousKeyKnown(nameKey, results.found);
 		    context.noteAccess(entry);
 		    if (entry.getReading()) {
 			/* Make temporary last entry permanent */
@@ -1789,7 +1789,8 @@ public class CachingDataStore extends AbstractDataStore
 	    if (previousKey == null) {
 		entry.updatePreviousKeyUnbound(nameKey);
 	    } else {
-		entry.updatePreviousKey(previousKey, previousKeyUnbound, true);
+ 		entry.updatePreviousKeyMaybeUnbound(
+ 		    previousKey, previousKeyUnbound);
 	    }
 	    entry.setNotPendingPrevious(lock);
 	}

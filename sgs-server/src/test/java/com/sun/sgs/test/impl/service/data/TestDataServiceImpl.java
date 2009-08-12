@@ -34,6 +34,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinator.TXN_TIMEOUT_PROPERTY;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -75,7 +77,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
-import static org.junit.Assert.*;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -84,7 +86,7 @@ import org.junit.runners.Parameterized;
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
 @RunWith(ParameterizedFilteredNameRunner.class)
-public class TestDataServiceImpl{
+public class TestDataServiceImpl extends Assert {
 
     @Parameterized.Parameters
     public static Collection data() {
@@ -777,21 +779,17 @@ public class TestDataServiceImpl{
 	testGetBindingTimeout(false);
     }
     private void testGetBindingTimeout(final boolean app) throws Exception {
+	final long timeout = Long.getLong(TXN_TIMEOUT_PROPERTY, 100);
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
                 setBinding(app, service, "dummy", dummy);
         }}, taskOwner);
-
-        Properties properties = getProperties();
-        properties.setProperty("com.sun.sgs.txn.timeout", "100");
-        serverNodeRestart(properties, false);
-
         try {
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
-                        Thread.sleep(200);
+                        Thread.sleep(2 * timeout);
                         getBinding(app, service, "dummy");
                         fail("Expected TransactionTimeoutException");
                     } catch (TransactionTimeoutException e) {

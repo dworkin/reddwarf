@@ -2103,7 +2103,12 @@ public class TestDataStoreImpl extends Assert {
 
     /** Creates a unique directory. */
     private String createDirectory() throws IOException {
-	File dir = File.createTempFile("TestDataStoreImpl", "dbdir");
+	String name = getClass().getName();
+	int dot = name.lastIndexOf('.');
+	if (dot > 0) {
+	    name = name.substring(dot + 1);
+	}
+	File dir = File.createTempFile(name, "dbdir");
 	if (!dir.delete()) {
 	    throw new RuntimeException("Problem deleting file: " + dir);
 	}

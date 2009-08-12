@@ -43,13 +43,12 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
-import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
+import com.sun.sgs.test.impl.service.data.store.TestDataStorePerformance;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
-import java.util.Properties;
 
-/** Test the {@link CachingDataStore} class. */
-public class TestCachingDataStore extends TestDataStoreImpl {
-    
+/** Test the performance of the {@link CachingDataStore} class. */
+public class TestCachingDataStorePerformance extends TestDataStorePerformance {
+
     /**
      * The name of the host running the {@link CachingDataStoreServer}, or
      * {@code null} to create one locally.
@@ -74,7 +73,7 @@ public class TestCachingDataStore extends TestDataStoreImpl {
     private static BasicDataStoreTestEnv staticEnv = null;
 
     /** Creates an instance of this class. */
-    public TestCachingDataStore() {
+    public TestCachingDataStorePerformance() {
 	super(staticEnv == null
 	      ? staticEnv = new BasicDataStoreTestEnv(
 		  System.getProperties(),
@@ -82,10 +81,12 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	      : staticEnv);
     }
 
-    /** Add client and server properties. */
+    /**
+     * Create a DataStoreClient, set any default properties, and start the
+     * server, if needed.
+     */
     @Override
-    protected Properties getProperties() throws Exception {
-	Properties props = super.getProperties();
+    protected DataStore getDataStore() throws Exception {
 	String host = serverHost;
 	int port = serverPort;
 	int queuePort = updateQueuePort;
@@ -105,42 +106,14 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 			  String.valueOf(queuePort));
 	props.setProperty(CALLBACK_PORT_PROPERTY,
 			  String.valueOf(callbackPort));
-	props.setProperty(DIRECTORY_PROPERTY, dbDirectory);
-	return props;
-    }
-
-    /** Create a {@link CachingDataStore}. */
-    @Override
-    protected DataStore createDataStore(Properties props) throws Exception {
+	props.setProperty(DIRECTORY_PROPERTY, directory);
 	txnProxy.setComponent(
 	    WatchdogService.class,
-	    new DummyWatchdogService(props, systemRegistry, txnProxy));
+	    new DummyWatchdogService(props, env.systemRegistry, txnProxy));
 	DataStore store = new DataStoreProfileProducer(
-	    new CachingDataStore(props, systemRegistry, txnProxy),
+	    new CachingDataStore(props, env.systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
-    }
-
-    /* -- Tests -- */
-
-    /* -- Skip tests that involve properties that don't apply -- */
-
-    @Override
-    public void testConstructorNoDirectory() throws Exception {
-	System.err.println("Skipping");
-    }
-    @Override
-    public void testConstructorNonexistentDirectory() throws Exception {
-	System.err.println("Skipping");
-    }
-    @Override
-    public void testConstructorDirectoryIsFile() throws Exception {
-	System.err.println("Skipping");
-
-    }
-    @Override
-    public void testConstructorDirectoryNotWritable() throws Exception {
-	System.err.println("Skipping");
     }
 }

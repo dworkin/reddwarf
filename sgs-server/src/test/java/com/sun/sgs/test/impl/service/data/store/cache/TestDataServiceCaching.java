@@ -21,7 +21,8 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import static com.sun.sgs.impl.kernel.StandardProperties.NODE_TYPE;
-import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import static com.sun.sgs.impl.service.data.
+    DataServiceImpl.DATA_STORE_CLASS_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.CALLBACK_PORT_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
@@ -40,16 +41,22 @@ import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.UPDATE_QUEUE_PORT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.NodeType;
-import com.sun.sgs.service.WatchdogService;
-import com.sun.sgs.service.store.DataStore;
-import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
-import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
-import com.sun.sgs.test.util.DummyProfileCoordinator;
+import com.sun.sgs.test.impl.service.data.TestDataServiceImpl;
+import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.Properties;
+import org.junit.Ignore;
+import org.junit.runner.RunWith;
 
-/** Test the {@link CachingDataStore} class. */
-public class TestCachingDataStore extends TestDataStoreImpl {
-    
+/** Test the {@code DataService} using a caching data store. */
+@SuppressWarnings("hiding")
+@RunWith(ParameterizedFilteredNameRunner.class)
+public class TestDataServiceCaching extends TestDataServiceImpl {
+
+    /** The configuration property for specifying the access coordinator. */
+    private static final String ACCESS_COORDINATOR_PROPERTY =
+	"com.sun.sgs.impl.kernel.access.coordinator";
+
     /**
      * The name of the host running the {@link CachingDataStoreServer}, or
      * {@code null} to create one locally.
@@ -70,19 +77,12 @@ public class TestCachingDataStore extends TestDataStoreImpl {
     private static final int nodeCallbackPort =
 	Integer.getInteger("test.callback.port", DEFAULT_CALLBACK_PORT);
 
-    /** The basic test environment, or {@code null} if not set. */
-    private static BasicDataStoreTestEnv staticEnv = null;
-
-    /** Creates an instance of this class. */
-    public TestCachingDataStore() {
-	super(staticEnv == null
-	      ? staticEnv = new BasicDataStoreTestEnv(
-		  System.getProperties(),
-		  LockingAccessCoordinator.class.getName())
-	      : staticEnv);
+    /** Creates an instance. */
+    public TestDataServiceCaching(boolean durableParticipant) {
+	super(durableParticipant);
     }
 
-    /** Add client and server properties. */
+    /** Adds client and server properties. */
     @Override
     protected Properties getProperties() throws Exception {
 	Properties props = super.getProperties();
@@ -96,7 +96,16 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	    port = 0;
 	    queuePort = 0;
 	    callbackPort = 0;
-	    nodeType = NodeType.coreServerNode.toString();
+            nodeType = NodeType.coreServerNode.toString();
+        }
+	if (port == 0) {
+	    port = SgsTestNode.getNextUniquePort();
+	}
+	if (queuePort == 0) {
+	    queuePort = SgsTestNode.getNextUniquePort();
+	}
+	if (callbackPort == 0) {
+	    callbackPort = SgsTestNode.getNextUniquePort();
 	}
         props.setProperty(NODE_TYPE, nodeType);
 	props.setProperty(SERVER_HOST_PROPERTY, host);
@@ -105,42 +114,27 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 			  String.valueOf(queuePort));
 	props.setProperty(CALLBACK_PORT_PROPERTY,
 			  String.valueOf(callbackPort));
-	props.setProperty(DIRECTORY_PROPERTY, dbDirectory);
+	props.setProperty(DIRECTORY_PROPERTY, getDbDirectory());
+	props.setProperty(DATA_STORE_CLASS_PROPERTY,
+			  CachingDataStore.class.getName());
+	props.setProperty(ACCESS_COORDINATOR_PROPERTY,
+			  LockingAccessCoordinator.class.getName());
 	return props;
-    }
-
-    /** Create a {@link CachingDataStore}. */
-    @Override
-    protected DataStore createDataStore(Properties props) throws Exception {
-	txnProxy.setComponent(
-	    WatchdogService.class,
-	    new DummyWatchdogService(props, systemRegistry, txnProxy));
-	DataStore store = new DataStoreProfileProducer(
-	    new CachingDataStore(props, systemRegistry, txnProxy),
-	    DummyProfileCoordinator.getCollector());
-	DummyProfileCoordinator.startProfiling();
-	return store;
     }
 
     /* -- Tests -- */
 
-    /* -- Skip tests that involve properties that don't apply -- */
+    /* -- Skip these tests -- they don't apply in the caching case -- */
 
     @Override
-    public void testConstructorNoDirectory() throws Exception {
+    @Ignore
+    public void testConstructorNoDirectory() {
 	System.err.println("Skipping");
     }
-    @Override
-    public void testConstructorNonexistentDirectory() throws Exception {
-	System.err.println("Skipping");
-    }
-    @Override
-    public void testConstructorDirectoryIsFile() throws Exception {
-	System.err.println("Skipping");
 
-    }
     @Override
-    public void testConstructorDirectoryNotWritable() throws Exception {
+    @Ignore
+    public void testConstructorNoDirectoryNorRoot() {
 	System.err.println("Skipping");
     }
 }

@@ -403,18 +403,19 @@ class TxnContext {
     void noteModifiedBinding(BindingCacheEntry entry, long oid) {
 	assert Thread.holdsLock(store.getCache().getBindingLock(entry.key));
 	if (entry.key != BindingKey.LAST) {
-	    if (!entry.getModified() &&
-		(modifiedBindings == null ||
-		 !modifiedBindings.containsKey(entry.key)))
-	    {
-		if (modifiedBindings == null) {
-		    modifiedBindings =
-			new HashMap<BindingKey, SavedBindingValue>();
+	    if (!entry.getModified()) {
+		if (modifiedBindings == null ||
+		    !modifiedBindings.containsKey(entry.key))
+		{
+		    if (modifiedBindings == null) {
+			modifiedBindings =
+			    new HashMap<BindingKey, SavedBindingValue>();
+		    }
+		    modifiedBindings.put(
+			entry.key, new SavedBindingValue(entry));
 		}
-		SavedBindingValue saved = new SavedBindingValue(entry);
-		modifiedBindings.put(entry.key, saved);
+		entry.setCachedDirty();
 	    }
-	    entry.setCachedDirty();
 	    entry.setValue(oid);
 	    entry.noteAccess(contextId);
 	    if (oid == -1) {

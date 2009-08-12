@@ -406,4 +406,39 @@ class Cache {
 		"This iterator does not support the remove method");
 	}
     }
+
+    /** Prints the contents of the cache -- for testing. */
+    void printContents() {
+	printObjects();
+	printBindings();
+    }
+
+    /** Prints the objects in the cache -- for testing. */
+    void printObjects() {
+	System.err.println("Objects:");
+	for (ObjectCacheEntry entry : objectMap.values()) {
+	    System.err.println("  " + entry);
+	}
+    }
+
+    /** Prints the bindings in the cache -- for testing. */
+    void printBindings() {
+	System.err.println("Bindings:");
+	for (BindingCacheEntry entry : bindingMap.values()) {
+	    System.err.println("  " + entry);
+	}
+    }
+
+    /** Checks consistency of previous key fields of bindings. */
+    void checkBindings() {
+	BindingKey previousKey = null;
+	for (BindingCacheEntry entry : bindingMap.values()) {
+	    if (previousKey != null) {
+		synchronized (getEntryLock(entry)) {
+		    entry.checkPreviousKey(previousKey);
+		}
+	    }
+	    previousKey = entry.key;
+	}
+    }
 }

@@ -45,8 +45,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	"com.sun.sgs.impl.service.data.store.net";
 
     /** Creates an instance. */
-    public TestDataStoreClientPerformance(String name) {
-	super(name);
+    public TestDataStoreClientPerformance() {
 	count = Integer.getInteger("test.count", 20);
     }
 

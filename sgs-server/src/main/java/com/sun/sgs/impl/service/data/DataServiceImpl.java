@@ -1046,10 +1046,12 @@ public final class DataServiceImpl implements DataService {
 
     /**
      * Returns the object ID of the object, or null if the object is null or
-     * not assigned an ID.  Returns an ID even if the object is removed.
+     * has not assigned an ID, or if the context is null.  Returns an ID even
+     * if the object is removed.
      */
     private static BigInteger objectId(Context context, Object object) {
-	return refId(context.safeFindReference(object));
+	return (context != null) ? refId(context.safeFindReference(object))
+	    : null;
     }
 
     /**
