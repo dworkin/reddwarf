@@ -23,7 +23,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.HashMap;
@@ -34,6 +33,7 @@ import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * A graph builder which builds an affinity graph consisting of identities 
@@ -69,9 +69,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of nodes to objects that were evicted to go to that node, with a
     // count.
-    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
+    private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
         conflictMap =
-            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>();
+            new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -194,9 +194,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
-            getConflictMap()
-    {
+    public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap() {
         return conflictMap;
     }
 
@@ -212,7 +210,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        ConcurrentHashMap<Object, Long> objMap = conflictMap.get(nodeId);
+        ConcurrentMap<Object, Long> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
             objMap = new ConcurrentHashMap<Object, Long>();
         }

@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Before;
@@ -499,7 +500,7 @@ public class TestLPA {
 
     private void printNodeConflictMap(LabelPropagation lp) {
 
-        for (Map.Entry<Long, ConcurrentHashMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
              lp.getNodeConflictMap().entrySet())
         {
             StringBuilder sb1 = new StringBuilder();
@@ -685,7 +686,7 @@ public class TestLPA {
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements GraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
-        private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
+        private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
                 conflictMap;
         private final Map<Object, Map<Identity, Long>> objUseMap;
 
@@ -704,8 +705,8 @@ public class TestLPA {
             super();
             graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
-            conflictMap = new ConcurrentHashMap<Long, 
-                                    ConcurrentHashMap<Object, Long>>();
+            conflictMap = new ConcurrentHashMap<Long,
+                                ConcurrentMap<Object, Long>>();
 
             if (node == NODE1) {
                 // Create a partial graph
@@ -792,8 +793,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
-                getConflictMap()
+        public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap()
         {
             return conflictMap;
         }

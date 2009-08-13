@@ -34,10 +34,10 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * A graph builder which builds a bipartite graph of identities and
@@ -60,9 +60,9 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of object to map of remote nodes it was accessed on, with a weight
     // for each node.
-    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
+    private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
         conflictMap =
-            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>();
+            new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -237,9 +237,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
-            getConflictMap()
-    {
+    public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap() {
         return conflictMap;
     }
 
@@ -281,7 +279,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        ConcurrentHashMap<Object, Long> objMap = conflictMap.get(nodeId);
+        ConcurrentMap<Object, Long> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
             objMap = new ConcurrentHashMap<Object, Long>();
         }

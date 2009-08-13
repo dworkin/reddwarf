@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -215,8 +216,7 @@ public class TestLPAPerf {
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
     private class DistributedZachBuilder implements GraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
-        private final
-            ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
+        private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
             conflictMap;
         private final Map<Object, Map<Identity, Long>> objUseMap;
 
@@ -234,8 +234,8 @@ public class TestLPAPerf {
             super();
             graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
-            conflictMap = new ConcurrentHashMap<Long,
-                                    ConcurrentHashMap<Object, Long>>();
+            conflictMap = 
+                    new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
             LabelVertex[] nodes = new LabelVertex[35];
             DummyIdentity[] idents = new DummyIdentity[35];
             int nodeAsInt = (int) node;
@@ -670,8 +670,7 @@ public class TestLPAPerf {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
-                getConflictMap()
+        public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap()
         {
             return conflictMap;
         }

@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -108,13 +109,14 @@ public class LabelPropagation implements LPAClient {
     // Weights?
     // nodeid-> objectid, weight
     // public for testing for now
-    private final ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
+    private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
         nodeConflictMap =
-            new ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>();
+            new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
 
     // Map identity -> label and count
     // This sums all uses of that identity on other nodes
-    private final Map<Identity, Map<Integer, Long>> remoteLabelMap =
+    private final ConcurrentMap<Identity, Map<Integer, Long>>
+        remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Long>>();
 
     // Synchronization for state, runNumber, and iteration
@@ -303,7 +305,7 @@ public class LabelPropagation implements LPAClient {
         // Now, go through the new map, and tell each vertex about the
         // edges we might have in common.
         assert (nodeConflictMap != null);
-        for (Map.Entry<Long, ConcurrentHashMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
              nodeConflictMap.entrySet())
         {
             Long nodeId = entry.getKey();
@@ -595,7 +597,7 @@ public class LabelPropagation implements LPAClient {
 
         // Now, go through the new map, asking for its labels
         assert (nodeConflictMap != null);
-        for (Map.Entry<Long, ConcurrentHashMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
              nodeConflictMap.entrySet())
         {
             Long nodeId = entry.getKey();
@@ -867,8 +869,7 @@ public class LabelPropagation implements LPAClient {
         }
         /// hmmm... this is just an update conflict information without the
         // prune stuff...
-        ConcurrentHashMap<Object, Long> conflicts =
-                nodeConflictMap.get(nodeId);
+        ConcurrentMap<Object, Long> conflicts = nodeConflictMap.get(nodeId);
         if (conflicts == null) {
             conflicts = new ConcurrentHashMap<Object, Long>();
         }
@@ -1040,7 +1041,7 @@ public class LabelPropagation implements LPAClient {
         if (!logger.isLoggable(Level.FINEST)) {
             return;
         }
-        for (Map.Entry<Long, ConcurrentHashMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
              nodeConflictMap.entrySet())
         {
             StringBuilder sb = new StringBuilder();
@@ -1061,8 +1062,7 @@ public class LabelPropagation implements LPAClient {
      * Returns the node conflict map.
      * @return the node conflict map.
      */
-    public ConcurrentHashMap<Long, ConcurrentHashMap<Object, Long>>
-            getNodeConflictMap()
+    public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getNodeConflictMap()
     {
         return nodeConflictMap;
     }
