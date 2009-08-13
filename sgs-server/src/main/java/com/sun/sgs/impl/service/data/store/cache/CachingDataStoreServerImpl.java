@@ -387,6 +387,13 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, e, "Problem starting server");
 	    }
+	    doShutdown();
+	    throw e;
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(WARNING)) {
+		logger.logThrow(WARNING, e, "Problem starting server");
+	    }
+	    doShutdown();
 	    throw e;
 	}
     }
@@ -1126,11 +1133,28 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     /** {@inheritDoc} */
     @Override
     protected void doShutdown() {
-	infoDb.close();
-	classesDb.close();
-	oidsDb.close();
-	namesDb.close();
-	env.close();
+	serverExporter.unexport();
+	if (requestQueueListener != null) {
+	    requestQueueListener.shutdown();
+	}
+	for (NodeInfo nodeInfo : nodeInfoMap.values()) {
+	    nodeInfo.updateQueueServer.disconnect();
+	}
+	if (infoDb != null) {
+	    infoDb.close();
+	}
+	if (classesDb != null) {
+	    classesDb.close();
+	}
+	if (oidsDb != null) {
+	    oidsDb.close();
+	}
+	if (namesDb != null) {
+	    namesDb.close();
+	}
+	if (env != null) {
+	    env.close();
+	}
     }
 
     /* -- Other methods -- */
