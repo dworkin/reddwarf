@@ -186,7 +186,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    }
 	};
 	connect.start();
-	failureReporter.checkCalled(2 * MAX_RETRY);
+	failureReporter.checkNotCalled();
     }
 
     /**

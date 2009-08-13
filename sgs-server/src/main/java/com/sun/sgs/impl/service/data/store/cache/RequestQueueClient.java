@@ -45,11 +45,36 @@ import java.util.logging.Logger;
 
 /**
  * A thread that implements the client side of a request queue.  The {@link
- * #addRequest} method adds requests, which are transmitted to the server side
- * and run there exactly once.  Requests for which no response has been
- * received are retransmitted to the server as needed after a network failure.
- * Once a request has been performed, its {@link Request#completed} method will
- * be called.
+ * #addRequest addRequest} method adds requests, which are transmitted to the
+ * server side and run there exactly once.  Requests for which no response has
+ * been received are retransmitted to the server as needed after a network
+ * failure.  Once a request has been performed, its {@link Request#completed
+ * Request.completed} method will be called. <p>
+ *
+ * Here's the network protocol:
+ *
+ * <ul>
+ * <li>Establish connection
+ * <ul>
+ * <li>Client request:<br>
+ *	<code>(long) </code><i>nodeId</i>
+ * <li>Server reply:<br>
+ *	<code>(boolean) <b>true</b></code>
+ * </ul>
+ * <li>Request
+ * <ul>
+ * <li>Client request:<br>
+ *	<code>(short) </code><i>requestNumber</i>,
+ *	<code>(byte[]) </code><i>serializedRequest</i>
+ * <li>Server reply:<br>
+ *	// Success:<br>
+ *	<code>(boolean) <b>true</b></code><br>
+ *	// Failure:<br>
+ *	<code>(boolean) <b>false</b></code>,
+ *	<code>(String) </code><i>exceptionClassName</i>,
+ *	<code>(String) </code><i>exceptionMessage</i>
+ * </ul>
+ * </ul>
  */
 public final class RequestQueueClient extends Thread {
 
@@ -131,8 +156,8 @@ public final class RequestQueueClient extends Thread {
 
     /**
      * The time in milliseconds of the first in the current run of failures
-     * when attempting to accept connections, or {@code -1} if the last attempt
-     * succeeded.
+     * when attempting to make connections, or {@code -1} if the last attempt
+     * succeeded.  Synchronize on this thread when accessing.
      */
     private long failureStarted = -1;
 
@@ -244,13 +269,15 @@ public final class RequestQueueClient extends Thread {
 		       "RequestQueueClient nodeId:" + nodeId +
 		       " shutdown requested");
 	}
+	Connection c = null;
 	synchronized (this) {
 	    if (!shutdown) {
 		shutdown = true;
-		if (connection != null) {
-		    connection.disconnect(true);
-		}
+		c = connection;
 	    }
+	}
+	if (c != null) {
+	    c.disconnect(true);
 	}
 	while (true) {
 	    try {
@@ -381,13 +408,15 @@ public final class RequestQueueClient extends Thread {
     }
 
     /** Notes that a connection was made successfully. */
-    synchronized void noteConnected() {
+    void noteConnected() {
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER,
 		       "RequestQueueClient nodeId:" + nodeId +
 		       " connected successfully");
 	}
-	failureStarted = -1;
+	synchronized (this) {
+	    failureStarted = -1;
+	}
     }
 
     /**
@@ -457,6 +486,8 @@ public final class RequestQueueClient extends Thread {
 		resendRequests.add(0, sentRequests.removeLast());
 	    }
 	    socket = socketFactory.createSocket();
+	    /* Configure the socket's input stream to timeout */
+	    socket.setSoTimeout((int) maxRetry);
 	    out = new DataOutputStream(
 		new BufferedOutputStream(
 		    socket.getOutputStream()));
@@ -480,7 +511,7 @@ public final class RequestQueueClient extends Thread {
 	 * @param	waitForReceiveThread whether to wait for the receive
 	 *		thread to complete
 	 */
-	synchronized void disconnect(boolean waitForReceiveThread) {
+	void disconnect(boolean waitForReceiveThread) {
 	    disconnect = true;
 	    receiveThread.interrupt();
 	    RequestQueueClient.this.interrupt();
@@ -536,6 +567,7 @@ public final class RequestQueueClient extends Thread {
 				       " requestNumber:" + requestNumber +
 				       ", request:" + request);
 			}
+			receiveThread.noteNewRequest();
 			out.writeShort(requestNumber);
 			sentRequests.putLast(
 			    new RequestHolder(request, requestNumber));
@@ -568,14 +600,17 @@ public final class RequestQueueClient extends Thread {
 	    /** The data input stream. */
 	    private final DataInput in;
 
-	    /** Whether any input has been received from the input stream. */
-	    private boolean inputReceived;
-
 	    /**
 	     * The exception thrown when reading server input or {@code null}.
 	     * Synchronize on this thread when accessing this field.
 	     */
 	    private Throwable receiveException;
+
+	    /**
+	     * The number of sent messages awaiting replies.  Synchronize on
+	     * this thread when accessing this field.
+	     */
+	    private int pendingReplies = 0;
 
 	    /**
 	     * Creates an instance of this class.
@@ -596,11 +631,23 @@ public final class RequestQueueClient extends Thread {
 	    @Override
 	    public void run() {
 		try {
+		    /* Confirm that the connection has been established */
+		    in.readBoolean();
+		    boolean firstMessage = true;
 		    while (!disconnect) {
+			synchronized (this) {
+			    if (pendingReplies == 0) {
+				try {
+				    wait();
+				} catch (InterruptedException e) {
+				}
+				continue;
+			    }
+			}
 			Throwable requestException = readResponse();
-			if (!inputReceived) {
+			if (firstMessage) {
 			    noteConnected();
-			    inputReceived = true;
+			    firstMessage = false;
 			}
 			RequestHolder holder = sentRequests.removeFirst();
 			if (logger.isLoggable(FINEST)) {
@@ -614,6 +661,9 @@ public final class RequestQueueClient extends Thread {
 				 : " failed: " + requestException));
 			}
 			holder.request.completed(requestException);
+			synchronized (this) {
+			    pendingReplies--;
+			}
 		    }
 		    return;
 		} catch (Throwable t) {
@@ -663,13 +713,24 @@ public final class RequestQueueClient extends Thread {
 	     * Sets the exception that the receive thread got when reading
 	     * responses from the server.
 	     */
-	    private synchronized void setReceiveException(
-		Throwable exception)
-	    {
+	    private void setReceiveException(Throwable exception) {
 		if (!disconnect) {
-		    receiveException = exception;
+		    synchronized (this) {
+			receiveException = exception;
+		    }
 		    disconnect(false);
 		}
+	    }
+
+	    /**
+	     * Notes that a new request has been made, notifying waiters that
+	     * were waiting for a non-zero number of requests.
+	     */
+	    synchronized void noteNewRequest() {
+		if (pendingReplies == 0) {
+		    notifyAll();
+		}
+		pendingReplies++;
 	    }
 	}
     }

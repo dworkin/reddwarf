@@ -331,6 +331,8 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    new DataOutputStream(clientSocket.getOutputStream());
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
+	/* Connection acknowledgement */
+	assertTrue(in.readBoolean());
 	/* First request */
 	out.writeShort(0);
 	out.flush();
@@ -376,6 +378,8 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	out.flush();
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
+	/* Connection acknowledgement */
+	assertTrue(in.readBoolean());
 	assertTrue(in.readBoolean());
 	assertFalse("Socket should not be closed", socket.isClosed());
     }
@@ -414,6 +418,8 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	server.handleConnection(socket);
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
+	/* Connection acknowledgement */
+	assertTrue(in.readBoolean());
 	for (int i = 0; i < 5; i++) {
 	    assertTrue("Read response " + i, in.readBoolean());
 	}
@@ -455,6 +461,8 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	server.handleConnection(socket);
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
+	/* Connection acknowledgement */
+	assertTrue(in.readBoolean());
 	for (int i = 0; i < 3; i++) {
 	    assertTrue("Read response " + i, in.readBoolean());
 	}
@@ -480,6 +488,8 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	socket = serverSocket.accept();
 	server.handleConnection(socket);
 	in = new DataInputStream(clientSocket.getInputStream());
+	/* Connection acknowledgement */
+	assertTrue(in.readBoolean());
 	for (int i = 0; i < 4; i++) {
 	    assertTrue("Read response " + i, in.readBoolean());
 	}
@@ -512,6 +522,8 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    new DataOutputStream(clientSocket.getOutputStream());
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
+	/* Connection acknowledgement */
+	assertTrue(in.readBoolean());
 	/* First request */
 	out.writeShort(0);
 	out.flush();

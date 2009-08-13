@@ -187,8 +187,6 @@ public final class RequestQueueListener extends Thread {
 			    "RequestQueueListener accepted connection" +
 			    " socket:" + socket);
 		    }
-		    /* Configure the socket's input stream to timeout */
-		    //socket.setSoTimeout((int) maxRetry);
 		    DataInputStream in =
 			new DataInputStream(socket.getInputStream());
 		    nodeId = in.readLong();

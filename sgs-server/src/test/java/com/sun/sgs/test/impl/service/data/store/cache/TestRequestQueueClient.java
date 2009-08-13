@@ -19,7 +19,6 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
-import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueClient;
@@ -386,7 +385,17 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 		    public void performRequest(SimpleRequest request)
 			throws Exception
 		    {
-			Thread.sleep(4 * MAX_RETRY);
+			long stop = System.currentTimeMillis() + 4 * MAX_RETRY;
+			while (true) {
+			    long sleep = stop - System.currentTimeMillis();
+			    if (sleep <= 0) {
+				break;
+			    }
+			    try {
+				Thread.sleep(sleep);
+			    } catch (InterruptedException e) {
+			    }
+			}
 		    }
 		},
 		props));

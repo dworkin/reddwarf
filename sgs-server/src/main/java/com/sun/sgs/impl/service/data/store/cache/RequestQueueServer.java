@@ -42,7 +42,10 @@ import java.util.logging.Logger;
  * input using a {@link DataInputStream}, their operations performed, and the
  * result written to socket output using a {@link DataOutputStream}. <p>
  * 
- * The request number is read as a {@code short} from the input stream, with
+ * First, the {@code boolean} {@code true} is written to the output stream, to
+ * signify that the connection has been established successfully. <p>
+ *
+ * Each request number is read as a {@code short} from the input stream, with
  * the stream then supplied to the request handler's {@link
  * Request.RequestHandler#readRequest} method to read any additional data and
  * return the request.  If the request number is newer than that of the last
@@ -289,6 +292,8 @@ public class RequestQueueServer<R extends Request> {
 	 */
 	public void run() {
 	    try {
+		out.writeBoolean(true);
+		out.flush();
 		while (!disconnect) {
 		    short requestNumber = in.readShort();
 		    R request = requestHandler.readRequest(in);
