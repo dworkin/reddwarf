@@ -106,8 +106,8 @@ public class LabelPropagation implements LPAClient {
     private volatile List<LabelVertex> vertices;
 
     // The map of conflicts in the system. 
-    // Weights?
-    // nodeid-> objectid, weight
+    // Weights? only dealing with counts now
+    // nodeid-> objectid, count
     // public for testing for now
     private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
         nodeConflictMap =
@@ -147,6 +147,10 @@ public class LabelPropagation implements LPAClient {
     // The current iteration being run, used to detect multiple calls
     // for an iteration.
     private volatile int iteration = -1;
+
+    // For remote label debugging - JANE
+    private Map<LabelVertex, Integer> debug =
+            new HashMap<LabelVertex, Integer>();
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -433,6 +437,25 @@ public class LabelPropagation implements LPAClient {
         // Gather the remote labels from each node.
         boolean failed = updateRemoteLabels();
 
+        //JANE for remote label debugging
+        for (LabelVertex v : vertices) {
+            int count = graph.getNeighborCount(v);
+            Map<Integer,Long> rmap = remoteLabelMap.get(v.getIdentity());
+            int rcount = 0;
+            for (Long val : rmap.values()) {
+                rcount += val.longValue();
+            }
+            int total = count + rcount;
+            if (iteration == 1) {
+                debug.put(v, total);
+            } else {
+                if (debug.get(v) != total) {
+                    System.out.println (v + "EXPECTED " +
+                            debug.get(v) + "  GOT " + total);
+                }
+            }
+        }
+
         // We include the current label when calculating the most frequent
         // label, so no labels changing indicates the algorithm has converged
         // and we can stop.
@@ -620,6 +643,23 @@ public class LabelPropagation implements LPAClient {
             Map<Object, Map<Integer, Long>> labels =
                     proxy.getRemoteLabels(
                         new HashSet<Object>(map.keySet()));
+
+            // JANE for remote label debugging
+            if (logger.isLoggable(Level.FINEST)) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(localNodeId + ": got back \n");
+                for (Map.Entry<Object, Map<Integer, Long>> remoteEntry :
+                    labels.entrySet())
+                {
+                     sb.append(remoteEntry.getKey() + ": ");
+                     for (Map.Entry<Integer, Long> ss : 
+                         remoteEntry.getValue().entrySet())
+                     {
+                         sb.append(ss.getKey() + "," + ss.getValue() + " ");
+                     }
+                }
+                logger.log(Level.FINEST, sb.toString());
+            }
             if (labels == null) {
                 // This is unexpected; the other node should have returned
                 // an empty collection.  Log it, but act as if it
@@ -643,7 +683,7 @@ public class LabelPropagation implements LPAClient {
                      objUse.entrySet())
                 {
                     Identity ident = objUseId.getKey();
-                    Long weight = objUseId.getValue();
+                    Long localCount = objUseId.getValue();
                     Map<Integer, Long> labelCount =
                             remoteLabelMap.get(ident);
                     if (labelCount == null) {
@@ -655,7 +695,10 @@ public class LabelPropagation implements LPAClient {
                     {
                         Integer rlabel = rLabelCount.getKey();
                         Long rcount = rLabelCount.getValue();
-                        long newWeight = Math.min(weight, rcount);
+//                        long newWeight = Math.min(localCount, rcount);
+                        // JANE remote label debugging - do not modify the
+                        // remote count
+                        long newWeight = rcount;
 
                         Long oldCount = labelCount.get(rlabel);
                         Long updateCount = (oldCount == null) ? newWeight :
@@ -663,9 +706,9 @@ public class LabelPropagation implements LPAClient {
                         labelCount.put(rlabel, updateCount);
                         logger.log(Level.FINEST,
                                 "{0}: label {1}, updateCount {2}, " +
-                                "newWeight {3} : ident {4}",
+                                "localCount {3}, rcount {4}: ident {5}",
                                 localNodeId, rlabel, updateCount,
-                                newWeight, ident);
+                                localCount, rcount, ident);
                     }
                     remoteLabelMap.put(ident, labelCount);
                 }

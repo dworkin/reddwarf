@@ -103,9 +103,9 @@ public class TestLPAPerf {
     }
 
     @Test
-    public void warmup() throws Exception {
+    public void warmupZach() throws Exception {
         final int node = 1;
-        // Warm up the compilers
+        // Warm up the compilers{
         LabelPropagation lpa =
            new LabelPropagation(new ZachBuilder(), node,
                                 "localhost",
@@ -167,7 +167,43 @@ public class TestLPAPerf {
     }
 
     @Test
-    public void testLPADistributedZach() throws Exception {
+    public void warmupDistZach() throws Exception {
+        // setup
+        LabelPropagationServer server = null;
+        if (WARMUP_RUNS > 0) {
+            Properties props = new Properties();
+            int serverPort = nextUniquePort.incrementAndGet();
+            props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                       String.valueOf(serverPort));
+            server = new LabelPropagationServer(props);
+            String localHost = InetAddress.getLocalHost().getHostName();
+
+            LabelPropagation lp1 =
+                new LabelPropagation(
+                    new DistributedZachBuilder(DistributedZachBuilder.NODE1),
+                        DistributedZachBuilder.NODE1, localHost, serverPort,
+                            true, numThreads);
+            LabelPropagation lp2 =
+                new LabelPropagation(
+                    new DistributedZachBuilder(DistributedZachBuilder.NODE2),
+                        DistributedZachBuilder.NODE2, localHost, serverPort,
+                            true, numThreads);
+            LabelPropagation lp3 =
+                new LabelPropagation(
+                    new DistributedZachBuilder(DistributedZachBuilder.NODE3),
+                        DistributedZachBuilder.NODE3, localHost, serverPort,
+                            true, numThreads);
+        }
+
+        for (int i = 0; i < WARMUP_RUNS; i++) {
+            Collection<AffinityGroup> groups = server.findAffinityGroups();
+        }
+        if (server != null) {
+            server.shutdown();
+        }
+    }
+    @Test
+    public void testDistZach() throws Exception {
         // setup
         Properties props = new Properties();
         int serverPort = nextUniquePort.incrementAndGet();
@@ -211,6 +247,7 @@ public class TestLPAPerf {
           RUNS,
           avgMod/(double) RUNS,
           minMod, maxMod);
+        server.shutdown();
     }
     
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
