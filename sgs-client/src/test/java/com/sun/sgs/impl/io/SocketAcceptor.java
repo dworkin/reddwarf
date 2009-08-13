@@ -33,6 +33,7 @@
 package com.sun.sgs.impl.io;
 
 import com.sun.sgs.impl.io.*;
+import com.sun.sgs.test.impl.io.*;
 import com.sun.sgs.test.impl.io.ServerSocketEndpoint;
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -48,6 +49,7 @@ import com.sun.sgs.test.io.ServerEndpoint;
 import com.sun.sgs.test.io.AcceptorListener;
 import com.sun.sgs.test.io.Acceptor;
 import com.sun.sgs.io.ConnectionListener;
+import com.sun.sgs.impl.io.AbstractSocketEndpoint;
 
 /**
  * This is an implementation of an {@link Acceptor} that uses a MINA 
