@@ -376,9 +376,9 @@ public class TaskServiceImpl
         // get the continue threshold
         continueThreshold = wrappedProps.getLongProperty(
                 CONTINUE_THRESHOLD_PROPERTY, CONTINUE_THRESHOLD_DEFAULT);
-        if (continueThreshold < 0) {
+        if (continueThreshold <= 0) {
             throw new IllegalStateException("Continue threshold property " +
-                                            "must be non-negative");
+                                            "must be positive");
         }
 
         // create our profiling info and register our MBean
