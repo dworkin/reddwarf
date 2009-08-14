@@ -104,21 +104,66 @@ import javax.management.JMException;
  * <p>
  * Task handoff between nodes is done by noting the task in a node-specific
  * entry in the data store. Each node will periodically query this entry to
- * see if any tasks have been handed off. The default time in milliseconds
- * for this period is {@code HANDOFF_PERIOD_DEFAULT}. The period may be
- * changed using the property {@code HANDOFF_PERIOD_PROPERTY}. This checking
+ * see if any tasks have been handed off. The time in milliseconds for this
+ * period is configurable via the {@value #HANDOFF_PERIOD_PROPERTY} property
+ * described below. This checking
  * will be delayed on node startup to give the system a chance to finish
- * initializing. The default length of time in milliseconds for this delay is
- * {@code HANDOFF_START_DEFAULT}. The delay may be changed using the property
- * {@code HANDOFF_START_PROPERTY}.
+ * initializing. The time in milliseconds for this delay is configurable via
+ * the {@value #HANDOFF_START_PROPERTY} property.
  * <p>
  * When the final task for an identity completes, or an initial task for an
  * identity is scheduled, the status of that identity as reported by this
  * service changes. Rather than immediately reporting this status change,
  * however, a delay is taken to see if the status is about to change back to
- * its previous state. This helps avoid voting too frequently. The default
- * time in milliseconds for delaying this vote is {@code VOTE_DELAY_DEFAULT}.
- * The delay may be changed using the property {@code VOTE_DELAY_PROPERTY}.
+ * its previous state. This helps avoid voting too frequently. The time in
+ * milliseconds for delaying this vote is configurable via the
+ * {@value #VOTE_DELAY_PROPERTY} property.
+ * <p>
+ * The {@code TaskServiceImpl} supports the following configuration properties,
+ * some of which have already been mentioned above:
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #HANDOFF_PERIOD_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #HANDOFF_PERIOD_DEFAULT}
+ *
+ * <dd style="padding-top: .5em">Specifies the periodic time in milliseconds
+ *      that the {@code TaskServiceImpl} will regularly query its handoff
+ *      queue for tasks that have been handed off by other nodes.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #HANDOFF_START_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #HANDOFF_START_DEFAULT}
+ *
+ * <dd style="padding-top: .5em">Specifies the time in milliseconds that the
+ *      {@code TaskServiceImpl} will wait at startup before querying its
+ *      handoff queue for the first time.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #VOTE_DELAY_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #VOTE_DELAY_DEFAULT}
+ *
+ * <dd style="padding-top: .5em">Specifies the time in milliseconds to wait
+ *      before reporting a status change for an identity.  The status change
+ *      is not reported if the identity's status changes back to its original
+ *      state during this delay period.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #CONTINUE_THRESHOLD_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #CONTINUE_THRESHOLD_DEFAULT}
+ *
+ * <dd style="padding-top: .5em">Specifies the time in milliseconds from the
+ *      start of a transaction during which the
+ *      {@link #shouldContinue() shouldContinue} method will return
+ *      {@code true}.  After this period of time has elapsed in a transaction,
+ *      this method will always return {@code false}.
+ *
+ * </dl> <p>
  */
 public class TaskServiceImpl 
         extends AbstractService
@@ -128,7 +173,8 @@ public class TaskServiceImpl
     /**
      * The identifier used for this {@code Service}.
      */
-    public static final String NAME = TaskServiceImpl.class.getName();
+    public static final String NAME = 
+        "com.sun.sgs.impl.service.task.TaskServiceImpl";
 
     // logger for this class
     private static final LoggerWrapper logger =

@@ -178,6 +178,8 @@ public interface TaskManager {
      *
      * @return {@code true} if the currently running task should do more work
      *         if possible; otherwise {@code false}
+     * @throws TransactionException if the operation failed because of a
+     *	       problem with the current transaction
      */
     boolean shouldContinue();
 }

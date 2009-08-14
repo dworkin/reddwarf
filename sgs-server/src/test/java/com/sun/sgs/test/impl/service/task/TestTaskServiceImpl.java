@@ -48,6 +48,7 @@ import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 
+import com.sun.sgs.test.util.Constants;
 import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
@@ -813,7 +814,8 @@ public class TestTaskServiceImpl extends Assert {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
-                    Thread.sleep(continueThreshold);
+                    Thread.sleep(continueThreshold +
+                                 Constants.MAX_CLOCK_GRANULARITY);
                     assertFalse(taskService.shouldContinue());
                 }
         }, taskOwner);
