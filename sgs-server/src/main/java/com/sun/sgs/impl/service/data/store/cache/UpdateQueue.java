@@ -20,14 +20,14 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.ResourceUnavailableException;
-import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
-    DowngradeBinding;
-import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
-    DowngradeObject;
-import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
-    EvictBinding;
-import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
-    EvictObject;
+import com.sun.sgs.impl.service.data.store.cache.
+    UpdateQueueRequest.DowngradeBinding;
+import com.sun.sgs.impl.service.data.store.cache.
+    UpdateQueueRequest.DowngradeObject;
+import com.sun.sgs.impl.service.data.store.cache.
+    UpdateQueueRequest.EvictBinding;
+import com.sun.sgs.impl.service.data.store.cache.
+    UpdateQueueRequest.EvictObject;
 import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.Commit;
 import com.sun.sgs.service.TransactionInterruptedException;
 import java.io.IOException;

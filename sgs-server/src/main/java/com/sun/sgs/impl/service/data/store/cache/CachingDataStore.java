@@ -25,24 +25,24 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.AbstractDataStore;
 import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.service.data.store.NetworkException;
-import com.sun.sgs.impl.service.data.store.cache.BasicCacheEntry.
-    AwaitWritableResult;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    GetBindingForRemoveResults;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    GetBindingForUpdateResults;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    GetBindingResults;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    GetObjectForUpdateResults;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    GetObjectResults;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    NextBoundNameResults;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    NextObjectResults;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer.
-    RegisterNodeResult;
+import com.sun.sgs.impl.service.data.store.cache.
+    BasicCacheEntry.AwaitWritableResult;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.GetBindingForRemoveResults;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.GetBindingForUpdateResults;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.GetBindingResults;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.GetObjectForUpdateResults;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.GetObjectResults;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.NextBoundNameResults;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.NextObjectResults;
+import com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServer.RegisterNodeResult;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
@@ -923,6 +923,7 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.getBindingEntry(cachedNextNameKey);
 		if (entry.getReading()) {
 		    /* Remove temporary last entry that was not used */
+		    assert cachedNextNameKey == BindingKey.LAST;
 		    entry.setEvictedAbandonFetching(lock);
 		    cache.removeBindingEntry(cachedNextNameKey);
 		} else {
@@ -983,6 +984,11 @@ public class CachingDataStore extends AbstractDataStore
 			assert cachedNextNameKey == BindingKey.LAST;
 			entry.setCachedRead(lock);
 		    }
+		} else if (entry.getReading()) {
+		    /* Remove temporary last entry that was not used */
+		    assert cachedNextNameKey == BindingKey.LAST;
+		    entry.setEvictedAbandonFetching(lock);
+		    cache.removeBindingEntry(cachedNextNameKey);
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
@@ -1382,6 +1388,7 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.getBindingEntry(cachedNextNameKey);
 		if (entry.getUpgrading()) {
 		    /* Remove temporary last entry that was not used */
+		    assert cachedNextNameKey == BindingKey.LAST;
 		    entry.setEvictedAbandonFetching(lock);
 		    cache.removeBindingEntry(cachedNextNameKey);
 		} else {
@@ -1445,6 +1452,11 @@ public class CachingDataStore extends AbstractDataStore
 			assert cachedNextNameKey == BindingKey.LAST;
 			entry.setCachedWrite(lock);
 		    }
+		} else if (entry.getUpgrading()) {
+		    /* Remove temporary last entry that was not used */
+		    assert cachedNextNameKey == BindingKey.LAST;
+		    entry.setEvictedAbandonFetching(lock);
+		    cache.removeBindingEntry(cachedNextNameKey);
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
@@ -1662,9 +1674,9 @@ public class CachingDataStore extends AbstractDataStore
 			 */
 			entry = context.noteCachedReservedBinding(
 			    serverNextNameKey, results.nextOid, true);
+			entry.updatePreviousKeyKnown(nameKey, results.found);
 			usedCacheEntry();
 		    }
- 		    entry.updatePreviousKeyKnown(nameKey, results.found);
 		}
 	    }
 	    /* Update cached next name entry */
@@ -1674,7 +1686,9 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.getBindingEntry(cachedNextNameKey);
 		if (compareServer >= 0) {
 		    /* No entries between the name and the cached next entry */
- 		    entry.updatePreviousKeyKnown(nameKey, results.found);
+ 		    boolean updated =
+			entry.updatePreviousKeyKnown(nameKey, results.found);
+		    assert updated;
 		    context.noteAccess(entry);
 		    if (entry.getReading()) {
 			/* Make temporary last entry permanent */
@@ -1691,6 +1705,7 @@ public class CachingDataStore extends AbstractDataStore
 		    }
 		} else if (entry.getReading()) {
 		    /* Remove temporary last entry that was not used */
+		    assert cachedNextNameKey == BindingKey.LAST;
 		    entry.setEvictedAbandonFetching(lock);
 		    cache.removeBindingEntry(cachedNextNameKey);
 		}
@@ -1744,8 +1759,8 @@ public class CachingDataStore extends AbstractDataStore
 		entry = context.noteLastBinding(false);
 		callServer = true;
 	    } else if (nameWritable &&
-		entry.getIsNextEntry(nameKey) &&
-		entry.getWritable())
+		       entry.getIsNextEntry(nameKey) &&
+		       entry.getWritable())
 	    {
 		/* Both name and next name were writable */
 		entry.setPendingPrevious();
@@ -1915,13 +1930,20 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.getBindingEntry(cachedNextNameKey);
 		if (compareServer >= 0) {
 		    /* No entries between the name and the cached next entry */
-		    entry.updatePreviousKeyUnknown(nameKey);
+		    boolean updated =
+			entry.updatePreviousKeyUnknown(nameKey);
+		    assert updated;
 		    context.noteAccess(entry);
 		    if (entry.getReading()) {
 			/* Make temporary last entry permanent */
 			assert cachedNextNameKey == BindingKey.LAST;
 			entry.setCachedRead(lock);
 		    }
+		} else if (entry.getReading()) {
+		    /* Remove temporary last entry that was not used */
+		    assert cachedNextNameKey == BindingKey.LAST;
+		    entry.setEvictedAbandonFetching(lock);
+		    cache.removeBindingEntry(cachedNextNameKey);
 		}
 		entry.setNotPendingPrevious(lock);
 	    }

@@ -28,20 +28,20 @@ import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeString;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeLong;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeString;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
-import static com.sun.sgs.impl.service.data.store.DataStoreImpl.
-    DEFAULT_ENVIRONMENT_CLASS;
-import static com.sun.sgs.impl.service.data.store.DataStoreImpl.
-    ENVIRONMENT_CLASS_PROPERTY;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
 import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
 import com.sun.sgs.impl.service.data.store.Scheduler;
-import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.
-    UpdateQueueRequestHandler;
+import com.sun.sgs.impl.service.data.store.cache.
+    UpdateQueueRequest.UpdateQueueRequestHandler;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
-import static com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl.
-    BOUNDED_TIMEOUT_DEFAULT;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
