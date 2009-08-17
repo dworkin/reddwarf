@@ -102,8 +102,13 @@ public class LabelPropagation implements LPAClient {
     private volatile UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
     // For now, we're only grabbing the vertices of interest at the
-    // start of the algorithm.  This will change. JANE
+    // start of the algorithm.   This could change so we update for each run,
+    // but for now it's easiest to leave this list fixed.
     private volatile List<LabelVertex> vertices;
+
+    // Lock to ensure we aren't modifying the vertices list at the same
+    // time we're processing an asynchronous call from another node.
+    private final Object verticesLock = new Object();
 
     // The map of conflicts in the system. 
     // Weights? only dealing with counts now
@@ -148,9 +153,10 @@ public class LabelPropagation implements LPAClient {
     // for an iteration.
     private volatile int iteration = -1;
 
-    // For remote label debugging - JANE
+    // For debugging remote labels (can be removed when that is done)
     private Map<LabelVertex, Integer> debug =
-            new HashMap<LabelVertex, Integer>();
+        new HashMap<LabelVertex, Integer>();
+    
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -437,24 +443,27 @@ public class LabelPropagation implements LPAClient {
         // Gather the remote labels from each node.
         boolean failed = updateRemoteLabels();
 
-        //JANE for remote label debugging
-        for (LabelVertex v : vertices) {
-            int count = graph.getNeighborCount(v);
-            Map<Integer,Long> rmap = remoteLabelMap.get(v.getIdentity());
-            int rcount = 0;
-            for (Long val : rmap.values()) {
-                rcount += val.longValue();
-            }
-            int total = count + rcount;
-            if (iteration == 1) {
-                debug.put(v, total);
-            } else {
-                if (debug.get(v) != total) {
-                    System.out.println (v + "EXPECTED " +
-                            debug.get(v) + "  GOT " + total);
-                }
-            }
-        }
+        //For remote label debugging
+//        for (LabelVertex v : vertices) {
+//            int count = graph.getNeighborCount(v);
+//            Map<Integer, Long> rmap = remoteLabelMap.get(v.getIdentity());
+//            int rcount = 0;
+//            if (rmap == null) {
+//                continue;
+//            }
+//            for (Long val : rmap.values()) {
+//                rcount += val.longValue();
+//            }
+//            int total = count + rcount;
+//            if (iteration == 1) {
+//                debug.put(v, total);
+//            } else {
+//                if (debug.get(v) != total) {
+//                    System.out.println(localNodeId + ":" + v + " EXPECTED " +
+//                            debug.get(v) + "  GOT " + total);
+//                }
+//            }
+//        }
 
         // We include the current label when calculating the most frequent
         // label, so no labels changing indicates the algorithm has converged
@@ -465,7 +474,9 @@ public class LabelPropagation implements LPAClient {
             // Arrange the vertices in a random order for each iteration.
             // For the first iteration, we just use the iterator ordering.
             if (iteration > 1) {
-                Collections.shuffle(vertices);
+                synchronized (verticesLock) {
+                    Collections.shuffle(vertices);
+                }
             }
 
             // For each of the vertices, set the label to the label with the
@@ -559,38 +570,60 @@ public class LabelPropagation implements LPAClient {
                 builder.getObjectUseMap();
         assert (objectMap != null);
 
-        for (Object obj : objIds) {
-            // look up the set of identities
-            Map<Identity, Long> idents = objectMap.get(obj);
-            Map<Integer, Long> countMap = new HashMap<Integer, Long>();
-            if (idents != null) {
-                for (Identity id : idents.keySet()) {
-                    // JANE not dealing with weights here
-                    // Find the label associated with the ident in the graph.
-                    // We do this by creating vid, a template of the
-                    // LabelVertex, and then finding the actual graph
-                    // vertex with that identity.  The current label can
-                    // be found in the actual graph vertex.
-                    LabelVertex vid = new LabelVertex(id);
-                    int index = vertices.indexOf(vid);
-                    if (index != -1) {
-                        // If the vid wasn't found in the vertices list,
-                        // it is a new identity since the vertices were
-                        // captured at the start of this algorithm run,
-                        // and we just ignore the label.
-                        // Otherwise, add the label to set of labels for
-                        // this identity.
+        synchronized (verticesLock) {
+            for (Object obj : objIds) {
+                // look up the set of identities
+                Map<Identity, Long> idents = objectMap.get(obj);
+                Map<Integer, Long> countMap = new HashMap<Integer, Long>();
+                if (idents != null) {
+                    for (Identity id : idents.keySet()) {
+                        // JANE not dealing with weights here
+                        // Find the label associated with the ident in the graph.
+                        // We do this by creating vid, a template of the
+                        // LabelVertex, and then finding the actual graph
+                        // vertex with that identity.  The current label can
+                        // be found in the actual graph vertex.
+                        LabelVertex vid = new LabelVertex(id);
+                        int index = vertices.indexOf(vid);
+                        if (index != -1) {
+                            // If the vid wasn't found in the vertices list,
+                            // it is a new identity since the vertices were
+                            // captured at the start of this algorithm run,
+                            // and we just ignore the label.
+                            // Otherwise, add the label to set of labels for
+                            // this identity.
 
-                        // not yet taking weights into account
-                        Integer label = vertices.get(index).getLabel();
-                        Long oldCount = countMap.get(label);
-                        Long updateCount = (oldCount == null) ? 1 :
-                                                1 + oldCount;
-                        countMap.put(label, updateCount);
+                            // not yet taking weights into account
+                            Integer label = vertices.get(index).getLabel();
+                            Long oldCount = countMap.get(label);
+                            Long updateCount = (oldCount == null) ? 1 :
+                                                    1 + oldCount;
+                            countMap.put(label, updateCount);
+                        } else {
+                            // Debugging code.  In general, this case is fine -
+                            // the vertices list is a snapshot from some time
+                            // in the past.
+//                            logger.log(Level.FINE,
+//                                    "{0}: no index for {1}, vid {2}",
+//                                    localNodeId, id, vid);
+//                            StringBuffer sb = new StringBuffer();
+//                            sb.append("Vertices now: ");
+//                            for (LabelVertex v : vertices) {
+//                                sb.append(v + " ");
+//                            }
+//                            logger.log(Level.FINE, "{0}: {1}",
+//                                       localNodeId, sb.toString());
+                        }
                     }
+                } else {
+                    // Debugging code.  In general, this case is fine - the
+                    // identity might no longer be considered used because
+                    // the graph was pruned as time goes on.
+//                    logger.log(Level.FINE,
+//                               "{0} : no idents for {1}", localNodeId, obj);
                 }
+                retMap.put(obj, countMap);
             }
-            retMap.put(obj, countMap);
         }
         return retMap;
     }
@@ -644,22 +677,22 @@ public class LabelPropagation implements LPAClient {
                     proxy.getRemoteLabels(
                         new HashSet<Object>(map.keySet()));
 
-            // JANE for remote label debugging
-            if (logger.isLoggable(Level.FINEST)) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(localNodeId + ": got back \n");
-                for (Map.Entry<Object, Map<Integer, Long>> remoteEntry :
-                    labels.entrySet())
-                {
-                     sb.append(remoteEntry.getKey() + ": ");
-                     for (Map.Entry<Integer, Long> ss : 
-                         remoteEntry.getValue().entrySet())
-                     {
-                         sb.append(ss.getKey() + "," + ss.getValue() + " ");
-                     }
-                }
-                logger.log(Level.FINEST, sb.toString());
-            }
+            // For remote label debugging
+//            if (logger.isLoggable(Level.FINEST)) {
+//                StringBuilder sb = new StringBuilder();
+//                sb.append(localNodeId + ": got back from " + nodeId + " \n");
+//                for (Map.Entry<Object, Map<Integer, Long>> remoteEntry :
+//                    labels.entrySet())
+//                {
+//                     sb.append(remoteEntry.getKey() + ": ");
+//                     for (Map.Entry<Integer, Long> ss :
+//                         remoteEntry.getValue().entrySet())
+//                     {
+//                         sb.append(ss.getKey() + "," + ss.getValue() + " ");
+//                     }
+//                }
+//                logger.log(Level.FINEST, sb.toString());
+//            }
             if (labels == null) {
                 // This is unexpected; the other node should have returned
                 // an empty collection.  Log it, but act as if it

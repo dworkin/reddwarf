@@ -151,7 +151,7 @@ public class TestLPAPerf {
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
         }
-        System.out.printf("XXX (%d runs, %d threads): " +
+        System.out.printf("SING (%d runs, %d threads): " +
                           "avg time : %4.2f ms, " +
                           " time range [%d - %d ms] " +
                           " avg iters : %4.2f, avg modularity: %.4f, " +
@@ -228,6 +228,10 @@ public class TestLPAPerf {
                     DistributedZachBuilder.NODE3, localHost, serverPort,
                         true, numThreads);
 
+        long avgTime = 0;
+        long maxTime = 0;
+        long minTime = Integer.MAX_VALUE;
+        int avgIter = 0;
         double avgMod  = 0.0;
         double maxMod = 0.0;
         double minMod = 1.0;
@@ -236,17 +240,28 @@ public class TestLPAPerf {
             double mod =
                 Graphs.calcModularity(new ZachBuilder().getAffinityGraph(),
                                       groups);
+
+            long time = server.getRunTime();
+            avgTime = avgTime + time;
+            maxTime = Math.max(maxTime, time);
+            minTime = Math.min(minTime, time);
+            avgIter = avgIter + server.getIterationCount();
             avgMod = avgMod + mod;
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
             System.out.printf("run %d, modularity: %.4f \n", i, mod);
         }
-        System.out.printf("(%d runs): " +
-          " avg modularity: %.4f, " +
-          " modularity range [%.4f - %.4f] %n",
-          RUNS,
-          avgMod/(double) RUNS,
-          minMod, maxMod);
+        System.out.printf("DIST (%d runs, %d threads): " +
+                  "avg time : %4.2f ms, " +
+                  " time range [%d - %d ms] " +
+                  " avg iters : %4.2f, avg modularity: %.4f, " +
+                  " modularity range [%.4f - %.4f] %n",
+                  RUNS, numThreads,
+                  avgTime/(double) RUNS,
+                  minTime, maxTime,
+                  avgIter/(double) RUNS,
+                  avgMod/(double) RUNS,
+                  minMod, maxMod);
         server.shutdown();
     }
     
@@ -517,6 +532,9 @@ public class TestLPAPerf {
                 tempMap.put(idents[29], 1L);
                 objUseMap.put("o66", tempMap);
                 tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[32], 1L);
+                objUseMap.put("o32", tempMap);
+                tempMap = new HashMap<Identity, Long>();
                 tempMap.put(idents[23], 1L);
                 objUseMap.put("o38", tempMap);
                 tempMap = new HashMap<Identity, Long>();
@@ -677,7 +695,6 @@ public class TestLPAPerf {
                         new ConcurrentHashMap<Object, Long>();
                 conflict.put("o3", 1L);
                 conflict.put("o4", 1L);
-                conflict.put("o12", 1L);
                 conflict.put("o16", 1L);
                 conflict.put("o24", 1L);
                 conflict.put("o25", 1L);
@@ -686,7 +703,6 @@ public class TestLPAPerf {
                 conflictMap.put(NODE1, conflict);
                 conflict = new ConcurrentHashMap<Object, Long>();
                 conflict.put("o17", 1L);
-                conflict.put("o26", 1L);
                 conflict.put("o27", 1L);
                 conflict.put("o38", 1L);
                 conflict.put("o39", 1L);

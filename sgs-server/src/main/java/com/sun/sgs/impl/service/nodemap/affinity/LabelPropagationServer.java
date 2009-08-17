@@ -113,6 +113,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     private boolean running = false;
 
     private final AtomicLong runNumber = new AtomicLong();
+
+    private long runTime;
     /**
      * Constructs a new label propagation server. Only one should exist
      * within a Darkstar cluster.
@@ -206,10 +208,10 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // on the failed node as being part of any group.
         retVal = gatherFinalGroups(clientProxyCopy);
 
+        runTime = System.currentTimeMillis() - startTime;
         if (logger.isLoggable(Level.FINE)) {
-            long time = System.currentTimeMillis() - startTime;
             logger.log(Level.FINE, "Algorithm took {0} milliseconds and {1} " +
-                    "iterations", time, currentIteration);
+                    "iterations", runTime, currentIteration);
             StringBuffer sb = new StringBuffer();
             sb.append(" LPA found " +  retVal.size() + " groups ");
 
@@ -296,6 +298,25 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         synchronized (clientProxyMap) {
             clientProxyMap.put(nodeId, client);
         }
+    }
+
+    // For testing
+
+    /**
+     * Returns the time, in milliseconds, that the last algorithm run took.
+     * @return time in milliseconds for the last algorithm run
+     */
+    public long getRunTime() {
+        return runTime;
+    }
+
+    /**
+     * Returns the number of iterations for the last algorithm run.  If called
+     * in the midst of a run, returns the current iteration number.
+     * @return the number of iterations for the last algorithm run
+     */
+    public int getIterationCount() {
+        return currentIteration;
     }
 
     /**
