@@ -48,11 +48,6 @@ public class MultiAffinityGroup implements AffinityGroup {
         assert identities.size() > 0;
         this.agid = agid;
         this.identities = identities;
-        System.out.println("group: " + agid);
-        for (Map.Entry<Identity, Long> e : identities.entrySet()) {
-            System.out.println("Identity: " + e.getKey().getName() +
-                               " on node " + e.getValue());
-        }
     }
 
     /** {@inheritDoc} */

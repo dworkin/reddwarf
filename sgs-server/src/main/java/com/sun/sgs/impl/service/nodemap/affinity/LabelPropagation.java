@@ -154,8 +154,8 @@ public class LabelPropagation implements LPAClient {
     private volatile int iteration = -1;
 
     // For debugging remote labels (can be removed when that is done)
-    private Map<LabelVertex, Integer> debug =
-        new HashMap<LabelVertex, Integer>();
+//    private Map<LabelVertex, Integer> debug =
+//        new HashMap<LabelVertex, Integer>();
     
     /**
      * Constructs a new instance of the label propagation algorithm.
@@ -246,11 +246,6 @@ public class LabelPropagation implements LPAClient {
             }
         }
 
-        // This can happen in testing - JANE probably will change
-        if (vertices == null) {
-            initializeLPARun();
-        }
-
         // Log the final graph before calling gatherGroups, which is
         // also responsible for reinitializing the vertices for the next run
         // if done is true
@@ -262,10 +257,9 @@ public class LabelPropagation implements LPAClient {
 
         if (done) {
             // Clear our maps that are set up as the first step of an
-            // algorithm run.  This is done here, rather than when
-            // prepareAlgorithm is called, to ensure the vertex conflict
-            // map is properly initialized.  We use an empty map as a
-            // signal that it needs to be initialized.
+            // algorithm run.  Doing this here ensures we catch errors
+            // where we attempt to get the final groups before an algorithm
+            // has completed a run.
             nodeConflictMap.clear();
             vertices = null;
 
@@ -305,10 +299,11 @@ public class LabelPropagation implements LPAClient {
                 return;
             }
             this.runNumber = runNumber;
-            iteration = 0;
+            iteration = -1;
             state = State.PREPARING;
         }
 
+        initializeLPARun();
         initializeNodeConflictMap();
 
         boolean failed = false;
@@ -400,6 +395,8 @@ public class LabelPropagation implements LPAClient {
      * exchanged information with other nodes.
      */
     public void startIteration(int iteration) throws IOException {
+        // We should have been prepared by now.
+        assert (vertices != null);
         long startTime = System.currentTimeMillis();
        
         // Block any additional threads entering this iteration
@@ -429,10 +426,6 @@ public class LabelPropagation implements LPAClient {
             this.iteration = iteration;
             // Otherwise, run the iteration
             state = State.IN_ITERATION;
-        }
-
-        if (iteration == 1) {
-            initializeLPARun();
         }
 
         if (logger.isLoggable(Level.FINEST)) {
@@ -553,10 +546,6 @@ public class LabelPropagation implements LPAClient {
                 Collection<Object> objIds)
             throws IOException
     {
-        if (vertices == null) {
-            // We can be called before our own initialization is done
-            initializeLPARun();
-        }
         Map<Object, Map<Integer, Long>> retMap =
                 new HashMap<Object, Map<Integer, Long>>();
         if (objIds == null) {
@@ -578,7 +567,8 @@ public class LabelPropagation implements LPAClient {
                 if (idents != null) {
                     for (Identity id : idents.keySet()) {
                         // JANE not dealing with weights here
-                        // Find the label associated with the ident in the graph.
+                        // Find the label associated with the identity in
+                        // the graph.
                         // We do this by creating vid, a template of the
                         // LabelVertex, and then finding the actual graph
                         // vertex with that identity.  The current label can
@@ -599,7 +589,7 @@ public class LabelPropagation implements LPAClient {
                             Long updateCount = (oldCount == null) ? 1 :
                                                     1 + oldCount;
                             countMap.put(label, updateCount);
-                        } else {
+//                        } else {
                             // Debugging code.  In general, this case is fine -
                             // the vertices list is a snapshot from some time
                             // in the past.
@@ -615,7 +605,7 @@ public class LabelPropagation implements LPAClient {
 //                                       localNodeId, sb.toString());
                         }
                     }
-                } else {
+//                } else {
                     // Debugging code.  In general, this case is fine - the
                     // identity might no longer be considered used because
                     // the graph was pruned as time goes on.
@@ -884,25 +874,20 @@ public class LabelPropagation implements LPAClient {
                 logger.log(Level.FINE, sb.toString());
             }
         }
-
         return groups;
     }
 
     /**
      * Initialize ourselves for a run of the algorithm.
      */
-    private synchronized void initializeLPARun() {
-        if (vertices != null) {
-            // Someone beat us to it
-            return;
-        }
+    private void initializeLPARun() {
         logger.log(Level.FINEST,
                 "{0}: initializing LPA run", localNodeId);
         // Grab the graph (the weighted graph builder returns a pointer
         // to the live graph) and a snapshot of the vertices.
         graph = builder.getAffinityGraph();
         assert (graph != null);
-        
+
         // The set of vertices we iterate over is fixed (e.g. we don't
         // consider new vertices as we process this graph).  If processing
         // takes a long time, or if we use a more dynamic work queue, we'll

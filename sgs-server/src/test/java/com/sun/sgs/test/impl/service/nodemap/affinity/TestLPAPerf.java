@@ -249,7 +249,7 @@ public class TestLPAPerf {
             avgMod = avgMod + mod;
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
-            System.out.printf("run %d, modularity: %.4f \n", i, mod);
+//            System.out.printf("run %d, modularity: %.4f \n", i, mod);
         }
         System.out.printf("DIST (%d runs, %d threads): " +
                   "avg time : %4.2f ms, " +

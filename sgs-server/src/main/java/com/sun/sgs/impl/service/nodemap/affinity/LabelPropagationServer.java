@@ -366,7 +366,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         final Set<Long> clean =
                 Collections.unmodifiableSet(clientProxies.keySet());
         final int cleanSize = clean.size();
-        currentIteration = 1;
+        currentIteration = 0;
         while (!runFailed && !nodesConverged) {
             // Assume we'll converge unless told otherwise; all nodes must
             // say we've converged for nodesConverged to remain true in
@@ -405,9 +405,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             // Wait for all nodes to complete this iteration
             waitOnLatch();
             // Papers show most work is done after 5 iterations
-            if (++currentIteration > MAX_ITERATIONS) {
-                // JANE - warning should be Level.FINE
-                logger.log(Level.WARNING, "exceeded {0} iterations, stopping",
+            if (++currentIteration >= MAX_ITERATIONS) {
+                logger.log(Level.FINE, "exceeded {0} iterations, stopping",
                         MAX_ITERATIONS);
                 break;
             }

@@ -296,8 +296,8 @@ public class TestLPA {
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
                     PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
         lp1.prepareAlgorithm(1);
-        Collection<AffinityGroup> groups1 = lp1.affinityGroups(1, true);
-        Collection<AffinityGroup> groups2 = lp1.affinityGroups(1, true);
+        Collection<AffinityGroup> groups1 = lp1.affinityGroups(1, false);
+        Collection<AffinityGroup> groups2 = lp1.affinityGroups(1, false);
         assertEquals(groups1.size(), groups2.size());
         // Because we haven't actually run the algorithm, I know the groups
         // correspond to the vertices on the node
@@ -524,6 +524,7 @@ public class TestLPA {
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
                     PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
 
+        lp1.prepareAlgorithm(1);
         Set<Object> objIds = new HashSet<Object>();
         objIds.add("obj1");
         objIds.add("obj2");
