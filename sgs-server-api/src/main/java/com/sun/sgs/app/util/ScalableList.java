@@ -1559,12 +1559,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	private static final long serialVersionUID = 4L;
 
 	/**
-	 * The maximum number of items to remove in a single iteration of the
-	 * task
-	 */
-	private static final int MAX_OPERATIONS = 50;
-
-	/**
 	 * A reference to the current {@code Node} whose children are being
 	 * deleted
 	 */
@@ -1602,7 +1596,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	}
 
 	/**
-	 * Removes MAX_OPERATION number of elements from the ScalableList and
+	 * Removes some number of elements from the ScalableList and
 	 * returns {@code true} if there is more work to be done. If there are
 	 * no more elements to remove, then it will return {@code false},
 	 * signifying to the {@code AsynchronousClearTask} to start taking
@@ -1615,13 +1609,12 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    ListNode<E> currentListNode = current.get();
 	    AppContext.getDataManager().markForUpdate(currentListNode);
 	    ListNode<E> next;
-	    int count = 0;
 	    int size = currentListNode.size();
 	    E entry = null;
 
 	    // Perform some removals
 	    while (size > 0 && currentListNode != null &&
-		    count++ < MAX_OPERATIONS) {
+                   AppContext.getTaskManager().shouldContinue()) {
 
 		// Repeatedly remove the head element in the
 		// ListNode as long as one exists.
