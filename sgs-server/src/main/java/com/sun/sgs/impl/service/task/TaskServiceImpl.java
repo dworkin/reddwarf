@@ -153,15 +153,17 @@ import javax.management.JMException;
  *      state during this delay period.<p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	{@value #CONTINUE_THRESHOLD_PROPERTY}
+ *	{@value #CONTINUE_POLICY_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> {@value #CONTINUE_THRESHOLD_DEFAULT}
+ *	<i>Default:</i> {@value #CONTINUE_POLICY_DEFAULT}
  *
- * <dd style="padding-top: .5em">Specifies the time in milliseconds from the
- *      start of a transaction during which the
- *      {@link #shouldContinue() shouldContinue} method will return
- *      {@code true}.  After this period of time has elapsed in a transaction,
- *      this method will always return {@code false}.
+ * <dd style="padding-top: .5em">Specifies the fully qualified class name of
+ *      the class which will be used as the {@link ContinuePolicy} for the task
+ *      service.  The given class should be a non-abstract class that implements
+ *      the {@code ContinuePolicy} interface, and that provides a
+ *      constructor with the parameters ({@link Properties},
+ *      {@link ComponentRegistry}, {@link TransactionProxy})<p>
+ *
  *
  * </dl> <p>
  */
@@ -254,17 +256,17 @@ public class TaskServiceImpl
     private RecurringTaskHandle handoffTaskHandle = null;
 
     /**
-     * The property key to set how long a task should run before
-     * {@link #shouldContinue() shouldContinue} returns false.
+     * The property key to specify which class to use as the continue policy.
      */
-    public static final String CONTINUE_THRESHOLD_PROPERTY =
-            NAME + ".continue.threshold";
+    public static final String CONTINUE_POLICY_PROPERTY =
+            NAME + ".continue.policy";
 
-    /** The default continue threshold. */
-    public static final long CONTINUE_THRESHOLD_DEFAULT = 10L;
+    /** The default continue policy. */
+    public static final String CONTINUE_POLICY_DEFAULT =
+            "com.sun.sgs.impl.service.task.FixedTimeContinuePolicy";
 
-    // the actual value of the continue threshold
-    private final long continueThreshold;
+    // the actual continue policy
+    private final ContinuePolicy continuePolicy;
 
     // the internal value used to represent a task with no delay
     private static final long START_NOW = 0;
@@ -373,12 +375,21 @@ public class TaskServiceImpl
                                             "be non-negative");
         }
 
-        // get the continue threshold
-        continueThreshold = wrappedProps.getLongProperty(
-                CONTINUE_THRESHOLD_PROPERTY, CONTINUE_THRESHOLD_DEFAULT);
-        if (continueThreshold <= 0) {
-            throw new IllegalStateException("Continue threshold property " +
-                                            "must be positive");
+        // get the continue policy
+        String continuePolicyClass = wrappedProps.getProperty(
+                CONTINUE_POLICY_PROPERTY);
+        if (continuePolicyClass == null ||
+            continuePolicyClass.equals(CONTINUE_POLICY_DEFAULT)) {
+            continuePolicy = new FixedTimeContinuePolicy(
+                    properties, systemRegistry, txnProxy);
+
+        } else {
+            continuePolicy = wrappedProps.getClassInstanceProperty(
+                    CONTINUE_POLICY_PROPERTY,
+                    ContinuePolicy.class, new Class[]{Properties.class,
+                                                      ComponentRegistry.class,
+                                                      TransactionProxy.class},
+                    properties, systemRegistry, txnProxy);
         }
 
         // create our profiling info and register our MBean
@@ -620,9 +631,7 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public boolean shouldContinue() {
-        Transaction txn = txnProxy.getCurrentTransaction();
-        return System.currentTimeMillis() - txn.getCreationTime() <
-               continueThreshold;
+        return continuePolicy.shouldContinue();
     }
 
     /**

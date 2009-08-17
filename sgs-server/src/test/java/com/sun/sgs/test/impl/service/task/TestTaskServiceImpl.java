@@ -143,7 +143,7 @@ public class TestTaskServiceImpl extends Assert {
         taskService = serverNode.getTaskService();
 
         continueThreshold = Long.valueOf(serviceProps.getProperty(
-                "com.sun.sgs.impl.service.task.TaskServiceImpl.continue.threshold"));
+                "com.sun.sgs.impl.service.task.continue.threshold"));
         
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present

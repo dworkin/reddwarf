@@ -469,8 +469,7 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
             "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
-            "com.sun.sgs.impl.service.task.TaskServiceImpl.continue.threshold",
-                "10"
+            "com.sun.sgs.impl.service.task.continue.threshold", "10"
         );
         
         
