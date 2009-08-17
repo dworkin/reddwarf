@@ -118,9 +118,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     static final String EVENT_QUEUE_MAP_PREFIX = PKG_NAME + "eventQueue.";
 
     /** The empty channel membership set. */
-    @SuppressWarnings("unchecked")
     static final Set<BigInteger> EMPTY_CHANNEL_MEMBERSHIP =
-	(Set<BigInteger>) Collections.EMPTY_SET;
+	Collections.unmodifiableSet(new HashSet<BigInteger>());
 
     /** The random number generator for choosing a new coordinator. */
     private static final Random random = new Random();
@@ -135,7 +134,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     protected final BigInteger channelRefId;
 
     /** The wrapped channel instance. */
-    private final ManagedReference<ChannelWrapper> wrappedChannelRef;
+    private ManagedReference<ChannelWrapper> wrappedChannelRef;
 
     /** The reference to this channel's listener. */
     private final ManagedReference<ChannelListener> listenerRef;
@@ -179,16 +178,19 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Constructs an instance of this class with the specified
-     * {@code name}, {@code listener}, {@code delivery} guarantee.
-     * and write buffer capacity.
+     * {@code name}, {@code listener}, {@code delivery} guarantee,
+     * write buffer capacity, and channel wrapper.
      *
      * @param name a channel name
      * @param listener a channel listener
      * @param delivery a delivery guarantee
      * @param writeBufferCapacity the capacity of the write buffer, in bytes
+     * @param channelWrapper the previous channel wrapper, or {@code null} if
+     *	      the channe is being created for the first time
      */
     protected ChannelImpl(String name, ChannelListener listener,
-			  Delivery delivery, int writeBufferCapacity)
+			  Delivery delivery, int writeBufferCapacity,
+			  ChannelWrapper channelWrapper)
     {
 	if (name == null) {
 	    throw new NullPointerException("null name");
@@ -209,21 +211,25 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	this.writeBufferCapacity = writeBufferCapacity;
 	this.txn = ChannelServiceImpl.getTransaction();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
-	this.wrappedChannelRef =
-	    dataService.createReference(new ChannelWrapper(ref));
+	if (channelWrapper == null) {
+	    channelWrapper = new ChannelWrapper(ref);
+	} else {
+	    channelWrapper.setChannelRef(ref);
+	}
+	this.wrappedChannelRef = dataService.createReference(channelWrapper);
 	this.channelRefId = ref.getId();
 	this.coordNodeId = getLocalNodeId();
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "Created ChannelImpl:{0}",
 		       HexDumper.toHexString(channelRefId.toByteArray()));
 	}
-	getChannelsMap().put(name, this);
+	getChannelsMap().putOverride(name, this);
 	EventQueue eventQueue = new EventQueue(this);
 	eventQueueRef = dataService.createReference(eventQueue);
 	getEventQueuesMap(coordNodeId).
 	    put(channelRefId.toString(), eventQueue);
     }
-
+    
     /** Returns the data service. */
     private static DataService getDataService() {
 	return ChannelServiceImpl.getDataService();
@@ -263,15 +269,24 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			       Delivery delivery,
                                int writeBufferCapacity)
     {
+	return newInstance(name, listener, delivery, writeBufferCapacity, null);
+    }
+    
+    private static Channel newInstance(String name,
+				       ChannelListener listener,
+				       Delivery delivery,
+				       int writeBufferCapacity,
+				       ChannelWrapper channelWrapper)
+    {
 	ChannelImpl channel =
 	    delivery.equals(Delivery.UNRELIABLE) ?
 	    new UnreliableChannel(name, listener, delivery,
-				  writeBufferCapacity) :
+				  writeBufferCapacity, channelWrapper) :
 	    new OrderedChannel(name, listener, delivery,
-				writeBufferCapacity);
+			       writeBufferCapacity, channelWrapper);
 	return channel.getWrappedChannel();
     }
-
+    
     /**
      * Returns a channel with the given {@code name}.
      */
@@ -558,13 +573,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     void leaveAll() {
 	try {
 	    checkClosed();
-
-	    /*
-	     * Enqueue leaveAll request.
-	     */
-	    addEvent(new LeaveAllEvent(eventQueueRef.get()));
+	    close(false);
+	    ChannelListener listener =
+		listenerRef != null ? listenerRef.get() : null;
+	    newInstance(name, listener, delivery, writeBufferCapacity,
+			getWrappedChannel());
 	    logger.log(Level.FINEST, "leaveAll returns");
-
+	
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINE, e, "leave throws");
 	    throw e;
@@ -659,14 +674,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * is invoked by this channel's {@code ChannelWrapper} when the
      * application removes the wrapper object.
      */
-    void close() {
+    void close(boolean removeName) {
 	checkContext();
 	getDataService().markForUpdate(this);
 	if (!isClosed) {
 	    /*
 	     * Enqueue close event.
 	     */
-	    addEvent(new CloseEvent());
+	    addEvent(new CloseEvent(removeName));
 	    isClosed = true;
 	}
     }
@@ -711,6 +726,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /* -- Other methods -- */
+
+    /**
+     * Returns the write buffer capacity for this channel.
+     *
+     * @return the write buffer capacity
+     */
+    private int getWriteBufferCapacity() {
+        return writeBufferCapacity;
+    }
 
     /**
      * Returns the ID for the specified {@code session}.
@@ -968,16 +992,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Removes all sessions from this channel, removes the channel
-     * object and its binding, the channel listener wrapper (if we
+     * Removes the channel object, the channel listener wrapper (if we
      * created a wrapper for it), and the event queue and associated
-     * binding from the data store.  This method should be called when
-     * the channel is closed.
+     * binding from the data store.  If {@code removeName} is {@code
+     * true}, the channel's name binding is also removed.  This method
+     * is called when {@code leaveAll} is invoked on the channel (in
+     * which case the channel's name binding is not removed) and is
+     * called when the channel is closed (in which case the channel's
+     * name binding is removed).
      */
-    private void removeChannel() {
+    private void removeChannel(boolean removeName) {
 	DataService dataService = getDataService();
 	clearServerNodeIds();
-	getChannelsMap().removeOverride(name);
+	if (removeName) {
+	    getChannelsMap().removeOverride(name);
+	}
 	dataService.removeObject(this);
 	if (listenerRef != null) {
 	    ChannelListener maybeWrappedListener = listenerRef.get();
@@ -1427,8 +1456,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    channel.addServerNodeId(getNodeId(session));
 
-	    ProcessJoinTask task =
-		new ProcessJoinTask(channel, channel.eventQueueRef.getId(),
+	    JoinNotifyTask task =
+		new JoinNotifyTask(channel, channel.eventQueueRef.getId(),
 				    this, session, sessionRefId);
 	    ChannelServiceImpl.getChannelService().addChannelTask(
 		    channel.channelRefId, task);
@@ -1444,11 +1473,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * A non-transactional task to send a join notification to a session's
+     * A non-transactional task to send a notification to a session's
      * node, allowing for the possibility of the session relocating while
-     * the join message is in transit.
+     * the notification is in transit.
      */
-    private abstract static class ProcessChannelEventTask
+    private abstract static class SessionNotifyTask
 	extends AbstractKernelRunnable
     {
 	protected final ChannelServiceImpl channelService;
@@ -1470,7 +1499,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance.  This contructor must be called within a
 	 * transaction.
 	 */
-	ProcessChannelEventTask(ChannelImpl channel,
+	SessionNotifyTask(ChannelImpl channel,
 				BigInteger eventQueueRefId,
 				ChannelEvent channelEvent,
 				ClientSessionImpl session,
@@ -1690,15 +1719,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * node, allowing for the possibility of the session relocating while
      * the join message is in transit.
      */
-    private static class ProcessJoinTask extends ProcessChannelEventTask {
+    private static class JoinNotifyTask extends SessionNotifyTask {
 
 	/**
 	 * Constructs an instance.  This contructor must be called within a
 	 * transaction.
 	 */
-	ProcessJoinTask(ChannelImpl channel, BigInteger eventQueueRefId,
-			JoinEvent joinEvent, ClientSessionImpl session,
-			BigInteger sessionRefId)
+	JoinNotifyTask(ChannelImpl channel, BigInteger eventQueueRefId,
+		       JoinEvent joinEvent, ClientSessionImpl session,
+		       BigInteger sessionRefId)
 	{
 	    super(channel, eventQueueRefId, joinEvent, session, sessionRefId);
 	}
@@ -1771,8 +1800,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return completed();
 	    }
 	
-	    ProcessLeaveTask task =
-		new ProcessLeaveTask(channel, channel.eventQueueRef.getId(),
+	    LeaveNotifyTask task =
+		new LeaveNotifyTask(channel, channel.eventQueueRef.getId(),
 				     this, session, sessionRefId);
 	    ChannelServiceImpl.getChannelService().addChannelTask(
 		channel.channelRefId, task);
@@ -1787,13 +1816,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
-    private static class ProcessLeaveTask extends ProcessChannelEventTask {
+    /**
+     * A non-transactional task to send a join notification to a session's
+     * node, allowing for the possibility of the session relocating while
+     * the join message is in transit.
+     */
+    private static class LeaveNotifyTask extends SessionNotifyTask {
 
 	/**
 	 * Constructs an instance.  This contructor must be called within a
 	 * transaction.
 	 */
-	ProcessLeaveTask(ChannelImpl channel, BigInteger eventQueueRefId,
+	LeaveNotifyTask(ChannelImpl channel, BigInteger eventQueueRefId,
 			 LeaveEvent leaveEvent, ClientSessionImpl session,
 			 BigInteger sessionRefId)
 	{
@@ -1831,50 +1865,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    timestamp, eventQueueTimestamp);
 	    }
 	    super.completed();
-	}
-    }
-
-    /**
-     * A channel leaveAll event.
-     */
-    private static class LeaveAllEvent extends ChannelEvent {
-	/** The serialVersionUID for this class. */
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * Constructs a leaveAll event.
-	 */
-	LeaveAllEvent(EventQueue eventQueue) {
-	    super(eventQueue.getTimestamp());
-	}
-
-	/** {@inheritDoc} */
-	public boolean serviceEvent(ChannelImpl channel) {
-
-	    Set<Long> serverNodeIds = channel.getServerNodeIds();
-	    channel.clearServerNodeIds();
-	    ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
-	    final BigInteger channelRefId = channel.channelRefId;
-	    for (final long nodeId : serverNodeIds) {
-		channelService.addChannelTask(
-		    channelRefId,					      
-		    new IoRunnable() {
-			public void run() throws IOException {
-			    ChannelServer server = getChannelServer(nodeId);
-			    if (server != null) {
-				server.leaveAll(channelRefId);
-			    }
-			} },
-		    nodeId);
-	    }
-	    return completed();
-	}
-
-	/** {@inheritDoc} */
-        @Override
-	public String toString() {
-	    return getClass().getName();
 	}
     }
 
@@ -2014,16 +2004,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    return getClass().getName();
 	}
     }
-
-    /**
-     * Returns the write buffer capacity for this channel.
-     *
-     * @return the write buffer capacity
-     */
-    int getWriteBufferCapacity() {
-        return writeBufferCapacity;
-    }
-
+    
     /**
      * A channel close event.
      */
@@ -2031,11 +2012,26 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
+	/** A flag to indicate whether the channel's name binding
+	 * should be removed. */
+	private final boolean removeName;
+	
 	/**
-	 * Constructs a close event.
+	 * Constructs a close event.  If {@code removeName} is {@code true},
+	 * the channel is truly being closed, and its channel name
+	 * binding should be removed.  If {@code removeName} is {@code
+	 * false}, then {@code leaveAll} was invoked on the channel, so
+	 * the channel's old persistent structures are being removed, but the
+	 * channel's name binding should remain, still referring to the
+	 * original {@code ChannelWrapper} whose underlying reference
+	 * was modified to refer to a newly created channel.
+	 *
+	 * @param removeName {@code true} if the channel's name binding
+	 *	  should be removed when the channel is closed
 	 */
-	CloseEvent() {
+	CloseEvent(boolean removeName) {
 	    super(0);
+	    this.removeName = removeName;
 	}
 
 	/** {@inheritDoc} */
@@ -2043,7 +2039,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	    final BigInteger channelRefId = channel.channelRefId;
 	    Set<Long> serverNodeIds = channel.getServerNodeIds();
-	    channel.removeChannel();
+	    channel.removeChannel(removeName);
 	    final ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    for (final long nodeId : serverNodeIds) {
@@ -2198,6 +2194,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		 * failure) fails before it has a chance to schedule a task
 		 * to remove the server node ID for another failed node
 		 * (cascading failure during recovery).
+		 *
+		 * TBD: a failed server node could be removed from the list
+		 * if a server node failure is discovered when sending a
+		 * channel message.
 		 */
 		for (long serverNodeId : channel.getServerNodeIds()) {
 		    Node serverNode = watchdogService.getNode(serverNodeId);
@@ -2247,7 +2247,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Finds the next locally-coordinated channel, removes the failed
+	 * Gets the next locally-coordinated channel, removes the failed
 	 * node from that channel, and reschedules this task to handle the
 	 * next locally-coordinated channel. If there are no more
 	 * locally-coordinated channels, then this task takes no action.
@@ -2258,21 +2258,30 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    
 	    BigInteger channelRefId = new BigInteger(iter.next());
-	    TaskService taskService = ChannelServiceImpl.getTaskService();
-	    ChannelImpl channel =
-		(ChannelImpl) getObjectForId(channelRefId);
+	    ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	    if (channel != null) {
 		channel.removeServerNodeId(failedNodeId);
 	    }
 	    // Schedule a task to remove failed node from next
 	    // locally coordinated channel.
 	    if (iter.hasNext()) {
-		taskService.scheduleTask(this);
+		ChannelServiceImpl.getTaskService().scheduleTask(this);
 	    }
 	}
     }
 
-
+    /**
+     * Checks with the {@code ChannelServer} on the node with the specified
+     * {@code nodeId} whether the session with the specified {@code
+     * sessionRefId} is a member of the channel with the specified {@code
+     * channelRefId}, and returns {@code true} if the session is a member
+     * and retuns {@code false} otherwise.
+     *
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
+     * @param	nodeId the session's node ID
+     * @param	timestamp the requesting event's timestamp
+     */
     private static boolean isChannelMemberRemoteCheck(
 	BigInteger channelRefId, BigInteger sessionRefId,
 	long nodeId, long timestamp)

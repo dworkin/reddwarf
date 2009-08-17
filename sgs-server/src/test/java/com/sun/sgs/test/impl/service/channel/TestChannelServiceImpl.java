@@ -960,6 +960,62 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	}
     }
 
+    @Test
+    public void testChannelLeaveAllThenJoin() throws Exception {
+	final String channelName = "leaveAllTest";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(someUsers);
+	
+	try {
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = getChannel(channelName);
+		    channel.leaveAll();
+		}
+	    }, taskOwner);
+	    
+	    Thread.sleep(200);
+	    checkUsersJoined(channelName, noUsers);
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 2);
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
+    @Test
+    public void testChannelLeaveAllThenSend() throws Exception {
+	final String channelName = "leaveAllTest";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(someUsers);
+	
+	try {
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = getChannel(channelName);
+		    channel.leaveAll();
+		}
+	    }, taskOwner);
+	    
+	    Thread.sleep(200);
+	    checkUsersJoined(channelName, noUsers);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(group, channelName, 0);
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
     // -- Test Channel.send --
 
     private static byte[] testMessage = new byte[] {'x'};

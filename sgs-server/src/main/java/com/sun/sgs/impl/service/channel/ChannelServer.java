@@ -113,16 +113,6 @@ public interface ChannelServer extends Remote {
 	throws IOException;
     
     /**
-     * Notifies this server that all locally-connected member sessions
-     * have left the channel with the specified {@code channelRefId}.
-     *
-     * @param	channelRefId a channel ID
-     * @throws	IOException if a communication problem occurs while
-     * 		invoking this method
-     */
-    void leaveAll(BigInteger channelRefId) throws IOException;
-
-    /**
      * Sends the specified message to all locally-connected sessions
      * that are members of the channel with the specified {@code
      * channelRefId}.

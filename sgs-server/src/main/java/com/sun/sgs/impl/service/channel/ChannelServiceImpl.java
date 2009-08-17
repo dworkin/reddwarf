@@ -187,18 +187,18 @@ public final class ChannelServiceImpl
     private final ConcurrentHashMap<Long, ChannelServer>
 	channelServerCache = new ConcurrentHashMap<Long, ChannelServer>();
 
-    /** The cache of channel membership lists, keyed by channel ID.  The
-     * cache entry timeout is one second.
+    /** The cache of channel membership snapshots, keyed by channel ID.
+     * The cache entry timeout is one second.
      */
     private final CacheMap<BigInteger, Set<BigInteger>>
 	channelMembershipCache =
 	    new CacheMap<BigInteger, Set<BigInteger>>(1000);
 
-    /** The cache of event queues, keyed by channel ID. */ 
+    /** The cache of channel event queues, keyed by channel ID. */ 
     private final ConcurrentHashMap<BigInteger, Queue<ChannelEventInfo>>
 	eventQueueCache =
 	    new ConcurrentHashMap<BigInteger, Queue<ChannelEventInfo>>();
-    
+
     /** The local channel membership lists, keyed by channel ID. */
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
 	localChannelMembersMap =
@@ -597,46 +597,6 @@ public final class ChannelServiceImpl
 	    }
 	}
 	
-	/** {@inheritDoc}
-	 *
-	 * Removes the channel from the per-channel local membership set,
-	 * and sends a channel leave message to the channel's local member
-	 * sessions.
-	 */
-	public void leaveAll(BigInteger channelRefId) {
-	    callStarted();
-	    try {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST, "leaveAll channelId:{0}",
-			HexDumper.toHexString(channelRefId.toByteArray()));
-		}
-		Set<BigInteger> localMembers;
-		localMembers = localChannelMembersMap.remove(channelRefId);
-		if (localMembers != null) {
-		    for (BigInteger sessionRefId : localMembers) {
-			SessionProtocol protocol =
-			    sessionService.getSessionProtocol(sessionRefId);
-			if (protocol != null) {
-                            try {
-                                protocol.channelLeave(channelRefId);
-                            } catch (IOException e) {
-                                logger.logThrow(Level.WARNING, e,
-                                                "channelLeave throws");
-                            } catch (RuntimeException e) {
-				// TBD
-                                logger.logThrow(Level.WARNING, e,
-                                                "channelLeave throws");
-			    }
-			}
-		    }
-		}
-		
-	    } finally {
-		callFinished();
-	    }
-	}
-
 	/** {@inheritDoc}
 	 *
 	 * Sends the given {@code message} to all local members of the
@@ -1078,14 +1038,7 @@ public final class ChannelServiceImpl
 			break;
 		    }
 		    
-		    if (info.eventType.equals(ChannelEventType.LEAVE_ALL)) {
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.log(Level.FINEST, "leaveAll");
-			    }
-			isChannelMember = false;
-			
-		    } else if (info.sessionRefId.equals(sessionRefId)) {
-			switch (info.eventType) {
+		    switch (info.eventType) {
 			    
 			case JOIN:
 			    if (logger.isLoggable(Level.FINEST)) {
@@ -1112,10 +1065,9 @@ public final class ChannelServiceImpl
 
 			default:
 			    break;
-			}
 		    }
 		}
-	    }		
+	    }
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "isChannelMember returns: {0}",
@@ -2100,7 +2052,7 @@ public final class ChannelServiceImpl
 	}
     }
 
-    enum ChannelEventType { JOIN, LEAVE, LEAVE_ALL };
+    enum ChannelEventType { JOIN, LEAVE };
     
     private class ChannelEventInfo {
 

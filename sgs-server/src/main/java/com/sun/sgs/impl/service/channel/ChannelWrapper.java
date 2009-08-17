@@ -49,7 +49,7 @@ class ChannelWrapper
     private static final long serialVersionUID = 1L;
 
     /** The reference to the channel that this instance wraps. */
-    private final ManagedReference<ChannelImpl> channelRef;
+    private ManagedReference<ChannelImpl> channelRef;
 
     /**
      * Constructs an instance with the specified {@code channelRef}.
@@ -120,10 +120,15 @@ class ChannelWrapper
 
     /* -- Implement ManagedObjectRemoval -- */
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     * 
+     * The application removed the wrapper, so close the channel,
+     * indicating that the the channel name mapping should be removed as
+     * well.
+     */
     public void removingObject() {
 	try {
-	    channelRef.get().close();
+	    channelRef.get().close(true);
 	} catch (ObjectNotFoundException e) {
 	    // already closed.
 	}
@@ -176,6 +181,21 @@ class ChannelWrapper
     }
     
     /* -- Other methods -- */
+
+    /**
+     * Set the channel reference for this wrapper to the specified {@code
+     * channelRef}.  The underlying channel reference changes when the
+     * application invokes {@code leaveAll} on the channel, which closes
+     * and removes the old channel (except for the channel's name binding)
+     * and reuses the existing wrapper, replacing the previous channel
+     * reference with a reference to the "next generation" channel of the
+     * same name.
+     *
+     * @param	channelRef the new channel reference
+     */
+    void setChannelRef(ManagedReference<ChannelImpl> channelRef) {
+	this.channelRef = channelRef;
+    }
 
     /**
      * Returns the underlying {@code ChannelImpl} instance for this

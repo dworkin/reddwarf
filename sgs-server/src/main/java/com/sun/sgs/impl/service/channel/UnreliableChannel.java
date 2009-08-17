@@ -33,12 +33,13 @@ class UnreliableChannel extends ChannelImpl {
 
     /**
      * Constructs an instance with the specified {@code name}, {@code listener},
-     * {@code delivery} guarantee, write capacity.
+     * {@code delivery} guarantee, write capacity, and {@code channelWrapper}.
      */
     UnreliableChannel(String name, ChannelListener listener,
-		      Delivery delivery, int writeBufferCapacity)
+		      Delivery delivery, int writeBufferCapacity,
+		      ChannelWrapper channelWrapper)
     {
-	super(name, listener, delivery, writeBufferCapacity);
+	super(name, listener, delivery, writeBufferCapacity, channelWrapper);
     }
 
     /** {@inheritDoc}
