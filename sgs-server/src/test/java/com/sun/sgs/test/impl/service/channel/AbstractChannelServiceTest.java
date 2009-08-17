@@ -482,6 +482,15 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	}, taskOwner);
     }
 
+    protected void leaveAll(final String channelName) throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = getChannel(channelName);
+		channel.leaveAll();
+	    }
+	}, taskOwner);
+    }
+
     protected void checkUsersJoined(
 	final String channelName, final String... users)
 	throws Exception
@@ -679,7 +688,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
 		    } catch (InterruptedException e) {
 		    }
 		    assertTrue(
-			toString() + "did not receive CHANNEL_JOIN, " +
+			toString() + " did not receive CHANNEL_JOIN, " +
 			"channel: " + channelName,
 			channelNameToId.containsKey(channelName));
 		}
@@ -704,7 +713,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
 		    } catch (InterruptedException e) {
 		    }
 		    assertFalse(
-			toString() + "did not receive CHANNEL_LEAVE, " +
+			toString() + " did not receive CHANNEL_LEAVE, " +
 			"channel: " + channelName,
 			channelNameToId.containsKey(channelName));
 		}

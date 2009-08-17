@@ -581,7 +581,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(Level.FINEST, "leaveAll returns");
 	
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINE, e, "leave throws");
+	    logger.logThrow(Level.FINE, e, "leaveAll throws");
 	    throw e;
 	}
     }
@@ -769,6 +769,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
+     * Returns {@code true} if the channel is closed, and {@code false}
+     * otherwise.
+     */
+    boolean isClosed() {
+	return isClosed;
+    }
+
+    /**
      * Checks the context, and then checks that this channel is not
      * closed, throwing an IllegalStateException if the channel is
      * closed.
@@ -821,6 +829,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * @param	nodeId a server node's ID
      */
     void addServerNodeId(long nodeId) {
+	checkClosed();
 	if (servers.add(nodeId)) {
 	    getDataService().markForUpdate(this);
 	}
@@ -2039,7 +2048,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	    final BigInteger channelRefId = channel.channelRefId;
 	    Set<Long> serverNodeIds = channel.getServerNodeIds();
-	    channel.removeChannel(removeName);
 	    final ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    for (final long nodeId : serverNodeIds) {
@@ -2061,7 +2069,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    public void run() {
 			channelService.closedChannel(channelRefId);
 		    } });
-	    return completed();
+	    completed();
+	    channel.removeChannel(removeName);
+	    return true;
 	}
 
 	/** {@inheritDoc} */

@@ -1820,28 +1820,43 @@ public final class ChannelServiceImpl
 	public void run() {
 	    final BigInteger channelRefId = channels.poll();
 	    if (channelRefId != null) {
+		boolean success = false;
 		try {
 		    // Add relocating client session to channel
-		    transactionScheduler.runTask(
-		      new AbstractKernelRunnable(
-			    "addRelocatingSessionToChannel")
-		      {
-			public void run() {
+		    success = runTransactionalCallable(
+		      new KernelCallable<Boolean>("addNodeIdToChannel") {
+			public Boolean call() {
 			    ChannelImpl channelImpl = (ChannelImpl)
 				getObjectForId(channelRefId);
-			    if (channelImpl != null) {
-				channelImpl.addServerNodeId(localNodeId);
+			    
+			    if (channelImpl == null || channelImpl.isClosed()) {
+				if (logger.isLoggable(Level.FINE)) {
+				    logger.log(
+					Level.FINE,
+					"Unable to update closed channel:{0} " +
+					"for session:{1}",
+					HexDumper.toHexString(
+					    channelRefId.toByteArray()),
+					HexDumper.toHexString(
+					    sessionRefId.toByteArray()));
+				}
+				return false;
 			    } else {
-				// TBD: throw Exception to indicate that
-				// channel has been closed so session
-				// should be notified (when relocated)
-				// via "leave" message?
+				channelImpl.addServerNodeId(localNodeId);
+				return true;
 			    }
 			}
-		    }, taskOwner);
+		      });
 		} catch (Exception e) {
 		    // TBD: exception handling...
 		}
+		if (!success) {
+		    // channel is closed, so send leave message.
+		    serverImpl.handleChannelRequest(
+		        sessionRefId,
+			new ChannelLeaveTask(channelRefId, sessionRefId));
+		}
+		
 		taskScheduler.scheduleTask(this, taskOwner);
 		
 	    } else {

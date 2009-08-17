@@ -257,8 +257,8 @@ public class TestChannelServiceImplRelocatingSessions
 	} finally {
 	    group.disconnect(false);
 	}
-	
     }
+    
     @Test
     @IntegrationTest
     public void testChannelLeaveToOldNodeDuringRelocate()
@@ -521,6 +521,43 @@ public class TestChannelServiceImplRelocatingSessions
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME);
 	    checkUsersJoined(channelName, noUsers);
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
+    @Test
+    @IntegrationTest
+    public void testChannelLeaveAllAfterRelocate() throws Exception {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	// channel coordinator is on server node
+	createChannel(channelName);
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
+	
+	// Client will log into "oldNode"
+	ClientGroup group = new ClientGroup(oldNode.getAppPort(), oneUser);
+	
+	try {
+	    // Initiate client relocation to new node.
+	    DummyClient relocatingClient = group.getClient(REX);
+	    joinUsers(channelName, oneUser);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    holdChannelServerMethodToNode(oldNode, "close");
+	    // send leaveAll...
+	    leaveAll(channelName);
+	    Thread.sleep(200);
+	    // Hold up close sent to oldNode
+	    
+	    moveClient(relocatingClient, oldNode, newNode);
+	    Thread.sleep(200);
+	    releaseChannelServerMethodHeld(oldNode);
+	    
+	    // Make sure that relocating session got "leave" message.
+	    checkUsersJoined(channelName, noUsers);
+	    relocatingClient.assertLeftChannel(channelName);
 	    
 	} finally {
 	    group.disconnect(false);

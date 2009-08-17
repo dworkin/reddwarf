@@ -934,14 +934,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
-
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() {
-		    Channel channel = getChannel(channelName);
-		    channel.leaveAll();
-		}
-	    }, taskOwner);
-	    
+	    leaveAll(channelName);
 	    Thread.sleep(100);
 	    
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -969,14 +962,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
-
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() {
-		    Channel channel = getChannel(channelName);
-		    channel.leaveAll();
-		}
-	    }, taskOwner);
-	    
+	    leaveAll(channelName);
 	    Thread.sleep(200);
 	    checkUsersJoined(channelName, noUsers);
 	    joinUsers(channelName, someUsers);
@@ -998,14 +984,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
-
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() {
-		    Channel channel = getChannel(channelName);
-		    channel.leaveAll();
-		}
-	    }, taskOwner);
-	    
+	    leaveAll(channelName);
 	    Thread.sleep(200);
 	    checkUsersJoined(channelName, noUsers);
 	    sendMessagesToChannel(channelName, 2);
