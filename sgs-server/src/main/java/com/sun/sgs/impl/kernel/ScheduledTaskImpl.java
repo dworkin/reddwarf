@@ -21,7 +21,7 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.kernel.schedule.ScheduledTask;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -40,20 +40,26 @@ import com.sun.sgs.kernel.TaskQueue;
  * completed successfully, or the {@code Throwable} that caused the task
  * to fail permanently in the case of failure. See the documentation on
  * the associated methods for more details on how interruption is handled.
+ * <p>
+ * Note: This class is located in the {@code com.sun.sgs.impl.kernel} package
+ * instead of the {@code com.sun.sgs.impl.kernel.schedule} package because
+ * it needs to be a package-private implementation for use by the schedulers.
  */
-class ScheduledTaskImpl implements ScheduledTask {
+final class ScheduledTaskImpl implements ScheduledTask {
 
     // the common, immutable aspects of a task
     private final KernelRunnable task;
     private final Identity owner;
-    private final Priority priority;
     private final long period;
 
     // the common, mutable aspects of a task
+    private volatile Priority priority;
     private volatile long startTime;
     private RecurringTaskHandle recurringTaskHandle = null;
     private int tryCount = 0;
     private TaskQueue queue = null;
+    private volatile long timeout;
+    private volatile Throwable lastFailure = null;
 
     // state associated with the lifetime of the task
     private enum State {
@@ -75,64 +81,147 @@ class ScheduledTaskImpl implements ScheduledTask {
     private Throwable result = null;
 
     /**
-     * Creates an instance of <code>ScheduledTask</code> with all the same
-     * values of an existing <code>ScheduledTask</code> except its starting
-     * time, which is set to the new value.
-     *
-     * @param task existing <code>ScheduledTask</code>
-     * @param newStartTime the new starting time for the task in milliseconds
-     *                     since January 1, 1970
+     * We use the builder pattern here to avoid constructor explosion.
+     * This builder takes three required parameters, {@code task},
+     * {@code owner}, and {@code priority} and then provides setter methods
+     * for each of the remaining optional parameters for building a
+     * {@code ScheduledTaskImpl} object.
+     * <p>
+     * Example usage:
+     * <p>
+     * <pre>
+     * ScheduledTaskImpl task = new ScheduledTaskImpl.Builder(
+     *     task, owner, priority).period(1000).build();
+     * </pre>
      */
-    ScheduledTaskImpl(ScheduledTaskImpl task, long newStartTime) {
-        this(task.task, task.owner, task.priority, newStartTime, task.period);
-        this.recurringTaskHandle = task.recurringTaskHandle;
+    static class Builder {
+        // attributes used to build the ScheduledTaskImpl
+        private KernelRunnable task;
+        private Identity owner;
+        private Priority priority;
+        private long startTime = System.currentTimeMillis();
+        private long period = NON_RECURRING;
+        private long timeout = defaultTimeout;
+        private RecurringTaskHandle recurringTaskHandle = null;
+
+        // default values
+        private static long defaultTimeout = -2;
+
+        /**
+         * Constructs a {@code Builder} object that takes three required
+         * parameters for building a {@code ScheduledTaskImpl}.
+         *
+         * @param task the <code>KernelRunnable</code> to run
+         * @param owner the <code>Identity</code> of the task owner
+         * @param priority the <code>Priority</code> of the task
+         */
+        Builder(KernelRunnable task, Identity owner, Priority priority) {
+            this.task = task;
+            this.owner = owner;
+            this.priority = priority;
+        }
+
+        /**
+         * Constructs a {@code Builder} object to build a
+         * {@code ScheduledTaskImpl} object with all of the same values as the
+         * given task except for the {@code startTime}, {@code timeout}, and
+         * {@code maxConcurrency} which are set to their default values.
+         *
+         * @param task existing {@code ScheduledTaskImpl}
+         */
+        Builder(ScheduledTaskImpl task) {
+            this(task.task, task.owner, task.priority);
+            this.period = task.period;
+            this.recurringTaskHandle = task.recurringTaskHandle;
+        }
+
+        /**
+         * Setter for setting the start time of a new {@code ScheduledTaskImpl}.
+         *
+         * @param startTime the time at which to start in milliseconds since
+         *                  January 1, 1970
+         * @return this {@code Builder} object
+         */
+        Builder startTime(long startTime) {
+            this.startTime = startTime;
+            return this;
+        }
+
+        /**
+         * Setter for setting the period of a new {@code ScheduledTaskImpl}
+         *
+         * @param period the delay between recurring executions, or
+         *               {@code NON_RECURRING}
+         * @return this {@code Builder} object
+         */
+        Builder period(long period) {
+            this.period = period;
+            return this;
+        }
+
+        /**
+         * Setter for setting the timeout of a new {@code ScheduledTaskImpl}
+         *
+         * @param timeout the transaction timeout to use for this task or
+         *                {@code UNBOUNDED}
+         * @return this {@code Builder} object
+         */
+        Builder timeout(long timeout) {
+            this.timeout = timeout;
+            return this;
+        }
+
+        /**
+         * Set the default value of {@code timeout} for new instances
+         * of {@code ScheduledTaskImpl} built with a builder.
+         *
+         * @param timeout default value of timeout
+         */
+        static void setDefaultTimeout(long timeout) {
+            defaultTimeout = timeout;
+        }
+
+        /**
+         * Builds a {@code ScheduledTaskImpl} object from the attributes
+         * in this builder.
+         *
+         * @return a {@code ScheduledTaskImpl} object
+         */
+        ScheduledTaskImpl build() {
+            return new ScheduledTaskImpl(this);
+        }
+
     }
 
     /**
-     * Creates an instance of <code>ScheduledTask</code> that does not
-     * represent a recurring task.
+     * Creates an instance of {@code ScheduledTaskImpl} from the given
+     * {@code Builder}.
      *
-     * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>Identity</code> of the task owner
-     * @param priority the <code>Priority</code> of the task
-     * @param startTime the time at which to start in milliseconds since
-     *                  January 1, 1970
+     * @param builder the {@code Builder} object that contains each of the
+     *                desired attributes of the new task
      */
-    ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime)
-    {
-        this(task, owner, priority, startTime, NON_RECURRING);
-    }
-
-    /**
-     * Creates an instance of <code>ScheduledTask</code>.
-     *
-     * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>Identity</code> of the task owner
-     * @param priority the <code>Priority</code> of the task
-     * @param startTime the time at which to start in milliseconds since
-     *                  January 1, 1970
-     * @param period the delay between recurring executions, or
-     *               <code>NON_RECURRING</code>
-     */
-    ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime, long period)
-    {
-        if (task == null) {
+    private ScheduledTaskImpl(Builder builder) {
+        if (builder.task == null) {
             throw new NullPointerException("Task cannot be null");
         }
-        if (owner == null) {
+        if (builder.owner == null) {
             throw new NullPointerException("Owner cannot be null");
         }
-        if (priority == null) {
+        if (builder.priority == null) {
             throw new NullPointerException("Priority cannot be null");
         }
 
-        this.task = task;
-        this.owner = owner;
-        this.priority = priority;
-        this.startTime = startTime;
-        this.period = period;
+        if (builder.timeout < 0 && builder.timeout != ScheduledTask.UNBOUNDED) {
+            throw new IllegalStateException("Timeout cannot be negative");
+        }
+
+        this.task = builder.task;
+        this.owner = builder.owner;
+        this.priority = builder.priority;
+        this.startTime = builder.startTime;
+        this.period = builder.period;
+        this.timeout = builder.timeout;
+        this.recurringTaskHandle = builder.recurringTaskHandle;
     }
 
     /** Implementation of ScheduledTask interface. */
@@ -160,6 +249,26 @@ class ScheduledTaskImpl implements ScheduledTask {
     /** {@inheritDoc} */
     public long getPeriod() {
         return period;
+    }
+
+    /** {@inheritDoc} */
+    public int getTryCount() {
+        return tryCount;
+    }
+
+    /** {@inheritDoc} */
+    public long getTimeout() {
+        return timeout;
+    }
+    
+    /** {@inheritDoc} */
+    public Throwable getLastFailure() {
+        return lastFailure;
+    }
+
+    /** {@inheritDoc} */
+    public void setPriority(Priority priority) {
+        this.priority = priority;
     }
 
     /** {@inheritDoc} */
@@ -215,9 +324,13 @@ class ScheduledTaskImpl implements ScheduledTask {
 
     /** Package-private utility methods. */
 
-    /** Re-sets the starting time to the now. */
-    void resetStartTime() {
-        startTime = System.currentTimeMillis();
+    /**
+     * Sets the transaction timeout for this task.
+     *
+     * @param timeout the new transaction timeout for this task
+     */
+    void setTimeout(long timeout) {
+        this.timeout = timeout;
     }
 
     /**
@@ -237,6 +350,11 @@ class ScheduledTaskImpl implements ScheduledTask {
             throw new InterruptedException("interrupted while getting result");
         }
         return result;
+    }
+
+    /** Re-sets the starting time to the now. */
+    void resetStartTime() {
+        startTime = System.currentTimeMillis();
     }
 
     /** Returns whether the task has finished. */
@@ -323,11 +441,12 @@ class ScheduledTaskImpl implements ScheduledTask {
     }
 
     /**
-     * Returns the try count (the number of times that this task has been
-     * attempted).
+     * Sets the {@code Throwable} that caused the last failure of this task.
+     *
+     * @param lastFailure the last failure
      */
-    int getTryCount() {
-        return tryCount;
+    void setLastFailure(Throwable lastFailure) {
+        this.lastFailure = lastFailure;
     }
 
     /**

@@ -25,6 +25,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.TransactionListenerDetail;
 import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 
 /**
@@ -74,6 +75,9 @@ public class DummyProfileCollectorHandle implements ProfileCollectorHandle {
 	ProfileParticipantDetail participantDetail)
     {
 	throw new UnsupportedOperationException();
+    }
+    public void addListener(TransactionListenerDetail listenerDetail) {
+        throw new UnsupportedOperationException();
     }
     public void finishTask(int tryCount) {
 	throw new UnsupportedOperationException();

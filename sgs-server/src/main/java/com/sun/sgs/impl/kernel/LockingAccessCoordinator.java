@@ -777,5 +777,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	public void afterCompletion(boolean committed) {
 	    endTransaction(txn);
 	}
+
+        /** {@inheritDoc} */
+        public String getTypeName() {
+            return TxnListener.class.getName();
+        }
     }
 }

@@ -19,18 +19,20 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.kernel.schedule.SchedulerQueue;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
+import com.sun.sgs.kernel.schedule.SchedulerQueue;
+import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -47,7 +49,6 @@ import com.sun.sgs.service.Transaction;
 
 import java.beans.PropertyChangeEvent;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
 import java.util.LinkedList;
@@ -79,13 +80,25 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>{@value #SCHEDULER_QUEUE_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i> <code>{@value #DEFAULT_SCHEDULER_QUEUE}</code>
- *
+ * 
  * <dd style="padding-top: .5em">The implementation class used to track
  *      access to define which queue implementation should back this scheduler.
  *      The value of this property should be the
  *      name of a public, non-abstract class that implements the
  *      {@link SchedulerQueue} interface, and that provides a public
  *      constructor with the parameters {@link Properties}<p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #SCHEDULER_RETRY_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_SCHEDULER_RETRY}</code>
+ *
+ * <dd style="padding-top: .5em">The implementation class used to define
+ *      which retry policy implementation to use when tasks fail or abort.
+ *      The value of this property should be the
+ *      name of a public, non-abstract class that implements the
+ *      {@link SchedulerRetryPolicy} interface, and that provides a public
+ *      constructor with the parameters {@link Properties}<p>
+ *
  * </dl>
  */
 final class TransactionSchedulerImpl
@@ -102,13 +115,26 @@ final class TransactionSchedulerImpl
      * this scheduler.
      */
     public static final String SCHEDULER_QUEUE_PROPERTY =
-        "com.sun.sgs.impl.kernel.scheduler.queue";
+            "com.sun.sgs.impl.kernel.scheduler.queue";
 
     /**
      * The default scheduler.
      */
     public static final String DEFAULT_SCHEDULER_QUEUE =
-        "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
+            "com.sun.sgs.impl.kernel.schedule.FIFOSchedulerQueue";
+
+    /**
+     * The property used to define which retry policy should be used in
+     * this scheduler
+     */
+    public static final String SCHEDULER_RETRY_PROPERTY =
+            "com.sun.sgs.impl.kernel.scheduler.retry";
+
+    /**
+     * The default retry policy
+     */
+    public static final String DEFAULT_SCHEDULER_RETRY =
+            "com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy";
 
     /**
      * The property used to define the default number of initial consumer
@@ -132,6 +158,9 @@ final class TransactionSchedulerImpl
     // the backing scheduler queue used for ordering tasks
     private final SchedulerQueue backingQueue;
 
+    // the retry policy used for this scheduler
+    private final SchedulerRetryPolicy retryPolicy;
+
     // the collector handle used for profiling data
     private final ProfileCollectorHandle profileCollectorHandle;
 
@@ -144,6 +173,9 @@ final class TransactionSchedulerImpl
     // the actual number of threads we're currently using
     private final AtomicInteger threadCount = new AtomicInteger(0);
 
+    // the number of requested consumer threads
+    private final int requestedThreads;
+
     // flag to note that this scheduler has shutdown
     private volatile boolean isShutdown = false;
 
@@ -152,6 +184,7 @@ final class TransactionSchedulerImpl
 
     // the number of dependent tasks sitting in queues
     private final AtomicInteger dependencyCount = new AtomicInteger(0);
+
 
     /**
      * Creates an instance of {@code TransactionSchedulerImpl}.
@@ -189,37 +222,26 @@ final class TransactionSchedulerImpl
 	    throw new NullPointerException("AccessCoordinator cannot be null");
         }
 
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+
         this.transactionCoordinator = transactionCoordinator;
         this.profileCollectorHandle = profileCollectorHandle;
         this.accessCoordinator = accessCoordinator;
-
-        String queueName = properties.getProperty(SCHEDULER_QUEUE_PROPERTY,
-                                                  DEFAULT_SCHEDULER_QUEUE);
-        try {
-            Class<?> queueClass = Class.forName(queueName);
-            Constructor<?> queueCtor =
-                queueClass.getConstructor(Properties.class);
-            this.backingQueue = 
-                (SchedulerQueue) (queueCtor.newInstance(properties));
-        } catch (InvocationTargetException e) {
-            if (logger.isLoggable(Level.CONFIG)) {
-                logger.logThrow(Level.CONFIG, e.getCause(), "Queue {0} " +
-                                "failed to initialize", queueName);
-            }
-            throw e;
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.CONFIG)) {
-                logger.logThrow(Level.CONFIG, e, "Queue {0} unavailable",
-                                queueName);
-            }
-            throw e;
-        }
+        
+        this.backingQueue = wrappedProps.getClassInstanceProperty(
+                SCHEDULER_QUEUE_PROPERTY, DEFAULT_SCHEDULER_QUEUE,
+                SchedulerQueue.class, new Class[]{Properties.class},
+                properties);
+        this.retryPolicy = wrappedProps.getClassInstanceProperty(
+                SCHEDULER_RETRY_PROPERTY, DEFAULT_SCHEDULER_RETRY,
+                SchedulerRetryPolicy.class, new Class[]{Properties.class},
+                properties);
 
         // startup the requested number of consumer threads
         // NOTE: this is a simple implmentation to replicate the previous
         // behvavior, with the assumption that it will change if the
         // scheduler starts trying to add or drop consumers adaptively
-        int requestedThreads =
+        this.requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
         if (logger.isLoggable(Level.CONFIG)) {
@@ -230,6 +252,10 @@ final class TransactionSchedulerImpl
         for (int i = 0; i < requestedThreads; i++) {
             executor.submit(new TaskConsumer());
         }
+
+        // initialize the default timeout for scheduled tasks
+        ScheduledTaskImpl.Builder.setDefaultTimeout(
+                transactionCoordinator.getDefaultTimeout());
     }
 
     /**
@@ -249,9 +275,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(KernelRunnable task, Identity owner) {
-        ScheduledTaskImpl t =
-            new ScheduledTaskImpl(task, owner, defaultPriority,
-                                  System.currentTimeMillis());
+        ScheduledTaskImpl t = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).build();
         return backingQueue.reserveTask(t);
     }
 
@@ -261,8 +286,8 @@ final class TransactionSchedulerImpl
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        long startTime) 
     {
-        ScheduledTaskImpl t =
-            new ScheduledTaskImpl(task, owner, defaultPriority, startTime);
+        ScheduledTaskImpl t = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).startTime(startTime).build();
         return backingQueue.reserveTask(t);
     }
 
@@ -270,9 +295,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public void scheduleTask(KernelRunnable task, Identity owner) {
-        backingQueue.
-            addTask(new ScheduledTaskImpl(task, owner, defaultPriority,
-                                          System.currentTimeMillis()));
+        backingQueue.addTask(new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).build());
     }
 
     /**
@@ -281,9 +305,8 @@ final class TransactionSchedulerImpl
     public void scheduleTask(KernelRunnable task, Identity owner,
                              long startTime) 
     {
-        backingQueue.
-            addTask(new ScheduledTaskImpl(task, owner, defaultPriority,
-                                          startTime));
+        backingQueue.addTask(new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).startTime(startTime).build());
     }
 
     /**
@@ -294,9 +317,11 @@ final class TransactionSchedulerImpl
                                                      long startTime,
                                                      long period) 
     {
-        ScheduledTaskImpl scheduledTask =
-            new ScheduledTaskImpl(task, owner, defaultPriority, startTime,
-                                  period);
+        ScheduledTaskImpl scheduledTask = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).
+                startTime(startTime).
+                period(period).
+                build();
         RecurringTaskHandle handle =
             backingQueue.createRecurringTaskHandle(scheduledTask);
         scheduledTask.setRecurringTaskHandle(handle);
@@ -325,10 +350,9 @@ final class TransactionSchedulerImpl
             task.run();
         } else {
             // we're starting a new transaction
-            ScheduledTaskImpl scheduledTask =
-                new ScheduledTaskImpl(task, owner, defaultPriority,
-                                      System.currentTimeMillis());
-            waitForTask(scheduledTask, false);
+            ScheduledTaskImpl scheduledTask = new ScheduledTaskImpl.Builder(
+                    task, owner, defaultPriority).build();
+            waitForTask(scheduledTask);
         }
     }
 
@@ -342,8 +366,8 @@ final class TransactionSchedulerImpl
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        Priority priority)
     {
-        ScheduledTaskImpl t = new ScheduledTaskImpl(task, owner, priority,
-                                                    System.currentTimeMillis());
+        ScheduledTaskImpl t = new ScheduledTaskImpl.Builder(
+                task, owner, priority).build();
         return backingQueue.reserveTask(t);
     }
 
@@ -353,9 +377,8 @@ final class TransactionSchedulerImpl
     public void scheduleTask(KernelRunnable task, Identity owner,
                              Priority priority)
     {
-        backingQueue.
-            addTask(new ScheduledTaskImpl(task, owner, priority,
-                                          System.currentTimeMillis()));
+        backingQueue.addTask(new ScheduledTaskImpl.Builder(
+                task, owner, priority).build());
     }
 
     /*
@@ -399,7 +422,7 @@ final class TransactionSchedulerImpl
      * Private method that blocks until the task has completed, re-throwing
      * any exception resulting from the task failing.
      */
-    private void waitForTask(ScheduledTaskImpl task, boolean unbounded)
+    private void waitForTask(ScheduledTaskImpl task)
         throws Exception
     {
         Throwable t = null;
@@ -411,7 +434,7 @@ final class TransactionSchedulerImpl
             // are threads in the scheduler pool. This could be changed to
             // hand-off the task and wait for the result if we wanted more
             // direct control over concurrent transactions
-            executeTask(task, unbounded, false);
+            executeTask(task, false);
             // wait for the task to complete...at this point it may have
             // already completed, or else it is being re-tried in a
             // scheduler thread
@@ -470,10 +493,11 @@ final class TransactionSchedulerImpl
         // this method more broadly, then it should probably use a separate
         // thread-pool so that it doesn't affect transaction latency
 
-        ScheduledTaskImpl scheduledTask =
-            new ScheduledTaskImpl(task, owner, defaultPriority,
-                                  System.currentTimeMillis());
-        waitForTask(scheduledTask, true);
+        ScheduledTaskImpl scheduledTask = new ScheduledTaskImpl.Builder(
+                task, owner, defaultPriority).
+                period(ScheduledTask.UNBOUNDED).
+                build();
+        waitForTask(scheduledTask);
     }
 
     /**
@@ -520,17 +544,18 @@ final class TransactionSchedulerImpl
                         (ScheduledTaskImpl) (backingQueue.getNextTask(true));
 
                     // run the task, checking if it completed
-                    if (executeTask(task, false, true)) {
+                    if (executeTask(task, true)) {
                         // if it's a recurring task, schedule the next run
                         if (task.isRecurring()) {
                             long nextStart =
-                                task.getStartTime() + task.getPeriod();
-                            task = new ScheduledTaskImpl(task, nextStart);
+                                 task.getStartTime() + task.getPeriod();
+                            task = new ScheduledTaskImpl.Builder(
+                                    task).startTime(nextStart).build();
                             backingQueue.addTask(task);
                         }
                         // if it has dependent tasks, schedule the next one
                         TaskQueueImpl queue =
-                            (TaskQueueImpl) (task.getTaskQueue());
+                                      (TaskQueueImpl) (task.getTaskQueue());
                         if (queue != null) {
                             queue.scheduleNextTask();
                         }
@@ -556,10 +581,7 @@ final class TransactionSchedulerImpl
      * method is interrupted before the task can complete then this method
      * attempts to re-schedule the task to run in another thread if
      * {@code retryOnInterruption} is {@code true} and always re-throws
-     * the associated {@code InterruptedException}. Providing {@code true} for
-     * the {@code unbounded} parameter results in a transaction with timeout
-     * value as specified by the value of the
-     * {@code TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY} property.
+     * the associated {@code InterruptedException}.
      * <p>
      * This method returns {@code true} if the task was completed or failed
      * permanently, and {@code false} otherwise. If {@code false} is returned
@@ -568,7 +590,7 @@ final class TransactionSchedulerImpl
      * status of the task and wait for the task to complete or fail permanently
      * through the {@code ScheduledTaskImpl} interface.
      */
-    private boolean executeTask(ScheduledTaskImpl task, boolean unbounded,
+    private boolean executeTask(ScheduledTaskImpl task,
                                 boolean retryOnInterruption)
         throws InterruptedException
     {
@@ -587,10 +609,11 @@ final class TransactionSchedulerImpl
                     return true;
                 }
 
-                // NOTE: We could report the two queue sizes separately,
+                // NOTE: We could report the queue sizes separately,
                 // so we should figure out how we want to represent these
                 int waitSize =
-                    backingQueue.getReadyCount() + dependencyCount.get();
+                    backingQueue.getReadyCount() +
+                    dependencyCount.get();
                 profileCollectorHandle.startTask(task.getTask(), 
                                                  task.getOwner(),
                                                  task.getStartTime(), 
@@ -601,8 +624,9 @@ final class TransactionSchedulerImpl
 
                 try {
                     // setup the transaction state
-                    TransactionHandle handle =
-                        transactionCoordinator.createTransaction(unbounded);
+                    TransactionHandle handle = 
+                            transactionCoordinator.createTransaction(
+                            task.getTimeout());
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
                     
@@ -642,17 +666,20 @@ final class TransactionSchedulerImpl
                         transaction.abort(ie);
                     }
                     profileCollectorHandle.finishTask(task.getTryCount(), ie);
+                    task.setLastFailure(ie);
+
                     // if the task didn't finish because of the interruption
                     // then we want to note that and possibly re-queue the
                     // task to run in a usable thread
                     if (task.setInterrupted() && retryOnInterruption) {
-                        if (!handoffRetry(task, ie)) {
+                        if (!handoff(task)) {
                             // if the task couldn't be re-queued, then there's
                             // nothing left to do but drop it
                             task.setDone(ie);
                             if (logger.isLoggable(Level.WARNING)) {
-                                logger.logThrow(Level.WARNING, ie, "dropping " +
-                                                "an interrupted task: {0}" +
+                                logger.logThrow(Level.WARNING, ie,
+                                                "dropping an " +
+                                                "interrupted task: {0}",
                                                 task);
                             }
                         }
@@ -665,17 +692,36 @@ final class TransactionSchedulerImpl
                         transaction.abort(t);
                     }
                     profileCollectorHandle.finishTask(task.getTryCount(), t);
+                    task.setLastFailure(t);
+
                     // some error occurred, so see if we should re-try
-                    if (!shouldRetry(task, t)) {
-                        // the task is not being re-tried
-                        task.setDone(t);
-                        return true;
-                    } else {
-                        // see if the re-try should be handed-off
-                        task.setRunning(false);
-                        if (handoffRetry(task, t)) {
-                            return false;
-                        }
+                    switch (retryPolicy.getRetryAction(task)) {
+                        case DROP:
+                            task.setDone(t);
+                            if (logger.isLoggable(Level.WARNING)) {
+                                if (task.isRecurring()) {
+                                    logger.logThrow(Level.WARNING, t,
+                                                    "skipping a recurrence " +
+                                                    "of a task that failed: " +
+                                                    "{0}", task);
+                                } else {
+                                    logger.logThrow(Level.WARNING, t,
+                                                    "dropping a task that " +
+                                                    "failed: {0}", task);
+                                }
+                            }
+                            return true;
+                        case RETRY_LATER:
+                            task.setRunning(false);
+                            if (handoff(task)) {
+                                return false;
+                            }
+                            break;
+                        case RETRY_NOW:
+                            task.setRunning(false);
+                            break;
+                        default:
+                            // we should never get here
                     }
                 }
             }
@@ -686,57 +732,18 @@ final class TransactionSchedulerImpl
     }
 
     /**
-     * Private method that determines whether a given task should be re-tried
-     * based on the given {@code Throwable} that caused failure. If this
-     * returns {@code true} then the task should be re-tried. Otherwise, the
-     * task should be dropped.
+     * Hands off the task to the backing queue.
+     *
+     * @param task the task to handoff
+     * @return {@code true} if handoff was successful, {@code false} otherwise
      */
-    private boolean shouldRetry(ScheduledTaskImpl task, Throwable t) {
-        // NOTE: as a first-pass implementation this simply instructs the
-        // caller to try again if retry is requested, but other strategies
-        // (like the number of times re-tried) might be considered later
-        if ((t instanceof ExceptionRetryStatus) &&
-            (((ExceptionRetryStatus) t).shouldRetry())) 
-        {
+    private boolean handoff(ScheduledTaskImpl task) {
+        try {
+            backingQueue.addTask(task);
             return true;
+        } catch (TaskRejectedException tre) {
+            return false;
         }
-
-        // we're not re-trying the task, so log that it's being dropped
-        if (logger.isLoggable(Level.WARNING)) {
-            if (task.isRecurring()) {
-                logger.logThrow(Level.WARNING, t, "skipping a recurrence of " +
-                                "a task that failed with a non-retryable " +
-                                "exception: {0}", task);
-            } else {
-                logger.logThrow(Level.WARNING, t, "dropping a task that " +
-                                "failed with a non-retryable exception: {0}",
-                                task);
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Private method that determines how to handoff a task that needs to
-     * be re-tried. If this returns {@code true} then the task has been
-     * taken and handed-off, and the caller is therefore no longer responsible
-     * for executing the task. If this returns {@code false} then it's up to
-     * the caller to try running the task again.
-     */
-    private boolean handoffRetry(ScheduledTaskImpl task, Throwable t) {
-        // NOTE: this is a very simple initial policy that always causes
-        // tasks to re-try "in place" unless they were interrupted, in which
-        // case there's nothing to do but re-queue the task
-        if (t instanceof InterruptedException) {
-            try {
-                backingQueue.addTask(task);
-                return true;
-            } catch (TaskRejectedException tre) {
-                return false;
-            }
-        }
-        return false;
     }
 
     /** Private implementation of {@code TaskQueue}. */
@@ -746,9 +753,8 @@ final class TransactionSchedulerImpl
         private boolean inScheduler = false;
         /** {@inheritDoc} */
         public void addTask(KernelRunnable task, Identity owner) {
-            ScheduledTaskImpl schedTask =
-                new ScheduledTaskImpl(task, owner, defaultPriority,
-                                      System.currentTimeMillis());
+            ScheduledTaskImpl schedTask = new ScheduledTaskImpl.Builder(
+                    task, owner, defaultPriority).build();
             schedTask.setTaskQueue(this);
 
             synchronized (this) {

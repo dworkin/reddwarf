@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
+import com.sun.sgs.kernel.schedule.ScheduledTask;
+import com.sun.sgs.kernel.schedule.SchedulerQueue;
 import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;

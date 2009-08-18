@@ -168,4 +168,18 @@ public interface TaskManager {
      */
     PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
                                             long period);
+
+    /**
+     * Returns {@code true} if the currently running task should do more work
+     * if it is available.  Otherwise, returns {@code false}.  This method
+     * should always return {@code true} until the current task has done enough
+     * work such that the work required to reschedule the task is negligible in
+     * comparison to the work already done.
+     *
+     * @return {@code true} if the currently running task should do more work
+     *         if possible; otherwise {@code false}
+     * @throws TransactionException if the operation failed because of a
+     *	       problem with the current transaction
+     */
+    boolean shouldContinue();
 }
