@@ -48,7 +48,7 @@ class TransactionListenerDetailImpl implements TransactionListenerDetail {
      * Creates an instance of {@code TransactionListenerDetailImpl} for the
      * given named listener.
      *
-     * @oaram listenerName the name of the listener associated with this detail
+     * @param listenerName the name of the listener associated with this detail
      */
     TransactionListenerDetailImpl(String listenerName) {
         if (listenerName == null) {
@@ -69,17 +69,17 @@ class TransactionListenerDetailImpl implements TransactionListenerDetail {
         return beforeCompletionCalled;
     }
 
-    /** {@inheritDoc */
+    /** {@inheritDoc} */
     public boolean abortedBeforeCompletion() {
         return beforeCompletionFailed;
     }
 
-    /** {@inheritDoc */
+    /** {@inheritDoc} */
     public long getBeforeCompletionTime() {
         return beforeCompletionTime;
     }
 
-    /** {@inheritDoc */
+    /** {@inheritDoc} */
     public long getAfterCompletionTime() {
         return afterCompletionTime;
     }

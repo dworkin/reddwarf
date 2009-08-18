@@ -1,5 +1,12 @@
 Project Darkstar Server API Changes
 
+Version 0.9.11
+
+- Add a method to provide guidance to applications in splitting
+  work into smaller tasks
+
+  The method TaskManager.shouldContinue() has been added
+
 Version 0.9.10
 
 - Remove ManagedObject superinterface from AppListener

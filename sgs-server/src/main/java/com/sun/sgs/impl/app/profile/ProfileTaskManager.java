@@ -66,4 +66,11 @@ public class ProfileTaskManager implements TaskManager {
         return backingManager.schedulePeriodicTask(task, delay, period);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public boolean shouldContinue() {
+        return backingManager.shouldContinue();
+    }
+
 }
