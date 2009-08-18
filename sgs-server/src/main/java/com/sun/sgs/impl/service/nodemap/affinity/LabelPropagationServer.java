@@ -99,9 +99,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // Set to true if something has gone wrong and the results from
     // this algorithm run should be ignored
     private boolean runFailed;
-    
-    // A thread pool.  Will create as many threads as needed (I was having
-    // starvation problems using a fixed thread pool - JANE?), with a timeout
+
+    // A thread pool.  Will create as many threads as needed, with a timeout
     // of 60 sec before unused threads are reaped.
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -248,8 +247,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 // as the entire system might be coming down.
             }
         }
-        executor.shutdownNow();
         exporter.unexport();
+        executor.shutdownNow();
     }
 
     // --- Implement LPAServer --- //
@@ -332,30 +331,26 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         latch = new CountDownLatch(clean.size());
 
         final long runNum = runNumber.incrementAndGet();
-        for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
-            executor.execute(new Runnable() {
-                public void run() {
-                    try {
-                        ce.getValue().prepareAlgorithm(runNum);
-                    } catch (IOException ioe) {
-                        runFailed = true;
-                        ioe.printStackTrace();
-                        // JANE NEED retry here.  If the retries fail,
-                        // be sure to count down the latch
-                        latch.countDown();
-                        // If we cannot reach the proxy after retries, we need
-                        // to remove it from the
-                        // clientProxyMap.
-                        removeNode(ce.getKey());
-                    } catch (Exception e) {
-                        logger.logThrow(Level.INFO, e,
-                            "exception from node {0} while preparing",
-                            ce.getKey());
-                        runFailed = true;
-                        latch.countDown();
-                    }
-                }
-            });
+        for (Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
+            try {
+                ce.getValue().prepareAlgorithm(runNum);
+            } catch (IOException ioe) {
+                runFailed = true;
+                ioe.printStackTrace();
+                // JANE NEED retry here.  If the retries fail,
+                // be sure to count down the latch
+                latch.countDown();
+                // If we cannot reach the proxy after retries, we need
+                // to remove it from the
+                // clientProxyMap.
+                removeNode(ce.getKey());
+            } catch (Exception e) {
+                logger.logThrow(Level.INFO, e,
+                    "exception from node {0} while preparing",
+                    ce.getKey());
+                runFailed = true;
+                latch.countDown();
+            }
         }
 
         // Wait for the initialization to complete on all nodes
@@ -375,32 +370,26 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             assert (nodeBarrier.isEmpty());
             nodeBarrier.addAll(clean);
             latch = new CountDownLatch(cleanSize);
-            for (final Map.Entry<Long, LPAClient> ce :
-                       clientProxies.entrySet())
-            {
-                executor.execute(new Runnable() {
-                    public void run() {
-                        try {
-                            ce.getValue().startIteration(currentIteration);
-                        } catch (IOException ioe) {
-                            runFailed = true;
-                            ioe.printStackTrace();
-                            // JANE NEED retry here.  If the retries fail,
-                            // be sure to count down the latch
-                            latch.countDown();
-                            // If we cannot reach the proxy after retries,
-                            // we need to remove it from the clientProxyMap.
-                            removeNode(ce.getKey());
-                        } catch (Exception e) {
-                            logger.logThrow(Level.INFO, e,
-                                "exception from node {0} while running " +
-                                "iteration {1}",
-                                ce.getKey(), currentIteration);
-                            runFailed = true;
-                            latch.countDown();
-                        }
-                    }
-                });
+            for (Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
+                try {
+                    ce.getValue().startIteration(currentIteration);
+                } catch (IOException ioe) {
+                    runFailed = true;
+                    ioe.printStackTrace();
+                    // JANE NEED retry here.  If the retries fail,
+                    // be sure to count down the latch
+                    latch.countDown();
+                    // If we cannot reach the proxy after retries,
+                    // we need to remove it from the clientProxyMap.
+                    removeNode(ce.getKey());
+                } catch (Exception e) {
+                    logger.logThrow(Level.INFO, e,
+                        "exception from node {0} while running " +
+                        "iteration {1}",
+                        ce.getKey(), currentIteration);
+                    runFailed = true;
+                    latch.countDown();
+                }
             }
             // Wait for all nodes to complete this iteration
             waitOnLatch();
@@ -430,8 +419,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        returnedGroups.put(nodeId, 
-                                           proxy.affinityGroups(runNum, true));
+                        returnedGroups.put(nodeId, proxy.affinityGroups(runNum, true));
                         latch.countDown();
                     } catch (IOException ioe) {
                         ioe.printStackTrace();

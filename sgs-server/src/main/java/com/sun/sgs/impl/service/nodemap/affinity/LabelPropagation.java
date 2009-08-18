@@ -274,16 +274,45 @@ public class LabelPropagation implements LPAClient {
     /** 
      * {@inheritDoc}
      * <p>
-     * 
+     * Asynchronously prepare ourselves for a run.
+     */
+    public void prepareAlgorithm(long runNumber) throws IOException {
+        PrepareRun pr = new PrepareRun(runNumber);
+        new Thread(pr).start();
+    }
+
+    private class PrepareRun implements Runnable {
+        final long run;
+        PrepareRun(long run) {
+            this.run = run;
+        }
+        public void run() {
+            prepareAlgorithmInternal(run);
+        }
+
+    }
+
+    /**
+     * Prepare for an algorithm run.  If we are unable to contact the server
+     * to report we are finished, log the failure and request that this
+     * node be shut down.  JANE TODO
+     * <p>
      * Each pair of nodes needs to exchange conflict information to ensure
      * that both pairs know the complete set for both (e.g. if node 1 has a
      * data conflict on obj1 with node 2, it lets node 2 know.
      * <p>
      * It might be better to just let the server ask each vertex for its
      * information and merge it there.
+     *
+     * @param runNumber
      */
-    public void prepareAlgorithm(long runNumber) throws IOException {
+    private void prepareAlgorithmInternal(long runNumber) {
         synchronized (stateLock) {
+            if (runNumber == this.runNumber) {
+                // We assume this happened if the server called us twice
+                // due to IO retries.
+                return;
+            }
             while (state == State.PREPARING) {
                 try {
                     stateLock.wait();
@@ -291,9 +320,13 @@ public class LabelPropagation implements LPAClient {
                     // Do nothing - ignore until state changes
                 }
             }
-            if (runNumber == this.runNumber) {
-                // We assume this happened if the server called us twice
-                // due to IO retries.
+            if (this.runNumber > runNumber) {
+                // Things are confused;  we should have already performed
+                // the run.  Do nothing.
+                logger.log(Level.FINE,
+                            "{0}: bad run number {1}, " +
+                            " we are on run {2}.  Returning.",
+                            localNodeId, runNumber, this.runNumber);
                 return;
             }
             this.runNumber = runNumber;
@@ -314,16 +347,20 @@ public class LabelPropagation implements LPAClient {
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
 
-            // JANE need retry
             if (proxy != null) {
                 logger.log(Level.FINEST, "{0}: exchanging edges with {1}",
                            localNodeId, nodeId);
                 Map<Object, Long> map = entry.getValue();
                 assert (map != null);
-                Collection<Object> objs =
-                    proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
-                                         localNodeId);
-                updateNodeConflictMap(objs, nodeId);
+                try {
+                    Collection<Object> objs =
+                        proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
+                                             localNodeId);
+                    updateNodeConflictMap(objs, nodeId);
+                } catch (IOException e) {
+                    // JANE retry
+                    failed = true;
+                }
             } else {
                 logger.log(Level.FINE, "{0}: could not exchange edges with {1}",
                            localNodeId, nodeId);
@@ -333,8 +370,13 @@ public class LabelPropagation implements LPAClient {
         }
 
         // Tell the server we're ready for the iterations to begin
-        // JANE need retry
-        server.readyToBegin(localNodeId, failed);
+        try {
+            server.readyToBegin(localNodeId, failed);
+        } catch (IOException e) {
+            // JANE retry
+            logger.logThrow(Level.WARNING, e,
+                            "{0}: could not contact server", localNodeId);
+        }
         synchronized (stateLock) {
             state = State.IDLE;
             stateLock.notifyAll();
@@ -377,6 +419,10 @@ public class LabelPropagation implements LPAClient {
 
     /** {@inheritDoc} */
     public void removeNode(long nodeId) throws IOException {
+        removeNodeInternal(nodeId);
+    }
+
+    private void removeNodeInternal(long nodeId) {
         logger.log(Level.FINEST, "{0}: Removing node {1} from LPA",
                    localNodeId, nodeId);
         nodeProxies.remove(nodeId);
@@ -386,16 +432,42 @@ public class LabelPropagation implements LPAClient {
     /**
      * {@inheritDoc}
      * <p>
-     * At this point, the node conflict map is complete, as we have
-     * exchanged information with other nodes.
+     * This method is run asynchronously.
      */
     public void startIteration(int iteration) throws IOException {
+        IterationRun ir = new IterationRun(iteration);
+        new Thread(ir).start();
+    }
+
+    private class IterationRun implements Runnable {
+        final int iter;
+        IterationRun(int iter) {
+            this.iter = iter;
+        }
+        public void run() {
+            startIterationInteral(iter);
+        }
+    }
+
+    /**
+     * Run an iteration of the algorithm.
+     * <p>
+     * If we are unable to contact the server to report we are finished,
+     * log the failure and request that this node be shut down.  JANE TODO
+     * @param iteration the iteration to run
+     */
+    private void startIterationInteral(int iteration) {
         // We should have been prepared by now.
         assert (vertices != null);
         long startTime = System.currentTimeMillis();
        
         // Block any additional threads entering this iteration
         synchronized (stateLock) {
+            if (this.iteration == iteration) {
+                // We have been called more than once by the server. Assume this
+                // is due to IO retries, so no action is needed.
+                return;
+            }
             while (state == State.IN_ITERATION) {
                 try {
                     stateLock.wait();
@@ -411,15 +483,9 @@ public class LabelPropagation implements LPAClient {
                             " we are on iteration {2}.  Returning.",
                             localNodeId, iteration, this.iteration);
                 return;
-            } else if (this.iteration == iteration) {
-                // We have been called more than once by the server. Assume this
-                // is due to IO retries, so no action is needed.
-                return;
             }
-
             // Record the current iteration so we can use it for error checks.
             this.iteration = iteration;
-            // Otherwise, run the iteration
             state = State.IN_ITERATION;
         }
 
@@ -516,7 +582,12 @@ public class LabelPropagation implements LPAClient {
         }
         // Tell the server we've finished this iteration
         // JANE need retry
-        server.finishedIteration(localNodeId, !changed, failed, iteration);
+        try {
+            server.finishedIteration(localNodeId, !changed, failed, iteration);
+        } catch (IOException e) {
+            logger.logThrow(Level.WARNING, e,
+                            "{0}: could not contact server", localNodeId);
+        }
 
         synchronized (stateLock) {
             state = State.IDLE;
@@ -525,7 +596,6 @@ public class LabelPropagation implements LPAClient {
         if (gatherStats) {
             // Record our statistics for this run, used for testing.
             time = System.currentTimeMillis() - startTime;
-
             if (logger.isLoggable(Level.FINE)) {
                 StringBuffer sb = new StringBuffer();
                 sb.append("(" + localNodeId + ")");
@@ -626,9 +696,8 @@ public class LabelPropagation implements LPAClient {
      * Exchanges information with other nodes in the system to fill in the
      * remoteLabelMap.
      * @return {@code true} if a problem occurred
-     * @throws IOException if there is a communication problem
      */
-    private boolean updateRemoteLabels() throws IOException {
+    private boolean updateRemoteLabels() {
         // reinitialize the remote label map
         remoteLabelMap.clear();
         Map<Object, Map<Identity, Long>> objectMap =
@@ -657,8 +726,15 @@ public class LabelPropagation implements LPAClient {
             assert (map != null);
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
                        localNodeId, nodeId);
-            Map<Object, Map<Integer, List<Long>>> labels =
+            Map<Object, Map<Integer, List<Long>>> labels = null;
+            try {
+                labels =
                     proxy.getRemoteLabels(new HashSet<Object>(map.keySet()));
+            } catch (IOException e) {
+                // JANE RETRY
+                logger.logThrow(Level.WARNING, e,
+                        "{0}: could not contact node {1}", localNodeId, nodeId);
+            }
 
             // For remote label debugging
 //            if (logger.isLoggable(Level.FINEST)) {
@@ -1055,15 +1131,19 @@ public class LabelPropagation implements LPAClient {
      * @param nodeId
      * @return
      */
-    private LPAClient getProxy(long nodeId) throws IOException {
+    private LPAClient getProxy(long nodeId) {
         LPAClient proxy = nodeProxies.get(nodeId);
         if (proxy == null) {
-            // Ask the server for it. JANE Retries?
-            proxy = server.getLPAClientProxy(nodeId);
+            // Ask the server for it.
+            try {
+                proxy = server.getLPAClientProxy(nodeId);
+            } catch (IOException e) {
+                // JANE retries
+            }
             if (proxy != null) {
                 nodeProxies.put(nodeId, proxy);
             } else {
-                removeNode(nodeId);
+                removeNodeInternal(nodeId);
             }
         }
         return proxy;
