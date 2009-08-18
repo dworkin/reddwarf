@@ -20,6 +20,8 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.TransactionTimeoutException;
+import static com.sun.sgs.impl.service.data.store.cache.BindingState.BOUND;
+import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNBOUND;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.service.TransactionInterruptedException;
 import static java.util.logging.Level.WARNING;
@@ -119,15 +121,11 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * names between that name and the one for this entry are unbound.
      *
      * @param	newPreviousKey the new previous key
-     * @param	newPreviousKeyBound specifies the state of {@code
-     *		newPreviousKey}, which is bound if the argument is {@code
-     *		Boolean#TRUE Boolean.TRUE}, unbound if the argument is {@code
-     *		Boolean#FALSE Boolean.FALSE}, and unknown if the argument is
-     *		{@code null}
+     * @param	newPreviousKeyBound the binding state of the new previous key
      * @return	whether this entry's previous key information was changed
      */
     boolean updatePreviousKey(BindingKey newPreviousKey,
-			      Boolean newPreviousKeyBound)
+			      BindingState newPreviousKeyBound)
     {
 	if (previousKey == null) {
 	    if (newPreviousKey.compareTo(key) < 0) {
@@ -136,7 +134,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		 * before this entry's key.
 		 */
 		previousKey = newPreviousKey;
-		previousKeyUnbound = (newPreviousKeyBound == Boolean.FALSE);
+		previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
 		return true;
 	    }
 	} else {
@@ -144,11 +142,11 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	    if (compareTo < 0) {
 		/* New previous key is earlier than previous one */
 		previousKey = newPreviousKey;
-		previousKeyUnbound = (newPreviousKeyBound == Boolean.FALSE);
+		previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
 		return true;
 	    } else if (compareTo == 0 &&
 		       !previousKeyUnbound &&
-		       newPreviousKeyBound == Boolean.FALSE)
+		       newPreviousKeyBound == UNBOUND)
 	    {
 		/*
 		 * Previous key is the same, but it was not previously known
@@ -156,7 +154,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		 */
 		previousKeyUnbound = true;
 		return true;
-	    } else if (newPreviousKeyBound == Boolean.TRUE) {
+	    } else if (newPreviousKeyBound == BOUND) {
 		previousKey = newPreviousKey;
 		previousKeyUnbound = false;
 		return true;
