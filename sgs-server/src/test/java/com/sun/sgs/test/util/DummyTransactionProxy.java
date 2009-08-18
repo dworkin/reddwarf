@@ -27,6 +27,7 @@ import static com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl.
 import static com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl.
     UNBOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -81,10 +82,18 @@ public class DummyTransactionProxy
 
     /* -- Implement TransactionCoordinator -- */
 
-    public TransactionHandle createTransaction(boolean unbounded) {
-	return new TxnHandle(
-	    disablePrepareAndCommitOpt,
-	    unbounded ? unboundedTimeout : boundedTimeout);
+    public TransactionHandle createTransaction(long timeout) {
+	if (timeout == ScheduledTask.UNBOUNDED) {
+	    timeout = unboundedTimeout;
+	} else if (timeout <= 0) {
+	    throw new IllegalArgumentException(
+		"Timeout value must be greater than 0: " + timeout);
+	}
+	return new TxnHandle(disablePrepareAndCommitOpt, timeout);
+    }
+
+    public long getDefaultTimeout() {
+        return boundedTimeout;
     }
 
     private static final class TxnHandle implements TransactionHandle {
