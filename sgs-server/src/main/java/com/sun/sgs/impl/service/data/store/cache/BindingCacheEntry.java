@@ -31,7 +31,7 @@ import java.util.logging.Logger;
  * methods, the lock should be held.
  */
 final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
-    
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(BindingCacheEntry.class.getName()));
@@ -91,9 +91,12 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * @param	forUpdate whether the last name is being fetched for update
      */
     static BindingCacheEntry createLast(boolean forUpdate) {
-	return new BindingCacheEntry(
+	BindingCacheEntry entry = new BindingCacheEntry(
 	    BindingKey.LAST,
 	    forUpdate ? State.FETCHING_WRITE : State.FETCHING_READ);
+	/* Give this last entry a numeric value, but an illegal one */
+	entry.setValue(-2L);
+	return entry;
     }
 
     @Override
@@ -110,87 +113,22 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	    "]";
     }
 
-
-    /**
-     * Updates information about previous names known to be unbound given that
-     * the given name is bound and that all names between that name and the one
-     * for this entry are unbound.
-     *
-     * @param	previousKey a previous key
-     * @return	whether this entry's previous key information was changed
-     */
-    boolean updatePreviousKeyBound(BindingKey previousKey) {
-	return updatePreviousKey(previousKey, true, false);
-    }
-
-    /**
-     * Updates information about previous names known to be unbound given that
-     * the given name is unbound and that all names between that name and the
-     * one for this entry are unbound.
-     *
-     * @param	previousKey a previous key known
-     * @return	whether this entry's previous key information was changed
-     */
-    boolean updatePreviousKeyUnbound(BindingKey previousKey) {
-	return updatePreviousKey(previousKey, false, true);
-    }
-
-    /**
-     * Updates information about previous names known to be unbound given that
-     * the given name is unbound or its state is unknown, and that all names
-     * between that name and the one for this entry are unbound.
-     *
-     * @param	previousKey a previous key
-     * @param	knownUnbound whether the previous key is known to be unbound
-     * @return	whether this entry's previous key information was changed
-     */
-    boolean updatePreviousKeyMaybeUnbound(
-	BindingKey previousKey, boolean knownUnbound)
-    {
-	return updatePreviousKey(previousKey, false, knownUnbound);
-    }
-
-    /**
-     * Updates information about previous names known to be unbound given that
-     * the given name is bound or unbound and that all names between that name
-     * and the one for this entry are unbound.
-     *
-     * @param	previousKey a previous key known
-     * @param	bound whether the previous key is bound
-     * @return	whether this entry's previous key information was changed
-     */
-    boolean updatePreviousKeyKnown(BindingKey previousKey, boolean bound) {
-	return updatePreviousKey(previousKey, bound, !bound);
-    }
-
-    /**
-     * Updates information about previous names known to be unbound given that
-     * all names between the given name and the one for this entry are unbound.
-     *
-     * @param	previousKey the previous key
-     * @return	whether this entry's previous key information was changed
-     */
-    boolean updatePreviousKeyUnknown(BindingKey previousKey) {
-	return updatePreviousKey(previousKey, false, false);
-    }
-
     /**
      * Updates information about previous names that are known to be unbound
      * given the status of a particular name and that it is known that all
      * names between that name and the one for this entry are unbound.
      *
      * @param	newPreviousKey the new previous key
-     * @param	newPreviousKeyBound whether {@code newPreviousKey} is known to
-     *		be bound
-     * @param	newPreviousKeyUnbound whether {@code newPreviousKey} is known
-     *		to be unbound
+     * @param	newPreviousKeyBound specifies the state of {@code
+     *		newPreviousKey}, which is bound if the argument is {@code
+     *		Boolean#TRUE Boolean.TRUE}, unbound if the argument is {@code
+     *		Boolean#FALSE Boolean.FALSE}, and unknown if the argument is
+     *		{@code null}
      * @return	whether this entry's previous key information was changed
      */
-    private boolean updatePreviousKey(BindingKey newPreviousKey,
-				      boolean newPreviousKeyBound,
-				      boolean newPreviousKeyUnbound)
+    boolean updatePreviousKey(BindingKey newPreviousKey,
+			      Boolean newPreviousKeyBound)
     {
-	assert !(newPreviousKeyBound && newPreviousKeyUnbound);
 	if (previousKey == null) {
 	    if (newPreviousKey.compareTo(key) < 0) {
 		/*
@@ -198,7 +136,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		 * before this entry's key.
 		 */
 		previousKey = newPreviousKey;
-		previousKeyUnbound = newPreviousKeyUnbound;
+		previousKeyUnbound = (newPreviousKeyBound == Boolean.FALSE);
 		return true;
 	    }
 	} else {
@@ -206,11 +144,11 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	    if (compareTo < 0) {
 		/* New previous key is earlier than previous one */
 		previousKey = newPreviousKey;
-		previousKeyUnbound = newPreviousKeyUnbound;
+		previousKeyUnbound = (newPreviousKeyBound == Boolean.FALSE);
 		return true;
 	    } else if (compareTo == 0 &&
 		       !previousKeyUnbound &&
-		       newPreviousKeyUnbound)
+		       newPreviousKeyBound == Boolean.FALSE)
 	    {
 		/*
 		 * Previous key is the same, but it was not previously known
@@ -218,7 +156,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		 */
 		previousKeyUnbound = true;
 		return true;
-	    } else if (newPreviousKeyBound) {
+	    } else if (newPreviousKeyBound == Boolean.TRUE) {
 		previousKey = newPreviousKey;
 		previousKeyUnbound = false;
 		return true;

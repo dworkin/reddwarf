@@ -104,7 +104,7 @@ public class CachingDataStore extends AbstractDataStore
 
     /** The default callback port. */
     public static final int DEFAULT_CALLBACK_PORT = 44541;
-    
+
     /**
      * The property for specifying the eviction batch size, which specifies the
      * number of entries to consider when selecting a single candidate for
@@ -133,7 +133,7 @@ public class CachingDataStore extends AbstractDataStore
      * attempting to obtain a lock.
      */
     public static final String LOCK_TIMEOUT_PROPERTY = PKG + ".lock.timeout";
-    
+
     /** The default lock timeout, in milliseconds. */
     public static final long DEFAULT_LOCK_TIMEOUT = 10;
 
@@ -194,6 +194,10 @@ public class CachingDataStore extends AbstractDataStore
     /** The default update queue size. */
     public static final int DEFAULT_UPDATE_QUEUE_SIZE = 100;
 
+    /** The property that controls checking bindings. */
+    private static final String CHECK_BINDINGS_PROPERTY =
+	PKG + ".check.bindings";
+
     /** The name of this class. */
     private static final String CLASSNAME = PKG + ".CachingDataStore";
 
@@ -225,6 +229,12 @@ public class CachingDataStore extends AbstractDataStore
 
     /** The retry wait for failed I/O operations. */
     private final long retryWait;
+
+    /**
+     * Whether to check the consistency of bindings after each binding call and
+     * at the end of transactions.
+     */
+    private final boolean checkBindings;
 
     /** The transaction proxy. */
     final TransactionProxy txnProxy;
@@ -291,7 +301,7 @@ public class CachingDataStore extends AbstractDataStore
 	/** Shutdown has not been requested. */
 	NOT_REQUESTED,
 
-        /** Shutdown has been requested. */
+	/** Shutdown has been requested. */
 	REQUESTED,
 
 	/** All active transactions have been completed. */
@@ -390,6 +400,8 @@ public class CachingDataStore extends AbstractDataStore
 	int updateQueueSize = wrappedProps.getIntProperty(
 	    UPDATE_QUEUE_SIZE_PROPERTY, DEFAULT_UPDATE_QUEUE_SIZE,
 	    1, Integer.MAX_VALUE);
+	checkBindings = wrappedProps.getBooleanProperty(
+	    CHECK_BINDINGS_PROPERTY, false);
 	if (logger.isLoggable(CONFIG)) {
 	    logger.log(CONFIG,
 		       "Creating CachingDataStore with properties:" +
@@ -404,7 +416,8 @@ public class CachingDataStore extends AbstractDataStore
 		       "\n  server port: " + serverPort +
 		       "\n  size: " + cacheSize +
 		       "\n  start server: " + startServer +
-		       "\n  update queue size: " + updateQueueSize);
+		       "\n  update queue size: " + updateQueueSize +
+		       (checkBindings ? "\n  check bindings: true" : ""));
 	}
 	try {
 	    if (serverHost == null && startServer) {
@@ -697,7 +710,7 @@ public class CachingDataStore extends AbstractDataStore
 	@Override
 	public String toString() {
 	    return "GetObjectForUpdateRunnable[" +
-		"context:" + context + ", oid:" + oid + "]";		
+		"context:" + context + ", oid:" + oid + "]";
 	}
 	GetObjectForUpdateResults callOnce() throws IOException {
 	    return server.getObjectForUpdate(nodeId, oid);
@@ -791,6 +804,7 @@ public class CachingDataStore extends AbstractDataStore
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
 	BindingKey nameKey = BindingKey.get(name);
+	BindingValue result;
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
@@ -807,11 +821,14 @@ public class CachingDataStore extends AbstractDataStore
 		} else if (nameKey.equals(entry.key)) {
 		    /* Name is bound */
 		    context.noteAccess(entry);
-		    return new BindingValue(entry.getValue(), null);
+		    result = new BindingValue(entry.getValue(), null);
+		    break;
 		} else if (entry.getKnownUnbound(nameKey)) {
 		    /* Name is unbound */
 		    context.noteAccess(entry);
-		    return new BindingValue(-1, entry.key.getNameAllowLast());
+		    result =
+			new BindingValue(-1, entry.key.getNameAllowLast());
+		    break;
 		} else if (!assureNextEntry(entry, nameKey, lock, stop)) {
 		    /* Entry is no longer for next name -- try again */
 		    continue;
@@ -824,7 +841,9 @@ public class CachingDataStore extends AbstractDataStore
 		if (entry.getReadable() && entry.getKnownUnbound(nameKey)) {
 		    /* Name is not bound */
 		    context.noteAccess(entry);
-		    return new BindingValue(-1, entry.key.getNameAllowLast());
+		    result =
+			new BindingValue(-1, entry.key.getNameAllowLast());
+		    break;
 		} else {
 		    /*
 		     * Either a new entry was created for the name or else the
@@ -835,6 +854,8 @@ public class CachingDataStore extends AbstractDataStore
 		}
 	    }
 	}
+	maybeCheckBindings();
+	return result;
     }
 
     /**
@@ -879,18 +900,13 @@ public class CachingDataStore extends AbstractDataStore
      * cached.
      */
     private class GetBindingRunnable
-	extends ReserveCacheRetryIoRunnable<GetBindingResults>
+	extends BasicBindingRunnable<GetBindingResults>
     {
-	private final TxnContext context;
-	private final BindingKey nameKey;
-	private final BindingKey cachedNextNameKey;
 	GetBindingRunnable(TxnContext context,
 			   BindingKey nameKey,
 			   BindingKey cachedNextNameKey)
 	{
-	    this.context = context;
-	    this.nameKey = nameKey;
-	    this.cachedNextNameKey = cachedNextNameKey;
+	    super(context, nameKey, cachedNextNameKey);
 	}
 	@Override
 	public String toString() {
@@ -928,7 +944,7 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.removeBindingEntry(cachedNextNameKey);
 		} else {
 		    /* Note bound previous key */
-		    entry.updatePreviousKeyBound(nameKey);
+		    entry.updatePreviousKey(nameKey, Boolean.TRUE);
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
@@ -940,6 +956,82 @@ public class CachingDataStore extends AbstractDataStore
 	private void handleNotFound(GetBindingResults results) {
 	    BindingKey serverNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
+	    handleNext(Boolean.FALSE, serverNextNameKey, results.oid, false);
+	    /* Schedule eviction */
+	    if (results.callbackEvict) {
+		scheduleTask(new EvictBindingTask(serverNextNameKey));
+	    }
+	}
+    }
+
+    /**
+     * A {@code ReserveCacheRetryIoRunnable} that provides utility methods for
+     * handling the results of server binding calls.
+     */
+    private abstract class BasicBindingRunnable<V>
+	extends ReserveCacheRetryIoRunnable<V>
+    {
+	/** The transaction context. */
+	final TxnContext context;
+
+	/** The key for the requested name. */
+	final BindingKey nameKey;
+
+	/** The key for the next cached name. */
+	final BindingKey cachedNextNameKey;
+
+	/**
+	 * Creates an instance with one preallocated entry.
+	 *
+	 * @param	context the transaction context
+	 * @param	nameKey the key for the requested name
+	 * @param	cachedNextNameKey the key for the next cached name
+	 */
+	BasicBindingRunnable(TxnContext context,
+			     BindingKey nameKey,
+			     BindingKey cachedNextNameKey)
+	{
+	    this(context, nameKey, cachedNextNameKey, 1);
+	}
+
+	/**
+	 * Creates an instance with the specified number of preallocated
+	 * entries.
+	 *
+	 * @param	context the transaction context
+	 * @param	nameKey the key for the requested name
+	 * @param	cachedNextNameKey the key for the next cached name
+	 * @param	numCacheEntries the number of entries to preallocate in
+	 *		the cache
+	 */
+	BasicBindingRunnable(TxnContext context,
+			     BindingKey nameKey,
+			     BindingKey cachedNextNameKey,
+			     int numCacheEntries)
+	{
+	    super(numCacheEntries);
+	    this.context = context;
+	    this.nameKey = nameKey;
+	    this.cachedNextNameKey = cachedNextNameKey;
+	}
+
+	/**
+	 * Handles the results of a server binding call.
+	 *
+	 * @param	nameFound whether the requested name was found to be
+	 *		bound, if the argument is {@link Boolean#TRUE},
+	 *		unbound, if the argument is {@link Boolean#FALSE}, or
+	 *		has unknown status, if the argument is {@code null}
+	 * @param	serverNextNameKey the key for the next name found
+	 * @param	serverNextNameOid the object ID associated with the
+	 *		next name found
+	 * @param	nextForWrite whether the next name was locked for write
+	 */
+	void handleNext(Boolean nameBound,
+			BindingKey serverNextNameKey,
+			long serverNextNameOid,
+			boolean nextForWrite)
+	{
 	    int compareServer = serverNextNameKey.compareTo(cachedNextNameKey);
 	    if (compareServer != 0) {
 		/*
@@ -963,8 +1055,9 @@ public class CachingDataStore extends AbstractDataStore
 			 * next entry after the requested name
 			 */
 			entry = context.noteCachedReservedBinding(
-			    serverNextNameKey, results.oid, false);
-			entry.updatePreviousKeyUnbound(nameKey);
+			    serverNextNameKey, serverNextNameOid,
+			    nextForWrite);
+			entry.updatePreviousKey(nameKey, nameBound);
 			usedCacheEntry();
 		    }
 		}
@@ -976,25 +1069,35 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.getBindingEntry(cachedNextNameKey);
 		if (compareServer >= 0) {
 		    /* No entries between the name and the cached next entry */
-		    boolean updated = entry.updatePreviousKeyUnbound(nameKey);
+		    boolean updated =
+			entry.updatePreviousKey(nameKey, nameBound);
 		    assert updated;
 		    context.noteAccess(entry);
-		    if (entry.getReading()) {
+		    if (entry.getUpgrading()) {
+			assert nextForWrite;
+			/* Make temporary last entry permanent */
+			assert cachedNextNameKey == BindingKey.LAST;
+			if (entry.getReading()) {
+			    entry.setCachedWrite(lock);
+			} else {
+			    entry.setUpgraded(lock);
+			}
+		    } else if (entry.getReading()) {
 			/* Make temporary last entry permanent */
 			assert cachedNextNameKey == BindingKey.LAST;
 			entry.setCachedRead(lock);
 		    }
-		} else if (entry.getReading()) {
+		    if (nextForWrite && !entry.getWritable()) {
+			/* Upgraded to write access for the next key */
+			entry.setUpgradedImmediate(lock);
+		    }
+		} else if (entry.getReading() || entry.getUpgrading()) {
 		    /* Remove temporary last entry that was not used */
 		    assert cachedNextNameKey == BindingKey.LAST;
 		    entry.setEvictedAbandonFetching(lock);
 		    cache.removeBindingEntry(cachedNextNameKey);
 		}
 		entry.setNotPendingPrevious(lock);
-	    }
-	    /* Schedule eviction */
-	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(serverNextNameKey));
 	    }
 	}
     }
@@ -1069,6 +1172,7 @@ public class CachingDataStore extends AbstractDataStore
     {
 	TxnContext context = contextMap.join(txn);
 	BindingKey nameKey = BindingKey.get(name);
+	BindingValue result;
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
@@ -1091,7 +1195,8 @@ public class CachingDataStore extends AbstractDataStore
 		    }
 		    /* Entry is writable */
 		    context.noteModifiedBinding(entry, oid);
-		    return new BindingValue(1, null);
+		    result = new BindingValue(1, null);
+		    break;
 		} else if (entry.getKnownUnbound(nameKey)) {
 		    /* Found next entry and know name is unbound */
 		    if (!setBindingInternalUnbound(
@@ -1122,18 +1227,25 @@ public class CachingDataStore extends AbstractDataStore
 		BindingCacheEntry nameEntry =
 		    context.noteCachedBinding(nameKey, -1, true);
 		context.noteModifiedBinding(nameEntry, oid);
-  		nameEntry.updatePreviousKeyMaybeUnbound(
-  		    entryPreviousKey, entryPreviousKeyUnbound);
+		nameEntry.updatePreviousKey(
+		    entryPreviousKey,
+		    entryPreviousKeyUnbound ? Boolean.FALSE : null);
 	    }
-	    /* Mark the next entry as not pending */
+	    /* Update the next entry */
+	    reportNameAccess(txnProxy.getCurrentTransaction(),
+			     entry.key.getNameAllowLast(), WRITE);
 	    synchronized (lock) {
 		entry = cache.getBindingEntry(entry.key);
 		entry.setNotPendingPrevious(lock);
-		entry.updatePreviousKeyBound(nameKey);
+		context.noteModifiedBinding(entry, entry.getValue());
+		entry.updatePreviousKey(nameKey, Boolean.TRUE);
 	    }
 	    /* Name was unbound */
-	    return new BindingValue(-1, entry.key.getNameAllowLast());
+	    result = new BindingValue(-1, entry.key.getNameAllowLast());
+	    break;
 	}
+	maybeCheckBindings();
+	return result;
     }
 
     /**
@@ -1240,7 +1352,7 @@ public class CachingDataStore extends AbstractDataStore
 					      BindingCacheEntry entry,
 					      BindingKey nameKey)
     {
-	long stop = context.getStopTime();	
+	long stop = context.getStopTime();
 	switch (entry.awaitWritable(lock, stop)) {
 	case DECACHED:
 	    /* Entry not in cache -- try again */
@@ -1328,7 +1440,7 @@ public class CachingDataStore extends AbstractDataStore
 					   BindingCacheEntry entry,
 					   BindingKey nameKey)
     {
-	long stop = context.getStopTime();	
+	long stop = context.getStopTime();
 	if (assureNextEntry(entry, nameKey, lock, stop)) {
 	    /* This is the next entry -- get information about the name */
 	    entry.setPendingPrevious();
@@ -1344,18 +1456,13 @@ public class CachingDataStore extends AbstractDataStore
      * entries cached.
      */
     private class GetBindingForUpdateRunnable
-	extends ReserveCacheRetryIoRunnable<GetBindingForUpdateResults>
+	extends BasicBindingRunnable<GetBindingForUpdateResults>
     {
-	private final TxnContext context;
-	private final BindingKey nameKey;
-	private final BindingKey cachedNextNameKey;
 	GetBindingForUpdateRunnable(TxnContext context,
 				    BindingKey nameKey,
 				    BindingKey cachedNextNameKey)
 	{
-	    this.context = context;
-	    this.nameKey = nameKey;
-	    this.cachedNextNameKey = cachedNextNameKey;
+	    super(context, nameKey, cachedNextNameKey);
 	}
 	@Override
 	public String toString() {
@@ -1393,7 +1500,7 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.removeBindingEntry(cachedNextNameKey);
 		} else {
 		    /* Note bound previous key */
-		    entry.updatePreviousKeyBound(nameKey);
+		    entry.updatePreviousKey(nameKey, Boolean.TRUE);
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
@@ -1408,58 +1515,7 @@ public class CachingDataStore extends AbstractDataStore
 	private void handleNotFound(GetBindingForUpdateResults results) {
 	    BindingKey serverNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
-	    int compareServer = serverNextNameKey.compareTo(cachedNextNameKey);
-	    if (compareServer != 0) {
-		/*
-		 * Update entry for next name from server if different from the
-		 * next cached name.  Only need to do something if server entry
-		 * is lower than the cached next entry.
-		 */
-		Object lock = cache.getBindingLock(serverNextNameKey);
-		synchronized (lock) {
-		    BindingCacheEntry entry =
-			cache.getBindingEntry(serverNextNameKey);
-		    /*
-		     * There should be no entry for the server's next name
-		     * precisely when the server's next name is lower than the
-		     * cached one
-		     */
-		    assert (entry == null) == (compareServer < 0);
-		    if (entry == null) {
-			/*
-			 * Add entry for next name from server, which is the
-			 * next entry after the requested name
-			 */
-			entry = context.noteCachedReservedBinding(
-			    serverNextNameKey, results.oid, true);
-			entry.updatePreviousKeyUnbound(nameKey);
-			usedCacheEntry();
-		    }
-		}
-	    }
-	    /* Update cached next name entry */
-	    Object lock = cache.getBindingLock(cachedNextNameKey);
-	    synchronized (lock) {
-		BindingCacheEntry entry =
-		    cache.getBindingEntry(cachedNextNameKey);
-		if (compareServer >= 0) {
-		    /* No entries between the name and the cached next entry */
-		    boolean updated = entry.updatePreviousKeyUnbound(nameKey);
-		    assert updated;
-		    context.noteAccess(entry);
-		    if (entry.getUpgrading()) {
-			/* Make temporary last entry permanent */
-			assert cachedNextNameKey == BindingKey.LAST;
-			entry.setCachedWrite(lock);
-		    }
-		} else if (entry.getUpgrading()) {
-		    /* Remove temporary last entry that was not used */
-		    assert cachedNextNameKey == BindingKey.LAST;
-		    entry.setEvictedAbandonFetching(lock);
-		    cache.removeBindingEntry(cachedNextNameKey);
-		}
-		entry.setNotPendingPrevious(lock);
-	    }
+	    handleNext(Boolean.FALSE, serverNextNameKey, results.oid, true);
 	    /* Schedule eviction and downgrade */
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(serverNextNameKey));
@@ -1477,8 +1533,10 @@ public class CachingDataStore extends AbstractDataStore
 	Transaction txn, String name)
     {
 	TxnContext context = contextMap.join(txn);
+	context.checkModified();
 	long stop = context.getStopTime();
 	BindingKey nameKey = BindingKey.get(name);
+	BindingValue result;
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
@@ -1511,7 +1569,9 @@ public class CachingDataStore extends AbstractDataStore
 		     * requested name is already unbound
 		     */
 		    context.noteAccess(entry);
-		    return new BindingValue(-1, entry.key.getNameAllowLast());
+		    result =
+			new BindingValue(-1, entry.key.getNameAllowLast());
+		    break;
 		} else {
 		    /* Get information about name and try again */
 		    removeBindingInternalUnknown(
@@ -1520,12 +1580,14 @@ public class CachingDataStore extends AbstractDataStore
 		}
 	    }
 	    /* Check next name */
-	    BindingValue result = removeBindingInternalCheckNext(
-		context, nameKey, nameWritable);
+	    result =
+		removeBindingInternalCheckNext(context, nameKey, nameWritable);
 	    if (result != null) {
-		return result;
+		break;
 	    }
 	}
+	maybeCheckBindings();
+	return result;
     }
 
     /**
@@ -1569,7 +1631,7 @@ public class CachingDataStore extends AbstractDataStore
     /**
      * Implement {@code removeBinding} for when no cache entries were found for
      * the requested name.
-     *     
+     *
      * @param	context the transaction info
      * @param	lock the lock for the next entry
      * @param	entry the next entry found in the cache
@@ -1595,11 +1657,8 @@ public class CachingDataStore extends AbstractDataStore
      * A {@link Runnable} that calls {@code getBindingForRemove} on the server.
      */
     private class GetBindingForRemoveRunnable
-	extends ReserveCacheRetryIoRunnable<GetBindingForRemoveResults>
+	extends BasicBindingRunnable<GetBindingForRemoveResults>
     {
-	private final TxnContext context;
-	private final BindingKey nameKey;
-	private final BindingKey cachedNextNameKey;
 	private final boolean createName;
 	private final boolean upgradeName;
 	GetBindingForRemoveRunnable(TxnContext context,
@@ -1608,10 +1667,7 @@ public class CachingDataStore extends AbstractDataStore
 				    boolean createName,
 				    boolean upgradeName)
 	{
-	    super(createName ? 2 : 1);
-	    this.context = context;
-	    this.nameKey = nameKey;
-	    this.cachedNextNameKey = cachedNextNameKey;
+	    super(context, nameKey, cachedNextNameKey, createName ? 2 : 1);
 	    this.createName = createName;
 	    this.upgradeName = upgradeName;
 	}
@@ -1650,67 +1706,8 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    BindingKey serverNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
-	    int compareServer = serverNextNameKey.compareTo(cachedNextNameKey);
-	    if (compareServer != 0) {
-		/*
-		 * Update entry for next name from server if different from the
-		 * next cached name.  Only need to do something if server entry
-		 * is lower than the cached next entry.
-		 */
-		Object lock = cache.getBindingLock(serverNextNameKey);
-		synchronized (lock) {
-		    BindingCacheEntry entry =
-			cache.getBindingEntry(serverNextNameKey);
-		    /*
-		     * There should be no entry for the server's next name
-		     * precisely when the server's next name is lower than the
-		     * cached one
-		     */
-		    assert (entry == null) == (compareServer < 0);
-		    if (entry == null) {
-			/*
-			 * Add entry for next name from server, which is the
-			 * next entry after the requested name
-			 */
-			entry = context.noteCachedReservedBinding(
-			    serverNextNameKey, results.nextOid, true);
-			entry.updatePreviousKeyKnown(nameKey, results.found);
-			usedCacheEntry();
-		    }
-		}
-	    }
-	    /* Update cached next name entry */
-	    Object lock = cache.getBindingLock(cachedNextNameKey);
-	    synchronized (lock) {
-		BindingCacheEntry entry =
-		    cache.getBindingEntry(cachedNextNameKey);
-		if (compareServer >= 0) {
-		    /* No entries between the name and the cached next entry */
- 		    boolean updated =
-			entry.updatePreviousKeyKnown(nameKey, results.found);
-		    assert updated;
-		    context.noteAccess(entry);
-		    if (entry.getReading()) {
-			/* Make temporary last entry permanent */
-			assert cachedNextNameKey == BindingKey.LAST;
-			entry.setCachedRead(lock);
-		    }
-		    if (results.found && !entry.getWritable()) {
-			/* Upgraded to write access for the next key */
-			if (entry.getUpgrading()) {
-			    entry.setUpgraded(lock);
-			} else {
-			    entry.setUpgradedImmediate(lock);
-			}
-		    }
-		} else if (entry.getReading()) {
-		    /* Remove temporary last entry that was not used */
-		    assert cachedNextNameKey == BindingKey.LAST;
-		    entry.setEvictedAbandonFetching(lock);
-		    cache.removeBindingEntry(cachedNextNameKey);
-		}
-		entry.setNotPendingPrevious(lock);
-	    }
+	    handleNext(Boolean.valueOf(results.found), serverNextNameKey,
+		       results.nextOid, results.found /* nextForWrite */);
 	    /* Schedule evictions and downgrades */
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(nameKey));
@@ -1798,14 +1795,17 @@ public class CachingDataStore extends AbstractDataStore
 	    previousKeyUnbound = entry.getPreviousKeyUnbound();
 	    context.noteModifiedBinding(entry, -1);
 	}
+	reportNameAccess(txnProxy.getCurrentTransaction(),
+			 nextKey.getNameAllowLast(), WRITE);
 	lock = cache.getBindingLock(nextKey);
 	synchronized (lock) {
 	    entry = cache.getBindingEntry(nextKey);
+	    context.noteModifiedBinding(entry, entry.getValue());
 	    if (previousKey == null) {
-		entry.updatePreviousKeyUnbound(nameKey);
+		entry.updatePreviousKey(nameKey, Boolean.FALSE);
 	    } else {
- 		entry.updatePreviousKeyMaybeUnbound(
- 		    previousKey, previousKeyUnbound);
+		entry.updatePreviousKey(
+		    previousKey, previousKeyUnbound ? Boolean.FALSE : null);
 	    }
 	    entry.setNotPendingPrevious(lock);
 	}
@@ -1819,6 +1819,7 @@ public class CachingDataStore extends AbstractDataStore
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
 	BindingKey nameKey = BindingKey.getAllowFirst(name);
+	String result;
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
 	    /* Find next entry */
@@ -1835,7 +1836,8 @@ public class CachingDataStore extends AbstractDataStore
 		} else if (entry.getIsNextEntry(nameKey)) {
 		    /* This is the next entry in the cache */
 		    context.noteAccess(entry);
-		    return entry.key.getNameAllowLast();
+		    result = entry.key.getNameAllowLast();
+		    break;
 		}
 		/* Confirm that we have the next entry in the cache */
 		if (!assureNextEntry(entry, nameKey, lock, stop)) {
@@ -1849,7 +1851,8 @@ public class CachingDataStore extends AbstractDataStore
 		if (entry.getReadable() && entry.getIsNextEntry(nameKey)) {
 		    /* This entry holds the next bound name */
 		    context.noteAccess(entry);
-		    return entry.key.getNameAllowLast();
+		    result = entry.key.getNameAllowLast();
+		    break;
 		} else {
 		    /*
 		     * Either another entry was inserted between the name and
@@ -1859,6 +1862,8 @@ public class CachingDataStore extends AbstractDataStore
 		}
 	    }
 	}
+	maybeCheckBindings();
+	return result;
     }
 
     /**
@@ -1867,18 +1872,13 @@ public class CachingDataStore extends AbstractDataStore
      * information was not in the cache.
      */
     private class NextBoundNameRunnable
-	extends ReserveCacheRetryIoRunnable<NextBoundNameResults>
+	extends BasicBindingRunnable<NextBoundNameResults>
     {
-	private final TxnContext context;
-	private final BindingKey nameKey;
-	private final BindingKey cachedNextNameKey;
 	NextBoundNameRunnable(TxnContext context,
 			      BindingKey nameKey,
 			      BindingKey cachedNextNameKey)
 	{
-	    this.context = context;
-	    this.nameKey = nameKey;
-	    this.cachedNextNameKey = cachedNextNameKey;
+	    super(context, nameKey, cachedNextNameKey);
 	}
 	@Override
 	public String toString() {
@@ -1894,59 +1894,7 @@ public class CachingDataStore extends AbstractDataStore
 	void runWithResult(NextBoundNameResults results) {
 	    BindingKey serverNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
-	    int compareServer = serverNextNameKey.compareTo(cachedNextNameKey);
-	    if (compareServer != 0) {
-		/*
-		 * Update entry for next name from server if different from the
-		 * next cached name.  Only need to do something if server entry
-		 * is lower than the cached next entry.
-		 */
-		Object lock = cache.getBindingLock(serverNextNameKey);
-		synchronized (lock) {
-		    BindingCacheEntry entry =
-			cache.getBindingEntry(serverNextNameKey);
-		    /*
-		     * There should be no entry for the server's next name
-		     * precisely when the server's next name is lower than the
-		     * cached one
-		     */
-		    assert (entry == null) == (compareServer < 0);
-		    if (entry == null) {
-			/*
-			 * Add entry for next name from server, which is the
-			 * next entry after the requested name
-			 */
-			entry = context.noteCachedReservedBinding(
-			    serverNextNameKey, results.oid, false);
-			entry.updatePreviousKeyUnknown(nameKey);
-			usedCacheEntry();
-		    }
-		}
-	    }
-	    /* Update cached next name entry */
-	    Object lock = cache.getBindingLock(cachedNextNameKey);
-	    synchronized (lock) {
-		BindingCacheEntry entry =
-		    cache.getBindingEntry(cachedNextNameKey);
-		if (compareServer >= 0) {
-		    /* No entries between the name and the cached next entry */
-		    boolean updated =
-			entry.updatePreviousKeyUnknown(nameKey);
-		    assert updated;
-		    context.noteAccess(entry);
-		    if (entry.getReading()) {
-			/* Make temporary last entry permanent */
-			assert cachedNextNameKey == BindingKey.LAST;
-			entry.setCachedRead(lock);
-		    }
-		} else if (entry.getReading()) {
-		    /* Remove temporary last entry that was not used */
-		    assert cachedNextNameKey == BindingKey.LAST;
-		    entry.setEvictedAbandonFetching(lock);
-		    cache.removeBindingEntry(cachedNextNameKey);
-		}
-		entry.setNotPendingPrevious(lock);
-	    }
+	    handleNext(null, serverNextNameKey, results.oid, false);
 	    /* Schedule eviction */
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(serverNextNameKey));
@@ -2096,16 +2044,19 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     protected void prepareAndCommitInternal(Transaction txn) {
 	contextMap.prepareAndCommit(txn);
+	maybeCheckBindings();
     }
 
     /** {@inheritDoc} */
     protected void commitInternal(Transaction txn) {
 	contextMap.commit(txn);
+	maybeCheckBindings();
     }
 
     /** {@inheritDoc} */
     protected void abortInternal(Transaction txn) {
 	contextMap.abort(txn);
+	maybeCheckBindings();
     }
 
     /* -- Implement CallbackServer -- */
@@ -2137,7 +2088,7 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	}
     }
-    
+
     /**
      * A {@link KernelRunnable} that downgrades an object after accessing it
      * for read.
@@ -2548,38 +2499,77 @@ public class CachingDataStore extends AbstractDataStore
 
     /* -- Other methods -- */
 
+    /**
+     * Returns the associated data store server.
+     *
+     * @return	the server
+     */
     CachingDataStoreServer getServer() {
 	return server;
     }
 
+    /**
+     * Returns the associated update queue.
+     *
+     * @return	the update queue
+     */
     UpdateQueue getUpdateQueue() {
 	return updateQueue;
     }
 
+    /**
+     * Returns the associated cache.
+     *
+     * @return	the cache
+     */
     Cache getCache() {
 	return cache;
     }
 
-    void scheduleFetch(Runnable runnable) {
-	fetchExecutor.execute(runnable);
-    }
-
+    /**
+     * Schedules a kernel task with the transaction scheduler.
+     *
+     * @param	task the task
+     */
     void scheduleTask(KernelRunnable task) {
 	txnScheduler.scheduleTask(task, taskOwner);
     }
 
+    /**
+     * Returns the associated node ID.
+     *
+     * @return	the node ID
+     */
     long getNodeId() {
 	return nodeId;
     }
 
+    /**
+     * Returns the number of milliseconds to continue retrying I/O operations
+     * before determining that the failure is permanent.
+     *
+     * @return	the maximum retry
+     */
     long getMaxRetry() {
 	return maxRetry;
     }
 
+    /**
+     * Returns the number of milliseconds to wait before retrying a failed I/O
+     * operation.
+     *
+     * @return	the retry wait
+     */
     long getRetryWait() {
 	return retryWait;
     }
 
+    /**
+     * Returns the number of milliseconds to wait when attempting to obtain a
+     * lock.
+     *
+     * @return	the lock timeout
+     */
     long getLockTimeout() {
 	return lockTimeout;
     }
@@ -2611,6 +2601,26 @@ public class CachingDataStore extends AbstractDataStore
      */
     boolean inUseForWrite(BasicCacheEntry<?, ?> entry) {
 	return entry.getModified() && inUse(entry);
+    }
+
+    /**
+     * Schedules an operation that contacts the server to fetch data or write
+     * access.
+     *
+     * @param	runnable the operation
+     */
+    private void scheduleFetch(Runnable runnable) {
+	fetchExecutor.execute(runnable);
+    }
+
+    /**
+     * Checks the consistency of bindings in the cache, if checking bindings
+     * has been requested.
+     */
+    private void maybeCheckBindings() {
+	if (checkBindings) {
+	    cache.checkBindings();
+	}
     }
 
     /* -- Utility classes -- */
@@ -2757,7 +2767,7 @@ public class CachingDataStore extends AbstractDataStore
 	    updateQueue.evictObject(
 		entry.getContextId(), entry.key,
 		new EvictObjectCompletionHandler(entry.key));
-	} 
+	}
 
 	/** Evict a binding cache entry that is not in use immediately. */
 	private void evictBindingNow(BindingCacheEntry entry) {

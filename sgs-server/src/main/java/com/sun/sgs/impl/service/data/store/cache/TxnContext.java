@@ -19,15 +19,23 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.service.Transaction;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import static java.util.logging.Level.FINEST;
+import static java.util.logging.Level.WARNING;
+import java.util.logging.Logger;
 
 /** Maintains state associated with a transaction. */
 class TxnContext {
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(TxnContext.class.getName()));
 
     /** The associated transaction. */
     final Transaction txn;
@@ -67,11 +75,14 @@ class TxnContext {
 	this.txn = txn;
 	this.store = store;
 	contextId = store.getUpdateQueue().beginTxn();
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST, "Created " + this);
+	}
     }
 
     @Override
     public String toString() {
-	return "TxnContext[txn:" + txn + "]";
+	return "TxnContext[contextId:" + contextId + ", txn:" + txn + "]";
     }
 
     /**
@@ -88,7 +99,7 @@ class TxnContext {
      *
      * @return	whether there were no modifications made in this transaction
      * @throws	IllegalStateException if there is a problem with the
-     *		transaction 
+     *		transaction
      */
     boolean prepare() {
 	if (prepared) {
@@ -108,7 +119,7 @@ class TxnContext {
      * Prepares and commits the transaction.
      *
      * @throws	IllegalStateException if there is a problem with the
-     *		transaction 
+     *		transaction
      */
     void prepareAndCommit() {
 	if (prepared) {
@@ -127,7 +138,7 @@ class TxnContext {
      * Commits the transaction.
      *
      * @throws	IllegalStateException if there is a problem with the
-     *		transaction 
+     *		transaction
      */
     void commit() {
 	if (!prepared) {
@@ -402,27 +413,67 @@ class TxnContext {
      */
     void noteModifiedBinding(BindingCacheEntry entry, long oid) {
 	assert Thread.holdsLock(store.getCache().getBindingLock(entry.key));
-	if (entry.key != BindingKey.LAST) {
-	    if (!entry.getModified()) {
-		if (modifiedBindings == null ||
-		    !modifiedBindings.containsKey(entry.key))
-		{
-		    if (modifiedBindings == null) {
-			modifiedBindings =
-			    new HashMap<BindingKey, SavedBindingValue>();
-		    }
-		    modifiedBindings.put(
-			entry.key, new SavedBindingValue(entry));
+	if (!entry.getModified()) {
+	    if (modifiedBindings == null ||
+		!modifiedBindings.containsKey(entry.key))
+	    {
+		if (modifiedBindings == null) {
+		    modifiedBindings =
+			new HashMap<BindingKey, SavedBindingValue>();
 		}
-		entry.setCachedDirty();
+		modifiedBindings.put(
+		    entry.key, new SavedBindingValue(entry));
 	    }
-	    entry.setValue(oid);
-	    entry.noteAccess(contextId);
-	    if (oid == -1) {
-		entry.setNotModified();
-		entry.setEvictedImmediate(
-		    store.getCache().getBindingLock(entry.key));
-		store.getCache().removeBindingEntry(entry.key);
+	    entry.setCachedDirty();
+	}
+	entry.setValue(oid);
+	entry.noteAccess(contextId);
+	if (oid == -1) {
+	    entry.setNotModified();
+	    entry.setEvictedImmediate(
+		store.getCache().getBindingLock(entry.key));
+	    store.getCache().removeBindingEntry(entry.key);
+	}
+    }
+
+    /** Checks the consistency of modified objects and bindings. */
+    void checkModified() {
+	Cache cache = store.getCache();
+	if (modifiedObjects != null) {
+	    for (SavedObjectValue saved : modifiedObjects) {
+		synchronized (cache.getObjectLock(saved.key)) {
+		    ObjectCacheEntry entry = cache.getObjectEntry(saved.key);
+		    if (entry == null) {
+			if (logger.isLoggable(WARNING)) {
+			    logger.log(WARNING,
+				       "Saved binding has no entry:" +
+				       "\n  key: " + saved.key);
+			}
+		    } else if (!entry.getModified()) {
+			if (logger.isLoggable(WARNING)) {
+			    logger.log(WARNING,
+				       "Saved entry is not modified:" +
+				       "\n  entry: " + entry);
+			}
+		    }
+		}
+	    }
+	}
+	if (modifiedBindings != null) {
+	    for (Entry<BindingKey, SavedBindingValue> mapEntry :
+		     modifiedBindings.entrySet())
+	    {
+		BindingKey key = mapEntry.getKey();
+		synchronized (cache.getBindingLock(key)) {
+		    BindingCacheEntry entry = cache.getBindingEntry(key);
+		    if (entry != null && !entry.getModified()) {
+			if (logger.isLoggable(WARNING)) {
+			    logger.log(WARNING,
+				       "Saved entry is not modified:" +
+				       "\n  entry: " + entry);
+			}
+		    }
+		}
 	    }
 	}
     }
@@ -464,9 +515,15 @@ class TxnContext {
 		}
 	    }
 	}
-	String[] names = new String[
-	    (modifiedBindings == null) ? 0 : modifiedBindings.size()];
-	long[] nameValues = new long[names.length];
+	int numNames = 0;
+	if (modifiedBindings != null) {
+	    numNames = modifiedBindings.size();
+	    if (modifiedBindings.containsKey(BindingKey.LAST)) {
+		numNames--;
+	    }
+	}
+	String[] names = new String[numNames];
+	long[] nameValues = new long[numNames];
 	int newNames = 0;
 	if (modifiedBindings != null) {
 	    int i = 0;
@@ -478,21 +535,28 @@ class TxnContext {
 		    SavedBindingValue saved = mapEntry.getValue();
 		    boolean isNew = (saved.restoreValue == -1);
 		    if (includeNew == isNew) {
-			if (isNew) {
-			    newNames++;
-			}
 			BindingKey key = mapEntry.getKey();
-			names[i] = key.getName();
+			String name = key.getNameAllowLast();
+			if (name != null) {
+			    if (isNew) {
+				newNames++;
+			    }
+			    names[i] = name;
+			}
 			synchronized (cache.getBindingLock(key)) {
 			    BindingCacheEntry entry =
 				cache.getBindingEntry(key);
-			    nameValues[i] =
-				(entry == null) ? -1 : entry.getValue();
+			    if (name != null) {
+				nameValues[i] =
+				    (entry == null) ? -1 : entry.getValue();
+			    }
 			    if (entry != null) {
 				entry.setNotModified();
 			    }
 			}
-			i++;
+			if (name != null) {
+			    i++;
+			}
 		    }
 		}
 	    }
@@ -572,6 +636,15 @@ class TxnContext {
 	    restoreValue = entry.getValue();
 	    restorePreviousKey = entry.getPreviousKey();
 	    restorePreviousKeyUnbound = entry.getPreviousKeyUnbound();
+	}
+
+	@Override
+	public String toString() {
+	    return "SavedBindingValue[" +
+		"restoreValue:" + restoreValue +
+		", restorePreviousKey:" + restorePreviousKey +
+		", restorePreviousKeyUnbound:" + restorePreviousKeyUnbound +
+		"]";
 	}
     }
 }
