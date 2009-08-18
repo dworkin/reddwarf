@@ -110,16 +110,14 @@ public class LabelPropagation implements LPAClient {
     // time we're processing an asynchronous call from another node.
     private final Object verticesLock = new Object();
 
-    // The map of conflicts in the system. 
-    // Weights? only dealing with counts now
-    // nodeid-> objectid, count
-    // public for testing for now
+    // The map of conflicts in the system, nodeId->objId, count
     private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
         nodeConflictMap =
             new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
 
     // Map identity -> label and count
-    // This sums all uses of that identity on other nodes
+    // This sums all uses of that identity on other nodes. The count takes
+    // weights for object uses into account.
     private final ConcurrentMap<Identity, Map<Integer, Long>>
         remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Long>>();
@@ -315,9 +313,6 @@ public class LabelPropagation implements LPAClient {
         {
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
-            // Tell the other vertex about the conflicts we know of.
-            // JANE should this also include weights?  I think so,
-            // so both sides are using the same info
 
             // JANE need retry
             if (proxy != null) {
@@ -542,12 +537,12 @@ public class LabelPropagation implements LPAClient {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Integer, Long>> getRemoteLabels(
+    public Map<Object, Map<Integer, List<Long>>> getRemoteLabels(
                 Collection<Object> objIds)
             throws IOException
     {
-        Map<Object, Map<Integer, Long>> retMap =
-                new HashMap<Object, Map<Integer, Long>>();
+        Map<Object, Map<Integer, List<Long>>> retMap =
+                new HashMap<Object, Map<Integer, List<Long>>>();
         if (objIds == null) {
             // This is unexpected;  the other node should have passed in an
             // empty collection
@@ -555,25 +550,24 @@ public class LabelPropagation implements LPAClient {
             return retMap;
         }
         
-        Map<Object, Map<Identity, Long>> objectMap =
-                builder.getObjectUseMap();
+        Map<Object, Map<Identity, Long>> objectMap = builder.getObjectUseMap();
         assert (objectMap != null);
 
         synchronized (verticesLock) {
             for (Object obj : objIds) {
                 // look up the set of identities
                 Map<Identity, Long> idents = objectMap.get(obj);
-                Map<Integer, Long> countMap = new HashMap<Integer, Long>();
+                Map<Integer, List<Long>> labelWeightMap =
+                        new HashMap<Integer, List<Long>>();
                 if (idents != null) {
-                    for (Identity id : idents.keySet()) {
-                        // JANE not dealing with weights here
+                    for (Map.Entry<Identity, Long> entry : idents.entrySet()) {
                         // Find the label associated with the identity in
                         // the graph.
                         // We do this by creating vid, a template of the
                         // LabelVertex, and then finding the actual graph
                         // vertex with that identity.  The current label can
                         // be found in the actual graph vertex.
-                        LabelVertex vid = new LabelVertex(id);
+                        LabelVertex vid = new LabelVertex(entry.getKey());
                         int index = vertices.indexOf(vid);
                         if (index != -1) {
                             // If the vid wasn't found in the vertices list,
@@ -583,12 +577,14 @@ public class LabelPropagation implements LPAClient {
                             // Otherwise, add the label to set of labels for
                             // this identity.
 
-                            // not yet taking weights into account
                             Integer label = vertices.get(index).getLabel();
-                            Long oldCount = countMap.get(label);
-                            Long updateCount = (oldCount == null) ? 1 :
-                                                    1 + oldCount;
-                            countMap.put(label, updateCount);
+
+                            List<Long> weightList = labelWeightMap.get(label);
+                            if (weightList == null) {
+                                weightList = new ArrayList<Long>();
+                                labelWeightMap.put(label, weightList);
+                            }
+                            weightList.add(entry.getValue());
 //                        } else {
                             // Debugging code.  In general, this case is fine -
                             // the vertices list is a snapshot from some time
@@ -612,7 +608,7 @@ public class LabelPropagation implements LPAClient {
 //                    logger.log(Level.FINE,
 //                               "{0} : no idents for {1}", localNodeId, obj);
                 }
-                retMap.put(obj, countMap);
+                retMap.put(obj, labelWeightMap);
             }
         }
         return retMap;
@@ -657,15 +653,12 @@ public class LabelPropagation implements LPAClient {
             }
 
             // Tell the other vertex about the conflicts we know of.
-            // JANE should this also include counts?  I think so,
-            // so both sides are using the same info
             Map<Object, Long> map = entry.getValue();
             assert (map != null);
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
                        localNodeId, nodeId);
-            Map<Object, Map<Integer, Long>> labels =
-                    proxy.getRemoteLabels(
-                        new HashSet<Object>(map.keySet()));
+            Map<Object, Map<Integer, List<Long>>> labels =
+                    proxy.getRemoteLabels(new HashSet<Object>(map.keySet()));
 
             // For remote label debugging
 //            if (logger.isLoggable(Level.FINEST)) {
@@ -692,48 +685,53 @@ public class LabelPropagation implements LPAClient {
             }
 
             // Process the returned labels
-            for (Map.Entry<Object, Map<Integer, Long>> remoteEntry :
+            // For each object returned...
+            for (Map.Entry<Object, Map<Integer, List<Long>>> remoteEntry :
                  labels.entrySet())
             {
                 Object remoteObject = remoteEntry.getKey();
-                Map<Integer, Long> remoteLabels = remoteEntry.getValue();
+                // ... look up the local node use of the object.
                 Map<Identity, Long> objUse = objectMap.get(remoteObject);
                 if (objUse == null) {
                     // no local uses of this object
                     continue;
                 }
-                for (Map.Entry<Identity, Long> objUseId :
-                     objUse.entrySet())
-                {
+                Map<Integer, List<Long>> remoteLabels = remoteEntry.getValue();
+                // Compare each local use's weight with each remote use of
+                // the weight, and fill in our remoteLabelMap.
+                for (Map.Entry<Identity, Long> objUseId : objUse.entrySet()) {
                     Identity ident = objUseId.getKey();
                     Long localCount = objUseId.getValue();
-                    Map<Integer, Long> labelCount =
-                            remoteLabelMap.get(ident);
+                    Map<Integer, Long> labelCount = remoteLabelMap.get(ident);
                     if (labelCount == null) {
-                        labelCount =
+                        // Effective Java item 69, faster to use get before
+                        // putIfAbsent
+                        Map<Integer, Long> newMap =
                                 new ConcurrentHashMap<Integer, Long>();
+                        labelCount = remoteLabelMap.putIfAbsent(ident, newMap);
+                        if (labelCount == null) {
+                            labelCount = newMap;
+                        }
                     }
-                    for (Map.Entry<Integer, Long> rLabelCount :
+                    for (Map.Entry<Integer, List<Long>> rLabelCount :
                         remoteLabels.entrySet())
                     {
                         Integer rlabel = rLabelCount.getKey();
-                        Long rcount = rLabelCount.getValue();
-//                        long newWeight = Math.min(localCount, rcount);
-                        // JANE remote label debugging - do not modify the
-                        // remote count
-                        long newWeight = rcount;
-
-                        Long oldCount = labelCount.get(rlabel);
-                        Long updateCount = (oldCount == null) ? newWeight :
-                                                newWeight + oldCount;
+                        List<Long> rcounts = rLabelCount.getValue();
+                        Long updateCount = labelCount.get(rlabel);
+                        if (updateCount == null) {
+                            updateCount = Long.valueOf(0);
+                        }
+                        for (Long rc : rcounts) {
+                            updateCount += Math.min(localCount, rc);
+                        }
                         labelCount.put(rlabel, updateCount);
                         logger.log(Level.FINEST,
                                 "{0}: label {1}, updateCount {2}, " +
-                                "localCount {3}, rcount {4}: ident {5}",
+                                "localCount {3}, : ident {4}",
                                 localNodeId, rlabel, updateCount,
-                                localCount, rcount, ident);
+                                localCount, ident);
                     }
-                    remoteLabelMap.put(ident, labelCount);
                 }
             }
         }
@@ -928,8 +926,6 @@ public class LabelPropagation implements LPAClient {
             logger.log(Level.FINE, "unexpected null objIds");
             return;
         }
-        /// hmmm... this is just an update conflict information without the
-        // prune stuff...
         ConcurrentMap<Object, Long> conflicts = nodeConflictMap.get(nodeId);
         if (conflicts == null) {
             conflicts = new ConcurrentHashMap<Object, Long>();
@@ -1120,11 +1116,25 @@ public class LabelPropagation implements LPAClient {
 
     // For testing
     /**
-     * Returns the node conflict map.
-     * @return the node conflict map.
+     * Returns a copy of the node conflict map.
+     * @return a copy of the node conflict map.
      */
     public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getNodeConflictMap()
     {
-        return nodeConflictMap;
+        ConcurrentMap<Long, ConcurrentMap<Object, Long>> copy =
+            new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>(
+                                                            nodeConflictMap);
+        return copy;
+//        return nodeConflictMap;
+    }
+
+    /**
+     * Returns a copy of the remote label map.
+     * @return a copy of the remote label map
+     */
+    public ConcurrentMap<Identity, Map<Integer, Long>> getRemoteLabelMap() {
+        ConcurrentMap<Identity, Map<Integer, Long>> copy =
+            new ConcurrentHashMap<Identity, Map<Integer, Long>>(remoteLabelMap);
+        return copy;
     }
 }

@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -98,10 +99,10 @@ public interface LPAClient extends Remote {
      * @param objIds the collection of objects, representing edges, that
      *               we want neighbor node information for
      * @return a map of Objects (one for each element of {@code objIds}) to
-     *               neighbor labels, with a count
+     *               neighbor labels, with a count of each use
      * @throws IOException if there is a communication problem
      */
-    Map<Object, Map<Integer, Long>> getRemoteLabels(
+    Map<Object, Map<Integer, List<Long>>> getRemoteLabels(
                 Collection<Object> objIds)
             throws IOException;
 

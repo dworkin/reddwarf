@@ -32,13 +32,16 @@ import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
+import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -428,7 +431,6 @@ public class TestLPA {
         map = lp1.getNodeConflictMap().get(PartialToyBuilder.NODE3);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj2"));
-        // JANE not checking weights
 
         assertEquals(1, lp2.getNodeConflictMap().size());
         map = lp2.getNodeConflictMap().get(PartialToyBuilder.NODE1);
@@ -477,7 +479,6 @@ public class TestLPA {
         map = lp1.getNodeConflictMap().get(PartialToyBuilder.NODE3);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj2"));
-        // JANE not checking weights
 
         assertEquals(1, lp2.getNodeConflictMap().size());
         map = lp2.getNodeConflictMap().get(PartialToyBuilder.NODE1);
@@ -520,32 +521,119 @@ public class TestLPA {
         // These match the ones from the partial toy builder
         Identity id1 = new DummyIdentity("1");
         Identity id2 = new DummyIdentity("2");
+        Identity id3 = new DummyIdentity("3");
+        Identity id4 = new DummyIdentity("4");
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
                     PartialToyBuilder.NODE1, localHost, serverPort, true, 1);
-
+        LabelPropagation lp2 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
+                    PartialToyBuilder.NODE2, localHost, serverPort, true, 1);
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1);
         lp1.prepareAlgorithm(1);
+        lp2.prepareAlgorithm(1);
+        lp3.prepareAlgorithm(1);
+        
         Set<Object> objIds = new HashSet<Object>();
         objIds.add("obj1");
         objIds.add("obj2");
 
-        Map<Object, Map<Integer, Long>> labelMap =
+        Map<Object, Map<Integer, List<Long>>> labelMap =
                 lp1.getRemoteLabels(objIds);
         assertEquals(2, labelMap.size());
         assertTrue(labelMap.keySet().equals(objIds));
-        Map<Integer, Long> obj1Map = labelMap.get("obj1");
+        Map<Integer, List<Long>> obj1Map = labelMap.get("obj1");
         assertEquals(2, obj1Map.size());
         for (Integer label : obj1Map.keySet()) {
             assertTrue(label.equals(1) || label.equals(2));
 //            assertTrue(label.equals(id1.getName().hashCode()) ||
 //                       label.equals(id2.getName().hashCode()));
         }
-        Map<Integer, Long> obj2Map = labelMap.get("obj2");
+        // Check returned weights
+        List<Long> oneWeightList = obj1Map.get(1);
+        assertEquals(1, oneWeightList.size());
+        for (Long weight : oneWeightList) {
+            assertEquals(2, weight.intValue());
+        }
+        List<Long> twoWeightList = obj1Map.get(2);
+        assertEquals(1, twoWeightList.size());
+        for (Long weight : twoWeightList) {
+            assertEquals(2, weight.intValue());
+        }
+        Map<Integer, List<Long>> obj2Map = labelMap.get("obj2");
         assertEquals(1, obj2Map.size());
         for (Integer label : obj2Map.keySet()) {
             assertTrue(label.equals(2));
 //            assertTrue(label.equals(id2.getName().hashCode()));
         }
+        twoWeightList = obj2Map.get(2);
+        assertEquals(1, twoWeightList.size());
+        for (Long weight : twoWeightList) {
+            assertEquals(1, weight.intValue());
+        }
+
+
+        // Call the private implementation to update the remote label
+        // maps, and check it.  We do this, rather than running an iteration,
+        // because we don't want the labels to change.
+        Method updateRemoteLabelsMethod =
+            UtilReflection.getMethod(LabelPropagation.class,
+                                     "updateRemoteLabels");
+
+        updateRemoteLabelsMethod.invoke(lp1);
+        updateRemoteLabelsMethod.invoke(lp2);
+        updateRemoteLabelsMethod.invoke(lp3);
+
+        // node 1
+        ConcurrentMap<Identity, Map<Integer, Long>> rlm =
+                lp1.getRemoteLabelMap();
+        assertEquals(2, rlm.size());
+        for (Identity id : rlm.keySet()) {
+            assertTrue (id.equals(id1) || id.equals(id2));
+        }
+        Map<Integer, Long> labelWeight = rlm.get(id1);
+        assertEquals(1, labelWeight.size());
+        Long weight = labelWeight.get(3);
+        assertTrue(weight != null);
+        assertEquals(1, weight.intValue());
+
+        labelWeight = rlm.get(id2);
+        assertEquals(2, labelWeight.size());
+        weight = labelWeight.get(3);
+        assertTrue(weight != null);
+        assertEquals(1, weight.intValue());
+        weight = labelWeight.get(4);
+        assertTrue(weight != null);
+        assertEquals(1, weight.intValue());
+
+        // node 2
+        rlm = lp2.getRemoteLabelMap();
+        assertEquals(1, rlm.size());
+        for (Identity id : rlm.keySet()) {
+            assertEquals(id3, id);
+        }
+        labelWeight = rlm.get(id3);
+        assertEquals(2, labelWeight.size());
+        weight = labelWeight.get(1);
+        assertTrue(weight != null);
+        assertEquals(1, weight.intValue());
+        weight = labelWeight.get(2);
+        assertTrue(weight != null);
+        assertEquals(1, weight.intValue());
+
+        // node 3
+        rlm = lp3.getRemoteLabelMap();
+        assertEquals(1, rlm.size());
+        for (Identity id : rlm.keySet()) {
+            assertEquals(id4, id);
+        }
+        labelWeight = rlm.get(id4);
+        assertEquals(1, labelWeight.size());
+        weight = labelWeight.get(2);
+        assertTrue(weight != null);
+        assertEquals(1, weight.intValue());
     }
 
     public interface TestLPAClientIface extends LPAClient {
@@ -634,7 +722,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Map<Integer, Long>> getRemoteLabels(
+        public Map<Object, Map<Integer, List<Long>>> getRemoteLabels(
                 Collection<Object> objIds) throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
@@ -734,9 +822,9 @@ public class TestLPA {
                 // conflicts - data cache evictions due to conflict
                 ConcurrentHashMap<Object, Long> conflict =
                         new ConcurrentHashMap<Object, Long>();
-                conflict.put("obj1", 1L);
-                conflictMap.put(NODE2, conflict);
-                conflict = new ConcurrentHashMap<Object, Long>();
+//                conflict.put("obj1", 1L);
+//                conflictMap.put(NODE2, conflict);
+//                conflict = new ConcurrentHashMap<Object, Long>();
                 conflict.put("obj2", 1L);
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
@@ -748,7 +836,7 @@ public class TestLPA {
                 // Obj uses
                 Map<Identity, Long> tempMap =
                         new HashMap<Identity, Long>();
-                tempMap.put(ident, 2L);
+                tempMap.put(ident, 1L);
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
