@@ -44,11 +44,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *  Initial implementation of label propagation algorithm for a single vertex.
- * <p>
  * An implementation of the algorithm presented in
  * "Near linear time algorithm to detect community structures in large-scale
  * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
+ * <p>
+ * This class supports running on a single node (useful for testing
+ * algorithm changes) and in a distributed system on several nodes.
  * <p>
  * Set logging to Level.FINEST for a trace of the algorithm (very verbose
  * and slow).
@@ -255,9 +256,9 @@ public class LabelPropagation implements LPAClient {
 
         if (done) {
             // Clear our maps that are set up as the first step of an
-            // algorithm run.  Doing this here ensures we catch errors
-            // where we attempt to get the final groups before an algorithm
-            // has completed a run.
+            // algorithm run.  Doing this here ensures we catch protocol
+            // errors, where we attempt to run iterations before we've
+            // prepared for a run.
             nodeConflictMap.clear();
             vertices = null;
 
@@ -388,10 +389,6 @@ public class LabelPropagation implements LPAClient {
                                              long nodeId)
         throws IOException
     {
-        // We might have been called by another node before we got
-        // notification from the server to exchange edges.
-        initializeNodeConflictMap();
-
         assert (nodeConflictMap != null);
         Map<Object, Long> origConflicts = nodeConflictMap.get(nodeId);
 
@@ -978,16 +975,11 @@ public class LabelPropagation implements LPAClient {
 
     /**
      * Initialize our vertex conflicts.  This needs to happen before
-     * we send our vertex conflict information to other (higher vertex-ident)
-     * nodes in response to an prepareAlgorithm call from the server,
-     * and before a crossNodeEdges call from a (lower vertex-ident) vertex.
+     * we send our vertex conflict information to other nodes in
+     * response to an prepareAlgorithm call from the server, and before 
+     * any crossNodeEdges calls.
      */
-    private synchronized void initializeNodeConflictMap() {
-        if (!nodeConflictMap.isEmpty()) {
-            // Someone beat us to it
-            return;
-        }
-
+    private void initializeNodeConflictMap() {
         // Get conflict information from the graph builder.
         nodeConflictMap.putAll(builder.getConflictMap());
         logger.log(Level.FINEST,
