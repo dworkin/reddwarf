@@ -127,10 +127,13 @@ class ChannelWrapper
      * well.
      */
     public void removingObject() {
-	try {
-	    channelRef.get().close(true);
-	} catch (ObjectNotFoundException e) {
-	    // already closed.
+	if (channelRef != null) {
+	    try {
+		channelRef.get().close(true);
+	    } catch (ObjectNotFoundException e) {
+		// already closed.
+	    }
+	    channelRef = null;
 	}
     }
 
@@ -204,10 +207,12 @@ class ChannelWrapper
      * channel has been closed, so {@code IllegalStateException} is thrown.
      */
     private ChannelImpl getChannel() {
-	try {
-	    return channelRef.get();
-	} catch (ObjectNotFoundException e) {
-	    throw new IllegalStateException("channel is closed");
+	if (channelRef != null) {
+	    try {
+		return channelRef.get();
+	    } catch (ObjectNotFoundException e) {
+	    }
 	}
+	throw new IllegalStateException("channel is closed");
     }
 }

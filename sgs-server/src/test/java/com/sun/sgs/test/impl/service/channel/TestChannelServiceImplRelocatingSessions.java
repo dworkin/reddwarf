@@ -235,7 +235,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Hold up joins send to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
-	    
+	    waitForHeldChannelServerMethodToNode(oldNode);
 	    moveIdentity(relocatingClient, oldNode, newNode);
 	    Thread.sleep(200);
 	    releaseChannelServerMethodHeld(oldNode);
@@ -283,6 +283,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    relocatingClient.assertJoinedChannel(channelName);
 	    checkUsersJoined(channelName, oneUser);
 	    leaveUsers(channelName, oneUser);
+	    waitForHeldChannelServerMethodToNode(oldNode);
 	    moveIdentity(relocatingClient, oldNode, newNode);
 	    Thread.sleep(200);
 	    releaseChannelServerMethodHeld(oldNode);
@@ -321,6 +322,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Hold up "join" to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser);
+	    waitForHeldChannelServerMethodToNode(oldNode);
 
 	    moveClient(relocatingClient, oldNode, newNode);
 	    // Release "join" to oldNode.
@@ -365,7 +367,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    joinUsers(channelName, oneUser);
 	    relocatingClient.assertJoinedChannel(channelName);
 	    leaveUsers(channelName, oneUser);
-	    Thread.sleep(200);
+	    waitForHeldChannelServerMethodToNode(oldNode);
+
 	    // Relocate client
 	    moveClient(relocatingClient, oldNode, newNode);
 	    // Make sure client hasn't yet received "leave" notification.
@@ -405,6 +408,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Hold up joins send to oldNode
 	    holdChannelServerMethodToNode(oldNode, "join");
 	    joinUsers(channelName, oneUser); 
+	    waitForHeldChannelServerMethodToNode(oldNode);
 	    
 	    moveClient(relocatingClient, oldNode, newNode1);
 	    moveClient(relocatingClient, newNode1, newNode2);
@@ -548,8 +552,8 @@ public class TestChannelServiceImplRelocatingSessions
 	    holdChannelServerMethodToNode(oldNode, "close");
 	    // send leaveAll...
 	    leaveAll(channelName);
-	    Thread.sleep(200);
 	    // Hold up close sent to oldNode
+	    waitForHeldChannelServerMethodToNode(oldNode);
 	    
 	    moveClient(relocatingClient, oldNode, newNode);
 	    Thread.sleep(200);

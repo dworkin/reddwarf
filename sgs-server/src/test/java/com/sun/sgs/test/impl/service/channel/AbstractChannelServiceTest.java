@@ -104,6 +104,10 @@ public abstract class AbstractChannelServiceTest extends Assert {
 
     private static Map<Long, MethodInfo> holdMethodMap =
 	new HashMap<Long, MethodInfo>();
+
+    private Object methodHeldLock = new Object();
+    
+    private boolean methodHeld = false;
     
     /** The number for creating host names. */
     private int hostNum = 1;
@@ -1032,16 +1036,41 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	SgsTestNode node, final String methodName)
 	throws Exception
     {
-	final long nodeId = node.getNodeId();
+	long nodeId = node.getNodeId();
 	MethodInfo info = holdMethodMap.get(nodeId);
 	if (info != null) {
 	    // just update method info and return.
 	    info.name = methodName;
 	    info.hold = true;
-	    return;
+	    info.isHeld = false;
+	} else {
+	    // Store method info in map, and wrap channel server to hold methods
+	    holdMethodMap.put(nodeId, new MethodInfo(methodName));
 	}
-	// Store method info in map, and wrap channel server to hold methods
-	holdMethodMap.put(nodeId, new MethodInfo(methodName));
+    }
+
+    protected void waitForHeldChannelServerMethodToNode(SgsTestNode node) 
+	throws Exception
+    {
+	long nodeId = node.getNodeId();
+	MethodInfo info = holdMethodMap.get(nodeId);
+	if (info != null) {
+	    synchronized (info) {
+		if (!info.isHeld) {
+		    try {
+			info.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		if (!info.isHeld) {
+		    fail("Timeout waiting for held method: " + info.name +
+			 " to node:" + nodeId);
+		}
+	    }
+	    
+	} else {
+	    fail("No method to node:" + nodeId + " held");
+	}
     }
 
     /**
@@ -1135,14 +1164,21 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	    MethodInfo info = holdMethodMap.get(nodeId);
 	    if (info != null) {
 		synchronized (info) {
-		    if (info.hold && method.getName().equals(info.name)) {
-			try {
+		    if (method.getName().equals(info.name)) {
+			if (info.hold) {
 			    System.err.println(
 				">>HOLD ChannelServer method: " + info.name +
 				" to node: " + nodeId);
-			    info.wait();
-			} catch (InterruptedException e) {
+			    info.isHeld = true;
+			    info.notifyAll();
 			}
+			while (info.hold) {
+			    try {
+				info.wait();
+			    } catch (InterruptedException e) {
+			    }
+			}
+			info.isHeld = false;
 			System.err.println(
 			    ">>RELEASE ChannelServer method: " + info.name +
 			    " to node: " + nodeId);
@@ -1175,6 +1211,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
     private static class MethodInfo {
 	volatile String name;
 	volatile boolean hold = true;
+	volatile boolean isHeld = false;
 
 	MethodInfo(String name) {
 	    this.name = name;

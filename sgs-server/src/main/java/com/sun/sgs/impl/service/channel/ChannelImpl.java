@@ -670,9 +670,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Enqueues a close event to this channel's event queue and notifies
-     * this channel's coordinator to service the event.  This method
-     * is invoked by this channel's {@code ChannelWrapper} when the
-     * application removes the wrapper object.
+     * this channel's coordinator to service the event.  This method is
+     * invoked with {@code true} by this channel's {@code ChannelWrapper}
+     * when the application removes the wrapper object, and is invoked with
+     * {@coee false} by this channel when the application invokes the
+     * {@link #leaveAll} method.
+     *
+     * @param	removeName if {@code true}, the channel's name binding
+     *		is removed when the channel's persistent structures
+     *		are cleaned up, otherwise, the channel's name binding is
+     *		not removed
      */
     void close(boolean removeName) {
 	checkContext();
@@ -681,7 +688,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    /*
 	     * Enqueue close event.
 	     */
-	    addEvent(new CloseEvent(removeName));
+	    addEvent(new CloseEvent(removeName, eventQueueRef.get()));
 	    isClosed = true;
 	}
     }
@@ -964,43 +971,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
     
     /**
-     * Removes all sessions from this channel and clears the list of
-     * channel servers for this channel.  This method should be called
-     * when all sessions leave the channel.
-     */
-    private void clearServerNodeIds() {
-	getDataService().markForUpdate(this);
-	servers.clear();
-    }
-
-    /**
-     * Sends a leave notification for the session with the specified {@code
-     * sessionRefId} to the channel server with the specified {@code
-     * nodeId}.
-     */
-    private void sendLeaveNotification(long nodeId,
-				       final BigInteger sessionRefId)
-    {
-	final ChannelServer server = getChannelServer(nodeId);
-	/*
-	 * If there is no channel server for the session's node,
-	 * then the session's node has failed and the session is
-	 * now disconnected.  There is no need to send a 'leave'
-	 * notification (to update the channel membership cache) to
-	 * the failed server.
-	 */
-	if (server != null) {
-	    ChannelServiceImpl.getChannelService().addChannelTask(
-		channelRefId,
-		new IoRunnable() {
-		    public void run() throws IOException {
-			server.leave(channelRefId, sessionRefId);
-		    } },
-		nodeId);
-	}
-    }
-
-    /**
      * Removes the channel object, the channel listener wrapper (if we
      * created a wrapper for it), and the event queue and associated
      * binding from the data store.  If {@code removeName} is {@code
@@ -1012,7 +982,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private void removeChannel(boolean removeName) {
 	DataService dataService = getDataService();
-	clearServerNodeIds();
 	if (removeName) {
 	    getChannelsMap().removeOverride(name);
 	}
@@ -1509,10 +1478,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * transaction.
 	 */
 	SessionNotifyTask(ChannelImpl channel,
-				BigInteger eventQueueRefId,
-				ChannelEvent channelEvent,
-				ClientSessionImpl session,
-				BigInteger sessionRefId)
+			  BigInteger eventQueueRefId,
+			  ChannelEvent channelEvent,
+			  ClientSessionImpl session,
+			  BigInteger sessionRefId)
 	{
 	    super(null);
 	    this.channelService = ChannelServiceImpl.getChannelService();
@@ -1921,7 +1890,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * send events appearing in the queue.
 	 */
 	public boolean serviceEvent(ChannelImpl channel) {
-
+	    assert isProcessing() && !isCompleted();
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    if (senderRefId != null) {
@@ -2038,40 +2007,19 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * @param removeName {@code true} if the channel's name binding
 	 *	  should be removed when the channel is closed
 	 */
-	CloseEvent(boolean removeName) {
-	    super(0);
+	CloseEvent(boolean removeName, EventQueue eventQueue) {
+	    super(eventQueue.getTimestamp());
 	    this.removeName = removeName;
 	}
 
 	/** {@inheritDoc} */
 	public boolean serviceEvent(ChannelImpl channel) {
-
-	    final BigInteger channelRefId = channel.channelRefId;
-	    Set<Long> serverNodeIds = channel.getServerNodeIds();
-	    final ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
-	    for (final long nodeId : serverNodeIds) {
-		channelService.addChannelTask(
-		    channelRefId,
-		    new IoRunnable() {
-			public void run() throws IOException {
-			    ChannelServer server = getChannelServer(nodeId);
-			    if (server != null) {
-				server.close(channelRefId);
-			    }
-			} },
-		    nodeId);
-	    }
-	    
-	    channelService.addChannelTask(
-		channelRefId,
-		new AbstractKernelRunnable("NotifyChannelClosed") {
-		    public void run() {
-			channelService.closedChannel(channelRefId);
-		    } });
-	    completed();
-	    channel.removeChannel(removeName);
-	    return true;
+	    assert isProcessing() && !isCompleted();
+	    CloseNotifyTask task =
+		new CloseNotifyTask(channel, removeName);
+	    ChannelServiceImpl.getChannelService().addChannelTask(
+		    channel.channelRefId, task);
+	    return false;
 	}
 
 	/** {@inheritDoc} */
@@ -2081,6 +2029,87 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
+    /**
+     * A non-transactional task (with transactional components) to send a
+     * "close" notification to each of the channel's server nodes so that
+     * each server node can inform the channel's respective members a
+     * leave notification.  This task also removes the channel's
+     * persistent data when the notifications have been delivered.  If
+     * {@code removeName}, specified during construction, is {@code true}
+     * the channel's name binding is removed along with the channel's
+     * persistent data, otherwise the channel's name binding is not
+     * removed. 
+     */
+    private static class CloseNotifyTask extends AbstractKernelRunnable {
+
+	private final BigInteger channelRefId;
+	private final Set<Long> serverNodeIds;
+	private final boolean removeName;
+
+	/**
+	 * Constructs an instance with the specified {@code channel}.  If
+	 * {@code removeName} is {@code true}, the channel's name binding
+	 * is removed along with its persistent data.
+	 */
+	CloseNotifyTask(ChannelImpl channel, boolean removeName) {
+	    super(null);
+	    this.channelRefId = channel.channelRefId;
+	    this.serverNodeIds = channel.servers;
+	    this.removeName = removeName;
+	}
+
+	public void run() {
+	    final ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    /*
+	     * Send "close" notification to channel's servers.
+	     */ 
+	    for (final long nodeId : serverNodeIds) {
+		channelService.runIoTask(
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.close(channelRefId);
+			    }
+			} },
+		    nodeId);
+	    }
+
+	    /*
+	     * Notify local channel service to clean up this channel's
+	     * coordinator's transient data.
+	     */
+	    channelService.closedChannel(channelRefId);
+
+	    /*
+	     * Remove channel's persistent data and, optionally, the
+	     * channel's name binding.
+	     */
+	    try {
+		channelService.runTransactionalTask(
+		  new AbstractKernelRunnable("RemoveClosedChannel") {
+		    public void run() {
+			ChannelImpl channel = (ChannelImpl)
+			    getObjectForId(channelRefId);
+			if (channel != null) {
+			    channel.removeChannel(removeName);
+			} else {
+			    // This shouldn't happen
+			    logger.log(
+				Level.SEVERE,
+				"channel:{0} removed before closed",
+				HexDumper.toHexString(
+				    channelRefId.toByteArray()));
+			}
+		    }
+		} );
+	    } catch (Exception e) {
+		// TBD: This shouldn't happen, so log message?
+	    }
+	}
+    }
+    
     /**
      * Returns the event queue for the channel that has the specified
      * {@code channelRefId} and coordinator {@code nodeId}.

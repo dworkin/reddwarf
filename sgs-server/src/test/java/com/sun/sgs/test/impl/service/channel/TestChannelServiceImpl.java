@@ -936,18 +936,10 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    checkUsersJoined(channelName, someUsers);
 	    leaveAll(channelName);
 	    Thread.sleep(100);
-	    
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() {
-		    Channel channel = getChannel(channelName);
-		    int numJoinedSessions = getSessions(channel).size();
-		    if (numJoinedSessions != 0) {
-			fail("Expected no sessions, got " + numJoinedSessions);
-		    }
-		    System.err.println("All sessions left");
-		    dataService.removeObject(channel);
-		}
-	    }, taskOwner);
+	    checkUsersJoined(channelName, noUsers);
+	    for (DummyClient client : group.getClients()) {
+		client.assertLeftChannel(channelName);
+	    }
 	} finally {
 	    group.disconnect(false);
 	}
@@ -965,6 +957,9 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    leaveAll(channelName);
 	    Thread.sleep(200);
 	    checkUsersJoined(channelName, noUsers);
+	    for (DummyClient client : group.getClients()) {
+		client.assertLeftChannel(channelName);
+	    }
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
 	    sendMessagesToChannel(channelName, 2);
@@ -987,8 +982,40 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    leaveAll(channelName);
 	    Thread.sleep(200);
 	    checkUsersJoined(channelName, noUsers);
+	    for (DummyClient client : group.getClients()) {
+		client.assertLeftChannel(channelName);
+	    }
 	    sendMessagesToChannel(channelName, 2);
 	    checkChannelMessagesReceived(group, channelName, 0);
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
+    @Test
+    @IntegrationTest
+    public void testChannelLeaveAllWithCoordinatorCrash() throws Exception {
+	final String channelName = "leaveAllTest";
+	// Create channel on coordinator node
+	SgsTestNode coordinatorNode = addNode();
+	createChannel(channelName, null, coordinatorNode);
+	// Clients will log into server node.
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	ClientGroup group = new ClientGroup(serverNode.getAppPort(), someUsers);
+	
+	try {
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+	    holdChannelServerMethodToNode(serverNode, "close");
+	    leaveAll(channelName);
+	    waitForHeldChannelServerMethodToNode(serverNode);
+	    coordinatorNode.shutdown(false);
+	    Thread.sleep(2000);
+	    checkUsersJoined(channelName, noUsers);
+	    for (DummyClient client : group.getClients()) {
+		client.assertLeftChannel(channelName);
+	    }
 	    
 	} finally {
 	    group.disconnect(false);
@@ -1585,6 +1612,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    holdChannelServerMethodToNode(userNode, "join");
 	    joinUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    for (int i = 0; i < 3; i++) {
 		client.sendChannelMessage(channelName, i);
 	    }
@@ -1613,7 +1641,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    client.sendChannelMessage(channelName, 0);
 	    checkChannelMessagesReceived(client, channelName, 1);
 	    holdChannelServerMethodToNode(userNode, "leave");
-	    leaveUsers(channelName, user);	
+	    leaveUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    client.sendChannelMessage(channelName, 0);
 	    Thread.sleep(1000);
 	    releaseChannelServerMethodHeld(userNode);
@@ -1640,6 +1669,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    holdChannelServerMethodToNode(userNode, "join");
 	    joinUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    leaveUsers(channelName, user);
 	    client.sendChannelMessage(channelName, 0);
 	    releaseChannelServerMethodHeld(userNode);
@@ -1667,6 +1697,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    holdChannelServerMethodToNode(userNode, "join");
 	    joinUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    leaveUsers(channelName, user);
 	    joinUsers(channelName, user);
 	    for (int i = 0; i < 2; i++) {
@@ -1702,6 +1733,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    holdChannelServerMethodToNode(userNode, "join");
 	    joinUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    for (int i = 0; i < 3; i++) {
 		client.sendChannelMessage(channelName, i);
 	    }
@@ -1736,7 +1768,8 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    client.sendChannelMessage(channelName, 0);
 	    checkChannelMessagesReceived(client, channelName, 1);
 	    holdChannelServerMethodToNode(userNode, "leave");
-	    leaveUsers(channelName, user);	
+	    leaveUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    client.sendChannelMessage(channelName, 0);
 	    Thread.sleep(1000);
 	    coordinatorNode.shutdown(false);
@@ -1766,6 +1799,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    holdChannelServerMethodToNode(userNode, "join");
 	    joinUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    leaveUsers(channelName, user);
 	    client.sendChannelMessage(channelName, 0);
 	    Thread.sleep(1000);
@@ -1796,6 +1830,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	try {
 	    holdChannelServerMethodToNode(userNode, "join");
 	    joinUsers(channelName, user);
+	    waitForHeldChannelServerMethodToNode(userNode);
 	    leaveUsers(channelName, user);
 	    joinUsers(channelName, user);
 	    for (int i = 0; i < 2; i++) {

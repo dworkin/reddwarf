@@ -742,12 +742,32 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Removes the specified channel from the per-channel set of
-	 * local members.
+	 * local members and sends a leave notification to each member.
 	 */
 	public void close(BigInteger channelRefId) {
 	    callStarted();
 	    try {
-		localChannelMembersMap.remove(channelRefId);
+		Set<BigInteger> localMembers =
+		    localChannelMembersMap.remove(channelRefId);
+		if (localMembers != null) {
+		    for (BigInteger sessionRefId : localMembers) {
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
+			if (protocol != null) {
+			    try {
+				protocol.channelLeave(channelRefId);
+			    } catch (IOException e) {
+				logger.logThrow(
+				    Level.WARNING, e, "channelLeave " +
+				    "session:{0} channel:{0} throws",
+				    HexDumper.toHexString(
+					sessionRefId.toByteArray()),
+				    HexDumper.toHexString(
+					channelRefId.toByteArray()));
+			    }
+			}
+		    }
+		}
 
 	    } finally {
 		callFinished();
