@@ -25,6 +25,8 @@ import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.CALLBACK_PORT_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStore.CHECK_BINDINGS_PROPERTY;
+import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.DEFAULT_CALLBACK_PORT;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.DEFAULT_SERVER_PORT;
@@ -106,6 +108,7 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	props.setProperty(CALLBACK_PORT_PROPERTY,
 			  String.valueOf(callbackPort));
 	props.setProperty(DIRECTORY_PROPERTY, dbDirectory);
+	props.setProperty(CHECK_BINDINGS_PROPERTY, "true");
 	return props;
     }
 

@@ -223,8 +223,8 @@ class TxnContext {
 
     /**
      * Returns the next object ID for this transaction of a newly created
-     * object, or {@code -1} if none is found.  Does not return IDs for removed
-     * objects.  Specifying {@code -1} requests the first ID.
+     * object, or {@code -1} if none is found.	Does not return IDs for removed
+     * objects.	 Specifying {@code -1} requests the first ID.
      *
      * @param	oid the identifier of the object to search after, or
      *		{@code -1} to request the first object
@@ -257,7 +257,7 @@ class TxnContext {
     /* -- Entry methods -- */
 
     /**
-     * Adds an entry to the cache for a newly allocated object.  The associated
+     * Adds an entry to the cache for a newly allocated object.	 The associated
      * lock should be held.
      *
      * @param	oid the object ID of the new object
@@ -270,7 +270,7 @@ class TxnContext {
 
     /**
      * Adds an entry to the cache for an object that is being fetched from the
-     * server.  The associated lock should be held.
+     * server.	The associated lock should be held.
      *
      * @param	oid the object ID of the object
      * @param	forUpdate whether the object is being fetched for update
@@ -301,17 +301,16 @@ class TxnContext {
 
     /**
      * Adds an entry to the cache that represents the last bound name in the
-     * cache.  The newly created entry will be marked as being fetched.  The
+     * cache.  The newly created entry will be marked as being fetched.	 The
      * associated lock should be held.
      *
-     * @param	forUpdate whether the last name is being fetched for update
      * @return	the new cache entry
      */
-    BindingCacheEntry noteLastBinding(boolean forUpdate) {
-	assert Thread.holdsLock(
-	    store.getCache().getBindingLock(BindingKey.LAST));
-	BindingCacheEntry entry = BindingCacheEntry.createLast(forUpdate);
-	store.getCache().addBindingEntry(entry);
+    BindingCacheEntry noteLastBinding() {
+	Cache cache = store.getCache();
+	assert Thread.holdsLock(cache.getBindingLock(BindingKey.LAST));
+	BindingCacheEntry entry = BindingCacheEntry.createLast();
+	cache.addBindingEntry(entry);
 	return entry;
     }
 

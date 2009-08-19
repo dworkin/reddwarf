@@ -43,6 +43,7 @@ import com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServer.NextObjectResults;
 import com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServer.RegisterNodeResult;
+import static com.sun.sgs.impl.service.data.store.cache.BindingKey.LAST;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.BOUND;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNBOUND;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNKNOWN;
@@ -198,7 +199,7 @@ public class CachingDataStore extends AbstractDataStore
     public static final int DEFAULT_UPDATE_QUEUE_SIZE = 100;
 
     /** The property that controls checking bindings. */
-    private static final String CHECK_BINDINGS_PROPERTY =
+    public static final String CHECK_BINDINGS_PROPERTY =
 	PKG + ".check.bindings";
 
     /** The name of this class. */
@@ -802,7 +803,53 @@ public class CachingDataStore extends AbstractDataStore
 
     /* DataStore.getBinding */
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * The implementation needs to handle the following cases:
+     * <ol style="list-style: upper-roman">
+     * <li> Entry for name found in cache
+     *	 <ul style="list-style: disc">
+     *	 <li> Return cached value </ul>
+     * <li> No entry for name found in cache
+     *   <ol style="list-style: upper-alpha">
+     *	 <li> Next entry records that name is unbound
+     *	   <ul style="list-style: disc">
+     *	   <li> Return next name and that name is unbound </ul>
+     *	 <li> Next entry does not cover name
+     *	   <ul style="list-style: disc">
+     *	   <li> Mark next entry pending previous
+     *	   <li> Call server
+     *	     <ol style="list-style: decimal">
+     *	     <li> Server returns name found
+     *	       <ul style="list-style: disc">
+     *	       <li> Try again </ul>
+     *	     <li> Server returns name not found
+     *	       <ol style="list-style: lower-alpha">
+     *	       <li> Next entry records that name is unbound
+     *	         <ul style="list-style: disc">
+     *		 <li> Return next name and that name is unbound </ul>
+     *	       <li> Next entry does not cover name
+     *	         <ul style="list-style: disc">
+     *		 <li> Try again </ul> </ol> </ol> </ul>
+     *	 <li> No next entry
+     *	   <ul style="list-style: disc">
+     *	   <li> Create last entry
+     *	   <li> Mark last entry pending previous and fetching read
+     *	   <li> Call server
+     *	     <ol style="list-style: decimal">
+     *	     <li> Server returns name found
+     *	        <ul style="list-style: disc">
+     *		<li> Try again </ul>
+     *	     <li> Server returns name not found
+     *		<ol style="list-style: lower-alpha">
+     *		<li> Next entry records that name is unbound
+     *	          <ul style="list-style: disc">
+     *		  <li> Return next name and that name is unbound </ul>
+     *		<li> Next entry does not cover name
+     *	          <ul style="list-style: disc">
+     *		  <li> Try again </ul> </ol> </ol> </ul> </ol>
+     */
     protected BindingValue getBindingInternal(Transaction txn, String name) {
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
@@ -812,12 +859,12 @@ public class CachingDataStore extends AbstractDataStore
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
-	    Object lock = cache.getBindingLock(
-		(entry != null) ? entry.key : BindingKey.LAST);
+	    Object lock =
+		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    synchronized (lock) {
 		if (entry == null) {
 		    /* No next entry -- create it */
-		    entry = context.noteLastBinding(false);
+		    entry = context.noteLastBinding();
 		} else if (!entry.awaitReadable(lock, stop)) {
 		    /* The entry is not in the cache -- try again */
 		    continue;
@@ -862,9 +909,9 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * Make sure that the entry is not being used to check an earlier binding
-     * and that it is indeed the next entry in the cache after the specified
-     * key.
+     * Make sure that the entry is not the next entry for a pending operation,
+     * is not being upgraded, and that it is indeed the next entry in the cache
+     * after the specified key.
      *
      * @param	entry the entry
      * @param	previousKey the key for which {@code entry} should be the next
@@ -882,6 +929,9 @@ public class CachingDataStore extends AbstractDataStore
 				    long stop)
     {
 	assert Thread.holdsLock(lock);
+	if (entry.getUpgrading()) {
+	    entry.awaitNotUpgrading(lock, stop);
+	}
 	entry.awaitNotPendingPrevious(lock, stop);
 	BindingCacheEntry checkEntry =
 	    cache.getHigherBindingEntry(previousKey);
@@ -891,16 +941,22 @@ public class CachingDataStore extends AbstractDataStore
 	     * entry and when we locked it -- try again
 	     */
 	    return false;
+	} else if (entry.getUpgrading()) {
+	    /* The entry is again being upgraded -- try again */
+	    return false;
 	} else {
 	    /* Check that entry is readable or being read */
-	    return checkEntry.getReadable() || checkEntry.getReading();
+	    return entry.getReadable() || entry.getReading();
 	}
     }
 
     /**
-     * A {@code Runnable} that calls {@code getBinding} on the server to get
+     * A {@link Runnable} that calls {@code getBinding} on the server to get
      * information about a requested name for which there were no entries
-     * cached.
+     * cached.  The entry for {@code cachedNextNameKey} is marked pending
+     * previous.  If it is the last entry, it is also marked fetching read if
+     * it was added to represent the next entry provisionally.  The entry will
+     * not be pending previous or fetching when the operation is complete.
      */
     private class GetBindingRunnable
 	extends BasicBindingRunnable<GetBindingResults>
@@ -990,7 +1046,14 @@ public class CachingDataStore extends AbstractDataStore
 	}
 
 	/**
-	 * Handles the results of a server binding call.
+	 * Handles the results of a server binding call.  When called, the
+	 * entry for {@code nameKey} will be marked fetching upgrade if {@code
+	 * nameForWrite} is {@code true} and the entry is not writable.  Also,
+	 * the entry for {@code cachedNextNameKey} will be marked pending
+	 * previous.  If the next entry is the last entry, it is also marked
+	 * fetching read if it was added to represent the next entry
+	 * provisionally. The next entry will not be pending previous, and
+	 * neither entry will be fetching, when the method returns.
 	 *
 	 * @param	nameBound the binding state of the name
 	 * @param	nameOid the value associated with the name, if bound
@@ -1014,7 +1077,7 @@ public class CachingDataStore extends AbstractDataStore
 				  serverNextNameOid, serverNextNameForWrite);
 	    updateCachedNextEntry(nameBound, serverNextNameKey,
 				  serverNextNameForWrite);
-    	}
+	}
 
 	/**
 	 * Updates the entry for the requested name given the results of a
@@ -1036,7 +1099,13 @@ public class CachingDataStore extends AbstractDataStore
 			    nameKey, nameOid, nameForWrite);
 			usedCacheEntry();
 		    } else {
+			assert !entry.getPendingPrevious();
 			context.noteAccess(entry);
+			/*
+			 * The entry should not be upgrading if it is not
+			 * supposed to be writable
+			 */
+			assert nameForWrite || !entry.getUpgrading();
 			if (nameForWrite && !entry.getWritable()) {
 			    entry.setUpgraded(lock);
 			}
@@ -1066,7 +1135,7 @@ public class CachingDataStore extends AbstractDataStore
 	    if (compareServer != 0) {
 		/*
 		 * Update the entry for the next name from server if it is
-		 * different from the cached next name.  Only need to do
+		 * different from the cached next name.	 Only need to do
 		 * something if the server entry is lower than the cached next
 		 * entry, in which case the entry should need to be created.
 		 * If the server entry is higher, then it should already be
@@ -1126,33 +1195,23 @@ public class CachingDataStore extends AbstractDataStore
 			entry.updatePreviousKey(nameKey, nameBound);
 		    assert updated;
 		    context.noteAccess(entry);
-		    if (entry.getReading() || entry.getUpgrading()) {
+		    if (entry.getReading()) {
 			/* Make a temporary last entry permanent */
-			assert cachedNextNameKey == BindingKey.LAST;
-			if (!serverNextNameForWrite) {
-			    entry.setCachedRead(lock);
-			} else if (entry.getReading()) {
-			    entry.setCachedWrite(lock);
-			} else {
-			    entry.setUpgraded(lock);
-			}
+			assert cachedNextNameKey == LAST;
+			entry.setCachedRead(lock);
 		    }
 		    if (serverNextNameForWrite && !entry.getWritable()) {
 			/* Upgraded to write access for the next key */
 			entry.setUpgradedImmediate(lock);
 		    }
-		} else if (entry.getReading() || entry.getUpgrading()) {
+		} else if (entry.getReading()) {
 		    /*
 		     * Remove or downgrade a temporary last entry that was not
 		     * used
 		     */
-		    assert cachedNextNameKey == BindingKey.LAST;
-		    if (entry.getReadable()) {
-			entry.setEvictedDowngradeImmediate(lock);
-		    } else {
-			entry.setEvictedAbandonFetching(lock);
-			cache.removeBindingEntry(cachedNextNameKey);
-		    }
+		    assert cachedNextNameKey == LAST;
+		    entry.setEvictedAbandonFetching(lock);
+		    cache.removeBindingEntry(cachedNextNameKey);
 		}
 		entry.setNotPendingPrevious(lock);
 	    }
@@ -1223,7 +1282,55 @@ public class CachingDataStore extends AbstractDataStore
 
     /* DataStore.setBinding */
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * The implementation needs to handle the following cases:
+     * <ol style="list-style: upper-roman">
+     * <li> Entry for name found in cache
+     *   <ol style="list-style: upper-alpha">
+     *	 <li> Entry is cached for write
+     *	   <ul style="list-style: disc">
+     *	   <li> Store new value and return that name was already bound </ul>
+     *	 <li> Entry is cached for read
+     *	   <ul style="list-style: disc">
+     *	   <li> Mark entry as fetching upgrade
+     *	   <li> Call server
+     *	   <li> Store new value and return that name was already bound </ul>
+     *		</ol>
+     * <li> No entry for name found in cache
+     *   <ol style="list-style: upper-alpha">
+     *	 <li> Next entry records that name is unbound
+     *	   <ol style="list-style: decimal">
+     *	   <li> Next entry is cached for write
+     *	     <ul style="list-style: disc">
+     *	     <li> Mark next entry pending previous
+     *	     <li> Create new entry for name and value
+     *	     <li> Report write access to next name
+     *	     <li> Store in next entry that name is bound
+     *	     <li> Mark next entry not pending previous
+     *	     <li> Return that name was unbound </ul>
+     *	   <li> Next entry is cached for read
+     *	     <ul style="list-style: disc">
+     *	     <li> Mark next entry pending previous
+     *	     <li> Call server
+     *	     <li> Mark next entry pending previous
+     *	     <li> Create new entry for name and value
+     *	     <li> Report write access to next name
+     *	     <li> Store in next entry that name is bound
+     *	     <li> Return that name was unbound </ul> </ol>
+     *	 <li> Next entry does not cover name
+     *	   <ul style="list-style: disc">
+     *	   <li> Mark next entry pending previous
+     *	   <li> Call server
+     *	   <li> Try again </ul>
+     *	 <li> No next entry
+     *	   <ul style="list-style: disc">
+     *	   <li> Create a last entry
+     *	   <li> Mark last entry pending previous and fetching read
+     *	   <li> Call server
+     *	   <li> Try again </ul> </ol> </ol>
+     */
     protected BindingValue setBindingInternal(
 	Transaction txn, String name, long oid)
     {
@@ -1236,12 +1343,12 @@ public class CachingDataStore extends AbstractDataStore
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    BindingKey entryPreviousKey;
 	    boolean entryPreviousKeyUnbound;
-	    Object lock = cache.getBindingLock(
-		(entry != null) ? entry.key : BindingKey.LAST);
+	    Object lock =
+		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    synchronized (lock) {
 		if (entry == null) {
 		    /* No next entry -- create it */
-		    entry = context.noteLastBinding(true);
+		    entry = context.noteLastBinding();
 		    setBindingInternalUnknown(context, lock, entry, nameKey);
 		    continue;
 		} else if (nameKey.equals(entry.key)) {
@@ -1326,7 +1433,7 @@ public class CachingDataStore extends AbstractDataStore
 	case READABLE:
 	    /*
 	     * We've obtained a write lock from the access coordinator, so
-	     * there can't be any evictions initiated.  For that reason, there
+	     * there can't be any evictions initiated.	For that reason, there
 	     * is no need to retry once we confirm that the entry is cached.
 	     */
 	    entry.awaitNotPendingPrevious(lock, stop);
@@ -1348,9 +1455,10 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@code Runnable} that calls {@code getBindingForUpgrade} on the server
+     * A {@link Runnable} that calls {@code getBindingForUpgrade} on the server
      * to upgrade the read-only cache entry already present for the requested
-     * name.
+     * name.  The entry for {@code nameKey} is marked fetching upgrade, and
+     * will not be fetching when the operation is complete.
      */
     private class GetBindingForUpdateUpgradeRunnable
 	extends RetryIoRunnable<GetBindingForUpdateResults>
@@ -1379,6 +1487,7 @@ public class CachingDataStore extends AbstractDataStore
 	    Object lock = cache.getBindingLock(nameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nameKey);
+		assert !entry.getPendingPrevious();
 		context.noteAccess(entry);
 		entry.setUpgraded(lock);
 	    }
@@ -1422,7 +1531,6 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    if (!entry.getWritable()) {
 		/* Upgrade */
-		entry.setFetchingUpgrade();
 		entry.setPendingPrevious();
 		scheduleFetch(
 		    new GetBindingForUpdateUpgradeNextRunnable(
@@ -1439,10 +1547,11 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@code Runnable} that calls {@code getBindingForUpdate} on the server
+     * A {@link Runnable} that calls {@code getBindingForUpdate} on the server
      * to upgrade the read-only cache entry already present for the next name
      * after the requested name, and that caches that the requested name is
-     * unbound.
+     * unbound.  The entry for {@code nextNameKey} is marked pending previous
+     * and will not be pending previous when the operation is complete.
      */
     private class GetBindingForUpdateUpgradeNextRunnable
 	extends RetryIoRunnable<GetBindingForUpdateResults>
@@ -1471,7 +1580,7 @@ public class CachingDataStore extends AbstractDataStore
 		BindingCacheEntry entry = cache.getBindingEntry(nextNameKey);
 		assert nextNameKey.equals(
 		    BindingKey.getAllowLast(results.nextName));
-		entry.setUpgraded(lock);
+		entry.setUpgradedImmediate(lock);
 		entry.setNotPendingPrevious(lock);
 	    }
 	    if (results.callbackEvict) {
@@ -1508,9 +1617,13 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@code Runnable} that calls {@code getBindingForUpdate} on the server
+     * A {@link Runnable} that calls {@code getBindingForUpdate} on the server
      * to get information about a requested name for which there were no
-     * entries cached.
+     * entries cached.  The entry for {@code cachedNextNameKey} is marked
+     * pending previous.  If it is the last entry, it is also marked fetching
+     * read if it was added to reprsent the next entry provisionally.  The
+     * entry will not be pending previous or fetching when the operation is
+     * complete.
      */
     private class GetBindingForUpdateRunnable
 	extends BasicBindingRunnable<GetBindingForUpdateResults>
@@ -1552,7 +1665,69 @@ public class CachingDataStore extends AbstractDataStore
 
     /* DataStore.removeBinding */
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * The implementation needs to handle the following cases:
+     * <ol style="list-style: upper-roman">
+     * <li> Entry for name found in cache
+     *	 <ul style="list-style: disc">
+     *	 <li> Check entry cache state
+     *     <ol style="list-style: upper-alpha">
+     *	   <li> Entry is cached for write
+     *	   <li> Entry is cached for read
+     *	     <ul style="list-style: disc">
+     *	     <li> Mark entry fetching upgrade </ul> </ol>
+     *	 <li> Check next entry
+     *     <ol style="list-style: upper-alpha">
+     *	   <li> Next entry records that it is the next entry
+     *	     <ol style="list-style: decimal">
+     *	     <li> Next entry is cached for write
+     *	       <ul style="list-style: disc">
+     *	       <li> Mark next entry pending previous
+     *	       <li> Remove entry for name
+     *	       <li> Report write access to next name
+     *	       <li> Store in next entry that name is unbound
+     *	       <li> Mark next entry not pending previous
+     *	       <li> Return that name was bound </ul>
+     *	     <li> Next entry is cached for read
+     *	       <ul style="list-style: disc">
+     *	       <li> Mark next entry fetching upgrade
+     *	       <li> Call server
+     *	       <li> Mark next entry pending previous
+     *	       <li> Remove entry for name
+     *	       <li> Report write access to next name
+     *	       <li> Store in next entry that name is unbound
+     *	       <li> Mark next entry not pending previous
+     *	       <li> Return that name was bound </ul> </ol>
+     *	   <li> Next entry does not cover name
+     *	     <ul style="list-style: disc">
+     *	     <li> Mark next entry pending previous
+     *	     <li> Call server
+     *	     <li> Try again </ul>
+     *	   <li> No next entry
+     *	     <ul style="list-style: disc">
+     *	     <li> Create a last entry
+     *	     <li> Mark last entry pending previous and fetching read
+     *	     <li> Call server
+     *	     <li> Try again </ul> </ol> </ul>
+     * <li> No entry for name found in cache
+     *  <ol style="list-style: upper-alpha">
+     *	<li> Next entry records that name is unbound
+     *	  <ul style="list-style: disc">
+     *	  <li> Return that name was already unbound </ul>
+     *	<li> Next entry does not cover name
+     *	  <ul style="list-style: disc">
+     *	  <li> Mark next entry pending previous
+     *	  <li> Call server
+     *	  <li> Try again </ul>
+     *	<li> No next entry
+     *	  <ul style="list-style: disc">
+     *	  <li> Create a last entry
+     *	  <li> Mark last entry pending previous and fetching read
+     *	  <li> Call server
+     *	  <li> Try again </ul> </ol> </ol>
+     */
     protected BindingValue removeBindingInternal(
 	Transaction txn, String name)
     {
@@ -1565,13 +1740,13 @@ public class CachingDataStore extends AbstractDataStore
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
-	    Object lock = cache.getBindingLock(
-		(entry != null) ? entry.key : BindingKey.LAST);
+	    Object lock =
+		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    boolean nameWritable;
 	    synchronized (lock) {
 		if (entry == null) {
 		    /* No next entry -- create it */
-		    entry = context.noteLastBinding(false);
+		    entry = context.noteLastBinding();
 		    removeBindingInternalUnknown(
 			context, lock, entry, nameKey);
 		    continue;
@@ -1678,7 +1853,14 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@link Runnable} that calls {@code getBindingForRemove} on the server.
+     * A {@link Runnable} that calls {@code getBindingForRemove} on the server
+     * to get information about the requested name and the next name.  The
+     * entry for {@code nameKey}, if present, is marked fetching upgrade if it
+     * is not writable.  The entry for {@code cachedNextNameKey} is marked
+     * pending previous.  If it is the last entry, it is also marked fetching
+     * read if it was added to represent the next entry provisionally.  The
+     * next entry will not be pending previous, and neither entry will be
+     * fetching, when the operation is complete.
      */
     private class GetBindingForRemoveRunnable
 	extends BasicBindingRunnable<GetBindingForRemoveResults>
@@ -1742,13 +1924,13 @@ public class CachingDataStore extends AbstractDataStore
     {
 	long stop = context.getStopTime();
 	BindingCacheEntry entry = cache.getHigherBindingEntry(nameKey);
-	BindingKey nextKey = (entry != null) ? entry.key : BindingKey.LAST;
+	BindingKey nextKey = (entry != null) ? entry.key : LAST;
 	Object lock = cache.getBindingLock(nextKey);
 	synchronized (lock) {
 	    boolean callServer = false;
 	    if (entry == null) {
 		/* No next entry -- create it */
-		entry = context.noteLastBinding(false);
+		entry = context.noteLastBinding();
 		callServer = true;
 	    } else if (nameWritable &&
 		       entry.getIsNextEntry(nameKey) &&
@@ -1765,12 +1947,6 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    if (callServer) {
 		/* Make request to server */
-		if (!nameWritable) {
-		    if (nextKey == BindingKey.LAST && entry.getReading()) {
-			entry.setCachedRead(lock);
-		    }
-		    entry.setFetchingUpgrade();
-		}
 		entry.setPendingPrevious();
 		scheduleFetch(
 		    new GetBindingForRemoveRunnable(
@@ -1809,7 +1985,48 @@ public class CachingDataStore extends AbstractDataStore
 
     /* DataStore.nextBoundName */
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * The implementation needs to handle the following cases:
+     * <ol style="list-style: upper-roman">
+     * <li> Next entry in cache records that it is the next entry
+     *	 <ul style="list-style: disc">
+     *	 <li> Return next name </ul>
+     * <li> Next entry does not cover name
+     *	 <ul style="list-style: disc">
+     *	 <li> Mark next entry pending previous
+     *	 <li> Call server
+     *     <ol style="list-style: upper-alpha">
+     *	   <li> Server returns name found
+     *	     <ul style="list-style: disc">
+     *	     <li> Try again </ul>
+     *	   <li> Server returns name not found
+     *       <ol style="list-style: decimal">
+     *	     <li> Next entry records that it is the next entry
+     *	       <ul style="list-style: disc">
+     *	       <li> Return next name </ul>
+     *	     <li> Next entry does not cover name
+     *	       <ul style="list-style: disc">
+     *	       <li> Try again </ul> </ol> </ol> </ul>
+     * <li> No next entry
+     *	 <ul style="list-style: disc">
+     *	 <li> Create last entry
+     *	 <li> Mark last entry pending previous and fetching read
+     *	 <li> Call server
+     *     <ol style="list-style: upper-alpha">
+     *	   <li> Server returns name found
+     *	     <ul style="list-style: disc">
+     *	     <li> Try again </ul>
+     *	   <li> Server returns name not found
+     *       <ol style="list-style: decimal">
+     *	     <li> Next entry records that it is the next entry
+     *	       <ul style="list-style: disc">
+     *	       <li> Return next name </ul>
+     *	     <li> Next entry does not cover name
+     *	       <ul style="list-style: disc">
+     *	       <li> Try again </ul> </ol> </ol> </ul> </ol>
+     */
     protected String nextBoundNameInternal(Transaction txn, String name) {
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
@@ -1819,12 +2036,12 @@ public class CachingDataStore extends AbstractDataStore
 	    assert i < 1000 : "Too many retries";
 	    /* Find next entry */
 	    BindingCacheEntry entry = cache.getHigherBindingEntry(nameKey);
-	    Object lock = cache.getBindingLock(
-		(entry != null) ? entry.key : BindingKey.LAST);
+	    Object lock =
+		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    synchronized (lock) {
 		if (entry == null) {
 		    /* No next entry -- create it */
-		    entry = context.noteLastBinding(false);
+		    entry = context.noteLastBinding();
 		} else if (!entry.awaitReadable(lock, stop)) {
 		    /* The entry is not in the cache -- try again */
 		    continue;
@@ -1864,7 +2081,11 @@ public class CachingDataStore extends AbstractDataStore
     /**
      * A {@link Runnable} that calls {@code nextBoundName} on the server to get
      * information about the next bound name after a specified name when that
-     * information was not in the cache.
+     * information was not in the cache.  The entry for {@code
+     * cachedNextNameKey} is marked pending previous.  If it is the last entry,
+     * it is also marked fetching read if it was added to represent the next
+     * entry provisionally.  The entry will not be pending previous or fetching
+     * when the operation is complete.
      */
     private class NextBoundNameRunnable
 	extends BasicBindingRunnable<NextBoundNameResults>
@@ -2591,7 +2812,7 @@ public class CachingDataStore extends AbstractDataStore
     /**
      * Checks if an entry is both modified and currently in use, either by an
      * active or pending transaction, or because it is a binding entry that has
-     * a pending operation on a previous entry.  The lock associated with the
+     * a pending operation on a previous entry.	 The lock associated with the
      * entry should be held.
      *
      * @param	entry the cache entry

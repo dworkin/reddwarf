@@ -89,13 +89,10 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     /**
      * Creates a binding cache entry to represent the last name binding that is
      * being fetched from the server.
-     *
-     * @param	forUpdate whether the last name is being fetched for update
      */
-    static BindingCacheEntry createLast(boolean forUpdate) {
-	BindingCacheEntry entry = new BindingCacheEntry(
-	    BindingKey.LAST,
-	    forUpdate ? State.FETCHING_WRITE : State.FETCHING_READ);
+    static BindingCacheEntry createLast() {
+	BindingCacheEntry entry =
+	    new BindingCacheEntry(BindingKey.LAST, State.FETCHING_READ);
 	/* Give this last entry a numeric value, but an illegal one */
 	entry.setValue(-2L);
 	return entry;
@@ -187,16 +184,16 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
      * Checks whether this entry's previous unbound key information is valid
-     * given that the previous bound name in the cache is as specified.  Logs
-     * a message if an inconsistency is found.
+     * given that the previous bound name in the cache is as specified.	 Logs a
+     * message if an inconsistency is found.
      */
     void checkPreviousKey(BindingKey previousEntryKey) {
 	if (previousEntryKey.compareTo(key) >= 0) {
 	    if (logger.isLoggable(WARNING)) {
 		logger.log(WARNING,
 			   "Entry is out of order:" +
-			   "\n  previous entry key: " + previousEntryKey +
-			   "\n  entry: " + this);
+			   "\n	previous entry key: " + previousEntryKey +
+			   "\n	entry: " + this);
 	    }
 	}
 	if (previousKey != null) {
@@ -215,8 +212,8 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 			logger.log(
 			    WARNING,
 			    "Previous key is bound:" +
-			    "\n  previous entry key: " + previousEntryKey +
-			    "\n  entry: " + this);
+			    "\n	 previous entry key: " + previousEntryKey +
+			    "\n	 entry: " + this);
 		    }
 		}
 	    }
@@ -225,7 +222,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
      * Returns whether this entry is known to be the next entry in the cache
-     * after the specified key.  Note that this entry does not necessarily
+     * after the specified key.	 Note that this entry does not necessarily
      * represent a bound name, in which case this entry would not represent the
      * next bound name after the specified key.
      *
