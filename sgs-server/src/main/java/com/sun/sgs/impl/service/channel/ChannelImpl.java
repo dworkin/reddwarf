@@ -1715,7 +1715,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    throws IOException
 	{
 	    boolean success =
-		server.join(name, channelRefId, delivery, sessionRefId);
+		server.join(name, channelRefId, (byte) delivery.ordinal(),
+			    timestamp - 1, sessionRefId);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -1952,8 +1953,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			public void run() throws IOException {
 			    ChannelServer server = getChannelServer(nodeId);
 			    if (server != null) {
-				server.send(channelRefId, message,
-					    deliveryOrdinal);
+				server.send(channelRefId, message, timestamp);
 			    }
 			} },
 		    nodeId);
@@ -2314,7 +2314,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * {@code nodeId} whether the session with the specified {@code
      * sessionRefId} is a member of the channel with the specified {@code
      * channelRefId}, and returns {@code true} if the session is a member
-     * and retuns {@code false} otherwise.
+     * and returns {@code false} otherwise.
      *
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID

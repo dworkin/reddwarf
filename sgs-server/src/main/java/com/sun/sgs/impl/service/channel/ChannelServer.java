@@ -74,8 +74,10 @@ public interface ChannelServer extends Remote {
      *
      * @param	name a channel name
      * @param	channelRefId a channel ID
+     * @param	deliveryOrdinal the channel's delivery requirement, as a {@link
+     *		Delivery} ordinal
+     * @param	msgTimestamp the timestamp of the last channel message sent
      * @param	sessionRefId a session ID
-     * @param	delivery the channel's delivery requirement
      * @return	{@code true} if the join succeeded (either was delivered or
      *		enqueued for a relocating session), and {@code false} if
      *		the session is not locally connected and is not known to be
@@ -83,8 +85,8 @@ public interface ChannelServer extends Remote {
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    boolean join(String name, BigInteger channelRefId, Delivery delivery,
-		 BigInteger sessionRefId)
+    boolean join(String name, BigInteger channelRefId, byte deliveryOrdinal,
+		 long msgTimestamp, BigInteger sessionRefId)
 	throws IOException;
 
     /**
@@ -119,12 +121,11 @@ public interface ChannelServer extends Remote {
      *
      * @param	channelRefId a channel ID
      * @param	message a channel message
-     * @param	deliveryOrdinal a delivery guarantee (the
-     *		ordinal representing the {@link Delivery} enum)
+     * @param	msgTimestamp the message's timestamp
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void send(BigInteger channelRefId, byte[] message, byte deliveryOrdinal)
+    void send(BigInteger channelRefId, byte[] message, long msgTimestamp)
 	throws IOException;
 
     /**
@@ -147,11 +148,17 @@ public interface ChannelServer extends Remote {
      * @param	oldNodeId the ID of the node the session is relocating from
      * @param	channelRefIds an array that contains the channel ID of each
      *		channel that the client session is a member of
+     * @param	deliveryOrdinals an array that contains the delivery ordinal
+     *		of each channel that the client session is a member of
+     * @param	msgTimestamp an array that contains the message timestamp
+     *		of each channel that the client session is a member of
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
     void relocateChannelMemberships(BigInteger sessionRefId, long oldNodeId,
-				    BigInteger[] channelRefIds)
+				    BigInteger[] channelRefIds,
+				    byte[] deliveryOrdinals,
+				    long[] msgTimestamps)
 	throws IOException;
 
     /**
