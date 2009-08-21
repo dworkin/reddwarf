@@ -19,8 +19,11 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -28,6 +31,8 @@ import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.NodesMXBean;
 import com.sun.sgs.profile.ProfileCollector;
@@ -86,6 +91,17 @@ import java.util.Arrays;
  *	{@link #renewNode renewNode} method). The interval must be greater
  *	than or equal to  {@code 5} milliseconds and less than or equal to
  *	{@code 10000} milliseconds (10 seconds).<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.server.timestamp.interval
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 5000} (five seconds)
+ *
+ * <dd style="padding-top: .5em">Represents the amount of time in milliseconds
+ *      that the server will wait between updates to the global application time
+ *      stored in the data store.  A larger value will take less system
+ *      resources but will allow the possibility of the global application clock
+ *      to drift by at least the given value if the system crashes.<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.id.block.size
@@ -150,6 +166,27 @@ public final class WatchdogServerImpl
     /** The upper bound for the renew interval. */
     private static final int RENEW_INTERVAL_UPPER_BOUND = Integer.MAX_VALUE;
 
+    /** The property name for the timestamp interval. */
+    private static final String TIMESTAMP_INTERVAL_PROPERTY =
+            SERVER_PROPERTY_PREFIX + ".timestamp.interval";
+
+    /** The default time in milliseconds to wait between timestamps. */
+    private static final long DEFAULT_TIMESTAMP_INTERVAL = 5000L;
+
+    /**
+     * The name binding used to store the current global time in the data store.
+     */
+    private static final String APP_TIME_BINDING = PKG_NAME +
+                                                       ".AppTime";
+
+    /**
+     * The name binding used to store the most recent timestamp interval
+     * that was being used when the application time was updated in the
+     * data store.
+     */
+    private static final String APP_TIME_DRIFT_BINDING = PKG_NAME +
+                                                         ".AppTimeDrift";
+
     /** The name of the ID generator. */
     private static final String ID_GENERATOR_NAME =
 	SERVER_PROPERTY_PREFIX + ".id.generator";
@@ -166,6 +203,9 @@ public final class WatchdogServerImpl
 
     /** The renew interval. */
     final long renewInterval;
+
+    /** The timestamp interval. */
+    final long timestampInterval;
 
     /** The node ID for this server. */
     final long localNodeId;
@@ -219,6 +259,12 @@ public final class WatchdogServerImpl
     
     /** The JMX MXBean to expose nodes in the system. */
     private final NodeManager nodeMgr;
+
+    /** The offset to use when reporting the global application time. */
+    private long timeOffset;
+
+    /** a handle to the periodic global time update task */
+    private RecurringTaskHandle timeUpdateTaskHandle = null;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -279,6 +325,10 @@ public final class WatchdogServerImpl
 	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host +
 		       "]: renewInterval:" + renewInterval);
 	}
+
+        timestampInterval = wrappedProps.getLongProperty(
+                TIMESTAMP_INTERVAL_PROPERTY, DEFAULT_TIMESTAMP_INTERVAL,
+                0, Long.MAX_VALUE);
 
 	idBlockSize = wrappedProps.getIntProperty(
  	    ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE,
@@ -353,11 +403,28 @@ public final class WatchdogServerImpl
     }
     
     /** {@inheritDoc} */
-    protected void doReady() {
+    protected void doReady() throws Exception {
         assert !notifyClientsThread.isAlive();
         // Don't notify clients until other services have had a chance
         // to register themselves with the watchdog.
-        notifyClientsThread.start();      
+        notifyClientsThread.start();
+
+        // If this is the first time booting up, bind the current global
+        // time and set now as time 0.  Also establish the global timeOffset
+        // for the server
+        try {
+            transactionScheduler.runTask(new TimestampBindingRunner(),
+                                         taskOwner);
+        } catch (Exception e) {
+            throw new AssertionError("Failed to initiate global time");
+        }
+
+        // kick off a periodic time update task
+        timeUpdateTaskHandle = transactionScheduler.scheduleRecurringTask(
+                new TimestampRunner(timestampInterval),
+                taskOwner, System.currentTimeMillis(),
+                timestampInterval);
+        timeUpdateTaskHandle.start();
     }
 
     /** {@inheritDoc} */
@@ -404,6 +471,19 @@ public final class WatchdogServerImpl
             nodeMgr.notifyNodeFailed(nodeId);
         }
 	aliveNodes.clear();
+
+        // stop the time update task and take the final timestamp
+        if (timeUpdateTaskHandle != null) {
+            timeUpdateTaskHandle.cancel();
+        }
+        try {
+            transactionScheduler.runTask(new TimestampRunner(0), taskOwner);
+        } catch (Exception e) {
+            if (logger.isLoggable(Level.FINE)) {
+                logger.logThrow(Level.FINE, e,
+                                "Unable to store latest application time");
+            }
+        }
     }
 
     /* -- Implement WatchdogServer -- */
@@ -569,7 +649,24 @@ public final class WatchdogServerImpl
         processNodeFailures(Arrays.asList(remoteNode));
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public long currentAppTimeMillis() {
+        return System.currentTimeMillis() - timeOffset;
+    }
+
     /* -- other methods -- */
+
+    /**
+     * Returns the offset being used by this server to report global
+     * application time with the {@link #currentAppTimeMillis()} method.
+     *
+     * @return the time offset
+     */
+    long getTimeOffset() {
+        return timeOffset;
+    }
 
     /**
      * Processes the nodes which have failed by calling the failure methods
@@ -1045,6 +1142,65 @@ public final class WatchdogServerImpl
                                      seqNumber.incrementAndGet(),
                                      System.currentTimeMillis(),
                                      "Node failed:  " + nodeId));
+        }
+    }
+
+    /**
+     * Private runnable that is used to setup the initial binding of the
+     * current global time in the data store.  This task also establishes the
+     * server's global time offset value.
+     */
+    private final class TimestampBindingRunner implements KernelRunnable {
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return TimestampBindingRunner.class.getName();
+        }
+        /** {@inheritDoc} */
+        public void run() throws Exception {
+            ManagedSerializable<Long> time = null;
+            ManagedSerializable<Long> drift = null;
+            try {
+                time = Objects.uncheckedCast(dataService.getServiceBinding(
+                        APP_TIME_BINDING));
+                drift = Objects.uncheckedCast(dataService.getServiceBinding(
+                        APP_TIME_DRIFT_BINDING));
+
+                // add a small amount of time when recovering to keep the
+                // global time from gradually drifting behind due to
+                // system crashes
+                time.set(time.get() + drift.get() / 2);
+            } catch (NameNotBoundException nnbe) {
+                time = new ManagedSerializable<Long>(new Long(0));
+                drift = new ManagedSerializable<Long>(timestampInterval);
+                dataService.setServiceBinding(APP_TIME_BINDING, time);
+                dataService.setServiceBinding(APP_TIME_DRIFT_BINDING, drift);
+            }
+
+            timeOffset = System.currentTimeMillis() - time.get();
+        }
+    }
+
+    /**
+     * Private runnable that periodically records the current global time
+     * in the data store
+     */
+    private final class TimestampRunner implements KernelRunnable {
+        private final long drift;
+        public TimestampRunner(long drift) {
+            this.drift = drift;
+        }
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return TimestampRunner.class.getName();
+        }
+        /** {@inheritDoc} */
+        public void run() throws Exception {
+            ManagedSerializable<Long> time = Objects.uncheckedCast(
+                    dataService.getServiceBinding(APP_TIME_BINDING));
+            ManagedSerializable<Long> drift = Objects.uncheckedCast(
+                    dataService.getServiceBinding(APP_TIME_DRIFT_BINDING));
+            time.set(currentAppTimeMillis());
+            drift.set(this.drift);
         }
     }
 }

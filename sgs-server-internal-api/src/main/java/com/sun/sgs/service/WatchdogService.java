@@ -169,4 +169,26 @@ public interface WatchdogService extends Service {
      *		transactional context
      */
     void reportFailure(long nodeId, String className);
+
+    /**
+     * Returns the current global application time in milliseconds. This
+     * method returns the amount of time in milliseconds that the current
+     * application has been running since the
+     * {@link AppListener#initialize(java.util.Properties) initialize} method
+     * was called on the application's {@code AppListener} object. Any time
+     * that passes while the application is not running does not affect this
+     * value. This means that this method can effectively be used to
+     * measure the global wall clock time of the current application's
+     * running state.
+     * <p>
+     * Note: This method cannot be reliably used to make fine-grained time
+     * comparisons across task boundaries.  Unpredictable conditions such as
+     * network latency mean that the resulting value may be subject to some
+     * skew.  Additionally, the <em>global</em> accuracy of the clock time
+     * may drift as much as a few seconds due to inherent inaccuracies
+     * recovering application time after a system crash.
+     *
+     * @return the current global application time in milliseconds
+     */
+    long currentAppTimeMillis();
 }
