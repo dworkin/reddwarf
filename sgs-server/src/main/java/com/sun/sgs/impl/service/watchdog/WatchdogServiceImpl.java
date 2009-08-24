@@ -602,6 +602,26 @@ public final class WatchdogServiceImpl
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public long getAppTimeMillis(long systemTimeMillis) {
+        if (systemTimeMillis < timeOffset) {
+            throw new IllegalArgumentException(
+                    "System time : " + systemTimeMillis +
+                    " is before the start time of this application.");
+        }
+
+        return systemTimeMillis - timeOffset;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long getSystemTimeMillis(long appTimeMillis) {
+        return appTimeMillis + timeOffset;
+    }
+
+    /**
      * This thread continuously renews this node with the watchdog server
      * before the renew interval (returned when registering the node) expires.
      */

@@ -192,4 +192,8 @@ public interface WatchdogService extends Service {
      * @return the current global application time in milliseconds
      */
     long currentAppTimeMillis();
+
+    long getAppTimeMillis(long systemTimeMillis);
+
+    long getSystemTimeMillis(long appTimeMillis);
 }
