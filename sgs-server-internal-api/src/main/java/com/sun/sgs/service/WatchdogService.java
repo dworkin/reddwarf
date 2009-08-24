@@ -24,6 +24,7 @@
 package com.sun.sgs.service;
 
 import java.util.Iterator;
+import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.TransactionException;
 
 /**

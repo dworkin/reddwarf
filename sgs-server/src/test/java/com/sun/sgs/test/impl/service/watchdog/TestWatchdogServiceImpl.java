@@ -41,6 +41,7 @@ import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.test.util.Constants;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -979,7 +980,7 @@ public class TestWatchdogServiceImpl extends Assert {
     {
 	List<Long> shutdownIds = new ArrayList<Long>();
 	long serverNodeId = serverNode.getWatchdogService().getLocalNodeId();
-	crashAndRestartServer();
+	crashAndRestartServer(false);
 	shutdownIds.add(serverNodeId);
 	Map<Long, WatchdogServiceImpl> watchdogs =
 	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
@@ -1041,7 +1042,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    }
 	    
 	    // simulate crash
-	    crashAndRestartServer();
+	    crashAndRestartServer(false);
 
 	    checkNodesFailed(watchdogs.keySet(), false);
 	    
@@ -1090,7 +1091,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    watchdogs.clear();
 
 	    // simulate crash
-	    crashAndRestartServer();
+	    crashAndRestartServer(false);
 
 	    // pause for watchdog server to detect failure and
 	    // reassign backups.
@@ -1502,6 +1503,81 @@ public class TestWatchdogServiceImpl extends Assert {
 	// The node should be shutting down or shut down
 	node.getWatchdogService().isLocalNodeAliveNonTransactional();
     }
+
+    /* -- test currentAppTimeMillis() -- */
+
+    @Test public void testCurrentAppTimeMillisInit() throws Exception {
+        assertTrue(watchdogService.currentAppTimeMillis() < 100);
+        Thread.sleep(1000);
+        assertTrue(watchdogService.currentAppTimeMillis() > 
+                   1000 - Constants.MAX_CLOCK_GRANULARITY);
+    }
+
+    @Test public void testCurrentAppTimeMillisAfterShutdown() throws Exception {
+        Thread.sleep(1000);
+        assertTrue(watchdogService.currentAppTimeMillis() >
+                   1000 - Constants.MAX_CLOCK_GRANULARITY);
+
+        long beforeTime = watchdogService.currentAppTimeMillis();
+        crashAndRestartServer(false);
+        long afterTime = watchdogService.currentAppTimeMillis();
+
+        assertTrue(afterTime >= beforeTime);
+        assertTrue(afterTime < beforeTime + 100);
+    }
+
+    @Test public void testCurrentAppTimeMillisAfterCleanShutdown()
+            throws Exception {
+        Thread.sleep(1000);
+        assertTrue(watchdogService.currentAppTimeMillis() >
+                   1000 - Constants.MAX_CLOCK_GRANULARITY);
+
+        long beforeTime = watchdogService.currentAppTimeMillis();
+        crashAndRestartServer(true);
+        long afterTime = watchdogService.currentAppTimeMillis();
+
+        assertTrue(afterTime < 100);
+        assertTrue(afterTime < beforeTime);
+    }
+
+    @Test public void testCurrentAppTimeMillisSync() throws Exception {
+        // setup an app node with a small timesync interval
+        Properties appProps = SgsTestNode.getDefaultProperties(
+                "TestWatchdogServiceImpl", serverNode, null);
+        appProps.setProperty(
+                "com.sun.sgs.impl.service.watchdog.timesync.interval",
+                "1000");
+        addNodes(appProps, 1);
+
+        WatchdogServerImpl watchdogServer = watchdogService.getServer();
+        WatchdogService remoteWatchdogService =
+                        additionalNodes[0].getWatchdogService();
+
+        // watchdog server and service should initially be sync'd
+        long serverTime = watchdogServer.currentAppTimeMillis();
+        long serviceTime = remoteWatchdogService.currentAppTimeMillis();
+        assertTrue(checkInRange(serverTime,
+                                serviceTime,
+                                Constants.MAX_CLOCK_GRANULARITY));
+
+        // force watchdog service out of sync
+        Field serviceTimeOffset = getField(WatchdogServiceImpl.class,
+                                           "timeOffset");
+        serviceTimeOffset.set(remoteWatchdogService, 0);
+        serverTime = watchdogServer.currentAppTimeMillis();
+        serviceTime = remoteWatchdogService.currentAppTimeMillis();
+        assertFalse(checkInRange(serverTime,
+                                 serviceTime,
+                                 Constants.MAX_CLOCK_GRANULARITY));
+
+        // wait for time sync interval and verify service syncs back with server
+        Thread.sleep(1000 + Constants.MAX_CLOCK_GRANULARITY);
+        serverTime = watchdogServer.currentAppTimeMillis();
+        serviceTime = remoteWatchdogService.currentAppTimeMillis();
+        assertTrue(checkInRange(serverTime,
+                                serviceTime,
+                                Constants.MAX_CLOCK_GRANULARITY));
+    }
     
     
     /**
@@ -1558,9 +1634,9 @@ public class TestWatchdogServiceImpl extends Assert {
     }
     
     /** Tears down the server node and restarts it as a server-only stack. */
-    private void crashAndRestartServer() throws Exception {
+    private void crashAndRestartServer(boolean clean) throws Exception {
 	System.err.println("simulate watchdog server crash...");
-	tearDown(false);
+	tearDown(clean);
 	Properties props =
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null);
@@ -1647,6 +1723,14 @@ public class TestWatchdogServiceImpl extends Assert {
 	        }
             }
         }, taskOwner);
+    }
+
+    /**
+     * returns {@code true} if val1 and val2 are within range of eachother
+     */
+    private boolean checkInRange(long val1, long val2, long range) {
+        long diff = Math.abs(val1 - val2);
+        return diff <= range;
     }
 
     private static class DummyRecoveryListener implements RecoveryListener {
