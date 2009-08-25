@@ -111,9 +111,13 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     private final Object runningLock = new Object();
     private boolean running = false;
 
+    // The iteration number, used to ensure that LPAClients are reporting
+    // results from the expected iteration.
     private final AtomicLong runNumber = new AtomicLong();
 
+    // The total amount of time the last algorithm run took.
     private long runTime;
+
     /**
      * Constructs a new label propagation server. Only one should exist
      * within a Darkstar cluster.
@@ -299,25 +303,6 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
     }
 
-    // For testing
-
-    /**
-     * Returns the time, in milliseconds, that the last algorithm run took.
-     * @return time in milliseconds for the last algorithm run
-     */
-    public long getRunTime() {
-        return runTime;
-    }
-
-    /**
-     * Returns the number of iterations for the last algorithm run.  If called
-     * in the midst of a run, returns the current iteration number.
-     * @return the number of iterations for the last algorithm run
-     */
-    public int getIterationCount() {
-        return currentIteration;
-    }
-
     /**
      * Tells each registred LPAClient to prepare for a run of the algorithm.
      * 
@@ -357,6 +342,10 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         waitOnLatch();
     }
 
+    /**
+     * Run the algorithm iterations until all LPAClients have converged.
+     * @param clientProxies a map of node ids to LPAClient proxies
+     */
     private void runIterations(Map<Long, LPAClient> clientProxies) {
         final Set<Long> clean =
                 Collections.unmodifiableSet(clientProxies.keySet());
@@ -402,6 +391,14 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
     }
 
+    /**
+     * Ask each of the LPAClients for the final affinity groups they found,
+     * also asking them to prepare for the next algorithm run.  The affinity
+     * groups are then merged, so the final groups can span nodes.
+     *
+     * @param clientProxies a map of node ids to LPAClient proxies
+     * @return the merged affinity groups found on each LPAClient
+     */
     private Collection<AffinityGroup> gatherFinalGroups(
             Map<Long, LPAClient> clientProxies)
     {
@@ -419,7 +416,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        returnedGroups.put(nodeId, proxy.affinityGroups(runNum, true));
+                        returnedGroups.put(nodeId,
+                                           proxy.affinityGroups(runNum, true));
                         latch.countDown();
                     } catch (IOException ioe) {
                         ioe.printStackTrace();
@@ -483,6 +481,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         return retVal;
     }
 
+    /**
+     * Wait on the global latch, noting if the wait was not successful.
+     */
     private void waitOnLatch() {
         try {
             boolean ok = latch.await(TIMEOUT, TimeUnit.MINUTES);
@@ -493,5 +494,23 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         } catch (InterruptedException ex) {
             runFailed = true;
         }
+    }
+
+    // For testing
+    /**
+     * Returns the time, in milliseconds, that the last algorithm run took.
+     * @return time in milliseconds for the last algorithm run
+     */
+    public long getRunTime() {
+        return runTime;
+    }
+
+    /**
+     * Returns the number of iterations for the last algorithm run.  If called
+     * in the midst of a run, returns the current iteration number.
+     * @return the number of iterations for the last algorithm run
+     */
+    public int getIterationCount() {
+        return currentIteration;
     }
 }

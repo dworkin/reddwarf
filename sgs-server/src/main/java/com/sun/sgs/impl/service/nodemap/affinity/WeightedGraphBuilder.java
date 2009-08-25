@@ -34,6 +34,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A graph builder which builds an affinity graph consisting of identities 
@@ -56,6 +57,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // Map for tracking object-> map of identity-> number accesses
     // (thus we keep track of the number of accesses each identity has made
     // for an object, to aid maintaining weighted edges)
+    // Concurrent modifications are protected by locking the affinity graph
     private final Map<Object, Map<Identity, Long>> objectMap =
             new HashMap<Object, Map<Identity, Long>>();
     
@@ -69,9 +71,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // node for it, we are told of the eviction.
     // Map of nodes to objects that were evicted to go to that node, with a
     // count.
-    private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
+    private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
         conflictMap =
-            new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
+            new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
 
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
@@ -194,14 +196,18 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap() {
+    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+            getConflictMap()
+    {
         return conflictMap;
     }
 
 
     /**
      * This will be the implementation of our conflict detection listener.
-     *
+     * <p>
+     * Note that forUpdate is currently not used.
+     * 
      * @param objId the object that was evicted
      * @param nodeId the node that caused the eviction
      * @param forUpdate {@code true} if this eviction was for an update,
@@ -210,17 +216,32 @@ public class WeightedGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        ConcurrentMap<Object, Long> objMap = conflictMap.get(nodeId);
+        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
-            objMap = new ConcurrentHashMap<Object, Long>();
+            ConcurrentMap<Object, AtomicLong> newMap =
+                    new ConcurrentHashMap<Object, AtomicLong>();
+            objMap = conflictMap.putIfAbsent(nodeId, newMap);
+            if (objMap == null) {
+                objMap = newMap;
+            }
         }
-        long value = objMap.containsKey(objId) ? objMap.get(objId) : 0;
-        value++;
-        objMap.put(objId, value);
-        conflictMap.put(nodeId, objMap);
+        AtomicLong count = objMap.get(objId);
+        if (count == null) {
+            AtomicLong newCount = new AtomicLong();
+            count = objMap.putIfAbsent(objId, newCount);
+            if (count == null) {
+                count = newCount;
+            }
+        }
+        count.incrementAndGet();
         pruneTask.updateConflict(objId, nodeId);
     }
-    
+
+    /** {@inheritDoc} */
+    public void removeNode(long nodeId) {
+        conflictMap.remove(nodeId);
+    }
+
     /**
      * The graph pruner.  It runs periodically, and is the only code
      * that removes edges and vertices from the graph.
@@ -236,12 +257,18 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 periodObjectQueue;
         private final Queue<Map<WeightedEdge, Integer>>
                 periodEdgeIncrementsQueue;
-        private final Queue<Map<Long, Map<Object, Integer>>>
+        private final Queue<ConcurrentMap<Long,
+                                          ConcurrentMap<Object, AtomicLong>>>
                 periodConflictQueue;
 
+        // ObjId -> <Identity -> count times accessed>
         private Map<Object, Map<Identity, Integer>> currentPeriodObject;
+        // Edge -> count of times incremented
         private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
-        private Map<Long, Map<Object, Integer>> currentPeriodConflicts;
+        // NodeId -> <ObjId, count times conflicted>
+        // Note that the conflict count is not currently used
+        private ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+                currentPeriodConflicts;
 
         public PruneTask(int count) {
             this.count = count;
@@ -250,7 +277,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
             periodEdgeIncrementsQueue = 
                 new LinkedList<Map<WeightedEdge, Integer>>();
             periodConflictQueue =
-                new LinkedList<Map<Long, Map<Object, Integer>>>();
+                new LinkedList<ConcurrentMap<Long,
+                                        ConcurrentMap<Object, AtomicLong>>>();
             synchronized (affinityGraph) {
                 addPeriodStructures();
             }
@@ -271,7 +299,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
                         periodObjectQueue.remove();
                 Map<WeightedEdge, Integer> periodEdgeIncrements =
                         periodEdgeIncrementsQueue.remove();
-                Map<Long, Map<Object, Integer>> periodConflicts =
+                Map<Long, ConcurrentMap<Object, AtomicLong>> periodConflicts =
                         periodConflictQueue.remove();
 
                 // For each object, remove the added access counts
@@ -318,27 +346,37 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 }
 
                 // For each conflict, update values
-                // JANE need to lock map?
-                for (Map.Entry<Long, Map<Object, Integer>> entry :
+                for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
                      periodConflicts.entrySet())
                 {
-                     Long nodeId = entry.getKey();
-                     Map<Object, Long> objMap = conflictMap.get(nodeId);
-                     for (Map.Entry<Object, Integer> updateEntry :
-                          entry.getValue().entrySet())
-                     {
-                        Object objId = updateEntry.getKey();
-                        long newVal =
-                                objMap.get(objId) - updateEntry.getValue();
-                        if (newVal <= 0) {
-                            objMap.remove(objId);
-                        } else {
-                            objMap.put(objId, newVal);
+                    Long nodeId = entry.getKey();
+                    ConcurrentMap<Object, AtomicLong> objMap =
+                            conflictMap.get(nodeId);
+                    // If the node went down, we might have removed the entry
+                    if (objMap != null) {
+                        for (Map.Entry<Object, AtomicLong> updateEntry :
+                              entry.getValue().entrySet())
+                        {
+                            Object objId = updateEntry.getKey();
+                            AtomicLong periodVal = updateEntry.getValue();
+                            AtomicLong conflictVal = objMap.get(objId);
+                            long oldVal;
+                            long newVal;
+                            do {
+                                oldVal = conflictVal.get();
+                                newVal = oldVal - periodVal.get();
+                            } while (!conflictVal.compareAndSet(oldVal,
+                                                                newVal));
+
+                            if (newVal <= 0) {
+                                // This could remove a just incremented value!
+                                objMap.remove(objId);
+                            }
                         }
-                     }
-                     if (objMap.isEmpty()) {
-                         conflictMap.remove(nodeId);
-                     }
+                        if (objMap.isEmpty()) {
+                            conflictMap.remove(nodeId);
+                        }
+                    }
                 }
             }
         }
@@ -355,7 +393,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
             assert Thread.holdsLock(affinityGraph);
             Map<Identity, Integer> periodIdMap = currentPeriodObject.get(objId);
             if (periodIdMap == null) {
-                periodIdMap = new ConcurrentHashMap<Identity, Integer>();
+                periodIdMap = new HashMap<Identity, Integer>();
             }
             int periodValue = periodIdMap.containsKey(owner) ?
                               periodIdMap.get(owner) : 0;
@@ -365,16 +403,26 @@ public class WeightedGraphBuilder implements GraphBuilder {
         }
 
         public void updateConflict(Object objId, long nodeId) {
-            Map<Object, Integer> periodObjMap =
+            ConcurrentMap<Object, AtomicLong> periodObjMap =
                     currentPeriodConflicts.get(nodeId);
             if (periodObjMap == null) {
-                periodObjMap = new ConcurrentHashMap<Object, Integer>();
+                ConcurrentMap<Object, AtomicLong> newMap = 
+                        new ConcurrentHashMap<Object, AtomicLong>();
+                periodObjMap =
+                        currentPeriodConflicts.putIfAbsent(nodeId, newMap);
+                if (periodObjMap == null) {
+                    periodObjMap = newMap;
+                }
             }
-            int periodValue = periodObjMap.containsKey(objId) ?
-                               periodObjMap.get(objId) : 0;
-            periodValue++;
-            periodObjMap.put(objId, periodValue);
-            currentPeriodConflicts.put(nodeId, periodObjMap);
+            AtomicLong val = periodObjMap.get(objId);
+            if (val == null) {
+                AtomicLong newVal = new AtomicLong();
+                val = periodObjMap.putIfAbsent(objId, newVal);
+                if (val == null) {
+                    val = newVal;
+                }
+            }
+            val.incrementAndGet();
         }
         
         private void addPeriodStructures() {
@@ -384,7 +432,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
             currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Integer>();
             periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
             currentPeriodConflicts = 
-                    new ConcurrentHashMap<Long, Map<Object, Integer>>();
+                new ConcurrentHashMap<Long, 
+                                        ConcurrentMap<Object, AtomicLong>>();
             periodConflictQueue.add(currentPeriodConflicts);
         }
     }

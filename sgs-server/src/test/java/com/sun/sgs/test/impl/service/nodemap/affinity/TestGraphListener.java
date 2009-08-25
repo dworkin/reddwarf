@@ -44,6 +44,8 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -51,7 +53,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 /**
- *  Tests for the graph listener
+ *  Tests for the graph listener and graph builders
  *
  */
 @RunWith(ParameterizedFilteredNameRunner.class)
@@ -60,9 +62,9 @@ public class TestGraphListener {
    @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(
-            new Object[][] {{"default", false},
-                        {WeightedGraphBuilder.class.getName(), false},
-                        {BipartiteGraphBuilder.class.getName(), false}});
+            new Object[][] {{"default"},
+                            {WeightedGraphBuilder.class.getName()},
+                            {BipartiteGraphBuilder.class.getName()}});
     }
    
     private static Class<?> profileReportImplClass;
@@ -90,19 +92,17 @@ public class TestGraphListener {
     GraphBuilder builder;
 
     private final String builderName;
-    private boolean parallelEdges;
     
     /**
      * Create this test class.
-     * @param testType the type of profile data to create
+     * @param builderName the type of graph builder to use
      */
-    public TestGraphListener(String builderName, boolean parallelEdges) {
+    public TestGraphListener(String builderName) {
         if (builderName.equals("default")) {
             this.builderName = null;
         } else {
             this.builderName = builderName;
         }
-        this.parallelEdges = parallelEdges;
         System.err.println("Graph builder used is: " + builderName);
         
     }
@@ -333,15 +333,11 @@ public class TestGraphListener {
         graph = builder.getAffinityGraph();
         System.out.println("New Graph: " + graph);
         Assert.assertEquals(4, graph.getVertexCount());
-        if (parallelEdges) {
-            Assert.assertEquals(6, graph.getEdgeCount());
-        } else {
-            Assert.assertEquals(4, graph.getEdgeCount());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
-        }
+        Assert.assertEquals(4, graph.getEdgeCount());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
     }
     
     @Test
@@ -391,12 +387,11 @@ public class TestGraphListener {
 
     @Test
     public void testGraphPruner() throws Exception {
-
         // First period
         testFourReports();
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         // Second period - nothing added to graph, so expect it to empty out
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
@@ -420,113 +415,86 @@ public class TestGraphListener {
         // Each update to the graph is followed by a pruning task run,
         // to simulate a pruning time period.
         testFourReports();
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         // 2nd period
 
         // Graph should still be intact:  not enough periods to clean up yet.
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
-        if (parallelEdges) {
-            Assert.assertEquals(6, graph.getEdgeCount());
-        } else {
-            Assert.assertEquals(4, graph.getEdgeCount());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
-        }
+        Assert.assertEquals(4, graph.getEdgeCount());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
 
         addFourReports();
 
         // 3rd period - no additions
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
-        if (parallelEdges) {
-            Assert.assertEquals(6, graph.getEdgeCount());
-        } else {
-
-            Assert.assertEquals(4, graph.getEdgeCount());
-            // Weights are doubled from testFourReports
-            Assert.assertEquals(4, graph.findEdge(vertA, vertB).getWeight());
-            Assert.assertEquals(4, graph.findEdge(vertA, vertC).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertB, vertC).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
-        }
+        Assert.assertEquals(4, graph.getEdgeCount());
+        // Weights are doubled from testFourReports
+        Assert.assertEquals(4, graph.findEdge(vertA, vertB).getWeight());
+        Assert.assertEquals(4, graph.findEdge(vertA, vertC).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertB, vertC).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
 
         // 4th period - no additions, back to single weights
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
-        if (parallelEdges) {
-            Assert.assertEquals(6, graph.getEdgeCount());
-        } else {
-            Assert.assertEquals(4, graph.getEdgeCount());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
-        }
+        Assert.assertEquals(4, graph.getEdgeCount());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
 
         // 5th period - no additions, back to empty graph
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
   
         testFourReports();
         // 6th period
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         addFourReports();
 
         // 7th period
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
-        Assert.assertEquals(4, graph.getVertexCount());
-        if (parallelEdges) {
-            Assert.assertEquals(6, graph.getEdgeCount());
-        } else {
-            
-            Assert.assertEquals(4, graph.getEdgeCount());
-            // Weights are doubled from testFourReports
-            Assert.assertEquals(4, graph.findEdge(vertA, vertB).getWeight());
-            Assert.assertEquals(4, graph.findEdge(vertA, vertC).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertB, vertC).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
-        }
+        Assert.assertEquals(4, graph.getVertexCount());           
+        Assert.assertEquals(4, graph.getEdgeCount());
+        // Weights are doubled from testFourReports
+        Assert.assertEquals(4, graph.findEdge(vertA, vertB).getWeight());
+        Assert.assertEquals(4, graph.findEdge(vertA, vertC).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertB, vertC).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
         addFourReports();
 
         // 8th period - no addition
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
-        if (parallelEdges) {
-            Assert.assertEquals(6, graph.getEdgeCount());
-        } else {
-            Assert.assertEquals(4, graph.getEdgeCount());
-            Assert.assertEquals(4, graph.findEdge(vertA, vertB).getWeight());
-            Assert.assertEquals(4, graph.findEdge(vertA, vertC).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertB, vertC).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
-        }
-
+        Assert.assertEquals(4, graph.getEdgeCount());
+        Assert.assertEquals(4, graph.findEdge(vertA, vertB).getWeight());
+        Assert.assertEquals(4, graph.findEdge(vertA, vertC).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertB, vertC).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
 
         // 9th period
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
-        if (parallelEdges) {
-            Assert.assertEquals(6, graph.getEdgeCount());
-        } else {
-            Assert.assertEquals(4, graph.getEdgeCount());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
-            Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
-            Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
-        }
+        Assert.assertEquals(4, graph.getEdgeCount());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertB).getWeight());
+        Assert.assertEquals(2, graph.findEdge(vertA, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
+        Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
 
         // 10th period
-        listener.getGraphBuilder().getPruneTask().run();
+        builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
@@ -572,6 +540,99 @@ public class TestGraphListener {
         detail.addAccess(new String("obj3"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
+    }
+
+    @Test
+    public void testNoteConflictDetected() throws Exception {
+        if (builderName == null) {
+            // We'll also test it when explicitly called - much easier this way
+            return;
+        }
+        Class builderClass = Class.forName(builderName);
+        // args:  object, node, forUpdate
+        Method meth = UtilReflection.getMethod(builderClass,
+            "noteConflictDetected", Object.class, long.class, boolean.class);
+        
+        Object obj = new String("obj");
+        long nodeId = 99L;
+        meth.invoke(builder, obj, nodeId, false);
+        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflictMap =
+                builder.getConflictMap();
+        Assert.assertEquals(1, conflictMap.size());
+        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
+        Assert.assertNotNull(objMap);
+        AtomicLong val = objMap.get(obj);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(1, val.get());
+
+        meth.invoke(builder, obj, nodeId, false);
+        Assert.assertEquals(1, conflictMap.size());
+        objMap = conflictMap.get(nodeId);
+        Assert.assertNotNull(objMap);
+        val = objMap.get(obj);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(2, val.get());
+
+        // Add a different object to the same node
+        Object obj1 = new String("obj1");
+        meth.invoke(builder, obj1, nodeId, true);
+        Assert.assertEquals(1, conflictMap.size());
+        objMap = conflictMap.get(nodeId);
+        Assert.assertNotNull(objMap);
+        val = objMap.get(obj);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(2, val.get());
+        val = objMap.get(obj1);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(1, val.get());
+    }
+
+    @Test
+    public void testRemoveNode() throws Exception {
+        if (builderName == null) {
+            // We'll also test it when explicitly called - much easier this way
+            return;
+        }
+        Class builderClass = Class.forName(builderName);
+        // args:  object, node, forUpdate
+        Method meth = UtilReflection.getMethod(builderClass,
+            "noteConflictDetected", Object.class, long.class, boolean.class);
+
+        Object obj = new String("obj");
+        Object obj1 = new String("obj1");
+        long nodeId = 99L;
+        long badNodeId = 102L;
+        meth.invoke(builder, obj, nodeId, false);
+        meth.invoke(builder, obj, badNodeId, false);
+        meth.invoke(builder, obj1, badNodeId, false);
+        meth.invoke(builder, obj1, badNodeId, true);
+        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflictMap =
+                builder.getConflictMap();
+        Assert.assertEquals(2, conflictMap.size());
+        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
+        Assert.assertNotNull(objMap);
+        AtomicLong val = objMap.get(obj);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(1, val.get());
+        objMap = conflictMap.get(badNodeId);
+        Assert.assertNotNull(objMap);
+        val = objMap.get(obj);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(1, val.get());
+        val = objMap.get(obj1);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(2, val.get());
+
+        // Now invalidate badNodeId
+        builder.removeNode(badNodeId);
+        Assert.assertEquals(1, conflictMap.size());
+        objMap = conflictMap.get(nodeId);
+        Assert.assertNotNull(objMap);
+        val = objMap.get(obj);
+        Assert.assertNotNull(val);
+        Assert.assertEquals(1, val.get());
+        objMap = conflictMap.get(badNodeId);
+        Assert.assertNull(objMap);
     }
 
     /* Utility methods and classes. */

@@ -27,6 +27,7 @@ import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Assert;
 
 /**
@@ -143,7 +144,14 @@ class ZachBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap() {
+    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+            getConflictMap()
+    {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    /** {@inheritDoc} */
+    public void removeNode(long nodeId) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

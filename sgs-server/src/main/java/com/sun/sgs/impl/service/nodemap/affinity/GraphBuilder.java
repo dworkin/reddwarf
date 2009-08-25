@@ -24,6 +24,7 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Graph builder interface.  Graph builder objects take task access information
@@ -119,5 +120,12 @@ public interface GraphBuilder {
      * 
      * @return the map of detected cross node data conflicts
      */
-    ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap();
+    ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> getConflictMap();
+
+    /**
+     * Note that a node has failed.
+     * 
+     * @param nodeId the id of the failed node
+     */
+    void removeNode(long nodeId);
 }

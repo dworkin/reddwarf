@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -225,6 +226,24 @@ public class TestLPA {
         assertTrue(groups.size() != 0);
         groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
+    }
+
+    @Test
+    public void testLPAAlgorithmOneClient() throws Exception {
+        // We choose node 3 here because it has no reported conflicts with
+        // other nodes, so it doesn't fail immediately because the other nodes
+        // are down.
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    PartialToyBuilder.NODE3, localHost, serverPort, true, 1);
+        Collection<AffinityGroup> groups = server.findAffinityGroups();
+        assertTrue(groups.size() != 0);
+    }
+
+    @Test
+    public void testLPAAlgorithmNoClient() throws Exception {
+        Collection<AffinityGroup> groups = server.findAffinityGroups();
+        assertEquals(0, groups.size());
     }
 
     // Need to rework this test - we now log the error, should shut down
@@ -456,7 +475,7 @@ public class TestLPA {
         expected.add(PartialToyBuilder.NODE2);
         expected.add(PartialToyBuilder.NODE3);
         assertTrue(expected.containsAll(lp1.getNodeConflictMap().keySet()));
-        Map<Object, Long> map =
+        Map<Object, AtomicLong> map =
                 lp1.getNodeConflictMap().get(PartialToyBuilder.NODE2);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj1"));
@@ -536,13 +555,13 @@ public class TestLPA {
 
     private void printNodeConflictMap(LabelPropagation lp) {
 
-        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
              lp.getNodeConflictMap().entrySet())
         {
             StringBuilder sb1 = new StringBuilder();
             sb1.append(entry.getKey());
             sb1.append(":  ");
-            for (Map.Entry<Object, Long> subEntry :
+            for (Map.Entry<Object, AtomicLong> subEntry :
                  entry.getValue().entrySet())
             {
                 sb1.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
@@ -816,7 +835,7 @@ public class TestLPA {
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements GraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
-        private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
+        private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
                 conflictMap;
         private final Map<Object, Map<Identity, Long>> objUseMap;
 
@@ -836,7 +855,7 @@ public class TestLPA {
             graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
             conflictMap = new ConcurrentHashMap<Long,
-                                ConcurrentMap<Object, Long>>();
+                                ConcurrentMap<Object, AtomicLong>>();
 
             if (node == NODE1) {
                 // Create a partial graph
@@ -861,12 +880,12 @@ public class TestLPA {
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                ConcurrentHashMap<Object, Long> conflict =
-                        new ConcurrentHashMap<Object, Long>();
+                ConcurrentHashMap<Object, AtomicLong> conflict =
+                        new ConcurrentHashMap<Object, AtomicLong>();
 //                conflict.put("obj1", 1L);
 //                conflictMap.put(NODE2, conflict);
 //                conflict = new ConcurrentHashMap<Object, Long>();
-                conflict.put("obj2", 1L);
+                conflict.put("obj2", new AtomicLong(1));
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
                 // Create a partial graph
@@ -881,9 +900,9 @@ public class TestLPA {
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                ConcurrentHashMap<Object, Long> conflict =
-                        new ConcurrentHashMap<Object, Long>();
-                conflict.put("obj1", 1L);
+                ConcurrentHashMap<Object, AtomicLong> conflict =
+                        new ConcurrentHashMap<Object, AtomicLong>();
+                conflict.put("obj1", new AtomicLong(1));
                 conflictMap.put(NODE1, conflict);
             } else if (node == NODE3) {
                 Identity[] idents = {new DummyIdentity("4"),
@@ -923,9 +942,15 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap()
+        public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+                getConflictMap()
         {
             return conflictMap;
+        }
+
+        /** {@inheritDoc} */
+        public void removeNode(long nodeId) {
+            conflictMap.remove(nodeId);
         }
 
         /** {@inheritDoc} */

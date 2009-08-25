@@ -41,6 +41,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
@@ -268,7 +269,7 @@ public class TestLPAPerf {
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
     private class DistributedZachBuilder implements GraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
-        private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
+        private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
             conflictMap;
         private final Map<Object, Map<Identity, Long>> objUseMap;
 
@@ -286,8 +287,8 @@ public class TestLPAPerf {
             super();
             graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
             objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
-            conflictMap = 
-                    new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
+            conflictMap = new ConcurrentHashMap<Long, 
+                                        ConcurrentMap<Object, AtomicLong>>();
             LabelVertex[] nodes = new LabelVertex[35];
             DummyIdentity[] idents = new DummyIdentity[35];
             int nodeAsInt = (int) node;
@@ -446,28 +447,28 @@ public class TestLPAPerf {
 
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                ConcurrentHashMap<Object, Long> conflict =
-                        new ConcurrentHashMap<Object, Long>();
-                conflict.put("o1", 1L);
-                conflict.put("o2", 1L);
-                conflict.put("o18", 1L);
-                conflict.put("o21", 1L);
-                conflict.put("o41", 1L);
-                conflict.put("o45", 1L);
-                conflict.put("o47", 1L);
+                ConcurrentHashMap<Object, AtomicLong> conflict =
+                        new ConcurrentHashMap<Object, AtomicLong>();
+                conflict.put("o1", new AtomicLong(1));
+                conflict.put("o2", new AtomicLong(1));
+                conflict.put("o18", new AtomicLong(1));
+                conflict.put("o21", new AtomicLong(1));
+                conflict.put("o41", new AtomicLong(1));
+                conflict.put("o45", new AtomicLong(1));
+                conflict.put("o47", new AtomicLong(1));
                 conflictMap.put(NODE2, conflict);
-                conflict = new ConcurrentHashMap<Object, Long>();
-                conflict.put("o1", 1L);
-                conflict.put("o5", 1L);
-                conflict.put("o7", 1L);
-                conflict.put("o11", 1L);
-                conflict.put("o31", 1L);
-                conflict.put("o35", 1L);
-                conflict.put("o36", 1L);
-                conflict.put("o42", 1L);
-                conflict.put("o46", 1L);
-                conflict.put("o48", 1L);
-                conflict.put("o49", 1L);
+                conflict = new ConcurrentHashMap<Object, AtomicLong>();
+                conflict.put("o1", new AtomicLong(1));
+                conflict.put("o5", new AtomicLong(1));
+                conflict.put("o7", new AtomicLong(1));
+                conflict.put("o11", new AtomicLong(1));
+                conflict.put("o31", new AtomicLong(1));
+                conflict.put("o35", new AtomicLong(1));
+                conflict.put("o36", new AtomicLong(1));
+                conflict.put("o42", new AtomicLong(1));
+                conflict.put("o46", new AtomicLong(1));
+                conflict.put("o48", new AtomicLong(1));
+                conflict.put("o49", new AtomicLong(1));
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
                 graph.addEdge(new WeightedEdge(), nodes[8], nodes[2]);
@@ -563,22 +564,22 @@ public class TestLPAPerf {
 
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                ConcurrentHashMap<Object, Long> conflict =
-                        new ConcurrentHashMap<Object, Long>();
-                conflict.put("o2", 1L);
-                conflict.put("o8", 1L);
-                conflict.put("o15", 1L);
-                conflict.put("o23", 1L);
-                conflict.put("o30", 1L);
-                conflict.put("o32", 1L);
-                conflict.put("o51", 1L);
-                conflict.put("o53", 1L);
+                ConcurrentHashMap<Object, AtomicLong> conflict =
+                        new ConcurrentHashMap<Object, AtomicLong>();
+                conflict.put("o2", new AtomicLong(1));
+                conflict.put("o8", new AtomicLong(1));
+                conflict.put("o15", new AtomicLong(1));
+                conflict.put("o23", new AtomicLong(1));
+                conflict.put("o30", new AtomicLong(1));
+                conflict.put("o32", new AtomicLong(1));
+                conflict.put("o51", new AtomicLong(1));
+                conflict.put("o53", new AtomicLong(1));
                 conflictMap.put(NODE1, conflict);
-                conflict = new ConcurrentHashMap<Object, Long>();
-                conflict.put("o1", 1L);
-                conflict.put("o10", 1L);
-                conflict.put("o14", 1L);
-                conflict.put("o22", 1L);
+                conflict = new ConcurrentHashMap<Object, AtomicLong>();
+                conflict.put("o1", new AtomicLong(1));
+                conflict.put("o10", new AtomicLong(1));
+                conflict.put("o14", new AtomicLong(1));
+                conflict.put("o22", new AtomicLong(1));
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE3) {
                 graph.addEdge(new WeightedEdge(), nodes[9], nodes[3]);
@@ -691,21 +692,21 @@ public class TestLPAPerf {
 
                 // conflicts - data cache evictions due to conflict
                 // just guessing
-                ConcurrentHashMap<Object, Long> conflict =
-                        new ConcurrentHashMap<Object, Long>();
-                conflict.put("o3", 1L);
-                conflict.put("o4", 1L);
-                conflict.put("o16", 1L);
-                conflict.put("o24", 1L);
-                conflict.put("o25", 1L);
-                conflict.put("o31", 1L);
-                conflict.put("o52", 1L);
+                ConcurrentHashMap<Object, AtomicLong> conflict =
+                        new ConcurrentHashMap<Object, AtomicLong>();
+                conflict.put("o3", new AtomicLong(1));
+                conflict.put("o4", new AtomicLong(1));
+                conflict.put("o16", new AtomicLong(1));
+                conflict.put("o24", new AtomicLong(1));
+                conflict.put("o25", new AtomicLong(1));
+                conflict.put("o31", new AtomicLong(1));
+                conflict.put("o52", new AtomicLong(1));
                 conflictMap.put(NODE1, conflict);
-                conflict = new ConcurrentHashMap<Object, Long>();
-                conflict.put("o17", 1L);
-                conflict.put("o27", 1L);
-                conflict.put("o38", 1L);
-                conflict.put("o39", 1L);
+                conflict = new ConcurrentHashMap<Object, AtomicLong>();
+                conflict.put("o17", new AtomicLong(1));
+                conflict.put("o27", new AtomicLong(1));
+                conflict.put("o38", new AtomicLong(1));
+                conflict.put("o39", new AtomicLong(1));
                 conflictMap.put(NODE2, conflict);
             }
         }
@@ -723,9 +724,15 @@ public class TestLPAPerf {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap()
+        public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+                getConflictMap()
         {
             return conflictMap;
+        }
+
+        /** {@inheritDoc} */
+        public void removeNode(long nodeId) {
+            conflictMap.remove(nodeId);
         }
 
         /** {@inheritDoc} */

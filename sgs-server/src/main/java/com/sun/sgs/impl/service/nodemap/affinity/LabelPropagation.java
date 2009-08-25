@@ -40,6 +40,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -91,9 +92,7 @@ public class LabelPropagation implements LPAClient {
 
     // If true, gather statistics for each run.
     private final boolean gatherStats;
-    // Statistics for the last run, only if gatherStats is true.
-    private Collection<AffinityGroup> groups;
-    // For single node testing
+    // For single node performance testing, only valid if gatherStats is true.
     private long time;
     private int iterations;
     private double modularity;
@@ -112,9 +111,9 @@ public class LabelPropagation implements LPAClient {
     private final Object verticesLock = new Object();
 
     // The map of conflicts in the system, nodeId->objId, count
-    private final ConcurrentMap<Long, ConcurrentMap<Object, Long>>
+    private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
         nodeConflictMap =
-            new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>();
+            new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
 
     // Map identity -> label and count
     // This sums all uses of that identity on other nodes. The count takes
@@ -151,6 +150,9 @@ public class LabelPropagation implements LPAClient {
     // The current iteration being run, used to detect multiple calls
     // for an iteration.
     private volatile int iteration = -1;
+
+    // The groups collected in the last run
+    private Collection<AffinityGroup> groups;
 
     // For debugging remote labels (can be removed when that is done)
 //    private Map<LabelVertex, Integer> debug =
@@ -211,6 +213,7 @@ public class LabelPropagation implements LPAClient {
     }
     
     // --- implement LPAClient -- //
+    
     /** {@inheritDoc} */
     public Collection<AffinityGroup> affinityGroups(long runNumber,
                                                     boolean done)
@@ -279,7 +282,8 @@ public class LabelPropagation implements LPAClient {
      */
     public void prepareAlgorithm(long runNumber) throws IOException {
         PrepareRun pr = new PrepareRun(runNumber);
-        new Thread(pr).start();
+        String name = "PrepareAlgorithm-" + runNumber;
+        new Thread(pr, name).start();
     }
 
     private class PrepareRun implements Runnable {
@@ -338,11 +342,12 @@ public class LabelPropagation implements LPAClient {
         initializeLPARun();
         initializeNodeConflictMap();
 
+        // If we cannot reach a proxy, we invalidate the run.
         boolean failed = false;
         // Now, go through the new map, and tell each vertex about the
         // edges we might have in common.
         assert (nodeConflictMap != null);
-        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
              nodeConflictMap.entrySet())
         {
             Long nodeId = entry.getKey();
@@ -351,7 +356,7 @@ public class LabelPropagation implements LPAClient {
             if (proxy != null) {
                 logger.log(Level.FINEST, "{0}: exchanging edges with {1}",
                            localNodeId, nodeId);
-                Map<Object, Long> map = entry.getValue();
+                Map<Object, AtomicLong> map = entry.getValue();
                 assert (map != null);
                 try {
                     Collection<Object> objs =
@@ -390,7 +395,7 @@ public class LabelPropagation implements LPAClient {
         throws IOException
     {
         assert (nodeConflictMap != null);
-        Map<Object, Long> origConflicts = nodeConflictMap.get(nodeId);
+        Map<Object, AtomicLong> origConflicts = nodeConflictMap.get(nodeId);
 
         // Before we update our map, gather what we knew about before
         // being contacted by the node, which is what we'll return to it.
@@ -424,6 +429,7 @@ public class LabelPropagation implements LPAClient {
                    localNodeId, nodeId);
         nodeProxies.remove(nodeId);
         nodeConflictMap.remove(nodeId);
+        builder.removeNode(nodeId);
     }
 
     /**
@@ -433,7 +439,8 @@ public class LabelPropagation implements LPAClient {
      */
     public void startIteration(int iteration) throws IOException {
         IterationRun ir = new IterationRun(iteration);
-        new Thread(ir).start();
+        String name = "StartIteration-" + iteration;
+        new Thread(ir, name).start();
     }
 
     private class IterationRun implements Runnable {
@@ -643,7 +650,6 @@ public class LabelPropagation implements LPAClient {
                             // and we just ignore the label.
                             // Otherwise, add the label to set of labels for
                             // this identity.
-
                             Integer label = vertices.get(index).getLabel();
 
                             List<Long> weightList = labelWeightMap.get(label);
@@ -705,7 +711,7 @@ public class LabelPropagation implements LPAClient {
 
         // Now, go through the new map, asking for its labels
         assert (nodeConflictMap != null);
-        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
              nodeConflictMap.entrySet())
         {
             Long nodeId = entry.getKey();
@@ -719,7 +725,7 @@ public class LabelPropagation implements LPAClient {
             }
 
             // Tell the other vertex about the conflicts we know of.
-            Map<Object, Long> map = entry.getValue();
+            Map<Object, AtomicLong> map = entry.getValue();
             assert (map != null);
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
                        localNodeId, nodeId);
@@ -729,6 +735,7 @@ public class LabelPropagation implements LPAClient {
                     proxy.getRemoteLabels(new HashSet<Object>(map.keySet()));
             } catch (IOException e) {
                 // JANE RETRY
+                failed = true;
                 logger.logThrow(Level.WARNING, e,
                         "{0}: could not contact node {1}", localNodeId, nodeId);
             }
@@ -810,6 +817,29 @@ public class LabelPropagation implements LPAClient {
         }
 
         return failed;
+    }
+    
+    /**
+     * Returns the client for the given nodeId, asking the server if necessary.
+     * @param nodeId
+     * @return
+     */
+    private LPAClient getProxy(long nodeId) {
+        LPAClient proxy = nodeProxies.get(nodeId);
+        if (proxy == null) {
+            // Ask the server for it.
+            try {
+                proxy = server.getLPAClientProxy(nodeId);
+            } catch (IOException e) {
+                // JANE retries
+            }
+            if (proxy != null) {
+                nodeProxies.put(nodeId, proxy);
+            } else {
+                removeNodeInternal(nodeId);
+            }
+        }
+        return proxy;
     }
 
     /**
@@ -948,12 +978,13 @@ public class LabelPropagation implements LPAClient {
         return groups;
     }
 
+    // Private methods used by both single-node test and distributed
+    // algorithms.
     /**
      * Initialize ourselves for a run of the algorithm.
      */
     private void initializeLPARun() {
-        logger.log(Level.FINEST,
-                "{0}: initializing LPA run", localNodeId);
+        logger.log(Level.FINEST, "{0}: initializing LPA run", localNodeId);
         // Grab the graph (the weighted graph builder returns a pointer
         // to the live graph) and a snapshot of the vertices.
         graph = builder.getAffinityGraph();
@@ -970,7 +1001,7 @@ public class LabelPropagation implements LPAClient {
             vertices = new ArrayList<LabelVertex>(graphVertices);
         }
         logger.log(Level.FINEST,
-                "{0}: finished initializing LPA run", localNodeId);
+                   "{0}: finished initializing LPA run", localNodeId);
     }
 
     /**
@@ -994,19 +1025,22 @@ public class LabelPropagation implements LPAClient {
             logger.log(Level.FINE, "unexpected null objIds");
             return;
         }
-        ConcurrentMap<Object, Long> conflicts = nodeConflictMap.get(nodeId);
+        ConcurrentMap<Object, AtomicLong> conflicts =
+                nodeConflictMap.get(nodeId);
         if (conflicts == null) {
-            conflicts = new ConcurrentHashMap<Object, Long>();
+            ConcurrentMap<Object, AtomicLong> newConf =
+                    new ConcurrentHashMap<Object, AtomicLong>();
+            conflicts = nodeConflictMap.putIfAbsent(nodeId, newConf);
+            if (conflicts == null) {
+                conflicts = newConf;
+            }
         }
 
         for (Object objId : objIds) {
-            // Until I pass around weights, its just the original value or 1
-            long value = conflicts.containsKey(objId) ?
-                         conflicts.get(objId) : 1;
-//            value++;
-            conflicts.put(objId, value);
+            // Just the original value or 1
+            // If we start using the number of conflicts, this might change.
+            conflicts.putIfAbsent(objId, new AtomicLong(1));
         }
-        nodeConflictMap.put(nodeId, conflicts);
     }
 
     /**
@@ -1082,7 +1116,7 @@ public class LabelPropagation implements LPAClient {
                 remoteLabelMap.get(vertex.getIdentity());
         if (remoteMap != null) {
             // The check above is just so I can continue to test in single 
-            // vertex mode
+            // node mode
             for (Map.Entry<Integer, Long> entry : remoteMap.entrySet()) {
                 Integer label = entry.getKey();
                 if (logger.isLoggable(Level.FINEST)) {
@@ -1118,29 +1152,7 @@ public class LabelPropagation implements LPAClient {
         return maxLabelSet;
     }
 
-    /**
-     * Returns the client for the given nodeId, asking the server if necessary.
-     * @param nodeId
-     * @return
-     */
-    private LPAClient getProxy(long nodeId) {
-        LPAClient proxy = nodeProxies.get(nodeId);
-        if (proxy == null) {
-            // Ask the server for it.
-            try {
-                proxy = server.getLPAClientProxy(nodeId);
-            } catch (IOException e) {
-                // JANE retries
-            }
-            if (proxy != null) {
-                nodeProxies.put(nodeId, proxy);
-            } else {
-                removeNodeInternal(nodeId);
-            }
-        }
-        return proxy;
-    }
-
+    // For single node performance testing.
     /**
      * Returns the time used for the last algorithm run.  This is only
      * valid if we were constructed to gather statistics.
@@ -1170,13 +1182,13 @@ public class LabelPropagation implements LPAClient {
         if (!logger.isLoggable(Level.FINEST)) {
             return;
         }
-        for (Map.Entry<Long, ConcurrentMap<Object, Long>> entry :
+        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
              nodeConflictMap.entrySet())
         {
             StringBuilder sb = new StringBuilder();
             sb.append(entry.getKey());
             sb.append(":  ");
-            for (Map.Entry<Object, Long> subEntry :
+            for (Map.Entry<Object, AtomicLong> subEntry :
                  entry.getValue().entrySet())
             {
                 sb.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
@@ -1191,13 +1203,13 @@ public class LabelPropagation implements LPAClient {
      * Returns a copy of the node conflict map.
      * @return a copy of the node conflict map.
      */
-    public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getNodeConflictMap()
+    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+            getNodeConflictMap()
     {
-        ConcurrentMap<Long, ConcurrentMap<Object, Long>> copy =
-            new ConcurrentHashMap<Long, ConcurrentMap<Object, Long>>(
+        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> copy =
+            new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>(
                                                             nodeConflictMap);
         return copy;
-//        return nodeConflictMap;
     }
 
     /**

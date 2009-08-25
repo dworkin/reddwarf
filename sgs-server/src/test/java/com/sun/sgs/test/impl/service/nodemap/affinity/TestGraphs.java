@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.Assert;
 import org.junit.Test;
 
@@ -224,8 +225,14 @@ public class TestGraphs {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Long, ConcurrentMap<Object, Long>> getConflictMap() 
+        public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+                getConflictMap()
         {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        /** {@inheritDoc} */
+        public void removeNode(long nodeId) {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
