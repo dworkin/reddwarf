@@ -32,7 +32,6 @@
 
 package com.sun.sgs.impl.io;
 
-import com.sun.sgs.impl.io.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -42,7 +41,7 @@ import org.apache.mina.common.IoHandlerAdapter;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.test.io.Acceptor;
+//import com.sun.sgs.test.io.Acceptor;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -54,7 +53,6 @@ import com.sun.sgs.io.ConnectionListener;
  * {@link Acceptor} on the server side.
  */
 class SocketConnectionListener extends IoHandlerAdapter {
-
     /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(
