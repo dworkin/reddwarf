@@ -60,16 +60,16 @@ public abstract class Locker<K, L extends Locker<K, L>> {
 
     /**
      * Returns the time when a lock attempt should stop, given the current time
-     * and the lock timeout time supplied by the caller.  Subclasses can
-     * override this method, for example to enforce a transaction timeout.
+     * and the lock timeout supplied by the caller.  Subclasses can override
+     * this method, for example to enforce a transaction timeout.
      *
      * @param	now the current time in milliseconds
-     * @param	lockTimeoutTime the time in milliseconds when the lock timeout
-     *		will cause the lock attempt to timeout
+     * @param	lockTimeout the amount of time in milliseconds to wait for a
+     *		lock
      * @return	the time in milliseconds when the lock attempt should timeout
      */
-    protected long getLockTimeoutTime(long now, long lockTimeoutTime) {
-	return lockTimeoutTime;
+    protected long getLockTimeoutTime(long now, long lockTimeout) {
+	return LockManager.addCheckOverflow(now, lockTimeout);
     }
 
     /**

@@ -115,7 +115,7 @@ final class Lock<K, L extends Locker<K, L>> {
 		}
 	    }
 	    if (conflict == null && upgrade) {
-		/* Remove read lock request */
+		/* Upgrading -- remove the read lock request from owners */
 		boolean found = false;
 		for (Iterator<LockRequest<K, L>> i = owners.iterator();
 		     i.hasNext(); )
@@ -132,12 +132,15 @@ final class Lock<K, L extends Locker<K, L>> {
 		assert found : "Should own when upgrading";
 	    }
 	}
-	LockRequest<K, L> request =
-	    (conflict == null && waiting) ? flushWaiter(locker)
-	    : locker.newLockRequest(key, forWrite, upgrade);
+	LockRequest<K, L> request;
 	if (conflict == null) {
+	    request = waiting ? flushWaiter(locker)
+		: locker.newLockRequest(key, forWrite, upgrade);
 	    owners.add(request);
-	} else if (!waiting) {
+	} else if (waiting) {
+	    request = getWaiter(locker);
+	} else {
+	    request = locker.newLockRequest(key, forWrite, upgrade);
 	    addWaiter(request);
 	}
 	assert validateInUse();
@@ -170,6 +173,19 @@ final class Lock<K, L extends Locker<K, L>> {
 		waiters.add(request);
 	    }
 	}
+    }
+
+    /**
+     * Returns the request associated with a locker that is waiting for this
+     * lock.
+     */
+    private LockRequest<K, L> getWaiter(L locker) {
+	for (LockRequest<K, L> request : waiters) {
+	    if (request.locker == locker) {
+		return request;
+	    }
+	}
+	throw new AssertionError("Waiter not found: " + locker);
     }
 
     /**

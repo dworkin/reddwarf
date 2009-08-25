@@ -402,6 +402,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	private Map<Key, Object> keyToDescriptionMap = null;
 
 	/**
+	 * Whether the transaction has ended.  Used when assertions are enabled
+	 * to check the thread safety of accesses to the requests field.
+	 * Synchronize on the requests field when accessing this field.
+	 */
+	private boolean ended = false;
+
+	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	txn the associated transaction
@@ -427,9 +434,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	 * ends.
 	 */
 	@Override
-	protected long getLockTimeoutTime(long now, long lockTimeoutTime) {
+	protected long getLockTimeoutTime(long now, long lockTimeout) {
 	    return Math.min(
-		TxnLockManager.addCheckOverflow(now, lockTimeoutTime),
+		TxnLockManager.addCheckOverflow(now, lockTimeout),
 		TxnLockManager.addCheckOverflow(
 		    txn.getCreationTime(), txn.getTimeout()));
 	}
@@ -444,6 +451,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	protected LockRequest<Key, LockerImpl> newLockRequest(
 	    Key key, boolean forWrite, boolean upgrade)
 	{
+	    assert !getEnded();
 	    AccessedObjectImpl request =
 		new AccessedObjectImpl(this, key, forWrite, upgrade);
 	    requests.add(request);
@@ -452,6 +460,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 
 	/** Release all locks. */
 	void releaseAll() {
+	    assert setEnded();
 	    LockManager<Key, LockerImpl> lockManager = getLockManager();
 	    for (LockRequest<Key, LockerImpl> request : requests) {
 		lockManager.releaseLock(this, request.getKey());
@@ -535,6 +544,29 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	Object getDescription(Key key) {
 	    return (keyToDescriptionMap == null)
 		? null : keyToDescriptionMap.get(key);
+	}
+
+	/**
+	 * Marks the transaction as ended.
+	 *
+	 * @return	whether the transaction is newly ended
+	 */
+	private boolean setEnded() {
+	    synchronized (requests) {
+		if (ended) {
+		    return false;
+		} else {
+		    ended = true;
+		    return true;
+		}
+	    }
+	}
+
+	/** Returns whether the transaction has ended. */
+	private boolean getEnded() {
+	    synchronized (requests) {
+		return ended;
+	    }
 	}
     }
 

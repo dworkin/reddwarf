@@ -196,6 +196,20 @@ class Cache {
     }
 
     /**
+     * Returns the cache entry for the binding with a key that is lower than
+     * the one specified, or {@code null} if none is found.
+     *
+     * @param	key the binding key
+     * @return	the next lower cache entry or {@code null}
+     */
+    BindingCacheEntry getLowerBindingEntry(BindingKey key) {
+	checkNull("key", key);
+	Entry<BindingKey, BindingCacheEntry> entry =
+	    bindingMap.lowerEntry(key);
+	return (entry == null) ? null : entry.getValue();
+    }
+
+    /**
      * Adds an entry for a previously uncached object.
      *
      * @param	entry the new cache entry
@@ -431,14 +445,9 @@ class Cache {
 
     /** Checks consistency of previous key fields of bindings. */
     void checkBindings() {
-	BindingKey previousKey = null;
+	long lockTimeout = store.getLockTimeout();
 	for (BindingCacheEntry entry : bindingMap.values()) {
-	    if (previousKey != null) {
-		synchronized (getEntryLock(entry)) {
-		    entry.checkPreviousKey(previousKey);
-		}
-	    }
-	    previousKey = entry.key;
+	    entry.checkState(this, lockTimeout);
 	}
     }
 }

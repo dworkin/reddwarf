@@ -1330,7 +1330,7 @@ public class TestDataStoreImpl extends Assert {
 	    fail("Unexpected exception: " + e);
 	} finally {
 	    flag2.release();
-	    thread.join(1000);
+	    thread.join(4000);
 	    assertFalse("Thread should not be alive", thread.isAlive());
 	}
     }

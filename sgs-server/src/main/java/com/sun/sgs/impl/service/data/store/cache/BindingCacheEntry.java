@@ -38,6 +38,9 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(BindingCacheEntry.class.getName()));
 
+    /** The dummy value used for the last key. */
+    private static final long LAST_KEY_VALUE = -2;
+
     /**
      * The lowest-valued previous key known such that names between that key
      * and this entry's key are known to be unbound, else {@code null} if no
@@ -94,7 +97,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	BindingCacheEntry entry =
 	    new BindingCacheEntry(BindingKey.LAST, State.FETCHING_READ);
 	/* Give this last entry a numeric value, but an illegal one */
-	entry.setValue(-2L);
+	entry.setValue(LAST_KEY_VALUE);
 	return entry;
     }
 
@@ -183,39 +186,75 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     }
 
     /**
-     * Checks whether this entry's previous unbound key information is valid
-     * given that the previous bound name in the cache is as specified.	 Logs a
-     * message if an inconsistency is found.
+     * Checks whether this entry is consistent, throwing an assertion error if
+     * an inconsistency is found.
+     *
+     * @param	cache the data store cache
+     * @param	lockTimeout the lock timeout for waiting for the entry to not
+     *		be pending previous
      */
-    void checkPreviousKey(BindingKey previousEntryKey) {
-	if (previousEntryKey.compareTo(key) >= 0) {
-	    if (logger.isLoggable(WARNING)) {
-		logger.log(WARNING,
-			   "Entry is out of order:" +
-			   "\n	previous entry key: " + previousEntryKey +
-			   "\n	entry: " + this);
+    void checkState(Cache cache, long lockTimeout) {
+	Object lock = cache.getEntryLock(this);
+	synchronized (lock) {
+	    if (getDecached()) {
+		return;
 	    }
-	}
-	if (previousKey != null) {
-	    int compareTo = previousEntryKey.compareTo(previousKey);
-	    if (compareTo > 0) {
+	    if (key == BindingKey.FIRST) {
+		throw new AssertionError("Binding entry for first key:" +
+					 "\n  entry: " + this);
+	    } else if (key == BindingKey.LAST) {
+		if (getValue() != LAST_KEY_VALUE) {
+		    throw new AssertionError(
+			"Binding entry for last key has wrong value:" +
+			"\n  entry: " + this);
+		}
+	    } else if (getValue() == -1) {
+		throw new AssertionError("Binding entry for removed binding:" +
+					 "\n  entry: " + this);
+	    }
+	    try {
+		awaitNotPendingPrevious(
+		    lock, System.currentTimeMillis() + lockTimeout);
+	    } catch (TransactionTimeoutException e) {
 		if (logger.isLoggable(WARNING)) {
-		    logger.log(
-			WARNING,
-			"Previous key is too low:" +
+		    logger.log(WARNING,
+			       "Unable to check entry's previous key due to" +
+			       " timeout on pending previous:" +
+			       "\n  entry: " + this);
+		}
+		return;
+	    }
+	    if (previousKey != null && previousKey.compareTo(key) >= 0) {
+		throw new AssertionError(
+		    "Binding entry key is not greater than its previous key:" +
+		    "\n  entry: " + this);
+	    }
+	    BindingCacheEntry previousEntry = cache.getLowerBindingEntry(key);
+	    if (previousEntry == null) {
+		return;
+	    }
+	    BindingKey previousEntryKey = previousEntry.key;
+	    if (previousKey != null) {
+		int compareTo = previousEntryKey.compareTo(previousKey);
+		if (compareTo > 0) {
+		    throw new AssertionError(
+			"Binding entry previous key is lower than previous" +
+			" entry key:" +
+			"\n  previous entry key: " + previousEntryKey +
+			"\n  entry: " + this);
+		} else if (compareTo == 0 && previousKeyUnbound) {
+		    throw new AssertionError(
+			"Binding entry notes previous key entry is unbound," +
+			" but key is bound:" +
 			"\n  previous entry key: " + previousEntryKey +
 			"\n  entry: " + this);
 		}
-	    } else if (compareTo == 0) {
-		if (previousKeyUnbound) {
-		    if (logger.isLoggable(WARNING)) {
-			logger.log(
-			    WARNING,
-			    "Previous key is bound:" +
-			    "\n	 previous entry key: " + previousEntryKey +
-			    "\n	 entry: " + this);
-		    }
-		}
+	    } else if (previousEntryKey.compareTo(key) >= 0) {
+		throw new AssertionError(
+		    "Binding entry key is not greater than the previous" +
+		    " entry's key:" +
+		    "\n  previous entry key: " + previousEntryKey +
+		    "\n  entry: " + this);
 	    }
 	}
     }

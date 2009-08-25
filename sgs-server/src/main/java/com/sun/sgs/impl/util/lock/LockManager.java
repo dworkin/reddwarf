@@ -452,7 +452,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 	}
     }
 
-    /** Attempts to acquire a lock, waiting if needed. */
+    /** Waits for a previous attempt to obtain a lock that blocked. */
     private LockConflict<K, L> waitForLockInternal(L locker) {
 	assert locker.noteSync();
 	try {
@@ -480,26 +480,27 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 		LockConflict<K, L> conflict = null;
 		while (true) {
 		    conflict = locker.getConflict();
-		    if (conflict != null) {
-			break;
-		    } else if (now >= stop) {
-			conflict = new LockConflict<K, L>(
-			    result.request, LockConflictType.TIMEOUT,
-			    result.conflict);
-			locker.setConflict(conflict);
-			break;
-		    }
 		    boolean isOwner;
+		    boolean timedOut = false;
 		    assert Lock.noteSync(this, key);
 		    try {
 			synchronized (keyMap) {
 			    isOwner = lock.isOwner(result.request);
+			    if (!isOwner) {
+				if (conflict != null) {
+				    lock.flushWaiter(locker);
+				} else if (now >= stop) {
+				    timedOut = true;
+				    lock.flushWaiter(locker);
+				}
+			    }
 			}
 		    } finally {
 			assert Lock.noteUnsync(this, key);
 		    }
 		    if (isOwner) {
 			locker.setWaitingFor(null);
+			locker.setConflict(null);
 			if (logger.isLoggable(FINER)) {
 			    logger.log(
 				FINER,
@@ -508,6 +509,15 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 				locker, key, result.request.getForWrite());
 			}
 			return null;
+		    } else if (timedOut) {
+			conflict = new LockConflict<K, L>(
+			    result.request,
+			    LockConflictType.TIMEOUT,
+			    result.conflict);
+			locker.setConflict(conflict);
+			break;
+		    } else if (conflict != null) {
+			break;
 		    }
 		    if (logger.isLoggable(FINER)) {
 			logger.log(FINER,
@@ -523,18 +533,9 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 			    result.request, LockConflictType.INTERRUPTED,
 			    result.conflict);
 			locker.setConflict(conflict);
-			break;
+			/* Loop again to check owners and waiters */
 		    }
 		    now = System.currentTimeMillis();
-		}
-		assert conflict != null;
-		assert Lock.noteSync(this, key);
-		try {
-		    synchronized (keyMap) {
-			lock.flushWaiter(locker);
-		    }
-		} finally {
-		    assert Lock.noteUnsync(this, key);
 		}
 		locker.setWaitingFor(null);
 		if (logger.isLoggable(FINER)) {

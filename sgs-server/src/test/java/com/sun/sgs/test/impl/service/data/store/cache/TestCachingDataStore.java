@@ -108,7 +108,9 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	props.setProperty(CALLBACK_PORT_PROPERTY,
 			  String.valueOf(callbackPort));
 	props.setProperty(DIRECTORY_PROPERTY, dbDirectory);
-	props.setProperty(CHECK_BINDINGS_PROPERTY, "true");
+	if (props.getProperty(CHECK_BINDINGS_PROPERTY) == null) {
+	    props.setProperty(CHECK_BINDINGS_PROPERTY, "TXN");
+	}
 	return props;
     }
 

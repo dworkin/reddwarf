@@ -72,6 +72,7 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -2667,12 +2668,9 @@ public class TestDataServiceImpl extends Assert {
                 service.setBinding("dummy", dummy);
         }}, taskOwner);
 
-        final Semaphore mainFlag = new Semaphore(0);
-        final Semaphore threadFlag = new Semaphore(0);
-        
-        // Semaphore to let us know when we are done; both threads must release
-        final Semaphore doneFlag = new Semaphore(2); 
-        doneFlag.acquire(2);
+	final CountDownLatch readDummy = new CountDownLatch(2);
+        final CountDownLatch completedMarkForUpdate = new CountDownLatch(1);
+        final CountDownLatch threadsDone = new CountDownLatch(2); 
         
         final AtomicReference<Throwable> error = 
             new AtomicReference<Throwable>();
@@ -2682,22 +2680,22 @@ public class TestDataServiceImpl extends Assert {
                 try {
                     dummy = (DummyManagedObject) service.getBinding("dummy");
                     assertEquals("a", dummy.value);
-                    assertTrue(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
-                    mainFlag.release();
-                    assertFalse(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
-                    doneFlag.release();
+		    readDummy.countDown();
+		    assertTrue(readDummy.await(500, TimeUnit.MILLISECONDS));
+		    assertFalse(
+			completedMarkForUpdate.await(
+			    100, TimeUnit.MILLISECONDS));
+		    threadsDone.countDown();
                 } catch (Throwable t) {
-                    // We don't expect any non-retryable throwables
                     if (!isRetryable(t)) {
                         error.set(t);
-                        doneFlag.release();
+			threadsDone.countDown();
                     }
                     if (t instanceof Exception) {
                         throw (Exception) t;
                     } else {
                         throw (Error) t;
                     } 
-                    
                 }
         }}, taskOwner);
 
@@ -2707,32 +2705,30 @@ public class TestDataServiceImpl extends Assert {
                     DummyManagedObject dummy2 =
                         (DummyManagedObject) service.getBinding("dummy");
                     assertEquals("a", dummy2.value);
-                    threadFlag.release();
-                    assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
+		    readDummy.countDown();
+		    assertTrue(readDummy.await(1, TimeUnit.SECONDS));
                     service.markForUpdate(dummy2);
-                    threadFlag.release();
-                    doneFlag.release();
+		    completedMarkForUpdate.countDown();
+		    threadsDone.countDown();
                 } catch (Throwable t) {
                     if (!isRetryable(t)) {
-                        doneFlag.release();
                         error.set(t);
+			threadsDone.countDown();
                     }
                     if (t instanceof Exception) {
                         throw (Exception) t;
                     } else {
                         throw (Error) t;
                     } 
-                }
-                Transaction txn = txnProxy.getCurrentTransaction();
-                txn.abort(new RuntimeException("abort"));
+		}
         }}, taskOwner);
 
-        assertTrue(doneFlag.tryAcquire(2, 1, TimeUnit.SECONDS));
-
+	boolean done = threadsDone.await(1, TimeUnit.SECONDS);
         Throwable throwable = error.get();
         if (throwable != null) {
             throw new AssertionError(throwable);
         }
+	assertTrue("Threads done", done);
     }
 
     /* -- Test createReference -- */
@@ -4931,128 +4927,118 @@ public class TestDataServiceImpl extends Assert {
                 service.setBinding("dummy2", new DummyManagedObject());
         }}, taskOwner);
 
-        class TestTask1 extends TestAbstractKernelRunnable {
-            Exception exception = null;
-            private final int runNumber;
-            private final Semaphore flag1;
-            private final Semaphore flag2;
-            private final Semaphore doneFlag;
+	abstract class TestTask extends TestAbstractKernelRunnable {
+	    private final int taskNumber;
+            final int runNumber;
+            final CountDownLatch firstStepDone;
+            private final CountDownLatch taskDone;
             private boolean firstTry = true;
-            TestTask1(int runNumber, Semaphore flag1, 
-                      Semaphore flag2, Semaphore doneFlag) 
+	    private Transaction txn;
+            private Exception exception = null;
+            TestTask(int taskNumber,
+		     int runNumber,
+		     CountDownLatch firstStepDone,
+		     CountDownLatch taskDone)
             {
+		this.taskNumber = taskNumber;
                 this.runNumber = runNumber;
-                this.flag1 = flag1;
-                this.flag2 = flag2;
-                this.doneFlag = doneFlag;
+                this.firstStepDone = firstStepDone;
+                this.taskDone = taskDone;
             }
-            public void run() throws Exception {
-                Transaction txn = txnProxy.getCurrentTransaction();
-                if (!firstTry) {     
-                    // Don't want to loop forever with retriable exceptions
-                    throw new RuntimeException("just kill it");             
-                }
+            public synchronized void run() throws Exception {
+		if (firstTry) {
+		    firstTry = false;
+		    txn = txnProxy.getCurrentTransaction();
+		    try {
+			runInternal();
+		    } catch (Exception e) {
+			print(e);
+			exception = e;
+		    } finally {
+			taskDone.countDown();
+		    }
+		}
+            }
+	    void print(Object message) {
+		System.err.println("pass " + runNumber +
+				   ", task " + taskNumber +
+				   ",  " + txn +
+				   ":\n  " + message);
+	    }
+	    abstract void runInternal() throws Exception;
+	    synchronized Exception getException() {
+		return exception;
+	    }
+        }
 
-                dummy = (DummyManagedObject) service.getBinding("dummy");
-
-                // First step is done, let the other task proceed
-                flag1.release();
-                firstTry = false;
-
+        class TestTask1 extends TestTask {
+            TestTask1(int runNumber,
+		      CountDownLatch firstStepDone,
+                      CountDownLatch taskDone)
+            {
+		super(1, runNumber, firstStepDone, taskDone);
+            }
+            void runInternal() throws Exception {
+		dummy = (DummyManagedObject) service.getBinding("dummy");
+		firstStepDone.countDown();
+		print("completed first step");
+		assertTrue("Wait for first step done",
+			   firstStepDone.await(1, TimeUnit.SECONDS));
                 // We can only hope the second task gets a chance
                 Thread.sleep(runNumber * 500);
-                System.err.println(runNumber + " task 1 ("
-                                 + txn + "): woke from sleep, acquiring flag");
-                flag2.acquire();
-                try {
-                    ((DummyManagedObject)
-                        service.getBinding("dummy2")).setValue(runNumber);
-                    System.err.println(runNumber + " task 1 ("
-                                       + txn + "): commit");
-                } catch (Exception e) {
-                    System.err.println(
-                            runNumber + " task 1 (" + txn + "): " + e);
-                    exception = e;
-                } finally {
-                    doneFlag.release();
-                }
+		print("woke from sleep");
+		((DummyManagedObject)
+		 service.getBinding("dummy2")).setValue(runNumber);
+		print("commit");
             }
         }
 
-        class TestTask2 extends TestAbstractKernelRunnable {
-            Exception exception = null;
-            Transaction txn = null;
-            private final int runNumber;
-            private final Semaphore flag1;
-            private final Semaphore flag2;
-            private final Semaphore doneFlag;
-            private boolean firstTry = true;
-            TestTask2(int runNumber, Semaphore flag1, 
-                      Semaphore flag2, Semaphore doneFlag) 
+        class TestTask2 extends TestTask {
+            TestTask2(int runNumber,
+		      CountDownLatch firstStepDone, 
+                      CountDownLatch taskDone)
             {
-                this.runNumber = runNumber;
-                this.flag1 = flag1;
-                this.flag2 = flag2;
-                this.doneFlag = doneFlag;
+		super(2, runNumber, firstStepDone, taskDone);
             }
-            public void run() throws Exception {
-                txn = txnProxy.getCurrentTransaction();
-                if (!firstTry) {
-                    throw new RuntimeException("just kill it");
-                }
-                flag1.acquire();
-                service.getBinding("dummy2");
-                // Let the other task proceed
-                flag2.release();
-                System.err.println(runNumber + " task 2 ("
-                                 + txn + "): released flag");
-                firstTry = false;
-                try {
-                    ((DummyManagedObject)
-                         service.getBinding("dummy")).setValue(runNumber);
-                    System.err.println(runNumber + " task 2 ("
-                                       + txn + "): commit");
-                } catch (Exception e) {
-                    System.err.println(
-                        runNumber + " task 2 (" + txn + "): " + e);
-                    exception = e;
-                } finally {
-                    doneFlag.release();
-                }
+            void runInternal() throws Exception {
+		service.getBinding("dummy2");
+		firstStepDone.countDown();
+		print("completed first step");
+		assertTrue("Wait for first step done",
+			   firstStepDone.await(1, TimeUnit.SECONDS));
+		((DummyManagedObject)
+		 service.getBinding("dummy")).setValue(runNumber);
+		print("commit");
             }
         }
 
 	for (int i = 0; i < 5; i++) {
-            final Semaphore flag1 = new Semaphore(1);
-            final Semaphore flag2 = new Semaphore(1);
-            // Both threads must release before an acquire can occur
-            final Semaphore doneFlag = new Semaphore(2);   
-            TestTask1 task1 = new TestTask1(i, flag1, flag2, doneFlag);
-            TestTask2 task2 = new TestTask2(i, flag1, flag2, doneFlag);
+	    CountDownLatch firstStepDone = new CountDownLatch(2);
+	    CountDownLatch taskDone = new CountDownLatch(2);
+            TestTask1 task1 = new TestTask1(i, firstStepDone, taskDone);
+            TestTask2 task2 = new TestTask2(i, firstStepDone, taskDone);
       
             // Note that we're using schedule task here, not run task,
             // which allows the tasks to run concurrently.
             // We should guarantee that these two can run concurrently
             // (default number of consumer threads allows this)
 
-            flag1.acquire();
-            flag2.acquire();
-            doneFlag.acquire(2);
-            System.err.println(i + " main loop, acquired flags");
             txnScheduler.scheduleTask(task1, taskOwner);
             txnScheduler.scheduleTask(task2, taskOwner);
+            assertTrue("Wait for tasks to complete",
+		       taskDone.await(10, TimeUnit.SECONDS));
 
-            doneFlag.acquire(2);
-            
-            if (task1.exception != null &&
-                !(task1.exception instanceof TransactionAbortedException))
+	    Exception exception1 = task1.getException();
+	    Exception exception2 = task2.getException();
+            if (exception1 != null &&
+                !(exception1 instanceof TransactionAbortedException))
             {
-                throw task1.exception;
-            } else if (task2.exception != null &&
-                !(task2.exception instanceof TransactionAbortedException))
+                throw exception1;
+            } else if (exception2 != null &&
+                !(exception2 instanceof TransactionAbortedException))
             {
-                throw task2.exception;
-            } else if (task1.exception == null && task2.exception == null) {
+                throw exception2;
+            } else if (exception1 == null && exception2 == null) {
                 fail ("Expected TransactionAbortedException");
             }
 	}
