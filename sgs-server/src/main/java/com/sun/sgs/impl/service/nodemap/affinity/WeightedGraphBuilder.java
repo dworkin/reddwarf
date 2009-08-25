@@ -34,11 +34,12 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A graph builder which builds an affinity graph consisting of identities 
- * as vertices and a single weighted edges for each object used by both 
+ * as vertices and a single weighted edges representing objects used by both
  * identities. 
  * <p>
  * The data access information naturally forms a bipartite graph, with
@@ -49,9 +50,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * graph to be folded.  
  * <p>
  * We build the folded graph on the fly by keeping track of which objects have
- * been used by which identities.  Edges between identities represent an object,
- * and has an associated weight, indicating the number of times both identities
- * have accessed the object.
+ * been used by which identities.  Edges between identities are weighted, and
+ * represent the number of object accesses the two identities have in common.
  */
 public class WeightedGraphBuilder implements GraphBuilder {
     // Map for tracking object-> map of identity-> number accesses
@@ -75,7 +75,14 @@ public class WeightedGraphBuilder implements GraphBuilder {
         conflictMap =
             new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
 
-    // The length of time for our snapshots, in milliseconds
+    // The TimerTask which prunes our data structures over time.  As the data
+    // structures above are modified, the pruneTask notes the ways they have
+    // changed.  Groups of changes are chunked into periods, each the length
+    // of the time snapshot (configured at construction time). We
+    // periodically remove the changes made in the earliest snapshot.
+    private final PruneTask pruneTask;
+
+    // The length of time for our data change snapshots, in milliseconds
     private final long snapshot;
     
     // number of calls to report, used for printing results every so often
@@ -83,8 +90,6 @@ public class WeightedGraphBuilder implements GraphBuilder {
     private long updateCount = 0;
     // part of the statistics for early testing
     private long totalTime = 0;
-
-    private final PruneTask pruneTask;
 
 
     /**
@@ -216,6 +221,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
+        if (objId == null) {
+            throw new NullPointerException("objId must not be null");
+        }
         ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
             ConcurrentMap<Object, AtomicLong> newMap =
@@ -247,30 +255,50 @@ public class WeightedGraphBuilder implements GraphBuilder {
      * that removes edges and vertices from the graph.
      */
     private class PruneTask extends TimerTask {
-        // JANE what would happen if we made count non-final?
-        // The number of snapshots we retain in our moving window
+        // The number of snapshots we retain in our moving window.
+        // We fill this window of changes by waiting for count snapshots
+        // to occur before we start pruning, ensuring our queues contain
+        // count items.  This means we cannot dynamically change the
+        // length of the window.
         private final int count;
         // The current snapshot count, used to initially fill up our window.
         private int current = 1;
 
+        // The change information we keep for each snapshot.  A new change info
+        // object is allocated for each snapshot, and during a snapshot it
+        // notes all changes made to this builder's data structures.
+        // ObjId -> <Identity -> count times accessed>
+        private Map<Object, Map<Identity, Integer>>
+                currentPeriodObject;
+        // Edge -> count of times incremented
+        private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
+        // NodeId -> <ObjId, count times conflicted>
+        // Note that the conflict count is not currently used
+        private ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
+                currentPeriodConflicts;
+
+        // Queues of snapshot information.  As a snapshot time period ends,
+        // we add its change info to the back of the appropriate queue.  If
+        // we have accumulated enough snapshots in our queues to satisfy our
+        // "count" requirement, we also remove the information from the first
+        // enqueued info object.
         private final Queue<Map<Object, Map<Identity, Integer>>>
                 periodObjectQueue;
         private final Queue<Map<WeightedEdge, Integer>>
                 periodEdgeIncrementsQueue;
         private final Queue<ConcurrentMap<Long,
-                                          ConcurrentMap<Object, AtomicLong>>>
+                                      ConcurrentMap<Object, AtomicInteger>>>
                 periodConflictQueue;
 
-        // ObjId -> <Identity -> count times accessed>
-        private Map<Object, Map<Identity, Integer>> currentPeriodObject;
-        // Edge -> count of times incremented
-        private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
-        // NodeId -> <ObjId, count times conflicted>
-        // Note that the conflict count is not currently used
-        private ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-                currentPeriodConflicts;
-
+        /**
+         * Creates a PruneTask.
+         * @param count the number of snapshots we wish to retain as live data
+         * @throws IllegalArgumentException if {@code count} < 1
+         */
         public PruneTask(int count) {
+            if (count < 1) {
+                throw new IllegalArgumentException("count must not be < 1");
+            }
             this.count = count;
             periodObjectQueue = 
                 new LinkedList<Map<Object, Map<Identity, Integer>>>();
@@ -278,33 +306,40 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 new LinkedList<Map<WeightedEdge, Integer>>();
             periodConflictQueue =
                 new LinkedList<ConcurrentMap<Long,
-                                        ConcurrentMap<Object, AtomicLong>>>();
+                                      ConcurrentMap<Object, AtomicInteger>>>();
             synchronized (affinityGraph) {
                 addPeriodStructures();
             }
         }
 
+        /**
+         * Performs all processing required when a time period has ended.
+         */
         public void run() {
+            // We want to make sure we don't have snapshots that are so
+            // short that we cannot do all our pruning within one.
             synchronized (affinityGraph) {
-                // Update the data structures for this snapshot
+                // Add the data structures for this new period that is just
+                // starting.
                 addPeriodStructures();
                 if (current <= count) {
-                    // Do nothing, we're still in our inital snapshot window
+                    // We're still in our inital time window, and haven't
+                    // gathered enough periods yet.
                     current++;
                     return;
                 }
 
-                // take care of everything.
-                Map<Object, Map<Identity, Integer>> periodObject =
-                        periodObjectQueue.remove();
+                // Remove the earliest snasphot.
+                Map<Object, Map<Identity, Integer>>
+                        periodObject = periodObjectQueue.remove();
                 Map<WeightedEdge, Integer> periodEdgeIncrements =
                         periodEdgeIncrementsQueue.remove();
-                Map<Long, ConcurrentMap<Object, AtomicLong>> periodConflicts =
-                        periodConflictQueue.remove();
+                ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
+                        periodConflicts = periodConflictQueue.remove();
 
                 // For each object, remove the added access counts
                 for (Map.Entry<Object, Map<Identity, Integer>> entry :
-                     periodObject.entrySet())
+                    periodObject.entrySet())
                 {
                     Map<Identity, Long> idMap =
                             objectMap.get(entry.getKey());
@@ -312,6 +347,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
                          entry.getValue().entrySet())
                     {
                         Identity idUpdate = updateEntry.getKey();
+
                         long newVal =
                             idMap.get(idUpdate) - updateEntry.getValue();
                         if (newVal == 0) {
@@ -346,19 +382,19 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 }
 
                 // For each conflict, update values
-                for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
-                     periodConflicts.entrySet())
+                for (Map.Entry<Long, ConcurrentMap<Object, AtomicInteger>>
+                             entry : periodConflicts.entrySet())
                 {
                     Long nodeId = entry.getKey();
                     ConcurrentMap<Object, AtomicLong> objMap =
                             conflictMap.get(nodeId);
                     // If the node went down, we might have removed the entry
                     if (objMap != null) {
-                        for (Map.Entry<Object, AtomicLong> updateEntry :
+                        for (Map.Entry<Object, AtomicInteger> updateEntry :
                               entry.getValue().entrySet())
                         {
                             Object objId = updateEntry.getKey();
-                            AtomicLong periodVal = updateEntry.getValue();
+                            AtomicInteger periodVal = updateEntry.getValue();
                             AtomicLong conflictVal = objMap.get(objId);
                             long oldVal;
                             long newVal;
@@ -381,7 +417,11 @@ public class WeightedGraphBuilder implements GraphBuilder {
             }
         }
 
-        public void incrementEdge(WeightedEdge edge) {
+        /**
+         * Note that an edge's weight has been incremented.
+         * @param edge the edge
+         */
+        void incrementEdge(WeightedEdge edge) {
             assert Thread.holdsLock(affinityGraph);
             int v = currentPeriodEdgeIncrements.containsKey(edge) ?
                      currentPeriodEdgeIncrements.get(edge) : 0;
@@ -389,7 +429,12 @@ public class WeightedGraphBuilder implements GraphBuilder {
             currentPeriodEdgeIncrements.put(edge, v);
         }
 
-        public void updateObjectAccess(Object objId, Identity owner) {
+        /**
+         * Note that an object has been accessed.
+         * @param objId the object
+         * @param owner the accessor
+         */
+        void updateObjectAccess(Object objId, Identity owner) {
             assert Thread.holdsLock(affinityGraph);
             Map<Identity, Integer> periodIdMap = currentPeriodObject.get(objId);
             if (periodIdMap == null) {
@@ -402,21 +447,26 @@ public class WeightedGraphBuilder implements GraphBuilder {
             currentPeriodObject.put(objId, periodIdMap);
         }
 
-        public void updateConflict(Object objId, long nodeId) {
-            ConcurrentMap<Object, AtomicLong> periodObjMap =
+        /**
+         * Note that a data cache conflict has been detected.
+         * @param objId the objId of the object causing the conflict
+         * @param nodeId the node ID of the node we were in conflict with
+         */
+        void updateConflict(Object objId, long nodeId) {
+            ConcurrentMap<Object, AtomicInteger> periodObjMap =
                     currentPeriodConflicts.get(nodeId);
             if (periodObjMap == null) {
-                ConcurrentMap<Object, AtomicLong> newMap = 
-                        new ConcurrentHashMap<Object, AtomicLong>();
+                ConcurrentMap<Object, AtomicInteger> newMap =
+                        new ConcurrentHashMap<Object, AtomicInteger>();
                 periodObjMap =
                         currentPeriodConflicts.putIfAbsent(nodeId, newMap);
                 if (periodObjMap == null) {
                     periodObjMap = newMap;
                 }
             }
-            AtomicLong val = periodObjMap.get(objId);
+            AtomicInteger val = periodObjMap.get(objId);
             if (val == null) {
-                AtomicLong newVal = new AtomicLong();
+                AtomicInteger newVal = new AtomicInteger();
                 val = periodObjMap.putIfAbsent(objId, newVal);
                 if (val == null) {
                     val = newVal;
@@ -424,7 +474,10 @@ public class WeightedGraphBuilder implements GraphBuilder {
             }
             val.incrementAndGet();
         }
-        
+
+        /**
+         * Update our queues for this period.
+         */
         private void addPeriodStructures() {
             assert Thread.holdsLock(affinityGraph);
             currentPeriodObject = new HashMap<Object, Map<Identity, Integer>>();
@@ -433,7 +486,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
             periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
             currentPeriodConflicts = 
                 new ConcurrentHashMap<Long, 
-                                        ConcurrentMap<Object, AtomicLong>>();
+                                        ConcurrentMap<Object, AtomicInteger>>();
             periodConflictQueue.add(currentPeriodConflicts);
         }
     }

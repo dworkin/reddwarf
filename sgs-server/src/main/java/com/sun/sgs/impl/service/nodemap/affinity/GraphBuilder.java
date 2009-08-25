@@ -123,7 +123,8 @@ public interface GraphBuilder {
     ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> getConflictMap();
 
     /**
-     * Note that a node has failed.
+     * Note that a node has failed.  Does nothing if the {@code nodeId} is
+     * unknown or has already been noted as failed.
      * 
      * @param nodeId the id of the failed node
      */

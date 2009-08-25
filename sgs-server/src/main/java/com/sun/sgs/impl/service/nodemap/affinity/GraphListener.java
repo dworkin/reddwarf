@@ -96,7 +96,7 @@ public class GraphListener implements ProfileListener {
         }
         
         AccessedObjectsDetail detail = profileReport.getAccessedObjectsDetail();
-	if (detail == null) {
+        if (detail == null) {
             return;
         }
 

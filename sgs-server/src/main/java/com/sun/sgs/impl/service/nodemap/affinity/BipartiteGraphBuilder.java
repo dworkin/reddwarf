@@ -38,6 +38,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -310,7 +311,11 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     private class PruneTask extends TimerTask {
-        // JANE what would happen if we made this non-final?
+        // The number of snapshots we retain in our moving window.
+        // We fill this window of changes by waiting for count snapshots
+        // to occur before we start pruning, ensuring our queues contain
+        // count items.  This means we cannot dynamically change the
+        // length of the window.
         private final int count;
 
         private int current = 1;
@@ -319,19 +324,24 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                                                 periodEdgeIncrementsQueue;
         private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
         private final Queue<ConcurrentMap<Long,
-                                          ConcurrentMap<Object, AtomicLong>>>
+                                          ConcurrentMap<Object, AtomicInteger>>>
                 periodConflictQueue;
-        private ConcurrentMap<Long,
-                    ConcurrentMap<Object, AtomicLong>> currentPeriodConflicts;
+        private ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
+                currentPeriodConflicts;
+
         public PruneTask(int count) {
+            if (count < 1) {
+                throw new IllegalArgumentException("count must not be < 1");
+            }
             this.count = count;
             periodEdgeIncrementsQueue =
                 new LinkedList<Map<WeightedEdge, Integer>>();
             periodConflictQueue =
                 new LinkedList<ConcurrentMap<Long,
-                                ConcurrentMap<Object, AtomicLong>>>();
+                                ConcurrentMap<Object, AtomicInteger>>>();
             addPeriodStructures();
         }
+
         public synchronized void run() {
             // Update the data structures for this snapshot
             addPeriodStructures();
@@ -344,7 +354,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             // take care of everything.
             Map<WeightedEdge, Integer> periodEdgeIncrements =
                     periodEdgeIncrementsQueue.remove();
-            ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+            ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
                     periodConflicts = periodConflictQueue.remove();
 
 
@@ -368,7 +378,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             }
 
             // For each conflict, update values
-            for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
+            for (Map.Entry<Long, ConcurrentMap<Object, AtomicInteger>> entry :
                  periodConflicts.entrySet())
             {
                 Long nodeId = entry.getKey();
@@ -376,11 +386,11 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                         conflictMap.get(nodeId);
                 // If the node went down, we might have removed the entry
                 if (objMap != null) {
-                    for (Map.Entry<Object, AtomicLong> updateEntry :
+                    for (Map.Entry<Object, AtomicInteger> updateEntry :
                           entry.getValue().entrySet())
                     {
                         Object objId = updateEntry.getKey();
-                        AtomicLong periodVal = updateEntry.getValue();
+                        AtomicInteger periodVal = updateEntry.getValue();
                         AtomicLong conflictVal = objMap.get(objId);
                         long oldVal;
                         long newVal;
@@ -390,7 +400,8 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                         } while (!conflictVal.compareAndSet(oldVal, newVal));
 
                         if (newVal <= 0) {
-                            // This could remove a just incremented value!
+                            // All conflictMap uses are synchrononized so
+                            // should be no problem.
                             objMap.remove(objId);
                         }
                     }
@@ -401,28 +412,28 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             }
         }
 
-        public synchronized void incrementEdge(WeightedEdge edge) {
+        synchronized void incrementEdge(WeightedEdge edge) {
             int v = currentPeriodEdgeIncrements.containsKey(edge) ?
                     currentPeriodEdgeIncrements.get(edge) : 0;
             v++;
             currentPeriodEdgeIncrements.put(edge, v);
         }
 
-        public synchronized void updateConflict(Object objId, long nodeId) {
-            ConcurrentMap<Object, AtomicLong> periodObjMap =
+        synchronized void updateConflict(Object objId, long nodeId) {
+            ConcurrentMap<Object, AtomicInteger> periodObjMap =
                     currentPeriodConflicts.get(nodeId);
             if (periodObjMap == null) {
-                ConcurrentMap<Object, AtomicLong> newMap =
-                        new ConcurrentHashMap<Object, AtomicLong>();
+                ConcurrentMap<Object, AtomicInteger> newMap =
+                        new ConcurrentHashMap<Object, AtomicInteger>();
                 periodObjMap =
                         currentPeriodConflicts.putIfAbsent(nodeId, newMap);
                 if (periodObjMap == null) {
                     periodObjMap = newMap;
                 }
             }
-            AtomicLong val = periodObjMap.get(objId);
+            AtomicInteger val = periodObjMap.get(objId);
             if (val == null) {
-                AtomicLong newVal = new AtomicLong();
+                AtomicInteger newVal = new AtomicInteger();
                 val = periodObjMap.putIfAbsent(objId, newVal);
                 if (val == null) {
                     val = newVal;
@@ -436,7 +447,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
             currentPeriodConflicts =
                 new ConcurrentHashMap<Long, 
-                                ConcurrentMap<Object, AtomicLong>>();
+                                ConcurrentMap<Object, AtomicInteger>>();
             periodConflictQueue.add(currentPeriodConflicts);
         }
     }

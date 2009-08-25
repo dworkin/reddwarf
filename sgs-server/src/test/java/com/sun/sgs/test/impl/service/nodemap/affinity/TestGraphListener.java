@@ -37,12 +37,14 @@ import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -119,10 +121,21 @@ public class TestGraphListener {
     
     @Test
     public void testConstructor() {
+        // empty graph
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         Assert.assertNotNull(graph);
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
+        // empty obj use
+        Map<Object, Map<Identity, Long>> objUse = builder.getObjectUseMap();
+        Assert.assertNotNull(objUse);
+        Assert.assertEquals(0, objUse.size());
+        // empty conflicts
+        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflicts =
+                builder.getConflictMap();
+        Assert.assertNotNull(conflicts);
+        Assert.assertEquals(0, conflicts.size());
+
     }
     
     @Test
@@ -542,6 +555,26 @@ public class TestGraphListener {
         listener.report(report);
     }
 
+    @Test(expected=NullPointerException.class)
+    public void testNoteConflictDetectedBadObjId() throws Throwable {
+        if (builderName == null) {
+            // We'll also test it when explicitly called - much easier this way
+            throw new NullPointerException("empty test");
+        }
+        Class builderClass = Class.forName(builderName);
+        // args:  object, node, forUpdate
+        Method meth = UtilReflection.getMethod(builderClass,
+            "noteConflictDetected", Object.class, long.class, boolean.class);
+
+        Object obj = null;
+        long nodeId = 99L;
+        try {
+            meth.invoke(builder, obj, nodeId, false);
+        } catch (InvocationTargetException e) {
+            throw e.getCause();
+        }
+    }
+    
     @Test
     public void testNoteConflictDetected() throws Exception {
         if (builderName == null) {
@@ -633,6 +666,17 @@ public class TestGraphListener {
         Assert.assertEquals(1, val.get());
         objMap = conflictMap.get(badNodeId);
         Assert.assertNull(objMap);
+    }
+
+    @Test
+    public void testRemoveNodeUnknownNodeId() {
+        builder.removeNode(22);
+    }
+
+    @Test
+    public void testRemoveNodeTwice() {
+        builder.removeNode(35);
+        builder.removeNode(35);
     }
 
     /* Utility methods and classes. */
