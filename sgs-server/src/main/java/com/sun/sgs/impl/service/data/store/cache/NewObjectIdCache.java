@@ -29,9 +29,13 @@ import java.util.logging.Logger;
  */
 class NewObjectIdCache {
 
+    /** The name of this class. */
+    private static final String CLASSNAME =
+	NewObjectIdCache.class.getName();
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(NewObjectIdCache.class.getName()));
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /** The data store */
     private final CachingDataStore store;
@@ -133,7 +137,7 @@ class NewObjectIdCache {
     /** Creates a thread for obtaining new object IDs. */
     private Thread createNewObjectsThread() {
 	return new Thread(
-	    new NewObjectsRunnable(store), "CachingDataStore newObjects");
+	    new NewObjectsRunnable(store), CLASSNAME + ".newObjects");
     }
 
     /** A {@code Runnable} that obtains new object IDs. */

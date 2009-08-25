@@ -23,25 +23,24 @@ import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import static com.sun.sgs.impl.kernel.StandardProperties.APP_ROOT;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeLong;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeString;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeLong;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeString;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
-import static com.sun.sgs.impl.service.data.store.
-    DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS;
-import static com.sun.sgs.impl.service.data.store.
-    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
 import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.cache.
     UpdateQueueRequest.UpdateQueueRequestHandler;
-import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
-import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import static com.sun.sgs.impl.service.transaction.
     TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -76,6 +75,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import static java.util.logging.Level.CONFIG;
 import static java.util.logging.Level.INFO;
@@ -97,6 +98,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     /** The package for this class. */
     private static final String PKG =
 	"com.sun.sgs.impl.service.data.store.cache";
+
+    /** The name of this class. */
+    private static final String CLASSNAME =
+	CachingDataStoreServerImpl.class.getName();
 
     /**
      * The property that specifies the directory in which to store database
@@ -131,6 +136,16 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     public static final long DEFAULT_LOCK_TIMEOUT = 
 	computeLockTimeout(BOUNDED_TIMEOUT_DEFAULT);
+
+    /**
+     * The property for specifying the number of threads to use for performing
+     * callbacks.
+     */
+    public static final String NUM_CALLBACK_THREADS_PROPERTY =
+	PKG + ".num.callback.threads";
+
+    /** The default number of callback threads. */
+    public static final int NUM_CALLBACK_THREADS_DEFAULT = 4;
 
     /**
      * The property for specifying the number of maps to use for associating
@@ -229,6 +244,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     final BlockingQueue<NodeRequest> callbackRequests =
 	new LinkedBlockingQueue<NodeRequest>();
 
+    /** A thread pool for performing callback requests. */
+    private final ExecutorService callbackExecutor;
+
     /**
      * The next node ID.  Synchronize on {@link #nextNodeIdSync} when accessing
      * this field.
@@ -314,6 +332,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    ? DEFAULT_LOCK_TIMEOUT : computeLockTimeout(txnTimeout);
 	long lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
+	int numCallbackThreads = wrappedProps.getIntProperty(
+	    NUM_CALLBACK_THREADS_PROPERTY, NUM_CALLBACK_THREADS_DEFAULT, 1,
+	    Integer.MAX_VALUE);
 	int numKeyMaps = wrappedProps.getIntProperty(
 	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
 	int requestedServerPort = wrappedProps.getIntProperty(
@@ -383,6 +404,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    serverPort = serverExporter.export(
 		new LoggingCachingDataStoreServer(this, logger),
 		"CachingDataStoreServer", requestedServerPort);
+	    callbackExecutor = Executors.newCachedThreadPool(
+		new NamedThreadFactory(CLASSNAME + ".callback-"));
+	    for (int i = 0; i < numCallbackThreads; i++) {
+		callbackExecutor.submit(new CallbackRequester());
+	    }
 	} catch (IOException e) {
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, e, "Problem starting server");
@@ -1080,7 +1106,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		}
 	    } else {
 		Thread thread =
-		    new Thread("CachingDataStoreServerImpl reportFailure") {
+		    new Thread(CLASSNAME + ".reportFailure") {
 			public void run() {
 			    watchdogService.reportFailure(
 				watchdogService.getLocalNodeId(),
@@ -1134,6 +1160,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     @Override
     protected void doShutdown() {
 	serverExporter.unexport();
+	if (callbackExecutor != null) {
+	    callbackExecutor.shutdownNow();
+	}
 	if (requestQueueListener != null) {
 	    requestQueueListener.shutdown();
 	}
@@ -1183,8 +1212,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    LockConflict<Object, NodeInfo> conflict =
 		lockManager.lockNoWait(nodeInfo, key, forWrite);
 	    if (conflict != null) {
-		NodeRequest request = (NodeRequest) conflict.getLockRequest();
-		callbackRequests.add(request);
+		callbackRequests.add((NodeRequest) conflict.getLockRequest());
 		conflict = lockManager.waitForLock(nodeInfo);
 		if (conflict != null) {
 		    String accessMsg = "Access nodeId:" + nodeInfo.nodeId +

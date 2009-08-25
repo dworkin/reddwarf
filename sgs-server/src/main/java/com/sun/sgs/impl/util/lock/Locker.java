@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.util.lock;
 
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
+import static com.sun.sgs.impl.util.Numbers.addCheckOverflow;
 
 /**
  * Records information about an entity that requests locks from a {@link
@@ -69,7 +70,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      * @return	the time in milliseconds when the lock attempt should timeout
      */
     protected long getLockTimeoutTime(long now, long lockTimeout) {
-	return LockManager.addCheckOverflow(now, lockTimeout);
+	return addCheckOverflow(now, lockTimeout);
     }
 
     /**

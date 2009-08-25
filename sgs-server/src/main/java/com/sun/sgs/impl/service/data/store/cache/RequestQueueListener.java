@@ -47,6 +47,10 @@ import java.util.logging.Logger;
  */
 public final class RequestQueueListener extends Thread {
 
+    /** The name of this class. */
+    private static final String CLASSNAME =
+	RequestQueueListener.class.getName();
+
     /**
      * The property for specifying the maximum time in milliseconds to continue
      * trying to accept and dispatch connections in the presence of failures
@@ -68,7 +72,7 @@ public final class RequestQueueListener extends Thread {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(RequestQueueListener.class.getName()));
+	Logger.getLogger(CLASSNAME));
 
     /** The socket server. */
     private final ServerSocket serverSocket;
@@ -115,7 +119,7 @@ public final class RequestQueueListener extends Thread {
 				FailureReporter failureReporter,
 				Properties properties)
     {
-	super("RequestQueueListener");
+	super(CLASSNAME);
 	checkNull("serverSocket", serverSocket);
 	checkNull("serverDispatcher", serverDispatcher);
 	checkNull("failureReporter", failureReporter);

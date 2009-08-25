@@ -300,6 +300,10 @@ class UpdateQueue {
 	}
     }
 
+    /**
+     * Note that the transaction with the associated context ID has completed,
+     * either by committing or aborting.
+     */
     private void completed(long contextId) {
 	PendingTxnInfo info = pendingMap.get(contextId);
 	assert info != null;
@@ -338,7 +342,8 @@ class UpdateQueue {
 
 	/**
 	 * Whether the transaction is still present in the pending transaction
-	 * map, meaning that it has or could receive, associated requests.
+	 * map, meaning that it has or could receive, associated requests,
+	 * because there are still active transactions with lower context IDs.
 	 */
 	private boolean pending = true;
 
@@ -355,20 +360,24 @@ class UpdateQueue {
 	}
 
 	/**
-	 * Stores the requests associated with this transaction in {@code
-	 * result} and returns {@code true} if
+	 * Returns the requests for the associated transaction.  Returns {@code
+	 * null} if the transaction is not yet complete.  If the transaction is
+	 * pending, returns a list containing the associated requests, if any,
+	 * and marks the transaction as not pending.  If the transaction is not
+	 * pending, returns an empty list.
+	 *
+	 * @return	the requests or {@code null}
 	 */
 	synchronized List<Request> getRequests() {
 	    if (!complete) {
 		return null;
+	    } else if (pending) {
+		pending = false;
+		if (requests != null) {
+		    return requests;
+		}
 	    }
-	    assert pending;
-	    pending = false;
-	    if (requests != null) {
-		return requests;
-	    } else {
-		return Collections.emptyList();
-	    }
+	    return Collections.emptyList();
 	}
 
 	/**

@@ -50,6 +50,7 @@ import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNKNOWN;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
+import static com.sun.sgs.impl.util.Numbers.addCheckOverflow;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -69,7 +70,6 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import java.util.concurrent.atomic.AtomicInteger;
 import static java.util.logging.Level.CONFIG;
@@ -295,18 +295,7 @@ public class CachingDataStore extends AbstractDataStore
     /** A thread pool for fetching data from the server. */
     private ExecutorService fetchExecutor =
 	Executors.newCachedThreadPool(
-	    /* Use named daemon threads */
-	    new ThreadFactory() {
-		private final AtomicInteger nextId = new AtomicInteger(1);
-		public Thread newThread(Runnable r) {
-		    Thread t = new Thread(r);
-		    t.setName(
-			"CachingDataStore fetch-" + nextId.getAndIncrement());
-		    t.setDaemon(true);
-		    logger.log(FINEST, "Created new fetch thread: {0}", t);
-		    return t;
-		}
-	    });
+	    new NamedThreadFactory(CLASSNAME + ".fetch-"));
 
     /** The possible shutdown states. */
     enum ShutdownState {
@@ -1420,8 +1409,10 @@ public class CachingDataStore extends AbstractDataStore
 		BindingCacheEntry nameEntry =
 		    context.noteCachedBinding(nameKey, -1, true);
 		context.noteModifiedBinding(nameEntry, oid);
-		nameEntry.setPreviousKey(
-		    entryPreviousKey, entryPreviousKeyUnbound);
+		if (entryPreviousKey.compareTo(nameKey) < 0) {
+		    nameEntry.setPreviousKey(
+			entryPreviousKey, entryPreviousKeyUnbound);
+		}
 	    }
 	    /* Update the next entry */
 	    reportNameAccess(txnProxy.getCurrentTransaction(),
@@ -2476,43 +2467,78 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     public boolean requestDowngradeBinding(String name, long nodeId) {
 	BindingKey nameKey = BindingKey.getAllowLast(name);
-	Object lock = cache.getBindingLock(nameKey);
-	synchronized (lock) {
-	    BindingCacheEntry entry = cache.getBindingEntry(nameKey);
+	for (int i = 0; true; i++) {
+	    assert i < 1000 : "Too many retries";
+	    /* Find cache entry for name or next higher name */
+	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    if (entry == null) {
-		/* Already evicted */
+		/* No entry -- already evicted */
 		return true;
-	    } else if (entry.getDowngrading()) {
-		/* Already being downgraded, but need to wait for completion */
-		return false;
-	    } else if (!entry.getWritable() &&
-		       !entry.getUpgrading() &&
-		       !entry.getPendingPrevious())
-	    {
-		/*
-		 * Already downgraded, and not being upgraded or the next entry
-		 * after a previous entry request
-		 */
-		return true;
-	    } else if (!inUseForWrite(entry)) {
-		/* OK to downgrade immediately */
-		entry.setEvictedDowngradeImmediate(lock);
-		return true;
-	    } else {
-		/* Downgrade when not in use */
-		scheduleTask(new DowngradeBindingTask(nameKey));
-		return false;
+	    }
+	    Object lock = cache.getBindingLock(entry.key);
+	    synchronized (lock) {
+		if (!nameKey.equals(entry.key)) {
+		    BindingCacheEntry checkEntry =
+			cache.getHigherBindingEntry(nameKey);
+		    if (checkEntry != entry) {
+			/* Not next entry -- try again */
+			continue;
+		    } else if (!entry.getIsNextEntry(nameKey)) {
+			/*
+			 * Next entry does not cover name, so name must already
+			 * be evicted
+			 */
+			return true;
+		    }
+		}
+		if (entry.getPendingPrevious() || entry.getUpgrading() ||
+		    inUseForWrite(entry))
+		{
+		    /*
+		     * Downgrade when not pending previous, upgrading, or in
+		     * use for write
+		     */
+		    scheduleTask(new DowngradeBindingTask(nameKey));
+		    return false;
+		} else if (entry.getDecaching() || entry.getDowngrading()) {
+		    /*
+		     * Already being evicted or downgraded, but need to wait
+		     * for completion
+		     */
+		    return false;
+		} else {
+		    /* OK to downgrade immediately */
+		    entry.setEvictedDowngradeImmediate(lock);
+		    if (!nameKey.equals(entry.key)) {
+			/*
+			 * Name was unbound -- tell server that the next bound
+			 * key has also been downgraded.  OK to use the
+			 * earliest possible context ID since the entry is not
+			 * in use for write
+			 */
+			updateQueue.downgradeBinding(
+			    1, entry.key.getName(),
+			    new NullCompletionHandler());
+		    }
+		    return true;
+		}
 	    }
 	}
+    }
+
+    /**
+     * A {@code CompletionHandler} that does nothing on successful
+     * completion.
+     */
+    private class NullCompletionHandler extends FailingCompletionHandler {
+	public void completed() { }
     }
 
     /**
      * A {@link KernelRunnable} that downgrades a binding after accessing it
      * for read.
      */
-    private class DowngradeBindingTask extends FailingCompletionHandler
-	implements KernelRunnable
-    {
+    private class DowngradeBindingTask implements KernelRunnable {
 	private final BindingKey nameKey;
 	DowngradeBindingTask(BindingKey nameKey) {
 	    this.nameKey = nameKey;
@@ -2520,24 +2546,67 @@ public class CachingDataStore extends AbstractDataStore
 	public void run() {
 	    reportNameAccess(txnProxy.getCurrentTransaction(),
 			     nameKey.getName(), READ);
-	    Object lock = cache.getBindingLock(nameKey);
-	    synchronized (lock) {
-		BindingCacheEntry entry = cache.getBindingEntry(nameKey);
-		if (entry != null) {
-		    entry.awaitNotPendingPrevious(
-			lock, System.currentTimeMillis() + lockTimeout);
-		    /* Check if cached for write and not downgrading */
-		    if (entry.getWritable() && !entry.getDowngrading()) {
-			assert !inUseForWrite(entry);
-			entry.setEvictingDowngrade();
+	    long stop =
+		addCheckOverflow(System.currentTimeMillis(), lockTimeout);
+	    for (int i = 0; true; i++) {
+		assert i < 1000 : "Too many retries";
+		/* Find cache entry for name or next higher name */
+		BindingCacheEntry entry =
+		    cache.getCeilingBindingEntry(nameKey);
+		if (entry == null) {
+		    /* No entry -- already evicted */
+		    return;
+		}
+		Object lock = cache.getBindingLock(entry.key);
+		synchronized (lock) {
+		    if (nameKey.equals(entry.key)) {
+			entry.awaitNotPendingPrevious(lock, stop);
+		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+			/* Not the next entry -- try again */
+			continue;
+		    } else if (!entry.getIsNextEntry(nameKey)) {
+			/*
+			 * The next entry does not cover the name, so the name
+			 * must already be evicted
+			 */
+			return;
+		    }			
+		    if (entry.getDecaching() || entry.getDowngrading()) {
+			/* Already being evicted or downgraded */
+			return;
+		    }
+		    assert !entry.getUpgrading() && !inUseForWrite(entry);
+		    /* Downgrade */
+		    entry.setEvictingDowngrade();
+		    updateQueue.downgradeBinding(
+			entry.getContextId(), entry.key.getName(),
+			new DowngradeCompletionHandler(entry.key));
+		    if (!nameKey.equals(entry.key)) {
+			/*
+			 * Notify the server that the requested name was
+			 * downgraded in addition to the name for the entry
+			 * found
+			 */
 			updateQueue.downgradeBinding(
-			    entry.getContextId(), nameKey.getName(), this);
+			    entry.getContextId(), nameKey.getName(),
+			    new NullCompletionHandler());
 		    }
 		}
 	    }
 	}
 	public String getBaseTaskType() {
 	    return getClass().getName();
+	}
+    }
+
+    /**
+     * A {@code CompletionHandler} that updates the cache for a binding that
+     * has been downgraded.
+     */
+    private class DowngradeCompletionHandler extends FailingCompletionHandler {
+	private final BindingKey nameKey;
+	DowngradeCompletionHandler(BindingKey nameKey) {
+	    this.nameKey = nameKey;
 	}
 	public void completed() {
 	    Object lock = cache.getBindingLock(nameKey);
@@ -2552,42 +2621,72 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     public boolean requestEvictBinding(String name, long nodeId) {
 	BindingKey nameKey = BindingKey.getAllowLast(name);
-	Object lock = cache.getBindingLock(nameKey);
-	synchronized (lock) {
-	    BindingCacheEntry entry = cache.getBindingEntry(nameKey);
+	for (int i = 0; true; i++) {
+	    assert i < 1000 : "Too many retries";
+	    /* Find cache entry for name or next higher name */
+	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    if (entry == null) {
-		/* Already evicted */
+		/* No entry -- already evicted */
 		return true;
-	    } else if (entry.getDecaching()) {
-		/* Already being evicted, but need to wait for completion */
-		return false;
-	    } else if (!entry.getReading() &&
-		       !entry.getUpgrading() &&
-		       !inUse(entry))
-	    {
-		/*
-		 * Not reading, not upgrading, and not in use, so OK to evict
-		 * immediately
-		 */
-		entry.setEvictedImmediate(lock);
-		cache.removeBindingEntry(nameKey);
-		return true;
-	    } else {
-		/* Evict when not in use */
-		scheduleTask(new EvictBindingTask(nameKey));
-		return false;
+	    }
+	    Object lock = cache.getBindingLock(entry.key);
+	    synchronized (lock) {
+		if (!nameKey.equals(entry.key)) {
+		    /* Check for the right next entry */
+		    BindingCacheEntry checkEntry =
+			cache.getHigherBindingEntry(nameKey);
+		    if (checkEntry != entry) {
+			/* Not the next entry -- try again */
+			continue;
+		    } else if (!entry.getIsNextEntry(nameKey)) {
+			/*
+			 * The next entry does not cover the name, so the name
+			 * must already be evicted
+			 */
+			return true;
+		    }
+		}
+		if (entry.getPendingPrevious() || entry.getReading() ||
+		    entry.getUpgrading() || entry.getDowngrading() ||
+		    inUse(entry))
+		{
+		    /*
+		     * Evict when not pending previous, reading, upgrading,
+		     * downgrading, or in use
+		     */
+		    scheduleTask(new EvictBindingTask(nameKey));
+		    return false;
+		} else if (entry.getDecaching()) {
+		    /*
+		     * Already being evicted, but need to wait for completion
+		     */
+		    return false;
+		} else if (nameKey.equals(entry.key)) {
+		    /* Entry is not in use -- evict */
+		    entry.setEvictedImmediate(lock);
+		    cache.removeBindingEntry(nameKey);
+		    return true;
+		} else {
+		    /*
+		     * Entry not in use -- update previous key to not cover the
+		     * evicted part
+		     */
+		    assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+		    entry.setPreviousKey(nameKey, false);
+		    return true;
+		}
 	    }
 	}
     }
 
     /**
-     * A {@code SimpleCompletionHandler} that updates the cache for a binding
-     * that has been evicted.
+     * A {@code CompletionHandler} that updates the cache for a binding that
+     * has been evicted.
      */
     private class EvictBindingCompletionHandler
 	extends FailingCompletionHandler
     {
-	final BindingKey nameKey;
+	private final BindingKey nameKey;
 	EvictBindingCompletionHandler(BindingKey nameKey) {
 	    this.nameKey = nameKey;
 	    pendingEvictions.incrementAndGet();
@@ -2603,30 +2702,85 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
+     * A {@code CompletionHandler} that updates the cache for an unbound name
+     * that has been evicted.
+     */
+    private class EvictUnboundNameCompletionHandler
+	extends FailingCompletionHandler
+    {
+	final BindingKey nameKey;
+	final BindingKey entryKey;
+	EvictUnboundNameCompletionHandler(BindingKey nameKey,
+					  BindingKey entryKey)
+	{
+	    this.nameKey = nameKey;
+	    this.entryKey = entryKey;
+	}
+	public void completed() {
+	    Object lock = cache.getBindingLock(entryKey);
+	    synchronized (lock) {
+		BindingCacheEntry entry = cache.getBindingEntry(entryKey);
+		assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+		entry.setPreviousKey(nameKey, false);
+		entry.setNotPendingPrevious(lock);
+	    }
+	}
+    }
+
+    /**
      * A {@link KernelRunnable} that evicts a binding after accessing it for
      * write.
      */
-    private class EvictBindingTask extends EvictBindingCompletionHandler
-	implements KernelRunnable
-    {
+    private class EvictBindingTask implements KernelRunnable {
+	private final BindingKey nameKey;
 	EvictBindingTask(BindingKey nameKey) {
-	    super(nameKey);
+	    this.nameKey = nameKey;
 	}
 	public void run() {
 	    reportNameAccess(txnProxy.getCurrentTransaction(),
 			     nameKey.getName(), WRITE);
-	    Object lock = cache.getBindingLock(nameKey);
-	    synchronized (lock) {
-		BindingCacheEntry entry = cache.getBindingEntry(nameKey);
-		if (entry != null) {
-		    entry.awaitNotPendingPrevious(
-			lock, System.currentTimeMillis() + lockTimeout);
-		    /* Check if cached and not evicting */
-		    if (entry.getReadable() && !entry.getDecaching()) {
-			assert !inUse(entry);
+	    long stop =
+		addCheckOverflow(System.currentTimeMillis(), lockTimeout);
+	    for (int i = 0; true; i++) {
+		assert i < 1000 : "Too many retries";
+		/* Find cache entry for name or next higher name */
+		BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
+		if (entry == null) {
+		    /* No entry -- already evicted */
+		    return;
+		}
+		Object lock = cache.getBindingLock(entry.key);
+		synchronized (lock) {
+		    if (nameKey.equals(entry.key)) {
+			entry.awaitNotPendingPrevious(lock, stop);
+			if (entry.getDecaching()) {
+			    /* Already being evicted */
+			    return;
+			}
+		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+			/* Not the next entry -- try again */
+			continue;
+		    } else if (!entry.getIsNextEntry(nameKey)) {
+			/*
+			 * The next entry does not cover the name, so the name
+			 * must already be evicted
+			 */
+			return;
+		    }
+		    assert !entry.getReading() && !entry.getUpgrading() &&
+			!entry.getDowngrading() && !inUse(entry);
+		    /* Evict */
+		    if (nameKey.equals(entry.key)) {
 			entry.setEvicting();
 			updateQueue.evictBinding(
-			    entry.getContextId(), nameKey.getName(), this);
+			    entry.getContextId(), nameKey.getName(),
+			    new EvictBindingCompletionHandler(nameKey));
+		    } else {
+			entry.setPendingPrevious();
+			updateQueue.evictBinding(
+			    entry.getContextId(), nameKey.getName(),
+			    new EvictUnboundNameCompletionHandler(
+				nameKey, entry.key));
 		    }
 		}
 	    }
@@ -2648,7 +2802,7 @@ public class CachingDataStore extends AbstractDataStore
 		    failureBeforeWatchdog = exception;
 		}
 	    } else {
-		Thread thread = new Thread("CachingDataStore reportFailure") {
+		Thread thread = new Thread(CLASSNAME + ".reportFailure") {
 		    public void run() {
 			watchdogService.reportFailure(
 			    nodeId, CachingDataStore.class.getName());
@@ -2896,7 +3050,7 @@ public class CachingDataStore extends AbstractDataStore
 
 	/** Creates an instance of this class. */
 	EvictionThread() {
-	    super("CachingDataStore eviction");
+	    super(CLASSNAME + ".eviction");
 	}
 
 	/* -- Implement Cache.FullNotifier -- */

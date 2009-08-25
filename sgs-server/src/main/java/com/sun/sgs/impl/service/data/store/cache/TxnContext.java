@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.util.Numbers.addCheckOverflow;
 import com.sun.sgs.service.Transaction;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -478,12 +479,6 @@ class TxnContext {
     }
 
     /* -- Private methods and classes -- */
-
-    private static long addCheckOverflow(long x, long y) {
-	assert x >= 0 && y >= 0;
-	long result = x + y;
-	return (result >= 0) ? result : Long.MAX_VALUE;
-    }
 
     /** Adds the commit request to the update queue. */
     private void commitInternal() {

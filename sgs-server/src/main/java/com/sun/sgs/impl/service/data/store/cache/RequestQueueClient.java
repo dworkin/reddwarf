@@ -78,6 +78,9 @@ import java.util.logging.Logger;
  */
 public final class RequestQueueClient extends Thread {
 
+    /** The name of this class. */
+    private static final String CLASSNAME = RequestQueueClient.class.getName();
+
     /**
      * The property for specifying the maximum time in milliseconds to continue
      * attempting to make new connections and send requests when failures have
@@ -119,7 +122,7 @@ public final class RequestQueueClient extends Thread {
 
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(RequestQueueClient.class.getName()));
+	Logger.getLogger(CLASSNAME));
 
     /** The node ID for this request queue. */
     private final long nodeId;
@@ -193,7 +196,7 @@ public final class RequestQueueClient extends Thread {
 			      FailureReporter failureReporter,
 			      Properties properties)
     {
-	super("RequestQueueClient");
+	super(CLASSNAME);
 	if (nodeId < 0) {
 	    throw new IllegalArgumentException(
 		"The nodeId must not be negative: " + nodeId);
@@ -618,7 +621,7 @@ public final class RequestQueueClient extends Thread {
 	     * @param	in the data input stream
 	     */
 	    ReceiveThread(DataInput in) {
-		super("RequestQueueClient.ReceiveThread");
+		super(CLASSNAME + ".receive");
 		this.in = in;
 	    }
 

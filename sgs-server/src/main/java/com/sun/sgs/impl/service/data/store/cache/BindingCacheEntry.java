@@ -301,11 +301,12 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * Sets information about previous known unbound keys, ignoring any
      * currently stored information.
      *
-     * @param	previousKey the new previous key
+     * @param	previousKey the new previous key or {@code null}
      * @param	previousKeyUnbound whether the new previous key is known to be
      *		unbound
      */
     void setPreviousKey(BindingKey previousKey, boolean previousKeyUnbound) {
+	assert previousKey == null || previousKey.compareTo(key) < 0;
 	this.previousKey = previousKey;
 	this.previousKeyUnbound = previousKeyUnbound;
     }

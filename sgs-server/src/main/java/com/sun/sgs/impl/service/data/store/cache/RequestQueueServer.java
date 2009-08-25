@@ -74,6 +74,9 @@ import java.util.logging.Logger;
  */
 public class RequestQueueServer<R extends Request> {
 
+    /** The name of this class. */
+    private static final String CLASSNAME = RequestQueueServer.class.getName();
+
     /**
      * The property for specifying the largest request number, which must be at
      * least {@code 2} and not larger than {@value java.lang.Short#MAX_VALUE}.
@@ -95,7 +98,7 @@ public class RequestQueueServer<R extends Request> {
 
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(RequestQueueServer.class.getName()));
+	Logger.getLogger(CLASSNAME));
 
     /** The node ID for this server. */
     final long nodeId;
@@ -256,7 +259,7 @@ public class RequestQueueServer<R extends Request> {
 	 * @param	socket the new socket
 	 */
 	Connection(Socket socket) throws IOException {
-	    super("RequestQueueServer.Connection");
+	    super(CLASSNAME + ".connection");
 	    this.socket = socket;
 	    in = new DataInputStream(
 		new BufferedInputStream(

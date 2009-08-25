@@ -28,6 +28,7 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import static com.sun.sgs.impl.util.Numbers.addCheckOverflow;
 import com.sun.sgs.impl.util.lock.LockConflict;
 import com.sun.sgs.impl.util.lock.LockConflictType;
 import com.sun.sgs.impl.util.lock.LockManager;
@@ -436,9 +437,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	@Override
 	protected long getLockTimeoutTime(long now, long lockTimeout) {
 	    return Math.min(
-		TxnLockManager.addCheckOverflow(now, lockTimeout),
-		TxnLockManager.addCheckOverflow(
-		    txn.getCreationTime(), txn.getTimeout()));
+		addCheckOverflow(now, lockTimeout),
+		addCheckOverflow(txn.getCreationTime(), txn.getTimeout()));
 	}
 
 	/**
