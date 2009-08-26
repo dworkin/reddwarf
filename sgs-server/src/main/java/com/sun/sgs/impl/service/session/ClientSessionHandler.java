@@ -196,7 +196,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		        sessionService.getLocalNodeId());
 	}
     }
-			 
+
+    String getName() {
+        return identity.getName();
+    }
+
     /* -- Implement SessionProtocolHandler -- */
 
     /** {@inheritDoc} */

@@ -42,6 +42,7 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.management.Client;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
@@ -193,6 +194,10 @@ public final class ChannelServiceImpl
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
 	localPerSessionChannelsMap =
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
+
+    /** DEMO */
+    private final ConcurrentHashMap<String, String>
+	demoMap = new ConcurrentHashMap<String, String>();
 
     /** Map of completion handlers for relocating client sessions, keyed by
      * session ID. */
@@ -353,7 +358,7 @@ public final class ChannelServiceImpl
             /* Create our service profiling info and register our MBean. */
             ProfileCollector collector = 
 		systemRegistry.getComponent(ProfileCollector.class);
-            serviceStats = new ChannelServiceStats(collector);
+            serviceStats = new ChannelServiceStats(collector, this);
             try {
                 collector.registerMBean(serviceStats, 
                                         ChannelServiceStats.MXBEAN_NAME);
@@ -370,7 +375,17 @@ public final class ChannelServiceImpl
 	    throw e;
 	}
     }
- 
+
+    Client[] getClients() {
+        Client[] clients = new Client[demoMap.size()];
+
+        int i = 0;
+        for (Map.Entry<String, String> entry : demoMap.entrySet()) {
+            clients[i++] = new Client(entry.getKey(), entry.getValue());
+        }
+        return clients;
+    }
+
     /* -- Implement AbstractService methods -- */
 
     /** {@inheritDoc} */
@@ -645,6 +660,9 @@ public final class ChannelServiceImpl
 		}
 		channelSet.add(channelRefId);
 
+                System.out.println("Putting " + sessionRefId + " into map with " + name);
+                demoMap.put(sessionRefId.toString(), name);
+
 		// TBD: If the session is disconnecting, then session needs
 		// to be removed from channel's membership list, and the
 		// channel needs to be removed from the channelSet.
@@ -826,6 +844,23 @@ public final class ChannelServiceImpl
 		addLocalChannelMember(channelRefId, sessionRefId);
 	    }
 
+            String sessionName = sessionService.getName(sessionRefId);
+            String channelName = null;
+            System.out.println("Session " + sessionName + "(" + sessionRefId + ") moved, checking channels");
+            for (BigInteger channelRefId : channelSet) {
+                ChannelImpl channelImpl = (ChannelImpl)
+				getObjectForId(channelRefId);
+                System.out.println("Checking " + channelImpl.getName());
+                if ((channelImpl != null) && (channelImpl.getName() != sessionName)) {
+                    channelName = channelImpl.getName();
+                }
+            }
+            System.out.println("Channel name found= " + channelName);
+            if (channelName != null) {
+                System.out.println("Putting " + sessionRefId + " into map with " + channelName);
+                demoMap.put(sessionRefId.toString(), channelName);
+            }
+
 	    /*
 	     * Schedule task to add the session's channel memberships to
 	     * the new node (the local node).
@@ -866,6 +901,9 @@ public final class ChannelServiceImpl
 	    // TBD: should this always return a non-null value?
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);
+
+            System.out.println("Removing " + sessionRefId + " from map");
+            demoMap.remove(sessionRefId.toString());
 	    
 	    // Remove session from locally cached channel membership lists
 	    // TBD: Are channel caches updated before channel membership cache
@@ -1157,6 +1195,9 @@ public final class ChannelServiceImpl
 
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);		
+
+            System.out.println("Removing " + sessionRefId + " from map");
+            demoMap.remove(sessionRefId.toString());
 
 	    /*
 	     * Schedule transactional task(s) to remove the

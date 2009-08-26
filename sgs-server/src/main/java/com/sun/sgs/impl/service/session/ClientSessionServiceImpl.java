@@ -460,6 +460,11 @@ public final class ClientSessionServiceImpl
 	}
     }
 
+    public String getName(BigInteger sessionRefId) {
+        ClientSessionHandler handler = handlers.get(sessionRefId);
+        return handler == null ? null : handler.getName();
+    }
+
     /* -- Implement AbstractService -- */
 
     /** {@inheritDoc} */

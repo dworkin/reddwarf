@@ -32,6 +32,8 @@ import java.math.BigInteger;
  */
 public interface ClientSessionService extends Service {
 
+    String getName(BigInteger sessionRefId);
+
     /**
      * Registers the specified status listener with this service.  This
      * method is non-transactional and should be called outside of a

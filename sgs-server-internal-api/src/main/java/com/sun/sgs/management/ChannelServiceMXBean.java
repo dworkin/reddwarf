@@ -39,6 +39,8 @@ import com.sun.sgs.app.ChannelManager;
 public interface ChannelServiceMXBean {
     /** The name for uniquely identifying this MBean. */
     String MXBEAN_NAME = "com.sun.sgs.service:type=ChannelService";
+
+    Client[] getClients();
     
     // Maybe add the number of channels in the system?
     // Maybe add, for each channel, a way to get to the channel name,

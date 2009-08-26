@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.management.ChannelServiceMXBean;
+import com.sun.sgs.management.Client;
 import com.sun.sgs.profile.AggregateProfileOperation;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
@@ -35,8 +36,10 @@ class ChannelServiceStats implements ChannelServiceMXBean {
 
     final ProfileOperation createChannelOp;
     final ProfileOperation getChannelOp;
+    final ChannelServiceImpl service;
     
-    ChannelServiceStats(ProfileCollector collector) {
+    ChannelServiceStats(ProfileCollector collector, ChannelServiceImpl service) {
+        this.service = service;
         ProfileConsumer consumer = 
             collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
                                   "ChannelService");
@@ -58,5 +61,10 @@ class ChannelServiceStats implements ChannelServiceMXBean {
     /** {@inheritDoc} */
     public long getGetChannelCalls() {
         return ((AggregateProfileOperation) getChannelOp).getCount();
+    }
+
+    @Override
+    public Client[] getClients() {
+        return service.getClients();
     }
 }
