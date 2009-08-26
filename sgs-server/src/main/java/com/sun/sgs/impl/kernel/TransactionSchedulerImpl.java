@@ -495,7 +495,7 @@ final class TransactionSchedulerImpl
 
         ScheduledTaskImpl scheduledTask = new ScheduledTaskImpl.Builder(
                 task, owner, defaultPriority).
-                period(ScheduledTask.UNBOUNDED).
+                timeout(ScheduledTask.UNBOUNDED).
                 build();
         waitForTask(scheduledTask);
     }
