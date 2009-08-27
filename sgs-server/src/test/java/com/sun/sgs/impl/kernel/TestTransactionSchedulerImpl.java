@@ -383,7 +383,6 @@ public class TestTransactionSchedulerImpl {
             Thread.sleep(sleep);
             finished = true;
             serverNode.getProxy().getCurrentTransaction();
-            serverNode.getProxy().getCurrentOwner();
         }
         public boolean isFinished() {
             return finished;
