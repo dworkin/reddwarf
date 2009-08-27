@@ -1692,11 +1692,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
          * {@inheritDoc}
          */
         private static final long serialVersionUID = 1L;
-        /**
-         * The maximum number of entries to remove in a single run of
-         * tasks that asynchronously remove nodes and entries.
-         */
-        private static final int MAX_REMOVE_ELEMENTS = 50;
+
         /**
          * A reference to the node that should be next removed
          */
@@ -1714,17 +1710,16 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         }
 
         /**
-         * Clears a finite number of entries and re-enqueues this task
+         * Clears some entries and re-enqueues this task
          * if more entries remain.
          */
         public void run() {
-            int removed = 0;
-            while (removed < MAX_REMOVE_ELEMENTS && curElement != null) {
+            while (AppContext.getTaskManager().shouldContinue() &&
+                   curElement != null) {
                 // remove the current node
                 Element<E> e = curElement.get();
                 AppContext.getDataManager().removeObject(e);
                 curElement = e.nextElement;
-                removed++;
             }
 
             // if there are still have more nodes to clean up, then
