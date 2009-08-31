@@ -1,0 +1,114 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.sun.sgs</groupId>
+  <artifactId>sgs-monitor</artifactId>
+  <version>agdc2009</version>
+  <name>Project Darkstar Monitor</name>
+  <packaging>jar</packaging>
+  <inceptionYear>2009</inceptionYear>
+
+
+  <build>
+    <plugins>
+      
+      <!-- Use 1.6 for source and target during compile -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>1.6</source>
+	  <target>1.6</target>
+	</configuration>
+      </plugin>
+
+      <!-- Always attach a sources jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-source-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Always attach a javadoc jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-javadoc-plugin</artifactId>
+	<configuration>
+          <links>
+            <link>http://java.sun.com/javase/6/docs/api/</link>
+          </links>
+        </configuration>
+	<executions>
+	  <execution>
+	    <id>attach-javadocs</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <quiet>true</quiet>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Enable execution of main class -->
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>1.1.1</version>
+        <configuration>
+          <executable>java</executable>
+	  <arguments>
+            <argument>-classpath</argument>
+            <classpath/>
+            <argument>com.sun.sgs.tools.monitor.Monitor</argument>
+          </arguments>
+        </configuration>
+      </plugin>
+
+    </plugins>
+
+  </build>
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-internal-api</artifactId>
+      <version>${sgs-server.version}</version>
+    </dependency>
+  </dependencies>
+
+  <!-- Repository to locate dependencies -->
+  <repositories>
+    <repository>
+      <id>java.net</id>
+      <name>java.net Maven2 Repository</name>
+      <url>http://download.java.net/maven/2/</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
+
+  <properties>
+    <junit.version>4.5</junit.version>
+    <sgs-server.version>agdc2009</sgs-server.version>
+  </properties>
+
+</project>
