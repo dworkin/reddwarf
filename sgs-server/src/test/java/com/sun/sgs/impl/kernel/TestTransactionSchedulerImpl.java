@@ -28,7 +28,6 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.kernel.schedule.ScheduledTask;
-import com.sun.sgs.kernel.schedule.SchedulerQueue;
 import com.sun.sgs.kernel.schedule.SchedulerRetryAction;
 import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
 
@@ -41,7 +40,6 @@ import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.lang.reflect.Field;
 
 import org.junit.After;
@@ -62,7 +60,7 @@ import org.junit.runner.RunWith;
 public class TestTransactionSchedulerImpl {
 
     private SgsTestNode serverNode = null;
-    private TransactionScheduler txnScheduler;
+    private TransactionSchedulerImpl txnScheduler;
     private Identity taskOwner;
 
     public TestTransactionSchedulerImpl() { }
@@ -76,8 +74,8 @@ public class TestTransactionSchedulerImpl {
                                NodeType.coreServerNode.name());
         serverNode = new SgsTestNode("TestTransactionSchedulerImpl",
                                      null, properties);
-        txnScheduler = serverNode.getSystemRegistry().
-            getComponent(TransactionScheduler.class);
+        txnScheduler = (TransactionSchedulerImpl) serverNode.
+                getSystemRegistry().getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
     }
 
@@ -165,6 +163,37 @@ public class TestTransactionSchedulerImpl {
         Thread.sleep(500L);
         assertEquals(0, countRunner.getRunCount());
     }
+
+    /**
+     * Test runUnboundedTask
+     */
+    @Test (expected=NullPointerException.class)
+    public void runUnboundedTaskNullTask() throws Exception {
+        txnScheduler.runUnboundedTask(null, taskOwner);
+    }
+
+    @Test (expected=NullPointerException.class)
+    public void runUnboundedTaskNullOwner() throws Exception {
+        txnScheduler.runUnboundedTask(new TestAbstractKernelRunnable() {
+            public void run() {
+            }
+        }, null);
+    }
+
+    @Test
+    public void runUnboundedTaskSingleTask() throws Exception {
+        RunCountTestRunner runner = new RunCountTestRunner(1);
+        txnScheduler.runUnboundedTask(runner, taskOwner);
+        assertEquals(0, runner.getRunCount());
+    }
+
+    @Test(timeout=2000)
+    public void runUnboundedTaskLongTransaction() throws Exception {
+        LongTransactionRunner runner = new LongTransactionRunner(1000L);
+        txnScheduler.runUnboundedTask(runner, taskOwner);
+        assertTrue(runner.isFinished());
+    }
+
 
     /**
      * Test interruption.
@@ -340,6 +369,25 @@ public class TestTransactionSchedulerImpl {
     /**
      * Utility classes.
      */
+
+    private class LongTransactionRunner implements KernelRunnable {
+        private boolean finished = false;
+        private long sleep = 0;
+        LongTransactionRunner(long sleep) {
+            this.sleep = sleep;
+        }
+        public String getBaseTaskType() {
+            return LongTransactionRunner.class.getName();
+        }
+        public void run() throws Exception {
+            Thread.sleep(sleep);
+            finished = true;
+            serverNode.getProxy().getCurrentTransaction();
+        }
+        public boolean isFinished() {
+            return finished;
+        }
+    }
 
     private class RunCountTestRunner implements KernelRunnable {
         private int runCount;
