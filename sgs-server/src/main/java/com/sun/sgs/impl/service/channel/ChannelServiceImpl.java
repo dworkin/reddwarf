@@ -836,7 +836,7 @@ public final class ChannelServiceImpl
 	     * Update the local per-session channel set and channel
 	     * membership caches with the session's channel memberships.
 	     */
-	    Set<BigInteger> channelSet =
+	    final Set<BigInteger> channelSet =
 		Collections.synchronizedSet(new HashSet<BigInteger>());
 	    localPerSessionChannelsMap.put(sessionRefId, channelSet);
 	    for (BigInteger channelRefId : channelRefIds) {
@@ -844,22 +844,29 @@ public final class ChannelServiceImpl
 		addLocalChannelMember(channelRefId, sessionRefId);
 	    }
 
-            String sessionName = sessionService.getName(sessionRefId);
-            String channelName = null;
-            System.out.println("Session " + sessionName + "(" + sessionRefId + ") moved, checking channels");
-            for (BigInteger channelRefId : channelSet) {
-                ChannelImpl channelImpl = (ChannelImpl)
-				getObjectForId(channelRefId);
-                System.out.println("Checking " + channelImpl.getName());
-                if ((channelImpl != null) && (channelImpl.getName() != sessionName)) {
-                    channelName = channelImpl.getName();
-                }
-            }
-            System.out.println("Channel name found= " + channelName);
-            if (channelName != null) {
-                System.out.println("Putting " + sessionRefId + " into map with " + channelName);
-                demoMap.put(sessionRefId.toString(), channelName);
-            }
+            try {
+            transactionScheduler.runTask(
+                    new AbstractKernelRunnable("CheckChannelNames") {
+                        public void run() {
+                            String sessionName = sessionService.getName(sessionRefId);
+                            String channelName = null;
+                            System.out.println("Session " + sessionName + "(" + sessionRefId + ") moved, checking channels");
+                            for (final BigInteger channelRefId : channelSet) {
+                                ChannelImpl channelImpl =
+                                            (ChannelImpl) getObjectForId(channelRefId);
+                                System.out.println("Checking " + channelImpl.getName());
+                                if ((channelImpl != null) && (channelImpl.getName() != sessionName)) {
+                                    channelName = channelImpl.getName();
+                                }
+                            }
+                            System.out.println("Channel name found= " + channelName);
+                            if (channelName != null) {
+                                System.out.println("Putting " + sessionRefId + " into map with " + channelName);
+                                demoMap.put(sessionRefId.toString(), channelName);
+                            }
+                        }
+                    }, taskOwner);
+            } catch(Exception ignore) { ignore.printStackTrace(); }
 
 	    /*
 	     * Schedule task to add the session's channel memberships to

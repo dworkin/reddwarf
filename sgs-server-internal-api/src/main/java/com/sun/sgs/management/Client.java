@@ -23,22 +23,25 @@
 
 package com.sun.sgs.management;
 
+import java.beans.ConstructorProperties;
+
 /**
  *
  * @author kbt
  */
 public class Client {
 
-    private final String client;
+    private final String name;
     private final String group;
 
-    public Client(String client, String group) {
-        this.client = client;
+    @ConstructorProperties({"name", "group" })
+    public Client(String name, String group) {
+        this.name = name;
         this.group = group;
     }
 
     public String getName() {
-        return client;
+        return name;
     }
 
     public String getGroup() {
