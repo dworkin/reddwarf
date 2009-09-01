@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 /**
@@ -47,6 +48,12 @@ public class InMemoryDataStore extends AbstractDataStore {
     /** The logger to pass to AbstractDataStore. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(InMemoryDataStore.class.getName()));
+
+    /** Stores the next node ID. */
+    private static final AtomicLong nextNodeId = new AtomicLong(1);
+
+    /** Stores the local node ID. */
+    private final long nodeId = nextNodeId.getAndIncrement();
 
     /** Maps object IDs to data. */
     private final NavigableMap<Long, byte[]> oids =
@@ -86,6 +93,10 @@ public class InMemoryDataStore extends AbstractDataStore {
     }
 
     /* -- Implement AbstractDataStore methods -- */
+
+    protected long getLocalNodeIdInternal() {
+	return nodeId;
+    }
 
     protected synchronized long createObjectInternal(Transaction txn) {
 	return nextOid++;

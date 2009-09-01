@@ -42,7 +42,6 @@ import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.UPDATE_QUEUE_PORT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.NodeType;
-import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
@@ -117,9 +116,6 @@ public class TestCachingDataStore extends TestDataStoreImpl {
     /** Create a {@link CachingDataStore}. */
     @Override
     protected DataStore createDataStore(Properties props) throws Exception {
-	txnProxy.setComponent(
-	    WatchdogService.class,
-	    new DummyWatchdogService(props, systemRegistry, txnProxy));
 	DataStore store = new DataStoreProfileProducer(
 	    new CachingDataStore(props, systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());

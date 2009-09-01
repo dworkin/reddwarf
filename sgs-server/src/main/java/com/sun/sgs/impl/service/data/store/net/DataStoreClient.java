@@ -161,11 +161,14 @@ public final class DataStoreClient extends AbstractDataStore {
     /** The server port. */
     private final int serverPort;
 
+    /** The local server or null. */
+    private DataStoreServerImpl localServer = null;
+
     /** The remote server. */
     private final DataStoreServer server;
 
-    /** The local server or null. */
-    private DataStoreServerImpl localServer = null;
+    /** The local node ID. */
+    private final long nodeId;
 
     /** The maximum transaction timeout. */
     private final long maxTxnTimeout;
@@ -279,9 +282,15 @@ public final class DataStoreClient extends AbstractDataStore {
 	    serverPort = specifiedServerPort;
 	}
 	server = getServer();
+	nodeId = server.newNodeId();
     }
 
     /* -- Implement AbstractDataStore's DataStore methods -- */
+
+    /** {@inheritDoc} */
+    protected long getLocalNodeIdInternal() {
+	return nodeId;
+    }
 
     /** {@inheritDoc} */
     protected long createObjectInternal(Transaction txn) {
@@ -587,7 +596,9 @@ public final class DataStoreClient extends AbstractDataStore {
      * @return	a string representation of this object
      */
     public String toString() {
-	return "DataStoreClient[serverHost:" + serverHost +
+	return "DataStoreClient[" +
+	    "nodeId:" + nodeId +
+	    ", serverHost:" + serverHost +
 	    ", serverPort:" + serverPort + "]";
     }
 

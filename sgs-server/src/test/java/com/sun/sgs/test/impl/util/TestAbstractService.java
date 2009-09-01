@@ -27,6 +27,7 @@ import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -34,7 +35,6 @@ import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.Properties;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
@@ -302,7 +302,9 @@ public class TestAbstractService extends TestCase {
 
         public void reportLocalFailure() throws IOException {
             WatchdogService svc = txnProxy.getService(WatchdogService.class);
-            svc.reportFailure(svc.getLocalNodeId(), this.getClass().getName());
+            svc.reportFailure(
+		txnProxy.getService(DataService.class).getLocalNodeId(),
+		this.getClass().getName());
         }
 
         public void reportRemoteFailure(long nodeId) throws IOException {

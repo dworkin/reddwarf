@@ -21,13 +21,15 @@ package com.sun.sgs.test.impl.service.watchdog;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.app.profile.ProfileDataManager;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
+import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
-import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -43,11 +45,14 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.BindException;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
@@ -59,6 +64,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.MissingResourceException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -81,6 +87,23 @@ public class TestWatchdogServiceImpl extends Assert {
     /* The number of additional nodes to create if tests need them */
     private static final int NUM_WATCHDOGS = 5;
 
+    /** The KernelContext class. */
+    private static final Class<?> kernelContextClass =
+	UtilReflection.getClass("com.sun.sgs.impl.kernel.KernelContext");
+
+    /** The three argument KernelContext constructor. */
+    private static final Constructor<?> kernelContextConstructor =
+	UtilReflection.getConstructor(
+	    kernelContextClass,
+	    String.class, ComponentRegistry.class, ComponentRegistry.class);
+
+    /** The ContextResolver.setTaskState method. */
+    private static final Method contextResolverSetTaskState =
+	UtilReflection.getMethod(
+	    UtilReflection.getClass(
+		"com.sun.sgs.impl.kernel.ContextResolver"),
+	    "setTaskState", kernelContextClass, Identity.class);
+
     /** The node that creates the servers */
     private SgsTestNode serverNode;
 
@@ -95,6 +118,8 @@ public class TestWatchdogServiceImpl extends Assert {
     /** System components found from the serverNode */
     private TransactionProxy txnProxy;
     private ComponentRegistry systemRegistry;
+
+    /** Properties for creating a new node. */
     private Properties serviceProps;
 
     /** A specific property we started with */
@@ -106,7 +131,7 @@ public class TestWatchdogServiceImpl extends Assert {
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
 
-    /** The data service for serverNode. */
+    /** A new data service. */
     private DataService dataService;
     
     /** The watchdog service for serverNode */
@@ -143,15 +168,39 @@ public class TestWatchdogServiceImpl extends Assert {
 				     null, null, props, clean);
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
-        serviceProps = serverNode.getServiceProperties();
+	serviceProps = SgsTestNode.getDefaultProperties(
+	    "TestWatchdogServiceImpl", serverNode, null);
+	Properties serverProps = serverNode.getServiceProperties();
         renewTime = Integer.valueOf(
-            serviceProps.getProperty(
+            serverProps.getProperty(
                 "com.sun.sgs.impl.service.watchdog.server.renew.interval"));
 
         txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
-	dataService = serverNode.getDataService();
+	dataService = createDataService(serviceProps);
         watchdogService = (WatchdogServiceImpl) serverNode.getWatchdogService();
+    }
+
+    /**
+     * Creates a new data service and installs it, and the associated data
+     * manager, in the kernel context.
+     *
+     * @param	props the configuration properties for creating the service
+     * @return	the new data service
+     * @throws	Exception if a problem occurs when creating the service
+     */
+    private DataService createDataService(Properties props) throws Exception {
+	DataService dataService =
+	    new DataServiceImpl(props, systemRegistry, txnProxy);
+	ComponentRegistry services =
+	    new SingletonComponentRegistry(dataService);
+	ComponentRegistry managers =
+	    new SingletonComponentRegistry(
+		new ProfileDataManager(dataService));
+	Object newKernelContext = kernelContextConstructor.newInstance(
+	    "TestWatchdogServiceImpl", services, managers);
+	contextResolverSetTaskState.invoke(null, newKernelContext, taskOwner);
+	return dataService;
     }
 
     /** 
@@ -169,7 +218,7 @@ public class TestWatchdogServiceImpl extends Assert {
             SgsTestNode node = new SgsTestNode(serverNode, null, props); 
             additionalNodes[i] = node;
             System.err.println("watchdog service id: " +
-                                   node.getWatchdogService().getLocalNodeId());
+                                   node.getDataService().getLocalNodeId());
 
         }
     }
@@ -186,6 +235,9 @@ public class TestWatchdogServiceImpl extends Assert {
             }
             additionalNodes = null;
         }
+	if (dataService != null) {
+	    dataService.shutdown();
+	}
         if (serverNode != null)
             serverNode.shutdown(clean);
 	/* Wait for sockets to close down. */
@@ -198,12 +250,7 @@ public class TestWatchdogServiceImpl extends Assert {
         WatchdogServiceImpl watchdog = null;
         try {
             watchdog = new WatchdogServiceImpl(
-		SgsTestNode.getDefaultProperties(
-		    "TestWatchdogServiceImpl", null, null),
-		systemRegistry, txnProxy, dummyShutdownCtrl);  
-            WatchdogServerImpl server = watchdog.getServer();
-            System.err.println("watchdog server: " + server);
-            server.shutdown();
+		serviceProps, systemRegistry, txnProxy, dummyShutdownCtrl);  
         } finally {
             if (watchdog != null) watchdog.shutdown();
         }
@@ -404,51 +451,6 @@ public class TestWatchdogServiceImpl extends Assert {
 				dummyShutdownCtrl);  
     }
     
-    /* -- Test getLocalNodeId -- */
-
-    @Test public void testGetLocalNodeId() throws Exception {
-	long id = watchdogService.getLocalNodeId();
-	if (id != 1) {
-	    fail("Expected id 1, got " + id);
-	}
-	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
-	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
-            WatchdogServerPropertyPrefix + ".host", "localhost",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry, txnProxy,
-				    dummyShutdownCtrl);
-	try {
-	    id = watchdog.getLocalNodeId();
-	    if (id != 2) {
-		fail("Expected id 2, got " + id);
-	    }
-	} finally {
-	    watchdog.shutdown();
-	}
-    }
-
-    @Test public void testGetLocalNodeIdInTxn() throws Exception {
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() throws Exception {
-		assertTrue(watchdogService.getLocalNodeId() > 0);
-            }
-        }, taskOwner);
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(
-		SgsTestNode.getDefaultProperties(
-		    "TestWatchdogServiceImpl", null, null),
-		systemRegistry, txnProxy, dummyShutdownCtrl);
-	watchdog.shutdown();
-	watchdog.getLocalNodeId();
-    }
-
     /* -- Test isLocalNodeAlive -- */
 
     @Test public void testIsLocalNodeAlive() throws Exception {
@@ -461,14 +463,9 @@ public class TestWatchdogServiceImpl extends Assert {
             }
         }, taskOwner);
 
-	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
-	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
-            WatchdogServerPropertyPrefix + ".host", "localhost",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+	DataService dataService = createDataService(serviceProps);
 	final WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry, txnProxy,
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy,
 				    dummyShutdownCtrl);
 	try {
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -495,6 +492,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    
 	} finally {
 	    watchdog.shutdown();
+	    dataService.shutdown();
 	}
     }
 
@@ -637,8 +635,7 @@ public class TestWatchdogServiceImpl extends Assert {
         addNodes(null, NUM_WATCHDOGS);
 
         for (SgsTestNode node : additionalNodes) {
-            WatchdogService watchdog = node.getWatchdogService();
-            final long id  = watchdog.getLocalNodeId();
+            final long id = node.getDataService().getLocalNodeId();
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
@@ -748,8 +745,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	watchdogService.addNodeListener(listener);
         addNodes(null, NUM_WATCHDOGS);
         for (SgsTestNode node : additionalNodes) {
-            WatchdogService watchdog = node.getWatchdogService();
-            final long id  = watchdog.getLocalNodeId();
+            final long id = node.getDataService().getLocalNodeId();
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
@@ -794,8 +790,16 @@ public class TestWatchdogServiceImpl extends Assert {
 
     @IntegrationTest
     @Test public void testShutdownAndNotifyFailedNodes() throws Exception {
-	Map<WatchdogServiceImpl, DummyNodeListener> watchdogMap =
-	    new HashMap<WatchdogServiceImpl, DummyNodeListener>();
+	class WatchdogInfo {
+	    final DummyNodeListener listener;
+	    final DataService dataService;
+	    WatchdogInfo(DummyNodeListener listener, DataService dataService) {
+		this.listener = listener;
+		this.dataService = dataService;
+	    }
+	};
+	Map<WatchdogServiceImpl, WatchdogInfo> watchdogMap =
+	    new HashMap<WatchdogServiceImpl, WatchdogInfo>();
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
@@ -805,12 +809,14 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	try {
 	    for (int i = 0; i < 5; i++) {
+		DataService dataService = createDataService(props);
 		WatchdogServiceImpl watchdog =
 		    new WatchdogServiceImpl(props, systemRegistry, txnProxy,
 					    dummyShutdownCtrl);
 		DummyNodeListener listener = new DummyNodeListener();
 		watchdog.addNodeListener(listener);
-		watchdogMap.put(watchdog, listener);
+		watchdogMap.put(
+		    watchdog, new WatchdogInfo(listener, dataService));
 	    }
 	
 	    // shutdown watchdog server
@@ -819,10 +825,12 @@ public class TestWatchdogServiceImpl extends Assert {
 	    Thread.sleep(renewTime * 4);
 
 	    for (WatchdogServiceImpl watchdog : watchdogMap.keySet()) {
-		DummyNodeListener listener = watchdogMap.get(watchdog);
+		WatchdogInfo info = watchdogMap.get(watchdog);
+		DummyNodeListener listener = info.listener;
+		DataService dataService = info.dataService;
 		Set<Node> nodes = listener.getFailedNodes();
 		System.err.println(
-		    "failedNodes for " + watchdog.getLocalNodeId() +
+		    "failedNodes for " + dataService.getLocalNodeId() +
 		    ": " + nodes);
 		if (nodes.size() != 6) {
 		    fail("Expected 6 failed nodes, got " + nodes.size());
@@ -837,6 +845,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	} finally {
 	    for (WatchdogServiceImpl watchdog : watchdogMap.keySet()) {
 		watchdog.shutdown();
+		watchdogMap.get(watchdog).dataService.shutdown();
 	    }
 	}
     }
@@ -848,9 +857,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	throws Exception
     {
 	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
-	    SgsTestNode.getDefaultProperties(
-		"TestWatchdogServiceImpl", null, null),
-	    systemRegistry, txnProxy, dummyShutdownCtrl);
+	    serviceProps, systemRegistry, txnProxy, dummyShutdownCtrl);
 	watchdog.shutdown();
 	watchdog.addRecoveryListener(new DummyRecoveryListener());
     }
@@ -873,8 +880,8 @@ public class TestWatchdogServiceImpl extends Assert {
 
     @IntegrationTest
     @Test public void testRecovery() throws Exception {
-	Map<Long, WatchdogServiceImpl> watchdogs =
-	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	Map<Long, WatchdogAndData> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogAndData>();
 	List<Long> shutdownIds = new ArrayList<Long>();
 
 	int totalWatchdogs = 5;
@@ -884,12 +891,12 @@ public class TestWatchdogServiceImpl extends Assert {
 	serverNode.getWatchdogService().addRecoveryListener(listener);
 	try {
 	    for (int i = 0; i < totalWatchdogs; i++) {
-		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		WatchdogAndData watchdog = createWatchdog(listener);
 		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 	    }
 
 	    // shut down a few watchdog services
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		if (numWatchdogsToShutdown == 0) {
 		    break;
 		}
@@ -908,7 +915,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    checkNodesAlive(watchdogs.keySet());
 
 	} finally {
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		watchdog.shutdown();
 	    }
 	}
@@ -918,8 +925,8 @@ public class TestWatchdogServiceImpl extends Assert {
     @Test public void testRecoveryWithBackupFailureDuringRecovery()
 	throws Exception
     {
-	Map<Long, WatchdogServiceImpl> watchdogs =
-	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	Map<Long, WatchdogAndData> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogAndData>();
 	List<Long> shutdownIds = new ArrayList<Long>();
 	int totalWatchdogs = 8;
 	int numWatchdogsToShutdown = 3;
@@ -928,12 +935,12 @@ public class TestWatchdogServiceImpl extends Assert {
 	serverNode.getWatchdogService().addRecoveryListener(listener);
 	try {
 	    for (int i = 0; i < totalWatchdogs; i++) {
-		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		WatchdogAndData watchdog = createWatchdog(listener);
 		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 	    }
 
 	    // shut down a few watchdog services
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		if (numWatchdogsToShutdown == 0) {
 		    break;
 		}
@@ -951,7 +958,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    // shutdown backups
 	    for (Node backup : backups) {
 		long backupId = backup.getId();
-		WatchdogServiceImpl watchdog = watchdogs.get(backupId);
+		WatchdogAndData watchdog = watchdogs.get(backupId);
 		if (watchdog != null) {
 		    System.err.println("shutting down backup: " + backupId);
 		    shutdownIds.add(backupId);
@@ -967,7 +974,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    checkNodesAlive(watchdogs.keySet());
 
 	} finally {
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		watchdog.shutdown();
 	    }
 	}
@@ -978,22 +985,22 @@ public class TestWatchdogServiceImpl extends Assert {
 	throws Exception
     {
 	List<Long> shutdownIds = new ArrayList<Long>();
-	long serverNodeId = serverNode.getWatchdogService().getLocalNodeId();
+	long serverNodeId = serverNode.getDataService().getLocalNodeId();
 	crashAndRestartServer();
 	shutdownIds.add(serverNodeId);
-	Map<Long, WatchdogServiceImpl> watchdogs =
-	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	Map<Long, WatchdogAndData> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogAndData>();
 	int totalWatchdogs = 5;
 
 	DummyRecoveryListener listener = new DummyRecoveryListener();
 	try {
 	    for (int i = 0; i < totalWatchdogs; i++) {
-		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		WatchdogAndData watchdog = createWatchdog(listener);
 		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 	    }
 
 	    // shut down all watchdog services.
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		long id = watchdog.getLocalNodeId();
 		System.err.println("shutting down node: " + id);
 		shutdownIds.add(id);
@@ -1010,7 +1017,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	    // Create new node to be (belatedly) assigned as backup
 	    // for failed nodes.
-	    WatchdogServiceImpl watchdog = createWatchdog(listener);
+	    WatchdogAndData watchdog = createWatchdog(listener);
 	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 
 	    listener.checkRecoveryNotifications(shutdownIds.size());
@@ -1019,7 +1026,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    checkNodesAlive(watchdogs.keySet());
 
 	} finally {
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		watchdog.shutdown();
 	    }
 	}
@@ -1027,16 +1034,16 @@ public class TestWatchdogServiceImpl extends Assert {
 
     @IntegrationTest
     @Test public void testRecoveryAfterServerCrash() throws Exception {
-	Map<Long, WatchdogServiceImpl> watchdogs =
-	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	Map<Long, WatchdogAndData> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogAndData>();
 	List<Long> shutdownIds = new ArrayList<Long>();
 	int totalWatchdogs = 5;
-	WatchdogServiceImpl newWatchdog = null;
+	WatchdogAndData newWatchdog = null;
 
 	DummyRecoveryListener listener = new DummyRecoveryListener();
 	try {
 	    for (int i = 0; i < totalWatchdogs; i++) {
-		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		WatchdogAndData watchdog = createWatchdog(listener);
 		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 	    }
 	    
@@ -1054,7 +1061,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    checkNodesRemoved(watchdogs.keySet());
 
 	} finally {
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		watchdog.shutdown();
 	    }
 	    if (newWatchdog != null) {
@@ -1067,20 +1074,20 @@ public class TestWatchdogServiceImpl extends Assert {
     @Test public void testRecoveryAfterAllNodesAndServerCrash()
 	throws Exception
     {
-	Map<Long, WatchdogServiceImpl> watchdogs =
-	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	Map<Long, WatchdogAndData> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogAndData>();
 	List<Long> shutdownIds = new ArrayList<Long>();
 	int totalWatchdogs = 5;
 
 	DummyRecoveryListener listener = new DummyRecoveryListener();
 	try {
 	    for (int i = 0; i < totalWatchdogs; i++) {
-		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		WatchdogAndData watchdog = createWatchdog(listener);
 		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 	    }
 
 	    // shut down all watchdog services.
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		long id = watchdog.getLocalNodeId();
 		System.err.println("shutting down node: " + id);
 		shutdownIds.add(id);
@@ -1100,7 +1107,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	    // Create new node to be (belatedly) assigned as backup
 	    // for failed nodes.
-	    WatchdogServiceImpl watchdog = createWatchdog(listener); 
+	    WatchdogAndData watchdog = createWatchdog(listener); 
 	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
 
 	    listener.checkRecoveryNotifications(shutdownIds.size() + 1);
@@ -1110,7 +1117,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    checkNodesAlive(watchdogs.keySet());
 
 	} finally {
-	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+	    for (WatchdogAndData watchdog : watchdogs.values()) {
 		watchdog.shutdown();
 	    }
 	}
@@ -1267,7 +1274,8 @@ public class TestWatchdogServiceImpl extends Assert {
 
     @Test(expected = NullPointerException.class)
     public void testReportFailureNullClassName() {
-	watchdogService.reportFailure(watchdogService.getLocalNodeId(), null);
+	watchdogService.reportFailure(
+	    serverNode.getDataService().getLocalNodeId(), null);
     }
 
     @Test(expected = IllegalStateException.class)
@@ -1282,38 +1290,32 @@ public class TestWatchdogServiceImpl extends Assert {
      * Check that a node can report a failure and shutdown itself down by
      * notifying the watchdog service
      */
-    @Test public void testReportLocalFailure() {
-        try {
-            final String appName = "TestReportFailure";
-            Properties properties = createProperties(
-                    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-                    WatchdogServerPropertyPrefix + ".port",
-		    	Integer.toString(65530));
+    @Test public void testReportLocalFailure() throws Exception {
+	final String appName = "TestReportFailure";
 
-            // Create a dummy shutdown controller to log calls to the shutdown
-            // method. NOTE: The controller does not actually shutdown the node
-            WatchdogServiceImpl watchdogService = 
-                    new WatchdogServiceImpl(properties, systemRegistry, 
-                    txnProxy, dummyShutdownCtrl);
+	// Create a dummy shutdown controller to log calls to the shutdown
+	// method. NOTE: The controller does not actually shutdown the node
+	DataService dataService = createDataService(serviceProps);
+	WatchdogServiceImpl watchdogService = 
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, 
+				    txnProxy, dummyShutdownCtrl);
 
-            // Report a failure, which should shutdown the node
-            watchdogService.reportFailure(watchdogService.getLocalNodeId(), 
-                    appName);
+	// Report a failure, which should shutdown the node
+	watchdogService.reportFailure(dataService.getLocalNodeId(), 
+				      appName);
 
-            // Node should not be alive since we reported a failure
-            try {
-                assertFalse(watchdogService.isLocalNodeAliveNonTransactional());
-            } catch (Exception e) {
-                fail("Not expecting an Exception: " + e.getLocalizedMessage());
-            }
+	// Node should not be alive since we reported a failure
+	try {
+	    assertFalse(watchdogService.isLocalNodeAliveNonTransactional());
+	} catch (Exception e) {
+	    fail("Not expecting an Exception: " + e.getLocalizedMessage());
+	}
             
-            // The shutdown controller should be incremented as a result of the 
-            // failure being reported
-            assertEquals(1, dummyShutdownCtrl.getShutdownCount());
-            watchdogService.shutdown();
-        } catch (Exception e) {
-            fail("Not expecting an Exception");
-        }
+	// The shutdown controller should be incremented as a result of the 
+	// failure being reported
+	assertEquals(1, dummyShutdownCtrl.getShutdownCount());
+	watchdogService.shutdown();
+	dataService.shutdown();
     }
 
     /**
@@ -1539,7 +1541,7 @@ public class TestWatchdogServiceImpl extends Assert {
     }
 
     /** Creates a watchdog service with the specified recovery listener. */
-    private WatchdogServiceImpl createWatchdog(RecoveryListener listener)
+    private WatchdogAndData createWatchdog(RecoveryListener listener)
 	throws Exception
     {
 	Properties props = createProperties(
@@ -1548,15 +1550,33 @@ public class TestWatchdogServiceImpl extends Assert {
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(watchdogService.getServer().getPort()));
+	DataService data = createDataService(props);
 	WatchdogServiceImpl watchdog = 
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy, 
             dummyShutdownCtrl);
 	watchdog.addRecoveryListener(listener);
 	watchdog.ready();
-	System.err.println("Created node (" + watchdog.getLocalNodeId() + ")");
-	return watchdog;
+	System.err.println("Created node (" + data.getLocalNodeId() + ")");
+	return new WatchdogAndData(watchdog, data);
     }
     
+    /** Stores a pair of associated watchdog and data services. */
+    private static class WatchdogAndData {
+	final WatchdogService watchdog;
+	final DataService data;
+	WatchdogAndData(WatchdogService watchdog, DataService data) {
+	    this.watchdog = watchdog;
+	    this.data = data;
+	}
+	long getLocalNodeId() {
+	    return data.getLocalNodeId();
+	}
+	void shutdown() {
+	    watchdog.shutdown();
+	    data.shutdown();
+	}
+    }
+
     /** Tears down the server node and restarts it as a server-only stack. */
     private void crashAndRestartServer() throws Exception {
 	System.err.println("simulate watchdog server crash...");
@@ -1722,6 +1742,27 @@ public class TestWatchdogServiceImpl extends Assert {
 
 	Set<Node> getStartedNodes() {
 	    return startedNodes;
+	}
+    }
+
+    /** Define a {@code ComponentRegistry} that holds a single component. */
+    private static class SingletonComponentRegistry
+	implements ComponentRegistry
+    {
+	private final Object component;
+	SingletonComponentRegistry(Object component) {
+	    this.component = component;
+	}
+	public <T> T getComponent(Class<T> type) {
+	    if (type.isAssignableFrom(component.getClass())) {
+		return type.cast(component);
+	    } else {
+		throw new MissingResourceException(
+		    "No matching components", type.getName(), null);
+	    }
+	}
+	public Iterator<Object> iterator() {
+	    return Collections.singleton(component).iterator();
 	}
     }
 }

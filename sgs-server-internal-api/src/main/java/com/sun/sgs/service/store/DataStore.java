@@ -50,6 +50,13 @@ public interface DataStore {
     void ready() throws Exception;
 
     /**
+     * Returns the node ID for the local node.
+     *
+     * @return	the node ID for the local node
+     */
+    long getLocalNodeId();
+
+    /**
      * Reserves an object ID for a new object.  Note that calling other
      * operations using this ID are not required to find the object until
      * {@link #setObject setObject} or {@link #setObjects setObjects} is

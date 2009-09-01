@@ -24,6 +24,7 @@
 package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryListener;
@@ -45,7 +46,7 @@ public class DummyWatchdogService implements WatchdogService {
     private final TransactionProxy txnProxy;
 
     /** The local node. */
-    private final NodeImpl node = new NodeImpl();	    
+    private final NodeImpl node;
 
     /** Node listeners. */
     private final List<NodeListener> nodeListeners =
@@ -63,6 +64,8 @@ public class DummyWatchdogService implements WatchdogService {
 				TransactionProxy txnProxy)
     {
 	this.txnProxy = txnProxy;
+	node = new NodeImpl(
+	    txnProxy.getService(DataService.class).getLocalNodeId());
     }
 
     /* -- Implement Service -- */
@@ -79,12 +82,6 @@ public class DummyWatchdogService implements WatchdogService {
     public void shutdown() { }
 
     /* -- Implement WatchdogService -- */
-
-    /** {@inheritDoc} */
-    public long getLocalNodeId() {
-	/* FIXME: This method needs to be moved to the data service! */
-	return node.getId();
-    }
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
@@ -142,9 +139,10 @@ public class DummyWatchdogService implements WatchdogService {
 
     /** Implement {@code Node}. */
     private static class NodeImpl implements Node {
+	private final long id;
 	private boolean alive = true;
-	NodeImpl() { }
-	public long getId() { return 1; }
+	NodeImpl(long id) { this.id = id; }
+	public long getId() { return id; }
 	public String getHostName() { return "localhost"; }
 	public synchronized boolean isAlive() {
 	    return alive;

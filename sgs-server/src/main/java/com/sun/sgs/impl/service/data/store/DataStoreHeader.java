@@ -234,47 +234,14 @@ final class DataStoreHeader {
 	switch (majorVersion) {
 	case 1:
 	case 2:
+	case 3:
+	case 4:
 	    throw new DataStoreException(
 		"Database version number " + majorVersion +
 		" is not supported");
-	case 3:
-	    upgrade3to4(db, dbTxn);
-	    /* Fall through */
-	case 4:
-	    upgrade4to5(db, dbTxn);
 	default:
 	    throw new AssertionError();
 	}
-    }
-
-    /**
-     * Updates database version 3 to version 4.  Although it would be
-     * theoretically possible for a version 3 database to contain data that
-     * could be mistaken for a placeholder or a quoted value, in practice all
-     * object values started with the two serialized version values (1 and 2).
-     * So, just update the major version number and add an entry for the first
-     * placeholder.
-     */
-    private static void upgrade3to4(DbDatabase db, DbTransaction dbTxn) {
-	db.put(dbTxn, DataEncoding.encodeLong(MAJOR_KEY),
-	       DataEncoding.encodeShort((short) 4));
-	boolean success = db.putNoOverwrite(
-	    dbTxn, DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY),
-	    DataEncoding.encodeLong(-1));
-	assert success;
-    }
-
-    /**
-     * Updates database version 4 to version 5.  Adds an entry for the next
-     * node ID.
-     */
-    private static void upgrade4to5(DbDatabase db, DbTransaction dbTxn) {
-	db.put(dbTxn, DataEncoding.encodeLong(MAJOR_KEY),
-	       DataEncoding.encodeShort((short) 5));
-	boolean success = db.putNoOverwrite(
-	    dbTxn, DataEncoding.encodeLong(NEXT_NODE_ID_KEY),
-	    DataEncoding.encodeLong(INITIAL_NEXT_NODE_ID));
-	assert success;
     }
 
     /**

@@ -27,6 +27,15 @@ import java.lang.reflect.Method;
 /** Utilities for using reflection in tests. */
 public class UtilReflection {
 
+    /** Returns the specified class. */
+    public static Class<?> getClass(String name) {
+	try {
+	    return Class.forName(name);
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
     /** Returns the specified declared constructor, making it accessible. */
     public static <T> Constructor<T> getConstructor(
 	Class<T> cl, Class<?>... params)

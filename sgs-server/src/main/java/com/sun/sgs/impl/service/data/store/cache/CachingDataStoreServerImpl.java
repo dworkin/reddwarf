@@ -58,6 +58,7 @@ import com.sun.sgs.impl.util.lock.MultiLockManager;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionInterruptedException;
@@ -266,23 +267,29 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private final Object nextNodeIdSync = new Object();
 
     /**
-     * The watchdog service, or {@code null} if not initialized.  Synchronize
-     * on {@link #watchdogServiceSync} when accessing.
+     * The data service, or {@code null} if not initialized.  Synchronize on
+     * {@link #readySync} when accessing.
      */
-    private WatchdogService watchdogService;
+    private DataService dataService = null;
+
+    /**
+     * The watchdog service, or {@code null} if not initialized.  Synchronize
+     * on {@link #readySync} when accessing.
+     */
+    private WatchdogService watchdogService = null;
 
     /**
      * An exception responsible for a failure before the watchdog service
      * became available, or {@code null} if there was no failure.  Synchronize
-     * on {@link #watchdogServiceSync} when accessing.
+     * on {@link #readySync} when accessing.
      */
-    private Throwable failureBeforeWatchdog;
+    private Throwable failureBeforeWatchdog = null;
 
     /**
-     * Synchronizer for {@link #watchdogService} and {@link
-     * #failureBeforeWatchdog}.
+     * Synchronizer for {@link #dataService}, {@link #watchdogService}, and
+     * {@link #failureBeforeWatchdog}.
      */
-    private final Object watchdogServiceSync = new Object();
+    private final Object readySync = new Object();
 
     /** The update queue server, wrapped for logging. */
     private final UpdateQueueServer updateQueueServer =
@@ -432,7 +439,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * @throws	Exception if an error occurs 
      */
     public void ready() throws Exception {
-	synchronized (watchdogServiceSync) {
+	synchronized (readySync) {
 	    if (failureBeforeWatchdog != null) {
 		if (failureBeforeWatchdog instanceof Error) {
 		    throw (Error) failureBeforeWatchdog;
@@ -440,6 +447,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    throw (Exception) failureBeforeWatchdog;
 		}
 	    }
+	    dataService = txnProxy.getService(DataService.class);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	}
 	watchdogService.addNodeListener(this);
@@ -1099,7 +1107,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     public void reportFailure(Throwable exception) {
 	logger.logThrow(
 	    WARNING, exception, "CachingDataStoreServerImpl failed");
-	synchronized (watchdogServiceSync) {
+	synchronized (readySync) {
 	    if (watchdogService == null) {
 		if (failureBeforeWatchdog != null) {
 		    failureBeforeWatchdog = exception;
@@ -1109,7 +1117,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    new Thread(CLASSNAME + ".reportFailure") {
 			public void run() {
 			    watchdogService.reportFailure(
-				watchdogService.getLocalNodeId(),
+				dataService.getLocalNodeId(),
 				CachingDataStoreServerImpl.class.getName());
 			}
 		    };

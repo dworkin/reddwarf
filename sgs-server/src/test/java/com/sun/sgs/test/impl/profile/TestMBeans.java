@@ -19,7 +19,6 @@
 
 package com.sun.sgs.test.impl.profile;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
@@ -50,7 +49,6 @@ import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -571,6 +569,8 @@ public class TestMBeans {
         long createRefForId = 
                 (Long) mbsc.getAttribute(name, "CreateReferenceForIdCalls");
         long getBinding = (Long) mbsc.getAttribute(name, "GetBindingCalls");
+        long getLocalNodeId = 
+                (Long) mbsc.getAttribute(name, "GetLocalNodeIdCalls");
         long getServiceBinding = 
                 (Long) mbsc.getAttribute(name, "GetServiceBindingCalls");
         long markForUpdate = 
@@ -599,6 +599,7 @@ public class TestMBeans {
         assertTrue(createRef <= proxy.getCreateReferenceCalls());
         assertTrue(createRefForId <= proxy.getCreateReferenceForIdCalls());
         assertTrue(getBinding <= proxy.getGetBindingCalls());
+        assertTrue(getLocalNodeId <= proxy.getGetLocalNodeIdCalls());
         assertTrue(getServiceBinding <= proxy.getGetServiceBindingCalls());
         assertTrue(markForUpdate <= proxy.getMarkForUpdateCalls());
         assertTrue(nextBoundName <= proxy.getNextBoundNameCalls());
@@ -618,6 +619,7 @@ public class TestMBeans {
         assertTrue(createRef <= bean.getCreateReferenceCalls());
         assertTrue(createRefForId <= bean.getCreateReferenceForIdCalls());
         assertTrue(getBinding <= bean.getGetBindingCalls());
+        assertTrue(getLocalNodeId <= bean.getGetLocalNodeIdCalls());
         assertTrue(getServiceBinding <= bean.getGetServiceBindingCalls());
         assertTrue(markForUpdate <= bean.getMarkForUpdateCalls());
         assertTrue(nextBoundName <= bean.getNextBoundNameCalls());
@@ -663,8 +665,6 @@ public class TestMBeans {
                 (Long) mbsc.getAttribute(name, "AddRecoveryListenerCalls");
         long getBackup = 
                 (Long) mbsc.getAttribute(name, "GetBackupCalls");
-        long getLocalNodeId = 
-                (Long) mbsc.getAttribute(name, "GetLocalNodeIdCalls");
         long getNode = (Long) mbsc.getAttribute(name, "GetNodeCalls");
         long getNodes = (Long) mbsc.getAttribute(name, "GetNodesCalls");
         long isLocalNodeAlive = 
@@ -688,7 +688,6 @@ public class TestMBeans {
         assertTrue(addNodeListener <= proxy.getAddNodeListenerCalls());
         assertTrue(addRecoveryListener <= proxy.getAddRecoveryListenerCalls());
         assertTrue(getBackup <= proxy.getGetBackupCalls());
-        assertTrue(getLocalNodeId <= proxy.getGetLocalNodeIdCalls());
         assertTrue(getNode <= proxy.getGetNodeCalls());
         assertTrue(getNodes <= proxy.getGetNodesCalls());
         assertTrue(isLocalNodeAlive <= proxy.getIsLocalNodeAliveCalls());
@@ -698,7 +697,6 @@ public class TestMBeans {
         assertTrue(addNodeListener <= bean.getAddNodeListenerCalls());
         assertTrue(addRecoveryListener <= bean.getAddRecoveryListenerCalls());
         assertTrue(getBackup <= bean.getGetBackupCalls());
-        assertTrue(getLocalNodeId <= bean.getGetLocalNodeIdCalls());
         assertTrue(getNode <= bean.getGetNodeCalls());
         assertTrue(getNodes <= bean.getGetNodesCalls());
         assertTrue(isLocalNodeAlive <= bean.getIsLocalNodeAliveCalls());
@@ -714,16 +712,14 @@ public class TestMBeans {
         // Test one of the APIs
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
-                    serverNode.getWatchdogService().getLocalNodeId();
+		    long nodeId =
+			serverNode.getDataService().getLocalNodeId();
+		    serverNode.getWatchdogService().getNode(nodeId);
 		}}, taskOwner);
         // Should certainly be greater number, not greater or equal
-        long newValue = proxy.getGetLocalNodeIdCalls();
-        assertTrue(getLocalNodeId < newValue);
-        assertTrue(getLocalNodeId < bean.getGetLocalNodeIdCalls());
-        // and try outside a transaction
-        serverNode.getWatchdogService().getLocalNodeId();
-        assertTrue(newValue < proxy.getGetLocalNodeIdCalls());
-        assertTrue(newValue < bean.getGetLocalNodeIdCalls());
+        long newValue = proxy.getGetNodeCalls();
+        assertTrue(getNode < newValue);
+        assertTrue(getNode < bean.getGetNodeCalls());
     }
     
     @Test

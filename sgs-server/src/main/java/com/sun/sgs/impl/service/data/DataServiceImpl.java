@@ -213,6 +213,9 @@ public final class DataServiceImpl implements DataService {
     /** The underlying data store. */
     private final DataStore store;
 
+    /** The local node ID. */
+    private final long nodeId;
+
     /** Table that stores information about classes used in serialization. */
     private final ClassesTable classesTable;
 
@@ -386,6 +389,7 @@ public final class DataServiceImpl implements DataService {
             ProfileCollector collector = 
 		systemRegistry.getComponent(ProfileCollector.class);
 	    store = new DataStoreProfileProducer(baseStore, collector);
+	    nodeId = store.getLocalNodeId();
             
             // create our service profiling info and register our MBean
             serviceStats = new DataServiceStats(collector);
@@ -614,6 +618,17 @@ public final class DataServiceImpl implements DataService {
     }
 
     /* -- Implement DataService -- */
+
+    /** {@inheritDoc} */
+    public long getLocalNodeId() {
+	serviceStats.getLocalNodeIdOp.report();
+	synchronized (state) {
+	    if (state != State.RUNNING) {
+		throw new IllegalStateException("Service is not running");
+	    }
+	}
+	return nodeId;
+    }
 
     /** {@inheritDoc} */
     public ManagedObject getServiceBinding(String name) {

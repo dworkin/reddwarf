@@ -3117,6 +3117,38 @@ public class TestDataServiceImpl extends Assert {
         }}, taskOwner);
     }
 
+    /* -- Test getLocalNodeId -- */
+
+    @Test
+    public void testGetLocalNodeId() throws Exception {
+	long id1 = service.getLocalNodeId();
+	assertTrue("Node ID should be greater than 0: " + id1, id1 > 0);
+	serverNodeRestart(getProperties(), false);
+	long id2 = serverNode.getDataService().getLocalNodeId();
+	assertTrue("Second node ID should be greater than " + id1 + ": " + id2,
+		   id2 > id1);
+    }
+
+    @Test
+    public void testGetLocalNodeIdInTxn() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		assertTrue(service.getLocalNodeId() > 0);
+            }
+        }, taskOwner);
+    }
+
+    @Test
+    public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
+	serverNode.shutdown(false);
+	serverNode = null;
+	try {
+	    service.getLocalNodeId();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	}
+    }
+
     /* -- Test createReferenceForId -- */
 
     @Test 
@@ -5732,6 +5764,7 @@ public class TestDataServiceImpl extends Assert {
     /** A dummy implementation of DataStore. */
     static class DummyDataStore implements DataStore {
 	public void ready() { }
+	public long getLocalNodeId() { return 1; }
 	public long createObject(Transaction txn) { return 0; }
 	public void markForUpdate(Transaction txn, long oid) { }
 	public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {

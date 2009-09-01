@@ -46,19 +46,20 @@ class DataStoreProtocol implements DataStoreServer {
 
     /* -- Opcodes for the methods -- */
 
-    private static final short CREATE_OBJECT = 1;
-    private static final short MARK_FOR_UPDATE = 2;
-    private static final short GET_OBJECT = 3;
-    private static final short SET_OBJECT = 4;
-    private static final short SET_OBJECTS = 5;
-    private static final short REMOVE_OBJECT = 6;
-    private static final short GET_BINDING = 7;
-    private static final short SET_BINDING = 8;
-    private static final short REMOVE_BINDING = 9;
-    private static final short NEXT_BOUND_NAME = 10;
-    private static final short GET_CLASS_ID = 11;
-    private static final short GET_CLASS_INFO = 12;
-    private static final short NEXT_OBJECT_ID = 13;
+    private static final short NEW_NODE_ID = 1;
+    private static final short CREATE_OBJECT = 2;
+    private static final short MARK_FOR_UPDATE = 3;
+    private static final short GET_OBJECT = 4;
+    private static final short SET_OBJECT = 5;
+    private static final short SET_OBJECTS = 6;
+    private static final short REMOVE_OBJECT = 7;
+    private static final short GET_BINDING = 8;
+    private static final short SET_BINDING = 9;
+    private static final short REMOVE_BINDING = 10;
+    private static final short NEXT_BOUND_NAME = 11;
+    private static final short GET_CLASS_ID = 12;
+    private static final short GET_CLASS_INFO = 13;
+    private static final short NEXT_OBJECT_ID = 14;
     private static final short CREATE_TRANSACTION = 100;
     private static final short PREPARE = 101;
     private static final short COMMIT = 102;
@@ -81,6 +82,9 @@ class DataStoreProtocol implements DataStoreServer {
     void dispatch(DataStoreServer server) throws IOException {
 	short op = in.readShort();
 	switch (op) {
+	case NEW_NODE_ID:
+	    handleNewNodeId(server);
+	    break;
 	case CREATE_OBJECT:
 	    handleCreateObject(server);
 	    break;
@@ -141,6 +145,23 @@ class DataStoreProtocol implements DataStoreServer {
     }
 
     /* -- Implement methods for the client and server sides -- */
+
+    public long newNodeId() throws IOException {
+	out.writeShort(NEW_NODE_ID);
+	checkResult();
+	return in.readLong();
+    }
+
+    private void handleNewNodeId(DataStoreServer server) throws IOException {
+	try {
+	    long result = server.newNodeId();
+	    out.writeBoolean(true);
+	    out.writeLong(result);
+	    out.flush();
+	} catch (Throwable t) {
+	    failure(t);
+	}
+    }
 
     public long createObject(long tid) throws IOException {
 	out.writeShort(CREATE_OBJECT);

@@ -114,7 +114,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     @Override
     public void testNextBoundNameEmpty() {
 	String first = store.nextBoundName(txn, null);
-	assertTrue(first == null || first.startsWith("s."));
+	while (first != null && !first.startsWith("s.")) {
+	    store.removeBinding(txn, first);
+	    first = store.nextBoundName(txn, null);
+	}
 	assertEquals(first, store.nextBoundName(txn, ""));
 	store.setBinding(txn, "", id);
 	assertEquals("", store.nextBoundName(txn, null));

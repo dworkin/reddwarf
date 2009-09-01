@@ -697,6 +697,11 @@ public class DataStoreServerImpl implements DataStoreServer {
 				      ", name:" + name);
 	    }
 	}
+
+	/** Provide access to newNodeId. */
+	long localNewNodeId() {
+	    return newNodeId();
+	}
     }
 
     /**
@@ -842,6 +847,11 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /* -- Implement DataStoreServer -- */
+
+    /** {@inheritDoc} */
+    public long newNodeId() {
+	return store.localNewNodeId();
+    }
 
     /** {@inheritDoc} */
     public long createObject(long tid) {

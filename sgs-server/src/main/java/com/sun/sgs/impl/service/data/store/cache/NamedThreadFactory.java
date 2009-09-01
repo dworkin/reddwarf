@@ -47,6 +47,7 @@ public class NamedThreadFactory implements ThreadFactory {
 
     /* -- Implement ThreadFactory -- */
 
+    /** {@inheritDoc} */
     @Override
     public Thread newThread(Runnable r) {
 	Thread t = new Thread(r);

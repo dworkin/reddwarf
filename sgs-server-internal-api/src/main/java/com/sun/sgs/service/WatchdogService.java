@@ -35,18 +35,6 @@ import com.sun.sgs.app.TransactionException;
 public interface WatchdogService extends Service {
 
     /**
-     * Returns the node ID for the local node.  The node ID for a node
-     * remains fixed for the lifetime of the node (i.e., until it fails). <p>
-     *
-     * This method may be invoked any time after this service is
-     * intialized, whether or not the calling context is inside or outside
-     * of a transaction.
-     *
-     * @return	the node ID for the local node
-     */
-    long getLocalNodeId();
-
-    /**
      * Returns {@code true} if the local node is considered alive,
      * otherwise returns {@code false}.  This method should only be
      * called from within a transaction.
@@ -165,6 +153,8 @@ public interface WatchdogService extends Service {
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed
+     * @throws	IllegalArgumentException if the specified {@code nodeId}
+     *		is not within the range of valid IDs
      * @throws	IllegalStateException if this method is invoked from a
      *		transactional context
      */

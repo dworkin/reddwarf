@@ -538,6 +538,13 @@ public class CachingDataStore extends AbstractDataStore
 	}
     }
 
+    /* DataStore.getLocalNodeId */
+
+    /** {@inheritDoc} */
+    protected long getLocalNodeIdInternal() {
+	return nodeId;
+    }
+
     /* DataStore.createObject */
 
     /** {@inheritDoc} */

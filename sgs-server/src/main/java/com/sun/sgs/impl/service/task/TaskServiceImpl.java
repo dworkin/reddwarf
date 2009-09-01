@@ -356,7 +356,7 @@ public class TaskServiceImpl
         // for recovery notices to manage cleanup of hand-off bindings
         WatchdogService watchdogService = 
                 txnProxy.getService(WatchdogService.class);
-        nodeId = watchdogService.getLocalNodeId();
+        nodeId = dataService.getLocalNodeId();
         localHandoffSpace = DS_HANDOFF_SPACE + nodeId;
         watchdogService.addRecoveryListener(this);
 

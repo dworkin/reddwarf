@@ -122,6 +122,34 @@ public abstract class AbstractDataStore
     /**
      * {@inheritDoc} <p>
      *
+     * This implementation does logging and calls {@link
+     * #getLocalNodeIdInternal} to perform the actual operation.
+     */
+    public long getLocalNodeId() {
+	logger.log(FINEST, "getLocalNodeId");
+	try {
+	    long result = getLocalNodeIdInternal();
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(
+		    FINEST, "getLocalNodeId returns nodeId:{0}", result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    throw handleException(null, FINEST, e, "getLocalNodeId");
+	}
+    }
+
+    /**
+     * Performs the actual operation for {@link #getLocalNodeId
+     * getLocalNodeId}.
+     *
+     * @return	the local node ID
+     */
+    protected abstract long getLocalNodeIdInternal();
+
+    /**
+     * {@inheritDoc} <p>
+     *
      * This implementation does logging and calls {@link #createObjectInternal
      * createObjectInternal} to perform the actual operation.
      */

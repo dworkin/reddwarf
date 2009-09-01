@@ -26,7 +26,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.NodesMXBean;
@@ -191,12 +190,6 @@ public final class WatchdogServerImpl
     final Queue<NodeImpl> statusChangedNodes =
 	new ConcurrentLinkedQueue<NodeImpl>();
 
-    /** The ID block size for the IdGenerator. */
-    private final int idBlockSize;
-    
-    /** The ID generator. */
-    private final IdGenerator idGenerator;
-
     /** The map of registered nodes that are alive, keyed by node ID. */
     private final ConcurrentMap<Long, NodeImpl> aliveNodes =
 	new ConcurrentHashMap<Long, NodeImpl>();
@@ -280,16 +273,6 @@ public final class WatchdogServerImpl
 		       "]: renewInterval:" + renewInterval);
 	}
 
-	idBlockSize = wrappedProps.getIntProperty(
- 	    ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE,
-	    IdGenerator.MIN_BLOCK_SIZE, Integer.MAX_VALUE);
-	
-	idGenerator =
-	    new IdGenerator(ID_GENERATOR_NAME,
-			    idBlockSize,
-			    txnProxy,
-			    transactionScheduler);
-
 	FailedNodesRunnable failedNodesRunnable = new FailedNodesRunnable();
 	transactionScheduler.runTask(failedNodesRunnable, taskOwner);
 	Collection<NodeImpl> failedNodes = failedNodesRunnable.nodes;
@@ -313,8 +296,8 @@ public final class WatchdogServerImpl
         // register our local id
         int jmxPort = wrappedProps.getIntProperty(
                     StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
-        long[] values = registerNode(host, client, jmxPort);
-        localNodeId = values[0];
+	localNodeId = dataService.getLocalNodeId();
+        registerNode(localNodeId, host, client, jmxPort);
 
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	serverPort = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
@@ -411,15 +394,17 @@ public final class WatchdogServerImpl
     /**
      * {@inheritDoc}
      */
-    public long[] registerNode(final String host, 
-                               WatchdogClient client,
-                               int jmxPort)
+    public long registerNode(long nodeId,
+			     final String host,
+			     WatchdogClient client,
+			     int jmxPort)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
 
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "registering node on host:{0}", host);
+	    logger.log(Level.FINEST,
+		       "registering node {0} on host {1}", nodeId, host);
 	}
 
 	try {
@@ -429,18 +414,7 @@ public final class WatchdogServerImpl
 		throw new IllegalArgumentException("null client");
 	    }
    
-	    // Get next node ID, and put new node in transient map.
-	    long nodeId;
-	    try {
-		nodeId = idGenerator.next();
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "Failed to obtain node ID for node on {0}, throws",
-		    host);
-		throw new NodeRegistrationFailedException(
-		    "Exception occurred while obtaining node ID", e);
-	    }
+	    // Put new node in transient map.
 	    final NodeImpl node = new NodeImpl(nodeId, host, jmxPort, client);
             
             if (aliveNodes.putIfAbsent(nodeId, node) != null) {
@@ -476,7 +450,7 @@ public final class WatchdogServerImpl
 	    }
 
 	    logger.log(Level.INFO, "node:{0} registered", node);
-	    return new long[]{nodeId, renewInterval};
+	    return renewInterval;
 	    
 	} finally {
 	    callFinished();

@@ -454,7 +454,7 @@ public class NodeMappingServiceImpl
             changeNotifier = exporter.getProxy();
             
             // Obtain our node id from the watchdog service.
-            localNodeId = watchdogService.getLocalNodeId();
+            localNodeId = dataService.getLocalNodeId();
             
             // Check if we're running on a full stack; if we are, register
             // with our server so our node is a candidate for identity

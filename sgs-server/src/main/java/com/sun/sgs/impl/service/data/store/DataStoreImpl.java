@@ -166,6 +166,9 @@ public class DataStoreImpl extends AbstractDataStore {
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
 
+    /** The local node ID. */
+    private final long nodeId;
+
     /**
      * Whether object allocations should create a placeholder at the end of
      * each allocation block.  These placeholders help to avoid allocation
@@ -791,6 +794,8 @@ public class DataStoreImpl extends AbstractDataStore {
 	    classesDb = dbs.classes();
 	    oidsDb = dbs.oids();
 	    namesDb = dbs.names();
+	    nodeId = DataStoreHeader.getNextId(
+		DataStoreHeader.NEXT_NODE_ID_KEY, infoDb, dbTxn, 1);
 	    useAllocationBlockPlaceholders =
 		env.useAllocationBlockPlaceholders();
 	    freeObjectIds = new FreeObjectIds(useAllocationBlockPlaceholders);
@@ -864,6 +869,11 @@ public class DataStoreImpl extends AbstractDataStore {
     }
 
     /* -- Implement AbstractDataStore's DataStore methods -- */
+
+    /** {@inheritDoc} */
+    protected long getLocalNodeIdInternal() {
+	return nodeId;
+    }
 
     /** {@inheritDoc} */
     protected long createObjectInternal(Transaction txn) {
@@ -1241,6 +1251,15 @@ public class DataStoreImpl extends AbstractDataStore {
 	    throw handleException(
 		txn, Level.FINER, e, "joinNewTransaction txn:" + txn);
 	}
+    }
+
+    /**
+     * Returns a new node ID, for use with a newly started node.
+     *
+     * @return	the new node ID
+     */
+    protected long newNodeId() {
+	return getNextId(DataStoreHeader.NEXT_NODE_ID_KEY, 1, Long.MAX_VALUE);
     }
 
     /* -- Private methods -- */
