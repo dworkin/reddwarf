@@ -1,0 +1,78 @@
+<assembly>
+  <formats>
+    <format>zip</format>
+  </formats>
+  
+  <dependencySets>
+
+    <!-- Include the sgs-server distribution -->
+    <dependencySet>
+      <includes>
+        <include>com.projectdarkstar.server:sgs-server-dist</include>
+      </includes>
+      <outputDirectory></outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <unpack>true</unpack>
+    </dependencySet>
+
+    <!-- Install the snowman distribution into the sgs-server -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.example.projectsnowman:snowman-server-dist</include>
+      </includes>
+      <outputDirectory>sgs-server-dist-${sgs-server-dist.version}/deploy/project-snowman</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <unpack>true</unpack>
+    </dependencySet>
+
+    <!-- Include the snowman client distribution -->
+    <dependencySet>
+      <includes>
+        <include>com.projectdarkstar.example.projectsnowman:snowman-client-dist</include>
+      </includes>
+      <outputDirectory></outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <unpack>true</unpack>
+    </dependencySet>
+
+    <!-- Include the sgs-monitor tool -->
+    <dependencySet>
+      <includes>
+	<include>com.sun.sgs:sgs-monitor</include>
+      </includes>
+      <outputDirectory></outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <unpack>true</unpack>
+    </dependencySet>
+
+  </dependencySets>
+
+  <fileSets>
+    
+    <!-- Include the configuration files -->
+    <fileSet>
+      <directory>${basedir}/src/main/conf</directory>
+      <outputDirectory>sgs-server-dist-${sgs-server-dist.version}/conf</outputDirectory>
+    </fileSet>
+
+    <!-- Include the tmp files -->
+    <fileSet>
+      <directory>${basedir}/src/main/tmp</directory>
+      <outputDirectory>tmp</outputDirectory>
+    </fileSet>
+
+  </fileSets>
+  
+  <files>
+    
+    <!-- Include README file -->
+    <file>
+      <source>${basedir}/src/main/README</source>
+      <outputDirectory></outputDirectory>
+      <fileMode>644</fileMode>
+    </file>
+
+  </files>
+  
+  
+</assembly>

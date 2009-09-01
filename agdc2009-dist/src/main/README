@@ -1,0 +1,35 @@
+Austin GDC 2009 Distribution
+
+
+Project Snowman Core Node:
+
+  # cd sgs-server-dist-agdc2009
+  # java -jar ./bin/sgs-boot.jar ./conf/project-snowman-core.boot
+
+
+Project Snowman App Node:
+
+  # cp tmp/project-snowman.sgs.properties ~/.sgs.properties
+  ==> UPDATE ~/.sgs.properties (com.sun.sgs.server.host should point to core hostname)
+  # cd sgs-server-dist-agdc2009
+  # java -jar ./bin/sgs-boot.jar ./conf/project-snowman-app.boot
+
+
+SGS Monitor Visualization Tool:
+
+  # cd sgs-monitor-agdc2009
+  # java -jar sgs-monitor-agdc2009.jar
+  ==> Connect to corehost:12345
+
+
+Project Snowman Client Simulator
+
+  # cd sgs-client-dist-agdc2009
+  # java -DmaxClients=1000 -Dhost=apphost -DbuildNumber=1 -jar ./snowman-client-simulator.jar
+  ==> Change maxClients, host, and buildNumber value as appropriate
+
+
+Project Snowman Client
+
+  # cd sgs-client-dist-agdc2009
+  # java -Dserver.host=apphost -jar ./snowman-client.jar

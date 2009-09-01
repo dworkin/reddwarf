@@ -61,6 +61,21 @@
 	</executions>
       </plugin>
 
+      <!-- Customize the manifest for this jar to include
+	   the executable class -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>true</addClasspath>
+	      <mainClass>com.sun.sgs.tools.monitor.Monitor</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
       <!-- Enable execution of main class -->
       <plugin>
 	<groupId>org.codehaus.mojo</groupId>
@@ -74,6 +89,25 @@
             <argument>com.sun.sgs.tools.monitor.Monitor</argument>
           </arguments>
         </configuration>
+      </plugin>
+
+      <!-- Zip artifact is generated with the assembly plugin
+	   and assembled according to the dist.xml assembly descriptor -->
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <configuration>
+          <descriptors>
+            <descriptor>src/main/assembly/dist.xml</descriptor>
+          </descriptors>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
 
     </plugins>

@@ -1,0 +1,17 @@
+<assembly>
+  <id>dist</id>
+
+  <formats>
+    <format>zip</format>
+  </formats>
+  
+  <dependencySets>
+
+    <!-- Include everything -->
+    <dependencySet>
+      <outputDirectory></outputDirectory>
+    </dependencySet>
+
+  </dependencySets>
+
+</assembly>
