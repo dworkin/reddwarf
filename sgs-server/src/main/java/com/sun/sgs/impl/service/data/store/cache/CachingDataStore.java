@@ -814,47 +814,32 @@ public class CachingDataStore extends AbstractDataStore
      * {@inheritDoc} <p>
      *
      * The implementation needs to handle the following cases:
-     * <ol style="list-style: upper-roman">
-     * <li> Entry for name found in cache
-     *	 <ul style="list-style: disc">
+     * <ol class="outline">
+     * <li> Entry for name found in cache <ul>
      *	 <li> Return cached value </ul>
-     * <li> No entry for name found in cache
-     *   <ol style="list-style: upper-alpha">
-     *	 <li> Next entry records that name is unbound
-     *	   <ul style="list-style: disc">
+     * <li> No entry for name found in cache <ol>
+     *	 <li> Next entry records that name is unbound <ul>
      *	   <li> Return next name and that name is unbound </ul>
-     *	 <li> Next entry does not cover name
-     *	   <ul style="list-style: disc">
+     *	 <li> Next entry does not cover name <ul>
      *	   <li> Mark next entry pending previous
-     *	   <li> Call server
-     *	     <ol style="list-style: decimal">
-     *	     <li> Server returns name found
-     *	       <ul style="list-style: disc">
+     *	   <li> Call server <ol>
+     *	     <li> Server returns name found <ul>
      *	       <li> Try again </ul>
-     *	     <li> Server returns name not found
-     *	       <ol style="list-style: lower-alpha">
-     *	       <li> Next entry records that name is unbound
-     *	         <ul style="list-style: disc">
+     *	     <li> Server returns name not found <ol>
+     *	       <li> Next entry records that name is unbound <ul>
      *		 <li> Return next name and that name is unbound </ul>
-     *	       <li> Next entry does not cover name
-     *	         <ul style="list-style: disc">
+     *	       <li> Next entry does not cover name <ul>
      *		 <li> Try again </ul> </ol> </ol> </ul>
-     *	 <li> No next entry
-     *	   <ul style="list-style: disc">
+     *	 <li> No next entry <ul>
      *	   <li> Create last entry
      *	   <li> Mark last entry pending previous and fetching read
-     *	   <li> Call server
-     *	     <ol style="list-style: decimal">
-     *	     <li> Server returns name found
-     *	        <ul style="list-style: disc">
+     *	   <li> Call server <ol>
+     *	     <li> Server returns name found <ul>
      *		<li> Try again </ul>
-     *	     <li> Server returns name not found
-     *		<ol style="list-style: lower-alpha">
-     *		<li> Next entry records that name is unbound
-     *	          <ul style="list-style: disc">
+     *	     <li> Server returns name not found <ol>
+     *		<li> Next entry records that name is unbound <ul>
      *		  <li> Return next name and that name is unbound </ul>
-     *		<li> Next entry does not cover name
-     *	          <ul style="list-style: disc">
+     *		<li> Next entry does not cover name <ul>
      *		  <li> Try again </ul> </ol> </ol> </ul> </ol> </ol>
      */
     protected BindingValue getBindingInternal(Transaction txn, String name) {
@@ -1299,32 +1284,25 @@ public class CachingDataStore extends AbstractDataStore
      * {@inheritDoc} <p>
      *
      * The implementation needs to handle the following cases:
-     * <ol style="list-style: upper-roman">
-     * <li> Entry for name found in cache
-     *   <ol style="list-style: upper-alpha">
-     *	 <li> Entry is cached for write
-     *	   <ul style="list-style: disc">
+     * <ol class="outline">
+     * <li> Entry for name found in cache <ol>
+     *	 <li> Entry is cached for write <ul>
      *	   <li> Store new value and return that name was already bound </ul>
-     *	 <li> Entry is cached for read
-     *	   <ul style="list-style: disc">
+     *	 <li> Entry is cached for read <ul>
      *	   <li> Mark entry as fetching upgrade
      *	   <li> Call server
      *	   <li> Store new value and return that name was already bound </ul>
      *		</ol>
-     * <li> No entry for name found in cache
-     *   <ol style="list-style: upper-alpha">
-     *	 <li> Next entry records that name is unbound
-     *	   <ol style="list-style: decimal">
-     *	   <li> Next entry is cached for write
-     *	     <ul style="list-style: disc">
+     * <li> No entry for name found in cache <ol>
+     *	 <li> Next entry records that name is unbound <ol>
+     *	   <li> Next entry is cached for write <ul>
      *	     <li> Mark next entry pending previous
      *	     <li> Create new entry for name and value
      *	     <li> Report write access to next name
      *	     <li> Store in next entry that name is bound
      *	     <li> Mark next entry not pending previous
      *	     <li> Return that name was unbound </ul>
-     *	   <li> Next entry is cached for read
-     *	     <ul style="list-style: disc">
+     *	   <li> Next entry is cached for read <ul>
      *	     <li> Mark next entry pending previous
      *	     <li> Call server
      *	     <li> Mark next entry pending previous
@@ -1332,13 +1310,11 @@ public class CachingDataStore extends AbstractDataStore
      *	     <li> Report write access to next name
      *	     <li> Store in next entry that name is bound
      *	     <li> Return that name was unbound </ul> </ol>
-     *	 <li> Next entry does not cover name
-     *	   <ul style="list-style: disc">
+     *	 <li> Next entry does not cover name <ul>
      *	   <li> Mark next entry pending previous
      *	   <li> Call server
      *	   <li> Try again </ul>
-     *	 <li> No next entry
-     *	   <ul style="list-style: disc">
+     *	 <li> No next entry <ul>
      *	   <li> Create a last entry
      *	   <li> Mark last entry pending previous and fetching read
      *	   <li> Call server
@@ -1695,29 +1671,22 @@ public class CachingDataStore extends AbstractDataStore
      * {@inheritDoc} <p>
      *
      * The implementation needs to handle the following cases:
-     * <ol style="list-style: upper-roman">
-     * <li> Entry for name found in cache
-     *	 <ul style="list-style: disc">
-     *	 <li> Check entry cache state
-     *     <ol style="list-style: upper-alpha">
+     * <ol class="outline">
+     * <li> Entry for name found in cache <ul>
+     *	 <li> Check entry cache state <ol>
      *	   <li> Entry is cached for write
-     *	   <li> Entry is cached for read
-     *	     <ul style="list-style: disc">
+     *	   <li> Entry is cached for read <ul>
      *	     <li> Mark entry fetching upgrade </ul> </ol>
-     *	 <li> Check next entry
-     *     <ol style="list-style: upper-alpha">
-     *	   <li> Next entry records that it is the next entry
-     *	     <ol style="list-style: decimal">
-     *	     <li> Next entry is cached for write
-     *	       <ul style="list-style: disc">
+     *	 <li> Check next entry <ol>
+     *	   <li> Next entry records that it is the next entry <ol>
+     *	     <li> Next entry is cached for write <ul>
      *	       <li> Mark next entry pending previous
      *	       <li> Remove entry for name
      *	       <li> Report write access to next name
      *	       <li> Store in next entry that name is unbound
      *	       <li> Mark next entry not pending previous
      *	       <li> Return that name was bound </ul>
-     *	     <li> Next entry is cached for read
-     *	       <ul style="list-style: disc">
+     *	     <li> Next entry is cached for read <ul>
      *	       <li> Mark next entry fetching upgrade
      *	       <li> Call server
      *	       <li> Mark next entry pending previous
@@ -1726,29 +1695,23 @@ public class CachingDataStore extends AbstractDataStore
      *	       <li> Store in next entry that name is unbound
      *	       <li> Mark next entry not pending previous
      *	       <li> Return that name was bound </ul> </ol>
-     *	   <li> Next entry does not cover name
-     *	     <ul style="list-style: disc">
+     *	   <li> Next entry does not cover name <ul>
      *	     <li> Mark next entry pending previous
      *	     <li> Call server
      *	     <li> Try again </ul>
-     *	   <li> No next entry
-     *	     <ul style="list-style: disc">
+     *	   <li> No next entry <ul>
      *	     <li> Create a last entry
      *	     <li> Mark last entry pending previous and fetching read
      *	     <li> Call server
      *	     <li> Try again </ul> </ol> </ul>
-     * <li> No entry for name found in cache
-     *  <ol style="list-style: upper-alpha">
-     *	<li> Next entry records that name is unbound
-     *	  <ul style="list-style: disc">
+     * <li> No entry for name found in cache <ol>
+     *	<li> Next entry records that name is unbound <ul>
      *	  <li> Return that name was already unbound </ul>
-     *	<li> Next entry does not cover name
-     *	  <ul style="list-style: disc">
+     *	<li> Next entry does not cover name <ul>
      *	  <li> Mark next entry pending previous
      *	  <li> Call server
      *	  <li> Try again </ul>
-     *	<li> No next entry
-     *	  <ul style="list-style: disc">
+     *	<li> No next entry <ul>
      *	  <li> Create a last entry
      *	  <li> Mark last entry pending previous and fetching read
      *	  <li> Call server
@@ -2013,42 +1976,29 @@ public class CachingDataStore extends AbstractDataStore
      * {@inheritDoc} <p>
      *
      * The implementation needs to handle the following cases:
-     * <ol style="list-style: upper-roman">
-     * <li> Next entry in cache records that it is the next entry
-     *	 <ul style="list-style: disc">
+     * <ol class="outline">
+     * <li> Next entry in cache records that it is the next entry <ul>
      *	 <li> Return next name </ul>
-     * <li> Next entry does not cover name
-     *	 <ul style="list-style: disc">
+     * <li> Next entry does not cover name <ul>
      *	 <li> Mark next entry pending previous
-     *	 <li> Call server
-     *     <ol style="list-style: upper-alpha">
-     *	   <li> Server returns name found
-     *	     <ul style="list-style: disc">
+     *	 <li> Call server <ol>
+     *	   <li> Server returns name found <ul>
      *	     <li> Try again </ul>
-     *	   <li> Server returns name not found
-     *       <ol style="list-style: decimal">
-     *	     <li> Next entry records that it is the next entry
-     *	       <ul style="list-style: disc">
+     *	   <li> Server returns name not found <ol>
+     *	     <li> Next entry records that it is the next entry <ul>
      *	       <li> Return next name </ul>
-     *	     <li> Next entry does not cover name
-     *	       <ul style="list-style: disc">
+     *	     <li> Next entry does not cover name <ul>
      *	       <li> Try again </ul> </ol> </ol> </ul>
-     * <li> No next entry
-     *	 <ul style="list-style: disc">
+     * <li> No next entry <ul>
      *	 <li> Create last entry
      *	 <li> Mark last entry pending previous and fetching read
-     *	 <li> Call server
-     *     <ol style="list-style: upper-alpha">
-     *	   <li> Server returns name found
-     *	     <ul style="list-style: disc">
+     *	 <li> Call server <ol>
+     *	   <li> Server returns name found <ul>
      *	     <li> Try again </ul>
-     *	   <li> Server returns name not found
-     *       <ol style="list-style: decimal">
-     *	     <li> Next entry records that it is the next entry
-     *	       <ul style="list-style: disc">
+     *	   <li> Server returns name not found <ol>
+     *	     <li> Next entry records that it is the next entry <ul>
      *	       <li> Return next name </ul>
-     *	     <li> Next entry does not cover name
-     *	       <ul style="list-style: disc">
+     *	     <li> Next entry does not cover name <ul>
      *	       <li> Try again </ul> </ol> </ol> </ul> </ol>
      */
     protected String nextBoundNameInternal(Transaction txn, String name) {
