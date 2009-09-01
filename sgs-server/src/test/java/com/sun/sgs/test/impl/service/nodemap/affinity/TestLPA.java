@@ -334,8 +334,8 @@ public class TestLPA {
                 fail("Too much time sleeping");
             }
         }
-        Collection<AffinityGroup> groups1 = lp1.affinityGroups(1, false);
-        Collection<AffinityGroup> groups2 = lp1.affinityGroups(1, false);
+        Collection<AffinityGroup> groups1 = lp1.getAffinityGroups(1, false);
+        Collection<AffinityGroup> groups2 = lp1.getAffinityGroups(1, false);
         assertEquals(groups1.size(), groups2.size());
         // Because we haven't actually run the algorithm, I know the groups
         // correspond to the vertices on the node
@@ -405,7 +405,7 @@ public class TestLPA {
                 fail("Too much time sleeping");
             }
         }
-        Collection<AffinityGroup> groups1 = lp1.affinityGroups(2, false);
+        Collection<AffinityGroup> groups1 = lp1.getAffinityGroups(2, false);
     }
 
     // Client test: iteration mismatch
@@ -502,9 +502,9 @@ public class TestLPA {
         printNodeConflictMap(lp3);
 
         // Clear out old information
-        lp1.affinityGroups(run, true);
-        lp2.affinityGroups(run, true);
-        lp3.affinityGroups(run, true);
+        lp1.getAffinityGroups(run, true);
+        lp2.getAffinityGroups(run, true);
+        lp3.getAffinityGroups(run, true);
         server.clear();
         System.out.println("Exchanging info a second time");
         run++;
@@ -727,8 +727,8 @@ public class TestLPA {
             return finishedExchangeInfo;
         }
         /** {@inheritDoc} */
-        public Collection<AffinityGroup> affinityGroups(long runNumber,
-                                                        boolean done)
+        public Collection<AffinityGroup> getAffinityGroups(long runNumber,
+                                                           boolean done)
                 throws IOException
         {
             return result;
@@ -774,8 +774,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Collection<Object> crossNodeEdges(Collection<Object> objIds,
-                                                 long nodeId)
+        public void crossNodeEdges(Collection<Object> objIds, long nodeId)
                 throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");

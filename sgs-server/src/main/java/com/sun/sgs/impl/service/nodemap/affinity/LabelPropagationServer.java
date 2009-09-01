@@ -168,7 +168,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         //     noting whether it believes the algorithm has converged.
         // When all nodes agree that the algorithm has converged, or many
         // iterations have been run, the server gathers all group information
-        // from each node by calling LPAClient.affinityGroups().  The server
+        // from each node by calling LPAClient.getAffinityGroups().  The server
         // combines groups that might cross nodes, and creates new, final
         // affinity group information.
         long startTime = System.currentTimeMillis();
@@ -417,7 +417,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 public void run() {
                     try {
                         returnedGroups.put(nodeId,
-                                           proxy.affinityGroups(runNum, true));
+                                      proxy.getAffinityGroups(runNum, true));
                         latch.countDown();
                     } catch (IOException ioe) {
                         ioe.printStackTrace();

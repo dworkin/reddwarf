@@ -28,15 +28,14 @@ import java.util.Map;
 /**
  * The label propagation algorithm clients, which can be called by
  * the {@code LPAServer} to coordinate runs of the algorithm.
- * 
  */
 public interface LPAClient extends Remote {
-
     /**
      * A new run of the algorithm is about to start, so the client nodes
      * should do whatever is necessary to set up for that run.  When
      * finished, {@link LPAServer#readyToBegin} should be called.
      * Called by the LPAServer.
+     *
      * @param runNumber the number of this algorithm run
      * @throws IOException if there is a communication problem
      */
@@ -46,6 +45,7 @@ public interface LPAClient extends Remote {
      * Start an iteration of the algorithm.  When finished,
      * {@link LPAServer#finishedIteration} should be called.
      * Called by the LPAServer.
+     *
      * @param iteration the iteration number
      * @throws IOException if there is a communication problem
      */
@@ -56,6 +56,7 @@ public interface LPAClient extends Remote {
      * Called by the LPAServer.  The LPAServer must call this with
      * {@code done} set to {@code true} if it intends to start another algorithm
      * run at any time in the future, even if the current run fails.
+     *
      * @param runNumber the run number provided to the last
      *                  {@link #prepareAlgorithm} call
      * @param done {@code true} if all iterations are done, allowing cleanup
@@ -64,12 +65,13 @@ public interface LPAClient extends Remote {
      *         call to {@code prepareAlgorithm}
      * @throws IOException if there is a communication problem
      */
-    Collection<AffinityGroup> affinityGroups(long runNumber, boolean done)
+    Collection<AffinityGroup> getAffinityGroups(long runNumber, boolean done)
             throws IOException;
 
     /**
      * Remove any cached information about a node.
      * Called by the LPAServer.
+     *
      * @param nodeId the node to be removed
      * @throws IOException if there is a communication problem
      */
@@ -80,35 +82,36 @@ public interface LPAClient extends Remote {
      * the local node.  This informs the local node where non-local neighbors
      * might reside. If there are no endpoints for the edges on this node,
      * nothing is done.
-     * Called by other LPAClients.  Nodes will only call other nodes with a
-     * lower node id.
+     * Called by other LPAClients.
+     *
      * @param objIds the collection of objects, representing edges, that
      *               probably have endpoints to vertices on this node
      * @param nodeId the node with vertices attached to the edges
-     * @return the objects that {@code nodeId} believes it might have in common
-     *         with this node
      * @throws IOException if there is a communication problem
      */
-    Collection<Object> crossNodeEdges(Collection<Object> objIds, long nodeId)
+    void crossNodeEdges(Collection<Object> objIds, long nodeId)
             throws IOException;
 
     /**
-     * Get the labels for the given edges.  If no vertex on this node is
-     * a possible endpoint for an edge, ignore that edge.
+     * Get the labels for all vertices in our affinity graph for identities
+     * that have used the given objects. If no such vertices exist, nothing
+     * is done.
      * Called by other LPAClients.
-     * @param objIds the collection of objects, representing edges, that
-     *               we want neighbor node information for
+     * 
+     * @param objIds the collection of objects, representing potential graph
+     *               edges, that we want neighbor node information for
      * @return a map of Objects (one for each element of {@code objIds}) to
      *               neighbor labels, with a count of each use
      * @throws IOException if there is a communication problem
      */
     Map<Object, Map<Integer, List<Long>>> getRemoteLabels(
-                Collection<Object> objIds)
+        Collection<Object> objIds)
             throws IOException;
 
     /**
      * Indicates that the affinity group finding system is shutting down,
      * and all local resources should be cleaned up.
+     * 
      * @throws IOException if there is a communication problem
      */
     void shutdown() throws IOException;

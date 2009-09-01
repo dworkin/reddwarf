@@ -111,6 +111,7 @@ public class LabelPropagation implements LPAClient {
     private final Object verticesLock = new Object();
 
     // The map of conflicts in the system, nodeId->objId, count
+    // Updates are multi-threaded.
     private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
         nodeConflictMap =
             new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
@@ -118,6 +119,7 @@ public class LabelPropagation implements LPAClient {
     // Map identity -> label and count
     // This sums all uses of that identity on other nodes. The count takes
     // weights for object uses into account.
+    // Updates are currently single threaded, node by node.
     private final ConcurrentMap<Identity, Map<Integer, Long>>
         remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Long>>();
@@ -128,16 +130,16 @@ public class LabelPropagation implements LPAClient {
     // States of this instance, ensuring that calls from the server are
     // idempotent
     private enum State {
-	// Preparing for an algorithm run
-	PREPARING,
-	// In the midst of an iteration
-	IN_ITERATION,
-	// Gathering up the final groups
-	GATHERING_GROUPS,
-        // Completed gathering groups
-        GATHERED_GROUPS,
-	// Idle (none of the above)
-	IDLE
+        // Preparing for an algorithm run
+        PREPARING,
+        // In the midst of an iteration
+        IN_ITERATION,
+        // Gathering up the final groups
+        GATHERING_GROUPS,
+            // Completed gathering groups
+            GATHERED_GROUPS,
+        // Idle (none of the above)
+        IDLE
     }
 
     /** The current state of this instance. */
@@ -154,10 +156,6 @@ public class LabelPropagation implements LPAClient {
     // The groups collected in the last run
     private Collection<AffinityGroup> groups;
 
-    // For debugging remote labels (can be removed when that is done)
-//    private Map<LabelVertex, Integer> debug =
-//        new HashMap<LabelVertex, Integer>();
-    
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -215,8 +213,8 @@ public class LabelPropagation implements LPAClient {
     // --- implement LPAClient -- //
     
     /** {@inheritDoc} */
-    public Collection<AffinityGroup> affinityGroups(long runNumber,
-                                                    boolean done)
+    public Collection<AffinityGroup> getAffinityGroups(long runNumber,
+                                                       boolean done)
         throws IOException
     {
         synchronized (stateLock) {
@@ -359,10 +357,8 @@ public class LabelPropagation implements LPAClient {
                 Map<Object, AtomicLong> map = entry.getValue();
                 assert (map != null);
                 try {
-                    Collection<Object> objs =
-                        proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
-                                             localNodeId);
-                    updateNodeConflictMap(objs, nodeId);
+                    proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
+                                         localNodeId);
                 } catch (IOException e) {
                     // JANE retry
                     failed = true;
@@ -390,33 +386,31 @@ public class LabelPropagation implements LPAClient {
     }
 
     /** {@inheritDoc} */
-    public Collection<Object> crossNodeEdges(Collection<Object> objIds,
-                                             long nodeId)
+    public void crossNodeEdges(Collection<Object> objIds, long nodeId)
         throws IOException
     {
-        assert (nodeConflictMap != null);
-        Map<Object, AtomicLong> origConflicts = nodeConflictMap.get(nodeId);
-
-        // Before we update our map, gather what we knew about before
-        // being contacted by the node, which is what we'll return to it.
-        // Both nodes should end up with the same cross node data between
-        // them.
-        Collection<Object> retVal;
-        if (origConflicts == null) {
-            retVal = new HashSet<Object>();
-        } else {
-            retVal = new HashSet<Object>(origConflicts.keySet());
+        if (objIds == null) {
+            // This is unexpected;  the other node should have returned
+            // an empty collection.
+            logger.log(Level.FINE, "unexpected null objIds");
+            return;
         }
-        updateNodeConflictMap(objIds, nodeId);
-//        if (logger.isLoggable(Level.FINEST)) {
-//            StringBuffer sb = new StringBuffer();
-//            for (Object o : retVal) {
-//                sb.append(o + " ");
-//            }
-//            logger.log(Level.FINEST, "{0}: returning edges {1} to {2}",
-//                               localNodeId, sb.toString(), nodeId);
-//        }
-        return retVal;
+        ConcurrentMap<Object, AtomicLong> conflicts =
+                nodeConflictMap.get(nodeId);
+        if (conflicts == null) {
+            ConcurrentMap<Object, AtomicLong> newConf =
+                    new ConcurrentHashMap<Object, AtomicLong>();
+            conflicts = nodeConflictMap.putIfAbsent(nodeId, newConf);
+            if (conflicts == null) {
+                conflicts = newConf;
+            }
+        }
+
+        for (Object objId : objIds) {
+            // Just the original value or 1
+            // If we start using the number of conflicts, this might change.
+            conflicts.putIfAbsent(objId, new AtomicLong(1));
+        }
     }
 
     /** {@inheritDoc} */
@@ -424,6 +418,11 @@ public class LabelPropagation implements LPAClient {
         removeNodeInternal(nodeId);
     }
 
+    /**
+     * Remove a failed node, telling dependent objects to do the same.
+     * This method is not called remotely.
+     * @param nodeId the ID of the failed node.
+     */
     private void removeNodeInternal(long nodeId) {
         logger.log(Level.FINEST, "{0}: Removing node {1} from LPA",
                    localNodeId, nodeId);
@@ -500,28 +499,6 @@ public class LabelPropagation implements LPAClient {
 
         // Gather the remote labels from each node.
         boolean failed = updateRemoteLabels();
-
-        //For remote label debugging
-//        for (LabelVertex v : vertices) {
-//            int count = graph.getNeighborCount(v);
-//            Map<Integer, Long> rmap = remoteLabelMap.get(v.getIdentity());
-//            int rcount = 0;
-//            if (rmap == null) {
-//                continue;
-//            }
-//            for (Long val : rmap.values()) {
-//                rcount += val.longValue();
-//            }
-//            int total = count + rcount;
-//            if (iteration == 1) {
-//                debug.put(v, total);
-//            } else {
-//                if (debug.get(v) != total) {
-//                    System.out.println(localNodeId + ":" + v + " EXPECTED " +
-//                            debug.get(v) + "  GOT " + total);
-//                }
-//            }
-//        }
 
         // We include the current label when calculating the most frequent
         // label, so no labels changing indicates the algorithm has converged
@@ -633,6 +610,9 @@ public class LabelPropagation implements LPAClient {
                 Map<Identity, Long> idents = objectMap.get(obj);
                 Map<Integer, List<Long>> labelWeightMap =
                         new HashMap<Integer, List<Long>>();
+                // If idents is null, the identity is no longer used, probably
+                // because the graph was pruned (we are using a live object
+                // use map).
                 if (idents != null) {
                     for (Map.Entry<Identity, Long> entry : idents.entrySet()) {
                         // Find the label associated with the identity in
@@ -658,28 +638,8 @@ public class LabelPropagation implements LPAClient {
                                 labelWeightMap.put(label, weightList);
                             }
                             weightList.add(entry.getValue());
-//                        } else {
-                            // Debugging code.  In general, this case is fine -
-                            // the vertices list is a snapshot from some time
-                            // in the past.
-//                            logger.log(Level.FINE,
-//                                    "{0}: no index for {1}, vid {2}",
-//                                    localNodeId, id, vid);
-//                            StringBuffer sb = new StringBuffer();
-//                            sb.append("Vertices now: ");
-//                            for (LabelVertex v : vertices) {
-//                                sb.append(v + " ");
-//                            }
-//                            logger.log(Level.FINE, "{0}: {1}",
-//                                       localNodeId, sb.toString());
                         }
                     }
-//                } else {
-                    // Debugging code.  In general, this case is fine - the
-                    // identity might no longer be considered used because
-                    // the graph was pruned as time goes on.
-//                    logger.log(Level.FINE,
-//                               "{0} : no idents for {1}", localNodeId, obj);
                 }
                 retMap.put(obj, labelWeightMap);
             }
@@ -740,22 +700,6 @@ public class LabelPropagation implements LPAClient {
                         "{0}: could not contact node {1}", localNodeId, nodeId);
             }
 
-            // For remote label debugging
-//            if (logger.isLoggable(Level.FINEST)) {
-//                StringBuilder sb = new StringBuilder();
-//                sb.append(localNodeId + ": got back from " + nodeId + " \n");
-//                for (Map.Entry<Object, Map<Integer, Long>> remoteEntry :
-//                    labels.entrySet())
-//                {
-//                     sb.append(remoteEntry.getKey() + ": ");
-//                     for (Map.Entry<Integer, Long> ss :
-//                         remoteEntry.getValue().entrySet())
-//                     {
-//                         sb.append(ss.getKey() + "," + ss.getValue() + " ");
-//                     }
-//                }
-//                logger.log(Level.FINEST, sb.toString());
-//            }
             if (labels == null) {
                 // This is unexpected; the other node should have returned
                 // an empty collection.  Log it, but act as if it
@@ -1016,31 +960,6 @@ public class LabelPropagation implements LPAClient {
         logger.log(Level.FINEST,
                 "{0}: initialized node conflict map", localNodeId);
         printNodeConflictMap();
-    }
-
-    private void updateNodeConflictMap(Collection<Object> objIds, long nodeId) {
-        if (objIds == null) {
-            // This is unexpected;  the other node should have returned
-            // an empty collection.
-            logger.log(Level.FINE, "unexpected null objIds");
-            return;
-        }
-        ConcurrentMap<Object, AtomicLong> conflicts =
-                nodeConflictMap.get(nodeId);
-        if (conflicts == null) {
-            ConcurrentMap<Object, AtomicLong> newConf =
-                    new ConcurrentHashMap<Object, AtomicLong>();
-            conflicts = nodeConflictMap.putIfAbsent(nodeId, newConf);
-            if (conflicts == null) {
-                conflicts = newConf;
-            }
-        }
-
-        for (Object objId : objIds) {
-            // Just the original value or 1
-            // If we start using the number of conflicts, this might change.
-            conflicts.putIfAbsent(objId, new AtomicLong(1));
-        }
     }
 
     /**
