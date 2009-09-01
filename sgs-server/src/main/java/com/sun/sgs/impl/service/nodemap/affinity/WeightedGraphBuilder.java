@@ -110,41 +110,45 @@ public class WeightedGraphBuilder implements GraphBuilder {
         pruneTimer.schedule(pruneTask, snapshot, snapshot);
     }
     
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This method is called by a single thread but must protect itself
+     * from changes to data structures made by the pruner.
+     */
     public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
         long startTime = System.currentTimeMillis();
         updateCount++;
 
         LabelVertex vowner = new LabelVertex(owner);
-        synchronized (affinityGraph) {
-            affinityGraph.addVertex(vowner);
 
-            // For each object accessed in this task...
-            for (AccessedObject obj : detail.getAccessedObjects()) {
-                Object objId = obj.getObjectId();
+        // For each object accessed in this task...
+        for (AccessedObject obj : detail.getAccessedObjects()) {
+            Object objId = obj.getObjectId();
 
-                // find the identities that have already used this object
-                ConcurrentMap<Identity, AtomicLong> idMap =
-                        objectMap.get(objId);
+            // find the identities that have already used this object
+            ConcurrentMap<Identity, AtomicLong> idMap = objectMap.get(objId);
+            if (idMap == null) {
+                // first time we've seen this object
+                ConcurrentMap<Identity, AtomicLong> newMap =
+                        new ConcurrentHashMap<Identity, AtomicLong>();
+                idMap = objectMap.putIfAbsent(objId, newMap);
                 if (idMap == null) {
-                    // first time we've seen this object
-                    ConcurrentMap<Identity, AtomicLong> newMap =
-                            new ConcurrentHashMap<Identity, AtomicLong>();
-                    idMap = objectMap.putIfAbsent(objId, newMap);
-                    if (idMap == null) {
-                        idMap = newMap;
-                    }
+                    idMap = newMap;
                 }
-                AtomicLong value = idMap.get(owner);
+            }
+            AtomicLong value = idMap.get(owner);
+            if (value == null) {
+                AtomicLong newVal = new AtomicLong();
+                value = idMap.putIfAbsent(owner, newVal);
                 if (value == null) {
-                    AtomicLong newVal = new AtomicLong();
-                    value = idMap.putIfAbsent(owner, newVal);
-                    if (value == null) {
-                        value = newVal;
-                    }
+                    value = newVal;
                 }
-                value.incrementAndGet();
+            }
+            long currentVal = value.incrementAndGet();
 
+            synchronized (affinityGraph) {
+                affinityGraph.addVertex(vowner);
                 // add or update edges between task owner and identities
                 for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
@@ -152,11 +156,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
                     // Our folded graph has no self-loops:  only add an
                     // edge if the identity isn't the owner
                     if (!ident.equals(owner)) {
-                        AtomicLong otherValue = entry.getValue();
                         LabelVertex vident = new LabelVertex(ident);
                         // Check to see if we already have an edge between
                         // the two vertices.  If so, update its weight.
-
                         WeightedEdge edge =
                                 affinityGraph.findEdge(vowner, vident);
                         if (edge == null) {
@@ -165,36 +167,35 @@ public class WeightedGraphBuilder implements GraphBuilder {
                             // period info
                             pruneTask.incrementEdge(newEdge);
                         } else {
-                            if (value.get() <= otherValue.get()) {
+                            AtomicLong otherValue = entry.getValue();
+                            if (currentVal <= otherValue.get()) {
                                 edge.incrementWeight();
                                 // period info
                                 pruneTask.incrementEdge(edge);
                             }
                         }
+
                     }
-
                 }
-                idMap.put(owner, value);
-                objectMap.put(objId, idMap);
-
-                // period info
-                pruneTask.updateObjectAccess(objId, owner);
             }
 
-            totalTime += System.currentTimeMillis() - startTime;
+            // period info
+            pruneTask.updateObjectAccess(objId, owner);
+        }
 
-            // Print out some data, just for helping look at the algorithms
-            // for now
-            if (updateCount % 500 == 0) {
-                System.out.println("Weighted Graph Builder results after " +
-                                   updateCount + " updates: ");
-                System.out.println("  graph vertex count: " +
-                                   affinityGraph.getVertexCount());
-                System.out.println("  graph edge count: " +
-                                   affinityGraph.getEdgeCount());
-                System.out.printf("  mean graph processing time: %.2fms %n",
-                                  totalTime / (double) updateCount);
-            }
+        totalTime += System.currentTimeMillis() - startTime;
+
+        // Print out some data, just for helping look at the algorithms
+        // for now
+        if (updateCount % 500 == 0) {
+            System.out.println("Weighted Graph Builder results after " +
+                               updateCount + " updates: ");
+            System.out.println("  graph vertex count: " +
+                               affinityGraph.getVertexCount());
+            System.out.println("  graph edge count: " +
+                               affinityGraph.getEdgeCount());
+            System.out.printf("  mean graph processing time: %.2fms %n",
+                              totalTime / (double) updateCount);
         }
     }
 
@@ -297,11 +298,11 @@ public class WeightedGraphBuilder implements GraphBuilder {
         // we have accumulated enough snapshots in our queues to satisfy our
         // "count" requirement, we also remove the information from the first
         // enqueued info object.
-        private final Queue<Map<Object, Map<Identity, Integer>>>
+        private final LinkedList<Map<Object, Map<Identity, Integer>>>
                 periodObjectQueue;
-        private final Queue<Map<WeightedEdge, Integer>>
+        private final LinkedList<Map<WeightedEdge, Integer>>
                 periodEdgeIncrementsQueue;
-        private final Queue<ConcurrentMap<Long,
+        private final LinkedList<ConcurrentMap<Long,
                                       ConcurrentMap<Object, AtomicInteger>>>
                 periodConflictQueue;
 
@@ -322,58 +323,58 @@ public class WeightedGraphBuilder implements GraphBuilder {
             periodConflictQueue =
                 new LinkedList<ConcurrentMap<Long,
                                       ConcurrentMap<Object, AtomicInteger>>>();
-            synchronized (affinityGraph) {
-                addPeriodStructures();
-            }
+            addPeriodStructures();
         }
 
         /**
          * Performs all processing required when a time period has ended.
          */
         public void run() {
-            // We want to make sure we don't have snapshots that are so
+            // Note: We want to make sure we don't have snapshots that are so
             // short that we cannot do all our pruning within one.
-            synchronized (affinityGraph) {
-                // Add the data structures for this new period that is just
-                // starting.
-                addPeriodStructures();
-                if (current <= count) {
-                    // We're still in our inital time window, and haven't
-                    // gathered enough periods yet.
-                    current++;
-                    return;
-                }
 
-                // Remove the earliest snasphot.
-                Map<Object, Map<Identity, Integer>>
-                        periodObject = periodObjectQueue.remove();
-                Map<WeightedEdge, Integer> periodEdgeIncrements =
-                        periodEdgeIncrementsQueue.remove();
-                ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
-                        periodConflicts = periodConflictQueue.remove();
+            // Add the data structures for this new period that is just
+            // starting.
+            addPeriodStructures();
+            if (current <= count) {
+                // We're still in our inital time window, and haven't
+                // gathered enough periods yet.
+                current++;
+                return;
+            }
 
-                // For each object, remove the added access counts
-                for (Map.Entry<Object, Map<Identity, Integer>> entry :
-                    periodObject.entrySet())
+            // Remove the earliest snasphot.
+            Map<Object, Map<Identity, Integer>>
+                    periodObject = periodObjectQueue.remove();
+            Map<WeightedEdge, Integer> periodEdgeIncrements =
+                    periodEdgeIncrementsQueue.remove();
+            ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
+                    periodConflicts = periodConflictQueue.remove();
+
+            // For each object, remove the added access counts
+            for (Map.Entry<Object, Map<Identity, Integer>> entry :
+                periodObject.entrySet())
+            {
+                ConcurrentMap<Identity, AtomicLong> idMap =
+                        objectMap.get(entry.getKey());
+                for (Map.Entry<Identity, Integer> updateEntry :
+                     entry.getValue().entrySet())
                 {
-                    ConcurrentMap<Identity, AtomicLong> idMap =
-                            objectMap.get(entry.getKey());
-                    for (Map.Entry<Identity, Integer> updateEntry :
-                         entry.getValue().entrySet())
-                    {
-                        Identity updateId = updateEntry.getKey();
-                        long updateValue = updateEntry.getValue();
-                        AtomicLong val = idMap.get(updateId);
-                        val.addAndGet(-updateValue);
-                        if (val.get() <= 0) {
-                            idMap.remove(updateId);
-                        }
-                    }
-                    if (idMap.isEmpty()) {
-                        objectMap.remove(entry.getKey());
+                    Identity updateId = updateEntry.getKey();
+                    long updateValue = updateEntry.getValue();
+                    AtomicLong val = idMap.get(updateId);
+                    // correct? should be using compareAndSet?
+                    val.addAndGet(-updateValue);
+                    if (val.get() <= 0) {
+                        idMap.remove(updateId);
                     }
                 }
+                if (idMap.isEmpty()) {
+                    objectMap.remove(entry.getKey());
+                }
+            }
 
+            synchronized (affinityGraph) {
                 // For each modified edge in the graph, update weights
                 for (Map.Entry<WeightedEdge, Integer> entry :
                      periodEdgeIncrements.entrySet())
@@ -393,38 +394,37 @@ public class WeightedGraphBuilder implements GraphBuilder {
                         edge.addWeight(-weight);
                     }
                 }
+            }
 
-                // For each conflict, update values
-                for (Map.Entry<Long, ConcurrentMap<Object, AtomicInteger>>
-                             entry : periodConflicts.entrySet())
-                {
-                    Long nodeId = entry.getKey();
-                    ConcurrentMap<Object, AtomicLong> objMap =
-                            conflictMap.get(nodeId);
-                    // If the node went down, we might have removed the entry
-                    if (objMap != null) {
-                        for (Map.Entry<Object, AtomicInteger> updateEntry :
-                              entry.getValue().entrySet())
-                        {
-                            Object objId = updateEntry.getKey();
-                            AtomicInteger periodVal = updateEntry.getValue();
-                            AtomicLong conflictVal = objMap.get(objId);
-                            long oldVal;
-                            long newVal;
-                            do {
-                                oldVal = conflictVal.get();
-                                newVal = oldVal - periodVal.get();
-                            } while (!conflictVal.compareAndSet(oldVal,
-                                                                newVal));
+            // For each conflict, update values
+            for (Map.Entry<Long, ConcurrentMap<Object, AtomicInteger>>
+                         entry : periodConflicts.entrySet())
+            {
+                Long nodeId = entry.getKey();
+                ConcurrentMap<Object, AtomicLong> objMap =
+                        conflictMap.get(nodeId);
+                // If the node went down, we might have removed the entry
+                if (objMap != null) {
+                    for (Map.Entry<Object, AtomicInteger> updateEntry :
+                          entry.getValue().entrySet())
+                    {
+                        Object objId = updateEntry.getKey();
+                        AtomicInteger periodVal = updateEntry.getValue();
+                        AtomicLong conflictVal = objMap.get(objId);
+                        long oldVal;
+                        long newVal;
+                        do {
+                            oldVal = conflictVal.get();
+                            newVal = oldVal - periodVal.get();
+                        } while (!conflictVal.compareAndSet(oldVal, newVal));
 
-                            if (newVal <= 0) {
-                                // This could remove a just incremented value!
-                                objMap.remove(objId);
-                            }
+                        if (newVal <= 0) {
+                            // This could remove a just incremented value!
+                            objMap.remove(objId);
                         }
-                        if (objMap.isEmpty()) {
-                            conflictMap.remove(nodeId);
-                        }
+                    }
+                    if (objMap.isEmpty()) {
+                        conflictMap.remove(nodeId);
                     }
                 }
             }
@@ -432,10 +432,10 @@ public class WeightedGraphBuilder implements GraphBuilder {
 
         /**
          * Note that an edge's weight has been incremented.
+         * Called by a single thread.
          * @param edge the edge
          */
         void incrementEdge(WeightedEdge edge) {
-            assert Thread.holdsLock(affinityGraph);
             int v = currentPeriodEdgeIncrements.containsKey(edge) ?
                      currentPeriodEdgeIncrements.get(edge) : 0;
             v++;
@@ -444,11 +444,11 @@ public class WeightedGraphBuilder implements GraphBuilder {
 
         /**
          * Note that an object has been accessed.
+         * Called by a single thread.
          * @param objId the object
          * @param owner the accessor
          */
         void updateObjectAccess(Object objId, Identity owner) {
-            assert Thread.holdsLock(affinityGraph);
             Map<Identity, Integer> periodIdMap = currentPeriodObject.get(objId);
             if (periodIdMap == null) {
                 periodIdMap = new HashMap<Identity, Integer>();
@@ -492,14 +492,15 @@ public class WeightedGraphBuilder implements GraphBuilder {
          * Update our queues for this period.
          */
         private void addPeriodStructures() {
-            assert Thread.holdsLock(affinityGraph);
-            currentPeriodObject = new HashMap<Object, Map<Identity, Integer>>();
+            currentPeriodObject =
+                    new HashMap<Object, Map<Identity, Integer>>();
             periodObjectQueue.add(currentPeriodObject);
-            currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Integer>();
+            currentPeriodEdgeIncrements =
+                    new HashMap<WeightedEdge, Integer>();
             periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
-            currentPeriodConflicts = 
-                new ConcurrentHashMap<Long, 
-                                        ConcurrentMap<Object, AtomicInteger>>();
+            currentPeriodConflicts =
+                    new ConcurrentHashMap<Long,
+                                ConcurrentMap<Object, AtomicInteger>>();
             periodConflictQueue.add(currentPeriodConflicts);
         }
     }
