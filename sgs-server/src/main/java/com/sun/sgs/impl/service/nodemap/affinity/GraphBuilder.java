@@ -110,7 +110,8 @@ public interface GraphBuilder {
      *
      * @return the map of local object uses
      */
-    Map<Object, Map<Identity, Long>> getObjectUseMap();
+    ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
+            getObjectUseMap();
 
     /**
      * Returns a map of detected cross node data conflicts.  This is a map 

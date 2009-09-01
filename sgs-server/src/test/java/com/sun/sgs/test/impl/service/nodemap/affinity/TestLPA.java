@@ -836,7 +836,8 @@ public class TestLPA {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
         private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
                 conflictMap;
-        private final Map<Object, Map<Identity, Long>> objUseMap;
+        private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
+                objUseMap;
 
         static final long NODE1 = 1;
         static final long NODE2 = 2;
@@ -852,7 +853,8 @@ public class TestLPA {
         public PartialToyBuilder(long node) {
             super();
             graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
-            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
+            objUseMap = new ConcurrentHashMap<Object, 
+                                ConcurrentMap<Identity, AtomicLong>>();
             conflictMap = new ConcurrentHashMap<Long,
                                 ConcurrentMap<Object, AtomicLong>>();
 
@@ -869,21 +871,18 @@ public class TestLPA {
 
 
                 // Obj uses
-                Map<Identity, Long> tempMap =
-                        new HashMap<Identity, Long>();
-                tempMap.put(idents[0], 2L);
-                tempMap.put(idents[1], 2L);
+                ConcurrentMap<Identity, AtomicLong> tempMap =
+                        new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[0], new AtomicLong(2));
+                tempMap.put(idents[1], new AtomicLong(2));
                 objUseMap.put("obj1", tempMap);
-                tempMap =  new HashMap<Identity, Long>();
-                tempMap.put(idents[1], 1L);
+                tempMap =  new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[1], new AtomicLong(1));
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
                 ConcurrentHashMap<Object, AtomicLong> conflict =
                         new ConcurrentHashMap<Object, AtomicLong>();
-//                conflict.put("obj1", 1L);
-//                conflictMap.put(NODE2, conflict);
-//                conflict = new ConcurrentHashMap<Object, Long>();
                 conflict.put("obj2", new AtomicLong(1));
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
@@ -893,9 +892,9 @@ public class TestLPA {
                 graph.addVertex(ver);
 
                 // Obj uses
-                Map<Identity, Long> tempMap =
-                        new HashMap<Identity, Long>();
-                tempMap.put(ident, 1L);
+                ConcurrentMap<Identity, AtomicLong> tempMap =
+                        new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(ident, new AtomicLong(1));
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
@@ -914,13 +913,13 @@ public class TestLPA {
                 graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
 
                 // Obj uses
-                Map<Identity, Long> tempMap =
-                        new HashMap<Identity, Long>();
-                tempMap.put(idents[0], 1L);
-                tempMap.put(idents[1], 1L);
+                ConcurrentMap<Identity, AtomicLong> tempMap =
+                        new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[0], new AtomicLong(1));
+                tempMap.put(idents[1], new AtomicLong(1));
                 objUseMap.put("obj3", tempMap);
-                tempMap =  new HashMap<Identity, Long>();
-                tempMap.put(idents[0], 1L);
+                tempMap =  new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[0], new AtomicLong(1));
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
@@ -953,7 +952,9 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Map<Identity, Long>> getObjectUseMap() {
+        public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
+                getObjectUseMap()
+        {
             return objUseMap;
         }
 

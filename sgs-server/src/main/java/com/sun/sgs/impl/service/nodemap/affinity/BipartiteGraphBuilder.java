@@ -247,21 +247,25 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
-        Map<Object, Map<Identity, Long>> retMap =
-            new HashMap<Object, Map<Identity, Long>>();
+    public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
+            getObjectUseMap()
+    {
+        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> retMap =
+            new ConcurrentHashMap<Object,
+                                  ConcurrentMap<Identity, AtomicLong>>();
         // Copy our input graph
         CopyableGraph<Object, WeightedEdge> graphCopy =
             new CopyableGraph<Object, WeightedEdge>(bipartiteGraph);
 
         for (Object vert : graphCopy.getVertices()) {
             if (!(vert instanceof Identity)) {
-                Map<Identity, Long> idMap = new HashMap<Identity, Long>();
+                ConcurrentMap<Identity, AtomicLong> idMap =
+                        new ConcurrentHashMap<Identity, AtomicLong>();
                 for (WeightedEdge edge : graphCopy.getIncidentEdges(vert)) {
                     Object v1 = graphCopy.getOpposite(vert, edge);
                     if (v1 instanceof Identity) {
-                        long val = (int) edge.getWeight();
-                        idMap.put((Identity) v1, val);
+                        idMap.put((Identity) v1, 
+                                  new AtomicLong(edge.getWeight()));
                     } else {
                         // our graph is messed up
                         System.out.println("unexpected vertex type " + v1);

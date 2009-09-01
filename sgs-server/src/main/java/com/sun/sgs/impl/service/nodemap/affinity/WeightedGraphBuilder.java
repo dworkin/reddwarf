@@ -58,8 +58,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // (thus we keep track of the number of accesses each identity has made
     // for an object, to aid maintaining weighted edges)
     // Concurrent modifications are protected by locking the affinity graph
-    private final Map<Object, Map<Identity, Long>> objectMap =
-            new HashMap<Object, Map<Identity, Long>>();
+    private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
+        objectMap =
+           new ConcurrentHashMap<Object, ConcurrentMap<Identity, AtomicLong>>();
     
     // Our graph of object accesses
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
@@ -123,23 +124,35 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 Object objId = obj.getObjectId();
 
                 // find the identities that have already used this object
-                Map<Identity, Long> idMap = objectMap.get(objId);
+                ConcurrentMap<Identity, AtomicLong> idMap =
+                        objectMap.get(objId);
                 if (idMap == null) {
                     // first time we've seen this object
-                    idMap = new HashMap<Identity, Long>();
+                    ConcurrentMap<Identity, AtomicLong> newMap =
+                            new ConcurrentHashMap<Identity, AtomicLong>();
+                    idMap = objectMap.putIfAbsent(objId, newMap);
+                    if (idMap == null) {
+                        idMap = newMap;
+                    }
                 }
-
-                long value = idMap.containsKey(owner) ? idMap.get(owner) : 0;
-                value++;
+                AtomicLong value = idMap.get(owner);
+                if (value == null) {
+                    AtomicLong newVal = new AtomicLong();
+                    value = idMap.putIfAbsent(owner, newVal);
+                    if (value == null) {
+                        value = newVal;
+                    }
+                }
+                value.incrementAndGet();
 
                 // add or update edges between task owner and identities
-                for (Map.Entry<Identity, Long> entry : idMap.entrySet()) {
+                for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
 
                     // Our folded graph has no self-loops:  only add an
                     // edge if the identity isn't the owner
                     if (!ident.equals(owner)) {
-                        long otherValue = entry.getValue();
+                        AtomicLong otherValue = entry.getValue();
                         LabelVertex vident = new LabelVertex(ident);
                         // Check to see if we already have an edge between
                         // the two vertices.  If so, update its weight.
@@ -152,7 +165,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
                             // period info
                             pruneTask.incrementEdge(newEdge);
                         } else {
-                            if (value <= otherValue) {
+                            if (value.get() <= otherValue.get()) {
                                 edge.incrementWeight();
                                 // period info
                                 pruneTask.incrementEdge(edge);
@@ -196,7 +209,9 @@ public class WeightedGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
+    public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
+            getObjectUseMap()
+    {
         return objectMap;
     }
 
@@ -341,19 +356,17 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 for (Map.Entry<Object, Map<Identity, Integer>> entry :
                     periodObject.entrySet())
                 {
-                    Map<Identity, Long> idMap =
+                    ConcurrentMap<Identity, AtomicLong> idMap =
                             objectMap.get(entry.getKey());
                     for (Map.Entry<Identity, Integer> updateEntry :
                          entry.getValue().entrySet())
                     {
-                        Identity idUpdate = updateEntry.getKey();
-
-                        long newVal =
-                            idMap.get(idUpdate) - updateEntry.getValue();
-                        if (newVal == 0) {
-                            idMap.remove(idUpdate);
-                        } else {
-                            idMap.put(idUpdate, newVal);
+                        Identity updateId = updateEntry.getKey();
+                        long updateValue = updateEntry.getValue();
+                        AtomicLong val = idMap.get(updateId);
+                        val.addAndGet(-updateValue);
+                        if (val.get() <= 0) {
+                            idMap.remove(updateId);
                         }
                     }
                     if (idMap.isEmpty()) {

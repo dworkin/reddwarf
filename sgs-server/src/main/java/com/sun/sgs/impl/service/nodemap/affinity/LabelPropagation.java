@@ -601,20 +601,23 @@ public class LabelPropagation implements LPAClient {
             return retMap;
         }
         
-        Map<Object, Map<Identity, Long>> objectMap = builder.getObjectUseMap();
+        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> objectMap =
+                builder.getObjectUseMap();
         assert (objectMap != null);
 
         synchronized (verticesLock) {
             for (Object obj : objIds) {
                 // look up the set of identities
-                Map<Identity, Long> idents = objectMap.get(obj);
+                ConcurrentMap<Identity, AtomicLong> idents = objectMap.get(obj);
                 Map<Integer, List<Long>> labelWeightMap =
                         new HashMap<Integer, List<Long>>();
                 // If idents is null, the identity is no longer used, probably
                 // because the graph was pruned (we are using a live object
                 // use map).
                 if (idents != null) {
-                    for (Map.Entry<Identity, Long> entry : idents.entrySet()) {
+                    for (Map.Entry<Identity, AtomicLong> entry :
+                        idents.entrySet())
+                    {
                         // Find the label associated with the identity in
                         // the graph.
                         // We do this by creating vid, a template of the
@@ -637,7 +640,7 @@ public class LabelPropagation implements LPAClient {
                                 weightList = new ArrayList<Long>();
                                 labelWeightMap.put(label, weightList);
                             }
-                            weightList.add(entry.getValue());
+                            weightList.add(entry.getValue().get());
                         }
                     }
                 }
@@ -663,7 +666,7 @@ public class LabelPropagation implements LPAClient {
     private boolean updateRemoteLabels() {
         // reinitialize the remote label map
         remoteLabelMap.clear();
-        Map<Object, Map<Identity, Long>> objectMap =
+        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> objectMap =
                 builder.getObjectUseMap();
         assert (objectMap != null);
         
@@ -715,7 +718,8 @@ public class LabelPropagation implements LPAClient {
             {
                 Object remoteObject = remoteEntry.getKey();
                 // ... look up the local node use of the object.
-                Map<Identity, Long> objUse = objectMap.get(remoteObject);
+                ConcurrentMap<Identity, AtomicLong> objUse =
+                        objectMap.get(remoteObject);
                 if (objUse == null) {
                     // no local uses of this object
                     continue;
@@ -723,9 +727,11 @@ public class LabelPropagation implements LPAClient {
                 Map<Integer, List<Long>> remoteLabels = remoteEntry.getValue();
                 // Compare each local use's weight with each remote use of
                 // the weight, and fill in our remoteLabelMap.
-                for (Map.Entry<Identity, Long> objUseId : objUse.entrySet()) {
+                for (Map.Entry<Identity, AtomicLong> objUseId :
+                    objUse.entrySet())
+                {
                     Identity ident = objUseId.getKey();
-                    Long localCount = objUseId.getValue();
+                    long localCount = objUseId.getValue().get();
                     Map<Integer, Long> labelCount = remoteLabelMap.get(ident);
                     if (labelCount == null) {
                         // Effective Java item 69, faster to use get before
@@ -747,7 +753,7 @@ public class LabelPropagation implements LPAClient {
                             updateCount = Long.valueOf(0);
                         }
                         for (Long rc : rcounts) {
-                            updateCount += Math.min(localCount, rc);
+                            updateCount += Math.min(localCount, rc.longValue());
                         }
                         labelCount.put(rlabel, updateCount);
                         logger.log(Level.FINEST,

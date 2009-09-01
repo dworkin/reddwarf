@@ -127,7 +127,8 @@ public class TestGraphListener {
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
         // empty obj use
-        Map<Object, Map<Identity, Long>> objUse = builder.getObjectUseMap();
+        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> objUse =
+                builder.getObjectUseMap();
         Assert.assertNotNull(objUse);
         Assert.assertEquals(0, objUse.size());
         // empty conflicts

@@ -237,7 +237,9 @@ public class TestGraphs {
         }
 
         /** {@inheritDoc} */
-        public Map<Object, Map<Identity, Long>> getObjectUseMap() {
+        public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
+                getObjectUseMap()
+        {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
