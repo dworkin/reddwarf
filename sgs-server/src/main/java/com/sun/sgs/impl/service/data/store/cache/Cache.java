@@ -210,27 +210,31 @@ class Cache {
     }
 
     /**
-     * Adds an entry for a previously uncached object.
+     * Adds an entry for a previously uncached object.  The caller should have
+     * already reserved space in the cache.
      *
      * @param	entry the new cache entry
+     * @param	reserve for tracking cache reservations
      */
-    void addObjectEntry(ObjectCacheEntry entry) {
+    void addObjectEntry(ObjectCacheEntry entry, ReserveCache reserve) {
 	assert !objectMap.containsKey(entry.key);
-	reserve(1);
 	objectCount.incrementAndGet();
 	objectMap.put(entry.key, entry);
+	reserve.used();
     }
 
     /**
-     * Adds an entry for a previously uncached binding.
+     * Adds an entry for a previously uncached binding.  The caller should have
+     * already reserved space in the cache.
      *
      * @param	entry the new cache entry
+     * @param	reserve for tracking cache reservations
      */
-    void addBindingEntry(BindingCacheEntry entry) {
+    void addBindingEntry(BindingCacheEntry entry, ReserveCache reserve) {
 	assert !bindingMap.containsKey(entry.key);
-	reserve(1);
 	bindingCount.incrementAndGet();
 	bindingMap.put(entry.key, entry);
+	reserve.used();
     }
 
     /**
@@ -279,31 +283,6 @@ class Cache {
      */
     void release(int count) {
 	available.release(count);
-    }
-
-    /**
-     * Adds an entry for a previously uncached object, assuming that a space
-     * for the new entry has already been reserved.
-     *
-     * @param	entry the new cache entry
-     */
-    void addReservedObjectEntry(ObjectCacheEntry entry) {
-	assert !objectMap.containsKey(entry.key);
-	objectCount.incrementAndGet();
-	objectMap.put(entry.key, entry);
-    }
-
-    /**
-     * Adds an entry for a previously uncached binding, assuming that a space
-     * for the new entry has already been reserved.
-     *
-     * @param	entry the new cache entry
-     */
-    void addReservedBindingEntry(BindingCacheEntry entry) {
-	assert !bindingMap.containsKey(entry.key)
-	    : "Entry already in cache: " + entry;
-	bindingCount.incrementAndGet();
-	bindingMap.put(entry.key, entry);
     }
 
     /**

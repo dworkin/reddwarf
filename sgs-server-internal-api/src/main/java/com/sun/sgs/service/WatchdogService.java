@@ -153,8 +153,6 @@ public interface WatchdogService extends Service {
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed
-     * @throws	IllegalArgumentException if the specified {@code nodeId}
-     *		is not within the range of valid IDs
      * @throws	IllegalStateException if this method is invoked from a
      *		transactional context
      */

@@ -107,6 +107,7 @@ import java.util.logging.Logger;
  * following logging levels: <p>
  *
  * <ul>
+ * <li> {@link Level#CONFIG CONFIG} - Creating an instance
  * <li> {@link Level#FINER FINER} - Beginning and ending transactions
  * </ul>
  */

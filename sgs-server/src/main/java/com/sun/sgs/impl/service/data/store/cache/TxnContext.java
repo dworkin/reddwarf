@@ -110,7 +110,8 @@ class TxnContext {
 	    store.getUpdateQueue().abort(contextId, false);
 	    return true;
 	} else {
-	    store.getUpdateQueue().prepare(getStopTime());
+	    store.getUpdateQueue().prepare(
+		addCheckOverflow(txn.getCreationTime(), txn.getTimeout()));
 	    prepared = true;
 	    return false;
 	}
@@ -123,14 +124,7 @@ class TxnContext {
      *		transaction
      */
     void prepareAndCommit() {
-	if (prepared) {
-	    throw new IllegalStateException(
-		"Transaction has already been prepared: " + txn);
-	} else if (!getModified()) {
-	    store.getUpdateQueue().abort(contextId, false);
-	} else {
-	    store.getUpdateQueue().prepare(getStopTime());
-	    prepared = true;
+	if (!prepare()) {
 	    commitInternal();
 	}
     }
@@ -179,24 +173,30 @@ class TxnContext {
 		BindingKey key = savedEntry.getKey();
 		SavedBindingValue saved = savedEntry.getValue();
 		Object lock = cache.getBindingLock(key);
-		synchronized (lock) {
-		    BindingCacheEntry entry = cache.getBindingEntry(key);
-		    if (entry == null && saved.restoreValue != -1) {
-			entry = noteCachedBinding(
-			    key, saved.restoreValue, true);
-		    }
-		    if (entry != null) {
-			entry.setValue(saved.restoreValue);
-			if (entry.getModified()) {
-			    entry.setNotModified();
+		ReserveCache reserve = new ReserveCache(cache);
+		try {
+		    synchronized (lock) {
+			BindingCacheEntry entry = cache.getBindingEntry(key);
+			if (entry == null && saved.restoreValue != -1) {
+			    entry = noteCachedBinding(
+				key, saved.restoreValue, true, reserve);
 			}
-			entry.setPreviousKey(saved.restorePreviousKey,
-					     saved.restorePreviousKeyUnbound);
-			if (saved.restoreValue == -1) {
-			    entry.setEvictedImmediate(lock);
-			    cache.removeBindingEntry(key);
+			if (entry != null) {
+			    entry.setValue(saved.restoreValue);
+			    if (entry.getModified()) {
+				entry.setNotModified();
+			    }
+			    entry.setPreviousKey(
+				saved.restorePreviousKey,
+				saved.restorePreviousKeyUnbound);
+			    if (saved.restoreValue == -1) {
+				entry.setEvictedImmediate(lock);
+				cache.removeBindingEntry(key);
+			    }
 			}
 		    }
+		} finally {
+		    reserve.done();
 		}
 	    }
 	}
@@ -258,97 +258,90 @@ class TxnContext {
     /* -- Entry methods -- */
 
     /**
-     * Adds an entry to the cache for a newly allocated object.	 The associated
-     * lock should be held.
+     * Adds an entry to the cache for a newly allocated object.  The associated
+     * lock should be held, and the caller should have reserved space in the
+     * cache.
      *
      * @param	oid the object ID of the new object
+     * @param	reserve for tracking cache reservations
      */
-    void noteNewObject(long oid) {
+    void noteNewObject(long oid, ReserveCache reserve) {
 	assert Thread.holdsLock(store.getCache().getObjectLock(oid));
 	ObjectCacheEntry entry = ObjectCacheEntry.createNew(oid, contextId);
-	store.getCache().addObjectEntry(entry);
+	store.getCache().addObjectEntry(entry, reserve);
     }
 
     /**
      * Adds an entry to the cache for an object that is being fetched from the
-     * server.	The associated lock should be held.
+     * server.  The associated lock should be held, and the caller should have
+     * reserved space in the cache.
      *
      * @param	oid the object ID of the object
      * @param	forUpdate whether the object is being fetched for update
+     * @param	reserve for tracking cache reservations
      */
-    ObjectCacheEntry noteFetchingObject(long oid, boolean forUpdate) {
+    ObjectCacheEntry noteFetchingObject(
+	long oid, boolean forUpdate, ReserveCache reserve)
+    {
 	assert Thread.holdsLock(store.getCache().getObjectLock(oid));
 	ObjectCacheEntry entry =
 	    ObjectCacheEntry.createFetching(oid, forUpdate);
-	store.getCache().addObjectEntry(entry);
+	store.getCache().addObjectEntry(entry, reserve);
 	return entry;
     }
 
     /**
      * Adds an entry to the cache for an object that is being cached for read
      * after being fetched from the server.  The associated lock should be
-     * held.
+     * held, and the caller should have reserved space in the cache.
      *
      * @param	oid the object ID of the object
      * @param	data the data for the object
+     * @param	reserve for tracking cache reservations
      */
-    ObjectCacheEntry noteCachedObject(long oid, byte[] data) {
+    ObjectCacheEntry noteCachedObject(
+	long oid, byte[] data, ReserveCache reserve)
+    {
 	assert Thread.holdsLock(store.getCache().getObjectLock(oid));
 	ObjectCacheEntry entry =
 	    ObjectCacheEntry.createCached(oid, data, contextId);
-	store.getCache().addObjectEntry(entry);
+	store.getCache().addObjectEntry(entry, reserve);
 	return entry;
     }
 
     /**
      * Adds an entry to the cache that represents the last bound name in the
      * cache.  The newly created entry will be marked as being fetched.	 The
-     * associated lock should be held.
+     * associated lock should be held, and the caller should have reserved
+     * space in the cache.
      *
+     * @param	reserve for tracking cache reservations
      * @return	the new cache entry
      */
-    BindingCacheEntry noteLastBinding() {
+    BindingCacheEntry noteLastBinding(ReserveCache reserve) {
 	Cache cache = store.getCache();
 	assert Thread.holdsLock(cache.getBindingLock(BindingKey.LAST));
 	BindingCacheEntry entry = BindingCacheEntry.createLast();
-	cache.addBindingEntry(entry);
+	cache.addBindingEntry(entry, reserve);
 	return entry;
     }
 
     /**
-     * Adds an entry to the cache for a name binding.
+     * Adds an entry to the cache for a name binding.  The associated lock
+     * should be held, and the caller should have reserved space in the cache.
      *
      * @param	key the key for the binding
      * @param	value the value of the binding
      * @param	forUpdate whether the entry is cached for update
+     * @param	reserve for tracking cache reservations
      */
     BindingCacheEntry noteCachedBinding(
-	BindingKey key, long value, boolean forUpdate)
+	BindingKey key, long value, boolean forUpdate, ReserveCache reserve)
     {
 	assert Thread.holdsLock(store.getCache().getBindingLock(key));
 	BindingCacheEntry entry =
 	    BindingCacheEntry.createCached(key, value, forUpdate, contextId);
-	store.getCache().addBindingEntry(entry);
-	return entry;
-    }
-
-
-    /**
-     * Adds an entry to the cache for a name binding given that a slot was
-     * already reserved.
-     *
-     * @param	key the key for the binding
-     * @param	value the value of the binding
-     * @param	forUpdate whether the entry is cached for update
-     */
-    BindingCacheEntry noteCachedReservedBinding(
-	BindingKey key, long value, boolean forUpdate)
-    {
-	assert Thread.holdsLock(store.getCache().getBindingLock(key));
-	assert key != BindingKey.LAST;
-	BindingCacheEntry entry =
-	    BindingCacheEntry.createCached(key, value, forUpdate, contextId);
-	store.getCache().addReservedBindingEntry(entry);
+	store.getCache().addBindingEntry(entry, reserve);
 	return entry;
     }
 

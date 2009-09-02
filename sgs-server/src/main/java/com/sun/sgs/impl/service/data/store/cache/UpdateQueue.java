@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.ResourceUnavailableException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.cache.
     UpdateQueueRequest.DowngradeBinding;
 import com.sun.sgs.impl.service.data.store.cache.
@@ -59,11 +60,11 @@ class UpdateQueue {
     private final Semaphore commitAvailable;
 
     /**
-     * Maps transaction ticks to information about the associated transaction.
-     * The entries are ordered with the lowest transaction tick first in order
-     * to find the items that are no longer waiting for earlier transactions to
-     * complete.  Synchronize on this object when adding new entries to insure
-     * that they are added in order.
+     * Maps transaction context IDs to information about the associated
+     * transaction.  The entries are ordered with the lowest context ID first
+     * in order to find the items that are no longer waiting for earlier
+     * transactions to complete.  Synchronize on this object when adding new
+     * entries to insure that they are added in order.
      */
     private final NavigableMap<Long, PendingTxnInfo> pendingMap =
 	new ConcurrentSkipListMap<Long, PendingTxnInfo>();
@@ -126,10 +127,14 @@ class UpdateQueue {
      *		the update queue before the transaction times out
      * @throws	TransactionInterruptedException if the thread is interrupted
      *		while waiting for space in the update queue
+     * @throws	TransactionTimeoutException if the transaction has timed out
      */
     void prepare(long stop) {
 	try {
-	    if (!commitAvailable.tryAcquire(stop, MILLISECONDS)) {
+	    long timeout = stop - System.currentTimeMillis();
+	    if (timeout < 0) {
+		throw new TransactionTimeoutException("Transaction timed out");
+	    } else if (!commitAvailable.tryAcquire(timeout, MILLISECONDS)) {
 		throw new ResourceUnavailableException("Update queue full");
 	    }
 	} catch (InterruptedException e) {
@@ -204,7 +209,7 @@ class UpdateQueue {
     /**
      * Evicts an object from the cache.  The {@link
      * CompletionHandler#completed} method of {@code handler} will be called
-     * with {@code oid} when the eviction has been completed.
+     * when the eviction has been completed.
      *
      * @param	contextId the transaction context ID
      * @param	oid the ID of the object to evict
@@ -221,12 +226,11 @@ class UpdateQueue {
     /**
      * Downgrades access to an object in the cache from write access to read
      * access.  The {@link CompletionHandler#completed} method of {@code
-     * handler} will be called with {@code oid} when the downgrade has been
-     * completed.
+     * handler} will be called when the downgrade has been completed.
      *
      * @param	contextId the transaction context ID
      * @param	oid the object ID to evict
-     * @param	completionHandler the handler to notify when the eviction has
+     * @param	completionHandler the handler to notify when the downgrade has
      *		been completed 
      */
     void downgradeObject(
@@ -238,10 +242,10 @@ class UpdateQueue {
     /**
      * Evicts a name binding from the cache.  The {@link
      * CompletionHandler#completed} method of {@code handler} will be called
-     * with {@code name} when the eviction has been completed.
+     * when the eviction has been completed.
      *
      * @param	contextId the transaction context ID
-     * @param	name the name
+     * @param	name the name, which may be {@code null}
      * @param	completionHandler the handler to notify when the eviction has
      *		been completed 
      */
@@ -254,11 +258,10 @@ class UpdateQueue {
     /**
      * Downgrades access to a name binding in the cache from write access to
      * read access.  The {@link CompletionHandler#completed} method of {@code
-     * handler} will be called with {@code name} when the downgrade has been
-     * completed.
+     * handler} will be called when the downgrade has been completed.
      *
      * @param	contextId the transaction context ID
-     * @param	name the name
+     * @param	name the name, which may be {@code null}
      * @param	completionHandler the handler to notify when the downgrade has
      *		been completed 
      */
@@ -268,18 +271,23 @@ class UpdateQueue {
 	addRequest(contextId, new DowngradeBinding(name, completionHandler));
     }
 
+    /** Shuts down the queue. */
     void shutdown() {
 	queue.shutdown();
     }
 
     /**
-     * Returns the context ID of the oldest transaction that is still pending.
+     * Returns the context ID of the oldest transaction that is still pending,
+     * or {@link Long#MIN_VALUE Long.MIN_VALUE} if there are no pending
+     * transactions
+     *
+     * @return	the lowest pending context ID or {@code Long.MIN_VALUE}
      */
-    long highestPendingContextId() {
+    long lowestPendingContextId() {
 	try {
 	    return pendingMap.firstKey();
 	} catch (NoSuchElementException e) {
-	    return Long.MAX_VALUE;
+	    return Long.MIN_VALUE;
 	}
     }
 
@@ -287,8 +295,7 @@ class UpdateQueue {
 
     /**
      * Adds a request to the table if the associated transaction is still
-     * pending.  If the request is not added, then the caller should add the
-     * request to the update queue directly.
+     * pending, and otherwise adds it directory to the update queue.
      *
      * @param	contextId the transaction context ID
      * @param	request the request
@@ -301,33 +308,40 @@ class UpdateQueue {
     }
 
     /**
-     * Note that the transaction with the associated context ID has completed,
+     * Notes that the transaction with the associated context ID has completed,
      * either by committing or aborting.
      */
     private void completed(long contextId) {
 	PendingTxnInfo info = pendingMap.get(contextId);
 	assert info != null;
 	info.setComplete();
-	if (contextId == pendingMap.firstKey()) {
-	    pendingMap.remove(contextId);
-	    List<Request> requests = info.getRequests();
-	    assert requests != null;
+	try {
+	    if (contextId != pendingMap.firstKey()) {
+		return;
+	    }
+	} catch (NoSuchElementException e) {
+	    return;
+	}
+	pendingMap.remove(contextId);
+	List<Request> requests = info.getRequests();
+	if (requests == null) {
+	    return;
+	}
+	for (Request request : requests) {
+	    queue.addRequest(request);
+	}
+	while (true) {
+	    Entry<Long, PendingTxnInfo> entry = pendingMap.firstEntry();
+	    if (entry == null) {
+		break;
+	    }
+	    requests = entry.getValue().getRequests();
+	    if (requests == null) {
+		break;
+	    }
+	    pendingMap.remove(entry.getKey());
 	    for (Request request : requests) {
 		queue.addRequest(request);
-	    }
-	    while (true) {
-		Entry<Long, PendingTxnInfo> entry = pendingMap.firstEntry();
-		if (entry == null) {
-		    break;
-		}
-		requests = entry.getValue().getRequests();
-		if (requests == null) {
-		    break;
-		}
-		pendingMap.remove(entry.getKey());
-		for (Request request : requests) {
-		    queue.addRequest(request);
-		}
 	    }
 	}
     }
