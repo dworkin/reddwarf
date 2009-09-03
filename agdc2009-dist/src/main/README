@@ -25,11 +25,11 @@ SGS Monitor Visualization Tool:
 Project Snowman Client Simulator
 
   # cd sgs-client-dist-agdc2009
-  # java -DmaxClients=1000 -Dhost=apphost -DbuildNumber=1 -jar ./snowman-client-simulator.jar
+  # java -DmaxClients=500 -DmoveDelay=10000 -Dhost=apphost -DbuildNumber=1 -jar ./snowman-client-simulator.jar
   ==> Change maxClients, host, and buildNumber value as appropriate
 
 
 Project Snowman Client
 
   # cd sgs-client-dist-agdc2009
-  # java -Dserver.host=apphost -jar ./snowman-client.jar
+  # java -jar ./snowman-client.jar
