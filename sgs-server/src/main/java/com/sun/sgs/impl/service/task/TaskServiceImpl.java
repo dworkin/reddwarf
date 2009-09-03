@@ -199,7 +199,7 @@ public class TaskServiceImpl
 
     /** The default length of time in milliseconds to wait between hand-off
         checks. */
-    public static final long HANDOFF_PERIOD_DEFAULT = 500L;
+    public static final long HANDOFF_PERIOD_DEFAULT = 100L;
 
     // the actual amount of time to wait between hand-off checks
     private final long handoffPeriod;
@@ -1376,8 +1376,8 @@ public class TaskServiceImpl
             // a mapping available, there's really nothing to be done except
             // just run the task locally, and in a separate thread try to get
             // the assignment taken care of
-            if (logger.isLoggable(Level.INFO)) {
-                logger.logThrow(Level.INFO, uie, "No mapping exists for " +
+            if (logger.isLoggable(Level.FINE)) {
+                logger.logThrow(Level.FINE, uie, "No mapping exists for " +
                                 "identity {0} so task {1} will run locally",
                                 identity.getName(), objName);
             }
@@ -1449,7 +1449,7 @@ public class TaskServiceImpl
 		localHandoffSpace);
             if (!set.isEmpty()) {
                 Iterator<String> it = set.iterator();
-                while (it.hasNext()) {
+                if (it.hasNext()) {
                     scheduleNonDurableTask(new TaskRestartRunner(it.next()),
                                            true);
                     it.remove();

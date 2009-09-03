@@ -55,7 +55,7 @@ SGS_PROPERTIES = ${SGS_HOME}/conf/project-snowman-core.properties
 # files from the ${SGS_HOME}/lib directory will be included
 # on the classpath.
 #
-BDB_TYPE = je
+#BDB_TYPE = db
 
 # Set this property to change the location of the 
 # BerkeleyDB native libraries to use when running the 

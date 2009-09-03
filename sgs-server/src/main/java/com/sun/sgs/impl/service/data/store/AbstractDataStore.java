@@ -100,7 +100,7 @@ public abstract class AbstractDataStore
 	checkNull("logger", logger);
 	checkNull("abortLogger", abortLogger);
 	this.logger = logger;
-	this.abortLogger = logger;
+	this.abortLogger = abortLogger;
 	String className = getClass().getName();
 	objectAccesses = accessCoordinator.registerAccessSource(
 	    className + ".objects", Long.class);
