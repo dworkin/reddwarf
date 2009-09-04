@@ -377,11 +377,15 @@ public final class ChannelServiceImpl
     }
 
     Client[] getClients() {
-        Client[] clients = new Client[demoMap.size()];
+        int numClients = demoMap.size();
+        Client[] clients = new Client[numClients];
 
         int i = 0;
         for (Map.Entry<String, String> entry : demoMap.entrySet()) {
             clients[i++] = new Client(entry.getKey(), entry.getValue());
+            if (i >= numClients) {
+                break;
+            }
         }
         return clients;
     }
