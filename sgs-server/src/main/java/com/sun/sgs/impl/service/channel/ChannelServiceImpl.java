@@ -383,7 +383,7 @@ public final class ChannelServiceImpl
         for (Map.Entry<String, String> entry : demoMap.entrySet()) {
             clients.add(new Client(entry.getKey(), entry.getValue()));
         }
-        return (Client[])clients.toArray();
+        return clients.toArray(new Client[0]);
     }
 
     /* -- Implement AbstractService methods -- */
