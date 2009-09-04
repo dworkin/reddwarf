@@ -76,7 +76,7 @@ public interface ChannelServer extends Remote {
      * @param	channelRefId a channel ID
      * @param	deliveryOrdinal the channel's delivery requirement, as a {@link
      *		Delivery} ordinal
-     * @param	msgTimestamp the timestamp of the last channel message sent
+     * @param	timestamp the timestamp of the last channel message sent
      * @param	sessionRefId a session ID
      * @return	{@code true} if the join succeeded (either was delivered or
      *		enqueued for a relocating session), and {@code false} if
@@ -86,7 +86,7 @@ public interface ChannelServer extends Remote {
      * 		invoking this method
      */
     boolean join(String name, BigInteger channelRefId, byte deliveryOrdinal,
-		 long msgTimestamp, BigInteger sessionRefId)
+		 long timestamp, BigInteger sessionRefId)
 	throws IOException;
 
     /**
@@ -95,6 +95,7 @@ public interface ChannelServer extends Remote {
      * specified {@code channelRefId}.
      *
      * @param	channelRefId a channel ID
+     * @param	timestamp the timestamp of the last channel message sent
      * @param	sessionRefId a session ID
      * @return	{@code true} if the leave succeeded (either was delivered or
      *		enqueued for a relocating session), and {@code false} if
@@ -103,7 +104,8 @@ public interface ChannelServer extends Remote {
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    boolean leave(BigInteger channelRefId, BigInteger sessionRefId)
+    boolean leave(BigInteger channelRefId, long timestamp,
+		  BigInteger sessionRefId)
 	throws IOException;
 
     /**
@@ -121,11 +123,11 @@ public interface ChannelServer extends Remote {
      *
      * @param	channelRefId a channel ID
      * @param	message a channel message
-     * @param	msgTimestamp the message's timestamp
+     * @param	timestamp the message's timestamp
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void send(BigInteger channelRefId, byte[] message, long msgTimestamp)
+    void send(BigInteger channelRefId, byte[] message, long timestamp)
 	throws IOException;
 
     /**
@@ -150,7 +152,7 @@ public interface ChannelServer extends Remote {
      *		channel that the client session is a member of
      * @param	deliveryOrdinals an array that contains the delivery ordinal
      *		of each channel that the client session is a member of
-     * @param	msgTimestamp an array that contains the message timestamp
+     * @param	msgTimestamps an array that contains the message timestamp
      *		of each channel that the client session is a member of
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
@@ -186,8 +188,9 @@ public interface ChannelServer extends Remote {
      * channelRefId} is closed.
      *
      * @param	channelRefId a channel ID
+     * @param	timestamp the timestamp of the last channel message sent
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void close(BigInteger channelRefId) throws IOException;
+    void close(BigInteger channelRefId, long timestamp) throws IOException;
 }

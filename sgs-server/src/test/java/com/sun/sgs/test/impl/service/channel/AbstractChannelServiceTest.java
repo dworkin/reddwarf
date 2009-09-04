@@ -499,7 +499,9 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	final String channelName, final String... users)
 	throws Exception
     {
-	Thread.sleep(600);
+	// Need to wait for possible cache entry to expire so that a true
+	// picture of the channel membership is reflected.
+	Thread.sleep(1000);
 	checkUsersJoined0(channelName, users);
     }
     

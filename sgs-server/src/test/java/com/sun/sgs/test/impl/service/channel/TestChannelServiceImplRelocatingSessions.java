@@ -291,8 +291,10 @@ public class TestChannelServiceImplRelocatingSessions
 	    // Finish relocation.
 	    relocatingClient.relocate(0, true, true);
 	    
-	    // Make sure all members are joined and can receive messages.
+	    // Make sure that the session got the leave message and that
+	    // there are no channel members.
 	    relocatingClient.assertLeftChannel(channelName);
+	    Thread.sleep(2000);
 	    checkUsersJoined(channelName, noUsers);
 	    
 	} finally {
@@ -471,7 +473,7 @@ public class TestChannelServiceImplRelocatingSessions
 	    
 	    // Finish relocation.
 	    relocatingClient.relocate(0, true, true);
-	    
+
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName2, someUsers);
 	    sendMessagesToChannel(channelName2, 2);
@@ -514,7 +516,7 @@ public class TestChannelServiceImplRelocatingSessions
 
 	    // Finish relocation.
 	    relocatingClient.relocate(0, true, true);
-	    
+
 	    // Make sure all members are joined and can receive messages.
 	    checkUsersJoined(channelName, someUsers);
 	    sendMessagesToChannel(channelName, 2);

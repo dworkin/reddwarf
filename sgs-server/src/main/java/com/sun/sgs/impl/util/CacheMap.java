@@ -180,7 +180,7 @@ public class CacheMap<K, V> {
 	 * returns {@code false}.
 	 */
 	boolean isExpired() {
-	    return expirationTime >= System.currentTimeMillis();
+	    return expirationTime <= System.currentTimeMillis();
 	}
 
 	/**

@@ -364,7 +364,7 @@ public class ClientSessionImpl
      * Returns {@code true} if the session is relocating, and {@code
      * false} otherwise.
      */
-    private boolean relocating() {
+    public boolean isRelocating() {
 	return relocatingToNode != -1;
     }
     
@@ -831,7 +831,7 @@ public class ClientSessionImpl
 	 * resume when the client connects to the new node to re-establish
 	 * the client session.
 	 */
-	if (isLocalSession && eventQueue.isEmpty() && !relocating()) {
+	if (isLocalSession && eventQueue.isEmpty() && !isRelocating()) {
 	    logger.log(Level.FINEST, "immediately processing event:{0}", event);
 	    event.serviceEvent(
  		eventQueue,
@@ -842,7 +842,7 @@ public class ClientSessionImpl
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add client session event");
 
-	} else if (!relocating()) {
+	} else if (!isRelocating()) {
 	    if (isLocalSession) {
 		eventQueue.serviceEvent();
 	    } else {
@@ -1162,7 +1162,7 @@ public class ClientSessionImpl
 			   getSessionRefId());
 	    }
 	    if (handler == null || !sessionImpl.isLocalSession() ||
-		sessionImpl.relocating())
+		sessionImpl.isRelocating())
 	    {
 		// Only service events on the session's local node, so return.
 		// The session may be moving, and this might be a left over

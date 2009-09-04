@@ -673,7 +673,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * this channel's coordinator to service the event.  This method is
      * invoked with {@code true} by this channel's {@code ChannelWrapper}
      * when the application removes the wrapper object, and is invoked with
-     * {@coee false} by this channel when the application invokes the
+     * {@code false} by this channel when the application invokes the
      * {@link #leaveAll} method.
      *
      * @param	removeName if {@code true}, the channel's name binding
@@ -751,13 +751,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the node ID for the specified  {@code session}.
+     * Returns the node ID for the specified {@code session}.  If the
+     * session is relocating, this method returns the node ID that
+     * the session is relocating to.
      */
     private static long getNodeId(ClientSessionImpl session) {
-	long relocatingToNodeId =
-	    session.getRelocatingToNodeId();
-	boolean relocating = relocatingToNodeId != -1;
-	return relocating ? relocatingToNodeId : session.getNodeId();
+	return
+	    session.isRelocating() ?
+	    session.getRelocatingToNodeId() :
+	    session.getNodeId();
     }
 
     /**
@@ -1263,16 +1265,50 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		ChannelEvent event = eventQueue.peek();
 		if (event == null) {
 		    //  No more events to process, so return.
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "no more events",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(
+					channel.channelRefId.toByteArray()));
+		    }
 		    return;
 		} else if (event.isCompleted()) {
 		    // Remove completed event and get next event to
 		    // process. Return if there are no more events.
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "removing completed event:{2}",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(
+					channel.channelRefId.toByteArray()),
+				   event);
+		    }
 		    eventQueue.poll();
 		    event = eventQueue.peek();
 		    if (event == null) {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(Level.FINEST,
+				       "coordinator:{0} channelId:{1} " +
+				       "no more events",
+				       getLocalNodeId(),
+				       HexDumper.toHexString(
+					   channel.channelRefId.toByteArray()));
+			}
 			return;
 		    }
 		} else if (event.isProcessing()) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "event:{2} is already processing",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(
+				       channel.channelRefId.toByteArray()),
+				   event);
+		    }
 		    return;
 		} 
 
@@ -1290,10 +1326,28 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		}
 		
-		// Mark event as processing and service event.
+		// Mark event as "processing", and then service event.
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST,
+			       "coordinator:{0} channelId:{1} " +
+			       "service event:{2}",
+			       getLocalNodeId(),
+			       HexDumper.toHexString(
+				   channel.channelRefId.toByteArray()),
+			       event);
+		}
 		event.processing();
 		completed = event.serviceEvent(getChannel());
 		if (completed) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "remove completed event:{2}",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(
+				       channel.channelRefId.toByteArray()),
+				   event);
+		    }
 		    eventQueue.poll();
 		}
 
@@ -1714,6 +1768,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	protected boolean sendNotification(ChannelServer server)
 	    throws IOException
 	{
+	    // TBD: why is it timestamp - 1 here?????
 	    boolean success =
 		server.join(name, channelRefId, (byte) delivery.ordinal(),
 			    timestamp - 1, sessionRefId);
@@ -1817,7 +1872,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	protected boolean sendNotification(ChannelServer server)
 	    throws IOException
 	{
-	    boolean success = server.leave(channelRefId, sessionRefId);
+	    boolean success =
+		server.leave(channelRefId, timestamp, sessionRefId);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -1946,6 +2002,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     */
 	    final BigInteger channelRefId = channel.channelRefId;
 	    final byte deliveryOrdinal = (byte) channel.delivery.ordinal();
+	    // TBD: still need to implement send notify...
 	    for (final long nodeId : channel.servers) {
 		channelService.addChannelTask(
 		    channelRefId,
@@ -2045,6 +2102,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private final BigInteger channelRefId;
 	private final Set<Long> serverNodeIds;
 	private final boolean removeName;
+	// FIXME: This is a kludge for now.
+	private final long timestamp = Long.MAX_VALUE;
 
 	/**
 	 * Constructs an instance with the specified {@code channel}.  If
@@ -2070,7 +2129,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			public void run() throws IOException {
 			    ChannelServer server = getChannelServer(nodeId);
 			    if (server != null) {
-				server.close(channelRefId);
+				server.close(channelRefId, timestamp);
 			    }
 			} },
 		    nodeId);
