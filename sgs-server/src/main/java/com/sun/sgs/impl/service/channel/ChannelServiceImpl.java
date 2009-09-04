@@ -59,6 +59,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -377,17 +378,12 @@ public final class ChannelServiceImpl
     }
 
     Client[] getClients() {
-        int numClients = demoMap.size();
-        Client[] clients = new Client[numClients];
+        ArrayList<Client> clients = new ArrayList<Client>();
 
-        int i = 0;
         for (Map.Entry<String, String> entry : demoMap.entrySet()) {
-            clients[i++] = new Client(entry.getKey(), entry.getValue());
-            if (i >= numClients) {
-                break;
-            }
+            clients.add(new Client(entry.getKey(), entry.getValue()));
         }
-        return clients;
+        return (Client[])clients.toArray();
     }
 
     /* -- Implement AbstractService methods -- */
