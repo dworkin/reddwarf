@@ -27,18 +27,17 @@ import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
+import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -51,8 +50,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  */
 public class BipartiteGraphBuilder implements GraphBuilder {
-    /** The graph of object accesses. */
-    protected final CopyableGraph<Object, WeightedEdge>
+    // The graph of object accesses.
+    private final CopyableGraph<Object, WeightedEdge>
         bipartiteGraph = 
             new CopyableGraph<Object, WeightedEdge>();
 
@@ -66,6 +65,13 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         conflictMap =
             new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
 
+    // The TimerTask which prunes our data structures over time.  As the data
+    // structures above are modified, the pruneTask notes the ways they have
+    // changed.  Groups of changes are chunked into periods, each the length
+    // of the time snapshot (configured at construction time). We
+    // periodically remove the changes made in the earliest snapshot.
+    private final PruneTask pruneTask;
+
     // The length of time for our snapshots, in milliseconds
     private final long snapshot;
     
@@ -74,8 +80,6 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     private long updateCount = 0;
     // part of the statistics for early testing
     private long totalTime = 0;
-
-    private final PruneTask pruneTask;
 
     /**
      * Constructs a new bipartite graph builder.
@@ -87,7 +91,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         int periodCount = wrappedProps.getIntProperty(
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
-                0, Integer.MAX_VALUE);
+                1, Integer.MAX_VALUE);
 
         pruneTask = new PruneTask(periodCount);
         Timer pruneTimer = new Timer("AffinityGraphPruner", true);
@@ -314,6 +318,10 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         conflictMap.remove(nodeId);
     }
 
+    /**
+     * The graph pruner.  It runs periodically, and is the only code
+     * that removes edges and vertices from the graph.
+     */
     private class PruneTask extends TimerTask {
         // The number of snapshots we retain in our moving window.
         // We fill this window of changes by waiting for count snapshots
@@ -321,68 +329,90 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         // count items.  This means we cannot dynamically change the
         // length of the window.
         private final int count;
-
+        // The current snapshot count, used to initially fill up our window.
         private int current = 1;
 
-        private final Queue<Map<WeightedEdge, Integer>>
-                                                periodEdgeIncrementsQueue;
+        // The change information we keep for each snapshot.  A new change info
+        // object is allocated for each snapshot, and during a snapshot it
+        // notes all changes made to this builder's data structures.
+        // Edge -> count of times incremented
         private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
-        private final Queue<ConcurrentMap<Long,
-                                          ConcurrentMap<Object, AtomicInteger>>>
-                periodConflictQueue;
-        private ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
-                currentPeriodConflicts;
+        // NodeId -> <ObjId, count times conflicted>
+        // Note that the conflict count is not currently used
+        private Map<Long, Map<Object, Integer>> currentPeriodConflicts;
 
-        public PruneTask(int count) {
-            if (count < 1) {
-                throw new IllegalArgumentException("count must not be < 1");
-            }
-            this.count = count;
+        // A lock to guard all uses of the current period information above.
+        // Specifically, we want to ensure that updates to these structures
+        // aren't ones currently being pruned.
+        private final Object currentPeriodLock = new Object();
+
+        // Queues of snapshot information.  As a snapshot time period ends,
+        // we add its change info to the back of the appropriate queue.  If
+        // we have accumulated enough snapshots in our queues to satisfy our
+        // "count" requirement, we also remove the information from the first
+        // enqueued info object.
+        private final Deque<Map<WeightedEdge, Integer>>
             periodEdgeIncrementsQueue =
-                new LinkedList<Map<WeightedEdge, Integer>>();
+                new ArrayDeque<Map<WeightedEdge, Integer>>();
+        private final Deque<Map<Long, Map<Object, Integer>>>
             periodConflictQueue =
-                new LinkedList<ConcurrentMap<Long,
-                                ConcurrentMap<Object, AtomicInteger>>>();
-            addPeriodStructures();
+                new ArrayDeque<Map<Long, Map<Object, Integer>>>();
+
+        /**
+         * Creates a PruneTask.
+         * @param count the number of full snapshots we wish to
+         *              retain as live data
+         */
+        public PruneTask(int count) {
+            this.count = count;
+            synchronized (currentPeriodLock) {
+                addPeriodStructures();
+            }
         }
 
-        public synchronized void run() {
+        /**
+         * Performs all processing required when a time period has ended.
+         */
+        public void run() {
             // Update the data structures for this snapshot
-            addPeriodStructures();
-            if (current <= count) {
-                // Do nothing, we're still in our inital snapshot window
-                current++;
-                return;
+            synchronized (currentPeriodLock) {
+                addPeriodStructures();
+                if (current <= count) {
+                    // Do nothing, we're still in our inital snapshot window
+                    current++;
+                    return;
+                }
             }
 
             // take care of everything.
             Map<WeightedEdge, Integer> periodEdgeIncrements =
                     periodEdgeIncrementsQueue.remove();
-            ConcurrentMap<Long, ConcurrentMap<Object, AtomicInteger>>
-                    periodConflicts = periodConflictQueue.remove();
+            Map<Long, Map<Object, Integer>> periodConflicts =
+                    periodConflictQueue.remove();
 
-
-            // For each modified edge in the graph, update weights
-            for (Map.Entry<WeightedEdge, Integer> entry :
-                 periodEdgeIncrements.entrySet())
-            {
-                WeightedEdge edge = entry.getKey();
-                int weight = entry.getValue();
-                if (edge.getWeight() == weight) {
-                    Pair<Object> endpts = bipartiteGraph.getEndpoints(edge);
-                    bipartiteGraph.removeEdge(edge);
-                    for (Object end : endpts) {
-                        if (bipartiteGraph.degree(end) == 0) {
-                            bipartiteGraph.removeVertex(end);
+            synchronized (bipartiteGraph) {
+                // For each modified edge in the graph, update weights
+                for (Map.Entry<WeightedEdge, Integer> entry :
+                     periodEdgeIncrements.entrySet())
+                {
+                    WeightedEdge edge = entry.getKey();
+                    int weight = entry.getValue();
+                    if (edge.getWeight() == weight) {
+                        Pair<Object> endpts = bipartiteGraph.getEndpoints(edge);
+                        bipartiteGraph.removeEdge(edge);
+                        for (Object end : endpts) {
+                            if (bipartiteGraph.degree(end) == 0) {
+                                bipartiteGraph.removeVertex(end);
+                            }
                         }
+                    } else {
+                        edge.addWeight(-weight);
                     }
-                } else {
-                    edge.addWeight(-weight);
                 }
             }
 
             // For each conflict, update values
-            for (Map.Entry<Long, ConcurrentMap<Object, AtomicInteger>> entry :
+            for (Map.Entry<Long, Map<Object, Integer>> entry :
                  periodConflicts.entrySet())
             {
                 Long nodeId = entry.getKey();
@@ -390,17 +420,17 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                         conflictMap.get(nodeId);
                 // If the node went down, we might have removed the entry
                 if (objMap != null) {
-                    for (Map.Entry<Object, AtomicInteger> updateEntry :
+                    for (Map.Entry<Object, Integer> updateEntry :
                           entry.getValue().entrySet())
                     {
                         Object objId = updateEntry.getKey();
-                        AtomicInteger periodVal = updateEntry.getValue();
+                        Integer periodVal = updateEntry.getValue();
                         AtomicLong conflictVal = objMap.get(objId);
                         long oldVal;
                         long newVal;
                         do {
                             oldVal = conflictVal.get();
-                            newVal = oldVal - periodVal.get();
+                            newVal = oldVal - periodVal;
                         } while (!conflictVal.compareAndSet(oldVal, newVal));
 
                         if (newVal <= 0) {
@@ -416,43 +446,52 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             }
         }
 
-        synchronized void incrementEdge(WeightedEdge edge) {
-            int v = currentPeriodEdgeIncrements.containsKey(edge) ?
-                    currentPeriodEdgeIncrements.get(edge) : 0;
-            v++;
-            currentPeriodEdgeIncrements.put(edge, v);
+        /**
+         * Note that an edge's weight has been incremented.
+         * Called by a single thread.
+         * @param edge the edge
+         */
+        void incrementEdge(WeightedEdge edge) {
+            synchronized (currentPeriodLock) {
+                int v = currentPeriodEdgeIncrements.containsKey(edge) ?
+                        currentPeriodEdgeIncrements.get(edge) : 0;
+                v++;
+                currentPeriodEdgeIncrements.put(edge, v);
+            }
         }
 
-        synchronized void updateConflict(Object objId, long nodeId) {
-            ConcurrentMap<Object, AtomicInteger> periodObjMap =
-                    currentPeriodConflicts.get(nodeId);
-            if (periodObjMap == null) {
-                ConcurrentMap<Object, AtomicInteger> newMap =
-                        new ConcurrentHashMap<Object, AtomicInteger>();
-                periodObjMap =
-                        currentPeriodConflicts.putIfAbsent(nodeId, newMap);
+        /**
+         * Note that a data cache conflict has been detected.
+         * @param objId the objId of the object causing the conflict
+         * @param nodeId the node ID of the node we were in conflict with
+         */
+        void updateConflict(Object objId, long nodeId) {
+            synchronized (currentPeriodLock) {
+                Map<Object, Integer> periodObjMap =
+                        currentPeriodConflicts.get(nodeId);
                 if (periodObjMap == null) {
-                    periodObjMap = newMap;
+                    periodObjMap = new HashMap<Object, Integer>();
+                    currentPeriodConflicts.put(nodeId, periodObjMap);
                 }
+                int periodValue = periodObjMap.containsKey(objId) ?
+                                  periodObjMap.get(objId) : 0;
+                periodValue++;
+                periodObjMap.put(objId, periodValue);
             }
-            AtomicInteger val = periodObjMap.get(objId);
-            if (val == null) {
-                AtomicInteger newVal = new AtomicInteger();
-                val = periodObjMap.putIfAbsent(objId, newVal);
-                if (val == null) {
-                    val = newVal;
-                }
-            }
-            val.incrementAndGet();
         }
 
-        private synchronized void addPeriodStructures() {
-            currentPeriodEdgeIncrements = new HashMap<WeightedEdge, Integer>();
-            periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
-            currentPeriodConflicts =
-                new ConcurrentHashMap<Long, 
-                                ConcurrentMap<Object, AtomicInteger>>();
-            periodConflictQueue.add(currentPeriodConflicts);
+        /**
+         * Update our queues for this period.
+         */
+        private void addPeriodStructures() {
+            synchronized (currentPeriodLock) {
+                currentPeriodEdgeIncrements =
+                        new HashMap<WeightedEdge, Integer>();
+                periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
+                currentPeriodConflicts =
+                        new HashMap<Long, Map<Object, Integer>>();
+                periodConflictQueue.add(currentPeriodConflicts);
+            }
         }
     }
 

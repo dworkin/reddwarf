@@ -44,7 +44,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -678,6 +677,16 @@ public class TestGraphListener {
     public void testRemoveNodeTwice() {
         builder.removeNode(35);
         builder.removeNode(35);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testGraphBuilderBadCount() throws Exception {
+        Properties p = new Properties();
+        if (builderName != null) {
+            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+        }
+        p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "0");
+        listener = new GraphListener(p);
     }
 
     /* Utility methods and classes. */
