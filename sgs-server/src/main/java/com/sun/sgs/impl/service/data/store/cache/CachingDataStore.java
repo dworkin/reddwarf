@@ -724,7 +724,7 @@ public class CachingDataStore extends AbstractDataStore
 		    false);
 	    }
 	    if (results != null && results.callbackEvict) {
-		scheduleTask(new EvictObjectTask(oid, true));
+		scheduleTask(new EvictObjectTask(oid));
 	    }
 	}
     }
@@ -757,7 +757,7 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    if (results != null) {
 		if (results.callbackEvict) {
-		    scheduleTask(new EvictObjectTask(oid, true));
+		    scheduleTask(new EvictObjectTask(oid));
 		}
 		if (results.callbackDowngrade) {
 		    scheduleTask(new DowngradeObjectTask(oid));
@@ -1023,7 +1023,7 @@ public class CachingDataStore extends AbstractDataStore
 	    if (results.callbackEvict) {
 		scheduleTask(
 		    new EvictBindingTask(
-			results.found ? nameKey : serverNextNameKey, true));
+			results.found ? nameKey : serverNextNameKey));
 	    }
 	}
     }
@@ -1533,7 +1533,7 @@ public class CachingDataStore extends AbstractDataStore
 		entry.setUpgraded(lock);
 	    }
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(nameKey, true));
+		scheduleTask(new EvictBindingTask(nameKey));
 	    }
 	    if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(nameKey));
@@ -1625,7 +1625,7 @@ public class CachingDataStore extends AbstractDataStore
 		entry.setNotPendingPrevious(lock);
 	    }
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(nextNameKey, true));
+		scheduleTask(new EvictBindingTask(nextNameKey));
 	    }
 	    if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(nextNameKey));
@@ -1699,7 +1699,7 @@ public class CachingDataStore extends AbstractDataStore
 	    /* Schedule eviction and downgrade */
 	    BindingKey evictKey = results.found ? nameKey : serverNextNameKey;
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(evictKey, true));
+		scheduleTask(new EvictBindingTask(evictKey));
 	    }
 	    if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(evictKey));
@@ -1932,13 +1932,13 @@ public class CachingDataStore extends AbstractDataStore
 			  /* nextForWrite */ results.found);
 	    /* Schedule evictions and downgrades */
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(nameKey, true));
+		scheduleTask(new EvictBindingTask(nameKey));
 	    }
 	    if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(nameKey));
 	    }
 	    if (results.nextCallbackEvict) {
-		scheduleTask(new EvictBindingTask(serverNextNameKey, true));
+		scheduleTask(new EvictBindingTask(serverNextNameKey));
 	    }
 	    if (results.nextCallbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(serverNextNameKey));
@@ -2161,7 +2161,7 @@ public class CachingDataStore extends AbstractDataStore
 			  /* nextForWrite */ false);
 	    /* Schedule eviction */
 	    if (results.callbackEvict) {
-		scheduleTask(new EvictBindingTask(serverNextNameKey, true));
+		scheduleTask(new EvictBindingTask(serverNextNameKey));
 	    }
 	}
     }
@@ -2271,7 +2271,7 @@ public class CachingDataStore extends AbstractDataStore
 		throw new NetworkException(e.getMessage(), e);
 	    }
 	    if (results != null && results.callbackEvict) {
-		scheduleTask(new EvictObjectTask(results.oid, true));
+		scheduleTask(new EvictObjectTask(results.oid));
 	    }
 	    if (results == null || (nextNew != -1 && results.oid > nextNew)) {
 		/*
@@ -2425,7 +2425,7 @@ public class CachingDataStore extends AbstractDataStore
 		return true;
 	    } else {
 		/* Evict when not in use */
-		scheduleTask(new EvictObjectTask(oid, true));
+		scheduleTask(new EvictObjectTask(oid));
 		return false;
 	    }
 	}
@@ -2475,20 +2475,17 @@ public class CachingDataStore extends AbstractDataStore
     private class EvictObjectTask extends EvictObjectCompletionHandler
 	implements KernelRunnable
     {
-	private final boolean evictInUse;
-	EvictObjectTask(long oid, boolean evictInUse) {
+	EvictObjectTask(long oid) {
 	    super(oid);
-	    this.evictInUse = evictInUse;
 	}
 	public void run() {
 	    reportObjectAccess(txnProxy.getCurrentTransaction(), oid, WRITE);
 	    synchronized (cache.getObjectLock(oid)) {
 		ObjectCacheEntry entry = cache.getObjectEntry(oid);
-		/* Check if cached, not evicting, and check in use  */
+		/* Check if cached and not evicting  */
 		if (entry != null &&
 		    entry.getReadable() &&
-		    !entry.getDecaching() &&
-		    (evictInUse || !inUse(entry)))
+		    !entry.getDecaching())
 		{
 		    entry.setEvicting();
 		    updateQueue.evictObject(entry.getContextId(), oid, this);
@@ -2700,7 +2697,7 @@ public class CachingDataStore extends AbstractDataStore
 		     * Evict when not pending previous, reading, upgrading or
 		     * downgrading
 		     */
-		    scheduleTask(new EvictBindingTask(nameKey, true));
+		    scheduleTask(new EvictBindingTask(nameKey));
 		    return false;
 		} else if (entry.getDecaching()) {
 		    /*
@@ -2783,10 +2780,8 @@ public class CachingDataStore extends AbstractDataStore
      */
     private class EvictBindingTask implements KernelRunnable {
 	private final BindingKey nameKey;
-	private final boolean evictInUse;
-	EvictBindingTask(BindingKey nameKey, boolean evictInUse) {
+	EvictBindingTask(BindingKey nameKey) {
 	    this.nameKey = nameKey;
-	    this.evictInUse = evictInUse;
 	}
 	public void run() {
 	    reportNameAccess(txnProxy.getCurrentTransaction(),
@@ -2816,12 +2811,6 @@ public class CachingDataStore extends AbstractDataStore
 			/*
 			 * The next entry does not cover the name, so the name
 			 * must already be evicted
-			 */
-			return;
-		    } else if (!evictInUse && inUse(entry)) {
-			/*
-			 * The entry is in use -- not a good candidate for LRU
-			 * eviction
 			 */
 			return;
 		    }
@@ -3223,7 +3212,9 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    if (bestEntry != null) {
 		synchronized (cache.getEntryLock(bestEntry)) {
-		    if (!bestEntry.getDecached()) {
+		    if (!bestEntry.getDecached() &&
+			bestInfo.contextId == bestEntry.getContextId())
+		    {
 			if (!inUse(bestEntry)) {
 			    logger.log(FINEST, "Evicting immediately: {0}",
 				       bestEntry);
@@ -3237,10 +3228,9 @@ public class CachingDataStore extends AbstractDataStore
 				       bestEntry);
 			    scheduleTask(
 				(bestEntry instanceof ObjectCacheEntry)
-				? new EvictObjectTask(
-				    (Long) bestEntry.key, false)
+				? new EvictObjectTask((Long) bestEntry.key)
 				: new EvictBindingTask(
-				    (BindingKey) bestEntry.key, false));
+				    (BindingKey) bestEntry.key));
 			}
 		    }
 		}
@@ -3277,7 +3267,7 @@ public class CachingDataStore extends AbstractDataStore
 	private final boolean inUseForWrite;
 
 	/** The transaction context ID when the entry was last used. */
-	private final long contextId;
+	final long contextId;
 
 	/** Creates an instance of this class. */
 	EntryInfo(boolean inUse, boolean inUseForWrite, long contextId) {

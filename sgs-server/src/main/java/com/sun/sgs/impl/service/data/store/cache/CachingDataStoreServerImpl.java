@@ -964,6 +964,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			    "The name values must not be less than -1");
 		    } else if (value == -1) {
 			namesDb.delete(txn, encodeString(name));
+			/*
+			 * Release the lock on the removed name since the node
+			 * does not maintain an entry for an unbound name.
+			 */
+			releaseLock(nodeInfo, key);
 		    } else {
 			namesDb.put(
 			    txn, encodeString(name), encodeLong(value));
