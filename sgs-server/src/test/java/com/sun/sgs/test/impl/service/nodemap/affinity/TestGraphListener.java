@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.SystemIdentity;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
@@ -32,6 +33,8 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
@@ -47,6 +50,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -88,9 +92,11 @@ public class TestGraphListener {
     }
     
     // The listener created for each test
-    GraphListener listener;
+    private GraphListener listener;
     // The builder used by the listener
-    GraphBuilder builder;
+    private GraphBuilder builder;
+    // The collector used by the listener/builder
+    private ProfileCollector collector;
 
     private final String builderName;
     
@@ -114,8 +120,15 @@ public class TestGraphListener {
         if (builderName != null) {
             p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
         }
-        listener = new GraphListener(p);
+        collector = new ProfileCollectorImpl(ProfileLevel.MIN, p, null);
+        listener = new GraphListener(collector, p);
         builder = listener.getGraphBuilder();
+    }
+
+    @After
+    public void afterEachTest() {
+        listener.shutdown();
+        collector.shutdown();
     }
     
     @Test
@@ -417,7 +430,7 @@ public class TestGraphListener {
             p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
         }
         p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
-        listener = new GraphListener(p);
+        listener = new GraphListener(collector, p);
         builder = listener.getGraphBuilder();
 
         LabelVertex vertA = new LabelVertex(new IdentityImpl("A"));
@@ -686,7 +699,7 @@ public class TestGraphListener {
             p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
         }
         p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "0");
-        listener = new GraphListener(p);
+        listener = new GraphListener(collector, p);
     }
 
     /* Utility methods and classes. */

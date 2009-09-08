@@ -401,7 +401,7 @@ class Kernel {
                 appProperties.getProperty(StandardProperties.NODE_TYPE));
         if (type == NodeType.appNode) {
             profileCollector.addListener(
-                    new GraphListener(appProperties), false);
+                    new GraphListener(profileCollector, appProperties), false);
         }
         
         // finally, register the scheduler as a listener too

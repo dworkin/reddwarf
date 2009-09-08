@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
 import java.beans.PropertyChangeEvent;
@@ -61,19 +62,20 @@ public class GraphListener implements ProfileListener {
     /**
      * Constructs a new listener instance.  This listener is constructed
      * and registered by the kernel.
-     * 
+     *
+     * @param col the profile collector
      * @param properties application properties
      */
-    public GraphListener(Properties properties) {
+    public GraphListener(ProfileCollector col, Properties properties) {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         String builderClass = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
         if (builderClass != null) {
             builder = wrappedProps.getClassInstanceProperty(
                         GRAPH_CLASS_PROPERTY, GraphBuilder.class,
-                        new Class[] { Properties.class },
-                        properties);
+                        new Class[] {ProfileCollector.class, Properties.class},
+                        col, properties);
         } else {
-            builder = new WeightedGraphBuilder(properties);
+            builder = new WeightedGraphBuilder(col, properties);
         }
     }
     

@@ -22,7 +22,9 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
+import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
@@ -35,6 +37,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.management.JMException;
 
 /**
  * A graph builder which builds an affinity graph consisting of identities 
@@ -82,27 +85,31 @@ public class WeightedGraphBuilder implements GraphBuilder {
     // periodically remove the changes made in the earliest snapshot.
     private final PruneTask pruneTask;
 
-    // The length of time for our data change snapshots, in milliseconds
-    private final long snapshot;
-    
-    // number of calls to report, used for printing results every so often
-    // this is an aid for early testing
-    private long updateCount = 0;
-    // part of the statistics for early testing
-    private long totalTime = 0;
-
+    // Our JMX exposed information
+    private final AffinityGraphBuilderStats stats;
     /**
      * Creates a weighted graph builder.
+     * @param col the profile collector
      * @param properties  application properties
      */
-    public WeightedGraphBuilder(Properties properties) {
+    public WeightedGraphBuilder(ProfileCollector col, Properties properties) {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        snapshot = 
+        long snapshot =
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         int periodCount = wrappedProps.getIntProperty(
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
                 1, Integer.MAX_VALUE);
 
+        // Create our JMX MBean
+        stats = new AffinityGraphBuilderStats(col,
+                    affinityGraph, periodCount, snapshot);
+        try {
+            col.registerMBean(stats, AffinityGraphBuilderMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
         pruneTask = new PruneTask(periodCount);
         Timer pruneTimer = new Timer("AffinityGraphPruner", true);
         pruneTimer.schedule(pruneTask, snapshot, snapshot);
@@ -116,7 +123,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
      */
     public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
         long startTime = System.currentTimeMillis();
-        updateCount++;
+        stats.updateCountInc();
 
         LabelVertex vowner = new LabelVertex(owner);
 
@@ -181,20 +188,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
             pruneTask.updateObjectAccess(objId, owner);
         }
 
-        totalTime += System.currentTimeMillis() - startTime;
-
-        // Print out some data, just for helping look at the algorithms
-        // for now
-        if (updateCount % 500 == 0) {
-            System.out.println("Weighted Graph Builder results after " +
-                               updateCount + " updates: ");
-            System.out.println("  graph vertex count: " +
-                               affinityGraph.getVertexCount());
-            System.out.println("  graph edge count: " +
-                               affinityGraph.getEdgeCount());
-            System.out.printf("  mean graph processing time: %.2fms %n",
-                              totalTime / (double) updateCount);
-        }
+        stats.processingTimeInc(System.currentTimeMillis() - startTime);
     }
 
     /** {@inheritDoc} */
@@ -325,6 +319,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
          * Performs all processing required when a time period has ended.
          */
         public void run() {
+            stats.pruneCountInc();
             // Note: We want to make sure we don't have snapshots that are so
             // short that we cannot do all our pruning within one.
             synchronized (currentPeriodLock) {
@@ -339,6 +334,8 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 }
             }
 
+            long startTime = System.currentTimeMillis();
+            
             // Remove the earliest snasphot.
             Map<Object, Map<Identity, Integer>>
                 periodObject = periodObjectQueue.remove();
@@ -424,6 +421,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
                     }
                 }
             }
+            stats.processingTimeInc(System.currentTimeMillis() - startTime);
         }
 
         /**

@@ -22,7 +22,9 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
+import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
@@ -39,6 +41,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.management.JMException;
 
 /**
  * A graph builder which builds a bipartite graph of identities and
@@ -72,27 +75,31 @@ public class BipartiteGraphBuilder implements GraphBuilder {
     // periodically remove the changes made in the earliest snapshot.
     private final PruneTask pruneTask;
 
-    // The length of time for our snapshots, in milliseconds
-    private final long snapshot;
-    
-    // number of calls to report, used for printing results every so often
-    // this is an aid for early testing
-    private long updateCount = 0;
-    // part of the statistics for early testing
-    private long totalTime = 0;
-
+    // Our JMX exposed information
+    private final AffinityGraphBuilderStats stats;
     /**
      * Constructs a new bipartite graph builder.
+     * @param col the profile collector
      * @param props application properties
      */
-    public BipartiteGraphBuilder(Properties props) {
+    public BipartiteGraphBuilder(ProfileCollector col, Properties props) {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
-        snapshot = 
+        long snapshot =
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         int periodCount = wrappedProps.getIntProperty(
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
                 1, Integer.MAX_VALUE);
 
+        // Create our JMX MBean
+        stats = new AffinityGraphBuilderStats(col,
+                    bipartiteGraph, periodCount, snapshot);
+        try {
+            col.registerMBean(stats, AffinityGraphBuilderMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
         pruneTask = new PruneTask(periodCount);
         Timer pruneTimer = new Timer("AffinityGraphPruner", true);
         pruneTimer.schedule(pruneTask, snapshot, snapshot);
@@ -103,7 +110,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                                          AccessedObjectsDetail detail)
     {
         long startTime = System.currentTimeMillis();
-        updateCount++;
+        stats.updateCountInc();
         
         synchronized (bipartiteGraph) {
             bipartiteGraph.addVertex(owner);
@@ -126,21 +133,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 }
             }
         }
-        totalTime += System.currentTimeMillis() - startTime;
-        
-        // Print out some data, just for helping look at the algorithms
-        // for now
-        if (updateCount % 500 == 0) {
-            System.out.println("Bipartite Graph Builder results after " + 
-                               updateCount + " updates: ");
-            System.out.println("  graph vertex count: " + 
-                               bipartiteGraph.getVertexCount());
-            System.out.println("  graph edge count: " + 
-                               bipartiteGraph.getEdgeCount());
-            System.out.printf("  mean graph processing time: %.2fms %n", 
-                              totalTime / (double) updateCount);
-            getAffinityGraph();
-        }
+        stats.processingTimeInc(System.currentTimeMillis() - startTime);
     }
 
     /** {@inheritDoc} */
@@ -230,15 +223,9 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                 edge.addWeight(e.getWeight());
             }
         }
-        
-        System.out.println(" Folded graph vertex count: " + 
-                               foldedGraph.getVertexCount());
-        System.out.println(" Folded graph edge count: " + 
-                               foldedGraph.getEdgeCount());
-        System.out.println("Time for graph folding is : " +
-                (System.currentTimeMillis() - startTime) + 
-                "msec");
 
+        // Include the folded time in our total processing time
+        stats.processingTimeInc(System.currentTimeMillis() - startTime);
         return foldedGraph;
     }
 
@@ -374,6 +361,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
          * Performs all processing required when a time period has ended.
          */
         public void run() {
+            stats.pruneCountInc();
             // Update the data structures for this snapshot
             synchronized (currentPeriodLock) {
                 addPeriodStructures();
@@ -383,6 +371,8 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                     return;
                 }
             }
+
+            long startTime = System.currentTimeMillis();
 
             // take care of everything.
             Map<WeightedEdge, Integer> periodEdgeIncrements =
@@ -444,6 +434,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
                     }
                 }
             }
+            stats.processingTimeInc(System.currentTimeMillis() - startTime);
         }
 
         /**
