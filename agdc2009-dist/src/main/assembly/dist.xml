@@ -61,6 +61,12 @@
       <outputDirectory>tmp</outputDirectory>
     </fileSet>
 
+    <!-- Include the client config files -->
+    <fileSet>
+      <directory>${basedir}/src/main/snowman-client</directory>
+      <outputDirectory>snowman-client-dist-${projectsnowman.version}</outputDirectory>
+    </fileSet>
+
   </fileSets>
   
   <files>

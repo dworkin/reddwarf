@@ -1,0 +1,26 @@
+<project name="snowman-client-runner" basedir=".">
+
+<property name="client.jvm.args" value="-client -Xmx1024m -Xms32m"/>
+<property name="snowman-client.jar" value="snowman-client.jar"/>
+<property name="server.host" value="localhost"/>
+<property name="server.port" value="3000"/>
+<property name="username" value="Austin"/>
+
+<!-- Runs the client -->
+<target name="run-client" description="Runs the client">
+  <antcall target="-run-client-raw"/>
+</target>
+
+<target name="-run-client-raw">
+  <java jar="${snowman-client.jar}" fork="true" failonerror="true">
+    <jvmarg line="${client.jvm.args}"/>
+    <sysproperty key="server.host" value="${server.host}"/>
+    <sysproperty key="server.port" value="${server.port}"/>
+    <sysproperty key="username" value="${username}"/>
+    <sysproperty key="java.util.logging.config.file" file="client-logging.properties"/>
+  </java>
+  <!-- loop back around -->
+  <antcall target="run-client"/>
+</target>
+
+</project>
