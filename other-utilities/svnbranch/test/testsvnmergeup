@@ -302,6 +302,7 @@ test("Trunk directory needs updating",
      join(" &&\n",
 	  "cd $escaped_branch",
 	  "$install_dir/svnrefresh",
+	  "svn update",
 	  "svn commit -m \"Refresh\""));
 
 test("Trunk modified and needs updating",
@@ -360,6 +361,7 @@ test("Merge without refresh",
      join(" &&\n",
 	  "cd $escaped_branch",
 	  "$install_dir/svnrefresh",
+	  "svn update",
 	  "svn commit -m ''"));
 
 ####
@@ -378,9 +380,11 @@ test("Merge change to file2.txt into working copy",
 	  check_compare(escape("$trunk/file2.txt"),
 			escape("$branch/file2.txt"))),
      join(" &&\n",
+	  "svn update",
 	  "svn commit -m \"Merge branch\"",
 	  "cd $escaped_branch",
 	  "$install_dir/svnrefresh",
+	  "svn update",
 	  "svn commit -m \"Refresh\""));
 
 ####
@@ -402,6 +406,7 @@ test("Merge change to file2.txt into working copy",
 	      "cd $escaped_branch",
 	      "$install_dir/svnrefresh",
 	      "svn mv file-a-$time file-b-$time",
+	      "svn update",
 	      "svn commit -m ''",
 	      "cd $escaped_trunk"),
 	 "$svnmergeup $branch_url",
@@ -445,6 +450,7 @@ test("Merge change to file2.txt into working copy",
 	 join(" &&\n",
 	      "cd $escaped_branch",
 	      "$install_dir/svnrefresh",
+	      "svn update",
 	      "svn commit -m ''"));
 }
 
