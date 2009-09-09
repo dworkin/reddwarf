@@ -466,6 +466,8 @@ public final class WatchdogServiceImpl
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
+                logger.log(Level.WARNING,
+                           "Problem with node health : {0}", node);
                 reportFailure(localNodeId, CLASSNAME);
 		return getHealth();
 	    } else {
@@ -553,7 +555,7 @@ public final class WatchdogServiceImpl
         boolean isLocal = (nodeId == localNodeId);
 
         if (logger.isLoggable(Level.FINER) || !newHealth.isAlive()) {
-            logger.log((newHealth.isAlive() ? Level.WARNING : Level.FINER),
+            logger.log(Level.WARNING,
                        "{1} reported {2} health in {3} node with id: {0}",
                        nodeId, component, newHealth,
                        isLocal ? "local" : "remote");

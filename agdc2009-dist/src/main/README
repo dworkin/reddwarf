@@ -15,17 +15,10 @@ Project Snowman App Node:
   # java -jar ./bin/sgs-boot.jar ./conf/project-snowman-app.boot
 
 
-SGS Monitor Visualization Tool:
-
-  # cd sgs-monitor-agdc2009
-  # java -jar sgs-monitor-agdc2009.jar
-  ==> Connect to corehost:12345
-
-
 Project Snowman Client Simulator
 
   # cd snowman-client-dist-agdc2009
-  # java -DmaxClients=500 -DmoveDelay=10000 -Dhost=apphost -DbuildNumber=1 -jar ./snowman-client-simulator.jar
+  # java -DmaxClients=1000 -DmoveDelay=10000 -DnewClientDelay=150 -Dhost=apphost -DbuildNumber=1 -jar ./snowman-client-simulator.jar
   ==> Change maxClients, host, and buildNumber value as appropriate
 
 
@@ -34,7 +27,44 @@ Project Snowman Client (one-off execution)
   # cd snowman-client-dist-agdc2009
   # java -jar ./snowman-client.jar
 
+
 Project Snowman Client (continuous loop)
 
   # cd snowman-client-dist-agdc2009
   # ant -Dserver.host=appHost -Dserver.port=appPort -Dusername=username run-client
+
+
+DarkChat Core Node:
+
+  # cd sgs-server-dist-agdc2009
+  # java -jar ./bin/sgs-boot.jar ./conf/darkchat-core.boot
+
+
+DarkChat App Node:
+
+  # cp tmp/darkchat.sgs.properties ~/.sgs.properties
+  ==> UPDATE ~/.sgs.properties (com.sun.sgs.server.host should point to core hostname)
+  # cd sgs-server-dist-agdc2009
+  # java -jar ./bin/sgs-boot.jar ./conf/darkchat-app.boot
+
+
+DarkChat Client Simulator
+
+  # cd darkchat-client-dist-agdc2009
+  # java -DmaxClients=50 -DmoveDelay=10000 -DnewClientDelay=50 -Dhost=apphost -Dport=3000 -DbuildNumber=1 -jar ./darkchat-client-simulator.jar
+  ==> Change maxClients, host, and buildNumber value as appropriate
+
+
+DarkChat Command Line Client
+
+  # cd darkchat-client-dist-agdc2009
+  # java -Dhost=apphost -Dport=3000 -DbuildNumber=1 -jar ./darkchat-cmdclient.jar
+  ==> Change host as appropriate
+
+
+SGS Monitor Visualization Tool:
+
+  # cd sgs-monitor-agdc2009
+  # java -jar sgs-monitor-agdc2009.jar
+  ==> Connect to corehost:12345
+

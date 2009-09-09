@@ -21,7 +21,7 @@
 # directory where the Project Darkstar server searches
 # for application jar files.
 #
-SGS_DEPLOY = ${SGS_HOME}/deploy/project-snowman
+SGS_DEPLOY = ${SGS_HOME}/deploy/darkchat
 
 # Set this property to change the default properties
 # file used to configure the Project Darkstar Kernel.  The
@@ -29,7 +29,7 @@ SGS_DEPLOY = ${SGS_HOME}/deploy/project-snowman
 # properties that can be overridden by the application's
 # specific properties file.
 #
-SGS_PROPERTIES = ${SGS_HOME}/conf/project-snowman-app.properties
+SGS_PROPERTIES = ${SGS_HOME}/conf/darkchat-app.properties
 
 # Set this property to change the logging
 # properties file used when running the Project Darkstar

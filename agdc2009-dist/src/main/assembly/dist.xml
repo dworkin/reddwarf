@@ -35,6 +35,26 @@
       <unpack>true</unpack>
     </dependencySet>
 
+    <!-- Install the darkchat distribution into the sgs-server -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.example.darkchat:darkchat-server-dist</include>
+      </includes>
+      <outputDirectory>sgs-server-dist-${sgs-server-dist.version}/deploy/darkchat</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <unpack>true</unpack>
+    </dependencySet>
+
+    <!-- Include the snowman client distribution -->
+    <dependencySet>
+      <includes>
+        <include>com.projectdarkstar.example.darkchat:darkchat-client-dist</include>
+      </includes>
+      <outputDirectory></outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <unpack>true</unpack>
+    </dependencySet>
+
     <!-- Include the sgs-monitor tool -->
     <dependencySet>
       <includes>

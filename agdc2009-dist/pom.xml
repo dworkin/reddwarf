@@ -31,6 +31,18 @@
       <version>${projectsnowman.version}</version>
     </dependency>
     <dependency>
+      <groupId>com.projectdarkstar.example.darkchat</groupId>
+      <artifactId>darkchat-server-dist</artifactId>
+      <type>zip</type>
+      <version>${darkchat.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.example.darkchat</groupId>
+      <artifactId>darkchat-client-dist</artifactId>
+      <type>zip</type>
+      <version>${darkchat.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.sun.sgs</groupId>
       <artifactId>sgs-monitor</artifactId>
       <classifier>dist</classifier>
@@ -68,6 +80,7 @@
   <properties>
     <sgs-server-dist.version>agdc2009</sgs-server-dist.version>
     <projectsnowman.version>agdc2009</projectsnowman.version>
+    <darkchat.version>agdc2009</darkchat.version>
     <sgs-monitor.version>agdc2009</sgs-monitor.version>
   </properties>
 

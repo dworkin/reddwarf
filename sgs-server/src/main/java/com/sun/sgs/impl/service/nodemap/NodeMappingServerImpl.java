@@ -358,7 +358,7 @@ public final class NodeMappingServerImpl
         /// Don't allow offloading below every half second
         offloadDelay = wrappedProps.getLongProperty(OFFLOAD_DELAY_PROPERTY,
                                                     DEFAULT_OFFLOAD_DELAY,
-                                                    500, Long.MAX_VALUE);
+                                                    250, Long.MAX_VALUE);
 
         logger.log(Level.CONFIG,
                    "NodeMappingServerImpl, requested port: {0,number,#}, " +
