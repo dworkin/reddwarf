@@ -1,0 +1,39 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.sun.sgs.tests</groupId>
+  <artifactId>boot-acceptance-parent</artifactId>
+  <name>SGS Boot Acceptance</name>
+  <version>0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <description />
+
+  <modules>
+    <module>boot-acceptance</module>
+    <module>boot-acceptance-dist</module>
+  </modules>
+  
+  <build>
+    <plugins>
+
+      <plugin>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>1.6</source>
+	  <target>1.6</target>
+	  <encoding>UTF-8</encoding>
+	</configuration>
+      </plugin>
+      
+    </plugins>
+  </build>
+
+  <repositories>
+    <repository>
+      <id>java.net</id>
+      <name>java.net Maven2 Repository</name>
+      <url>http://download.java.net/maven/2/</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+  
+</project>
