@@ -24,6 +24,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.TransactionListenerDetail;
 
 /**
  * The portion of a profile collector that allows the kernel to modify
@@ -68,6 +69,11 @@ public class ProfileCollectorHandleImpl implements ProfileCollectorHandle {
     /** {@inheritDoc} */
     public void addParticipant(ProfileParticipantDetail participantDetail) {
         profileCollector.addParticipant(participantDetail);
+    }
+
+    /** {@inheritDoc} */
+    public void addListener(TransactionListenerDetail listenerDetail) {
+        profileCollector.addTransactionListener(listenerDetail);
     }
 
     /** {@inheritDoc} */

@@ -38,6 +38,7 @@ import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.TransactionListenerDetail;
 
 import java.beans.PropertyChangeEvent;
 
@@ -475,6 +476,31 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
+     * Tells the collector about a listener of a transaction when that
+     * listener is finished with its work (i.e., after its afterCompletion
+     * method has been called).
+     *
+     * @param listenerDetail the detail associated with the listener
+     */
+    void addTransactionListener(TransactionListenerDetail listenerDetail) {
+        if (listenerDetail == null) {
+            throw new NullPointerException("Listener detail cannot be null");
+        }
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().peek();
+        } catch (EmptyStackException ese) {
+            throw new IllegalStateException("No task is being profiled in " +
+                                            "this thread");
+        }
+        if (!profileReport.wasTaskTransactional()) {
+            throw new IllegalStateException("Listeners cannot be added " +
+                                            "to a non-transactional task");
+        }
+        profileReport.addListener(listenerDetail);
+    }
+
+    /**
      * Sets the detail for all objects accessed during the task as
      * reported to the {@code AccessCoordinator}.
      * 
@@ -545,7 +571,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         profileReport.finish();
         
         // queue up the report to be reported to our listeners
-        queue.offer(profileReport);
+        if (!queue.offer(profileReport)) {
+            logger.log(Level.FINE, "ProfileCollector queue is full");
+        }
         
         // Update the task aggregate data 
         boolean trans = profileReport.wasTaskTransactional();

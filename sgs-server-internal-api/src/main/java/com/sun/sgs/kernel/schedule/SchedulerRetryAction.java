@@ -15,21 +15,33 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
-package com.sun.sgs.impl.kernel.schedule;
+package com.sun.sgs.kernel.schedule;
 
-import com.sun.sgs.kernel.schedule.ScheduledTask;
-
-
-/** Package-private interface for notifying when delayed tasks are ready. */
-interface TimedTaskListener {
+/**
+ * Enumeration of possible retry actions that a scheduler can use to
+ * retry a failed task.
+ */
+public enum SchedulerRetryAction {
 
     /**
-     * Called when a delayed task has reached its time to run.
-     *
-     * @param task the {@code ScheduledTask} that is ready to run
+     * Indicates that a task should be dropped.
      */
-    void timedTaskReady(ScheduledTask task);
+    DROP,
+
+    /**
+     * Indicates that a task should be retried at some point in the future.
+     */
+    RETRY_LATER,
+
+    /**
+     * Indicates that a task should be retried immediately.
+     */
+    RETRY_NOW;
 
 }

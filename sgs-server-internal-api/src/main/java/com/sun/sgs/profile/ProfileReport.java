@@ -77,6 +77,15 @@ public interface ProfileReport {
     Set<ProfileParticipantDetail> getParticipantDetails();
 
     /**
+     * Returns detail about each listener for the transaction, or an
+     * empty <code>Set</code> if the task was not transactional or had
+     * no listeners.
+     *
+     * @return a <code>Set</code> of <code>TransactionListenerDetail</code>
+     */
+    Set<TransactionListenerDetail> getListenerDetails();
+
+    /**
      * Returns whether the task successfully ran to completion. If this
      * task was transactional, then this means that the task committed
      * successfully.

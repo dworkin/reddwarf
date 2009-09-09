@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.transaction;
 import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
@@ -155,17 +156,24 @@ public final class TransactionCoordinatorImpl
     }
 
     /** {@inheritDoc} */
-    public TransactionHandle createTransaction(boolean unbounded) {
-	if (unbounded) {
+    public TransactionHandle createTransaction(long timeout) {
+        if (timeout == ScheduledTask.UNBOUNDED) {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
 					     unboundedTimeout, 
                                              disablePrepareAndCommitOpt,
                                              collectorHandle);
-	} else {
-	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
-					     boundedTimeout, 
-                                             disablePrepareAndCommitOpt,
-                                             collectorHandle);
-	}
+        } else if (timeout <= 0) {
+            throw new IllegalArgumentException(
+                    "Timeout value must be greater than 0 : " + timeout);
+        }
+        return new TransactionHandleImpl(nextTid.getAndIncrement(),
+                                         timeout,
+                                         disablePrepareAndCommitOpt,
+                                         collectorHandle);
+    }
+
+    /** {@inheritDoc} */
+    public long getDefaultTimeout() {
+        return boundedTimeout;
     }
 }

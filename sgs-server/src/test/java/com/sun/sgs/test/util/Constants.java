@@ -17,19 +17,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.schedule;
+package com.sun.sgs.test.util;
 
-import com.sun.sgs.kernel.schedule.ScheduledTask;
-
-
-/** Package-private interface for notifying when delayed tasks are ready. */
-interface TimedTaskListener {
+/**
+ * Contains constant values to be used with tests.
+ */
+public final class Constants {
 
     /**
-     * Called when a delayed task has reached its time to run.
-     *
-     * @param task the {@code ScheduledTask} that is ready to run
+     * This value is the maximum clock granularity that is expected for calls
+     * to {@link java.lang.System#currentTimeMillis()
+     * System.currentTimeMillis()} across all operating systems.  In other
+     * words, this is the shortest amount of time (in milliseconds) between
+     * calls to {@code System.currentTimeMillis()} where you can be
+     * guaranteed to get different values.
      */
-    void timedTaskReady(ScheduledTask task);
+    public static final Long MAX_CLOCK_GRANULARITY =
+            Long.getLong("test.clock.granularity", 20);
 
+    /**
+     * This class should not be instantiated,
+     */
+    private Constants() {
+
+    }
 }

@@ -3290,6 +3290,7 @@ public class TestScalableList extends Assert {
 
 		Random random = new Random(randomSeed);
 		int startingPoint = random.nextInt(shadow.size() - 1);
+                System.err.println("START: " + startingPoint);
 
 		// place iterators in the middle
 		ListIterator<String> shadowIter =
@@ -3516,6 +3517,90 @@ public class TestScalableList extends Assert {
                 shadowNext = shadowIter.next();
                 listNext = listIter.next();
                 Assert.assertEquals(shadowNext, listNext);
+            }
+        }, taskOwner);
+    }
+
+    /**
+     * Test setting an object with an iterator after a call to
+     * previous returns NoSuchElementException.
+     *
+     * @throws java.lang.Exception
+     */
+    @Test
+    public void testSetAfterInvalidPrevious() throws Exception {
+        // create the list
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+
+                // Populate the list
+		for (int i = 0; i < 5; i++) {
+		    list.add(Integer.toString(i));
+		}
+
+                // place iterator at the beginning
+		ListIterator<String> listIter =
+			list.listIterator();
+
+                //attempt to get previous item for the list
+                try {
+                    listIter.previous();
+                    fail("Expected NoSuchElementException");
+                } catch (NoSuchElementException e) {
+
+                }
+
+                //attempt to set an item with the iterator
+                try {
+                    listIter.set("Test");
+                    fail("Expected IllegalStateException");
+                } catch(IllegalStateException e) {
+
+                }
+
+            }
+        }, taskOwner);
+    }
+
+    /**
+     * Test setting an object with an iterator after a call to
+     * next returns NoSuchElementException.
+     *
+     * @throws java.lang.Exception
+     */
+    @Test
+    public void testSetAfterInvalidNext() throws Exception {
+        // create the list
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+
+                // Populate the list
+		for (int i = 0; i < 5; i++) {
+		    list.add(Integer.toString(i));
+		}
+
+                // place iterator at the end
+		ListIterator<String> listIter =
+			list.listIterator(list.size());
+
+                //attempt to get next item for the list
+                try {
+                    listIter.next();
+                    fail("Expected NoSuchElementException");
+                } catch (NoSuchElementException e) {
+
+                }
+
+                //attempt to set an item with the iterator
+                try {
+                    listIter.set("Test");
+                    fail("Expected IllegalStateException");
+                } catch(IllegalStateException e) {
+
+                }
+
             }
         }, taskOwner);
     }

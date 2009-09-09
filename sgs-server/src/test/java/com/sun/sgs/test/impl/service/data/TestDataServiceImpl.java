@@ -4290,7 +4290,7 @@ public class TestDataServiceImpl{
     public void testShutdownAgain() throws Exception {
         serverNode.shutdown(false);
         serverNode = null;
-	ShutdownServiceAction action = new ShutdownServiceAction(service);
+        ShutdownServiceAction action = new ShutdownServiceAction(service);
         // the expected behavior of a second shutdown is to return silently.
         action.assertDone();
     }
@@ -5363,6 +5363,9 @@ public class TestDataServiceImpl{
 	    synchronized RuntimeException getException() {
 		return exception;
 	    }
+            public String getTypeName() {
+                return "MyTransactionListener";
+            }
 	}
 	final MyTransactionListener listener = new MyTransactionListener();
 	txnScheduler.runTask(new InitialTestRunnable() {
@@ -5535,6 +5538,7 @@ public class TestDataServiceImpl{
                         }
                     }
                 };
+                threadAction.start();
             }
         }
         ShutdownTask task = new ShutdownTask();
@@ -5631,14 +5635,6 @@ public class TestDataServiceImpl{
 	 */
 	private Throwable exception;
 
-	/**
-	 * Creates an instance of this class and starts the operation in a
-	 * separate thread.
-	 */
-	ThreadAction() {
-	    start();
-	}
-
 	/** Performs the operation and collects the results. */
 	public void run() {
 	    try {
@@ -5726,6 +5722,7 @@ public class TestDataServiceImpl{
         final DataServiceImpl service;
 	ShutdownServiceAction(DataServiceImpl service) {
             this.service = service;
+            start();
         }
         
 	protected void action() throws Exception {

@@ -17,17 +17,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.test.impl.kernel;
+package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
+import com.sun.sgs.kernel.schedule.SchedulerRetryAction;
+import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
 
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -37,8 +39,8 @@ import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.util.Properties;
-
 import java.util.concurrent.atomic.AtomicInteger;
+import java.lang.reflect.Field;
 
 import org.junit.After;
 import org.junit.Before;
@@ -58,7 +60,7 @@ import org.junit.runner.RunWith;
 public class TestTransactionSchedulerImpl {
 
     private SgsTestNode serverNode = null;
-    private TransactionScheduler txnScheduler;
+    private TransactionSchedulerImpl txnScheduler;
     private Identity taskOwner;
 
     public TestTransactionSchedulerImpl() { }
@@ -72,8 +74,8 @@ public class TestTransactionSchedulerImpl {
                                NodeType.coreServerNode.name());
         serverNode = new SgsTestNode("TestTransactionSchedulerImpl",
                                      null, properties);
-        txnScheduler = serverNode.getSystemRegistry().
-            getComponent(TransactionScheduler.class);
+        txnScheduler = (TransactionSchedulerImpl) serverNode.
+                getSystemRegistry().getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
     }
 
@@ -161,6 +163,37 @@ public class TestTransactionSchedulerImpl {
         Thread.sleep(500L);
         assertEquals(0, countRunner.getRunCount());
     }
+
+    /**
+     * Test runUnboundedTask
+     */
+    @Test (expected=NullPointerException.class)
+    public void runUnboundedTaskNullTask() throws Exception {
+        txnScheduler.runUnboundedTask(null, taskOwner);
+    }
+
+    @Test (expected=NullPointerException.class)
+    public void runUnboundedTaskNullOwner() throws Exception {
+        txnScheduler.runUnboundedTask(new TestAbstractKernelRunnable() {
+            public void run() {
+            }
+        }, null);
+    }
+
+    @Test
+    public void runUnboundedTaskSingleTask() throws Exception {
+        RunCountTestRunner runner = new RunCountTestRunner(1);
+        txnScheduler.runUnboundedTask(runner, taskOwner);
+        assertEquals(0, runner.getRunCount());
+    }
+
+    @Test(timeout=2000)
+    public void runUnboundedTaskLongTransaction() throws Exception {
+        LongTransactionRunner runner = new LongTransactionRunner(1000L);
+        txnScheduler.runUnboundedTask(runner, taskOwner);
+        assertTrue(runner.isFinished());
+    }
+
 
     /**
      * Test interruption.
@@ -262,8 +295,99 @@ public class TestTransactionSchedulerImpl {
     }
 
     /**
+     * Test retry policy
+     */
+
+    @Test public void dropFailedTask() throws Exception {
+        final Exception result = new Exception("task failed");
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.DROP));
+        final AtomicInteger i = new AtomicInteger(0);
+        final KernelRunnable r = new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                if (i.getAndIncrement() == 0)
+                    throw result;
+            }
+        };
+        try {
+            txnScheduler.runTask(r, taskOwner);
+            fail("expected Exception");
+        } catch(Exception e) {
+            assertEquals(result, e);
+        } finally {
+            assertEquals(i.get(), 1);
+        }
+    }
+
+    @Test public void retryFailedTask() throws Exception {
+        final Exception result = new Exception("task failed");
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_NOW));
+        final AtomicInteger i = new AtomicInteger(0);
+        final KernelRunnable r = new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                if (i.getAndIncrement() == 0)
+                    throw result;
+            }
+        };
+        txnScheduler.runTask(r, taskOwner);
+        assertEquals(i.get(), 2);
+    }
+
+    @Test public void handoffFailedTask() throws Exception {
+        final Exception result = new Exception("task failed");
+        replaceRetryPolicy(createRetryPolicy(SchedulerRetryAction.RETRY_LATER));
+        final AtomicInteger i = new AtomicInteger(0);
+        final KernelRunnable r = new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                if (i.getAndIncrement() == 0)
+                    throw result;
+            }
+        };
+        txnScheduler.runTask(r, taskOwner);
+        assertEquals(i.get(), 2);
+    }
+
+    /**
+     * Utility methods.
+     */
+
+    private void replaceRetryPolicy(SchedulerRetryPolicy policy)
+            throws Exception {
+        Field policyField =
+              TransactionSchedulerImpl.class.getDeclaredField("retryPolicy");
+        policyField.setAccessible(true);
+        policyField.set((TransactionSchedulerImpl) txnScheduler, policy);
+    }
+
+    private SchedulerRetryPolicy createRetryPolicy(final SchedulerRetryAction action) {
+        return new SchedulerRetryPolicy() {
+            public SchedulerRetryAction getRetryAction(ScheduledTask task) {
+                return action;
+            }
+        };
+    }
+
+    /**
      * Utility classes.
      */
+
+    private class LongTransactionRunner implements KernelRunnable {
+        private boolean finished = false;
+        private long sleep = 0;
+        LongTransactionRunner(long sleep) {
+            this.sleep = sleep;
+        }
+        public String getBaseTaskType() {
+            return LongTransactionRunner.class.getName();
+        }
+        public void run() throws Exception {
+            Thread.sleep(sleep);
+            finished = true;
+            serverNode.getProxy().getCurrentTransaction();
+        }
+        public boolean isFinished() {
+            return finished;
+        }
+    }
 
     private class RunCountTestRunner implements KernelRunnable {
         private int runCount;
@@ -306,7 +430,7 @@ public class TestTransactionSchedulerImpl {
         private static volatile int nextExpectedObjNumber = 0;
         private final int objNumber;
         private final AtomicInteger runCounter;
-        DependentTask(AtomicInteger runCounter) {
+        public DependentTask(AtomicInteger runCounter) {
             synchronized (lock) {
                 objNumber = objNumberSequence++;
             }

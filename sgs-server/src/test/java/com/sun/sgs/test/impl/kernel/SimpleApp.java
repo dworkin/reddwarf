@@ -47,6 +47,11 @@ public class SimpleApp implements AppListener, Serializable {
 	return null;
     }
     public void initialize(Properties props) {
+        try {
+            Thread.sleep(500L);
+        } catch (InterruptedException e) {
+            //ignore
+        }
 	TaskManager taskManager = AppContext.getTaskManager();
 	taskManager.schedulePeriodicTask(new MyTask(), 0, 2000);
     }
