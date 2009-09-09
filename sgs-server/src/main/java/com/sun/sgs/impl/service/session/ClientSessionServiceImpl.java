@@ -1293,7 +1293,7 @@ public final class ClientSessionServiceImpl
     }
 
     private synchronized void checkHighWater() {
-        if (handlers.size() > loginHighWater * 1.5) {
+        if (handlers.size() >= loginHighWater * 1.1) {
             setHealth(Health.ORANGE);
         } else if(handlers.size() >= loginHighWater) {
             setHealth(Health.YELLOW);

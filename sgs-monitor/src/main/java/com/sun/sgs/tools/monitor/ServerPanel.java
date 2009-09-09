@@ -52,7 +52,7 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
         this.setLayout(new BorderLayout(5, 5));
 
         if (initialData.nodeType != NodeType.coreServerNode) {
-            ServerPanel.setMaxDisplayValue(initialData.loginHighWater * 10 / 9);
+            ServerPanel.setMaxDisplayValue(initialData.loginHighWater * 11 / 9);
 
             barPanel = newBarPanel(initialData.numClients,
                                    initialData.loginHighWater,
@@ -167,6 +167,7 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
             Dimension boxSize = new Dimension(componentSize.width - 2, componentSize.height - 1);
             Dimension highWaterMark = new Dimension(boxSize.width, 0);
             int highWaterHeight = boxSize.height - boxSize.height * loginHighWater / maxDisplayValue;
+            int orangeHighWaterHeight = boxSize.height - boxSize.height * (loginHighWater * 11/10) / maxDisplayValue;
 
             paintBar(g2, boxSize);
 
@@ -174,6 +175,10 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
             g2.setColor(Color.LIGHT_GRAY);
             g2.setStroke(dashes);
             g2.draw(new Rectangle(new Point(0, highWaterHeight), highWaterMark));
+
+            g2.setColor(Color.DARK_GRAY);
+            g2.setStroke(dashes);
+            g2.draw(new Rectangle(new Point(0, orangeHighWaterHeight), highWaterMark));
 
             g2.setColor(Color.BLACK);
             g2.setStroke(stroke);
