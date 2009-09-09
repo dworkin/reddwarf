@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.kernel;
 
 /**
- * This class contains filenames that are used during Kernel
+ * This class contains property and file names that are used during Kernel
  * bootup to locate application configuration files.
  */
 final class BootProperties {
@@ -51,5 +51,11 @@ final class BootProperties {
      */
     static final String DEFAULT_LOG_PROPERTIES =
             "META-INF/logging.properties";
+
+    /**
+     * The property used to specify an optional properties file used to
+     * configure extension libraries.
+     */
+    static final String EXTENSION_FILE_PROPERTY = "com.sun.sgs.ext.properties";
 
 }

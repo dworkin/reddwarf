@@ -29,6 +29,10 @@
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-boot</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-internal-api</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
@@ -44,7 +48,7 @@
 	      <mainClass>com.sun.sgs.system.stop.Stop</mainClass>
             </manifest>
 	    <manifestEntries>
-	      <Class-Path>../conf/ sgs-boot.jar</Class-Path>
+	      <Class-Path>../conf/ sgs-boot.jar ../lib/sgs-server-internal-api-${sgs.version}.jar</Class-Path>
 	    </manifestEntries>
           </archive>
         </configuration>
