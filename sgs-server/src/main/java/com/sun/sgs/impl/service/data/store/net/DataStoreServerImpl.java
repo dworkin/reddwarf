@@ -700,7 +700,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/** Provide access to newNodeId. */
 	long localNewNodeId() {
-	    return newNodeId();
+	    return super.newNodeId();
 	}
     }
 

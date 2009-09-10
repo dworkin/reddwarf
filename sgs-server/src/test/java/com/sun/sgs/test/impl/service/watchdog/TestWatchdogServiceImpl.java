@@ -131,7 +131,7 @@ public class TestWatchdogServiceImpl extends Assert {
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
 
-    /** A new data service. */
+    /** The data service for serverNode. */
     private DataService dataService;
     
     /** The watchdog service for serverNode */
@@ -170,37 +170,14 @@ public class TestWatchdogServiceImpl extends Assert {
         systemRegistry = serverNode.getSystemRegistry();
 	serviceProps = SgsTestNode.getDefaultProperties(
 	    "TestWatchdogServiceImpl", serverNode, null);
-	Properties serverProps = serverNode.getServiceProperties();
         renewTime = Integer.valueOf(
-            serverProps.getProperty(
+            serverNode.getServiceProperties().getProperty(
                 "com.sun.sgs.impl.service.watchdog.server.renew.interval"));
 
         txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
-	dataService = createDataService(serviceProps);
+	dataService = serverNode.getDataService();
         watchdogService = (WatchdogServiceImpl) serverNode.getWatchdogService();
-    }
-
-    /**
-     * Creates a new data service and installs it, and the associated data
-     * manager, in the kernel context.
-     *
-     * @param	props the configuration properties for creating the service
-     * @return	the new data service
-     * @throws	Exception if a problem occurs when creating the service
-     */
-    private DataService createDataService(Properties props) throws Exception {
-	DataService dataService =
-	    new DataServiceImpl(props, systemRegistry, txnProxy);
-	ComponentRegistry services =
-	    new SingletonComponentRegistry(dataService);
-	ComponentRegistry managers =
-	    new SingletonComponentRegistry(
-		new ProfileDataManager(dataService));
-	Object newKernelContext = kernelContextConstructor.newInstance(
-	    "TestWatchdogServiceImpl", services, managers);
-	contextResolverSetTaskState.invoke(null, newKernelContext, taskOwner);
-	return dataService;
     }
 
     /** 
@@ -235,9 +212,6 @@ public class TestWatchdogServiceImpl extends Assert {
             }
             additionalNodes = null;
         }
-	if (dataService != null) {
-	    dataService.shutdown();
-	}
         if (serverNode != null)
             serverNode.shutdown(clean);
 	/* Wait for sockets to close down. */
@@ -247,11 +221,14 @@ public class TestWatchdogServiceImpl extends Assert {
     /* -- Test constructor -- */
 
     @Test public void testConstructor() throws Exception {
+	DataService dataService = null;
         WatchdogServiceImpl watchdog = null;
         try {
+	    dataService = createDataService(serviceProps);
             watchdog = new WatchdogServiceImpl(
 		serviceProps, systemRegistry, txnProxy, dummyShutdownCtrl);  
         } finally {
+	    if (dataService != null) dataService.shutdown();
             if (watchdog != null) watchdog.shutdown();
         }
     }
@@ -520,17 +497,9 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
 
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
-	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    "com.sun.sgs.impl.service.nodemap.client.port",
-	        String.valueOf(SgsTestNode.getNextUniquePort()),
-	    "com.sun.sgs.impl.service.watchdog.client.port",
-	        String.valueOf(SgsTestNode.getNextUniquePort()),
-            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
-            WatchdogServerPropertyPrefix + ".host", "localhost",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+	DataService dataService = createDataService(serviceProps);
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry, txnProxy,
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy,
 				    dummyShutdownCtrl);
 	try {
 	    if (! watchdog.isLocalNodeAliveNonTransactional()) {
@@ -546,6 +515,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	    }
 	    
 	} finally {
+	    dataService.shutdown();
 	    watchdog.shutdown();
 	}
     }
@@ -856,10 +826,12 @@ public class TestWatchdogServiceImpl extends Assert {
     public void testAddRecoveryListenerServiceShuttingDown()
 	throws Exception
     {
+	DataService dataService = createDataService(serviceProps);
 	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
 	    serviceProps, systemRegistry, txnProxy, dummyShutdownCtrl);
 	watchdog.shutdown();
 	watchdog.addRecoveryListener(new DummyRecoveryListener());
+	dataService.shutdown();
     }
 
     @Test(expected = NullPointerException.class)
@@ -1764,5 +1736,27 @@ public class TestWatchdogServiceImpl extends Assert {
 	public Iterator<Object> iterator() {
 	    return Collections.singleton(component).iterator();
 	}
+    }
+
+    /**
+     * Creates a new data service and installs it, and the associated data
+     * manager, in the kernel context.
+     *
+     * @param	props the configuration properties for creating the service
+     * @return	the new data service
+     * @throws	Exception if a problem occurs when creating the service
+     */
+    private DataService createDataService(Properties props) throws Exception {
+	DataService dataService =
+	    new DataServiceImpl(props, systemRegistry, txnProxy);
+	ComponentRegistry services =
+	    new SingletonComponentRegistry(dataService);
+	ComponentRegistry managers =
+	    new SingletonComponentRegistry(
+		new ProfileDataManager(dataService));
+	Object newKernelContext = kernelContextConstructor.newInstance(
+	    "TestWatchdogServiceImpl", services, managers);
+	contextResolverSetTaskState.invoke(null, newKernelContext, taskOwner);
+	return dataService;
     }
 }

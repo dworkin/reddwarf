@@ -21,11 +21,11 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.UNBOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
-import static com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl.
-    BOUNDED_TIMEOUT_DEFAULT;
-import static com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl.
-    UNBOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.service.Service;

@@ -20,6 +20,12 @@
 package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.store.BindingValue;
+import static com.sun.sgs.impl.util.DataStreamUtil.readBytes;
+import static com.sun.sgs.impl.util.DataStreamUtil.readLongs;
+import static com.sun.sgs.impl.util.DataStreamUtil.readString;
+import static com.sun.sgs.impl.util.DataStreamUtil.writeBytes;
+import static com.sun.sgs.impl.util.DataStreamUtil.writeLongs;
+import static com.sun.sgs.impl.util.DataStreamUtil.writeString;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -213,7 +219,7 @@ class DataStoreProtocol implements DataStoreServer {
 	out.writeLong(oid);
 	out.writeBoolean(forUpdate);
 	checkResult();
-	return readBytes();
+	return readBytes(in);
     }
 
     private void handleGetObject(DataStoreServer server) throws IOException {
@@ -223,7 +229,7 @@ class DataStoreProtocol implements DataStoreServer {
 	    boolean forUpdate = in.readBoolean();
 	    byte[] result = server.getObject(tid, oid, forUpdate);
 	    out.writeBoolean(true);
-	    writeBytes(result);
+	    writeBytes(result, out);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);
@@ -236,7 +242,7 @@ class DataStoreProtocol implements DataStoreServer {
 	out.writeShort(SET_OBJECT);
 	out.writeLong(tid);
 	out.writeLong(oid);
-	writeBytes(data);
+	writeBytes(data, out);
 	checkResult();
     }
 
@@ -244,7 +250,7 @@ class DataStoreProtocol implements DataStoreServer {
 	try {
 	    long tid = in.readLong();
 	    long oid = in.readLong();
-	    byte[] data = readBytes();
+	    byte[] data = readBytes(in);
 	    server.setObject(tid, oid, data);
 	    out.writeBoolean(true);
 	    out.flush();
@@ -258,10 +264,10 @@ class DataStoreProtocol implements DataStoreServer {
     {
 	out.writeShort(SET_OBJECTS);
 	out.writeLong(tid);
-	writeLongs(oids);
+	writeLongs(oids, out);
 	out.writeInt(dataArray.length);
 	for (int i = 0; i < dataArray.length; i++) {
-	    writeBytes(dataArray[i]);
+	    writeBytes(dataArray[i], out);
 	}
 	checkResult();
     }
@@ -269,11 +275,11 @@ class DataStoreProtocol implements DataStoreServer {
     private void handleSetObjects(DataStoreServer server) throws IOException {
 	try {
 	    long tid = in.readLong();
-	    long[] oids = readLongs();
+	    long[] oids = readLongs(in);
 	    int dataArrayLength = in.readInt();
 	    byte[][] dataArray = new byte[dataArrayLength][];
 	    for (int i = 0; i < dataArrayLength; i++) {
-		dataArray[i] = readBytes();
+		dataArray[i] = readBytes(in);
 	    }
 	    server.setObjects(tid, oids, dataArray);
 	    out.writeBoolean(true);
@@ -307,7 +313,7 @@ class DataStoreProtocol implements DataStoreServer {
     public BindingValue getBinding(long tid, String name) throws IOException {
 	out.writeShort(GET_BINDING);
 	out.writeLong(tid);
-	writeString(name);
+	writeString(name, out);
 	checkResult();
 	return readBindingValue();
     }
@@ -315,7 +321,7 @@ class DataStoreProtocol implements DataStoreServer {
     private void handleGetBinding(DataStoreServer server) throws IOException {
 	try {
 	    long tid = in.readLong();
-	    String name = readString();
+	    String name = readString(in);
 	    BindingValue result = server.getBinding(tid, name);
 	    out.writeBoolean(true);
 	    writeBindingValue(result);
@@ -330,7 +336,7 @@ class DataStoreProtocol implements DataStoreServer {
     {
 	out.writeShort(SET_BINDING);
 	out.writeLong(tid);
-	writeString(name);
+	writeString(name, out);
 	out.writeLong(oid);
 	checkResult();
 	return readBindingValue();
@@ -339,7 +345,7 @@ class DataStoreProtocol implements DataStoreServer {
     private void handleSetBinding(DataStoreServer server) throws IOException {
 	try {
 	    long tid = in.readLong();
-	    String name = readString();
+	    String name = readString(in);
 	    long oid = in.readLong();
 	    BindingValue result = server.setBinding(tid, name, oid);
 	    out.writeBoolean(true);
@@ -355,7 +361,7 @@ class DataStoreProtocol implements DataStoreServer {
     {
 	out.writeShort(REMOVE_BINDING);
 	out.writeLong(tid);
-	writeString(name);
+	writeString(name, out);
 	checkResult();
 	return readBindingValue();
     }
@@ -365,7 +371,7 @@ class DataStoreProtocol implements DataStoreServer {
     {
 	try {
 	    long tid = in.readLong();
-	    String name = readString();
+	    String name = readString(in);
 	    BindingValue result = server.removeBinding(tid, name);
 	    out.writeBoolean(true);
 	    writeBindingValue(result);
@@ -378,9 +384,9 @@ class DataStoreProtocol implements DataStoreServer {
     public String nextBoundName(long tid, String name) throws IOException {
 	out.writeShort(NEXT_BOUND_NAME);
 	out.writeLong(tid);
-	writeString(name);
+	writeString(name, out);
 	checkResult();
-	return readString();
+	return readString(in);
     }
 
     private void handleNextBoundName(DataStoreServer server)
@@ -388,10 +394,10 @@ class DataStoreProtocol implements DataStoreServer {
     {
 	try {
 	    long tid = in.readLong();
-	    String name = readString();
+	    String name = readString(in);
 	    String result = server.nextBoundName(tid, name);
 	    out.writeBoolean(true);
-	    writeString(result);
+	    writeString(result, out);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);
@@ -401,7 +407,7 @@ class DataStoreProtocol implements DataStoreServer {
     public int getClassId(long tid, byte[] classInfo) throws IOException {
 	out.writeShort(GET_CLASS_ID);
 	out.writeLong(tid);
-	writeBytes(classInfo);
+	writeBytes(classInfo, out);
 	checkResult();
 	return in.readInt();
     }
@@ -411,7 +417,7 @@ class DataStoreProtocol implements DataStoreServer {
     {
 	try {
 	    long tid = in.readLong();
-	    byte[] classInfo = readBytes();
+	    byte[] classInfo = readBytes(in);
 	    int result = server.getClassId(tid, classInfo);
 	    out.writeBoolean(true);
 	    out.writeInt(result);
@@ -426,7 +432,7 @@ class DataStoreProtocol implements DataStoreServer {
 	out.writeLong(tid);
 	out.writeInt(classId);
 	checkResult();
-	return readBytes();
+	return readBytes(in);
     }
 
     private void handleGetClassInfo(DataStoreServer server)
@@ -437,7 +443,7 @@ class DataStoreProtocol implements DataStoreServer {
 	    int classId = in.readInt();
 	    byte[] result = server.getClassInfo(tid, classId);
 	    out.writeBoolean(true);
-	    writeBytes(result);
+	    writeBytes(result, out);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);
@@ -572,8 +578,8 @@ class DataStoreProtocol implements DataStoreServer {
 	if (ok) {
 	    return;
 	}
-	String className = readString();
-	String message = readString();
+	String className = readString(in);
+	String message = readString(in);
 	Throwable exception;
 	try {
 	    Class<? extends Throwable> exceptionClass =
@@ -602,73 +608,19 @@ class DataStoreProtocol implements DataStoreServer {
      */
     private void failure(Throwable t) throws IOException {
 	out.writeBoolean(false);
-	writeString(t.getClass().getName());
-	writeString(t.getMessage());
+	writeString(t.getClass().getName(), out);
+	writeString(t.getMessage(), out);
 	out.flush();
-    }
-
-    /**
-     * Read the number of bytes and the byte data from input and return the
-     * resulting array.
-     */
-    private byte[] readBytes() throws IOException {
-	int numBytes = in.readInt();
-	byte[] result = new byte[numBytes];
-	in.readFully(result);
-	return result;
-    }
-
-    /** Write the number of bytes and the byte data to output. */
-    private void writeBytes(byte[] bytes) throws IOException {
-	out.writeInt(bytes.length);
-	out.write(bytes);
-    }
-
-    /**
-     * Read a string or null from input.  If the initial boolean value is true,
-     * the next item is the UTF for the string; otherwise, the string was null.
-     */
-    private String readString() throws IOException {
-	return in.readBoolean() ? in.readUTF() : null;
-    }
-
-    /** Write a string or null to output. */
-    private void writeString(String string) throws IOException {
-	if (string == null) {
-	    out.writeBoolean(false);
-	} else {
-	    out.writeBoolean(true);
-	    out.writeUTF(string);
-	}
-    }
-
-    /** Read an array of longs from input. */
-    private long[] readLongs() throws IOException {
-	int len = in.readInt();
-	long[] result = new long[len];
-	for (int i = 0; i < len; i++) {
-	    result[i] = in.readLong();
-	}
-	return result;
-    }
-
-    /** Write an array of longs to output. */
-    private void writeLongs(long[] array) throws IOException {
-	int len = array.length;
-	out.writeInt(len);
-	for (int i = 0; i < len; i++) {
-	    out.writeLong(array[i]);
-	}
     }
 
     /** Read a BindingValue from input. */
     private BindingValue readBindingValue() throws IOException {
-	return new BindingValue(in.readLong(), readString());
+	return new BindingValue(in.readLong(), readString(in));
     }
 
     /** Write a BindingValue to output. */
     private void writeBindingValue(BindingValue result) throws IOException {
 	out.writeLong(result.getObjectId());
-	writeString(result.getNextName());
+	writeString(result.getNextName(), out);
     }
 }
