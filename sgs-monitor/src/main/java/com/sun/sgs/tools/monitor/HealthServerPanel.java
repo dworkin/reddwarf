@@ -15,7 +15,7 @@ import java.awt.Rectangle;
 public class HealthServerPanel extends ServerPanel {
 
     public HealthServerPanel(ServerModel.DataPacket initialData) {
-        super(initialData);
+        super(initialData, true);
     }
 
     @Override

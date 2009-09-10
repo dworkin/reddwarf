@@ -35,6 +35,7 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
 
     protected static int maxDisplayValue = 0;
     protected static SwingPropertyChangeSupport maxDisplayValueSupport = new SwingPropertyChangeSupport(ServerPanel.class, true);
+    protected static final Stroke dashes = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{5}, 0f);
 
     private JLabel nodeLabel;
     private JLabel hostLabel;
@@ -44,12 +45,14 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
     private JSlider highWaterSlider;
     private int loginHighWater;
     private PropertyChangeSupport highWaterChangeSupport = new PropertyChangeSupport(this.loginHighWater);
+    private boolean showHighWater;
 
 
-    public ServerPanel(ServerModel.DataPacket initialData) {
+    public ServerPanel(ServerModel.DataPacket initialData, boolean showHighWater) {
         super();
         this.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         this.setLayout(new BorderLayout(5, 5));
+        this.showHighWater = showHighWater;
 
         if (initialData.nodeType != NodeType.coreServerNode) {
             ServerPanel.setMaxDisplayValue(initialData.loginHighWater * 11 / 9);
@@ -62,12 +65,15 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
             centerLabel = new JLabel(String.valueOf(initialData.numClients),
                                      JLabel.CENTER);
             barPanel.add(centerLabel, BorderLayout.CENTER);
+            this.add(barPanel, BorderLayout.CENTER);
+
             highWaterSlider = new JSlider(JSlider.VERTICAL, 0, maxDisplayValue, initialData.loginHighWater);
             highWaterSlider.addChangeListener(this);
             this.loginHighWater = initialData.loginHighWater;
+            if (showHighWater) {
+                this.add(highWaterSlider, BorderLayout.WEST);
+            }
 
-            this.add(barPanel, BorderLayout.CENTER);
-            this.add(highWaterSlider, BorderLayout.WEST);
             maxDisplayValueSupport.addPropertyChangeListener(this);
         } else {
             centerLabel = new JLabel("Core Node", JLabel.CENTER);
@@ -136,9 +142,7 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
 
     protected abstract BarPanel newBarPanel(int numClients, int loginHighWater, Node.Health nodeHealth, Client[] clients);
 
-    protected abstract static class BarPanel extends JComponent {
-
-        protected static final Stroke dashes = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{5}, 0f);
+    protected abstract class BarPanel extends JComponent {
         
         protected int numClients;
         protected int loginHighWater;
@@ -171,14 +175,18 @@ public abstract class ServerPanel extends JPanel implements PropertyChangeListen
 
             paintBar(g2, boxSize);
 
-            Stroke stroke = g2.getStroke();
-            g2.setColor(Color.LIGHT_GRAY);
-            g2.setStroke(dashes);
-            g2.draw(new Rectangle(new Point(0, highWaterHeight), highWaterMark));
 
-            g2.setColor(Color.DARK_GRAY);
-            g2.setStroke(dashes);
-            g2.draw(new Rectangle(new Point(0, orangeHighWaterHeight), highWaterMark));
+            Stroke stroke = g2.getStroke();
+
+            if (showHighWater) {
+                g2.setColor(Color.LIGHT_GRAY);
+                g2.setStroke(dashes);
+                g2.draw(new Rectangle(new Point(0, highWaterHeight), highWaterMark));
+
+                g2.setColor(Color.DARK_GRAY);
+                g2.setStroke(dashes);
+                g2.draw(new Rectangle(new Point(0, orangeHighWaterHeight), highWaterMark));
+            }
 
             g2.setColor(Color.BLACK);
             g2.setStroke(stroke);
