@@ -29,6 +29,7 @@ public class GroupServerPanel extends ServerPanel {
         private static final String RED_ROOM = "RED";
         private static final String BLUE_ROOM = "BLUE";
         private static final String GREEN_ROOM = "GREEN";
+        private static final String ORANGE_ROOM = "ORANGE";
 
         public GroupBarPanel(int numClients, int loginHighWater, Node.Health nodeHealth, Client[] clients) {
             super(numClients, loginHighWater, nodeHealth, clients);
@@ -40,6 +41,7 @@ public class GroupServerPanel extends ServerPanel {
             int redClients = 0;
             int blueClients = 0;
             int greenClients = 0;
+            int orangeClients = 0;
             int grayClients = 0;
 
             for (Client c : clients) {
@@ -49,6 +51,8 @@ public class GroupServerPanel extends ServerPanel {
                     blueClients++;
                 } else if (c.getGroup().equals(GREEN_ROOM)) {
                     greenClients++;
+                } else if (c.getGroup().equals(ORANGE_ROOM)) {
+                    orangeClients++;
                 } else {
                     grayClients++;
                 }
@@ -58,6 +62,7 @@ public class GroupServerPanel extends ServerPanel {
             Dimension redSize = new Dimension(boxSize.width, boxSize.height * redClients / maxDisplayValue);
             Dimension blueSize = new Dimension(boxSize.width, boxSize.height * blueClients / maxDisplayValue);
             Dimension greenSize = new Dimension(boxSize.width, boxSize.height * greenClients / maxDisplayValue);
+            Dimension orangeSize = new Dimension(boxSize.width, boxSize.height * orangeClients / maxDisplayValue);
 
             g2.setColor(Color.WHITE);
             g2.fill(new Rectangle(new Point(0, boxSize.height - graySize.height), graySize));
@@ -70,6 +75,9 @@ public class GroupServerPanel extends ServerPanel {
 
             g2.setColor(Color.GREEN);
             g2.fill(new Rectangle(new Point(0, boxSize.height - redSize.height - blueSize.height - greenSize.height), greenSize));
+
+            g2.setColor(Color.ORANGE);
+            g2.fill(new Rectangle(new Point(0, boxSize.height - redSize.height - blueSize.height - greenSize.height - orangeSize.height), orangeSize));
         }
 
     }

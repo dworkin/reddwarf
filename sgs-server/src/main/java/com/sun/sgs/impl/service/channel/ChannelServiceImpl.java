@@ -848,14 +848,15 @@ public final class ChannelServiceImpl
             transactionScheduler.runTask(
                     new AbstractKernelRunnable("CheckChannelNames") {
                         public void run() {
-                            String sessionName = sessionService.getName(sessionRefId);
+                            ClientSession session = (ClientSession) getObjectForId(sessionRefId);
+                            String sessionName = session.getName();
                             String channelName = null;
                             System.out.println("Session " + sessionName + "(" + sessionRefId + ") moved, checking channels");
                             for (final BigInteger channelRefId : channelSet) {
                                 ChannelImpl channelImpl =
                                             (ChannelImpl) getObjectForId(channelRefId);
                                 System.out.println("Checking " + channelImpl.getName());
-                                if ((channelImpl != null) && (channelImpl.getName() != sessionName)) {
+                                if ((channelImpl != null) && !(channelImpl.getName().equals(sessionName)))  {
                                     channelName = channelImpl.getName();
                                 }
                             }

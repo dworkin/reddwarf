@@ -54,7 +54,7 @@ public class UserGroupFinderServerImpl implements GroupFinder,
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".finder"));
 
     /** The property name for the update period. */
-    static final String UPDATE_PERIOD_PROPERTY = PKG_NAME + ".server.port";
+    static final String UPDATE_PERIOD_PROPERTY = PKG_NAME + ".update.period";
 
     /** The default value of the update period, in seconds. */
     static final int DEFAULT_UPDATE_PERIOD = 30;
