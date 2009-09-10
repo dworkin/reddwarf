@@ -41,6 +41,22 @@ import java.io.ObjectStreamClass;
 public interface DataStore {
 
     /**
+     * Notifies the data store that services associated with the application
+     * have been successfully created.  If the method throws an exception, then
+     * the application should be shutdown.
+     *
+     * @throws Exception if an error occurs
+     */
+    void ready() throws Exception;
+
+    /**
+     * Returns the node ID for the local node.
+     *
+     * @return	the node ID for the local node
+     */
+    long getLocalNodeId();
+
+    /**
      * Reserves an object ID for a new object.  Note that calling other
      * operations using this ID are not required to find the object until
      * {@link #setObject setObject} or {@link #setObjects setObjects} is

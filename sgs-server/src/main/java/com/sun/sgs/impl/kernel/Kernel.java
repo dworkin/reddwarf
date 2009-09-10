@@ -519,6 +519,8 @@ class Kernel {
             appProperties.getProperty(StandardProperties.DATA_MANAGER,
                                       DEFAULT_DATA_MANAGER);
         setupService(dataServiceClass, dataManagerClass, startupContext);
+	shutdownCtrl.setDataService(
+	    startupContext.getService(DataService.class));
 
         // load the watch-dog service, which has no associated manager
 
@@ -963,10 +965,19 @@ class Kernel {
     private final class KernelShutdownControllerImpl implements
             KernelShutdownController 
     {
+	private DataService dataService = null;
         private WatchdogService watchdogSvc = null;
         private boolean shutdownQueued = false;
         private boolean isReady = false;
         private final Object shutdownQueueLock = new Object();
+
+        /**
+         * Provides the shutdown controller with the {@code DataService}, for
+         * use during shutdown.
+         */
+        public void setDataService(DataService dataService) {
+	    this.dataService = dataService;
+        }
 
         /**
          * This method gives the shutdown controller a handle to the
@@ -1009,12 +1020,15 @@ class Kernel {
                     } else {
                         // component shutdown; we go through the watchdog to
                         // cleanup and notify the server first
-                        if (watchdogSvc != null) {
-                            watchdogSvc.reportFailure(watchdogSvc.
-                                    getLocalNodeId(),
-                                    caller.getClass().toString());
+                        if (dataService != null &&
+			    watchdogSvc != null)
+			{
+                            watchdogSvc.reportFailure(
+				dataService.getLocalNodeId(),
+				caller.getClass().toString());
                         } else {
-                            // shutdown directly if watchdog has not been setup
+                            // shutdown directly if data service and watchdog
+                            // have not been setup
                             runShutdown();
                         }
                     }

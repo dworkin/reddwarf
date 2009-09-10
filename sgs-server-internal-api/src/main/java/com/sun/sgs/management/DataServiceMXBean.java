@@ -112,6 +112,14 @@ public interface DataServiceMXBean {
     long getSetBindingCalls();
   
     /**
+     * Returns the number of times {@link DataService#getLocalNodeId
+     * getLocalNodeId} has been called.
+     * 
+     * @return the number of times {@code getLocalNodeId} has been called
+     */
+    long getGetLocalNodeIdCalls();
+
+    /**
      * Returns the number of times 
      * {@link DataService#createReferenceForId createReferenceForId} 
      * has been called.

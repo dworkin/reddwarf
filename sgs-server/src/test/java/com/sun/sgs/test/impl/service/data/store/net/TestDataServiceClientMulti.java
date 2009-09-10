@@ -17,22 +17,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.test.impl.service.data.store;
+package com.sun.sgs.test.impl.service.data.store.net;
 
-import com.sun.sgs.service.store.DataStore;
-import com.sun.sgs.test.util.InMemoryDataStore;
-import com.sun.sgs.tools.test.FilteredNameRunner;
-import org.junit.runner.RunWith;
+import com.sun.sgs.test.impl.service.data.BasicDataServiceMultiTest;
+import com.sun.sgs.test.util.SgsTestNode;
+import java.util.Properties;
 
 /**
- * Tests the isolation that {@link AbstractDataStore} enforces between
- * transactions.
+ * Perform multi-node tests on the {@code DataService} using the network data
+ * store.
  */
-@RunWith(FilteredNameRunner.class)
-public class TestAbstractDataStoreTxnIsolation extends BasicTxnIsolationTest {
+public class TestDataServiceClientMulti extends BasicDataServiceMultiTest {
 
-    /** Creates an {@link InMemoryDataStore}. */
-    protected DataStore createDataStore() {
-	return new InMemoryDataStore(props, env.systemRegistry, txnProxy);
+    @Override
+    protected Properties getServerProperties() throws Exception {
+	return SgsTestNode.getDefaultProperties(appName, null, null);
     }
 }

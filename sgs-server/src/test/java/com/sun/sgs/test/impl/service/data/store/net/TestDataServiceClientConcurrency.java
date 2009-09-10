@@ -57,8 +57,7 @@ public class TestDataServiceClientConcurrency
 	DataServiceImpl.class.getName();
 
     /** Creates an instance. */
-    public TestDataServiceClientConcurrency(String name) {
-	super(name);
+    public TestDataServiceClientConcurrency() {
 	/* Reduce the size of the test -- the networked version is slower */
 	operations = Integer.getInteger("test.operations", 5000);
 	objects = Integer.getInteger("test.objects", 500);

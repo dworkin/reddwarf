@@ -29,13 +29,16 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /**
@@ -62,8 +65,8 @@ import org.junit.runner.RunWith;
  * Time: 9.4 ms per transaction
  */
 @IntegrationTest
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestDataServicePerformance extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public class TestDataServicePerformance extends Assert {
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
@@ -91,61 +94,47 @@ public class TestDataServicePerformance extends TestCase {
     /** Whether to flush to disk on transaction commits. */
     protected boolean testFlush = Boolean.getBoolean("test.flush");
 
-    /** Set when the test passes. */
-    protected boolean passed;
-
     /** The server node. */
     private SgsTestNode serverNode = null;
 
     /** Creates the test. */
-    public TestDataServicePerformance(String name) {
-	super(name);
-    }
+    public TestDataServicePerformance() { }
 
-    /** Prints the test case and sets up the service properties. */
-    protected void setUp() throws Exception {
-	System.err.println("Testcase: " + getName());
+    /** Prints test properties. */
+    @Before
+    public void setUp() throws Exception {
 	System.err.println("Parameters:" +
 			   "\n  test.items=" + items +
 			   "\n  test.modify.items=" + modifyItems +
 			   "\n  test.count=" + count);
     }
 
-    /** Sets passed if the test passes. */
-    protected void runTest() throws Throwable {
-	super.runTest();
-	passed = true;
-    }
-
-    /**
-     * Deletes the directory if the test passes and the directory was
-     * created.
-     */
-    protected void tearDown() throws Exception {
+    /** Shuts down the server */
+    @After
+    public void tearDown() throws Exception {
 	if (serverNode != null) {
 	    try {
 		shutdown();
 	    } catch (RuntimeException e) {
-		if (passed) {
-		    throw e;
-		} else {
-		    e.printStackTrace();
-		}
+		e.printStackTrace();
+		throw e;
 	    }
 	}
     }
 
     /** Shuts down the service. */
     protected void shutdown() throws Exception {
-	serverNode.shutdown(passed);
+	serverNode.shutdown(true);
     }
 
     /* -- Tests -- */
 
+    @Test
     public void testRead() throws Exception {
 	doTestRead(true);
     }
 
+    @Test
     public void testReadNoDetectMods() throws Exception {
 	doTestRead(false);
     }
@@ -183,6 +172,7 @@ public class TestDataServicePerformance extends TestCase {
         }
     }
 
+    @Test
     public void testReadForUpdate() throws Exception {
 	Properties props = getNodeProps();
 	props.setProperty("com.sun.sgs.txn.timeout", "10000");
@@ -214,6 +204,7 @@ public class TestDataServicePerformance extends TestCase {
         }
     }
 
+    @Test
     public void testMarkForUpdate() throws Exception {
 	Properties props = getNodeProps();
 	props.setProperty("com.sun.sgs.txn.timeout", "10000");
@@ -248,14 +239,17 @@ public class TestDataServicePerformance extends TestCase {
         }
     }
 
+    @Test
     public void testWrite() throws Exception {
 	doTestWrite(true, false);
     }
 
+    @Test
     public void testWriteNoDetectMods() throws Exception {
 	doTestWrite(false, false);
     }
 
+    @Test
     public void testWriteFlush() throws Exception {
 	if (!testFlush) {
 	    System.err.println("Skipping");
