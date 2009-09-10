@@ -23,6 +23,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.management.AffinityGroupFinderMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * The server portion of the distributed label propagation algorithm.
@@ -115,22 +118,35 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // results from the expected iteration.
     private final AtomicLong runNumber = new AtomicLong();
 
-    // The total amount of time the last algorithm run took.
-    private long runTime;
-
+    // Our JMX info
+    private final AffinityGroupFinderStats stats;
+    
     /**
      * Constructs a new label propagation server. Only one should exist
      * within a Darkstar cluster.
+     * @param col the profile collector
      * @param properties the application properties
      * @throws IOException if an error occurs
      */
-    public LabelPropagationServer(Properties properties) throws IOException {
+    public LabelPropagationServer(ProfileCollector col, Properties properties)
+            throws IOException
+    {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
                 SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
         // Export ourself.
         exporter = new Exporter<LPAServer>(LPAServer.class);
         exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
+
+        // Create our JMX MBean
+        stats = new AffinityGroupFinderStats(col, MAX_ITERATIONS);
+        try {
+            col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
     }
 
     // ---- Implement AffinityGroupFinder --- //
@@ -173,6 +189,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // affinity group information.
         long startTime = System.currentTimeMillis();
 
+        stats.runsCountInc();
+
         // Don't pay any attention to changes while we're running, at least
         // to start with.  If a node fails, we'll stop and return no information
         // for now.  When a node fails, a lot of changes will occur in the
@@ -202,6 +220,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 running = false;
                 runningLock.notifyAll();
             }
+            stats.failedCountInc();
+            stats.setNumGroups(0);
             return retVal;
         }
 
@@ -211,7 +231,10 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // on the failed node as being part of any group.
         retVal = gatherFinalGroups(clientProxyCopy);
 
-        runTime = System.currentTimeMillis() - startTime;
+        long runTime = System.currentTimeMillis() - startTime;
+        stats.runtimeSample(runTime);
+        stats.iterationsSample(currentIteration);
+        stats.setNumGroups(retVal.size());
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Algorithm took {0} milliseconds and {1} " +
                     "iterations", runTime, currentIteration);
@@ -384,6 +407,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             waitOnLatch();
             // Papers show most work is done after 5 iterations
             if (++currentIteration >= MAX_ITERATIONS) {
+                stats.stoppedCountInc();
                 logger.log(Level.FINE, "exceeded {0} iterations, stopping",
                         MAX_ITERATIONS);
                 break;
@@ -494,23 +518,5 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         } catch (InterruptedException ex) {
             runFailed = true;
         }
-    }
-
-    // For testing
-    /**
-     * Returns the time, in milliseconds, that the last algorithm run took.
-     * @return time in milliseconds for the last algorithm run
-     */
-    public long getRunTime() {
-        return runTime;
-    }
-
-    /**
-     * Returns the number of iterations for the last algorithm run.  If called
-     * in the midst of a run, returns the current iteration number.
-     * @return the number of iterations for the last algorithm run
-     */
-    public int getIterationCount() {
-        return currentIteration;
     }
 }

@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
@@ -31,6 +32,8 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -39,7 +42,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +90,7 @@ public class TestLPA {
     private TestLPAServer server;
     private String localHost;
     private int serverPort;
+    private ProfileCollector collector;
 
     @Before
     public void setup() throws Exception {
@@ -95,7 +98,8 @@ public class TestLPA {
         serverPort = getNextUniquePort();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
-        server = new TestLPAServer(props);
+        collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
+        server = new TestLPAServer(collector, props);
         localHost = InetAddress.getLocalHost().getHostName();
     }
 
@@ -104,6 +108,7 @@ public class TestLPA {
         if (server != null) {
             server.shutdown();
             server = null;
+            collector.shutdown();
         }
     }
     /**
@@ -801,8 +806,10 @@ public class TestLPA {
         private AtomicInteger finishedIterationCount = new AtomicInteger(0);
         private AtomicInteger readyToBeginCount = new AtomicInteger(0);
 
-        public TestLPAServer(Properties properties) throws IOException {
-            super(properties);
+        public TestLPAServer(ProfileCollector col, Properties properties)
+                throws IOException
+        {
+            super(col, properties);
         }
 
         /** {@inheritDoc} */

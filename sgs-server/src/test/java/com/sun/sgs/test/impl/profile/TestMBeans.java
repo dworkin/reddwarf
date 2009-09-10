@@ -727,7 +727,7 @@ public class TestMBeans {
     }
     
     @Test
-    public void tesNodeMapServiceMXBean() throws Exception {
+    public void testNodeMapServiceMXBean() throws Exception {
         // Turn on profiling for the service
         ProfileConsumer cons = 
             getCollector(serverNode).getConsumer(

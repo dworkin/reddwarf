@@ -64,7 +64,14 @@ public interface AffinityGroupFinderMXBean {
      * runs.
      * @return the average amount of time spent in algorithm runs
      */
-    long getAvgRunTime();
+    double getAvgRunTime();
+
+    /**
+     * Returns the minimum amount of time, in milliseconds, spent in an
+     * algorithm run.
+     * @return the minimum amount of time spent in an algorithm run
+     */
+    long getMinRunTime();
 
     /**
      * Returns the maximum amount of time, in milliseconds, spent in an
@@ -77,7 +84,7 @@ public interface AffinityGroupFinderMXBean {
      * Returns the average number of iterations required for algorithm runs.
      * @return the average number of iterations required for algorithm runs
      */
-    int getAvgIterations();
+    double getAvgIterations();
 
     /**
      * Returns the max number of iterations for any algorithm run.
@@ -92,4 +99,18 @@ public interface AffinityGroupFinderMXBean {
      */
     int getStopIteration();
 
+    /**
+     * Clears all data values.
+     */
+    void clear();
+
+    /**
+     * Returns the time of the last call to {@link #clear}, or the time
+     * this MBean was created {@code clear} has never been called.  The
+     * time is the difference, measured in milliseconds, between the time at
+     * which this was last cleared and midnight, January 1, 1970 UTC.
+     *
+     * @return the time of the last call to {@code clear}
+     */
+    long getLastClearTime();
 }

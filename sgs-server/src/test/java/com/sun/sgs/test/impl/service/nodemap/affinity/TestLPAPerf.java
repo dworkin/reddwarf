@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.Graphs;
@@ -27,7 +28,10 @@ import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
+import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.IntegrationTest;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
@@ -35,8 +39,6 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -47,6 +49,7 @@ import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
+import static org.junit.Assert.assertNotNull;
 /**
  * Test of single node performance of label propagation.
  * This is useful for modifying parameters before integrating
@@ -66,6 +69,9 @@ public class TestLPAPerf {
 
     // server used for single node tests
     private static LabelPropagationServer lpaServer;
+
+    // profile collector
+    private static ProfileCollector collector;
 
     /** The default initial unique port for this test suite. */
     private final static int DEFAULT_PORT = 20000;
@@ -95,12 +101,15 @@ public class TestLPAPerf {
 
     @BeforeClass
     public static void before() throws Exception {
-        lpaServer = new LabelPropagationServer(new Properties());
+        Properties props = new Properties();
+        collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
+        lpaServer = new LabelPropagationServer(collector, props);
     }
 
     @AfterClass
     public static void after() throws Exception {
         lpaServer.shutdown();
+        collector.shutdown();
     }
 
     @Test
@@ -176,7 +185,7 @@ public class TestLPAPerf {
             int serverPort = nextUniquePort.incrementAndGet();
             props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                        String.valueOf(serverPort));
-            server = new LabelPropagationServer(props);
+            server = new LabelPropagationServer(collector, props);
             String localHost = InetAddress.getLocalHost().getHostName();
 
             LabelPropagation lp1 =
@@ -211,7 +220,8 @@ public class TestLPAPerf {
         int serverPort = nextUniquePort.incrementAndGet();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
-        LabelPropagationServer server = new LabelPropagationServer(props);
+        LabelPropagationServer server = 
+                new LabelPropagationServer(collector, props);
         String localHost = InetAddress.getLocalHost().getHostName();
 
         LabelPropagation lp1 =
@@ -230,10 +240,11 @@ public class TestLPAPerf {
                     DistributedZachBuilder.NODE3, localHost, serverPort,
                         true, numThreads);
 
-        long avgTime = 0;
-        long maxTime = 0;
-        long minTime = Integer.MAX_VALUE;
-        int avgIter = 0;
+        AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
+            collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
+        assertNotNull(bean);
+        bean.clear();
+        
         double avgMod  = 0.0;
         double maxMod = 0.0;
         double minMod = 1.0;
@@ -243,15 +254,9 @@ public class TestLPAPerf {
                 Graphs.calcModularity(new ZachBuilder().getAffinityGraph(),
                                       groups);
 
-            long time = server.getRunTime();
-            avgTime = avgTime + time;
-            maxTime = Math.max(maxTime, time);
-            minTime = Math.min(minTime, time);
-            avgIter = avgIter + server.getIterationCount();
             avgMod = avgMod + mod;
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
-//            System.out.printf("run %d, modularity: %.4f \n", i, mod);
         }
         System.out.printf("DIST (%d runs, %d threads): " +
                   "avg time : %4.2f ms, " +
@@ -259,9 +264,10 @@ public class TestLPAPerf {
                   " avg iters : %4.2f, avg modularity: %.4f, " +
                   " modularity range [%.4f - %.4f] %n",
                   RUNS, numThreads,
-                  avgTime/(double) RUNS,
-                  minTime, maxTime,
-                  avgIter/(double) RUNS,
+                  bean.getAvgRunTime(),
+                  bean.getMinRunTime(),
+                  bean.getMaxRunTime(),
+                  bean.getAvgIterations(),
                   avgMod/(double) RUNS,
                   minMod, maxMod);
         server.shutdown();

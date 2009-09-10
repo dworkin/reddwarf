@@ -135,7 +135,7 @@ public class AffinityGraphBuilderStats extends StandardMBean
         } else if (info.getName().equals("UpdateCount")) {
             description = "The number of updates (additions) to the graph.";
         } else if (info.getName().equals("PruneCount")) {
-            description = "Then number of times the graph was pruned (had dead"
+            description = "The number of times the graph was pruned (had dead"
                    +  " information removed";
         } else if (info.getName().equals("SnapshotCount")) {
             description = "The configured number of live snapshots of the"
