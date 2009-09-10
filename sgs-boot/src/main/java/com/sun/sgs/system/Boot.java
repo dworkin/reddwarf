@@ -19,6 +19,7 @@
 
 package com.sun.sgs.system;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.BufferedOutputStream;
@@ -38,6 +39,8 @@ import java.util.Scanner;
  */
 public final class Boot {
     private static final Logger logger = Logger.getLogger(Boot.class.getName());
+
+    private static volatile Process sgsProcess = null;
 
     /**
      * This class should not be instantiated.
@@ -159,21 +162,38 @@ public final class Boot {
                 throw e;
             }
         }
+
+        // install a handler to cleanup when the process is killed directly
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+                public void run() {
+                    if (sgsProcess != null) {
+                        sgsProcess.destroy();
+                        closeStream(sgsProcess.getOutputStream());
+                        closeStream(sgsProcess.getInputStream());
+                        closeStream(sgsProcess.getErrorStream());
+                    }
+                }
+                private void closeStream(Closeable c) {
+                    try {
+                        c.close();
+                    } catch (IOException ioe) { }
+                }
+            });
         
         //run the process
-        Process p = null;
         try {
-            p = pb.start();
-            new Thread(new StreamPipe(p.getInputStream(), output)).start();
-            p.waitFor();
+            sgsProcess = pb.start();
+            new Thread(new StreamPipe(sgsProcess.getInputStream(),
+                                      output)).start();
+            sgsProcess.waitFor();
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to start process", e);
             throw e;
         } catch (InterruptedException i) {
             logger.log(Level.WARNING, "Thread interrupted", i);
         } finally {
-            if (p != null) {
-                p.destroy();
+            if (sgsProcess != null) {
+                sgsProcess.destroy();
             }
             output.close();
         }
