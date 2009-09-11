@@ -51,14 +51,14 @@ DarkChat App Node:
 DarkChat Client Simulator
 
   # cd darkchat-client-dist-agdc2009
-  # java -DmaxClients=50 -DmoveDelay=30000 -DnewClientDelay=150 -Dhost=apphost -Dport=3000 -DbuildNumber=1 -jar ./darkchat-client-simulator.jar
+  # java -DmaxClients=50 -DmoveDelay=30000 -DnewClientDelay=150 -Dhost=apphost -Dport=3000 -DbuildNumber=1 -Dreconnect.delay=500 -jar ./darkchat-client-simulator.jar
   ==> Change maxClients, host, and buildNumber value as appropriate
 
 
 DarkChat Command Line Client
 
   # cd darkchat-client-dist-agdc2009
-  # java -Dhost=apphost -Dport=3000 -DbuildNumber=1 -jar ./darkchat-cmdclient.jar
+  # java -Dhost=apphost -Dport=3000 -DbuildNumber=1 -Dreconnect.delay=500 -jar ./darkchat-cmdclient.jar
   ==> Change host as appropriate
 
 

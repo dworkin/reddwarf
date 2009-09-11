@@ -660,7 +660,7 @@ public final class ChannelServiceImpl
 		}
 		channelSet.add(channelRefId);
 
-                System.out.println("Putting " + sessionRefId + " into map with " + name);
+                //System.out.println("Putting " + sessionRefId + " into map with " + name);
                 demoMap.put(sessionRefId.toString(), name);
 
 		// TBD: If the session is disconnecting, then session needs
@@ -851,18 +851,18 @@ public final class ChannelServiceImpl
                             ClientSession session = (ClientSession) getObjectForId(sessionRefId);
                             String sessionName = session.getName();
                             String channelName = null;
-                            System.out.println("Session " + sessionName + "(" + sessionRefId + ") moved, checking channels");
+                            //System.out.println("Session " + sessionName + "(" + sessionRefId + ") moved, checking channels");
                             for (final BigInteger channelRefId : channelSet) {
                                 ChannelImpl channelImpl =
                                             (ChannelImpl) getObjectForId(channelRefId);
-                                System.out.println("Checking " + channelImpl.getName());
+                                //System.out.println("Checking " + channelImpl.getName());
                                 if ((channelImpl != null) && !(channelImpl.getName().equals(sessionName)))  {
                                     channelName = channelImpl.getName();
                                 }
                             }
-                            System.out.println("Channel name found= " + channelName);
+                            //System.out.println("Channel name found= " + channelName);
                             if (channelName != null) {
-                                System.out.println("Putting " + sessionRefId + " into map with " + channelName);
+                                //System.out.println("Putting " + sessionRefId + " into map with " + channelName);
                                 demoMap.put(sessionRefId.toString(), channelName);
                             }
                         }
@@ -910,7 +910,7 @@ public final class ChannelServiceImpl
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);
 
-            System.out.println("Removing " + sessionRefId + " from map");
+            //System.out.println("Removing " + sessionRefId + " from map");
             demoMap.remove(sessionRefId.toString());
 	    
 	    // Remove session from locally cached channel membership lists
@@ -1204,7 +1204,7 @@ public final class ChannelServiceImpl
 	    Set<BigInteger> channelSet =
 		localPerSessionChannelsMap.remove(sessionRefId);		
 
-            System.out.println("Removing " + sessionRefId + " from map");
+            //System.out.println("Removing " + sessionRefId + " from map");
             demoMap.remove(sessionRefId.toString());
 
 	    /*

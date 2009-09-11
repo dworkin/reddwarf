@@ -16,7 +16,7 @@ import java.awt.Rectangle;
 public class GroupServerPanel extends ServerPanel {
 
     public GroupServerPanel(ServerModel.DataPacket initialData) {
-        super(initialData, false);
+        super(initialData, true);
     }
 
     @Override
