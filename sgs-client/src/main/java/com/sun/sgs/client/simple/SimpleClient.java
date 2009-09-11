@@ -96,6 +96,8 @@ public class SimpleClient implements ServerSession {
     @SuppressWarnings("unused")
     private byte[] reconnectKey;
 
+    private final int reconnectDelay;
+
     /** The map of channels this client is a member of, keyed by channel ID */
     private final ConcurrentHashMap<BigInteger, SimpleClientChannel> channels =
         new ConcurrentHashMap<BigInteger, SimpleClientChannel>();
@@ -117,6 +119,8 @@ public class SimpleClient implements ServerSession {
                 "The SimpleClientListener argument must not be null");
         }
         this.clientListener = listener;
+        reconnectDelay = Integer.getInteger("reconnect.delay", 0);
+        System.out.println("Reconnect delay= " + reconnectDelay);
     }
 
     /**
@@ -685,6 +689,9 @@ public class SimpleClient implements ServerSession {
                                     "throws");
                 }
             }
+            try {
+                Thread.sleep(reconnectDelay);
+            } catch (InterruptedException ignore) {}
             redirectedOrRelocated = true;
             Properties props = new Properties();
             props.setProperty("host", host);
