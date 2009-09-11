@@ -770,15 +770,10 @@ public class TestWatchdogServiceImpl extends Assert {
 	};
 	Map<WatchdogServiceImpl, WatchdogInfo> watchdogMap =
 	    new HashMap<WatchdogServiceImpl, WatchdogInfo>();
-	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
- 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
-            WatchdogServerPropertyPrefix + ".host", "localhost",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
-
 	try {
 	    for (int i = 0; i < 5; i++) {
+		Properties props = SgsTestNode.getDefaultProperties(
+		    "TestWatchdogServiceImpl", serverNode, null);
 		DataService dataService = createDataService(props);
 		WatchdogServiceImpl watchdog =
 		    new WatchdogServiceImpl(props, systemRegistry, txnProxy,
@@ -1226,6 +1221,9 @@ public class TestWatchdogServiceImpl extends Assert {
             // check for reuse is implemented with a transient data structure.
             System.err.println("attempting to restart failed single node");
 	    props.setProperty(
+		"com.sun.sgs.impl.service.data.store.net.server.port",
+		String.valueOf(SgsTestNode.getNextUniquePort()));
+	    props.setProperty(
 		"com.sun.sgs.impl.service.nodemap.server.port",
 		String.valueOf(SgsTestNode.getNextUniquePort()));
 	    props.setProperty(
@@ -1516,12 +1514,8 @@ public class TestWatchdogServiceImpl extends Assert {
     private WatchdogAndData createWatchdog(RecoveryListener listener)
 	throws Exception
     {
-	Properties props = createProperties(
- 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
-            WatchdogServerPropertyPrefix + ".host", "localhost",
-	    WatchdogServerPropertyPrefix + ".port",
-	    Integer.toString(watchdogService.getServer().getPort()));
+	Properties props = SgsTestNode.getDefaultProperties(
+	    "TestWatchdogServiceImpl", serverNode, null);
 	DataService data = createDataService(props);
 	WatchdogServiceImpl watchdog = 
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy, 
