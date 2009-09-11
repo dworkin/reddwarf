@@ -120,7 +120,6 @@ public class SimpleClient implements ServerSession {
         }
         this.clientListener = listener;
         reconnectDelay = Integer.getInteger("reconnect.delay", 0);
-        System.out.println("Reconnect delay= " + reconnectDelay);
     }
 
     /**
