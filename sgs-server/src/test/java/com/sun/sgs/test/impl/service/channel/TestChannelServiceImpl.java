@@ -1715,7 +1715,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    client.disconnect();
 	}
     }
-
     @Test
     @IntegrationTest
     public void testSendFromClientSessionWithDelayedJoinAndCoordinatorCrash()
@@ -1849,7 +1848,36 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    client.disconnect();
 	}
     }
-    
+
+    @Test
+    @IntegrationTest
+    public void testSendWithCoordinatorCrash() throws Exception {
+	String user = "user";
+	String channelName = "test";
+	SgsTestNode coordinatorNode = addNode();
+	// Create channel with coordinator on coordinator node.
+	createChannel(channelName, null, coordinatorNode);
+	SgsTestNode userNode = addNode();
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(user);
+	client.connect(userNode.getAppPort()).login();
+	try {
+	    joinUsers(channelName, user);
+	    client.assertJoinedChannel(channelName);
+	    holdChannelServerMethodToNode(userNode, "send");
+	    for (int i = 0; i < 3; i++) {
+		client.sendChannelMessage(channelName, i);
+	    }
+	    waitForHeldChannelServerMethodToNode(userNode);
+	    // Shutdown coordinator node.
+	    coordinatorNode.shutdown(false);
+	    Thread.sleep(5000);
+	    checkChannelMessagesReceived(client, channelName, 3);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
     // -- other classes --
 
     private static class NonSerializableChannelListener

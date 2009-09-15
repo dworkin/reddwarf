@@ -646,8 +646,18 @@ public final class ChannelServiceImpl
 		    new ChannelSendTask(channelRefId, channelInfo.delivery,
 					message);
 		synchronized (channelInfo.members) {
-		    // TBD: check to ensure this is the next consecutive
-		    // timestamp?   Depends on delivery criteria...
+		    if (channelInfo.delivery == Delivery.RELIABLE &&
+			timestamp <= channelInfo.msgTimestamp)
+		    {
+			// Reliable messages may be retransmitted on
+			// coordinator recovery, so don't deliver messages
+			// with a timestamp that is less than or equal to
+			// the channel's timestamp of the last delivered
+			// message. 
+			return;
+		    }
+		    // Note: the message timestamp may not be consecutive
+		    // because a non-member sender's message can get dropped.
 		    channelInfo.msgTimestamp = timestamp;
 		    for (BigInteger sessionRefId : channelInfo.members) {
 			// Deliver send request or enqueue for delivery if

@@ -376,7 +376,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Enqueues a join event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    void join(final Set<ClientSession> sessions) {
+    void join(final Set<? extends ClientSession> sessions) {
 	try {
 	    checkClosed();
 	    if (sessions == null) {
@@ -856,6 +856,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
+    private void saveMessage(byte[] message, long timestamp) {
+	// TBD: implement...
+    }
+
     /**
      * Reassigns the channel coordinator as follows:
      *
@@ -1124,6 +1128,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * reassigned.
 	 */
 	void coordinatorReassigned() {
+	    getDataService().markForUpdate(this);
 	    coordinatorAssignmentTimestamp =
 		isEmpty() ? 0 : timestamp;
 	}
@@ -1489,8 +1494,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    channel.addServerNodeId(getNodeId(session));
 
 	    JoinNotifyTask task =
-		new JoinNotifyTask(channel, channel.eventQueueRef.getId(),
-				    this, session, sessionRefId);
+		new JoinNotifyTask(channel, this, session, sessionRefId);
 	    ChannelServiceImpl.getChannelService().addChannelTask(
 		    channel.channelRefId, task);
 	    return isCompleted();
@@ -1504,22 +1508,70 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
+    private abstract static class NotifyTask extends AbstractKernelRunnable {
+	
+	protected final ChannelServiceImpl channelService;
+	protected final BigInteger channelRefId;
+	protected final long timestamp;
+	private final BigInteger eventRefId;
+	
+	/**
+	 * Constructs an instance.  This contructor must be called within a
+	 * transaction.
+	 */
+	NotifyTask(ChannelImpl channel, ChannelEvent channelEvent) {
+	    super(null);
+	    this.channelService = ChannelServiceImpl.getChannelService();
+	    this.channelRefId = channel.channelRefId;
+	    this.eventRefId =
+		getDataService().createReference(channelEvent).getId();
+	    this.timestamp = channelEvent.timestamp;
+	}
+	
+	/**
+	 * Marks the associated event complete and adds a task to
+	 * resume servicing the channel's event queue.  This must be
+	 * called outside of a transaction.
+	 */
+	protected void completed() {
+	    
+	    try {
+	      channelService.runTransactionalTask(
+		new AbstractKernelRunnable("MarkChannelEventCompleted") {
+		    public void run() {
+			ChannelEvent event = (ChannelEvent)
+			    getObjectForId(eventRefId);
+			if (event != null) {
+			    event.completed();
+			} else {
+			    // This shouldn't happen
+			    logger.log(
+				Level.SEVERE,
+				"channel:{0}: event removed before completed",
+				HexDumper.toHexString(
+				    channelRefId.toByteArray()));
+			}
+		    }
+		} ); 
+	    } catch (Exception e) {
+		// TBD: This shouldn't happen, so log message?
+	    } finally {
+		channelService.addServiceEventQueueTask(channelRefId);
+	    }
+	}
+    }
+
     /**
      * A non-transactional task to send a notification to a session's
      * node, allowing for the possibility of the session relocating while
      * the notification is in transit.
      */
-    private abstract static class SessionNotifyTask
-	extends AbstractKernelRunnable
-    {
-	protected final ChannelServiceImpl channelService;
+    private abstract static class SessionNotifyTask extends NotifyTask {
+	
 	protected String name;
 	protected final Delivery delivery;
-	protected final BigInteger channelRefId;
 	protected final BigInteger sessionRefId;
 	private final BigInteger eventQueueRefId;
-	private final BigInteger eventRefId;
-	protected final long timestamp;
 
 	/** The session's node ID.  Initialized during construction
 	 * and modified by calls to {@code removeMembershipIfNodeUnchanged}
@@ -1532,20 +1584,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * transaction.
 	 */
 	SessionNotifyTask(ChannelImpl channel,
-			  BigInteger eventQueueRefId,
 			  ChannelEvent channelEvent,
 			  ClientSessionImpl session,
 			  BigInteger sessionRefId)
 	{
-	    super(null);
-	    this.channelService = ChannelServiceImpl.getChannelService();
+	    super(channel, channelEvent);
 	    this.name = channel.name;
 	    this.delivery = channel.delivery;
-	    this.channelRefId = channel.channelRefId;
-	    this.eventRefId =
-		getDataService().createReference(channelEvent).getId();
-	    this.eventQueueRefId = eventQueueRefId;
-	    this.timestamp = channelEvent.timestamp;
+	    this.eventQueueRefId = channel.eventQueueRef.getId();
 	    this.sessionRefId = sessionRefId;
 	    this.sessionNodeId = getNodeId(session);
 	}
@@ -1711,39 +1757,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return -1L;
 	    }
 	}
-	
-	/**
-	 * Marks the associated event complete and adds a task to
-	 * resume servicing the channel's event queue.  This must be
-	 * called outside of a transaction.
-	 */
-	protected void completed() {
-	    
-	    try {
-	      channelService.runTransactionalTask(
-		new AbstractKernelRunnable("MarkChannelEventCompleted") {
-		    public void run() {
-			ChannelEvent event = (ChannelEvent)
-			    getObjectForId(eventRefId);
-			if (event != null) {
-			    event.completed();
-			} else {
-			    // This shouldn't happen
-			    logger.log(
-				Level.SEVERE,
-				"channel name:{0} session:{1} channel event " +
-				"removed before completed", name,
-				HexDumper.toHexString(
-				    sessionRefId.toByteArray()));
-			}
-		    }
-		} ); 
-	    } catch (Exception e) {
-		// TBD: This shouldn't happen, so log message?
-	    } finally {
-		channelService.addServiceEventQueueTask(channelRefId);
-	    }
-	}
     }
 
     /**
@@ -1757,11 +1770,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance.  This contructor must be called within a
 	 * transaction.
 	 */
-	JoinNotifyTask(ChannelImpl channel, BigInteger eventQueueRefId,
-		       JoinEvent joinEvent, ClientSessionImpl session,
-		       BigInteger sessionRefId)
+	JoinNotifyTask(ChannelImpl channel, JoinEvent joinEvent,
+		       ClientSessionImpl session, BigInteger sessionRefId)
 	{
-	    super(channel, eventQueueRefId, joinEvent, session, sessionRefId);
+	    super(channel, joinEvent, session, sessionRefId);
 	}
 
 	/** {@inheritDoc} <p> Sends a join notification. */
@@ -1797,7 +1809,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	protected void completed() {
 	    long eventQueueTimestamp = getEventQueueTimestamp();
 	    if (eventQueueTimestamp > timestamp) {
-		ChannelServiceImpl.getChannelService().cacheEvent(
+		channelService.cacheEvent(
 		    ChannelEventType.JOIN, channelRefId, sessionRefId,
 		    timestamp, eventQueueTimestamp);
 	    }
@@ -1835,8 +1847,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	
 	    LeaveNotifyTask task =
-		new LeaveNotifyTask(channel, channel.eventQueueRef.getId(),
-				     this, session, sessionRefId);
+		new LeaveNotifyTask(channel, this, session, sessionRefId);
 	    ChannelServiceImpl.getChannelService().addChannelTask(
 		channel.channelRefId, task);
 	    return isCompleted();
@@ -1861,11 +1872,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance.  This contructor must be called within a
 	 * transaction.
 	 */
-	LeaveNotifyTask(ChannelImpl channel, BigInteger eventQueueRefId,
-			 LeaveEvent leaveEvent, ClientSessionImpl session,
-			 BigInteger sessionRefId)
+	LeaveNotifyTask(ChannelImpl channel, LeaveEvent leaveEvent,
+			ClientSessionImpl session, BigInteger sessionRefId)
 	{
-	    super(channel, eventQueueRefId, leaveEvent, session, sessionRefId);
+	    super(channel, leaveEvent, session, sessionRefId);
 	}
 
 	/** {@inheritDoc} <p> Sends a leave notification. */
@@ -1895,7 +1905,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	protected void completed() {
 	    long eventQueueTimestamp = getEventQueueTimestamp();
 	    if (eventQueueTimestamp > timestamp) {
-		ChannelServiceImpl.getChannelService().cacheEvent(
+		channelService.cacheEvent(
 		    ChannelEventType.LEAVE, channelRefId, sessionRefId,
 		    timestamp, eventQueueTimestamp);
 	    }
@@ -1995,31 +2005,24 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		} 
 	    }
+
+	    /*
+	     * If the message is reliable, store message for a period of
+	     * time so that relocating client sessions belonging to this
+	     * channel can obtain messages sent while those sessions are
+	     * relocating.
+	     */
+	    channel.saveMessage(message, timestamp);
 	    
 	    /*
 	     * Enqueue a channel task to forward the message to the
 	     * channel's servers for delivery.
 	     */
-	    final BigInteger channelRefId = channel.channelRefId;
-	    final byte deliveryOrdinal = (byte) channel.delivery.ordinal();
-	    // TBD: still need to implement send notify...
-	    for (final long nodeId : channel.servers) {
-		channelService.addChannelTask(
-		    channelRefId,
-		    new IoRunnable() {
-			public void run() throws IOException {
-			    ChannelServer server = getChannelServer(nodeId);
-			    if (server != null) {
-				server.send(channelRefId, message, timestamp);
-			    }
-			} },
-		    nodeId);
-	    }
-
-	    return completed();
-	    // TBD: need to add a task to update queue that all
-	    // channel servers have been notified of
-	    // the 'send'.
+	    SendNotifyTask task = new SendNotifyTask(channel, this);
+	    ChannelServiceImpl.getChannelService().addChannelTask(
+		channel.channelRefId, task);
+	    
+	    return isCompleted();
 	}
 
 	/** Use the message length as the cost for sending messages.
@@ -2037,6 +2040,50 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
         @Override
 	public String toString() {
 	    return getClass().getName();
+	}
+    }
+
+    /**
+     * A non-transactional task (with transactional components) to transmit
+     * a "send" notification to each of the channel's server nodes so that
+     * each server node can deliver a channel message to the channel's
+     * respective members.
+     */
+    private static class SendNotifyTask extends NotifyTask {
+
+	private final Set<Long> serverNodeIds;
+	private final byte[] message;
+
+	/**
+	 * Constructs an instance with the specified {@code channel}.  If
+	 * {@code removeName} is {@code true}, the channel's name binding
+	 * is removed along with its persistent data.
+	 */
+	SendNotifyTask(ChannelImpl channel, SendEvent sendEvent) {
+	    super(channel, sendEvent);
+	    this.serverNodeIds = channel.servers;
+	    this.message = sendEvent.message;
+	}
+
+	public void run() {
+	    try {
+		/*
+		 * Send "send" notification to channel's servers.
+		 */ 
+		for (final long nodeId : serverNodeIds) {
+		    channelService.runIoTask(
+		      new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.send(channelRefId, message, timestamp);
+			    }
+			} },
+		      nodeId);
+		}
+	    } finally {
+		completed();
+	    }
 	}
     }
     

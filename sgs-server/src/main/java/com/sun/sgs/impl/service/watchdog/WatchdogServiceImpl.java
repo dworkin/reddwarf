@@ -517,14 +517,10 @@ public final class WatchdogServiceImpl
         }
 
         boolean isLocal = (nodeId == localNodeId);
-        if (isLocal) {
-            logger.log(Level.WARNING, "{1} reported failure in local " +
-                    "node with id: {0}", nodeId, className);
-        } else {
-            logger.log(Level.WARNING, "{1} reported failure in remote" +
-                    " node with id {0}", nodeId, className);
-        }
-
+	logger.log(Level.WARNING, "node:{0}, className:{1} reported " +
+		   "failure in {2} node:{3}", localNodeId, className,
+		   (isLocal ? "local" : "remote"), nodeId);
+	
         /*
          * Try to report the failure to the watchdog server. If we cannot 
          * contact the Watchdog server while reporting a remote failure, then
@@ -538,8 +534,10 @@ public final class WatchdogServiceImpl
                 break;
             } catch (IOException ioe) {
                 if (retries == 0) {
-                    logger.log(Level.SEVERE, "Cannot report failure to " +
-                            "Watchdog server");
+                    logger.logThrow(
+ 			Level.SEVERE, ioe,
+			"node:{0} cannot report failure of node:{1} to " +
+			"Watchdog server", localNodeId, nodeId);
                     isLocal = true;
                 }
             }

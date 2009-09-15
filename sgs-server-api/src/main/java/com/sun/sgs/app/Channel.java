@@ -180,7 +180,7 @@ public interface Channel extends ManagedObject {
      * @throws TransactionException if the operation failed because of
      *	       a problem with the current transaction
      */
-    Channel join(Set<ClientSession> sessions);
+    Channel join(Set<? extends ClientSession> sessions);
     
     /**
      * Removes a client session from this channel.  If the specified
