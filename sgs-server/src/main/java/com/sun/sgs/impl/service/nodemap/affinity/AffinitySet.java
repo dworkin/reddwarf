@@ -29,17 +29,18 @@ import java.util.Set;
  * The affinity group information for a single node, in a format which
  * can be sent between nodes and the server.
  */
-public class AffinityGroupImpl implements AffinityGroup, Serializable {
+public class AffinitySet implements AffinityGroup, Serializable {
     /** Serialization version. */
     private static final long serialVersionUID = 1L;
     private final long id;
-    private final HashSet<Identity> identities = new HashSet<Identity>();
+    private final Set<Identity> identities = 
+            Collections.synchronizedSet(new HashSet<Identity>());
 
     /**
      * Constructs a new affinity group with the given identity.
      * @param id the affinity group identity
      */
-    public AffinityGroupImpl(long id) {
+    public AffinitySet(long id) {
         this.id = id;
     }
 
@@ -49,7 +50,7 @@ public class AffinityGroupImpl implements AffinityGroup, Serializable {
     }
 
     /** {@inheritDoc} */
-    public synchronized Set<Identity> getIdentities() {
+    public Set<Identity> getIdentities() {
         return Collections.unmodifiableSet(identities);
     }
 
@@ -63,7 +64,7 @@ public class AffinityGroupImpl implements AffinityGroup, Serializable {
      * Add the given identity to this affinity group.
      * @param id the identity to add
      */
-    public synchronized void addIdentity(Identity id) {
+    public void addIdentity(Identity id) {
         identities.add(id);
     }
 }

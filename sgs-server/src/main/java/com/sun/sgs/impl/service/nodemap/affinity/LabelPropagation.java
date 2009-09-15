@@ -1100,10 +1100,10 @@ public class LabelPropagation implements LPAClient {
                 new HashMap<Integer, AffinityGroup>();
         for (LabelVertex vertex : vertices) {
             int label = vertex.getLabel();
-            AffinityGroupImpl ag =
-                    (AffinityGroupImpl) groupMap.get(label);
+            AffinitySet ag =
+                    (AffinitySet) groupMap.get(label);
             if (ag == null) {
-                ag = new AffinityGroupImpl(label);
+                ag = new AffinitySet(label);
                 groupMap.put(label, ag);
             }
             ag.addIdentity(vertex.getIdentity());

@@ -21,7 +21,9 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 /**
@@ -31,13 +33,12 @@ import java.util.Set;
  * These affinity groups can span multiple nodes.
  */
 public class MultiAffinityGroup implements AffinityGroup {
-
+    // The group id
     private final long agid;
-
     // Map Identity -> nodeId
     private final Map<Identity, Long> identities;
-
-    private long targetNodeId = -1;
+    // The node id that most Identities seem to be on
+    private final long targetNodeId;
 
     /**
      * Creates a new affinity group which contains node information
@@ -48,6 +49,33 @@ public class MultiAffinityGroup implements AffinityGroup {
         assert identities.size() > 0;
         this.agid = agid;
         this.identities = identities;
+        targetNodeId = calcMostUsedNode();
+    }
+
+    /**
+     * Calculate the node that the most number of identities is on.
+     * @return the node id of the most used node
+     */
+    private long calcMostUsedNode() {
+        Map<Long, Integer> nodeCountMap = new HashMap<Long, Integer>();
+        for (Long nodeId : identities.values()) {
+            Integer count = nodeCountMap.get(nodeId);
+            if (count == null) {
+                count = new Integer(0);
+            }
+            count++;
+            nodeCountMap.put(nodeId, count);
+        }
+        long retNode = -1;
+        int highestCount = -1;
+        for (Entry<Long, Integer> entry : nodeCountMap.entrySet()) {
+            int count = entry.getValue();
+            if (highestCount > count) {
+                highestCount = count;
+                retNode = entry.getKey();
+            }         
+        }
+        return retNode;
     }
 
     /** {@inheritDoc} */

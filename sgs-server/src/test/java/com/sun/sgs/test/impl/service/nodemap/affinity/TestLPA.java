@@ -22,7 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.LPAServer;
@@ -124,30 +124,30 @@ public class TestLPA {
     public void testDistributedFramework() throws Exception {
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         {
-            AffinityGroupImpl a = new AffinityGroupImpl(1);
+            AffinitySet a = new AffinitySet(1);
             a.addIdentity(new DummyIdentity("1"));
             a.addIdentity(new DummyIdentity("2"));
             a.addIdentity(new DummyIdentity("3"));
             group1.add(a);
-            AffinityGroupImpl b = new AffinityGroupImpl(2);
+            AffinitySet b = new AffinitySet(2);
             b.addIdentity(new DummyIdentity("4"));
             b.addIdentity(new DummyIdentity("5"));
             group1.add(b);
         }
         Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
         {
-            AffinityGroupImpl a = new AffinityGroupImpl(1);
+            AffinitySet a = new AffinitySet(1);
             a.addIdentity(new DummyIdentity("6"));
             a.addIdentity(new DummyIdentity("7"));
             group2.add(a);
-            AffinityGroupImpl b = new AffinityGroupImpl(3);
+            AffinitySet b = new AffinitySet(3);
             b.addIdentity(new DummyIdentity("8"));
             b.addIdentity(new DummyIdentity("9"));
             group2.add(b);
         }
         Collection<AffinityGroup> group3 = new HashSet<AffinityGroup>();
         {
-            AffinityGroupImpl a = new AffinityGroupImpl(4);
+            AffinitySet a = new AffinitySet(4);
             a.addIdentity(new DummyIdentity("10"));
             a.addIdentity(new DummyIdentity("11"));
             group3.add(a);

@@ -21,7 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
@@ -46,12 +46,12 @@ public class TestAffinityGroupGoodness {
         GraphBuilder builder = new TestToyBuilder();
 
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
-        AffinityGroupImpl a = new AffinityGroupImpl(1);
+        AffinitySet a = new AffinitySet(1);
         a.addIdentity(new DummyIdentity("1"));
         a.addIdentity(new DummyIdentity("2"));
         a.addIdentity(new DummyIdentity("3"));
         group1.add(a);
-        AffinityGroupImpl b = new AffinityGroupImpl(2);
+        AffinitySet b = new AffinitySet(2);
         b.addIdentity(new DummyIdentity("4"));
         b.addIdentity(new DummyIdentity("5"));
         group1.add(b);
@@ -62,11 +62,11 @@ public class TestAffinityGroupGoodness {
         Assert.assertEquals(0.22, modularity, .001);
 
         Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
-        a = new AffinityGroupImpl(3);
+        a = new AffinitySet(3);
         a.addIdentity(new DummyIdentity("1"));
         a.addIdentity(new DummyIdentity("3"));
         group2.add(a);
-        b = new AffinityGroupImpl(4);
+        b = new AffinitySet(4);
         b.addIdentity(new DummyIdentity("2"));
         b.addIdentity(new DummyIdentity("4"));
         b.addIdentity(new DummyIdentity("5"));
@@ -89,7 +89,7 @@ public class TestAffinityGroupGoodness {
     public void testZachModularity() {
         GraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
-        AffinityGroupImpl a = new AffinityGroupImpl(1);
+        AffinitySet a = new AffinitySet(1);
         a.addIdentity(new DummyIdentity("1"));
         a.addIdentity(new DummyIdentity("2"));
         a.addIdentity(new DummyIdentity("3"));
@@ -108,7 +108,7 @@ public class TestAffinityGroupGoodness {
         a.addIdentity(new DummyIdentity("22"));
         groups.add(a);
 
-        AffinityGroupImpl b = new AffinityGroupImpl(2);
+        AffinitySet b = new AffinitySet(2);
         b.addIdentity(new DummyIdentity("9"));
         b.addIdentity(new DummyIdentity("10"));
         b.addIdentity(new DummyIdentity("15"));
@@ -140,11 +140,11 @@ public class TestAffinityGroupGoodness {
     public void testModularityCalc() {
         GraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
-        AffinityGroupImpl a = new AffinityGroupImpl(49);
+        AffinitySet a = new AffinitySet(49);
         a.addIdentity(new DummyIdentity("17"));
         groups.add(a);
 
-        AffinityGroupImpl b = new AffinityGroupImpl(2);
+        AffinitySet b = new AffinitySet(2);
         b.addIdentity(new DummyIdentity("1"));
         b.addIdentity(new DummyIdentity("2"));
         b.addIdentity(new DummyIdentity("3"));
