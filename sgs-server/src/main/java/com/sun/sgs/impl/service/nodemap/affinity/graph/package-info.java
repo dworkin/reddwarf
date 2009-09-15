@@ -18,7 +18,8 @@
  */
 
 /**
- * Provides classes used to find affinity groups with the label propagation
+ * Provides classes used to build graphs used by the label propagation
  * algorithm.
  */
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap.affinity.graph;
+
