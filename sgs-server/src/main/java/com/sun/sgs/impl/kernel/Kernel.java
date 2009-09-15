@@ -40,7 +40,7 @@ import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
-import com.sun.sgs.impl.service.nodemap.affinity.GraphListener;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;

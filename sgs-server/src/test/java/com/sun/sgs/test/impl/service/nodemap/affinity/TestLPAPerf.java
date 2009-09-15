@@ -22,12 +22,12 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.Graphs;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.LabelPropagationServer;
-import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
-import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
@@ -251,8 +251,8 @@ public class TestLPAPerf {
         for (int i = 0; i < RUNS; i++) {
             Collection<AffinityGroup> groups = server.findAffinityGroups();
             double mod =
-                Graphs.calcModularity(new ZachBuilder().getAffinityGraph(),
-                                      groups);
+                AffinityGroupGoodness.calcModularity(
+                                new ZachBuilder().getAffinityGraph(), groups);
 
             avgMod = avgMod + mod;
             maxMod = Math.max(maxMod, mod);

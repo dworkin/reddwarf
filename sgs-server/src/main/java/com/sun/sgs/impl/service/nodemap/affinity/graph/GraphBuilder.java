@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.profile.AccessedObjectsDetail;

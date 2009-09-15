@@ -19,9 +19,9 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
-import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;

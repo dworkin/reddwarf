@@ -21,7 +21,7 @@
  * this code.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AggregateProfileCounter;

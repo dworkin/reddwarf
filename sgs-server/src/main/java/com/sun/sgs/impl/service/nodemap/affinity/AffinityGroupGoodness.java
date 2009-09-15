@@ -19,25 +19,24 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
+import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.auth.Identity;
 import edu.uci.ics.jung.graph.Graph;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
- *  Utility methods for use with affinity graphs.
+ *  Utility methods for "goodness" measurements of found groups.
  */
-public final class Graphs {
+public final class AffinityGroupGoodness {
     
     /**
      * A private constructor:  we do not want instances of this class to
      * be constructed, as it contains only static utility methods.
      */
-    private Graphs() {
+    private AffinityGroupGoodness() {
     }
 
     /**
@@ -187,38 +186,5 @@ public final class Graphs {
             }
         }
         return false;
-    }
-
-    /**
-     * Return the affinity groups found within the given vertices, putting all
-     * nodes with the same label in a group.  The affinity group's id
-     * will be the common label of the group.  Also, as an optimization,
-     * can reinitialize the labels to their initial setting.
-     *
-     * @param vertices the vertices that we gather groups from
-     * @param reinitialize if {@code true}, reinitialize the labels
-     * @return the affinity groups
-     */
-    public static Collection<AffinityGroup> gatherGroups(
-            List<LabelVertex> vertices, boolean reinitialize)
-    {
-        assert (vertices != null);
-        // All nodes with the same label are in the same community.
-        Map<Integer, AffinityGroup> groupMap =
-                new HashMap<Integer, AffinityGroup>();
-        for (LabelVertex vertex : vertices) {
-            int label = vertex.getLabel();
-            AffinityGroupImpl ag =
-                    (AffinityGroupImpl) groupMap.get(label);
-            if (ag == null) {
-                ag = new AffinityGroupImpl(label);
-                groupMap.put(label, ag);
-            }
-            ag.addIdentity(vertex.getIdentity());
-            if (reinitialize) {
-                vertex.initializeLabel();
-            }
-        }
-        return groupMap.values();
     }
 }

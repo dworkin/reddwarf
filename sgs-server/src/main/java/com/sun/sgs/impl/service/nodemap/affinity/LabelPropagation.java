@@ -21,6 +21,9 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.util.Exporter;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
@@ -45,7 +48,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * An implementation of the algorithm presented in
+ * A distributed implementation of the algorithm presented in
  * "Near linear time algorithm to detect community structures in large-scale
  * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
  * <p>
@@ -253,7 +256,7 @@ public class LabelPropagation implements LPAClient {
             logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
                                      localNodeId, graph);
         }
-        groups = Graphs.gatherGroups(vertices, done);
+        groups = gatherGroups(vertices, done);
 
         if (done) {
             // Clear our maps that are set up as the first step of an
@@ -549,7 +552,7 @@ public class LabelPropagation implements LPAClient {
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
                 Collection<AffinityGroup> intermediateGroups =
-                        Graphs.gatherGroups(vertices, false);
+                        gatherGroups(vertices, false);
                 for (AffinityGroup group : intermediateGroups) {
                     StringBuffer logSB = new StringBuffer();
                     for (Identity id : group.getIdentities()) {
@@ -881,7 +884,7 @@ public class LabelPropagation implements LPAClient {
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
                 Collection<AffinityGroup> intermediateGroups =
-                        Graphs.gatherGroups(vertices, false);
+                        gatherGroups(vertices, false);
                 for (AffinityGroup group : intermediateGroups) {
                     StringBuffer logSB = new StringBuffer();
                     for (Identity id : group.getIdentities()) {
@@ -899,7 +902,7 @@ public class LabelPropagation implements LPAClient {
             logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
                                     localNodeId, graph);
         }
-        groups = Graphs.gatherGroups(vertices, true);
+        groups = gatherGroups(vertices, true);
 
         if (gatherStats) {
             // Record our statistics for this run, used for testing.
@@ -907,7 +910,7 @@ public class LabelPropagation implements LPAClient {
             iterations = t;
             // Note that the graph might be changing while we ran
             // the algorithm.
-            modularity = Graphs.calcModularity(graph, groups);
+            modularity = AffinityGroupGoodness.calcModularity(graph, groups);
 
             if (logger.isLoggable(Level.FINE)) {
                 StringBuffer sb = new StringBuffer();
@@ -1075,6 +1078,40 @@ public class LabelPropagation implements LPAClient {
             }
         }
         return maxLabelSet;
+    }
+
+    // Utility methods
+        /**
+     * Return the affinity groups found within the given vertices, putting all
+     * nodes with the same label in a group.  The affinity group's id
+     * will be the common label of the group.  Also, as an optimization,
+     * can reinitialize the labels to their initial setting.
+     *
+     * @param vertices the vertices that we gather groups from
+     * @param reinitialize if {@code true}, reinitialize the labels
+     * @return the affinity groups
+     */
+    public static Collection<AffinityGroup> gatherGroups(
+            List<LabelVertex> vertices, boolean reinitialize)
+    {
+        assert (vertices != null);
+        // All nodes with the same label are in the same community.
+        Map<Integer, AffinityGroup> groupMap =
+                new HashMap<Integer, AffinityGroup>();
+        for (LabelVertex vertex : vertices) {
+            int label = vertex.getLabel();
+            AffinityGroupImpl ag =
+                    (AffinityGroupImpl) groupMap.get(label);
+            if (ag == null) {
+                ag = new AffinityGroupImpl(label);
+                groupMap.put(label, ag);
+            }
+            ag.addIdentity(vertex.getIdentity());
+            if (reinitialize) {
+                vertex.initializeLabel();
+            }
+        }
+        return groupMap.values();
     }
 
     // For single node performance testing.

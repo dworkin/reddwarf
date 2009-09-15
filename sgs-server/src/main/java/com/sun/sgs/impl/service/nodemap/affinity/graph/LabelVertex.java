@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.auth.Identity;
 
@@ -100,7 +100,7 @@ public final class LabelVertex {
      * Sets the label to a new value.
      * @param newLabel the new label value
      */
-    void setLabel(int newLabel) {
+    public void setLabel(int newLabel) {
         label = newLabel;
     }
 
@@ -108,7 +108,7 @@ public final class LabelVertex {
      * Returns the current label for this vertex.
      * @return the current label for this vertex
      */
-    int getLabel() {
+    public int getLabel() {
         return label;
     }
 

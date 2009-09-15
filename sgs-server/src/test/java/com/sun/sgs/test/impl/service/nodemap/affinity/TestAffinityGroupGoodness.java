@@ -22,26 +22,24 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupImpl;
-import com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.Graphs;
-import com.sun.sgs.impl.service.nodemap.affinity.LabelVertex;
-import com.sun.sgs.impl.service.nodemap.affinity.WeightedEdge;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.Assert;
 import org.junit.Test;
 
 /**
- *  Tests for static Graphs methods.
- * 
+ *  Tests for static AffinityGroupGoodness methods.
  */
-public class TestGraphs {
+public class TestAffinityGroupGoodness {
 
     @Test
     public void testToyModularityAndJaccard() {
@@ -58,8 +56,9 @@ public class TestGraphs {
         b.addIdentity(new DummyIdentity("5"));
         group1.add(b);
 
-        double modularity =
-                Graphs.calcModularity(builder.getAffinityGraph(), group1);
+        double modularity = 
+            AffinityGroupGoodness.calcModularity(builder.getAffinityGraph(),
+                                                 group1);
         Assert.assertEquals(0.22, modularity, .001);
 
         Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
@@ -73,12 +72,14 @@ public class TestGraphs {
         b.addIdentity(new DummyIdentity("5"));
         group2.add(b);
 
-        modularity = Graphs.calcModularity(builder.getAffinityGraph(), group2);
+        modularity = 
+            AffinityGroupGoodness.calcModularity(builder.getAffinityGraph(),
+                                                 group2);
         Assert.assertEquals(0.08, modularity, .001);
 
         // JANE need to test with graph with weighted edges!
 
-        double jaccard = Graphs.calcJaccard(group1, group2);
+        double jaccard = AffinityGroupGoodness.calcJaccard(group1, group2);
         System.out.println("Jaccard index is " + jaccard);
         Assert.assertEquals(0.333, jaccard, .001);
     }
@@ -129,7 +130,8 @@ public class TestGraphs {
         groups.add(b);
 
         double modularity =
-                Graphs.calcModularity(builder.getAffinityGraph(), groups);
+            AffinityGroupGoodness.calcModularity(builder.getAffinityGraph(),
+                                                 groups);
         System.out.println("Modularity for correct Zachary's karate club is " +
                 modularity);
     }
@@ -180,7 +182,8 @@ public class TestGraphs {
         groups.add(b);
 
         double modularity =
-            Graphs.calcModularity(builder.getAffinityGraph(), groups);
+            AffinityGroupGoodness.calcModularity(builder.getAffinityGraph(),
+                                                 groups);
         System.out.println("Modularity test club partition is " +
                 modularity);
     }
