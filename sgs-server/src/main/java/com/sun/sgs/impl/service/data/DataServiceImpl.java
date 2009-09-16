@@ -622,11 +622,6 @@ public final class DataServiceImpl implements DataService {
     /** {@inheritDoc} */
     public long getLocalNodeId() {
 	serviceStats.getLocalNodeIdOp.report();
-	synchronized (state) {
-	    if (state != State.RUNNING) {
-		throw new IllegalStateException("Service is not running");
-	    }
-	}
 	return nodeId;
     }
 

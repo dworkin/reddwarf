@@ -149,17 +149,6 @@ public final class WatchdogServerImpl
     /** The upper bound for the renew interval. */
     private static final int RENEW_INTERVAL_UPPER_BOUND = Integer.MAX_VALUE;
 
-    /** The name of the ID generator. */
-    private static final String ID_GENERATOR_NAME =
-	SERVER_PROPERTY_PREFIX + ".id.generator";
-
-    /** The property name for the ID block size. */
-    private static final String ID_BLOCK_SIZE_PROPERTY =
-	SERVER_PROPERTY_PREFIX + ".id.block.size";
-
-    /** The default ID block size for the ID generator. */
-    private static final int DEFAULT_ID_BLOCK_SIZE = 256;
-    
     /** The server port. */
     private final int serverPort;
 

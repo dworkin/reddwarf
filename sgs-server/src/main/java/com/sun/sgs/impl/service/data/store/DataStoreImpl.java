@@ -36,7 +36,6 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -129,14 +128,6 @@ public class DataStoreImpl extends AbstractDataStore {
     /** The default environment class. */
     public static final String DEFAULT_ENVIRONMENT_CLASS =
         "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
-
-    /** The logger for this class. */
-    static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
-    /** The logger for transaction abort exceptions. */
-    static final LoggerWrapper abortLogger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort"));
 
     /** The object data for a placeholder. */
     private static final byte[] PLACEHOLDER_DATA = { PLACEHOLDER_OBJ_VALUE };
@@ -742,7 +733,9 @@ public class DataStoreImpl extends AbstractDataStore {
 			 ComponentRegistry systemRegistry,
 			 TransactionProxy txnProxy)
     {
-	super(systemRegistry, logger, abortLogger);
+	super(systemRegistry,
+	      new LoggerWrapper(Logger.getLogger(CLASSNAME)),
+	      new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort")));
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -777,17 +770,15 @@ public class DataStoreImpl extends AbstractDataStore {
                                                  directoryFile.getName());
                 }
 	    }
-	    Scheduler scheduler = new DelegatingScheduler(
-		systemRegistry.getComponent(TaskScheduler.class),
-		txnProxy.getCurrentOwner());
             env = wrappedProps.getClassInstanceProperty(
                     ENVIRONMENT_CLASS_PROPERTY,
                     DEFAULT_ENVIRONMENT_CLASS,
                     DbEnvironment.class,
                     new Class<?>[]{
-                        String.class, Properties.class, Scheduler.class
+                        String.class, Properties.class,
+			ComponentRegistry.class, TransactionProxy.class
                     },
-                    directory, properties, scheduler);
+                    directory, properties, systemRegistry, txnProxy);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
 	    Databases dbs = DbUtilities.getDatabases(env, dbTxn, logger);
 	    infoDb = dbs.info();

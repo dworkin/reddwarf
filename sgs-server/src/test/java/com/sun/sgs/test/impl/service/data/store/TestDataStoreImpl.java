@@ -2166,7 +2166,22 @@ public class TestDataStoreImpl extends Assert {
      * unusual state.
      */
     abstract class Action {
+
+	/**
+	 * Perform any setup required for calling the {@link #run} method.
+	 * This method needs to put the database in use for the current
+	 * transaction, but not in a way that conflicts with the operations
+	 * performed by {@code run}.
+	 *
+	 * @throws	Exception if the setup throws an exception
+	 */
 	void setUp() throws Exception { };
+
+	/**
+	 * Run the test action.
+	 *
+	 * @throws	Exception if the action throws an exception
+	 */
 	abstract void run() throws Exception;
     }
 
