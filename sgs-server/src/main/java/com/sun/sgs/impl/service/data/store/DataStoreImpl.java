@@ -28,17 +28,17 @@ import static com.sun.sgs.impl.service.data.store.
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.FIRST_PLACEHOLDER_ID_KEY;
 import static com.sun.sgs.impl.service.data.store.
-    DataStoreHeader.NEXT_OBJ_ID_KEY;
-import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.PLACEHOLDER_OBJ_VALUE;
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.QUOTE_OBJ_VALUE;
+import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.kernel.AccessCoordinator;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import com.sun.sgs.service.store.db.DbCursor;
 import com.sun.sgs.service.store.db.DbDatabase;
@@ -46,10 +46,6 @@ import com.sun.sgs.service.store.db.DbDatabaseException;
 import com.sun.sgs.service.store.db.DbEnvironment;
 import com.sun.sgs.service.store.db.DbTransaction;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.security.DigestException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -57,9 +53,6 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -85,8 +78,7 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl(Properties, AccessCoordinator) constructor}
- * supports these public <a
+ * The {@link #DataStoreImpl constructor} supports these public <a
  * href="../../../../impl/kernel/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
  * 
@@ -134,31 +126,8 @@ public class DataStoreImpl extends AbstractDataStore {
 	"com.sun.sgs.impl.service.data.store.db.environment.class";
     
     /** The default environment class. */
-    private static final String DEFAULT_ENVIRONMENT_CLASS =
+    public static final String DEFAULT_ENVIRONMENT_CLASS =
         "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
-
-    /** The logger for this class. */
-    static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
-    /** The logger for transaction abort exceptions. */
-    static final LoggerWrapper abortLogger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort"));
-
-    /** The number of bytes in a SHA-1 message digest. */
-    private static final int SHA1_SIZE = 20;
-
-    /** A message digest for use by the current thread. */
-    private static final ThreadLocal<MessageDigest> messageDigest =
-	new ThreadLocal<MessageDigest>() {
-	    protected MessageDigest initialValue() {
-		try {
-		    return MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-		    throw new AssertionError(e);
-		}
-	    }
-        };
 
     /** The object data for a placeholder. */
     private static final byte[] PLACEHOLDER_DATA = { PLACEHOLDER_OBJ_VALUE };
@@ -187,6 +156,9 @@ public class DataStoreImpl extends AbstractDataStore {
 
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
+
+    /** The local node ID. */
+    private final long nodeId;
 
     /**
      * Whether object allocations should create a placeholder at the end of
@@ -568,33 +540,6 @@ public class DataStoreImpl extends AbstractDataStore {
 	}
     }
 
-    /** The default implementation of Scheduler. */
-    private static class BasicScheduler implements Scheduler {
-	public TaskHandle scheduleRecurringTask(Runnable task, long period) {
-	    final ScheduledExecutorService executor =
-		Executors.newSingleThreadScheduledExecutor();
-	    executor.scheduleAtFixedRate(
-		task, period, period, TimeUnit.MILLISECONDS);
-	    return new TaskHandle() {
-		public synchronized void cancel() {
-		    if (executor.isShutdown()) {
-			throw new IllegalStateException(
-			    "Task is already cancelled");
-		    }
-		    executor.shutdownNow();
-		}
-	    };
-	}
-    }
-
-    /**
-     * Stores information about the databases that constitute the data
-     * store.
-     */
-    private static class Databases {
-	DbDatabase info, classes, oids, names;
-    }
-
     /** Stores information about free object IDs. */
     private static final class FreeObjectIds {
 
@@ -774,39 +719,23 @@ public class DataStoreImpl extends AbstractDataStore {
     }
 
     /**
-     * Creates an instance of this class configured with the specified
-     * properties and access coordinator.  See the {@linkplain DataStoreImpl
+     * Creates an instance of this class.  See the {@linkplain DataStoreImpl
      * class documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
-     * @param	accessCoordinator the access coordinator
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if any of the properties are invalid,
      *		as specified in the class documentation
      */
     public DataStoreImpl(Properties properties,
-			 AccessCoordinator accessCoordinator)
+			 ComponentRegistry systemRegistry,
+			 TransactionProxy txnProxy)
     {
-	this(properties, accessCoordinator, new BasicScheduler());
-    }
-
-    /**
-     * Creates an instance of this class configured with the specified
-     * properties, access coordinator, and scheduler.  See the {@linkplain
-     * DataStoreImpl class documentation} for a list of supported properties.
-     *
-     * @param	properties the properties for configuring this instance
-     * @param	accessCoordinator the access coordinator
-     * @param	scheduler the scheduler used to schedule periodic tasks
-     * @throws	DataStoreException if there is a problem with the database
-     * @throws	IllegalArgumentException if any of the properties are invalid,
-     *		as specified in the class documentation}
-     */
-    public DataStoreImpl(Properties properties, 
-			 AccessCoordinator accessCoordinator,
-			 Scheduler scheduler)
-    {
-	super(accessCoordinator, logger, abortLogger);
+	super(systemRegistry,
+	      new LoggerWrapper(Logger.getLogger(CLASSNAME)),
+	      new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort")));
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -846,15 +775,18 @@ public class DataStoreImpl extends AbstractDataStore {
                     DEFAULT_ENVIRONMENT_CLASS,
                     DbEnvironment.class,
                     new Class<?>[]{
-                        String.class, Properties.class, Scheduler.class
+                        String.class, Properties.class,
+			ComponentRegistry.class, TransactionProxy.class
                     },
-                    directory, properties, scheduler);
+                    directory, properties, systemRegistry, txnProxy);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
-	    Databases dbs = getDatabases(dbTxn);
-	    infoDb = dbs.info;
-	    classesDb = dbs.classes;
-	    oidsDb = dbs.oids;
-	    namesDb = dbs.names;
+	    Databases dbs = DbUtilities.getDatabases(env, dbTxn, logger);
+	    infoDb = dbs.info();
+	    classesDb = dbs.classes();
+	    oidsDb = dbs.oids();
+	    namesDb = dbs.names();
+	    nodeId = DataStoreHeader.getNextId(
+		DataStoreHeader.NEXT_NODE_ID_KEY, infoDb, dbTxn, 1);
 	    useAllocationBlockPlaceholders =
 		env.useAllocationBlockPlaceholders();
 	    freeObjectIds = new FreeObjectIds(useAllocationBlockPlaceholders);
@@ -879,55 +811,6 @@ public class DataStoreImpl extends AbstractDataStore {
 	}
     }
     
-    /**
-     * Opens or creates the Berkeley DB databases associated with this data
-     * store.
-     */
-    private Databases getDatabases(DbTransaction dbTxn) {
-	Databases dbs = new Databases();
-	boolean create = false;
-	try {
-	    dbs.info = env.openDatabase(dbTxn, "info", false);
-	    int minorVersion = DataStoreHeader.verify(dbs.info, dbTxn);
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.log(Level.CONFIG, "Found existing header {0}",
-			   DataStoreHeader.headerString(minorVersion));
-	    }
-	} catch (FileNotFoundException e) {
-	    try {
-		dbs.info = env.openDatabase(dbTxn, "info", true);
-	    } catch (FileNotFoundException e2) {
-		throw new DataStoreException(
-		    "Problem creating database: " + e2.getMessage(), e2);
-	    }
-	    DataStoreHeader.create(dbs.info, dbTxn);
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.log(Level.CONFIG, "Created new header {0}",
-			   DataStoreHeader.headerString());
-	    }
-	    create = true;
-	}
-	try {
-	    dbs.classes = env.openDatabase(dbTxn, "classes", create);
-	} catch (FileNotFoundException e) {
-	    throw new DataStoreException(
-		"Classes database not found: " + e.getMessage(), e);
-	}
-	try {
-	    dbs.oids = env.openDatabase(dbTxn, "oids", create);
-	} catch (FileNotFoundException e) {
-	    throw new DataStoreException(
-		"Oids database not found: " + e.getMessage(), e);
-	}
-	try {
-	    dbs.names = env.openDatabase(dbTxn, "names", create);
-	} catch (FileNotFoundException e) {
-	    throw new DataStoreException(
-		"Names database not found: " + e.getMessage(), e);
-	}
-	return dbs;
-    }
-
     /**
      * Removes any unused allocation block placeholders and updates the ID of
      * the first placeholder.
@@ -979,6 +862,11 @@ public class DataStoreImpl extends AbstractDataStore {
     /* -- Implement AbstractDataStore's DataStore methods -- */
 
     /** {@inheritDoc} */
+    protected long getLocalNodeIdInternal() {
+	return nodeId;
+    }
+
+    /** {@inheritDoc} */
     protected long createObjectInternal(Transaction txn) {
 	TxnInfo txnInfo = checkTxn(txn);
 	ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
@@ -989,8 +877,8 @@ public class DataStoreImpl extends AbstractDataStore {
 	    DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
 	    boolean done = false;
 	    try {
-		newNextObjectId = DataStoreHeader.getNextId(
-		    NEXT_OBJ_ID_KEY, infoDb, dbTxn, ALLOCATION_BLOCK_SIZE);
+		newNextObjectId = DbUtilities.getNextObjectId(
+		    infoDb, dbTxn, ALLOCATION_BLOCK_SIZE);
 		newLastObjectId =
 		    newNextObjectId + ALLOCATION_BLOCK_SIZE - 1;
 		maybeUpdateAllocationBlockPlaceholders(
@@ -1156,57 +1044,8 @@ public class DataStoreImpl extends AbstractDataStore {
     /** {@inheritDoc} */
     protected int getClassIdInternal(Transaction txn, byte[] classInfo) {
 	checkTxn(txn);
-	byte[] hashKey = getKeyFromClassInfo(classInfo);
-	boolean done = false;
-	/*
-	 * Use a separate transaction when obtaining the class ID so that
-	 * the ID will be available for other transactions to use right
-	 * away.  This approach means that the class info will be
-	 * registered even if the main transaction fails.  If any
-	 * transaction wants to register a new class, though, it's very
-	 * likely that the class will be needed, even if that transaction
-	 * aborts, so it makes sense to commit this operation separately to
-	 * improve concurrency.  -tjb@sun.com (05/23/2007)
-	 *
-	 * Use full transaction isolation to insure consistency when
-	 * concurrently allocating new class IDs.  -tjb@sun.com (03/17/2009)
-	 */
-	DbTransaction dbTxn = env.beginTransaction(txn.getTimeout(), true);
-	try {
-	    int result;
-	    byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
-	    if (hashValue != null) {
-		result = DataEncoding.decodeInt(hashValue);
-	    } else {
-		DbCursor cursor = classesDb.openCursor(dbTxn);
-		try {
-		    result = cursor.findLast()
-			? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
-		    byte[] idKey = getKeyFromClassId(result);
-		    boolean success =
-			cursor.putNoOverwrite(idKey, classInfo);
-		    if (!success) {
-			throw new DataStoreException(
-			    "Class ID key already present");
-		    }
-		} finally {
-		    cursor.close();
-		}
-		boolean success = classesDb.putNoOverwrite(
-		    dbTxn, hashKey, DataEncoding.encodeInt(result));
-		if (!success) {
-		    throw new DataStoreException(
-			"Class hash already present");
-		}
-	    }
-	    done = true;
-	    dbTxn.commit();
-	    return result;
-	} finally {
-	    if (!done) {
-		dbTxn.abort();
-	    }
-	}
+	return DbUtilities.getClassId(
+	    env, classesDb, classInfo, txn.getTimeout());
     }
 
     /** {@inheritDoc} */
@@ -1214,19 +1053,8 @@ public class DataStoreImpl extends AbstractDataStore {
 	throws ClassInfoNotFoundException
     {
 	checkTxn(txn);
-	byte[] key = getKeyFromClassId(classId);
-	byte[] result;
-	boolean done = false;
-	DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
-	try {
-	    result = classesDb.get(dbTxn, key, false);
-	    done = true;
-	    dbTxn.commit();
-	} finally {
-	    if (!done) {
-		dbTxn.abort();
-	    }
-	}
+	byte[] result = DbUtilities.getClassInfo(
+	    env, classesDb, classId, txn.getTimeout());
 	if (result != null) {
 	    return result;
 	} else {
@@ -1416,6 +1244,15 @@ public class DataStoreImpl extends AbstractDataStore {
 	}
     }
 
+    /**
+     * Returns a new node ID, for use with a newly started node.
+     *
+     * @return	the new node ID
+     */
+    protected long newNodeId() {
+	return getNextId(DataStoreHeader.NEXT_NODE_ID_KEY, 1, Long.MAX_VALUE);
+    }
+
     /* -- Private methods -- */
 
     /**
@@ -1525,35 +1362,6 @@ public class DataStoreImpl extends AbstractDataStore {
 	    if (!done) {
 		dbTxn.abort();
 	    }
-	}
-    }
-
-    /** Converts a database key to a class ID. */
-    private static int getClassIdFromKey(byte[] key) {
-	assert key[0] == DataStoreHeader.CLASS_ID_PREFIX;
-	return DataEncoding.decodeInt(key, 1);
-    }
-
-    /** Converts a class ID to a database key. */
-    private static byte[] getKeyFromClassId(int classId) {
-	byte[] key = new byte[5];
-	key[0] = DataStoreHeader.CLASS_ID_PREFIX;
-	DataEncoding.encodeInt(classId, key, 1);
-	return key;
-    }
-
-    /** Converts class information to a database key. */
-    private byte[] getKeyFromClassInfo(byte[] classInfo) {
-	byte[] keyBytes = new byte[1 + SHA1_SIZE];
-	keyBytes[0] = DataStoreHeader.CLASS_HASH_PREFIX;
-	MessageDigest md = messageDigest.get();
-	try {
-	    md.update(classInfo);
-	    int numBytes = md.digest(keyBytes, 1, SHA1_SIZE);
-	    assert numBytes == SHA1_SIZE;
-	    return keyBytes;
-	} catch (DigestException e) {
-	    throw new AssertionError(e);
 	}
     }
 

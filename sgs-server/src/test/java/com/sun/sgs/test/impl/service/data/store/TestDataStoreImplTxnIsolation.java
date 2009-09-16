@@ -24,7 +24,6 @@ import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.service.store.DataStore;
 import java.io.File;
-import java.util.Properties;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -47,26 +46,21 @@ public class TestDataStoreImplTxnIsolation extends BasicTxnIsolationTest {
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImplTxnIsolation.db";
 
-    /** Clean the database directory. */
     @BeforeClass
     public static void beforeClass() {
+	/* Clean the database directory */
 	cleanDirectory(dbDirectory);
-    }
-
-    /** Adds properties specific to {@link DataStoreImpl}. */
-    protected Properties createProperties() {
-	Properties props = super.createProperties();
+	/* Add properties specific to DataStoreImpl */
 	props.setProperty(DataStoreImplClassName + ".directory", dbDirectory);
 	props.setProperty(BdbEnvironment.LOCK_TIMEOUT_PROPERTY,
 			  String.valueOf(timeoutSuccess));
 	props.setProperty(JeEnvironment.LOCK_TIMEOUT_PROPERTY,
 			  String.valueOf(timeoutSuccess));
-	return props;
     }
 
     /** Creates a {@link DataStoreImpl}. */
     protected DataStore createDataStore() {
-	return new DataStoreImpl(props, accessCoordinator);
+	return new DataStoreImpl(props, env.systemRegistry, env.txnProxy);
     }
 
     /** Insures an empty version of the directory exists. */

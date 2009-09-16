@@ -23,9 +23,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.store.DataStore;
-import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.UtilProperties;
@@ -48,33 +46,49 @@ import org.junit.Test;
 public abstract class BasicTxnIsolationTest extends Assert {
 
     /** The configuration properties. */
-    protected static Properties props;
+    protected static final Properties props =
+	UtilProperties.createProperties();
 
     /**
      * The number of milliseconds to wait to see if an operation is successful.
      */
-    protected static long timeoutSuccess;
+    protected static final long timeoutSuccess =
+	Long.parseLong(props.getProperty("test.timeout.success", "1000"));
+
+    /* Set the access coordinator's lock timeout */
+    static {
+	props.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			  String.valueOf(timeoutSuccess));
+    }
 
     /**
      * The number of milliseconds to wait to see if an operation is blocked.
      */
-    protected static long timeoutBlock;
+    protected static final long timeoutBlock =
+	Long.parseLong(
+	    props.getProperty(
+		"test.timeout.block", String.valueOf(timeoutSuccess / 10)));
+
+    /** The test environment, using a locking access coordinator. */
+    protected static final BasicDataStoreTestEnv env =
+	new BasicDataStoreTestEnv(
+	    props, LockingAccessCoordinator.class.getName());
+
+    /** The transaction proxy. */
+    protected static final DummyTransactionProxy txnProxy = env.txnProxy;
+
+    /** The access coordinator to test. */
+    protected static final AccessCoordinatorHandle accessCoordinator =
+	env.accessCoordinator;
+
+    /** The data store to test. */
+    protected static DataStore store;
 
     /** A test value for an object ID. */
     private static final byte[] value = { 1 };
 
     /** Another test value for an object ID. */
     private static final byte[] secondValue = { 2 };
-
-    /** The transaction proxy. */
-    protected static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
-
-    /** The access coordinator to test. */
-    protected static AccessCoordinatorHandle accessCoordinator;
-
-    /** The data store to test. */
-    protected static DataStore store;
 
     /** An initial, open transaction. */
     protected DummyTransaction txn;
@@ -89,11 +103,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
      */
     @Before
     public void before() {
-	if (props == null) {
-	    props = createProperties();
-	}
 	if (store == null) {
-	    accessCoordinator = createAccessCoordinator();
 	    store = createDataStore();
 	}
 	txn = createTransaction();
@@ -125,29 +135,6 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	}
 	txnProxy.setCurrentTransaction(null);
 	Runner.abortAllOpen();
-    }
-
-    /** Creates the configuration properties. */
-    protected Properties createProperties() {
-	props = UtilProperties.createProperties();
-	PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
-	timeoutSuccess = wrappedProps.getLongProperty(
-	    "test.timeout.success", 1000);
-	timeoutBlock = wrappedProps.getLongProperty(
-	    "test.timeout.block", timeoutSuccess / 10);
-	props.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
-			  String.valueOf(timeoutSuccess));
-	return props;
-    }
-
-    /**
-     * Creates the access coordinator.
-     *
-     * @return	the access coordinator
-     */
-    protected AccessCoordinatorHandle createAccessCoordinator() {
-	return new LockingAccessCoordinator(
-	    props, txnProxy, new DummyProfileCollectorHandle());
     }
 
     /**

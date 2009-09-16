@@ -20,41 +20,40 @@
 package com.sun.sgs.test.impl.service.data.store.db;
 
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.data.store.Scheduler;
-import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.db.DbEnvironment;
+import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutMicros;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.File;
 import java.util.Properties;
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /** Test the DbEnvironment class. */
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestDbEnvironment extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public class TestDbEnvironment extends Assert {
 
     /** Directory used for database. */
     static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDbEnvironment.db";
 
-    /** A scheduler that does nothing. */
-    static final Scheduler dummyScheduler = new Scheduler() {
-	public TaskHandle scheduleRecurringTask(Runnable task, long period) {
-	    return new TaskHandle() {
-		public void cancel() { }
-	    };
-	}
-    };
-
     /** The system property that specifies the lock timeout. */
     static final String lockTimeoutPropertyName =
 	getLockTimeoutPropertyName(System.getProperties());
+
+    /** The test environment. */
+    static final BasicDataStoreTestEnv testEnv =
+	new BasicDataStoreTestEnv(System.getProperties());
 
     /** Properties for creating the environment. */
     private Properties props;
@@ -62,15 +61,16 @@ public class TestDbEnvironment extends TestCase {
     /** The environment or null. */
     private DbEnvironment env = null;
 
-    /** Prints the test case, and cleans the database directory. */
-    protected void setUp() throws Exception {
-	System.err.println("Testcase: " + getName());
+    /** Cleans the database directory. */
+    @Before
+    public void setUp() throws Exception {
 	cleanDirectory(dbDirectory);
 	props = createProperties();
     }
 
     /** Closes the environment, if present. */
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
 	if (env != null) {
 	    env.close();
 	    env = null;
@@ -81,6 +81,7 @@ public class TestDbEnvironment extends TestCase {
 
     /* -- Test constructor via factory -- */
 
+    @Test
     public void testLockTimeoutIllegal() {
 	props.setProperty(lockTimeoutPropertyName, "-1");
 	try {
@@ -98,18 +99,21 @@ public class TestDbEnvironment extends TestCase {
 	}
     }
 
+    @Test
     public void testLockTimeoutDefault() {
 	props.remove(TransactionCoordinator.TXN_TIMEOUT_PROPERTY);
 	env = getEnvironment(props);
 	assertEquals(10000, getLockTimeoutMicros(env));
     }
 
+    @Test
     public void testLockTimeoutFromTxnTimeoutIllegal() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "-1");
 	env = getEnvironment(props);
 	assertEquals(10000, getLockTimeoutMicros(env));
     }
 
+    @Test
     public void testLockTimeoutFromTxnTimeoutUnderflow() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "1");
 	env = getEnvironment(props);
@@ -120,6 +124,7 @@ public class TestDbEnvironment extends TestCase {
 	assertEquals(1000, getLockTimeoutMicros(env));
     }
 
+    @Test
     public void testLockTimeoutFromTxnTimeout() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
 			  "12345678");
@@ -127,6 +132,7 @@ public class TestDbEnvironment extends TestCase {
 	assertEquals(1234567000, getLockTimeoutMicros(env));
     }
 
+    @Test
     public void testLockTimeoutFromTxnTimeoutOverflow() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
 			  String.valueOf((Long.MAX_VALUE / 100) + 1));
@@ -139,6 +145,7 @@ public class TestDbEnvironment extends TestCase {
 	assertEquals(0, getLockTimeoutMicros(env));
     }
 
+    @Test
     public void testLockTimeoutSpecified() {
 	props.setProperty(lockTimeoutPropertyName, "1");
 	env = getEnvironment(props);
@@ -149,6 +156,7 @@ public class TestDbEnvironment extends TestCase {
 	assertEquals(437000, getLockTimeoutMicros(env));
     }
 
+    @Test
     public void testLockTimeoutSpecifiedOverflow() {
 	props.setProperty(lockTimeoutPropertyName,
 			  String.valueOf((Long.MAX_VALUE / 1000) + 1));
@@ -170,9 +178,11 @@ public class TestDbEnvironment extends TestCase {
                 "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment",
                 DbEnvironment.class,
                 new Class<?>[]{
-                    String.class, Properties.class, Scheduler.class
+                    String.class, Properties.class, ComponentRegistry.class,
+			TransactionProxy.class
                 },
-                dbDirectory, properties, dummyScheduler);
+                dbDirectory, properties, testEnv.systemRegistry,
+		testEnv.txnProxy);
     }
 
     /** Insures an empty version of the directory exists. */

@@ -33,13 +33,16 @@ import com.sleepycat.je.XAEnvironment;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.impl.service.data.store.Scheduler;
-import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.RecurringTaskHandle;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.db.DbDatabase;
 import com.sun.sgs.service.store.db.DbDatabaseException;
 import com.sun.sgs.service.store.db.DbEnvironment;
@@ -256,7 +259,7 @@ public class JeEnvironment implements DbEnvironment {
     private StatsRunnable statsTask = null;
 
     /** Used to cancel the stats task, if non-null. */
-    private TaskHandle statsTaskHandle = null;
+    private RecurringTaskHandle statsTaskHandle = null;
 
     /** A Berkeley DB exception listener that uses logging. */
     private static class LoggingExceptionListener
@@ -272,10 +275,11 @@ public class JeEnvironment implements DbEnvironment {
     }
 
     /** A runnable that logs database statistics. */
-    private class StatsRunnable implements Runnable {
+    private class StatsRunnable extends AbstractKernelRunnable {
 	private final StatsConfig statsConfig = new StatsConfig();
 	private boolean cancelled = false;
 	StatsRunnable() {
+	    super(null);
 	    statsConfig.setClear(true);
 	}
 	/** Prevents this task from running in the future. */
@@ -301,17 +305,20 @@ public class JeEnvironment implements DbEnvironment {
      *
      * @param	directory the directory containing database files
      * @param	properties the properties to configure this instance
-     * @param	scheduler the scheduler for running periodic tasks
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    public JeEnvironment(
-	String directory, Properties properties, Scheduler scheduler)
+    public JeEnvironment(String directory,
+			 Properties properties,
+			 ComponentRegistry systemRegistry,
+			 TransactionProxy txnProxy)
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(Level.CONFIG,
 		       "JeEnvironment directory:{0}, properties:{1}, " +
-		       "scheduler:{2}",
-		       directory, properties, scheduler);
+		       "systemRegistry:{2}, txnProxy:{3}",
+		       directory, properties, systemRegistry, txnProxy);
 	}
 	Properties propertiesWithDefaults = new Properties(properties);
 	for (Enumeration<?> names = defaultProperties.propertyNames();
@@ -403,8 +410,11 @@ public class JeEnvironment implements DbEnvironment {
 	}
 	if (stats >= 0) {
 	    statsTask = new StatsRunnable();
-	    statsTaskHandle = scheduler.scheduleRecurringTask(
-		statsTask, stats);
+	    TaskScheduler taskScheduler =
+		systemRegistry.getComponent(TaskScheduler.class);
+	    statsTaskHandle = taskScheduler.scheduleRecurringTask(
+		statsTask, txnProxy.getCurrentOwner(),
+		System.currentTimeMillis() + stats, stats);
 	}
     }
 

@@ -34,9 +34,12 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinator.TXN_TIMEOUT_PROPERTY;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
-import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
@@ -71,12 +74,13 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
-import static org.junit.Assert.*;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -85,7 +89,7 @@ import org.junit.runners.Parameterized;
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
 @RunWith(ParameterizedFilteredNameRunner.class)
-public class TestDataServiceImpl{
+public class TestDataServiceImpl extends Assert {
 
     @Parameterized.Parameters
     public static Collection data() {
@@ -413,8 +417,9 @@ public class TestDataServiceImpl{
     }
 
     public static class DataStoreConstructorFails extends DummyDataStore {
-	public DataStoreConstructorFails(
-	    Properties props, AccessCoordinator accessCoordinator)
+	public DataStoreConstructorFails(Properties props,
+					 ComponentRegistry systemRegistry,
+					 TransactionProxy txnProxy)
 	{
 	    throw new DataStoreConstructorException();
 	}
@@ -777,21 +782,18 @@ public class TestDataServiceImpl{
 	testGetBindingTimeout(false);
     }
     private void testGetBindingTimeout(final boolean app) throws Exception {
+	final long timeout =
+	    Long.getLong(TXN_TIMEOUT_PROPERTY, BOUNDED_TIMEOUT_DEFAULT);
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
                 setBinding(app, service, "dummy", dummy);
         }}, taskOwner);
-
-        Properties properties = getProperties();
-        properties.setProperty("com.sun.sgs.txn.timeout", "100");
-        serverNodeRestart(properties, false);
-
         try {
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
-                        Thread.sleep(200);
+                        Thread.sleep(2 * timeout);
                         getBinding(app, service, "dummy");
                         fail("Expected TransactionTimeoutException");
                     } catch (TransactionTimeoutException e) {
@@ -2648,6 +2650,10 @@ public class TestDataServiceImpl{
         }}, taskOwner);
     }
 
+    /**
+     * Test that markForUpdate blocks while a read is underway in another
+     * thread.
+     */
     @Test 
     public void testMarkForUpdateLocking() throws Exception {
 	/*
@@ -2669,12 +2675,9 @@ public class TestDataServiceImpl{
                 service.setBinding("dummy", dummy);
         }}, taskOwner);
 
-        final Semaphore mainFlag = new Semaphore(0);
-        final Semaphore threadFlag = new Semaphore(0);
-        
-        // Semaphore to let us know when we are done; both threads must release
-        final Semaphore doneFlag = new Semaphore(2); 
-        doneFlag.acquire(2);
+	final CountDownLatch readDummy = new CountDownLatch(2);
+        final CountDownLatch completedMarkForUpdate = new CountDownLatch(1);
+        final CountDownLatch threadsDone = new CountDownLatch(2); 
         
         final AtomicReference<Throwable> error = 
             new AtomicReference<Throwable>();
@@ -2684,22 +2687,22 @@ public class TestDataServiceImpl{
                 try {
                     dummy = (DummyManagedObject) service.getBinding("dummy");
                     assertEquals("a", dummy.value);
-                    assertTrue(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
-                    mainFlag.release();
-                    assertFalse(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
-                    doneFlag.release();
+		    readDummy.countDown();
+		    assertTrue(readDummy.await(500, TimeUnit.MILLISECONDS));
+		    assertFalse(
+			completedMarkForUpdate.await(
+			    100, TimeUnit.MILLISECONDS));
+		    threadsDone.countDown();
                 } catch (Throwable t) {
-                    // We don't expect any non-retryable throwables
                     if (!isRetryable(t)) {
                         error.set(t);
-                        doneFlag.release();
+			threadsDone.countDown();
                     }
                     if (t instanceof Exception) {
                         throw (Exception) t;
                     } else {
                         throw (Error) t;
                     } 
-                    
                 }
         }}, taskOwner);
 
@@ -2709,32 +2712,31 @@ public class TestDataServiceImpl{
                     DummyManagedObject dummy2 =
                         (DummyManagedObject) service.getBinding("dummy");
                     assertEquals("a", dummy2.value);
-                    threadFlag.release();
-                    assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
+		    readDummy.countDown();
+		    assertTrue(readDummy.await(1, TimeUnit.SECONDS));
                     service.markForUpdate(dummy2);
-                    threadFlag.release();
-                    doneFlag.release();
+		    assertEquals(1L, threadsDone.getCount());
+		    completedMarkForUpdate.countDown();
+		    threadsDone.countDown();
                 } catch (Throwable t) {
                     if (!isRetryable(t)) {
-                        doneFlag.release();
                         error.set(t);
+			threadsDone.countDown();
                     }
                     if (t instanceof Exception) {
                         throw (Exception) t;
                     } else {
                         throw (Error) t;
                     } 
-                }
-                Transaction txn = txnProxy.getCurrentTransaction();
-                txn.abort(new RuntimeException("abort"));
+		}
         }}, taskOwner);
 
-        assertTrue(doneFlag.tryAcquire(2, 1, TimeUnit.SECONDS));
-
+	boolean done = threadsDone.await(1, TimeUnit.SECONDS);
         Throwable throwable = error.get();
         if (throwable != null) {
             throw new AssertionError(throwable);
         }
+	assertTrue("Threads done", done);
     }
 
     /* -- Test createReference -- */
@@ -3121,6 +3123,34 @@ public class TestDataServiceImpl{
                     service.getObjectId(x).equals(
                         service.getObjectId(y)));
         }}, taskOwner);
+    }
+
+    /* -- Test getLocalNodeId -- */
+
+    @Test
+    public void testGetLocalNodeId() throws Exception {
+	long id1 = service.getLocalNodeId();
+	assertTrue("Node ID should be greater than 0: " + id1, id1 > 0);
+	serverNodeRestart(getProperties(), false);
+	long id2 = serverNode.getDataService().getLocalNodeId();
+	assertTrue("Second node ID should be greater than " + id1 + ": " + id2,
+		   id2 > id1);
+    }
+
+    @Test
+    public void testGetLocalNodeIdInTxn() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+		assertTrue(service.getLocalNodeId() > 0);
+            }
+        }, taskOwner);
+    }
+
+    @Test
+    public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
+	serverNode.shutdown(false);
+	serverNode = null;
+	service.getLocalNodeId();
     }
 
     /* -- Test createReferenceForId -- */
@@ -4933,128 +4963,118 @@ public class TestDataServiceImpl{
                 service.setBinding("dummy2", new DummyManagedObject());
         }}, taskOwner);
 
-        class TestTask1 extends TestAbstractKernelRunnable {
-            Exception exception = null;
-            private final int runNumber;
-            private final Semaphore flag1;
-            private final Semaphore flag2;
-            private final Semaphore doneFlag;
+	abstract class TestTask extends TestAbstractKernelRunnable {
+	    private final int taskNumber;
+            final int runNumber;
+            final CountDownLatch firstStepDone;
+            private final CountDownLatch taskDone;
             private boolean firstTry = true;
-            TestTask1(int runNumber, Semaphore flag1, 
-                      Semaphore flag2, Semaphore doneFlag) 
+	    private Transaction txn;
+            private Exception exception = null;
+            TestTask(int taskNumber,
+		     int runNumber,
+		     CountDownLatch firstStepDone,
+		     CountDownLatch taskDone)
             {
+		this.taskNumber = taskNumber;
                 this.runNumber = runNumber;
-                this.flag1 = flag1;
-                this.flag2 = flag2;
-                this.doneFlag = doneFlag;
+                this.firstStepDone = firstStepDone;
+                this.taskDone = taskDone;
             }
-            public void run() throws Exception {
-                Transaction txn = txnProxy.getCurrentTransaction();
-                if (!firstTry) {     
-                    // Don't want to loop forever with retriable exceptions
-                    throw new RuntimeException("just kill it");             
-                }
+            public synchronized void run() throws Exception {
+		if (firstTry) {
+		    firstTry = false;
+		    txn = txnProxy.getCurrentTransaction();
+		    try {
+			runInternal();
+		    } catch (Exception e) {
+			print(e);
+			exception = e;
+		    } finally {
+			taskDone.countDown();
+		    }
+		}
+            }
+	    void print(Object message) {
+		System.err.println("pass " + runNumber +
+				   ", task " + taskNumber +
+				   ",  " + txn +
+				   ":\n  " + message);
+	    }
+	    abstract void runInternal() throws Exception;
+	    synchronized Exception getException() {
+		return exception;
+	    }
+        }
 
-                dummy = (DummyManagedObject) service.getBinding("dummy");
-
-                // First step is done, let the other task proceed
-                flag1.release();
-                firstTry = false;
-
+        class TestTask1 extends TestTask {
+            TestTask1(int runNumber,
+		      CountDownLatch firstStepDone,
+                      CountDownLatch taskDone)
+            {
+		super(1, runNumber, firstStepDone, taskDone);
+            }
+            void runInternal() throws Exception {
+		dummy = (DummyManagedObject) service.getBinding("dummy");
+		firstStepDone.countDown();
+		print("completed first step");
+		assertTrue("Wait for first step done",
+			   firstStepDone.await(1, TimeUnit.SECONDS));
                 // We can only hope the second task gets a chance
                 Thread.sleep(runNumber * 500);
-                System.err.println(runNumber + " task 1 ("
-                                 + txn + "): woke from sleep, acquiring flag");
-                flag2.acquire();
-                try {
-                    ((DummyManagedObject)
-                        service.getBinding("dummy2")).setValue(runNumber);
-                    System.err.println(runNumber + " task 1 ("
-                                       + txn + "): commit");
-                } catch (Exception e) {
-                    System.err.println(
-                            runNumber + " task 1 (" + txn + "): " + e);
-                    exception = e;
-                } finally {
-                    doneFlag.release();
-                }
+		print("woke from sleep");
+		((DummyManagedObject)
+		 service.getBinding("dummy2")).setValue(runNumber);
+		print("commit");
             }
         }
 
-        class TestTask2 extends TestAbstractKernelRunnable {
-            Exception exception = null;
-            Transaction txn = null;
-            private final int runNumber;
-            private final Semaphore flag1;
-            private final Semaphore flag2;
-            private final Semaphore doneFlag;
-            private boolean firstTry = true;
-            TestTask2(int runNumber, Semaphore flag1, 
-                      Semaphore flag2, Semaphore doneFlag) 
+        class TestTask2 extends TestTask {
+            TestTask2(int runNumber,
+		      CountDownLatch firstStepDone, 
+                      CountDownLatch taskDone)
             {
-                this.runNumber = runNumber;
-                this.flag1 = flag1;
-                this.flag2 = flag2;
-                this.doneFlag = doneFlag;
+		super(2, runNumber, firstStepDone, taskDone);
             }
-            public void run() throws Exception {
-                txn = txnProxy.getCurrentTransaction();
-                if (!firstTry) {
-                    throw new RuntimeException("just kill it");
-                }
-                flag1.acquire();
-                service.getBinding("dummy2");
-                // Let the other task proceed
-                flag2.release();
-                System.err.println(runNumber + " task 2 ("
-                                 + txn + "): released flag");
-                firstTry = false;
-                try {
-                    ((DummyManagedObject)
-                         service.getBinding("dummy")).setValue(runNumber);
-                    System.err.println(runNumber + " task 2 ("
-                                       + txn + "): commit");
-                } catch (Exception e) {
-                    System.err.println(
-                        runNumber + " task 2 (" + txn + "): " + e);
-                    exception = e;
-                } finally {
-                    doneFlag.release();
-                }
+            void runInternal() throws Exception {
+		service.getBinding("dummy2");
+		firstStepDone.countDown();
+		print("completed first step");
+		assertTrue("Wait for first step done",
+			   firstStepDone.await(1, TimeUnit.SECONDS));
+		((DummyManagedObject)
+		 service.getBinding("dummy")).setValue(runNumber);
+		print("commit");
             }
         }
 
 	for (int i = 0; i < 5; i++) {
-            final Semaphore flag1 = new Semaphore(1);
-            final Semaphore flag2 = new Semaphore(1);
-            // Both threads must release before an acquire can occur
-            final Semaphore doneFlag = new Semaphore(2);   
-            TestTask1 task1 = new TestTask1(i, flag1, flag2, doneFlag);
-            TestTask2 task2 = new TestTask2(i, flag1, flag2, doneFlag);
+	    CountDownLatch firstStepDone = new CountDownLatch(2);
+	    CountDownLatch taskDone = new CountDownLatch(2);
+            TestTask1 task1 = new TestTask1(i, firstStepDone, taskDone);
+            TestTask2 task2 = new TestTask2(i, firstStepDone, taskDone);
       
             // Note that we're using schedule task here, not run task,
             // which allows the tasks to run concurrently.
             // We should guarantee that these two can run concurrently
             // (default number of consumer threads allows this)
 
-            flag1.acquire();
-            flag2.acquire();
-            doneFlag.acquire(2);
-            System.err.println(i + " main loop, acquired flags");
             txnScheduler.scheduleTask(task1, taskOwner);
             txnScheduler.scheduleTask(task2, taskOwner);
+            assertTrue("Wait for tasks to complete",
+		       taskDone.await(10, TimeUnit.SECONDS));
 
-            doneFlag.acquire(2);
-            
-            if (task1.exception != null &&
-                !(task1.exception instanceof TransactionAbortedException))
+	    Exception exception1 = task1.getException();
+	    Exception exception2 = task2.getException();
+            if (exception1 != null &&
+                !(exception1 instanceof TransactionAbortedException))
             {
-                throw task1.exception;
-            } else if (task2.exception != null &&
-                !(task2.exception instanceof TransactionAbortedException))
+                throw exception1;
+            } else if (exception2 != null &&
+                !(exception2 instanceof TransactionAbortedException))
             {
-                throw task2.exception;
-            } else if (task1.exception == null && task2.exception == null) {
+                throw exception2;
+            } else if (exception1 == null && exception2 == null) {
                 fail ("Expected TransactionAbortedException");
             }
 	}
@@ -5747,6 +5767,8 @@ public class TestDataServiceImpl{
 
     /** A dummy implementation of DataStore. */
     static class DummyDataStore implements DataStore {
+	public void ready() { }
+	public long getLocalNodeId() { return 1; }
 	public long createObject(Transaction txn) { return 0; }
 	public void markForUpdate(Transaction txn, long oid) { }
 	public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
