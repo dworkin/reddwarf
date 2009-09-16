@@ -28,17 +28,10 @@ import java.rmi.Remote;
 public interface WatchdogServer extends Remote {
 
     /**
-     * Registers a node with the corresponding {@code host} and
-     * {@code client}, and returns and array containing two {@code
-     * long} values consisting of:
-     *
-     * <ul>
-     * <li>a unique node ID for the node, and
-     *
-     * <li>an interval (in milliseconds) that this watchdog must be
-     * notified, via the {@link #renewNode renewNode} method, in order
-     * for the specified node to be considered alive.
-     * </ul>
+     * Registers a node with the corresponding {@code nodeId}, {@code host},
+     * and {@code client}, and returns the interval (in milliseconds) that this
+     * watchdog must be notified, via the {@link #renewNode renewNode} method,
+     * in order for the specified node to be considered alive.
      *
      * <p>If this method throws {@code NodeRegistrationFailedException},
      * the caller should not retry as this indicates a fatal error.
@@ -47,20 +40,21 @@ public interface WatchdogServer extends Remote {
      * client} will be notified of these status changes via its {@link
      * WatchdogClient#nodeStatusChanges nodeStatusChanges} method.
      *
+     * @param	nodeId the node ID of the node
      * @param	host  a host name
      * @param	client a watchdog client
      * @param   jmxPort the port JMX is listening on, or -1 if JMX is not
      *                   enabled for remote listening on the node
      *
-     * @return 	an array containing two {@code long} values consisting of
-     *		a unique node ID and a renew interval (in milliseconds)
+     * @return 	the renew interval (in milliseconds)
      *
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long[] registerNode(String host, WatchdogClient client, int jmxPort)
+    long registerNode(
+	long nodeId, String host, WatchdogClient client, int jmxPort)
 	throws NodeRegistrationFailedException, IOException;
 
     /**

@@ -481,7 +481,7 @@ public class SgsTestNode {
      * Returns the nodeId for this test node.
      */
     public long getNodeId() {
-        return getWatchdogService().getLocalNodeId();
+        return getDataService().getLocalNodeId();
     }
 
     /**

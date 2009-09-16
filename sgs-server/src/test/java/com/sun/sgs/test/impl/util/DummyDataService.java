@@ -28,7 +28,6 @@ import com.sun.sgs.service.DataService;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -84,6 +83,9 @@ class DummyDataService
     }
 	
     /* -- Implement DataService -- */
+    public long getLocalNodeId() {
+	throw new UnsupportedOperationException();
+    }
     public ManagedObject getServiceBinding(String name) {
 	ManagedObject obj = get(name);
 	if (obj == null) {

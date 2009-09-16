@@ -62,6 +62,11 @@ abstract class DataStoreProtocolClient implements DataStoreServer {
     /* -- Implement DataStoreServer -- */
 
     /** {@inheritDoc} */
+    public long newNodeId() throws IOException {
+	return getHandler().newNodeId();
+    }
+
+    /** {@inheritDoc} */
     public long createObject(long tid) throws IOException {
 	return getHandler().createObject(tid);
     }

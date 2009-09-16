@@ -29,13 +29,16 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 import java.util.Properties;
@@ -546,8 +549,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	/** Creates an instance. */
-	CustomDataStoreImpl(Properties properties) {
-	    super(properties, new NullAccessCoordinator());
+	CustomDataStoreImpl(Properties properties,
+			    ComponentRegistry systemRegistry,
+			    TransactionProxy txnProxy)
+	{
+	    super(properties,
+		  /* Use a NullAccessCoordinator */
+		  new ComponentRegistryWithOverride(
+		      new NullAccessCoordinator(), systemRegistry),
+		  txnProxy);
 	}
 
 	/**
@@ -687,6 +697,68 @@ public class DataStoreServerImpl implements DataStoreServer {
 				      ", name:" + name);
 	    }
 	}
+
+	/** Provide access to newNodeId. */
+	long localNewNodeId() {
+	    return super.newNodeId();
+	}
+    }
+
+    /**
+     * Defines a {@code ComponentRegistry} with a component that overrides
+     * matches from a supplied registry.
+     */
+    private static class ComponentRegistryWithOverride
+	implements ComponentRegistry
+    {
+	/** The overriding component. */
+	private final Object overrideComponent;
+
+	/** The base registry. */
+	private final ComponentRegistry registry;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	overrideComponent the overriding component
+	 * @param	registry the base registry
+	 */
+	ComponentRegistryWithOverride(Object overrideComponent,
+				      ComponentRegistry registry)
+	{
+	    this.overrideComponent = overrideComponent;
+	    this.registry = registry;
+	}
+
+	/** {@inheritDoc} */
+	public <T> T getComponent(Class<T> type) {
+	    if (type.isAssignableFrom(overrideComponent.getClass())) {
+		return type.cast(overrideComponent);
+	    } else {
+		return registry.getComponent(type);
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public Iterator<Object> iterator() {
+	    return new Iterator<Object>() {
+		private boolean first = true;
+		private final Iterator iterator = registry.iterator();
+		public boolean hasNext() {
+		    return first || iterator.hasNext();
+		}
+		public Object next() {
+		    if (!first) {
+			return iterator.next();
+		    }
+		    first = false;
+		    return overrideComponent;
+		}
+		public void remove() {
+		    throw new UnsupportedOperationException();
+		}
+	    };
+	}
     }
 
     /**
@@ -725,6 +797,8 @@ public class DataStoreServerImpl implements DataStoreServer {
      * a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if the value of the {@code
      *	      com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
@@ -733,11 +807,15 @@ public class DataStoreServerImpl implements DataStoreServer {
      *	      DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
      * @throws	IOException if a network problem occurs
      */
-    public DataStoreServerImpl(Properties properties) throws IOException {
+    public DataStoreServerImpl(Properties properties,
+			       ComponentRegistry systemRegistry,
+			       TransactionProxy txnProxy)
+	throws IOException
+    {
 	logger.log(Level.CONFIG, "Creating DataStoreServerImpl properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	store = new CustomDataStoreImpl(properties);
+	store = new CustomDataStoreImpl(properties, systemRegistry, txnProxy);
 	maxTxnTimeout = wrappedProps.getLongProperty(
 	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT,
 	    1, Long.MAX_VALUE);
@@ -769,6 +847,11 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /* -- Implement DataStoreServer -- */
+
+    /** {@inheritDoc} */
+    public long newNodeId() {
+	return store.localNewNodeId();
+    }
 
     /** {@inheritDoc} */
     public long createObject(long tid) {
