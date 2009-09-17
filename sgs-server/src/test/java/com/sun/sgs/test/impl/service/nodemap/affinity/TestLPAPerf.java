@@ -115,11 +115,15 @@ public class TestLPAPerf {
     @Test
     public void warmupZach() throws Exception {
         final int node = 1;
-        // Warm up the compilers{
+        // Warm up the compilers
+        Properties props = new Properties();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(LabelPropagationServer.DEFAULT_SERVER_PORT));
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
+                       InetAddress.getLocalHost().getHostName());
         LabelPropagation lpa =
            new LabelPropagation(new ZachBuilder(), node,
-                                "localhost",
-                                LabelPropagationServer.DEFAULT_SERVER_PORT,
+                                props,
                                 false,
                                 numThreads);
 
@@ -134,11 +138,15 @@ public class TestLPAPerf {
     public void testZachary() throws Exception {
         final int node = 1;
         GraphBuilder builder = new ZachBuilder();
+        Properties props = new Properties();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(LabelPropagationServer.DEFAULT_SERVER_PORT));
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
+                       InetAddress.getLocalHost().getHostName());
         // second argument true:  gather statistics
         LabelPropagation lpa =
             new LabelPropagation(builder, node,
-                                 "localhost",
-                                 LabelPropagationServer.DEFAULT_SERVER_PORT,
+                                 props,
                                  true, numThreads);
 
         long avgTime = 0;
@@ -185,23 +193,25 @@ public class TestLPAPerf {
             int serverPort = nextUniquePort.incrementAndGet();
             props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                        String.valueOf(serverPort));
+            props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
+                       InetAddress.getLocalHost().getHostName());
             server = new LabelPropagationServer(collector, props);
-            String localHost = InetAddress.getLocalHost().getHostName();
+//            String localHost = InetAddress.getLocalHost().getHostName();
 
             LabelPropagation lp1 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                        DistributedZachBuilder.NODE1, localHost, serverPort,
+                        DistributedZachBuilder.NODE1, props,
                             true, numThreads);
             LabelPropagation lp2 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                        DistributedZachBuilder.NODE2, localHost, serverPort,
+                        DistributedZachBuilder.NODE2, props,
                             true, numThreads);
             LabelPropagation lp3 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                        DistributedZachBuilder.NODE3, localHost, serverPort,
+                        DistributedZachBuilder.NODE3, props,
                             true, numThreads);
         }
 
@@ -220,24 +230,26 @@ public class TestLPAPerf {
         int serverPort = nextUniquePort.incrementAndGet();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
+                       InetAddress.getLocalHost().getHostName());
         LabelPropagationServer server = 
                 new LabelPropagationServer(collector, props);
-        String localHost = InetAddress.getLocalHost().getHostName();
+//        String localHost = InetAddress.getLocalHost().getHostName();
 
         LabelPropagation lp1 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                    DistributedZachBuilder.NODE1, localHost, serverPort,
+                    DistributedZachBuilder.NODE1, props,
                         true, numThreads);
         LabelPropagation lp2 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                    DistributedZachBuilder.NODE2, localHost, serverPort,
+                    DistributedZachBuilder.NODE2, props,
                         true, numThreads);
         LabelPropagation lp3 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                    DistributedZachBuilder.NODE3, localHost, serverPort,
+                    DistributedZachBuilder.NODE3, props,
                         true, numThreads);
 
         AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)

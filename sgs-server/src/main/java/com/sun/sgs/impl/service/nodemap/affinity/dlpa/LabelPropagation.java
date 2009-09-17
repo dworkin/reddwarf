@@ -20,12 +20,14 @@
 package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
@@ -38,6 +40,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -70,6 +73,9 @@ public class LabelPropagation implements LPAClient {
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
+    // The property name for the server host
+    static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
+    
     // The producer of our graphs.
     private final GraphBuilder builder;
 
@@ -165,8 +171,7 @@ public class LabelPropagation implements LPAClient {
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
      * @param nodeId the local vertex ID
-     * @param host the server host name
-     * @param port the port used by the LPAServer
+     * @param	properties the properties for configuring this service
      * @param gatherStats if {@code true}, gather extra statistics for each run.
      *            Useful for testing.
      * @param numThreads number of threads, for TESTING.
@@ -178,7 +183,7 @@ public class LabelPropagation implements LPAClient {
      * @throws Exception if any other error occurs
      */
     public LabelPropagation(GraphBuilder builder, long nodeId,
-                            String host, int port,
+                            Properties properties,
                             boolean gatherStats,
                             int numThreads)
         throws Exception
@@ -196,6 +201,17 @@ public class LabelPropagation implements LPAClient {
             executor = null;
         }
 
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,
+			wrappedProps.getProperty(
+			    StandardProperties.SERVER_HOST));
+        if (host == null) {
+            throw new IllegalArgumentException(
+                                   "A server host must be specified");
+        }
+        int port = wrappedProps.getIntProperty(
+                LabelPropagationServer.SERVER_PORT_PROPERTY,
+                LabelPropagationServer.DEFAULT_SERVER_PORT, 0, 65535);
         // Look up our server
         Registry registry = LocateRegistry.getRegistry(host, port);
         server = (LPAServer) registry.lookup(

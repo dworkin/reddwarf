@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.BipartiteGraphBuilder;
@@ -32,6 +33,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
@@ -99,6 +101,8 @@ public class TestGraphListener {
     private ProfileCollector collector;
 
     private final String builderName;
+
+    private Properties props;
     
     /**
      * Create this test class.
@@ -116,12 +120,13 @@ public class TestGraphListener {
     
     @Before
     public void beforeEachTest() throws Exception {
-        Properties p = new Properties();
+        props = new Properties();
         if (builderName != null) {
-            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+            props.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
         }
-        collector = new ProfileCollectorImpl(ProfileLevel.MIN, p, null);
-        listener = new GraphListener(collector, p);
+        collector = new ProfileCollectorImpl(ProfileLevel.MIN, props, null);
+        props.setProperty(StandardProperties.NODE_TYPE, NodeType.appNode.name());
+        listener = new GraphListener(collector, props);
         builder = listener.getGraphBuilder();
     }
 
@@ -425,10 +430,7 @@ public class TestGraphListener {
 
     @Test
     public void testGraphPrunerCountTwo() throws Exception {
-        Properties p = new Properties();
-        if (builderName != null) {
-            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
-        }
+        Properties p = new Properties(props);
         p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
         listener = new GraphListener(collector, p);
         builder = listener.getGraphBuilder();

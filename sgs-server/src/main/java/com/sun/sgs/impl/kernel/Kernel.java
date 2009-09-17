@@ -40,8 +40,6 @@ import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
-import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
-
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -395,15 +393,6 @@ class Kernel {
             }
         }
 
-        // Add the affinity graph listener if we are an app node
-        NodeType type =
-            NodeType.valueOf(
-                appProperties.getProperty(StandardProperties.NODE_TYPE));
-        if (type == NodeType.appNode) {
-            profileCollector.addListener(
-                    new GraphListener(profileCollector, appProperties), false);
-        }
-        
         // finally, register the scheduler as a listener too
         // NOTE: if we make the schedulers pluggable, or add other components
         // that are listeners, then we should scan through all of the system

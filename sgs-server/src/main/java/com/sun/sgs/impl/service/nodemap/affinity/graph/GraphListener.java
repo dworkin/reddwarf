@@ -23,8 +23,10 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
 import
      com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
@@ -59,7 +61,7 @@ public class GraphListener implements ProfileListener {
      * The public property for specifying the graph builder class.
      */
     public static final String GRAPH_CLASS_PROPERTY =
-	PROP_BASE + ".graphbuilder.class";
+        PROP_BASE + ".graphbuilder.class";
     
     // the affinity graph builder
     private final GraphBuilder builder;
@@ -81,6 +83,13 @@ public class GraphListener implements ProfileListener {
                         col, properties);
         } else {
             builder = new WeightedGraphBuilder(col, properties);
+        }
+        // Add the self as listener if we are an app node
+        NodeType type =
+            NodeType.valueOf(
+                properties.getProperty(StandardProperties.NODE_TYPE));
+        if (type == NodeType.appNode) {
+            col.addListener(this, false);
         }
     }
     
