@@ -499,7 +499,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         for (Map.Entry<Long, Map<Identity, Long>> e :
             groupMap.entrySet())
         {
-            retVal.add(new MultiAffinityGroup(e.getKey(), e.getValue()));
+            retVal.add(new RelocatingAffinityGroup(e.getKey(), e.getValue()));
         }
 
         return retVal;

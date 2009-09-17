@@ -30,9 +30,10 @@ import java.util.Set;
  * Affinity group.  Key ideas swiped from Keith's branch to help us with
  * merging.
  * <p>
- * These affinity groups can span multiple nodes.
+ * These affinity groups can span multiple nodes and will eventually
+ * pro-actively relocate their members to a single node.
  */
-public class MultiAffinityGroup implements AffinityGroup {
+public class RelocatingAffinityGroup implements AffinityGroup {
     // The group id
     private final long agid;
     // Map Identity -> nodeId
@@ -45,7 +46,7 @@ public class MultiAffinityGroup implements AffinityGroup {
      * @param agid the group id
      * @param identities the identities and their nodes in the group
      */
-    MultiAffinityGroup(long agid, Map<Identity, Long> identities) {
+    RelocatingAffinityGroup(long agid, Map<Identity, Long> identities) {
         assert identities.size() > 0;
         this.agid = agid;
         this.identities = identities;

@@ -27,7 +27,8 @@ import java.util.Set;
 
 /**
  * The affinity group information for a single node, in a format which
- * can be sent between nodes and the server.
+ * can be sent between nodes and the server.  These affinity groups are
+ * data containers only.
  */
 public class AffinitySet implements AffinityGroup, Serializable {
     /** Serialization version. */
