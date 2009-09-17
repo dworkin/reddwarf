@@ -19,6 +19,9 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
+import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
+import
+     com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -41,7 +44,9 @@ import java.util.Properties;
  *   com.sun.sgs.impl.service.nodemap.affinity.GraphListener.graphbuilder.class
  *	</b></code><br>
  *	<i>Default:</i>
- *   {@code com.sun.sgs.impl.service.nodemap.affinity.WeightedGraphBuilder} <br>
+ *    {@code
+ *    com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder}
+ * <br>
  *
  * <dd style="padding-top: .5em">The graph builder to use.<p>
  * </dl>

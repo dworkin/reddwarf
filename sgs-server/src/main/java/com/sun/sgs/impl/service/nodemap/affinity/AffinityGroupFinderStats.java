@@ -44,15 +44,23 @@ public class AffinityGroupFinderStats extends StandardMBean
     private static final String NAME = "com.sun.sgs.AffinityGroupFinder";
     // Configuration info -- what if we allow this be modified?
     private final int stopIteration;
-    // JANE?
-    private int numGroups;
+    /** The number of groups found in the last algorithm run. */
+    protected int numGroups;
 
-    //
-    private final AggregateProfileSample iterations;
-    private final AggregateProfileSample runtime;
-    private final AggregateProfileCounter runs;
-    private final AggregateProfileCounter failed;
-    private final AggregateProfileCounter stopped;
+    // Statistics are gathered for these items (min, max, avg).
+    /** The number of iterations in the last algorithm run. */
+    protected final AggregateProfileSample iterations;
+    /** The time (milliseconds) for the last algorithm run. */
+    protected final AggregateProfileSample runtime;
+
+    /** The total number of algorithm runs. */
+    protected final AggregateProfileCounter runs;
+    /** The total number of failed algorithm runs. */
+    protected final AggregateProfileCounter failed;
+    /** The total number of stopped algorithm runs. Stopped runs are
+     * not considered failures.
+     */
+    protected final AggregateProfileCounter stopped;
 
     // The last time {@link #clear} was called, or when this object
     // was created if {@code clear} has not been called.
@@ -63,7 +71,8 @@ public class AffinityGroupFinderStats extends StandardMBean
      * @param collector the profile collector
      * @param stopIter the maximum iterations a run will perform
      */
-    public AffinityGroupFinderStats(ProfileCollector collector, int stopIter) {
+    protected AffinityGroupFinderStats(ProfileCollector collector, int stopIter)
+    {
         super(AffinityGroupFinderMXBean.class, true);
         stopIteration = stopIter;
 
@@ -199,28 +208,5 @@ public class AffinityGroupFinderStats extends StandardMBean
             return MBeanOperationInfo.ACTION;
         }
         return MBeanOperationInfo.UNKNOWN;
-    }
-
-    // Package updators
-    void iterationsSample(long sample) {
-        iterations.addSample(sample);
-    }
-    void runtimeSample(long sample) {
-        runtime.addSample(sample);
-    }
-    void runsCountInc() {
-        runs.incrementCount();
-    }
-
-    void failedCountInc() {
-        failed.incrementCount();
-    }
-
-    void stoppedCountInc() {
-        stopped.incrementCount();
-    }
-
-    void setNumGroups(int value) {
-        numGroups = value;
     }
 }

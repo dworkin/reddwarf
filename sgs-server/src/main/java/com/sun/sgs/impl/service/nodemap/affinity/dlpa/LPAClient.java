@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Collection;

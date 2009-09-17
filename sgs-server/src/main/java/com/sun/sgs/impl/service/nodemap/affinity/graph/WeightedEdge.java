@@ -53,17 +53,23 @@ public class WeightedEdge {
         return weight.get();
     }
     
+    /**
+     * Increments the edge weight.
+     */
+    public void incrementWeight() {
+        weight.incrementAndGet();
+    }
+
+    /**
+     * Adds the given {@code value} to the edge weight.
+     * @param value the value to add to the weight
+     */
+    public void addWeight(long value) {
+        weight.addAndGet(value);
+    }
+
     /** {@inheritDoc} */
     public String toString() {
         return "E:" + weight;
-    }
-    
-    /*  Package private methods */
-    void incrementWeight() {
-        weight.incrementAndGet();
-    }
-    
-    void addWeight(long value) {
-        weight.addAndGet(value);
     }
 }

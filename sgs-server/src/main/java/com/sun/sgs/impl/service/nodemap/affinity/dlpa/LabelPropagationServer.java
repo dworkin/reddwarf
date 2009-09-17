@@ -17,9 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
@@ -119,7 +122,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     private final AtomicLong runNumber = new AtomicLong();
 
     // Our JMX info
-    private final AffinityGroupFinderStats stats;
+    private final LPFinderStats stats;
     
     /**
      * Constructs a new label propagation server. Only one should exist
@@ -139,7 +142,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
 
         // Create our JMX MBean
-        stats = new AffinityGroupFinderStats(col, MAX_ITERATIONS);
+        stats = new LPFinderStats(col, MAX_ITERATIONS);
         try {
             col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
         } catch (JMException e) {

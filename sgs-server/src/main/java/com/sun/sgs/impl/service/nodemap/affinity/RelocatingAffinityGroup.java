@@ -31,7 +31,9 @@ import java.util.Set;
  * merging.
  * <p>
  * These affinity groups can span multiple nodes and will eventually
- * pro-actively relocate their members to a single node.
+ * relocate their members to a single node.  There probably needs to be
+ * some external control of the relocation in case we merge affinity groups
+ * or find that an algorithm run returns a single group.
  */
 public class RelocatingAffinityGroup implements AffinityGroup {
     // The group id
@@ -42,11 +44,11 @@ public class RelocatingAffinityGroup implements AffinityGroup {
     private final long targetNodeId;
 
     /**
-     * Creates a new affinity group which contains node information
+     * Creates a new affinity group containing node information.
      * @param agid the group id
      * @param identities the identities and their nodes in the group
      */
-    RelocatingAffinityGroup(long agid, Map<Identity, Long> identities) {
+    public RelocatingAffinityGroup(long agid, Map<Identity, Long> identities) {
         assert identities.size() > 0;
         this.agid = agid;
         this.identities = identities;
@@ -61,11 +63,9 @@ public class RelocatingAffinityGroup implements AffinityGroup {
         Map<Long, Integer> nodeCountMap = new HashMap<Long, Integer>();
         for (Long nodeId : identities.values()) {
             Integer count = nodeCountMap.get(nodeId);
-            if (count == null) {
-                count = new Integer(0);
-            }
-            count++;
-            nodeCountMap.put(nodeId, count);
+            int val = (count == null) ? 0 : count.intValue();
+            val++;
+            nodeCountMap.put(nodeId, Integer.valueOf(val));
         }
         long retNode = -1;
         int highestCount = -1;
