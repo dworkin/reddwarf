@@ -36,7 +36,6 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.IntegrationTest;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
@@ -117,15 +116,10 @@ public class TestLPAPerf {
         final int node = 1;
         // Warm up the compilers
         Properties props = new Properties();
-        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
-                   String.valueOf(LabelPropagationServer.DEFAULT_SERVER_PORT));
-        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
-                       InetAddress.getLocalHost().getHostName());
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
+                    String.valueOf(numThreads));
         LabelPropagation lpa =
-           new LabelPropagation(new ZachBuilder(), node,
-                                props,
-                                false,
-                                numThreads);
+           new LabelPropagation(new ZachBuilder(), node, props, false);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.singleNodeFindCommunities();
@@ -139,15 +133,11 @@ public class TestLPAPerf {
         final int node = 1;
         GraphBuilder builder = new ZachBuilder();
         Properties props = new Properties();
-        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
-                   String.valueOf(LabelPropagationServer.DEFAULT_SERVER_PORT));
-        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
-                       InetAddress.getLocalHost().getHostName());
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
+                    String.valueOf(numThreads));
         // second argument true:  gather statistics
         LabelPropagation lpa =
-            new LabelPropagation(builder, node,
-                                 props,
-                                 true, numThreads);
+            new LabelPropagation(builder, node, props, true);
 
         long avgTime = 0;
         int avgIter = 0;
@@ -193,26 +183,22 @@ public class TestLPAPerf {
             int serverPort = nextUniquePort.incrementAndGet();
             props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                        String.valueOf(serverPort));
-            props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
-                       InetAddress.getLocalHost().getHostName());
+            props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
+                    String.valueOf(numThreads));
             server = new LabelPropagationServer(collector, props);
-//            String localHost = InetAddress.getLocalHost().getHostName();
 
             LabelPropagation lp1 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                        DistributedZachBuilder.NODE1, props,
-                            true, numThreads);
+                        DistributedZachBuilder.NODE1, props, true);
             LabelPropagation lp2 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                        DistributedZachBuilder.NODE2, props,
-                            true, numThreads);
+                        DistributedZachBuilder.NODE2, props, true);
             LabelPropagation lp3 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                        DistributedZachBuilder.NODE3, props,
-                            true, numThreads);
+                        DistributedZachBuilder.NODE3, props, true);
         }
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
@@ -230,27 +216,23 @@ public class TestLPAPerf {
         int serverPort = nextUniquePort.incrementAndGet();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
-        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
-                       InetAddress.getLocalHost().getHostName());
         LabelPropagationServer server = 
                 new LabelPropagationServer(collector, props);
-//        String localHost = InetAddress.getLocalHost().getHostName();
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
+                    String.valueOf(numThreads));
 
         LabelPropagation lp1 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                    DistributedZachBuilder.NODE1, props,
-                        true, numThreads);
+                    DistributedZachBuilder.NODE1, props, true);
         LabelPropagation lp2 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                    DistributedZachBuilder.NODE2, props,
-                        true, numThreads);
+                    DistributedZachBuilder.NODE2, props, true);
         LabelPropagation lp3 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                    DistributedZachBuilder.NODE3, props,
-                        true, numThreads);
+                    DistributedZachBuilder.NODE3, props, true);
 
         AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
             collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
@@ -763,6 +745,11 @@ public class TestLPAPerf {
         /** {@inheritDoc} */
         public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
             return;
+        }
+
+        /** {@inheritDoc} */
+        public void shutdown() {
+            // do nothing
         }
     }
 }

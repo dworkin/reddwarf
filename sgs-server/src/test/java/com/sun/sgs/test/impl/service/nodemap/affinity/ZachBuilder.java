@@ -167,4 +167,8 @@ class ZachBuilder implements GraphBuilder {
         return;
     }
 
+    /** {@inheritDoc} */
+    public void shutdown() {
+        // do nothing
+    }
 }

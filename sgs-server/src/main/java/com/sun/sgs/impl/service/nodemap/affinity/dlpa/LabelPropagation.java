@@ -31,6 +31,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
@@ -60,6 +61,21 @@ import java.util.logging.Logger;
  * This class supports running on a single node (useful for testing
  * algorithm changes) and in a distributed system on several nodes.
  * <p>
+ * The following property is supported:
+ * <p>
+ * <dl style="margin-left: 1em">
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *   com.sun.sgs.impl.service.nodemap.affinity.numThreads
+ *	</b></code><br>
+ *	<i>Default:</i>
+ *    {@code 4}
+ * <br>
+ *
+ * <dd style="padding-top: .5em">The number of threads to use while running
+ *     the algorithm. Set to {@code 1} to run single-threaded.
+ * <p>
+ * </dl>
  * Set logging to Level.FINEST for a trace of the algorithm (very verbose
  * and slow).
  * Set logging to Level.FINER to see the final labeled graph.
@@ -75,7 +91,13 @@ public class LabelPropagation implements LPAClient {
 
     // The property name for the server host
     static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
-    
+
+    /** The property name for the number of threads to use. */
+    public static final String NUM_THREADS_PROPERTY = PKG_NAME + ".numThreads";
+
+    /** The default value for the number of threads to use. */
+    public static final int DEFAULT_NUM_THREADS = 4;
+
     // The producer of our graphs.
     private final GraphBuilder builder;
 
@@ -170,13 +192,10 @@ public class LabelPropagation implements LPAClient {
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
-     * @param nodeId the local vertex ID
+     * @param nodeId the local node ID
      * @param	properties the properties for configuring this service
      * @param gatherStats if {@code true}, gather extra statistics for each run.
      *            Useful for testing.
-     * @param numThreads number of threads, for TESTING.
-     *      If 1, use the sequential asynchronous version.
-     *      If >1, use the parallel version, with that number of threads.
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
@@ -184,30 +203,28 @@ public class LabelPropagation implements LPAClient {
      */
     public LabelPropagation(GraphBuilder builder, long nodeId,
                             Properties properties,
-                            boolean gatherStats,
-                            int numThreads)
+                            boolean gatherStats)
         throws Exception
     {
-        if (numThreads < 1) {
-            throw new IllegalArgumentException("Num threads must be > 0");
-        }
         this.builder = builder;
         localNodeId = nodeId;
         this.gatherStats = gatherStats;
-        this.numThreads = numThreads;
+
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        numThreads = wrappedProps.getIntProperty(
+            NUM_THREADS_PROPERTY, DEFAULT_NUM_THREADS, 1, 65535);
         if (numThreads > 1) {
             executor = Executors.newFixedThreadPool(numThreads);
         } else {
             executor = null;
         }
-
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        
         String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,
 			wrappedProps.getProperty(
 			    StandardProperties.SERVER_HOST));
         if (host == null) {
-            throw new IllegalArgumentException(
-                                   "A server host must be specified");
+            // None specified, use local host
+            host = InetAddress.getLocalHost().getHostName();
         }
         int port = wrappedProps.getIntProperty(
                 LabelPropagationServer.SERVER_PORT_PROPERTY,

@@ -24,6 +24,7 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
@@ -51,6 +52,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.After;
 import org.junit.Assert;
@@ -92,18 +94,34 @@ public class TestGraphListener {
             e.printStackTrace();
         }
     }
-    
+    /** The default initial unique port for this test suite. */
+    private final static int DEFAULT_PORT = 20000;
+
+    /** The property that can be used to select an initial port. */
+    private final static String PORT_PROPERTY = "test.sgs.port";
+
+    /** The next unique port to use for this test suite. */
+    private final static AtomicInteger nextUniquePort;
+
+    static {
+        Integer systemPort = Integer.getInteger(PORT_PROPERTY);
+        int port = systemPort == null ? DEFAULT_PORT
+                                      : systemPort.intValue();
+        nextUniquePort = new AtomicInteger(port);
+    }
     // The listener created for each test
     private GraphListener listener;
     // The builder used by the listener
     private GraphBuilder builder;
     // The collector used by the listener/builder
-    private ProfileCollector collector;
+    private static ProfileCollector collector;
+    // The server, needs to be of the same type as the lpa "client"
+    private static LabelPropagationServer lpaServer;
 
     private final String builderName;
 
     private Properties props;
-    
+
     /**
      * Create this test class.
      * @param builderName the type of graph builder to use
@@ -120,13 +138,22 @@ public class TestGraphListener {
     
     @Before
     public void beforeEachTest() throws Exception {
+        // Note that we aren't using the SgsTestNode.  It's easiest for all
+        // our other tests to disable the affinity group finding while
+        // using SgsTestNode.
         props = new Properties();
+        collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
         if (builderName != null) {
             props.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
         }
-        collector = new ProfileCollectorImpl(ProfileLevel.MIN, props, null);
-        props.setProperty(StandardProperties.NODE_TYPE, NodeType.appNode.name());
-        listener = new GraphListener(collector, props);
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
+                   String.valueOf(nextUniquePort.incrementAndGet()));
+        props.setProperty(StandardProperties.NODE_TYPE,
+                          NodeType.coreServerNode.name());
+        lpaServer = new LabelPropagationServer(collector, props);
+        props.setProperty(StandardProperties.NODE_TYPE,
+                          NodeType.appNode.name());
+        listener = new GraphListener(collector, props, 1);
         builder = listener.getGraphBuilder();
     }
 
@@ -134,6 +161,7 @@ public class TestGraphListener {
     public void afterEachTest() {
         listener.shutdown();
         collector.shutdown();
+        lpaServer.shutdown();
     }
     
     @Test
@@ -432,7 +460,7 @@ public class TestGraphListener {
     public void testGraphPrunerCountTwo() throws Exception {
         Properties p = new Properties(props);
         p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
-        listener = new GraphListener(collector, p);
+        listener = new GraphListener(collector, p, 2);
         builder = listener.getGraphBuilder();
 
         LabelVertex vertA = new LabelVertex(new IdentityImpl("A"));
@@ -696,12 +724,17 @@ public class TestGraphListener {
 
     @Test(expected=IllegalArgumentException.class)
     public void testGraphBuilderBadCount() throws Exception {
-        Properties p = new Properties();
-        if (builderName != null) {
-            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+        String orig = props.getProperty(GraphBuilder.PERIOD_COUNT_PROPERTY);
+        props.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "0");
+        try {
+            listener = new GraphListener(collector, props, 2);
+        } finally {
+            if (orig == null) {
+                props.remove(GraphBuilder.PERIOD_COUNT_PROPERTY);
+            } else {
+                props.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, orig);
+            }
         }
-        p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "0");
-        listener = new GraphListener(collector, p);
     }
 
     /* Utility methods and classes. */

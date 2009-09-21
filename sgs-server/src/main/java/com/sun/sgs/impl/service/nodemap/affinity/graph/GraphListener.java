@@ -43,51 +43,76 @@ import java.util.Properties;
  * <dl style="margin-left: 1em">
  *
  * <dt>	<i>Property:</i> <code><b>
- *   com.sun.sgs.impl.service.nodemap.affinity.GraphListener.graphbuilder.class
+ *   com.sun.sgs.impl.service.nodemap.affinity.graphbuilder.class
  *	</b></code><br>
  *	<i>Default:</i>
  *    {@code
  *    com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder}
  * <br>
  *
- * <dd style="padding-top: .5em">The graph builder to use.<p>
+ * <dd style="padding-top: .5em">The graph builder to use.  Set to
+ *   {@code None} if no affinity group finding is required, which is
+ *   useful for testing. <p>
  * </dl>
  */
 public class GraphListener implements ProfileListener {
     // the base name for properties
-    private static final String PROP_BASE = GraphListener.class.getName();
-    
+    private static final String PROP_BASE =
+            "com.sun.sgs.impl.service.nodemap.affinity";
     /**
      * The public property for specifying the graph builder class.
      */
     public static final String GRAPH_CLASS_PROPERTY =
         PROP_BASE + ".graphbuilder.class";
     
-    // the affinity graph builder
+    /**
+     * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
+     * affinity group finding should be instantiated (useful for testing).
+     */
+    public static final String GRAPH_CLASS_NONE = "None";
+
+    // the affinity graph builder, null if there is none
     private final GraphBuilder builder;
 
     /**
-     * Constructs a new listener instance.  This listener is constructed
-     * and registered by the kernel.
+     * Constructs a new listener instance. 
      *
      * @param col the profile collector
      * @param properties application properties
+     * @param nodeId the local node id
+     * @throws Exception if an error occurs
      */
-    public GraphListener(ProfileCollector col, Properties properties) {
+    public GraphListener(ProfileCollector col, Properties properties, 
+                         long nodeId)
+        throws Exception
+    {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        String builderClass = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
-        if (builderClass != null) {
-            builder = wrappedProps.getClassInstanceProperty(
-                        GRAPH_CLASS_PROPERTY, GraphBuilder.class,
-                        new Class[] {ProfileCollector.class, Properties.class},
-                        col, properties);
-        } else {
-            builder = new WeightedGraphBuilder(col, properties);
-        }
-        // Add the self as listener if we are an app node
         NodeType type =
             NodeType.valueOf(
                 properties.getProperty(StandardProperties.NODE_TYPE));
+        String builderClass = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
+        if (GRAPH_CLASS_NONE.equals(builderClass)) {
+            // do not instantiate anything
+            builder = null;
+            return;
+        }
+        if (builderClass != null) {
+            builder = wrappedProps.getClassInstanceProperty(
+                GRAPH_CLASS_PROPERTY, GraphBuilder.class,
+                new Class[] {ProfileCollector.class,
+                             Properties.class, long.class},
+                col, properties, nodeId);
+        } else if (type != NodeType.singleNode) {
+            builder = new WeightedGraphBuilder(col, properties, nodeId);
+        } else {
+            // If we're in single node, and no builder was requested,
+            // don't bother creating anything.  Affinity groups will make
+            // no sense.
+            builder = null;
+        }
+
+        // Add the self as listener if we are an app node
+
         if (type == NodeType.appNode) {
             col.addListener(this, false);
         }
@@ -100,7 +125,9 @@ public class GraphListener implements ProfileListener {
 
     /** {@inheritDoc} */
     public void shutdown() {
-        // do nothing
+        if (builder != null) {
+            builder.shutdown();
+        }
     }
     
     /** {@inheritDoc} */

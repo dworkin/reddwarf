@@ -131,4 +131,9 @@ public interface GraphBuilder {
      * @param nodeId the id of the failed node
      */
     void removeNode(long nodeId);
+
+    /**
+     * Shut down this builder.
+     */
+    void shutdown();
 }

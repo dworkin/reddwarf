@@ -40,7 +40,6 @@ import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.net.InetAddress;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -88,8 +87,6 @@ public class TestLPA {
     }
 
     private TestLPAServer server;
-//    private String localHost;
-//    private int serverPort;
     private ProfileCollector collector;
     private Properties props;
 
@@ -99,8 +96,7 @@ public class TestLPA {
         int serverPort = getNextUniquePort();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
-        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.host",
-                   InetAddress.getLocalHost().getHostName());
+        props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads", "1");
         collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
         server = new TestLPAServer(collector, props);
     }
@@ -206,13 +202,13 @@ public class TestLPA {
         // Create three clients.
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, props, true, 1);
+                    PartialToyBuilder.NODE2, props, true);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, props, true, 1);
+                    PartialToyBuilder.NODE3, props, true);
         Collection<AffinityGroup> groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
     }
@@ -222,13 +218,13 @@ public class TestLPA {
         // Create three clients.
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, props, true, 1);
+                    PartialToyBuilder.NODE2, props, true);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, props, true, 1);
+                    PartialToyBuilder.NODE3, props, true);
         Collection<AffinityGroup> groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
         groups = server.findAffinityGroups();
@@ -242,7 +238,7 @@ public class TestLPA {
         // are down.
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, props, true, 1);
+                    PartialToyBuilder.NODE3, props, true);
         Collection<AffinityGroup> groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
     }
@@ -260,7 +256,7 @@ public class TestLPA {
     public void testServerShutdown() throws Throwable {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         server.shutdown();
         lp1.prepareAlgorithm(1);
     }
@@ -332,7 +328,7 @@ public class TestLPA {
     public void testAffinityGroupsTwice() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -358,7 +354,7 @@ public class TestLPA {
     public void testPrepareTwice() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         lp1.prepareAlgorithm(1);
         lp1.prepareAlgorithm(1);
         int count = 0;
@@ -376,7 +372,7 @@ public class TestLPA {
     public void testIterationTwice() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -403,7 +399,7 @@ public class TestLPA {
     public void testAffinityGroupsRunMismatch() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -420,7 +416,7 @@ public class TestLPA {
     public void testIterationMismatch() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -455,13 +451,13 @@ public class TestLPA {
     public void testCrossNodeData() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, props, true, 1);
+                    PartialToyBuilder.NODE2, props, true);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, props, true, 1);
+                    PartialToyBuilder.NODE3, props, true);
 
         long run = 1;
         lp1.prepareAlgorithm(run);
@@ -586,13 +582,13 @@ public class TestLPA {
         Identity id4 = new DummyIdentity("4");
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    PartialToyBuilder.NODE1, props, true, 1);
+                    PartialToyBuilder.NODE1, props, true);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    PartialToyBuilder.NODE2, props, true, 1);
+                    PartialToyBuilder.NODE2, props, true);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    PartialToyBuilder.NODE3, props, true, 1);
+                    PartialToyBuilder.NODE3, props, true);
         lp1.prepareAlgorithm(1);
         lp2.prepareAlgorithm(1);
         lp3.prepareAlgorithm(1);
@@ -970,6 +966,11 @@ public class TestLPA {
         /** {@inheritDoc} */
         public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
             return;
+        }
+
+        /** {@inheritDoc} */
+        public void shutdown() {
+            // do nothing
         }
     }
 }

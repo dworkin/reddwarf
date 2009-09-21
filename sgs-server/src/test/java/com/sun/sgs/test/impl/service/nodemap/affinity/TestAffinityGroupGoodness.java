@@ -250,5 +250,10 @@ public class TestAffinityGroupGoodness {
         public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
             return;
         }
+
+        /** {@inheritDoc} */
+        public void shutdown() {
+            // do nothing
+        }
     }
 }

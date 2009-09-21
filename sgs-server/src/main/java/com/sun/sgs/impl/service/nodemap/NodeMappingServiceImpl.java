@@ -23,6 +23,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -360,6 +361,10 @@ public class NodeMappingServiceImpl
     private final ConcurrentMap<Identity, Queue<SimpleCompletionHandler>>
         relocationHandlers =
             new ConcurrentHashMap<Identity, Queue<SimpleCompletionHandler>>();
+
+    /** A graph listener, used for detecting affinity groups. */
+    private final GraphListener graphListener;
+
     /**
      * Constructs an instance of this class with the specified properties.
      * <p>
@@ -486,6 +491,9 @@ public class NodeMappingServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
 
+            // Create our graph listener
+            graphListener =
+                    new GraphListener(collector, properties, localNodeId);
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
                             "Failed to create NodeMappingServiceImpl");
@@ -524,6 +532,7 @@ public class NodeMappingServiceImpl
     
     /** {@inheritDoc} */
     protected void doShutdown() {
+        graphListener.shutdown();
         try {
             exporter.unexport();
             if (dataService != null) {

@@ -20,10 +20,14 @@
 package com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
@@ -89,12 +93,22 @@ public class WeightedGraphBuilder implements GraphBuilder {
 
     // Our JMX exposed information
     private final AffinityGraphBuilderStats stats;
+
+    // Our label propagation algorithm parts:  there is a different piece
+    // on the core server node.
+    private final LabelPropagationServer lpaServer;
+    private final LabelPropagation lpa;
     /**
      * Creates a weighted graph builder.
      * @param col the profile collector
      * @param properties  application properties
+     * @param nodeId the local node id
+     * @throws Exception if an error occurs
      */
-    public WeightedGraphBuilder(ProfileCollector col, Properties properties) {
+    public WeightedGraphBuilder(ProfileCollector col, Properties properties,
+                                long nodeId)
+        throws Exception
+    {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         long snapshot =
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
@@ -102,6 +116,21 @@ public class WeightedGraphBuilder implements GraphBuilder {
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
                 1, Integer.MAX_VALUE);
 
+        // Create the LPA algorithm pieces
+        NodeType type =
+            NodeType.valueOf(
+                properties.getProperty(StandardProperties.NODE_TYPE));
+        if (type == NodeType.coreServerNode) {
+            lpaServer = new LabelPropagationServer(col, properties);
+            lpa = null;
+        } else if (type == NodeType.appNode) {
+            lpaServer = null;
+            lpa = new LabelPropagation(this, nodeId, properties, false);
+        } else {
+            lpaServer = null;
+            lpa = null;
+        }
+        
         // Create our JMX MBean
         stats = new AffinityGraphBuilderStats(col,
                     affinityGraph, periodCount, snapshot);
@@ -217,6 +246,16 @@ public class WeightedGraphBuilder implements GraphBuilder {
         return conflictMap;
     }
 
+    /** {@inheritDoc} */
+    public void shutdown() {
+        pruneTask.cancel();
+        if (lpaServer != null) {
+            lpaServer.shutdown();
+        }
+        if (lpa != null) {
+            lpa.shutdown();
+        }
+    }
 
     /**
      * This will be the implementation of our conflict detection listener.
