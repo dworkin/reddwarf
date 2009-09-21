@@ -263,12 +263,15 @@ Setting these properties has no effect on application nodes.
   <a href="../../../service/store/db/DbEnvironment.html">
     <code>com.sun.sgs.service.store.db.DbEnvironment</code>
   </a>, and that has a 
-  public constructor with three parameters: a <code>java.util.String</code>,
+  public constructor with four parameters: a <code>java.util.String</code>,
   which specifies the directory containing database files, a 
   <code>java.util.Properties</code>, which specifies configuration options,
-  and a <a href="../../../impl/service/data/store/Scheduler.html">
-    <code>com.sun.sgs.impl.service.data.store.Scheduler</code></a>,
-  which the implementation can use to run asynchronous, periodic tasks. <p>
+  a <a href="../../../kernel/ComponentRegistry.html">
+  <code>com.sun.sgs.kernel.ComponentRegistry</code></a> which provides a
+  registry of available system components, and
+  a <a href="../../../service/TransactionProxy.html">
+  <code>com.sun.sgs.service.TransactionProxy</code></a> for access to
+  the current transaction and its owner. <p>
 
   Note that persistent data created using Berkeley DB is incompatible
   with data created using Berkeley DB Java edition

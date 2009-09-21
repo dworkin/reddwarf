@@ -36,6 +36,8 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import static com.sun.sgs.impl.service.transaction.
     TransactionCoordinator.TXN_TIMEOUT_PROPERTY;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -780,7 +782,8 @@ public class TestDataServiceImpl extends Assert {
 	testGetBindingTimeout(false);
     }
     private void testGetBindingTimeout(final boolean app) throws Exception {
-	final long timeout = Long.getLong(TXN_TIMEOUT_PROPERTY, 100);
+	final long timeout =
+	    Long.getLong(TXN_TIMEOUT_PROPERTY, BOUNDED_TIMEOUT_DEFAULT);
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
@@ -2647,6 +2650,10 @@ public class TestDataServiceImpl extends Assert {
         }}, taskOwner);
     }
 
+    /**
+     * Test that markForUpdate blocks while a read is underway in another
+     * thread.
+     */
     @Test 
     public void testMarkForUpdateLocking() throws Exception {
 	/*
@@ -2708,6 +2715,7 @@ public class TestDataServiceImpl extends Assert {
 		    readDummy.countDown();
 		    assertTrue(readDummy.await(1, TimeUnit.SECONDS));
                     service.markForUpdate(dummy2);
+		    assertEquals(1L, threadsDone.getCount());
 		    completedMarkForUpdate.countDown();
 		    threadsDone.countDown();
                 } catch (Throwable t) {
@@ -3142,11 +3150,7 @@ public class TestDataServiceImpl extends Assert {
     public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
 	serverNode.shutdown(false);
 	serverNode = null;
-	try {
-	    service.getLocalNodeId();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	}
+	service.getLocalNodeId();
     }
 
     /* -- Test createReferenceForId -- */

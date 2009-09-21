@@ -32,17 +32,20 @@ import com.sleepycat.db.RunRecoveryException;
 import com.sleepycat.db.TransactionConfig;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.impl.service.data.store.Scheduler;
-import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.RecurringTaskHandle;
+import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.db.DbDatabase;
 import com.sun.sgs.service.store.db.DbDatabaseException;
 import com.sun.sgs.service.store.db.DbEnvironment;
 import com.sun.sgs.service.store.db.DbTransaction;
-import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Properties;
@@ -246,7 +249,7 @@ public class BdbEnvironment implements DbEnvironment {
     private final CheckpointRunnable checkpointTask;
 
     /** Used to cancel the checkpoint task. */
-    private final TaskHandle checkpointTaskHandle;
+    private final RecurringTaskHandle checkpointTaskHandle;
 
     /** A Berkeley DB message handler that uses logging. */
     private static class LoggingMessageHandler implements MessageHandler {
@@ -267,10 +270,11 @@ public class BdbEnvironment implements DbEnvironment {
     }
 
     /** A runnable that performs a periodic database checkpoint. */
-    private class CheckpointRunnable implements Runnable {
+    private class CheckpointRunnable extends AbstractKernelRunnable {
 	private final CheckpointConfig config = new CheckpointConfig();
 	private boolean cancelled = false;
 	CheckpointRunnable(long size) {
+	    super(null);
 	    config.setKBytes((int) (size / 1000));
 	}
 	/** Prevents this task from running in the future. */
@@ -293,17 +297,20 @@ public class BdbEnvironment implements DbEnvironment {
      *
      * @param	directory the directory containing database files
      * @param	properties the properties to configure this instance
-     * @param	scheduler the scheduler for running periodic tasks
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    public BdbEnvironment(
-	String directory, Properties properties, Scheduler scheduler)
+    public BdbEnvironment(String directory,
+			  Properties properties,
+			  ComponentRegistry systemRegistry,
+			  TransactionProxy txnProxy)
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(Level.CONFIG,
 		       "BdbEnvironment directory:{0}, properties:{1}, " +
-		       "scheduler:{2}",
-		       directory, properties, scheduler);
+		       "systemRegistry:{2}, txnProxy:{3}",
+		       directory, properties, systemRegistry, txnProxy);
 	}
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	long cacheSize = wrappedProps.getLongProperty(
@@ -368,8 +375,12 @@ public class BdbEnvironment implements DbEnvironment {
 	    throw convertException(e, false);
 	}
 	checkpointTask = new CheckpointRunnable(checkpointSize);
-	checkpointTaskHandle = scheduler.scheduleRecurringTask(
-	    checkpointTask, checkpointInterval);
+	TaskScheduler taskScheduler =
+	    systemRegistry.getComponent(TaskScheduler.class);
+	checkpointTaskHandle = taskScheduler.scheduleRecurringTask(
+	    checkpointTask, txnProxy.getCurrentOwner(),
+	    System.currentTimeMillis() + checkpointInterval,
+	    checkpointInterval);
     }
 
     /**

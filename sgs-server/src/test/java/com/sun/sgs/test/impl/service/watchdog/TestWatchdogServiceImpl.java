@@ -194,9 +194,7 @@ public class TestWatchdogServiceImpl extends Assert {
         for (int i = 0; i < num; i++) {
             SgsTestNode node = new SgsTestNode(serverNode, null, props); 
             additionalNodes[i] = node;
-            System.err.println("watchdog service id: " +
-                                   node.getDataService().getLocalNodeId());
-
+            System.err.println("watchdog service id: " + node.getNodeId());
         }
     }
 
