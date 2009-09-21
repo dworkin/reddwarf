@@ -21,15 +21,13 @@ package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
-import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
@@ -42,67 +40,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * A distributed implementation of the algorithm presented in
  * "Near linear time algorithm to detect community structures in large-scale
  * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
- * <p>
- * This class supports running on a single node (useful for testing
- * algorithm changes) and in a distributed system on several nodes.
- * <p>
- * The following property is supported:
- * <p>
- * <dl style="margin-left: 1em">
- *
- * <dt>	<i>Property:</i> <code><b>
- *   com.sun.sgs.impl.service.nodemap.affinity.numThreads
- *	</b></code><br>
- *	<i>Default:</i>
- *    {@code 4}
- * <br>
- *
- * <dd style="padding-top: .5em">The number of threads to use while running
- *     the algorithm. Set to {@code 1} to run single-threaded.
- * <p>
- * </dl>
- * Set logging to Level.FINEST for a trace of the algorithm (very verbose
- * and slow).
- * Set logging to Level.FINER to see the final labeled graph.
- * Set logging to Level.FINE and construct with {@code gatherStats} set to
- *  {@code true} to print some high level statistics about each algorithm run.
  */
-public class LabelPropagation implements LPAClient {
-    private static final String PKG_NAME = 
-            "com.sun.sgs.impl.service.nodemap.affinity";
-    // Our logger
-    private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PKG_NAME));
-
+public class LabelPropagation extends AbstractLPA implements LPAClient {
     // The property name for the server host
     static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
-
-    /** The property name for the number of threads to use. */
-    public static final String NUM_THREADS_PROPERTY = PKG_NAME + ".numThreads";
-
-    /** The default value for the number of threads to use. */
-    public static final int DEFAULT_NUM_THREADS = 4;
-
-    // The producer of our graphs.
-    private final GraphBuilder builder;
-
-    // The local node id
-    private final long localNodeId;
 
     // The server : our master
     private final LPAServer server;
@@ -113,31 +65,6 @@ public class LabelPropagation implements LPAClient {
 
     // The exporter
     private final Exporter<LPAClient> clientExporter;
-
-    // A random number generator, to break ties.
-    private final Random ran = new Random();
-
-    // Our executor, for running tasks in parallel.
-    private final ExecutorService executor;
-
-    // The number of threads this algorithm should use.
-    private final int numThreads;
-
-    // If true, gather statistics for each run.
-    private final boolean gatherStats;
-    // For single node performance testing, only valid if gatherStats is true.
-    private long time;
-    private int iterations;
-    private double modularity;
-
-    // The graph in which we're finding communities.  This is a live
-    // graph for some graph builders;  we have to be able to handle changes.
-    private volatile UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
-
-    // For now, we're only grabbing the vertices of interest at the
-    // start of the algorithm.   This could change so we update for each run,
-    // but for now it's easiest to leave this list fixed.
-    private volatile List<LabelVertex> vertices;
 
     // Lock to ensure we aren't modifying the vertices list at the same
     // time we're processing an asynchronous call from another node.
@@ -169,8 +96,8 @@ public class LabelPropagation implements LPAClient {
         IN_ITERATION,
         // Gathering up the final groups
         GATHERING_GROUPS,
-            // Completed gathering groups
-            GATHERED_GROUPS,
+        // Completed gathering groups
+        GATHERED_GROUPS,
         // Idle (none of the above)
         IDLE
     }
@@ -189,6 +116,8 @@ public class LabelPropagation implements LPAClient {
     // The groups collected in the last run
     private Collection<AffinityGroup> groups;
 
+    /** The modularity of the last run, only valid on a single node. */
+    private double modularity;
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -206,18 +135,9 @@ public class LabelPropagation implements LPAClient {
                             boolean gatherStats)
         throws Exception
     {
-        this.builder = builder;
-        localNodeId = nodeId;
-        this.gatherStats = gatherStats;
+        super(builder, nodeId, properties, gatherStats);
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        numThreads = wrappedProps.getIntProperty(
-            NUM_THREADS_PROPERTY, DEFAULT_NUM_THREADS, 1, 65535);
-        if (numThreads > 1) {
-            executor = Executors.newFixedThreadPool(numThreads);
-        } else {
-            executor = null;
-        }
         
         String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,
 			wrappedProps.getProperty(
@@ -376,7 +296,6 @@ public class LabelPropagation implements LPAClient {
         }
 
         initializeLPARun();
-        initializeNodeConflictMap();
 
         // If we cannot reach a proxy, we invalidate the run.
         boolean failed = false;
@@ -697,6 +616,48 @@ public class LabelPropagation implements LPAClient {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * Initialize our vertex conflicts.  This needs to happen before
+     * we send our vertex conflict information to other nodes in
+     * response to an prepareAlgorithm call from the server, and before
+     * any crossNodeEdges calls.
+     */
+    protected void doOtherInitialization() {
+        // Get conflict information from the graph builder.
+        nodeConflictMap.putAll(builder.getConflictMap());
+        logger.log(Level.FINEST,
+                "{0}: initialized node conflict map", localNodeId);
+        printNodeConflictMap();
+    }
+
+    /** {@inheritDoc} */
+    protected void doOtherNeighbors(LabelVertex vertex,
+                                    Map<Integer, Long> labelMap,
+                                    StringBuffer logSB)
+    {
+        // Account for the remote neighbors:  look up this LabelVertex in
+        // the remoteNeighborMap
+        Map<Integer, Long> remoteMap =
+                remoteLabelMap.get(vertex.getIdentity());
+        if (remoteMap != null) {
+            // The check above is just so I can continue to test in single
+            // node mode
+            for (Map.Entry<Integer, Long> entry : remoteMap.entrySet()) {
+                Integer label = entry.getKey();
+                if (logger.isLoggable(Level.FINEST)) {
+                    logSB.append("RLabel:" + label +
+                                 "(" + entry.getValue() + ") ");
+                }
+                Long value = labelMap.containsKey(label) ?
+                                labelMap.get(label) : 0;
+                value += entry.getValue();
+                labelMap.put(label, value);
+            }
+        }
+    }
+    
+    /**
      * Exchanges information with other nodes in the system to fill in the
      * remoteLabelMap.
      * @return {@code true} if a problem occurred
@@ -966,214 +927,6 @@ public class LabelPropagation implements LPAClient {
         return groups;
     }
 
-    // Private methods used by both single-node test and distributed
-    // algorithms.
-    /**
-     * Initialize ourselves for a run of the algorithm.
-     */
-    private void initializeLPARun() {
-        logger.log(Level.FINEST, "{0}: initializing LPA run", localNodeId);
-        // Grab the graph (the weighted graph builder returns a pointer
-        // to the live graph) and a snapshot of the vertices.
-        graph = builder.getAffinityGraph();
-        assert (graph != null);
-
-        // The set of vertices we iterate over is fixed (e.g. we don't
-        // consider new vertices as we process this graph).  If processing
-        // takes a long time, or if we use a more dynamic work queue, we'll
-        // want to revisit this.
-        Collection<LabelVertex> graphVertices = graph.getVertices();
-        if (graphVertices == null) {
-            vertices = new ArrayList<LabelVertex>();
-        } else {
-            vertices = new ArrayList<LabelVertex>(graphVertices);
-        }
-        logger.log(Level.FINEST,
-                   "{0}: finished initializing LPA run", localNodeId);
-    }
-
-    /**
-     * Initialize our vertex conflicts.  This needs to happen before
-     * we send our vertex conflict information to other nodes in
-     * response to an prepareAlgorithm call from the server, and before 
-     * any crossNodeEdges calls.
-     */
-    private void initializeNodeConflictMap() {
-        // Get conflict information from the graph builder.
-        nodeConflictMap.putAll(builder.getConflictMap());
-        logger.log(Level.FINEST,
-                "{0}: initialized node conflict map", localNodeId);
-        printNodeConflictMap();
-    }
-
-    /**
-     * Sets the label of {@code vertex} to the label used most frequently
-     * by {@code vertex}'s neighbors.  Returns {@code true} if {@code vertex}'s
-     * label changed.
-     *
-     * @param vertex a vertex in the graph
-     * @param self {@code true} if we should pick our own label if it is
-     *             in the set of highest labels
-     * @return {@code true} if {@code vertex}'s label is changed, {@code false}
-     *        if it is not changed
-     */
-    private boolean setMostFrequentLabel(LabelVertex vertex, boolean self) {
-        List<Integer> highestSet = getNeighborCounts(vertex);
-
-        // If we got back an empty set, no neighbors were found and we're done.
-        if (highestSet.isEmpty()) {
-            return false;
-        }
-        
-        // If our current label is in the set of highest labels, we're done.
-        if (self && highestSet.contains(vertex.getLabel())) {
-            return false;
-        }
-
-        // Otherwise, choose a label at random
-        vertex.setLabel(highestSet.get(ran.nextInt(highestSet.size())));
-        logger.log(Level.FINEST, "{0} : Returning true: vertex is now {1}",
-                                 localNodeId, vertex);
-        return true;
-    }
-
-    /**
-     * Given a graph, and a vertex within that graph, find the set of labels
-     * with the highest count amongst {@code vertex}'s neighbors
-     *
-     * @param vertex the vertex whose neighbors labels will be examined
-     * @return a list of labels with the higest counts
-     */
-    private List<Integer> getNeighborCounts(LabelVertex vertex) {
-        // A map of labels -> counts, counting how many
-        // of our neighbors use a particular label.
-        Map<Integer, Long> labelMap = new HashMap<Integer, Long>();
-
-        // Put our neighbors vertex into the map.  We allow parallel edges, and
-        // use edge weights.
-        // NOTE can remove some code if we decide we don't need parallel edges 
-        Collection<LabelVertex> neighbors = graph.getNeighbors(vertex);
-        if (neighbors == null) {
-            // JUNG returns null if vertex is not present
-            return new ArrayList<Integer>();
-        }
-
-        StringBuffer logSB = new StringBuffer();
-        for (LabelVertex neighbor : neighbors) {
-            Integer label = neighbor.getLabel();
-            Long value = labelMap.containsKey(label) ?
-                            labelMap.get(label) : 0;
-            WeightedEdge edge = graph.findEdge(vertex, neighbor);
-            if (edge != null) {
-                if (logger.isLoggable(Level.FINEST)) {
-                    logSB.append(neighbor + "(" + edge.getWeight() + ") ");
-                }
-                value += edge.getWeight();
-                labelMap.put(label, value);
-            }
-        }
-
-        // Account for the remote neighbors:  look up this LabelVertex in
-        // the remoteNeighborMap
-        Map<Integer, Long> remoteMap =
-                remoteLabelMap.get(vertex.getIdentity());
-        if (remoteMap != null) {
-            // The check above is just so I can continue to test in single 
-            // node mode
-            for (Map.Entry<Integer, Long> entry : remoteMap.entrySet()) {
-                Integer label = entry.getKey();
-                if (logger.isLoggable(Level.FINEST)) {
-                    logSB.append("RLabel:" + label + 
-                                 "(" + entry.getValue() + ") ");
-                }
-                Long value = labelMap.containsKey(label) ?
-                                labelMap.get(label) : 0;
-                value += entry.getValue();
-                labelMap.put(label, value);
-            }
-        }
-
-
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST, "{0}: Neighbors of {1} : {2}",
-                       localNodeId, vertex, logSB.toString());
-        }
-
-        // Find the set of labels used the max number of times
-        long maxValue = -1L;
-        List<Integer> maxLabelSet = new ArrayList<Integer>();
-        for (Map.Entry<Integer, Long> entry : labelMap.entrySet()) {
-            long val = entry.getValue();
-            if (val > maxValue) {
-                maxValue = val;
-                maxLabelSet.clear();
-                maxLabelSet.add(entry.getKey());
-            } else if (val == maxValue) {
-                maxLabelSet.add(entry.getKey());
-            }
-        }
-        return maxLabelSet;
-    }
-
-    // Utility methods
-        /**
-     * Return the affinity groups found within the given vertices, putting all
-     * nodes with the same label in a group.  The affinity group's id
-     * will be the common label of the group.  Also, as an optimization,
-     * can reinitialize the labels to their initial setting.
-     *
-     * @param vertices the vertices that we gather groups from
-     * @param reinitialize if {@code true}, reinitialize the labels
-     * @return the affinity groups
-     */
-    public static Collection<AffinityGroup> gatherGroups(
-            List<LabelVertex> vertices, boolean reinitialize)
-    {
-        assert (vertices != null);
-        // All nodes with the same label are in the same community.
-        Map<Integer, AffinityGroup> groupMap =
-                new HashMap<Integer, AffinityGroup>();
-        for (LabelVertex vertex : vertices) {
-            int label = vertex.getLabel();
-            AffinitySet ag =
-                    (AffinitySet) groupMap.get(label);
-            if (ag == null) {
-                ag = new AffinitySet(label);
-                groupMap.put(label, ag);
-            }
-            ag.addIdentity(vertex.getIdentity());
-            if (reinitialize) {
-                vertex.initializeLabel();
-            }
-        }
-        return groupMap.values();
-    }
-
-    // For single node performance testing.
-    /**
-     * Returns the time used for the last algorithm run.  This is only
-     * valid if we were constructed to gather statistics.
-     *
-     * @return the time used for the last algorithm run
-     */
-    public long getTime()         { return time; }
-
-    /**
-     * Returns the iterations required for the last algorithm run.  This is only
-     * valid if we were constructed to gather statistics.
-     *
-     * @return the iterations required for the last algorithm run
-     */
-    public int getIterations()    { return iterations; }
-
-    /**
-     * Returns the moduarity of the last algorithm run results. This is only
-     * valid if we were constructed to gather statistics.
-     *
-     * @return the moduarity of the last algorithm run results
-     */
-    public double getModularity() { return modularity; }
-
     // For debugging.
     private void printNodeConflictMap() {
         if (!logger.isLoggable(Level.FINEST)) {
@@ -1218,4 +971,12 @@ public class LabelPropagation implements LPAClient {
             new ConcurrentHashMap<Identity, Map<Integer, Long>>(remoteLabelMap);
         return copy;
     }
+    
+    /**
+     * Returns the moduarity of the last algorithm run results. This is only
+     * valid if we were constructed to gather statistics.
+     *
+     * @return the moduarity of the last algorithm run results
+     */
+    public double getModularity() { return modularity; }
 }

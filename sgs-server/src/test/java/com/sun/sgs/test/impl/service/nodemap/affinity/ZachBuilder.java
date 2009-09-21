@@ -25,7 +25,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Assert;
@@ -147,7 +147,7 @@ class ZachBuilder implements GraphBuilder {
     public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
             getConflictMap()
     {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
     }
 
     /** {@inheritDoc} */
