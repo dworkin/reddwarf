@@ -369,7 +369,7 @@ sub warn_or_die {
 sub check_svn_version {
     my ($current_version) = command("$svn --version --quiet");
     chomp($current_version);
-    my ($major, $minor) = $current_version =~ m!^([0-9]+)[.]([0-9]+)[0-9.]*!;
+    my ($major, $minor) = $current_version =~ m!^([0-9]+)[.]([0-9]+)([.].*)?!;
     if ($major != $svn_major_version || $minor < $svn_minor_version) {
 	die "Error: Found version $current_version of Subversion, but" .
 	    " require version $svn_major_version\.$svn_minor_version";
