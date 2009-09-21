@@ -23,8 +23,9 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.service.data.store.AbstractDataStore;
 import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.kernel.AccessCoordinator;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import com.sun.sgs.service.store.DataStore;
 import java.math.BigInteger;
@@ -35,6 +36,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 /**
@@ -46,6 +48,12 @@ public class InMemoryDataStore extends AbstractDataStore {
     /** The logger to pass to AbstractDataStore. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(InMemoryDataStore.class.getName()));
+
+    /** Stores the next node ID. */
+    private static final AtomicLong nextNodeId = new AtomicLong(1);
+
+    /** Stores the local node ID. */
+    private final long nodeId = nextNodeId.getAndIncrement();
 
     /** Maps object IDs to data. */
     private final NavigableMap<Long, byte[]> oids =
@@ -77,13 +85,18 @@ public class InMemoryDataStore extends AbstractDataStore {
     private int nextClassId = 1;
 
     /** Creates an instance of this class. */
-    public InMemoryDataStore(
-	Properties properties, AccessCoordinator accessCoordinator)
+    public InMemoryDataStore(Properties properties,
+			     ComponentRegistry systemRegistry,
+			     TransactionProxy txnProxy)
     {
-	super(accessCoordinator, logger, logger);
+	super(systemRegistry, logger, logger);
     }
 
     /* -- Implement AbstractDataStore methods -- */
+
+    protected long getLocalNodeIdInternal() {
+	return nodeId;
+    }
 
     protected synchronized long createObjectInternal(Transaction txn) {
 	return nextOid++;

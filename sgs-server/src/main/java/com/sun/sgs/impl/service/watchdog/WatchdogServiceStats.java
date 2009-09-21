@@ -41,7 +41,6 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     final ProfileOperation addNodeListenerOp;
     final ProfileOperation addRecoveryListenerOp;
     final ProfileOperation getBackupOp;
-    final ProfileOperation getLocalNodeIdOp;
     final ProfileOperation getNodeOp;
     final ProfileOperation getNodesOp;
     final ProfileOperation isLocalNodeAliveOp;
@@ -62,8 +61,6 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
             consumer.createOperation("addRecoveryListener", type, level);
         getBackupOp = 
             consumer.createOperation("getBackup", type, level);
-        getLocalNodeIdOp =
-            consumer.createOperation("getLocalNodeId", type, level);
         getNodeOp =
             consumer.createOperation("getNode", type, level);
         getNodesOp =
@@ -88,11 +85,6 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     /** {@inheritDoc} */
     public long getGetBackupCalls() {
         return ((AggregateProfileOperation) getBackupOp).getCount();
-    }
-        
-    /** {@inheritDoc} */
-    public long getGetLocalNodeIdCalls() {
-        return ((AggregateProfileOperation) getLocalNodeIdOp).getCount();
     }
         
     /** {@inheritDoc} */

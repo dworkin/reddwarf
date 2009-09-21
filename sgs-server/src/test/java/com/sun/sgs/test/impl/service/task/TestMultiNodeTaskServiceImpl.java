@@ -40,7 +40,6 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.WatchdogService;
 
 import com.sun.sgs.test.impl.service.task.TestTaskServiceImpl.Counter;
 import com.sun.sgs.test.impl.service.task.TestTaskServiceImpl.ManagedHandle;
@@ -438,7 +437,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         private final long nodeId;
         public NodeIdService(Properties p, ComponentRegistry cr,
                              TransactionProxy tp) {
-            nodeId = tp.getService(WatchdogService.class).getLocalNodeId();
+            nodeId = tp.getService(DataService.class).getLocalNodeId();
         }
         public String getName() { return getClass().getName(); }
         public void ready() throws Exception {}

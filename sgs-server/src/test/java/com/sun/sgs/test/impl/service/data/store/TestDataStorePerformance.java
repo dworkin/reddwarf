@@ -20,23 +20,24 @@
 package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
-import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.service.store.DataStore;
-import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /**
@@ -64,16 +65,24 @@ import org.junit.runner.RunWith;
  * Time: 2.0 ms per transaction
  */
 @IntegrationTest
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestDataStorePerformance extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public class TestDataStorePerformance extends Assert {
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	DataStoreImpl.class.getName();
 
+    /** The default basic test environment, or {@code null} if not set. */
+    private static BasicDataStoreTestEnv defaultEnv = null;
+
+    /** The basic test environment. */
+    protected final BasicDataStoreTestEnv env;
+
     /** The transaction proxy. */
-    protected static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
+    protected final DummyTransactionProxy txnProxy;
+
+    /** The access coordinator. */
+    protected final AccessCoordinatorHandle accessCoordinator;
 
     /** The number of objects to read in a transaction. */
     protected int items = Integer.getInteger("test.items", 100);
@@ -95,29 +104,32 @@ public class TestDataStorePerformance extends TestCase {
     /** Whether to flush to disk on transaction commits. */
     protected boolean testFlush = Boolean.getBoolean("test.flush");
 
-    /** Set when the test passes. */
-    protected boolean passed;
-
     /** A per-test database directory, or null if not created. */
-    private String directory;
+    protected String directory;
 
     /** Properties for creating the DataStore. */
     protected Properties props;
-
-    /** The access coordinator. */
-    protected AccessCoordinatorHandle accessCoordinator;
 
     /** The store to test. */
     private DataStore store;
 
     /** Creates the test. */
-    public TestDataStorePerformance(String name) {
-	super(name);
+    public TestDataStorePerformance() {
+	this(defaultEnv == null
+	     ? defaultEnv = new BasicDataStoreTestEnv(System.getProperties())
+	     : defaultEnv);
     }
 
-    /** Prints the test case and sets up data store properties. */
-    protected void setUp() throws Exception {
-	System.err.println("Testcase: " + getName());
+    /** Creates the test using the specified basic test environment. */
+    protected TestDataStorePerformance(BasicDataStoreTestEnv env) {
+	this.env = env;
+	txnProxy = env.txnProxy;
+	accessCoordinator = env.accessCoordinator;	
+    }	
+
+    /** Sets up data store properties. */
+    @Before
+    public void setUp() throws Exception {
 	System.err.println("Parameters:" +
 			   "\n  test.items=" + items +
 			   "\n  test.item.size=" + itemSize +
@@ -125,29 +137,16 @@ public class TestDataStorePerformance extends TestCase {
 			   "\n  test.count=" + count);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory());
-	accessCoordinator = new NullAccessCoordinator(
-	    props, txnProxy, new DummyProfileCollectorHandle());
     }
 
-    /** Sets passed if the test passes. */
-    protected void runTest() throws Throwable {
-	super.runTest();
-	passed = true;
-    }
-
-    /**
-     * Deletes the directory if the test passes and the directory was
-     * created.
-     */
-    protected void tearDown() throws Exception {
+    /** Shutdown the data store. */
+    @After
+    public void tearDown() throws Exception {
 	try {
 	    shutdown();
 	} catch (RuntimeException e) {
-	    if (passed) {
-		throw e;
-	    } else {
-		e.printStackTrace();
-	    }
+	    e.printStackTrace();
+	    throw e;
 	}
     }
 
@@ -159,6 +158,7 @@ public class TestDataStorePerformance extends TestCase {
 
     /* -- Tests -- */
 
+    @Test
     public void testReadIds() throws Exception {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
@@ -186,6 +186,7 @@ public class TestDataStorePerformance extends TestCase {
 	}
     }
 
+    @Test
     public void testReadIdsForUpdate() throws Exception {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
@@ -213,7 +214,7 @@ public class TestDataStorePerformance extends TestCase {
 	}
     }
 
-
+    @Test
     public void testMarkIdsForUpdate() throws Exception {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
@@ -242,10 +243,12 @@ public class TestDataStorePerformance extends TestCase {
 	}
     }
 
+    @Test
     public void testWriteIds() throws Exception {
 	testWriteIdsInternal(false);
     }	
 
+    @Test
     public void testWriteIdsFlush() throws Exception {
 	if (!testFlush) {
 	    System.err.println("Skipping");
@@ -297,6 +300,7 @@ public class TestDataStorePerformance extends TestCase {
 	}
     }
 
+    @Test
     public void testReadNames() throws Exception {
 	store = getDataStore();
 	DummyTransaction txn = createTransaction(1000);
@@ -320,6 +324,7 @@ public class TestDataStorePerformance extends TestCase {
 	}
     }
 
+    @Test
     public void testWriteNames() throws Exception {
 	store = getDataStore();
 	DummyTransaction txn = createTransaction(1000);
@@ -352,7 +357,7 @@ public class TestDataStorePerformance extends TestCase {
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props, accessCoordinator),
+	    new DataStoreImpl(props, env.systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());
         DummyProfileCoordinator.startProfiling();
 	return store;
@@ -360,7 +365,12 @@ public class TestDataStorePerformance extends TestCase {
 
     /** Creates a per-test directory. */
     private String createDirectory() throws IOException {
-	File dir = File.createTempFile(getName(), "dbdir");
+	String name = getClass().getName();
+	int dot = name.lastIndexOf('.');
+	if (dot > 0) {
+	    name = name.substring(dot + 1);
+	}
+	File dir = File.createTempFile(name, "dbdir");
 	if (!dir.delete()) {
 	    throw new RuntimeException("Problem deleting file: " + dir);
 	}

@@ -48,6 +48,9 @@ import java.math.BigInteger;
  * that are no longer in use.  Placeholders always appear at the end of each
  * allocation block, whose size is fixed (as of version 4.0) at 1024 bytes.
  *
+ * Key 6 store the ID of the next free node ID to use for giving unique
+ * identifiers to nodes.
+ *
  * In the classes database, keys whose initial byte is 1 map the SHA-1 hash of
  * the serialized form of a class descriptor (a ObjectStreamClass) to the class
  * ID, which is 4 byte integer.
@@ -97,6 +100,7 @@ import java.math.BigInteger;
  * Version 2.0: Add NEXT_TXN_ID, 2/15/2007
  * Version 3.0: Add classes DB, compress object values, 5/18/2007
  * Version 4.0: Add placeholders, 7/8/2008
+ * Version 5.0: Add node IDs, 7/21/2009
  */
 final class DataStoreHeader {
 
@@ -121,11 +125,14 @@ final class DataStoreHeader {
     /** The key for the value of the first allocation block placeholder ID. */
     static final long FIRST_PLACEHOLDER_ID_KEY = 5;
 
+    /** The key for the value of the next free node ID. */
+    static final long NEXT_NODE_ID_KEY = 6;
+
     /** The magic number: DaRkStAr. */
     static final long MAGIC = 0x4461526b53744172L;
 
     /** The major version number. */
-    static final short MAJOR_VERSION = 4;
+    static final short MAJOR_VERSION = 5;
 
     /** The minor version number. */
     static final short MINOR_VERSION = 0;
@@ -135,6 +142,9 @@ final class DataStoreHeader {
 
     /** The first free transaction ID. */
     static final long INITIAL_NEXT_TXN_ID = 1;
+
+    /** The first free node ID. */
+    static final long INITIAL_NEXT_NODE_ID = 1;
 
     /** The first byte stored in keys for the classes database hash keys. */
     static final byte CLASS_HASH_PREFIX = 1;
@@ -224,32 +234,14 @@ final class DataStoreHeader {
 	switch (majorVersion) {
 	case 1:
 	case 2:
+	case 3:
+	case 4:
 	    throw new DataStoreException(
 		"Database version number " + majorVersion +
 		" is not supported");
-	case 3:
-	    upgrade3to4(db, dbTxn);
-	    break;
 	default:
 	    throw new AssertionError();
 	}
-    }
-
-    /**
-     * Updates database version 3 to version 4.  Although it would be
-     * theoretically possible for a version 3 database to contain data that
-     * could be mistaken for a placeholder or a quoted value, in practice all
-     * object values started with the two serialized version values (1 and 2).
-     * So, just update the major version number and add an entry for the first
-     * placeholder.
-     */
-    private static void upgrade3to4(DbDatabase db, DbTransaction dbTxn) {
-	db.put(dbTxn, DataEncoding.encodeLong(MAJOR_KEY),
-	       DataEncoding.encodeShort((short) 4));
-	boolean success = db.putNoOverwrite(
-	    dbTxn, DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY),
-	    DataEncoding.encodeLong(-1));
-	assert success;
     }
 
     /**
@@ -283,6 +275,10 @@ final class DataStoreHeader {
 	success = db.putNoOverwrite(
 	    dbTxn, DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY),
 	    DataEncoding.encodeLong(-1));
+	assert success;
+	success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(NEXT_NODE_ID_KEY),
+	    DataEncoding.encodeLong(INITIAL_NEXT_NODE_ID));
 	assert success;
     }
 

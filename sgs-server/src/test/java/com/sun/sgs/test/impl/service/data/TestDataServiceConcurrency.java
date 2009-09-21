@@ -25,22 +25,25 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.test.util.DummyManagedObject;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /** Test concurrent operation of the data service. */
 @SuppressWarnings("hiding")
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestDataServiceConcurrency extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public class TestDataServiceConcurrency extends Assert {
 
     /** Logger for this test. */
     private static final LoggerWrapper logger =
@@ -96,9 +99,6 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The number of times to repeat each timing. */
     protected int repeat = Integer.getInteger("test.repeat", 1);
 
-    /** Set when the test passes. */
-    protected boolean passed;
-
     /**
      * The exception thrown by one of the threads, or null if none of the
      * threads have failed.
@@ -127,13 +127,11 @@ public class TestDataServiceConcurrency extends TestCase {
     private Identity taskOwner;
 
     /** Creates the test. */
-    public TestDataServiceConcurrency(String name) {
-	super(name);
-    }
+    public TestDataServiceConcurrency() { }
 
-    /** Prints the name of the test case. */
-    protected void setUp() throws Exception {
-	System.err.println("Testcase: " + getName());
+    /** Prints the test parameters and sets up the server. */
+    @Before
+    public void setUp() throws Exception {
 	System.err.println(
 	    "Parameters:" +
 	    "\n  test.which.operations=" + whichOperations +
@@ -152,34 +150,27 @@ public class TestDataServiceConcurrency extends TestCase {
 	taskOwner = serverNode.getProxy().getCurrentOwner();
     }
 
-    /** Sets passed if the test passes. */
-    protected void runTest() throws Throwable {
-	super.runTest();
-	passed = true;
-    }
-
-    /** Deletes the directory if the test passes. */
-    protected void tearDown() throws Exception {
+    /** Shuts down the server. */
+    @After
+    public void tearDown() throws Exception {
 	if (serverNode != null) {
 	    try {
 		shutdown();
 	    } catch (RuntimeException e) {
-		if (passed) {
-		    throw e;
-		} else {
-		    e.printStackTrace();
-		}
+		e.printStackTrace();
+		throw e;
 	    }
 	}
     }
 
     /** Shuts down the service. */
     protected void shutdown() throws Exception {
-	serverNode.shutdown(passed);
+	serverNode.shutdown(true);
     }
 
     /* -- Tests -- */
 
+    @Test
     public void testConcurrency() throws Throwable {
         final int perThread = objects + objectsBuffer;
         /* Create objects */

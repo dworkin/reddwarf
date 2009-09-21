@@ -42,7 +42,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Queue;
@@ -331,20 +330,12 @@ public final class WatchdogServiceImpl
 
             int jmxPort = wrappedProps.getIntProperty(
                     StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
+	    localNodeId = dataService.getLocalNodeId();
             if (startServer) {
-                localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                long[] values =
-		    serverProxy.registerNode(clientHost, clientProxy, jmxPort);
-                if (values == null || values.length < 2) {
-                    setFailedThenNotify(false);
-                    throw new IllegalArgumentException(
-                        "registerNode returned improper array: " +
-			Arrays.toString(values));
-                }
-                localNodeId = values[0];
-                renewInterval = values[1];
+                renewInterval = serverProxy.registerNode(
+		    localNodeId, clientHost, clientProxy, jmxPort);
             }
             renewThread.start();
             
@@ -425,13 +416,6 @@ public final class WatchdogServiceImpl
     }
 	
     /* -- Implement WatchdogService -- */
-
-    /** {@inheritDoc} */
-    public long getLocalNodeId() {
-	checkState();
-        serviceStats.getLocalNodeIdOp.report();
-	return localNodeId;
-    }
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {

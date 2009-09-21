@@ -45,6 +45,7 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryListener;
@@ -251,7 +252,8 @@ public final class ChannelServiceImpl
 	    WatchdogService watchdogService =
 		txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
-	    localNodeId = watchdogService.getLocalNodeId();
+	    localNodeId =
+		txnProxy.getService(DataService.class).getLocalNodeId();
 
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
@@ -1076,7 +1078,7 @@ public final class ChannelServiceImpl
      * Returns the local node ID.
      */
     static long getLocalNodeId() {
-	return txnProxy.getService(WatchdogService.class).getLocalNodeId();
+	return txnProxy.getService(DataService.class).getLocalNodeId();
     }
 
     /**

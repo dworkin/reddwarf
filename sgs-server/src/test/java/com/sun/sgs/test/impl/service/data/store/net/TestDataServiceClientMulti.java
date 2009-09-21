@@ -17,16 +17,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store;
+package com.sun.sgs.test.impl.service.data.store.net;
 
-/** An interface for cancelling a periodic task. */
-public interface TaskHandle {
+import com.sun.sgs.test.impl.service.data.BasicDataServiceMultiTest;
+import com.sun.sgs.test.util.SgsTestNode;
+import java.util.Properties;
 
-    /**
-     * Cancels future runs of the task.
-     *
-     * @throws	IllegalStateException if the task has already been
-     *		cancelled
-     */
-    void cancel();
+/**
+ * Perform multi-node tests on the {@code DataService} using the network data
+ * store.
+ */
+public class TestDataServiceClientMulti extends BasicDataServiceMultiTest {
+
+    @Override
+    protected Properties getServerProperties() throws Exception {
+	return SgsTestNode.getDefaultProperties(appName, null, null);
+    }
 }

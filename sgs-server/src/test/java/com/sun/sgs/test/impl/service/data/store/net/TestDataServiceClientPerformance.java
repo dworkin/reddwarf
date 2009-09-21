@@ -54,8 +54,7 @@ public class TestDataServiceClientPerformance
 	DataServiceImpl.class.getName();
 
     /** Creates an instance. */
-    public TestDataServiceClientPerformance(String name) {
-	super(name);
+    public TestDataServiceClientPerformance() {
 	count = Integer.getInteger("test.count", 20);
     }
 
