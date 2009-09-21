@@ -20,12 +20,19 @@
 package com.sun.sgs.impl.util.lock;
 
 /**
- * Records information about an entity that requests locks of a {@link
- * MultiLockManager}.
+ * Records information about an entity that requests locks from a {@link
+ * LockManager} and that permits only a single active lock request.
  *
  * @param	<K> the type of key
  */
-public class MultiLocker<K> extends Locker<K> {
+public class BasicLocker<K> extends Locker<K> {
+
+    /**
+     * The result of the lock request that this transaction is waiting for,
+     * or {@code null} if it is not waiting.  Synchronize on this locker
+     * when accessing this field.
+     */
+    private LockAttemptResult<K> waitingFor;
 
     /* -- Constructor -- */
 
@@ -34,7 +41,7 @@ public class MultiLocker<K> extends Locker<K> {
      *
      * @param	lockManager the lock manager for this locker
      */
-    public MultiLocker(MultiLockManager<K> lockManager) {
+    public BasicLocker(LockManager<K> lockManager) {
 	super(lockManager);
     }
 
@@ -43,27 +50,33 @@ public class MultiLocker<K> extends Locker<K> {
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation returns the value for the current thread obtained
-     * from the {@link MultiLockManager}.
+     * This implementation returns the lock attempt request associated with the
+     * current thread, if any.
      */
     @Override
     LockAttemptResult<K> getWaitingFor() {
-	return ((MultiLockManager<K>) lockManager).getWaitingFor();
+	assert checkAllowSync();
+	synchronized (this) {
+	    return waitingFor;
+	}
     }
 
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation sets the value for the current thread in the {@link
-     * MultiLockManager}.
+     * This implementation sets the lock attempt request associated with the
+     * current thread.
      */
     @Override
     void setWaitingFor(LockAttemptResult<K> waitingFor) {
+	assert checkAllowSync();
 	if (waitingFor != null && waitingFor.conflict == null) {
 	    throw new IllegalArgumentException(
 		"Attempt to specify a lock attempt result that is not a" +
 		" conflict: " + waitingFor);
 	}
-	((MultiLockManager<K>) lockManager).setWaitingFor(waitingFor);
+	synchronized (this) {
+	    this.waitingFor = waitingFor;
+	}
     }
 }

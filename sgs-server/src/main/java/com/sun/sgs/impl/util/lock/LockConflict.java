@@ -24,18 +24,17 @@ package com.sun.sgs.impl.util.lock;
  * {@link LockManager}.
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  */
-public final class LockConflict<K, L extends Locker<K, L>> {
+public final class LockConflict<K> {
 
     /** The lock request. */
-    final LockRequest<K, L> request;
+    final LockRequest<K> request;
 
     /** The type of conflict. */
     final LockConflictType type;
 
     /** A locker that caused the conflict. */
-    final L conflictingLocker;
+    final Locker<K> conflictingLocker;
 
     /**
      * Creates an instance of this class.
@@ -44,9 +43,9 @@ public final class LockConflict<K, L extends Locker<K, L>> {
      * @param	type the type of conflict
      * @param	conflictingLocker a locker that caused the conflict
      */
-    public LockConflict(LockRequest<K, L> request,
+    public LockConflict(LockRequest<K> request,
 			LockConflictType type,
-			L conflictingLocker)
+			Locker<K> conflictingLocker)
     {
 	assert request != null;
 	assert type != null;
@@ -79,7 +78,7 @@ public final class LockConflict<K, L extends Locker<K, L>> {
      *
      * @return	a transaction that caused the conflict
      */
-    public L getConflictingLocker() {
+    public Locker<K> getConflictingLocker() {
 	return conflictingLocker;
     }
 

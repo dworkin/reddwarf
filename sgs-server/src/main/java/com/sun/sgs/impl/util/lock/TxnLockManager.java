@@ -26,14 +26,14 @@ import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
 
 /**
- * A class for managing lock conflicts as part of a transaction.
+ * A class for managing lock conflicts as part of a transaction.  All {@link
+ * Locker} objects supplied to this class should be instances of {@link
+ * TxnLocker}.
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  */
-public final class TxnLockManager<K, L extends TxnLocker<K, L>>
-    extends LockManager<K, L>
-{
+public final class TxnLockManager<K> extends LockManager<K> {
+
     /* -- Public constructor -- */
 
     /**
@@ -49,23 +49,73 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	super(lockTimeout, numKeyMaps);
     }
 
+    /* -- Public methods -- */
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
+     *		not an instance of {@link TxnLocker}
+     */
+    @Override
+    public LockConflict<K> lock(Locker<K> locker, K key, boolean forWrite) {
+	checkTxnLocker(locker);
+	return super.lock(locker, key, forWrite);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
+     *		not an instance of {@link TxnLocker}
+     */
+    @Override
+    public LockConflict<K> lockNoWait(
+	Locker<K> locker, K key, boolean forWrite)
+    {
+	checkTxnLocker(locker);
+	return super.lockNoWait(locker, key, forWrite);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
+     *		not an instance of {@link TxnLocker}
+     */
+    public LockConflict<K> waitForLock(Locker<K> locker) {
+	checkTxnLocker(locker);
+	return super.waitForLock(locker);
+    }
+
     /* -- Package access methods -- */
 
     /**
      * This implementation calls the deadlock checker if the request blocks.
      */
     @Override
-    LockConflict<K, L> lockNoWaitInternal(L locker, K key, boolean forWrite) {
-	LockConflict<K, L> conflict =
+    LockConflict<K> lockNoWaitInternal(
+	Locker<K> locker, K key, boolean forWrite)
+    {
+	LockConflict<K> conflict =
 	    super.lockNoWaitInternal(locker, key, forWrite);
 	if (conflict != null) {
-	    LockConflict<K, L> deadlockConflict =
+	    LockConflict<K> deadlockConflict =
 		new DeadlockChecker(locker.getWaitingFor().request).check();
 	    if (deadlockConflict != null) {
 		conflict = deadlockConflict;
 	    }
 	}
 	return conflict;
+    }
+
+    /* -- Other methods -- */
+
+    /** Throws IllegalArgumentException if the argument is not a TxnLocker. */
+    private static void checkTxnLocker(Locker<?> locker) {
+	if (locker != null && !(locker instanceof TxnLocker<?>)) {
+	    throw new IllegalArgumentException("Locker is not a TxnLocker");
+	}
     }
 
     /* -- Other classes -- */
@@ -79,11 +129,11 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	 * avoid the synchronization needed to retrieve it again when checking
 	 * for multiple deadlocks.
 	 */
-	private final Map<L, WaiterInfo<K, L>> waiterMap =
-	    new HashMap<L, WaiterInfo<K, L>>();
+	private final Map<Locker<K>, WaiterInfo<K>> waiterMap =
+	    new HashMap<Locker<K>, WaiterInfo<K>>();
 
 	/** The top level request we are checking for deadlocks. */
-	private final LockRequest<K, L> rootRequest;
+	private final LockRequest<K> rootRequest;
 
 	/**
 	 * The pass number of the current deadlock check.  There could be
@@ -93,32 +143,32 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	private int pass;
 
 	/** The request that was found in a circular reference. */
-	private LockRequest<K, L> cycleBoundary;
+	private LockRequest<K> cycleBoundary;
 
 	/** The current choice of a request to abort. */
-	private LockRequest<K, L> victim;
+	private LockRequest<K> victim;
 
 	/** Another request in the deadlock. */
-	private LockRequest<K, L> conflict;
+	private LockRequest<K> conflict;
 
 	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	request the request to check
 	 */
-	DeadlockChecker(LockRequest<K, L> request) {
+	DeadlockChecker(LockRequest<K> request) {
 	    assert request != null;
 	    rootRequest = request;
 	}
 
 	/**
-	 * Checks for a deadlock starting with the root locker.
+	 * Checks for a deadlock starting with the root request.
 	 *
 	 * @return	a lock conflict if a deadlock was found, else {@code
 	 *		null}
 	 */
-	LockConflict<K, L> check() {
-	    LockConflict<K, L> result = null;
+	LockConflict<K> check() {
+	    LockConflict<K> result = null;
 	    for (pass = 1; true; pass++) {
 		if (!checkInternal(
 			rootRequest, getWaiterInfo(rootRequest.getLocker())))
@@ -135,15 +185,15 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 		    logger.log(FINER, "check deadlock {0}: victim {1}",
 			       rootRequest, victim);
 		}
-		LockConflict<K, L> deadlock = new LockConflict<K, L>(
+		LockConflict<K> deadlock = new LockConflict<K>(
 		    rootRequest, LockConflictType.DEADLOCK,
 		    conflict.getLocker());
 		getWaiterInfo(victim.getLocker()).waitingFor = null;
-		victim.getLocker().setConflict(deadlock);
+		((TxnLocker<K>) victim.getLocker()).setConflict(deadlock);
 		if (victim.getLocker() == rootRequest.getLocker()) {
 		    return deadlock;
 		} else {
-		    result = new LockConflict<K, L>(
+		    result = new LockConflict<K>(
 			rootRequest, LockConflictType.BLOCKED,
 			conflict.getLocker());
 		}
@@ -156,12 +206,12 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	 * found.
 	 */
 	private boolean checkInternal(
-	    LockRequest<K, L> request, WaiterInfo<K, L> waiterInfo)
+	    LockRequest<K> request, WaiterInfo<K> waiterInfo)
 	{
-	    L locker = request.getLocker();
+	    Locker<K> locker = request.getLocker();
 	    waiterInfo.pass = pass;
-	    for (LockRequest<K, L> ownerRequest : waiterInfo.waitingFor) {
-		L owner = ownerRequest.locker;
+	    for (LockRequest<K> ownerRequest : waiterInfo.waitingFor) {
+		Locker<K> owner = ownerRequest.locker;
 		if (owner == locker) {
 		    if (logger.isLoggable(FINEST)) {
 			logger.log(FINEST,
@@ -171,7 +221,7 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 				   rootRequest, pass, locker, ownerRequest);
 		    }
 		} else {
-		    WaiterInfo<K, L> ownerInfo = getWaiterInfo(owner);
+		    WaiterInfo<K> ownerInfo = getWaiterInfo(owner);
 		    if (ownerInfo.waitingFor == null) {
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(FINEST,
@@ -185,6 +235,7 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 			/* Found a deadlock! */
 			cycleBoundary = ownerRequest;
 			victim = ownerRequest;
+			conflict = request;
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(FINEST,
 				       "checking deadlock {0}, pass {1}:" +
@@ -217,16 +268,16 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	 * Returns information about the lockers that the specified locker is
 	 * waiting for.
 	 */
-	private WaiterInfo<K, L> getWaiterInfo(L locker) {
-	    WaiterInfo<K, L> waiterInfo = waiterMap.get(locker);
+	private WaiterInfo<K> getWaiterInfo(Locker<K> locker) {
+	    WaiterInfo<K> waiterInfo = waiterMap.get(locker);
 	    if (waiterInfo == null) {
-		List<LockRequest<K, L>> waitingFor;
-		LockAttemptResult<K, L> result = locker.getWaitingFor();
+		List<LockRequest<K>> waitingFor;
+		LockAttemptResult<K> result = locker.getWaitingFor();
 		if (result == null || locker.getConflict() != null) {
 		    waitingFor = null;
 		} else {
 		    K key = result.request.key;
-		    Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+		    Map<K, Lock<K>> keyMap = getKeyMap(key);
 		    assert Lock.noteSync(TxnLockManager.this, key);
 		    try {
 			synchronized (keyMap) {
@@ -237,7 +288,7 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 			assert Lock.noteUnsync(TxnLockManager.this, key);
 		    }
 		}
-		waiterInfo = new WaiterInfo<K, L>(waitingFor);
+		waiterInfo = new WaiterInfo<K>(waitingFor);
 		waiterMap.put(locker, waiterInfo);
 	    }
 	    return waiterInfo;
@@ -249,7 +300,7 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	 * has a newer requested start time than the previously selected
 	 * victim.
 	 */
-	private void maybeUpdateVictim(LockRequest<K, L> request) {
+	private void maybeUpdateVictim(LockRequest<K> request) {
 	    assert request != null;
 	    if (conflict == null) {
 		conflict = request;
@@ -258,8 +309,8 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 		/* We've gone all the way around the circle, so we're done */
 		cycleBoundary = null;
 	    } else if (cycleBoundary != null &&
-		       (request.getLocker().getRequestedStartTime() >
-			victim.getLocker().getRequestedStartTime()))
+		       (getRequestedStartTime(request) >
+			getRequestedStartTime(victim)))
 	    {
 		/*
 		 * We're still within the cycle and this request started later
@@ -274,19 +325,27 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 			   rootRequest, pass, victim);
 	    }
 	}
+
+	/**
+	 * Returns the requested start time of a request, which should have
+	 * been made on behalf of a TxnLocker.
+	 */
+	private long getRequestedStartTime(LockRequest<K> request) {
+	    return ((TxnLocker) request.getLocker()).getRequestedStartTime();
+	}
     }
 
     /**
      * Provides information about the requests a locker is waiting for.  Used
      * in deadlock detection.
      */
-    private static class WaiterInfo<K, L extends Locker<K, L>> {
+    private static class WaiterInfo<K> {
 
 	/**
 	 * The requests the locker is waiting for, or {@code null} if not
 	 * waiting.
 	 */
-	List<LockRequest<K, L>> waitingFor;
+	List<LockRequest<K>> waitingFor;
 
 	/**
 	 * The pass in which the locker was checked.  If we encounter an
@@ -299,7 +358,7 @@ public final class TxnLockManager<K, L extends TxnLocker<K, L>>
 	 *
 	 * @param	waitingFor the requests the locker is waiting for
 	 */
-	WaiterInfo(List<LockRequest<K, L>> waitingFor) {
+	WaiterInfo(List<LockRequest<K>> waitingFor) {
 	    this.waitingFor = waitingFor;
 	}
     }

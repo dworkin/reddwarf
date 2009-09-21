@@ -23,15 +23,14 @@ package com.sun.sgs.impl.util.lock;
  * A class representing a request for a lock made to a {@link LockManager}.
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  */
-public class LockRequest<K, L extends Locker<K, L>> {
+public class LockRequest<K> {
 
     /** Types of requests. */
     private enum Type { READ, WRITE, UPGRADE; }
 
     /** The locker that requested the lock. */
-    final L locker;
+    final Locker<K> locker;
 
     /** The key identifying the lock. */
     final K key;
@@ -47,7 +46,9 @@ public class LockRequest<K, L extends Locker<K, L>> {
      * @param	forWrite whether a write lock was requested
      * @param	upgrade whether an upgrade was requested
      */
-    public LockRequest(L locker, K key, boolean forWrite, boolean upgrade) {
+    public LockRequest(
+	Locker<K> locker, K key, boolean forWrite, boolean upgrade)
+    {
 	assert locker != null;
 	assert key != null;
 	assert !upgrade || forWrite : "Upgrade implies forWrite";
@@ -74,7 +75,7 @@ public class LockRequest<K, L extends Locker<K, L>> {
      *
      * @return	the locker that requested the lock.
      */
-    public L getLocker() {
+    public Locker<K> getLocker() {
 	return locker;
     }
 

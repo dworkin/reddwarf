@@ -27,12 +27,11 @@ import static com.sun.sgs.impl.util.Numbers.addCheckOverflow;
  * LockManager}.
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  */
-public abstract class Locker<K, L extends Locker<K, L>> {
+public abstract class Locker<K> {
 
     /** The lock manager for this locker. */
-    final LockManager<K, L> lockManager;
+    final LockManager<K> lockManager;
 
     /* -- Constructor -- */
 
@@ -41,7 +40,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      *
      * @param	lockManager the lock manager for this locker
      */
-    protected Locker(LockManager<K, L> lockManager) {
+    protected Locker(LockManager<K> lockManager) {
 	checkNull("lockManager", lockManager);
 	this.lockManager = lockManager;
     }
@@ -53,7 +52,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      *
      * @return	the lock manager for this locker.
      */
-    public LockManager<K, L> getLockManager() {
+    public LockManager<K> getLockManager() {
 	return lockManager;
     }
 
@@ -74,50 +73,71 @@ public abstract class Locker<K, L extends Locker<K, L>> {
     }
 
     /**
-     * Creates a new lock request.
+     * Creates a new lock request. <p>
+     *
+     * The default implementation creates and returns an instance of {@link
+     * LockRequest}.
      *
      * @param	key the key that identifies the lock
      * @param	forWrite whether the request is for write
      * @param	upgrade whether the request is for an upgrade
      * @return	the lock request
      */
-    protected abstract LockRequest<K, L> newLockRequest(
-	K key, boolean forWrite, boolean upgrade);
+    protected LockRequest<K> newLockRequest(
+	K key, boolean forWrite, boolean upgrade)
+    {
+	return new LockRequest<K>(this, key, forWrite, upgrade);
+    }
 
     /**
      * Checks if there is a conflict that should cause this locker's
-     * request to be denied.  This value can be cleared to permit a new
-     * request unless the conflict is a deadlock.
+     * current request to be denied.  Returns {@code null} if there was no
+     * conflict. <p>
+     *
+     * The default implementation of this method always returns {@code null}.
      *
      * @return	the conflicting request or {@code null}
      */
-    protected abstract LockConflict<K, L> getConflict();
+    protected LockConflict<K> getConflict() {
+	return null;
+    }
+
+    /**
+     * Clears the conflict that should cause this locker's current request to
+     * be denied.  If there is no conflict, then this method has no effect.  If
+     * the conflict is a deadlock, represented by a return value of {@link
+     * #getConflict getConflict} is not {@code null} and whose {@code type}
+     * field is {@link LockConflictType#DEADLOCK DEADLOCK}, then the conflict
+     * cannot be cleared and {@code IllegalStateException} will be thrown. <p>
+     *
+     * The default implementation of this method does nothing.
+     *
+     * @param	conflict the conflicting request or {@code null}
+     * @throws	IllegalStateException if the conflict is a deadlock
+     */
+    protected void clearConflict() { }
 
     /* -- Package access methods -- */
 
     /**
-     * Requests that this locker request be denied because of a conflict
-     * with the specified request.
-     */
-    abstract void setConflict(LockConflict<K, L> conflict);
-
-    /**
      * Checks if this locker is waiting for a lock.
      *
-     * @return	the result of the lock request this locker is waiting
-     *		for or {@code null} if it is not waiting
+     * @return	the result of the attempt to request a lock that this locker
+     *		is waiting for, or {@code null} if it is not waiting
      */
-    abstract LockAttemptResult<K, L> getWaitingFor();
+    abstract LockAttemptResult<K> getWaitingFor();
 
     /**
-     * Sets the lock that this locker is waiting for, or marks that it is
-     * not waiting if the argument is {@code null}.  If {@code waitingFor}
-     * is not {@code null}, then it should represent a conflict, and it's
-     * {@code conflict} field must not be {@code null}.
+     * Records that this locker is waiting for a lock, or marks that it is not
+     * waiting if the argument is {@code null}.  If {@code waitingFor} is not
+     * {@code null}, then it should represent a conflict, and it's {@code
+     * conflict} field must not be {@code null}.
      *
      * @param	waitingFor the lock or {@code null}
+     * @throws	IllegalArgumentException if {@code waitingFor} is not {@code
+     *		null} and its {@code conflict} field is {@code null}
      */
-    abstract void setWaitingFor(LockAttemptResult<K, L> waitingFor);
+    abstract void setWaitingFor(LockAttemptResult<K> waitingFor);
 
     /**
      * Checks that the current thread is permitted to synchronize on this
@@ -126,7 +146,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      * true}.
      */
     boolean checkAllowSync() {
-	Locker<K, L> locker = lockManager.currentLockerSync.get();
+	Locker<K> locker = lockManager.currentLockerSync.get();
 	if (locker != null && locker != this) {
 	    throw new AssertionError(
 		"Attempt to synchronize on locker " + this +
@@ -142,7 +162,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      * otherwise returns {@code true}.
      */
     boolean noteSync() {
-	Locker<K, L> locker = lockManager.currentLockerSync.get();
+	Locker<K> locker = lockManager.currentLockerSync.get();
 	if (locker != null) {
 	    throw new AssertionError(
 		"Attempt to synchronize on locker " + this +
@@ -159,7 +179,7 @@ public abstract class Locker<K, L extends Locker<K, L>> {
      * otherwise returns {@code true}.
      */
     boolean noteUnsync() {
-	Locker<K, L> locker = lockManager.currentLockerSync.get();
+	Locker<K> locker = lockManager.currentLockerSync.get();
 	if (locker == null) {
 	    throw new AssertionError(
 		"Attempt to unsynchronize on locker " + this +

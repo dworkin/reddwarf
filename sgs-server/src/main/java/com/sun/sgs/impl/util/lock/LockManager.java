@@ -73,9 +73,9 @@ import java.util.logging.Logger;
  * <li>Blocks synchronized on a {@code Lock} should not synchronize on anything
  *     else <p>
  *
- *     The code enforces this requirement by having lock methods not make calls
- *     to other classes, and by performing minimal work while synchronized on
- *     the associated key map.
+ *     The implementation enforces this requirement by having lock methods not
+ *     make calls to other classes, and by performing minimal work while
+ *     synchronized on the associated key map.
  *
  * <li>Blocks synchronized on a {@code Locker} should not synchronize on a
  *     different locker, but can synchronize on a {@code Lock}
@@ -86,14 +86,13 @@ import java.util.logging.Logger;
  *     Locker} methods that it calls are on the locker it has already
  *     synchronized on.
  *
- * <li>Use assertions to check adherence to the scheme
+ * <li>Uses assertions to check adherence to the scheme
  *
  * </ul>
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  */
-public abstract class LockManager<K, L extends Locker<K, L>> {
+public class LockManager<K> {
 
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
@@ -118,14 +117,14 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * methods on locks should not be used without synchronizing on the
      * associated key map lock.
      */
-    private final Map<K, Lock<K, L>>[] keyMaps;
+    private final Map<K, Lock<K>>[] keyMaps;
 
     /**
      * When assertions are enabled, holds the {@code Locker} that the
      * current thread is synchronized on, if any.
      */
-    final ThreadLocal<Locker<K, L>> currentLockerSync =
-	new ThreadLocal<Locker<K, L>>();
+    final ThreadLocal<Locker<K>> currentLockerSync =
+	new ThreadLocal<Locker<K>>();
 
     /**
      * When assertions are enabled, hold the {@code Key} whose associated
@@ -144,7 +143,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * @throws	IllegalArgumentException if {@code lockTimeout} or {@code
      *		numKeyMaps} is less than {@code 1}
      */
-    LockManager(long lockTimeout, int numKeyMaps) {
+    public LockManager(long lockTimeout, int numKeyMaps) {
 	if (lockTimeout < 1) {
 	    throw new IllegalArgumentException(
 		"The lockTimeout must not be less than 1");
@@ -156,7 +155,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 	this.numKeyMaps = numKeyMaps;
 	keyMaps = uncheckedCast(new Map[numKeyMaps]);
 	for (int i = 0; i < numKeyMaps; i++) {
-	    keyMaps[i] = new HashMap<K, Lock<K, L>>();
+	    keyMaps[i] = new HashMap<K, Lock<K>>();
 	}
     }
 
@@ -169,7 +168,8 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * was acquired.  If the {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
      * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
+     * IllegalStateException}.  Otherwise, the caller can repeat this call, and
+     * any conflicts from earlier calls will be ignored.
      *
      * @param	locker the locker requesting the lock
      * @param	key the key identifying the lock
@@ -182,11 +182,8 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      *		transaction produced a deadlock, or if still waiting for an
      *		earlier attempt to complete
      */
-    public LockConflict<K, L> lock(L locker, K key, boolean forWrite) {
-	checkLockManager(locker);
-	checkLockerNotAborted(locker);
-	LockConflict<K, L> conflict =
-	    lockNoWaitInternal(locker, key, forWrite);
+    public LockConflict<K> lock(Locker<K> locker, K key, boolean forWrite) {
+	LockConflict<K> conflict = lockNoWait(locker, key, forWrite);
 	return (conflict == null) ? null : waitForLockInternal(locker);
     }
 
@@ -199,7 +196,8 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
      * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.
+     * IllegalStateException}.  Otherwise, the caller can repeat this call, and
+     * any conflicts from earlier calls will be ignored.
      *
      * @param	locker the locker requesting the lock
      * @param	key the key identifying the lock
@@ -207,14 +205,15 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
+     *		manager
+     * @throws	IllegalStateException if a previous lock request was aborted
+     *		due to deadlock, or if this locker is already waiting for a
+     *		lock
      */
-    public LockConflict<K, L> lockNoWait(L locker, K key, boolean forWrite) {
+    public LockConflict<K> lockNoWait(
+	Locker<K> locker, K key, boolean forWrite)
+    {
 	checkLockManager(locker);
-	checkLockerNotAborted(locker);
 	return lockNoWaitInternal(locker, key, forWrite);
     }
 
@@ -232,12 +231,9 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
      *		manager 
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock
      */
-    public LockConflict<K, L> waitForLock(L locker) {
+    public LockConflict<K> waitForLock(Locker<K> locker) {
 	checkLockManager(locker);
-	checkLockerNotAborted(locker);
 	return waitForLockInternal(locker);
     }
 
@@ -250,7 +246,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * @throws	IllegalArgumentException if {@code locker} has a different lock
      *		manager 
      */
-    public void releaseLock(L locker, K key) {
+    public void releaseLock(Locker<K> locker, K key) {
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER, "release {0} {1}", locker, key);
 	}
@@ -264,8 +260,8 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * @param	key the key identifying the lock
      * @return	a list of the requests
      */
-    public List<LockRequest<K, L>> getOwners(K key) {
-	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+    public List<LockRequest<K>> getOwners(K key) {
+	Map<K, Lock<K>> keyMap = getKeyMap(key);
 	assert Lock.noteSync(this, key);
 	try {
 	    synchronized (keyMap) {
@@ -283,8 +279,8 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * @param	key the key identifying the lock
      * @return	a list of the requests
      */
-    public List<LockRequest<K, L>> getWaiters(K key) {
-	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+    public List<LockRequest<K>> getWaiters(K key) {
+	Map<K, Lock<K>> keyMap = getKeyMap(key);
 	assert Lock.noteSync(this, key);
 	try {
 	    synchronized (keyMap) {
@@ -303,7 +299,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * @param	key the key
      * @return	the associated key map
      */
-    Map<K, Lock<K, L>> getKeyMap(K key) {
+    Map<K, Lock<K>> getKeyMap(K key) {
 	/* Mask off the sign bit to get a positive value */
 	int index = (key.hashCode() & Integer.MAX_VALUE) % numKeyMaps;
 	return keyMaps[index];
@@ -318,38 +314,53 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
      * @param	keyMap the keyMap
      * @return	the associated lock
      */
-    Lock<K, L> getLock(K key, Map<K, Lock<K, L>> keyMap) {
+    Lock<K> getLock(K key, Map<K, Lock<K>> keyMap) {
 	assert Thread.holdsLock(keyMap);
-	Lock<K, L> lock = keyMap.get(key);
+	Lock<K> lock = keyMap.get(key);
 	if (lock == null) {
-	    lock = new Lock<K, L>(key);
+	    lock = new Lock<K>(key);
 	    keyMap.put(key, lock);
 	}
 	return lock;
     }
 
-    /** Attempts to acquire a lock, returning immediately. */
-    LockConflict<K, L> lockNoWaitInternal(L locker, K key, boolean forWrite) {
+    /**
+     * Attempts to acquire a lock, returning immediately.  Like {@link
+     * #lockNoWait}, but does not check that the correct lock manager was
+     * supplied.
+     *
+     * @param	locker the locker requesting the lock
+     * @param	key the key identifying the lock
+     * @param	forWrite whether to request a write lock
+     * @return	lock conflict information, or {@code null} if there was no
+     *		conflict
+     * @throws	IllegalStateException if a previous lock request was aborted
+     *		due to deadlock, or if this locker is already waiting for a
+     *		lock
+     */
+    LockConflict<K> lockNoWaitInternal(
+	Locker<K> locker, K key, boolean forWrite)
+    {
 	if (locker.getWaitingFor() != null) {
 	    throw new IllegalStateException(
 		"Attempt to obtain a new lock while waiting");
 	}
-	LockConflict<K, L> conflict = locker.getConflict();
+	LockConflict<K> conflict = locker.getConflict();
 	if (conflict != null) {
 	    if (conflict.type == LockConflictType.DEADLOCK) {
 		throw new IllegalStateException(
 		    "Attempt to obtain a new lock after a deadlock");
 	    } else {
 		/* Ignoring the previous conflict */
-		locker.setConflict(null);
+		locker.clearConflict();
 	    }
 	}
-	LockAttemptResult<K, L> result;
-	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+	LockAttemptResult<K> result;
+	Map<K, Lock<K>> keyMap = getKeyMap(key);
 	assert Lock.noteSync(this, key);
 	try {
 	    synchronized (keyMap) {
-		Lock<K, L> lock = getLock(key, keyMap);
+		Lock<K> lock = getLock(key, keyMap);
 		result = lock.lock(locker, forWrite, false);
 	    }
 	} finally {
@@ -373,14 +384,8 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 	    }
 	    return null;
 	}
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "lock attempt {0}, {1}, forWrite:{2}" +
-		       "\n  returns blocked",
-		       locker, key, forWrite);
-	}
 	locker.setWaitingFor(result);
-	conflict = new LockConflict<K, L>(
+	conflict = new LockConflict<K>(
 	    result.request, LockConflictType.BLOCKED, result.conflict);
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER,
@@ -390,69 +395,29 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 	return conflict;
     }
 
-    /** Releases a lock, only downgrading it if downgrade is true. */
-    void releaseLockInternal(L locker, K key, boolean downgrade) {
-	checkLockManager(locker);
-	List<L> newOwners = Collections.emptyList();
-	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
-	try {
-	    synchronized (keyMap) {
-		/* Don't create the lock if it isn't present */
-		Lock<K, L> lock = keyMap.get(key);
-		if (lock != null) {
-		    newOwners = lock.release(locker, downgrade);
-		    if (!lock.inUse(locker.lockManager)) {
-			keyMap.remove(key);
-		    }
-		}
-	    }
-	} finally {
-	    assert Lock.noteUnsync(this, key);
-	}
-	for (L newOwner : newOwners) {
-	    logger.log(FINEST, "notify new owner {0}", newOwner);
-	    assert newOwner.noteSync();
-	    try {
-		synchronized (newOwner) {
-		    newOwner.notify();
-		}
-	    } finally {
-		assert newOwner.noteUnsync();
-	    }
-	}
-    }
-
-    /* -- Private methods -- */
-
-    /** Checks if the locker has been requested to abort. */
-    private static <K, L extends Locker<K, L>> void checkLockerNotAborted(
-	L locker)
-    {
-	LockConflict<K, L> lockConflict = locker.getConflict();
-	if (lockConflict != null &&
-	    lockConflict.type == LockConflictType.DEADLOCK)
-	{
-	    throw new IllegalStateException(
-		"Transaction must abort: " + locker);
-	}
-    }
-
-    /** Waits for a previous attempt to obtain a lock that blocked. */
-    private LockConflict<K, L> waitForLockInternal(L locker) {
+    /**
+     * Waits for a previous attempt to obtain a lock that blocked.  Like {@link
+     * #waitForLock}, but does not check that the correct lock manager was
+     * supplied.
+     *
+     * @param	locker the locker requesting the lock
+     * @return	lock conflict information, or {@code null} if there was no
+     *		conflict
+     */
+    LockConflict<K> waitForLockInternal(Locker<K> locker) {
 	assert locker.noteSync();
 	try {
 	    synchronized (locker) {
-		LockAttemptResult<K, L> result = locker.getWaitingFor();
+		LockAttemptResult<K> result = locker.getWaitingFor();
 		if (result == null) {
 		    logger.log(
 			FINER,
 			"lock {0}\n  returns null (not waiting)", locker);
 		    return null;
 		}
-		Lock<K, L> lock;
+		Lock<K> lock;
 		K key = result.request.key;
-		Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+		Map<K, Lock<K>> keyMap = getKeyMap(key);
 		assert Lock.noteSync(this, key);
 		try {
 		    synchronized (keyMap) {
@@ -463,9 +428,11 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 		}
 		long now = System.currentTimeMillis();
 		long stop = locker.getLockTimeoutTime(now, lockTimeout);
-		LockConflict<K, L> conflict = null;
+		LockConflict<K> conflict = null;
 		while (true) {
-		    conflict = locker.getConflict();
+		    if (conflict == null) {
+			conflict = locker.getConflict();
+		    }
 		    boolean isOwner;
 		    boolean timedOut = false;
 		    assert Lock.noteSync(this, key);
@@ -486,7 +453,7 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 		    }
 		    if (isOwner) {
 			locker.setWaitingFor(null);
-			locker.setConflict(null);
+			locker.clearConflict();
 			if (logger.isLoggable(FINER)) {
 			    logger.log(
 				FINER,
@@ -496,11 +463,10 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 			}
 			return null;
 		    } else if (timedOut) {
-			conflict = new LockConflict<K, L>(
+			conflict = new LockConflict<K>(
 			    result.request,
 			    LockConflictType.TIMEOUT,
 			    result.conflict);
-			locker.setConflict(conflict);
 			break;
 		    } else if (conflict != null) {
 			break;
@@ -515,10 +481,9 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 		    try {
 			locker.wait(stop - now);
 		    } catch (InterruptedException e) {
-			conflict = new LockConflict<K, L>(
+			conflict = new LockConflict<K>(
 			    result.request, LockConflictType.INTERRUPTED,
 			    result.conflict);
-			locker.setConflict(conflict);
 			/* Loop again to check owners and waiters */
 		    }
 		    now = System.currentTimeMillis();
@@ -537,8 +502,52 @@ public abstract class LockManager<K, L extends Locker<K, L>> {
 	}
     }
 
+    /**
+     * Releases a lock, but only downgrading it if {@code downgrade} is true.
+     * Like {@link #releaseLock}, but permits specifying if the lock is being
+     * downgraded rather than fully released, and does not check that the
+     * correct lock manager was supplied.
+     *
+     * @param	locker the locker holding the lock
+     * @param	key the key identifying the lock
+     * @param	downgrade whether the lock should only be downgraded
+     */
+    void releaseLockInternal(Locker<K> locker, K key, boolean downgrade) {
+	checkLockManager(locker);
+	List<Locker<K>> newOwners = Collections.emptyList();
+	Map<K, Lock<K>> keyMap = getKeyMap(key);
+	assert Lock.noteSync(this, key);
+	try {
+	    synchronized (keyMap) {
+		/* Don't create the lock if it isn't present */
+		Lock<K> lock = keyMap.get(key);
+		if (lock != null) {
+		    newOwners = lock.release(locker, downgrade);
+		    if (!lock.inUse(locker.lockManager)) {
+			keyMap.remove(key);
+		    }
+		}
+	    }
+	} finally {
+	    assert Lock.noteUnsync(this, key);
+	}
+	for (Locker<K> newOwner : newOwners) {
+	    logger.log(FINEST, "notify new owner {0}", newOwner);
+	    assert newOwner.noteSync();
+	    try {
+		synchronized (newOwner) {
+		    newOwner.notify();
+		}
+	    } finally {
+		assert newOwner.noteUnsync();
+	    }
+	}
+    }
+
+    /* -- Private methods -- */
+
     /** Checks that the locker has this lock manager. */
-    private void checkLockManager(L locker) {
+    private void checkLockManager(Locker<K> locker) {
 	if (locker.getLockManager() != this) {
 	    throw new IllegalArgumentException(
 		"The locker has a different lock manager");

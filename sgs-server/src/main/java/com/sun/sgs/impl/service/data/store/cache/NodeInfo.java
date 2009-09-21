@@ -31,7 +31,7 @@ import java.util.Set;
  * A {@link Locker} that stores information about a node, including storing
  * information about locks held and whether the node has been shutdown.
  */
-class NodeInfo extends MultiLocker<Object, NodeInfo> {
+class NodeInfo extends MultiLocker<Object> {
 
     /** The node ID. */
     final long nodeId;
@@ -62,7 +62,7 @@ class NodeInfo extends MultiLocker<Object, NodeInfo> {
      * @param	callbackServer the callback server
      * @param	updateQueueServer the update queue server
      */
-    NodeInfo(MultiLockManager<Object, NodeInfo> lockManager,
+    NodeInfo(MultiLockManager<Object> lockManager,
 	     long nodeId,
 	     CallbackServer callbackServer,
 	     RequestQueueServer<UpdateQueueRequest> updateQueueServer)
@@ -84,7 +84,7 @@ class NodeInfo extends MultiLocker<Object, NodeInfo> {
      * This implementation returns an instance of {@link NodeRequest}.
      */
     @Override
-    protected LockRequest<Object, NodeInfo> newLockRequest(
+    protected LockRequest<Object> newLockRequest(
 	Object key, boolean forWrite, boolean upgrade)
     {
 	return new NodeRequest(this, key, forWrite, upgrade);
@@ -114,7 +114,7 @@ class NodeInfo extends MultiLocker<Object, NodeInfo> {
 
     /** Releases all locks held by this node. */
     void releaseAllLocks() {
-	LockManager<Object, NodeInfo> lockManager = getLockManager();
+	LockManager<Object> lockManager = getLockManager();
 	synchronized (locksHeld) {
 	    for (Object key : locksHeld) {
 		lockManager.releaseLock(this, key);

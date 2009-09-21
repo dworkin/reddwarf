@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 import com.sun.sgs.impl.util.lock.LockRequest;
 
 /** A lock request from a node. */
-class NodeRequest extends LockRequest<Object, NodeInfo> {
+class NodeRequest extends LockRequest<Object> {
 
     /**
      * Whether the cache ownership of the item represented by this request
@@ -61,5 +61,10 @@ class NodeRequest extends LockRequest<Object, NodeInfo> {
 	} else {
 	    return false;
 	}
+    }
+
+    /** Returns the node information for this request. */
+    NodeInfo getNodeInfo() {
+	return (NodeInfo) getLocker();
     }
 }

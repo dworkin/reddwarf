@@ -23,19 +23,18 @@ package com.sun.sgs.impl.util.lock;
  * The result of attempting to request a lock.
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  * @see		LockManager
  */
-final class LockAttemptResult<K, L extends Locker<K, L>> {
+final class LockAttemptResult<K> {
 
     /** The lock request. */
-    final LockRequest<K, L> request;
+    final LockRequest<K> request;
 
     /**
      * A conflicting locker, if the request was not granted, or {@code
      * null}.
      */
-    final L conflict;
+    final Locker<K> conflict;
 
     /**
      * Creates an instance of this class.
@@ -43,7 +42,7 @@ final class LockAttemptResult<K, L extends Locker<K, L>> {
      * @param	request the lock request
      * @param	conflict a conflicting locker or {@code null}
      */
-    LockAttemptResult(LockRequest<K, L> request, L conflict) {
+    LockAttemptResult(LockRequest<K> request, Locker<K> conflict) {
 	assert request != null;
 	this.request = request;
 	this.conflict = conflict;

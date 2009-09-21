@@ -216,7 +216,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * The lock manager, for managing contended access to name bindings and
      * objects.
      */
-    private final MultiLockManager<Object, NodeInfo> lockManager;
+    private final MultiLockManager<Object> lockManager;
 
     /** The port for accepting update queue connections. */
     private final int updateQueuePort;
@@ -393,8 +393,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    txn.abort();
 		}
 	    }
-	    lockManager = new MultiLockManager<Object, NodeInfo>(
-		lockTimeout, numKeyMaps);
+	    lockManager =
+		new MultiLockManager<Object>(lockTimeout, numKeyMaps);
 	    ServerSocket serverSocket =
 		new ServerSocket(requestedUpdateQueuePort);
 	    updateQueuePort = serverSocket.getLocalPort();
@@ -582,9 +582,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	try {
 	    checkOid(oid);
 	    boolean found = false;
-	    for (LockRequest<Object, NodeInfo> owner :
-		     lockManager.getOwners(oid))
-	    {
+	    for (LockRequest<Object> owner : lockManager.getOwners(oid)) {
 		if (nodeInfo == owner.getLocker()) {
 		    if (owner.getForWrite()) {
 			/* Already locked for write -- no conflict */
@@ -1222,7 +1220,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     private void lock(NodeInfo nodeInfo, Object key, boolean forWrite) {
 	assert key instanceof Long || key instanceof BindingKey;
 	synchronized (nodeInfo) {
-	    LockConflict<Object, NodeInfo> conflict =
+	    LockConflict<Object> conflict =
 		lockManager.lockNoWait(nodeInfo, key, forWrite);
 	    if (conflict != null) {
 		callbackRequests.add((NodeRequest) conflict.getLockRequest());
@@ -1232,9 +1230,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    ", key:" + key +
 		    ", forWrite:" + forWrite +
 		    " failed: ";
-		String conflictMsg = ", with conflicting node ID " +
-		    conflict.getConflictingLocker().nodeId;
-		switch (conflict.getType()) {
+		    String conflictMsg = ", with conflicting node ID " +
+			((NodeInfo) conflict.getConflictingLocker()).nodeId;
+		    switch (conflict.getType()) {
 		    case TIMEOUT:
 			throw new TransactionTimeoutException(
 			    accessMsg + "Transaction timed out" + conflictMsg);
@@ -1281,9 +1279,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	throws CacheConsistencyException
     {
 	assert key instanceof Long || key instanceof BindingKey;
-	for (LockRequest<Object, NodeInfo> lockRequest :
-		 lockManager.getOwners(key))
-	{
+	for (LockRequest<Object> lockRequest : lockManager.getOwners(key)) {
 	    if (lockRequest.getLocker() == nodeInfo) {
 		if (!forWrite || lockRequest.getForWrite()) {
 		    return;
@@ -1439,10 +1435,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		return;
 	    }
 	    try {
-		NodeInfo nodeInfo = request.getLocker();
+		NodeInfo nodeInfo = request.getNodeInfo();
 		nodeInfo.nodeCallStarted();
 		try {
-		    for (LockRequest<Object, NodeInfo> owner
+		    for (LockRequest<Object> owner
 			     : lockManager.getOwners(request.getKey()))
 		    {
 			if (nodeInfo != owner.getLocker()) {
@@ -1464,11 +1460,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    if (owner.noteCallback()) {
 		boolean downgrade =
 		    owner.getForWrite() && !request.getForWrite();
-		NodeInfo ownerNodeInfo = owner.getLocker();
+		NodeInfo ownerNodeInfo = owner.getNodeInfo();
 		Object key = request.getKey();
 		CallbackTask task = new CallbackTask(
 		    ownerNodeInfo.callbackServer, key, downgrade,
-		    request.getLocker().nodeId);
+		    request.getNodeInfo().nodeId);
 		runIoTask(task, ownerNodeInfo.nodeId);
 		if (task.released) {
 		    if (downgrade) {

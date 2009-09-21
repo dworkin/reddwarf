@@ -23,20 +23,20 @@ import static java.util.logging.Level.FINER;
 
 /**
  * A class for managing lock conflicts where locks are not held by transactions
- * and the locker can make simultaneous requests from multiple threads.
+ * and the locker can make simultaneous requests from multiple threads.  This
+ * class does not detect deadlocks.  All {@link Locker} objects supplied to
+ * this class should be instances of {@link MultiLocker}.
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  */
-public final class MultiLockManager<K, L extends MultiLocker<K, L>>
-    extends LockManager<K, L>
-{
+public final class MultiLockManager<K> extends LockManager<K> {
+
     /**
      * A thread local that stores the result of the lock request that the
      * current thread is waiting for, or {@code null} if it is not waiting.
      */
-    private final ThreadLocal<LockAttemptResult<K, L>> waitingFor =
-	new ThreadLocal<LockAttemptResult<K, L>>();
+    private final ThreadLocal<LockAttemptResult<K>> waitingFor =
+	new ThreadLocal<LockAttemptResult<K>>();
 
     /* -- Public constructor -- */
 
@@ -56,18 +56,57 @@ public final class MultiLockManager<K, L extends MultiLocker<K, L>>
     /* -- Public methods -- */
 
     /**
+     * {@inheritDoc}
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
+     *		not an instance of {@link MultiLocker}
+     */
+    @Override
+    public LockConflict<K> lock(Locker<K> locker, K key, boolean forWrite) {
+	checkMultiLocker(locker);
+	return super.lock(locker, key, forWrite);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
+     *		not an instance of {@link MultiLocker}
+     */
+    @Override
+    public LockConflict<K> lockNoWait(
+	Locker<K> locker, K key, boolean forWrite)
+    {
+	checkMultiLocker(locker);
+	return super.lockNoWait(locker, key, forWrite);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
+     *		not an instance of {@link MultiLocker}
+     */
+    public LockConflict<K> waitForLock(Locker<K> locker) {
+	checkMultiLocker(locker);
+	return super.waitForLock(locker);
+    }
+
+    /**
      * Downgrades a lock held by a locker from write to read access.  This
      * method does nothing if the lock is not held for write.
      *
      * @param	locker the locker holding the lock
      * @param	key the key identifying the lock
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
+     *		manager , or if {@code locker} is not an instance of {@link
+     *		MultiLocker}
      */
-    public void downgradeLock(L locker, K key) {
+    public void downgradeLock(Locker<K> locker, K key) {
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER, "downgrade {0} {1}", locker, key);
 	}
+	checkMultiLocker(locker);
 	releaseLockInternal(locker, key, true);
     }
 
@@ -79,7 +118,7 @@ public final class MultiLockManager<K, L extends MultiLocker<K, L>>
      * @return	the result of the lock request this thread is waiting
      *		for or {@code null} if it is not waiting
      */
-    LockAttemptResult<K, L> getWaitingFor() {
+    LockAttemptResult<K> getWaitingFor() {
 	return waitingFor.get();
     }
 
@@ -91,7 +130,16 @@ public final class MultiLockManager<K, L extends MultiLocker<K, L>>
      *
      * @param	waitingFor the lock or {@code null}
      */
-    void setWaitingFor(LockAttemptResult<K, L> waitingFor) {
+    void setWaitingFor(LockAttemptResult<K> waitingFor) {
 	this.waitingFor.set(waitingFor);
+    }
+
+    /**
+     * Throws IllegalArgumentException if the argument is not a MultiLocker.
+     */
+    private static void checkMultiLocker(Locker<?> locker) {
+	if (locker != null && !(locker instanceof MultiLocker<?>)) {
+	    throw new IllegalArgumentException("Locker is not a MultiLocker");
+	}
     }
 }

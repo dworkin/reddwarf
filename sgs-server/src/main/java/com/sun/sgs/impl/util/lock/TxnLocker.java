@@ -19,28 +19,26 @@
 
 package com.sun.sgs.impl.util.lock;
 
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
+import static com.sun.sgs.impl.util.Numbers.addCheckOverflow;
+import com.sun.sgs.service.Transaction;
+
 /**
  * Records information about an entity that requests locks from a {@link
  * TxnLockManager} as part of a transaction.
  *
  * @param	<K> the type of key
- * @param	<L> the type of locker
  */
-public abstract class TxnLocker<K, L extends TxnLocker<K, L>>
-    extends Locker<K, L>
-{
+public class TxnLocker<K> extends BasicLocker<K> {
+
+    /** The associated transaction. */
+    protected final Transaction txn;
+
     /**
      * The time in milliseconds when the task associated with this
      * transaction was originally requested to start.
      */
-    private final long requestedStartTime;
-
-    /**
-     * The result of the lock request that this transaction is waiting for,
-     * or {@code null} if it is not waiting.  Synchronize on this locker
-     * when accessing this field.
-     */
-    private LockAttemptResult<K, L> waitingFor;
+    protected final long requestedStartTime;
 
     /**
      * A conflict that should cause this transaction's request to be
@@ -48,7 +46,7 @@ public abstract class TxnLocker<K, L extends TxnLocker<K, L>>
      * has been reported unless the conflict is a deadlock.  Synchronize on
      * this locker when accessing this field.
      */
-    private LockConflict<K, L> conflict;
+    private LockConflict<K> conflict;
 
     /* -- Constructor -- */
 
@@ -56,24 +54,37 @@ public abstract class TxnLocker<K, L extends TxnLocker<K, L>>
      * Creates an instance of this class.
      *
      * @param	lockManager the lock manager for this locker
+     * @param	txn the associated transaction
      * @param	requestedStartTime the time in milliseconds that the task
      *		associated with the transaction was originally
      *		requested to start
      * @throws	IllegalArgumentException if {@code requestedStartTime}
      *		is less than {@code 0}
      */
-    protected TxnLocker(
-	TxnLockManager<K, L> lockManager, long requestedStartTime)
+    public TxnLocker(TxnLockManager<K> lockManager,
+		     Transaction txn,
+		     long requestedStartTime)
     {
 	super(lockManager);
+	checkNull("txn", txn);
 	if (requestedStartTime < 0) {
 	    throw new IllegalArgumentException(
 		"The requestedStartTime must not be less than 0");
 	}
+	this.txn = txn;
 	this.requestedStartTime = requestedStartTime;
     }
 
     /* -- Public methods -- */
+
+    /**
+     * Returns the transaction associated with this request.
+     *
+     * @return	the transaction associated with this request
+     */
+    public Transaction getTransaction() {
+	return txn;
+    }
 
     /**
      * Returns the time in milliseconds that the task associated with the
@@ -91,41 +102,69 @@ public abstract class TxnLocker<K, L extends TxnLocker<K, L>>
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation returns the conflict recorded for this locker.
+     * This implementation stops the lock attempt when the transaction ends.
      */
     @Override
-    protected LockConflict<K, L> getConflict() {
+    protected long getLockTimeoutTime(long now, long lockTimeout) {
+	return Math.min(
+	    addCheckOverflow(now, lockTimeout),
+	    addCheckOverflow(txn.getCreationTime(), txn.getTimeout()));
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation returns the conflict recorded for this locker.
+     *
+     * @throws	IllegalStateException {@inheritDoc}
+     */
+    @Override
+    protected LockConflict<K> getConflict() {
 	assert checkAllowSync();
 	synchronized (this) {
 	    return conflict;
 	}
     }
 
-    /* -- Package access methods -- */
-
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation checks for deadlocks and notifies waiters.
+     */
+    /** {@inheritDoc} */
     @Override
-    void setConflict(LockConflict<K, L> conflict) {
+    protected void clearConflict() {
 	assert checkAllowSync();
 	synchronized (this) {
+	    if (conflict != null) {
+		if (conflict.type == LockConflictType.DEADLOCK) {
+		    throw new IllegalStateException(
+			"Transaction " + this +
+			" must abort due to conflict: " + conflict);
+		}
+		conflict = null;
+	    }
+	    notifyAll();
+	}
+    }
+
+    /**
+     * Specifies a conflict that should cause this locker's current request to
+     * be denied, and notifies waiters.
+     *
+     * @param	conflict the conflicting request
+     * @throws	IllegalStateException if a conflicting request has already been
+     *		specified
+     */
+    protected void setConflict(LockConflict<K> conflict) {
+	assert checkAllowSync();
+	synchronized (this) {
+	    if (this.conflict != null) {
+		throw new IllegalStateException(
+		    "This locker already has a conflict");
+	    }
 	    this.conflict = conflict;
-	    notify();
-	}
-    }
-
-    @Override
-    LockAttemptResult<K, L> getWaitingFor() {
-	assert checkAllowSync();
-	synchronized (this) {
-	    return waitingFor;
-	}
-    }
-
-    @Override
-    void setWaitingFor(LockAttemptResult<K, L> waitingFor) {
-	assert checkAllowSync();
-	synchronized (this) {
-	    assert waitingFor == null || waitingFor.conflict != null;
-	    this.waitingFor = waitingFor;
+	    notifyAll();
 	}
     }
 }
