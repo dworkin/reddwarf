@@ -330,6 +330,7 @@ public class TestBoundNamesUtil extends TestCase {
 	}
 	public BigInteger getObjectId(Object object) { return null; }
 	/* -- Stubs for DataService -- */
+	public long getLocalNodeId() { return 1; }
 	public ManagedObject getServiceBinding(String name) {
 	    return null;
 	}

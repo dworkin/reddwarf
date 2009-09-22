@@ -346,7 +346,7 @@ public final class ClientSessionServiceImpl
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
 	    taskService = txnProxy.getService(TaskService.class);
-	    localNodeId = watchdogService.getLocalNodeId();
+	    localNodeId = dataService.getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
 	    

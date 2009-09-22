@@ -25,12 +25,13 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.AbstractDataStore;
 import com.sun.sgs.impl.service.data.store.BindingValue;
+import com.sun.sgs.impl.service.data.store.NetworkException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.kernel.AccessCoordinator;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.Transaction;
-import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import com.sun.sgs.service.store.DataStore;
 import java.io.IOException;
@@ -47,8 +48,8 @@ import java.util.logging.Logger;
  * network to an implementation of {@link DataStoreServer}, and optionally runs
  * the server. <p>
  *
- * The {@link #DataStoreClient(Properties, AccessCoordinator) constructor}
- * supports the following properties: <p>
+ * The {@link #DataStoreClient constructor} supports the following properties:
+ * <p>
  *
  * <dl style="margin-left: 1em">
  *
@@ -108,14 +109,6 @@ public final class DataStoreClient extends AbstractDataStore {
     private static final String PACKAGE =
 	"com.sun.sgs.impl.service.data.store.net";
 
-    /** The logger for this class. */
-    static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client"));
-
-    /** The logger for transaction abort exceptions. */
-    static final LoggerWrapper abortLogger =
-	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client.abort"));
-
     /** The property that specifies the name of the server host. */
     private static final String SERVER_HOST_PROPERTY =
 	PACKAGE + ".server.host";
@@ -159,11 +152,14 @@ public final class DataStoreClient extends AbstractDataStore {
     /** The server port. */
     private final int serverPort;
 
+    /** The local server or null. */
+    private final DataStoreServerImpl localServer;
+
     /** The remote server. */
     private final DataStoreServer server;
 
-    /** The local server or null. */
-    private DataStoreServerImpl localServer = null;
+    /** The local node ID. */
+    private final long nodeId;
 
     /** The maximum transaction timeout. */
     private final long maxTxnTimeout;
@@ -209,7 +205,8 @@ public final class DataStoreClient extends AbstractDataStore {
      * documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
-     * @param	accessCoordinator the access coordinator
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @throws	IllegalArgumentException if the {@code
      *		com.sun.sgs.impl.service.data.store.net.server.host} property
      *		is not set, or if the value of the {@code
@@ -221,10 +218,13 @@ public final class DataStoreClient extends AbstractDataStore {
      *		registry
      */
     public DataStoreClient(Properties properties,
-			   AccessCoordinator accessCoordinator)
+			   ComponentRegistry systemRegistry,
+			   TransactionProxy txnProxy)
 	throws IOException, NotBoundException
     {
-	super(accessCoordinator, logger, abortLogger);
+	super(systemRegistry, 
+	      new LoggerWrapper(Logger.getLogger(PACKAGE + ".client")),
+	      new LoggerWrapper(Logger.getLogger(PACKAGE + ".client.abort")));
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -260,7 +260,8 @@ public final class DataStoreClient extends AbstractDataStore {
 	    Long.MAX_VALUE);
 	if (serverStart) {
 	    try {
-		localServer = new DataStoreServerImpl(properties);
+		localServer = new DataStoreServerImpl(
+		    properties, systemRegistry, txnProxy);
 		serverPort = localServer.getPort();
 		logger.log(Level.INFO, "Started server: {0}", localServer);
 	    } catch (IOException t) {
@@ -271,12 +272,19 @@ public final class DataStoreClient extends AbstractDataStore {
 		throw t;
 	    }
 	} else {
+	    localServer = null;
 	    serverPort = specifiedServerPort;
 	}
 	server = getServer();
+	nodeId = server.newNodeId();
     }
 
     /* -- Implement AbstractDataStore's DataStore methods -- */
+
+    /** {@inheritDoc} */
+    protected long getLocalNodeIdInternal() {
+	return nodeId;
+    }
 
     /** {@inheritDoc} */
     protected long createObjectInternal(Transaction txn) {
@@ -409,7 +417,6 @@ public final class DataStoreClient extends AbstractDataStore {
 	    txnCount = -1;
 	    if (localServer != null) {
 		localServer.shutdown();
-		localServer = null;
 	    }
 	}
     }
@@ -582,7 +589,9 @@ public final class DataStoreClient extends AbstractDataStore {
      * @return	a string representation of this object
      */
     public String toString() {
-	return "DataStoreClient[serverHost:" + serverHost +
+	return "DataStoreClient[" +
+	    "nodeId:" + nodeId +
+	    ", serverHost:" + serverHost +
 	    ", serverPort:" + serverPort + "]";
     }
 

@@ -100,6 +100,18 @@ public class DataStoreProfileProducer
      */
 
     /** {@inheritDoc} */
+    public void ready() throws Exception {
+	/* No profiling for this operation -- it only happens once */
+	dataStore.ready();
+    }
+
+    /** {@inheritDoc} */
+    public long getLocalNodeId() {
+	/* No profiling for this operation -- it only happens once */
+	return dataStore.getLocalNodeId();
+    }
+
+    /** {@inheritDoc} */
     public long createObject(Transaction txn) {
 	long result = dataStore.createObject(txn);
 	stats.createObjectOp.report();

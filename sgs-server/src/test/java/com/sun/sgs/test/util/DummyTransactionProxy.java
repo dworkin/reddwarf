@@ -19,17 +19,39 @@
 
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.UNBOUNDED_TIMEOUT_DEFAULT;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionHandle;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.MissingResourceException;
+import java.util.Properties;
 
-/** Provides a simple implementation of TransactionProxy, for testing. */
-public class DummyTransactionProxy implements TransactionProxy {
+/**
+ * Provides a simple implementation of {@code TransactionProxy} and {@code
+ * TransactionCoordinator}, for testing.
+ */
+public class DummyTransactionProxy
+    implements TransactionCoordinator, TransactionProxy
+{
+    /** The value for bounded timeout. */
+    private long boundedTimeout;
+
+    /** The value for unbounded timeout. */
+    private long unboundedTimeout;
+
+    /** Should we use {@code prepareAndCommit} or separate calls? */
+    private boolean disablePrepareAndCommitOpt;
 
     /** Stores information about the transaction for the current thread. */
     private final ThreadLocal<DummyTransaction> threadTxn =
@@ -43,7 +65,51 @@ public class DummyTransactionProxy implements TransactionProxy {
 	new HashMap<Class<? extends Service>, Service>();
 
     /** Creates an instance of this class. */
-    public DummyTransactionProxy() { }
+    public DummyTransactionProxy() {
+	Properties properties = System.getProperties();
+	boundedTimeout = Long.parseLong(
+	    properties.getProperty(
+		TXN_TIMEOUT_PROPERTY,
+		String.valueOf(BOUNDED_TIMEOUT_DEFAULT)));
+	unboundedTimeout = Long.parseLong(
+	    properties.getProperty(
+		TXN_UNBOUNDED_TIMEOUT_PROPERTY,
+		String.valueOf(UNBOUNDED_TIMEOUT_DEFAULT)));
+        disablePrepareAndCommitOpt = Boolean.parseBoolean(
+            properties.getProperty(
+		TXN_DISABLE_PREPAREANDCOMMIT_OPT_PROPERTY, "false"));
+    }
+
+    /* -- Implement TransactionCoordinator -- */
+
+    public TransactionHandle createTransaction(long timeout) {
+	if (timeout == ScheduledTask.UNBOUNDED) {
+	    timeout = unboundedTimeout;
+	} else if (timeout <= 0) {
+	    throw new IllegalArgumentException(
+		"Timeout value must be greater than 0: " + timeout);
+	}
+	return new TxnHandle(disablePrepareAndCommitOpt, timeout);
+    }
+
+    public long getDefaultTimeout() {
+        return boundedTimeout;
+    }
+
+    private static final class TxnHandle implements TransactionHandle {
+	private final DummyTransaction txn;
+	TxnHandle(boolean disablePrepareAndCommitOpt, long timeout) {
+	    txn = new DummyTransaction(
+		disablePrepareAndCommitOpt ?
+		UsePrepareAndCommit.NO : UsePrepareAndCommit.ARBITRARY);
+	}
+	public Transaction getTransaction() {
+	    return txn;
+	}
+	public void commit() throws Exception {
+	    txn.commit();
+	}
+    }   
 
     /* -- Implement TransactionProxy -- */
 
@@ -103,4 +169,31 @@ public class DummyTransactionProxy implements TransactionProxy {
 	services.put(type, service);
     }
 
+    /**
+     * Sets the bounded transaction timeout for creating new transactions.
+     *
+     * @param	timeout the bounded transaction timeout
+     */
+    public void setBoundedTransactionTimeout(long timeout) {
+	boundedTimeout = timeout;
+    }
+
+    /**
+     * Sets the unbounded transaction timeout for creating new transactions.
+     *
+     * @param	timeout the bounded transaction timeout
+     */
+    public void setUnboundedTransactionTimeout(long timeout) {
+	unboundedTimeout = timeout;
+    }
+
+    /**
+     * Sets whether new transactions should use {@code prepareAndCommit}.
+     *
+     * @param	disablePrepareAndCommitOpt whether use of {@code
+     *		prepareAndCommit} should be disabled
+     */
+    public void setDisablePrepareAndCommitOpt(boolean disable) {
+	disablePrepareAndCommitOpt = disable;
+    }
 }

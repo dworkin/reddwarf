@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.task;
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.impl.kernel.KernelShutdownController;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
@@ -34,9 +35,6 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import java.util.concurrent.atomic.AtomicLong;
-
-
 /**
  * An in-memory testing implementation of WatchdogService. Note that
  * this class is not designed to scale, simply to back the
@@ -44,8 +42,6 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class DummyWatchdogService implements WatchdogService {
 
-    // the generator for all node identifiers
-    private final static AtomicLong idGenerator = new AtomicLong(0);
     // the map from node identifier to Node instance
     private static ConcurrentHashMap<Long,Node> nodeMap;
     // the collection of listeners
@@ -63,7 +59,7 @@ public class DummyWatchdogService implements WatchdogService {
             nodeMap = new ConcurrentHashMap<Long,Node>();
             listeners = new ConcurrentLinkedQueue<NodeListener>();
         }
-        localId = idGenerator.getAndIncrement();
+	localId = tp.getService(DataService.class).getLocalNodeId();
         nodeMap.put(localId, new NodeImpl(localId));
     }
 
@@ -86,11 +82,6 @@ public class DummyWatchdogService implements WatchdogService {
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
             listener.nodeFailed(localNode);
-    }
-
-    /** {@inheritDoc} */
-    public long getLocalNodeId() {
-        return localId;
     }
 
     /** {@inheritDoc} */
