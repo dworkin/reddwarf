@@ -260,7 +260,7 @@ public final class ChannelServiceImpl
     /** The timeout expiration for a client session relocating to this
      * node, in milliseconds.
      */
-    private final int sessionRelocationTimeout;
+    final int sessionRelocationTimeout;
     
     /** Our JMX exposed statistics. */
     final ChannelServiceStats serviceStats;
@@ -646,7 +646,7 @@ public final class ChannelServiceImpl
 		    new ChannelSendTask(channelRefId, channelInfo.delivery,
 					message);
 		synchronized (channelInfo.members) {
-		    if (channelInfo.delivery == Delivery.RELIABLE &&
+		    if (channelInfo.delivery.equals(Delivery.RELIABLE) &&
 			timestamp <= channelInfo.msgTimestamp)
 		    {
 			// Reliable messages may be retransmitted on

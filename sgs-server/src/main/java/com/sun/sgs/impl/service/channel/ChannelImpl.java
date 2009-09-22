@@ -30,10 +30,12 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.app.util.ScalableDeque;
 import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.ChannelEventType;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
@@ -47,6 +49,7 @@ import com.sun.sgs.impl.util.BindingKeyedMap;
 import com.sun.sgs.impl.util.BindingKeyedSet;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
+import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
@@ -117,6 +120,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** An event queue map prefix. */
     static final String EVENT_QUEUE_MAP_PREFIX = PKG_NAME + "eventQueue.";
 
+    /** The saved messages map prefix. */
+    private static final String SAVED_MESSAGES_MAP_PREFIX =
+	PKG_NAME + "message.";
+
+    /** The saved messages map prefix. */
+    private static final String SAVED_MESSAGES_QUEUE_PREFIX =
+	PKG_NAME + "messageQueue.";
+    
     /** The empty channel membership set. */
     static final Set<BigInteger> EMPTY_CHANNEL_MEMBERSHIP =
 	Collections.unmodifiableSet(new HashSet<BigInteger>());
@@ -154,6 +165,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * members.
      */
     private long coordNodeId;
+
+    /** Indicates whether this coordinator is reassigned so that some
+     *  actions can be performed by the new coordinator. */
+    private boolean isCoordinatorReassigned;
 
     /** The transaction. */
     private transient Transaction txn;
@@ -805,6 +820,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	return coordNodeId == getLocalNodeId();
     }
 
+    private boolean checkCoordinator() {
+	if (!isCoordinator()) {
+	    return false;
+	} else {
+	    if (isCoordinatorReassigned) {
+		ChannelServiceImpl.getDataService().markForUpdate(this);
+		if (delivery.equals(Delivery.RELIABLE)) {
+		    SavedMessageReaper.scheduleNewTask(channelRefId, false);
+		}
+		isCoordinatorReassigned = false;
+	    }
+	    return true;
+	}
+    }
+
     /**
      * Returns a new {@code BindingKeyedSet} with the specified {@code
      * keyPrefix}.
@@ -856,10 +886,196 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
-    private void saveMessage(byte[] message, long timestamp) {
-	// TBD: implement...
+    /**
+     * Returns the map of saved messages for this channel, for looking up
+     * messages by timestamp.
+     */
+    private static BindingKeyedMap<ChannelMessageInfo>
+	getSavedMessagesMap(BigInteger channelRefId)
+    {
+	return newMap(SAVED_MESSAGES_MAP_PREFIX + channelRefId + ".");
     }
 
+    /**
+     * Returns the queue of saved messages for this channel, for
+     * determining which messages have expired and can be removed.
+     */
+    @SuppressWarnings("unchecked")
+    private static ScalableDeque<ChannelMessageInfo>
+	getSavedMessagesQueue(BigInteger channelRefId, boolean createIfAbsent)
+    {
+	DataService dataService = getDataService();
+	ManagedObject messageQueue = null;
+	String key = SAVED_MESSAGES_QUEUE_PREFIX + channelRefId;
+	try {
+	    messageQueue = dataService.getServiceBinding(key);
+	} catch (NameNotBoundException e) {
+	    if (createIfAbsent) {
+		messageQueue = new ScalableDeque<ChannelMessageInfo>();
+		dataService.setServiceBinding(key, messageQueue);
+		SavedMessageReaper.scheduleNewTask(channelRefId, false);
+	    }
+	}
+	return (ScalableDeque<ChannelMessageInfo>) messageQueue;
+    }
+
+    /**
+     * Saves the specified channel {@code message} with the specified
+     * {@code timestamp}.
+     */
+    private void saveMessage(byte[] message, long timestamp) {
+	BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
+	    getSavedMessagesMap(channelRefId);
+	ChannelMessageInfo messageInfo =
+	    new ChannelMessageInfo(message, timestamp);
+	savedMessagesMap.put(Long.toString(timestamp), messageInfo);
+	getSavedMessagesQueue(channelRefId, true).add(messageInfo);
+    }
+
+    /**
+     * Contains a saved channel message with its associated timestamp
+     * and expiration time.
+     */
+    private static class ChannelMessageInfo
+	implements ManagedObject, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+	/** The channel message. */
+	private final byte[] message;
+	/** The message timestamp. */
+	private final long timestamp;
+	/** The message's expiration time. */
+	private final long expiration;
+
+	/**
+	 * Constructs an instance with the specified {@code message}
+	 * and {@code timestamp}.
+	 */
+	ChannelMessageInfo(byte[] message, long timestamp) {
+	    this.message = message;
+	    this.timestamp = timestamp;
+	    this.expiration =
+		System.currentTimeMillis() +
+		ChannelServiceImpl.getChannelService().sessionRelocationTimeout;
+	}
+
+	/**
+	 * Returns {@code true} if the channel message has expired
+	 * (that is, its expiration time has passed).
+	 */
+	boolean isExpired() {
+	    return expiration <= System.currentTimeMillis();
+	}
+    }
+
+    /**
+     * A (periodic) task to reap messages saved past their expiration time.
+     */
+    private static class SavedMessageReaper
+	implements KernelRunnable, Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+	
+	/** The channel's ID. */
+	private final BigInteger channelRefId;
+	/** Indicates whether this task is durable. */
+	private final boolean isDurable;
+
+	/**
+	 * Constructs an instance with the specified {@code channelRefId}.
+	 * Use the {@code scheduleNewTask} method to construct an instance and
+	 * schedule the instance as a periodic task.
+	 */
+	private SavedMessageReaper(BigInteger channelRefId, boolean isDurable) {
+	    this.channelRefId = channelRefId;
+	    this.isDurable = isDurable;
+	}
+
+	/** {@inheritDoc} */
+	public String getBaseTaskType() {
+	    return getClass().getName();
+	}
+	
+	/**
+	 * Iterates through the message queue, removing messages saved past
+	 * their expiration time.  The message is removed from the queue, as
+	 * well as the map of saved messages, keyed by message timestamp.
+	 */
+	public void run() {
+	    ScalableDeque<ChannelMessageInfo> messageQueue =
+		getSavedMessagesQueue(channelRefId, false);
+	    if (messageQueue == null) {
+		// Queue no longer exists, so "cancel" periodic task.
+		return;
+	    } else {
+		// Remove messages saved past their expiration time.
+		DataService dataService = getDataService();
+		if (!messageQueue.isEmpty()) {
+		    Iterator<ChannelMessageInfo> iter = messageQueue.iterator();
+		    while (iter.hasNext()) {
+			ChannelMessageInfo messageInfo = iter.next();
+			if (messageInfo.isExpired()) {
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.log(
+				    Level.FINEST,
+				    "Removing saved message, channel:{0} " +
+				    "timestamp:{1}",
+				    HexDumper.toHexString(
+					channelRefId.toByteArray()),
+				    messageInfo.timestamp);
+			    }
+			    iter.remove();
+			    getSavedMessagesMap(channelRefId).
+				remove(Long.toString(messageInfo.timestamp));
+			    dataService.removeObject(messageInfo);
+			} else {
+			    break;
+			}
+		    }
+		}
+		if (messageQueue.isEmpty()) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "Removing saved messages queue, channel:{0}",
+			    HexDumper.toHexString(channelRefId.toByteArray()));
+		    }
+		    dataService.removeObject(messageQueue);
+		    dataService.removeServiceBinding(
+			SAVED_MESSAGES_QUEUE_PREFIX + channelRefId);
+		} else {
+		    scheduleTask();
+		}
+	    }
+	}
+
+	private void scheduleTask() {
+	    TaskService taskService = 
+		ChannelServiceImpl.getChannelService().getTaskService();
+	    if (isDurable) {
+		taskService.scheduleTask(this, 1000L);
+	    } else {
+		taskService.scheduleNonDurableTask(this, 1000L, true);
+	    }
+	}
+
+	/**
+	 * Creates a new message reaper and schedules it to run.
+	 *
+	 * @param channelRefId a channel ID
+	 * @param isDurable if {@code true} the task should be
+	 *	  scheduled as a durable task, otherwise it should be
+	 *	  scheduled as a non-durable task
+	 */
+	static void scheduleNewTask(
+	    BigInteger channelRefId, boolean isDurable)
+	{
+	    (new SavedMessageReaper(channelRefId, isDurable)).scheduleTask();
+	}
+    }
+    
     /**
      * Reassigns the channel coordinator as follows:
      *
@@ -868,7 +1084,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * channel members), or the local node (if there are no channel
      * members) and rebinds the event queue to the new coordinator's key.
      *
-     * 2} Sends out a 'serviceEventQueue' request to the new
+     * 2) Sends out a 'serviceEventQueue' request to the new
      * coordinator to restart this channel's event processing.
      */
     private void reassignCoordinator(long failedCoordNodeId) {
@@ -888,6 +1104,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * coordinator's event queue map.
 	 */
 	coordNodeId = chooseCoordinatorNode();
+	isCoordinatorReassigned = true;
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(
 		Level.FINER,
@@ -1003,6 +1220,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	eventQueuesMap.removeOverride(channelRefId.toString());
 	EventQueue eventQueue = eventQueueRef.get();
 	dataService.removeObject(eventQueue);
+	if (delivery.equals(Delivery.RELIABLE)) {
+	    SavedMessageReaper.scheduleNewTask(channelRefId, true);
+	}
     }
     
     /* -- Other classes -- */
@@ -1237,7 +1457,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	void serviceEventQueue() {
 	    ChannelImpl channel = getChannel();
-	    if (!channel.isCoordinator()) {
+	    if (!channel.checkCoordinator()) {
 		// TBD: should a serviceEventQueue request be forwarded to
 		// the true channel coordinator?
 		logger.log(
@@ -1258,7 +1478,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    DataService dataService = getDataService();
-	    
+
 	    /*
 	     * Process channel events
 	     */
@@ -2007,20 +2227,24 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 
 	    /*
-	     * If the message is reliable, store message for a period of
-	     * time so that relocating client sessions belonging to this
-	     * channel can obtain messages sent while those sessions are
-	     * relocating.
-	     */
-	    channel.saveMessage(message, timestamp);
-	    
-	    /*
 	     * Enqueue a channel task to forward the message to the
 	     * channel's servers for delivery.
 	     */
 	    SendNotifyTask task = new SendNotifyTask(channel, this);
 	    ChannelServiceImpl.getChannelService().addChannelTask(
 		channel.channelRefId, task);
+
+	    /*
+	     * If the message is reliable, store message for a period of
+	     * time so that relocating client sessions belonging to this
+	     * channel can obtain messages sent while those sessions are
+	     * relocating, otherwise, mark this event as completed.
+	     */
+	    if (channel.delivery.equals(Delivery.RELIABLE)) {
+		channel.saveMessage(message, timestamp);
+	    } else {
+		completed();
+	    }
 	    
 	    return isCompleted();
 	}
@@ -2044,10 +2268,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * A non-transactional task (with transactional components) to transmit
-     * a "send" notification to each of the channel's server nodes so that
-     * each server node can deliver a channel message to the channel's
-     * respective members.
+     * A non-transactional task to transmit a "send" notification to
+     * each of the channel's server nodes so that each server node
+     * can deliver a channel message to the channel's respective
+     * members.  When all the appropriate channel servers have been
+     * notified, this task marks the associated ChannelEvent complete
+     * (within a transaction).
      */
     private static class SendNotifyTask extends NotifyTask {
 
@@ -2055,9 +2281,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private final byte[] message;
 
 	/**
-	 * Constructs an instance with the specified {@code channel}.  If
-	 * {@code removeName} is {@code true}, the channel's name binding
-	 * is removed along with its persistent data.
+	 * Constructs an instance with the specified {@code channel}
+	 * and {@code sendEvent}.
 	 */
 	SendNotifyTask(ChannelImpl channel, SendEvent sendEvent) {
 	    super(channel, sendEvent);
@@ -2065,6 +2290,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    this.message = sendEvent.message;
 	}
 
+	/** {@inheritDoc} */
 	public void run() {
 	    try {
 		/*
@@ -2088,7 +2314,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
     
     /**
-     * A channel close event.
+     * A channel close event, used for closing a channel or removing
+     * all members from the channel (as a result of a "leaveAll"
+     * request).  If a channel is being closed permanently, its name
+     * binding is removed from the data service.  If the channel is
+     * being cleared of its membership (as a result of "leaveAll"),
+     * then its name binding is being used to refer to a
+     * ChannelWrapper with a new channel instance, so the name
+     * binding is retained.
      */
     private static class CloseEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
@@ -2101,10 +2334,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/**
 	 * Constructs a close event.  If {@code removeName} is {@code true},
 	 * the channel is truly being closed, and its channel name
-	 * binding should be removed.  If {@code removeName} is {@code
+	 * binding will be removed.  If {@code removeName} is {@code
 	 * false}, then {@code leaveAll} was invoked on the channel, so
-	 * the channel's old persistent structures are being removed, but the
-	 * channel's name binding should remain, still referring to the
+	 * the channel's old persistent structures will be removed, but the
+	 * channel's name binding will remain, still referring to the
 	 * original {@code ChannelWrapper} whose underlying reference
 	 * was modified to refer to a newly created channel.
 	 *
