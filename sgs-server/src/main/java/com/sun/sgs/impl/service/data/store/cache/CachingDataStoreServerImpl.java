@@ -21,7 +21,6 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.auth.Identity;
 import static com.sun.sgs.impl.kernel.StandardProperties.APP_ROOT;
 import static com.sun.sgs.impl.service.data.store.
     DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS;
@@ -34,8 +33,6 @@ import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeString;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
-import com.sun.sgs.impl.service.data.store.DelegatingScheduler;
-import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.cache.
     UpdateQueueRequest.UpdateQueueRequestHandler;
 import static com.sun.sgs.impl.service.transaction.
@@ -57,7 +54,6 @@ import com.sun.sgs.impl.util.lock.LockRequest;
 import com.sun.sgs.impl.util.lock.MultiLockManager;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -171,10 +167,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     /** The default update queue port. */
     public static final int DEFAULT_UPDATE_QUEUE_PORT = 44542;
 
-    /** The logger for this class. */
-    static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(PKG + ".server"));
-
     /** The number of node IDs to allocate at once. */
     private static final int NODE_ID_ALLOCATION_BLOCK_SIZE = 100;
 
@@ -183,15 +175,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /** The transaction timeout. */
     private final long txnTimeout;
-
-    /** The transaction proxy. */
-    private final TransactionProxy txnProxy;
-
-    /** The owner for tasks run by the server. */
-    private final Identity taskOwner;
-
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
 
     /** The database environment. */
     private final DbEnvironment env;
@@ -220,6 +203,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /** The port for accepting update queue connections. */
     private final int updateQueuePort;
+
+    /** The update queue server, wrapped for logging. */
+    private final UpdateQueueServer updateQueueServer;
 
     /** Thread that handles update queue connections. */
     private final RequestQueueListener requestQueueListener;
@@ -291,10 +277,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      */
     private final Object readySync = new Object();
 
-    /** The update queue server, wrapped for logging. */
-    private final UpdateQueueServer updateQueueServer =
-	new LoggingUpdateQueueServer(this, logger);
-
     /* -- Constructor -- */
 
     /**
@@ -311,7 +293,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 				      TransactionProxy txnProxy)
 	throws IOException
     {
-	super(properties, systemRegistry, txnProxy, logger);
+	super(properties, systemRegistry, txnProxy,
+	      new LoggerWrapper(Logger.getLogger(PKG + ".server")));
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	String dbEnvClass = wrappedProps.getProperty(
 	    ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS);	    
@@ -359,9 +342,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		       "\n  txn timeout: " + txnTimeout +
 		       "\n  update queue port: " + requestedUpdateQueuePort);
 	}
-	this.txnProxy = txnProxy;
-	taskOwner = txnProxy.getCurrentOwner();
-	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	try {
 	    File directoryFile = new File(directory);
 	    if (!directoryFile.exists()) {
@@ -375,9 +355,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS,
 		DbEnvironment.class,
 		new Class<?>[] {
-		    String.class, Properties.class, Scheduler.class },
-		directory, properties,
-		new DelegatingScheduler(taskScheduler, taskOwner));
+		    String.class, Properties.class,
+		    ComponentRegistry.class, TransactionProxy.class },
+		directory, properties, systemRegistry, txnProxy);
 	    boolean txnDone = false;
 	    DbTransaction txn = env.beginTransaction(Long.MAX_VALUE);
 	    try {
@@ -398,6 +378,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    ServerSocket serverSocket =
 		new ServerSocket(requestedUpdateQueuePort);
 	    updateQueuePort = serverSocket.getLocalPort();
+	    updateQueueServer = new LoggingUpdateQueueServer(this, logger);
 	    requestQueueListener = new RequestQueueListener(
 		serverSocket,
 		new RequestQueueListener.ServerDispatcher() {
