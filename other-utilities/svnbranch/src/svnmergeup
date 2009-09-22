@@ -18,6 +18,9 @@ use warnings;
 # Use getopts
 use Getopt::Std;
 
+# Use module for obtaining the current working directory
+use Cwd;
+
 # The directory containing the current program
 my ($program_dir) = $0 =~ m!^(.*)/[^/]*$!;
 if (!$program_dir) {
@@ -156,6 +159,7 @@ main();
 
 # Main subroutine
 sub main {
+    check_svn_version();
     check_arguments();
     check_branch_and_trunk();
     handle_opt_ip();
@@ -191,7 +195,7 @@ sub check_arguments {
 # Checks that the branch and trunk are valid.
 sub check_branch_and_trunk {
     # Check trunk URL
-    $trunk_url = get_wc_url(".");
+    $trunk_url = get_wc_url(cwd());
     if ($trunk_url !~ m!^(.*)/trunk$!) {
 	die "Error: Current directory not top of trunk: " . `pwd`;
     }
@@ -226,7 +230,7 @@ sub check_branch_and_trunk {
     if (!$trunk_rev) {
 	die "Error: Trunk URL not found\n";
     }
-    my $result = get_update_modified(".", !$opt_f);
+    my $result = get_update_modified(cwd(), !$opt_f);
     if ($result) {
 	die "Error: Trunk working copy $result: " . `pwd`;
     }
@@ -239,12 +243,12 @@ sub handle_opt_ip {
 	    print "Would mark branch $branch_name merged up to revision " .
 		"$opt_i\n";
 	} else {
-	    set_merged_up(".", $opt_i, $branch_name);
+	    set_merged_up(cwd(), $opt_i, $branch_name);
 	    print "Set branch $branch_name merged up to revision $opt_i\n";
 	}
 	exit 0;
     } elsif ($opt_p) {
-	my $merged = get_merged_up(".", $branch_name) ||
+	my $merged = get_merged_up(cwd(), $branch_name) ||
 	    "Branch $branch_name is not merged up";
 	print "$merged\n";
 	exit 0;
@@ -254,7 +258,7 @@ sub handle_opt_ip {
 # Determine when the branch was last merged up to the trunk, and exit
 # if the trunk is already up to date.
 sub check_merged {
-    $merged = get_merged_up(".", $branch_name);
+    $merged = get_merged_up(cwd(), $branch_name);
     if (!$merged) {
 	# Branch not merged, use the initial branch revision instead
 	$merged = get_branch_first_revision($branch, $branch_rev);
@@ -304,11 +308,11 @@ sub check_moves {
 
 # Performs the merge, and prints the log and diffs as needed.
 sub merge {
-    my $old = ".\@$refreshed";
+    my $old = cwd() . "\@$refreshed";
     my $new = escape($branch) . "\@$branch_rev";
     my $merge_command;
     if (!$opt_n) {
-	$merge_command = "$svn merge $old $new";
+	$merge_command = "$svn merge --accept postpone $old $new";
     } elsif ($trunk_rev > $refreshed) {
 	# The branch is not up-to-date with the latest trunk revision,
 	# so use diff so that we don't attempt to merge with the current
@@ -323,7 +327,7 @@ sub merge {
     print command($merge_command);
     if (!$opt_n) {
 	# Update meta data
-	set_merged_up(".", $branch_rev, $branch_name);
+	set_merged_up(cwd(), $branch_rev, $branch_name);
     }
     # Print log and diffs in verbose mode
     if ($opt_v) {

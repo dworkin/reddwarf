@@ -18,6 +18,12 @@ use Getopt::Std;
 # separated by vertical bars.
 my $repos_schemes = "file|http|https|svn";
 
+# The required major version of Subversion.
+my $svn_major_version = "1";
+
+# The required minimum minor version of Subversion.
+my $svn_minor_version = "6";
+
 # The value of the SVNDIR environment variable, with the final path
 # separator removed, if present.
 my $svndir = eval {
@@ -184,7 +190,7 @@ sub command {
 # describes the problem if one is found, otherwise an empty string.
 sub get_update_modified {
     my ($working_copy, $check_modified) = @_;
-    my $update = "^.......[*].*\$";
+    my $update = "^........[*].*\$";
     my $modified = "^([^ ?]|.[CM]).*\$";
     my @status = command("$svn status -uv " . escape($working_copy));
     my $found_update = 0;
@@ -354,6 +360,19 @@ sub warn_or_die {
 	warn "Warning: $msg";
     } else {
 	die "Error: $msg";
+    }
+}
+
+# Check for the correct version of Subversion.  We require an exact
+# match for the major version and at least the minimum minor version,
+# with no requirement on the third version component.
+sub check_svn_version {
+    my ($current_version) = command("$svn --version --quiet");
+    chomp($current_version);
+    my ($major, $minor) = $current_version =~ m!^([0-9]+)[.]([0-9]+)([.].*)?!;
+    if ($major != $svn_major_version || $minor < $svn_minor_version) {
+	die "Error: Found version $current_version of Subversion, but" .
+	    " require version $svn_major_version\.$svn_minor_version";
     }
 }
 

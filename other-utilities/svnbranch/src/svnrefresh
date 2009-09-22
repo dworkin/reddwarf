@@ -18,6 +18,9 @@ use warnings;
 # Use getopts
 use Getopt::Std;
 
+# Use module for obtaining the current working directory
+use Cwd;
+
 # The directory containing the current program
 my ($program_dir) = $0 =~ m!^(.*)/[^/]*$!;
 if (!$program_dir) {
@@ -151,6 +154,7 @@ main();
 
 # Main subroutine
 sub main {
+    check_svn_version();
     check_arguments();
     check_branch_and_trunk();
     handle_opt_ip();
@@ -187,7 +191,7 @@ sub check_arguments {
 # Checks that the branch and trunk are valid.
 sub check_branch_and_trunk {
     # Check branch URL
-    $branch_url = get_wc_url(".");
+    $branch_url = get_wc_url(cwd());
     if ($branch_url !~ m!^(.*)/branches/([^/]+)$!) {
 	die "Error: Current directory not top of branch: " . `pwd`;
     }
@@ -207,8 +211,7 @@ sub check_branch_and_trunk {
     }
     my $trunk_base = $1;
     if ($branch_base ne $trunk_base) {
-	chomp(my $cwd = `pwd`);
-	die "Error: Branch and trunk not related: " . $cwd . ", $trunk\n";
+	die "Error: Branch and trunk not related: " . cwd() . ", $trunk\n";
     }
     # Check trunk
     $trunk_rev = get_url_revision($trunk_url);
@@ -226,7 +229,7 @@ sub check_branch_and_trunk {
     if (!$branch_rev) {
 	die "Error: Branch URL not found\n";
     }
-    my $result = get_update_modified(".", !$opt_f);
+    my $result = get_update_modified(cwd(), !$opt_f);
     if ($result) {
 	warn_or_die($opt_n, "Branch working copy $result: " . `pwd`);
     }
@@ -238,12 +241,12 @@ sub handle_opt_ip {
 	if ($opt_n) {
 	    print "Would mark branch refreshed to revision $opt_i\n";
 	} else {
-	    set_refreshed(".", $opt_i, $branch_name);
+	    set_refreshed(cwd(), $opt_i, $branch_name);
 	    print "Set branch refreshed to revision $opt_i\n";
 	}
 	exit 0;
     } elsif ($opt_p) {
-	my $refreshed = get_refreshed(".", $branch_name, $branch_rev);
+	my $refreshed = get_refreshed(cwd(), $branch_name, $branch_rev);
 	print "$refreshed\n";
 	exit 0;
     }
@@ -252,7 +255,7 @@ sub handle_opt_ip {
 # Determine when this branch was last refreshed, and exit if it is up to
 # date with the trunk.  Also sets $merged .
 sub check_refreshed {
-    $refreshed = get_refreshed(".", $branch_name, $branch_rev);
+    $refreshed = get_refreshed(cwd(), $branch_name, $branch_rev);
     if ($trunk_rev <= $refreshed) {
 	print "Branch working copy is up to date with trunk revision " .
 	    "$refreshed\n";
@@ -275,7 +278,7 @@ sub check_moves {
 	warn "Warning: Trunk changes contain moves:\n$moves";
     }
     # Check for moves in the branch not reflected in the trunk
-    my $created = get_branch_first_revision(".", $branch_rev);
+    my $created = get_branch_first_revision(cwd(), $branch_rev);
     if ($merged > $created) {
 	$log_start = $merged + 1;
     } else {
@@ -296,10 +299,10 @@ sub merge {
     if ($opt_n) {
 	$merge = "$svn merge --dry-run";
     } else {
-	$merge = "$svn merge";
+	$merge = "$svn merge --accept postpone";
     }
     my $old = ($merged > $refreshed)
-	? ".\@$merged" : escape($trunk) . "\@$refreshed";
+	? cwd() . "\@$merged" : escape($trunk) . "\@$refreshed";
     my $new = escape($trunk) . "\@$trunk_rev";
     my $merge_command = "$merge $old $new";
     print "$merge_command\n";
@@ -307,7 +310,7 @@ sub merge {
     print @merge_results;
     if (!$opt_n) {
 	# Update meta data
-	set_refreshed(".", $trunk_rev, $branch_name);
+	set_refreshed(cwd(), $trunk_rev, $branch_name);
     }
     # Print log and diffs in verbose mode
     if ($opt_v) {
