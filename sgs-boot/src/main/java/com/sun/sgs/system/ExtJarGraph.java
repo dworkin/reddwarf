@@ -44,7 +44,8 @@ class ExtJarGraph {
     static final String DEPENDENCY_PROPERTY = "DEPENDS_ON";
 
     // a map of all extension jars
-    private final Map<String,JarNode> extNodes = new HashMap<String,JarNode>();
+    private final Map<String, JarNode> extNodes =
+        new HashMap<String, JarNode>();
 
     // a collection of jars that depend on other jars
     private final Set<JarNode> dependencyRoots = new HashSet<JarNode>();
@@ -55,7 +56,7 @@ class ExtJarGraph {
     private boolean hasDependencies = false;
 
     /** Creates an instance of {@code ExtJarGraph}. */
-    ExtJarGraph() {}
+    ExtJarGraph() { }
 
     /**
      * Adds a jar file to this collection. This method checks that the jar
@@ -97,7 +98,7 @@ class ExtJarGraph {
         // see if the jar file contains any darkstar properties
         JarEntry propertiesEntry = jar.getJarEntry(EXT_PROPERTIES_FILE);
         if (propertiesEntry != null) {
-            SubstitutionProperties p = new SubstitutionProperties();
+            Properties p = new Properties();
             try {
                 p.load(jar.getInputStream(propertiesEntry));
             } catch (IOException ioe) {
@@ -133,7 +134,7 @@ class ExtJarGraph {
      * @throws IOException if there is a problem creating the property file
      */
     String getPropertiesFile() throws IOException {
-        if (extNodes.isEmpty() || (! hasPreferences)) {
+        if (extNodes.isEmpty() || (!hasPreferences)) {
             return null;
         }
         if (hasDependencies) {
@@ -163,8 +164,11 @@ class ExtJarGraph {
         // generate the properties file
         File propFile = File.createTempFile("extProperties", null);
         FileOutputStream out = new FileOutputStream(propFile);
-        p.store(out, "Temporary extension properties file");
-        out.close();
+        try {
+            p.store(out, "Temporary extension properties file");
+        } finally {
+            out.close();
+        }
         return propFile.getAbsolutePath();
     }
 
@@ -277,7 +281,7 @@ class ExtJarGraph {
     private static class JarNode {
         final String name;
         final String version;
-        final SubstitutionProperties properties;
+        final Properties properties;
         final Set<String> namedDependencies = new HashSet<String>();
         final Set<JarNode> dNodes = new HashSet<JarNode>();
         JarNode(String name, String version) {
@@ -285,15 +289,13 @@ class ExtJarGraph {
             this.version = version;
             this.properties = null;
         }
-        JarNode(String name, String version,
-                SubstitutionProperties properties)
-        {
+        JarNode(String name, String version, Properties properties) {
             this.name = name;
             this.version = version;
             this.properties = properties;
         }
         public boolean equals(Object o) {
-            if (! (o instanceof JarNode)) {
+            if (!(o instanceof JarNode)) {
                 return false;
             }
             return name.equals(((JarNode) o).name);

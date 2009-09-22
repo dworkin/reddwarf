@@ -55,7 +55,7 @@ public final class Stop {
      * by the system resource {@link BootEnvironment#SGS_BOOT}.
      * <p>
      * A shutdown command is sent to the running Project Darkstar Server
-     * by connecting to the JXM server on the localhost at the port specified
+     * by connecting to the JMX server on the localhost at the port specified
      * by the {@link BootEnvironment#JMX_PORT} property in the configuration,
      * or the value of {@link BootEnvironment#DEFAULT_JMX_PORT} if no value
      * is given for the property. The {@code KernelMXBean.requestShutdown()}

@@ -111,7 +111,7 @@ public final class Boot {
         // command-line properties for JMX management
         executeCmd.add("-Dcom.sun.management.jmxremote.port=" +
                        properties.getProperty(BootEnvironment.JMX_PORT));
-        if (! properties.
+        if (!properties.
             getProperty(BootEnvironment.DISABLE_JMX_SECURITY).equals("false"))
         {
             executeCmd.add("-Dcom.sun.management.jmxremote.authenticate=false");

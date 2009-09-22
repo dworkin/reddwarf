@@ -255,29 +255,8 @@ class Kernel {
             ProfileCollectorHandle profileCollectorHandle = 
                     new ProfileCollectorHandleImpl(profileCollector);
 
-            // Create the configuration MBean and register it.  This is
-            // used during the construction of later components.
-            ConfigManager config = new ConfigManager(appProperties);
-            try {
-                profileCollector.registerMBean(config, 
-                                               ConfigManager.MXBEAN_NAME);
-            } catch (JMException e) {
-                logger.logThrow(Level.WARNING, e, "Could not register MBean");
-                // Stop bringing up the kernel - the ConfigManager is used
-                // by other parts of the system, who rely on it being 
-                // successfully registered.
-                throw e;
-            }
-
-            // SHUTDOWN EXPERIMENT
-            KernelManager kernelManager = new KernelManager();
-            try {
-                profileCollector.registerMBean(kernelManager,
-                                               KernelManager.MXBEAN_NAME);
-            } catch (JMException e) {
-                logger.logThrow(Level.WARNING, e, "Could not register MBean");
-                // halt startup?
-            }
+            // with profiling setup, register all MXBeans
+            registerMXBeans(appProperties);
 
             // create the authenticators and identity coordinator, folding in
             // any extension library authenticators
@@ -287,7 +266,8 @@ class Kernel {
                 appProperties.getProperty(StandardProperties.AUTHENTICATORS,
                                           DEFAULT_IDENTITY_AUTHENTICATOR);
             String extAuthList =
-                appProperties.getProperty("com.sun.sgs.ext.authenticators");
+                appProperties.getProperty(BootProperties.
+                                          EXTENSION_AUTHENTICATORS_PROPERTY);
             if (extAuthList != null) {
                 authList = extAuthList + ":" + authList;
             }
@@ -376,6 +356,32 @@ class Kernel {
             }
             // shut down whatever we've started
             shutdown();
+            throw e;
+        }
+    }
+
+    /** Private helper that registers MXBeans for management. */
+    private void registerMXBeans(Properties p) throws Exception {
+        // Create the configuration MBean and register it.  This is
+        // used during the construction of later components.
+        ConfigManager config = new ConfigManager(p);
+        try {
+            profileCollector.registerMBean(config, ConfigManager.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.WARNING, e, "Could not register MBean");
+            // Stop bringing up the kernel - the ConfigManager is used
+            // by other parts of the system, who rely on it being 
+            // successfully registered.
+            throw e;
+        }
+
+        // install the MXBean that exports a shutdown interface
+        KernelManager kernelManager = new KernelManager();
+        try {
+            profileCollector.registerMBean(kernelManager,
+                                           KernelManager.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.WARNING, e, "Could not register MBean");
             throw e;
         }
     }
@@ -509,11 +515,13 @@ class Kernel {
         String externalServices =
             appProperties.getProperty(StandardProperties.SERVICES);
         String extensionServices =
-            appProperties.getProperty("com.sun.sgs.ext.services");
+            appProperties.getProperty(BootProperties.
+                                      EXTENSION_SERVICES_PROPERTY);
         String externalManagers =
             appProperties.getProperty(StandardProperties.MANAGERS);
         String extensionManagers =
-            appProperties.getProperty("com.sun.sgs.ext.managers");
+            appProperties.getProperty(BootProperties.
+                                      EXTENSION_MANAGERS_PROPERTY);
 
         if ((externalServices == null) || (externalServices.length() == 0)) {
             externalServices = extensionServices;
@@ -630,26 +638,35 @@ class Kernel {
 
         // finally, load any external services and their associated managers
         if ((externalServices != null) && (externalManagers != null)) {
-            String [] serviceClassNames = externalServices.split(":", -1);
-            String [] managerClassNames = externalManagers.split(":", -1);
-            if (serviceClassNames.length != managerClassNames.length) {
-                if (logger.isLoggable(Level.SEVERE)) {
-                    logger.log(Level.SEVERE, "External service count " +
-                               "({0}) does not match manager count ({1}).",
-                               serviceClassNames.length,
-                               managerClassNames.length);
-                }
-                throw new IllegalArgumentException("Mis-matched service " +
-                                                   "and manager count");
-            }
-
-            for (int i = 0; i < serviceClassNames.length; i++) {
-                if (!managerClassNames[i].equals("")) {
-                    setupService(serviceClassNames[i], managerClassNames[i],
+            loadExternalServices(externalServices, externalManagers,
                                  startupContext);
-                } else {
-                    setupServiceNoManager(serviceClassNames[i], startupContext);
-                }
+        }
+    }
+
+    /** Private helper used to load all extenal services and managers. */
+    private void loadExternalServices(String externalServices,
+                                      String externalManagers,
+                                      StartupKernelContext startupContext)
+        throws Exception
+    {
+        String [] serviceClassNames = externalServices.split(":", -1);
+        String [] managerClassNames = externalManagers.split(":", -1);
+        if (serviceClassNames.length != managerClassNames.length) {
+            if (logger.isLoggable(Level.SEVERE)) {
+                logger.log(Level.SEVERE, "External service count " +
+                           "({0}) does not match manager count ({1}).",
+                           serviceClassNames.length, managerClassNames.length);
+            }
+            throw new IllegalArgumentException("Mis-matched service " +
+                                               "and manager count");
+        }
+
+        for (int i = 0; i < serviceClassNames.length; i++) {
+            if (!managerClassNames[i].equals("")) {
+                setupService(serviceClassNames[i], managerClassNames[i],
+                             startupContext);
+            } else {
+                setupServiceNoManager(serviceClassNames[i], startupContext);
             }
         }
     }

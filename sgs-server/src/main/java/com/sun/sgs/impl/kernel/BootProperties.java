@@ -58,4 +58,16 @@ final class BootProperties {
      */
     static final String EXTENSION_FILE_PROPERTY = "com.sun.sgs.ext.properties";
 
+    /** The property used to specify services from extension libraries. */
+    static final String EXTENSION_SERVICES_PROPERTY =
+        "com.sun.sgs.ext.services";
+
+    /** The property used to specify managers from extension libraries. */
+    static final String EXTENSION_MANAGERS_PROPERTY =
+        "com.sun.sgs.ext.managers";
+
+    /** The property used to specify authenticators from extension libraries. */
+    static final String EXTENSION_AUTHENTICATORS_PROPERTY =
+        "com.sun.sgs.ext.authenticators";
+
 }

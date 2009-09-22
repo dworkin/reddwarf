@@ -27,7 +27,7 @@ package com.sun.sgs.management;
 /**
  * The management interface for the kernel.
  * <p>
- * An instance implementing this MBean can be obtained from the from the
+ * An instance implementing this MBean can be obtained from the
  * {@link java.lang.management.ManagementFactory.html#getPlatformMBeanServer()
  * getPlatformMBeanServer} method.
  * <p>
