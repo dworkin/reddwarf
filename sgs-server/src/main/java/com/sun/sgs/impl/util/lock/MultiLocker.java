@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.util.lock;
 
 /**
- * Records information about an entity that requests locks of a {@link
+ * Records information about an entity that requests locks from a {@link
  * MultiLockManager}.
  *
  * @param	<K> the type of key

@@ -100,8 +100,14 @@ public final class TxnLockManager<K> extends LockManager<K> {
 	LockConflict<K> conflict =
 	    super.lockNoWaitInternal(locker, key, forWrite);
 	if (conflict != null) {
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(FINEST,
+			   "lock attempt {0}, {1}, forWrite:{2}" +
+			   "\n  returns blocked -- checking for deadlocks",
+			   locker, key, forWrite);
+	    }
 	    LockConflict<K> deadlockConflict =
-		new DeadlockChecker(locker.getWaitingFor().request).check();
+		new DeadlockChecker((TxnLocker<K>) locker).check();
 	    if (deadlockConflict != null) {
 		conflict = deadlockConflict;
 	    }
@@ -124,16 +130,16 @@ public final class TxnLockManager<K> extends LockManager<K> {
     private class DeadlockChecker {
 
 	/**
-	 * Maps lockers to information about requests they are waiting for.
+	 * Maps lockers to information about lockers they are waiting for.
 	 * This map serves as a cache for information about lock owners, to
 	 * avoid the synchronization needed to retrieve it again when checking
 	 * for multiple deadlocks.
 	 */
-	private final Map<Locker<K>, WaiterInfo<K>> waiterMap =
-	    new HashMap<Locker<K>, WaiterInfo<K>>();
+	private final Map<TxnLocker<K>, WaiterInfo<K>> waiterMap =
+	    new HashMap<TxnLocker<K>, WaiterInfo<K>>();
 
-	/** The top level request we are checking for deadlocks. */
-	private final LockRequest<K> rootRequest;
+	/** The top level locker we are checking for deadlocks. */
+	private final TxnLocker<K> rootLocker;
 
 	/**
 	 * The pass number of the current deadlock check.  There could be
@@ -142,27 +148,27 @@ public final class TxnLockManager<K> extends LockManager<K> {
 	 */
 	private int pass;
 
-	/** The request that was found in a circular reference. */
-	private LockRequest<K> cycleBoundary;
+	/** The locker that was found in a circular reference. */
+	private TxnLocker<K> cycleBoundary;
 
-	/** The current choice of a request to abort. */
-	private LockRequest<K> victim;
+	/** The current choice of a locker to abort. */
+	private TxnLocker<K> victim;
 
-	/** Another request in the deadlock. */
-	private LockRequest<K> conflict;
+	/** Another locker in the deadlock. */
+	private TxnLocker<K> conflict;
 
 	/**
 	 * Creates an instance of this class.
 	 *
-	 * @param	request the request to check
+	 * @param	locker the locker to check
 	 */
-	DeadlockChecker(LockRequest<K> request) {
-	    assert request != null;
-	    rootRequest = request;
+	DeadlockChecker(TxnLocker<K> locker) {
+	    assert locker != null;
+	    rootLocker = locker;
 	}
 
 	/**
-	 * Checks for a deadlock starting with the root request.
+	 * Checks for a deadlock starting with the root locker.
 	 *
 	 * @return	a lock conflict if a deadlock was found, else {@code
 	 *		null}
@@ -170,12 +176,10 @@ public final class TxnLockManager<K> extends LockManager<K> {
 	LockConflict<K> check() {
 	    LockConflict<K> result = null;
 	    for (pass = 1; true; pass++) {
-		if (!checkInternal(
-			rootRequest, getWaiterInfo(rootRequest.getLocker())))
-		{
+		if (!checkInternal(rootLocker, getWaiterInfo(rootLocker))) {
 		    if (result == null) {
 			logger.log(FINEST, "check deadlock {0}: no deadlock",
-				   rootRequest);
+				   rootLocker);
 			return null;
 		    } else {
 			return result;
@@ -183,42 +187,39 @@ public final class TxnLockManager<K> extends LockManager<K> {
 		}
 		if (logger.isLoggable(FINER)) {
 		    logger.log(FINER, "check deadlock {0}: victim {1}",
-			       rootRequest, victim);
+			       rootLocker, victim);
 		}
-		LockConflict<K> deadlock = new LockConflict<K>(
-		    rootRequest, LockConflictType.DEADLOCK,
-		    conflict.getLocker());
-		getWaiterInfo(victim.getLocker()).waitingFor = null;
-		((TxnLocker<K>) victim.getLocker()).setConflict(deadlock);
-		if (victim.getLocker() == rootRequest.getLocker()) {
+		LockConflict<K> deadlock =
+		    new LockConflict<K>(LockConflictType.DEADLOCK, conflict);
+		getWaiterInfo(victim).waitingFor = null;
+		victim.setConflict(deadlock);
+		if (victim == rootLocker) {
 		    return deadlock;
 		} else {
 		    result = new LockConflict<K>(
-			rootRequest, LockConflictType.BLOCKED,
-			conflict.getLocker());
+			LockConflictType.BLOCKED, conflict);
 		}
 	    }
 	}
 
 	/**
-	 * Checks for deadlock starting with the specified request and
+	 * Checks for deadlock starting with the specified locker and
 	 * information about its waiters.  Returns whether a deadlock was
 	 * found.
 	 */
 	private boolean checkInternal(
-	    LockRequest<K> request, WaiterInfo<K> waiterInfo)
+	    TxnLocker<K> locker, WaiterInfo<K> waiterInfo)
 	{
-	    Locker<K> locker = request.getLocker();
 	    waiterInfo.pass = pass;
-	    for (LockRequest<K> ownerRequest : waiterInfo.waitingFor) {
-		Locker<K> owner = ownerRequest.locker;
+	    for (LockRequest<K> request : waiterInfo.waitingFor) {
+		TxnLocker<K> owner = (TxnLocker<K>) request.locker;
 		if (owner == locker) {
 		    if (logger.isLoggable(FINEST)) {
 			logger.log(FINEST,
 				   "checking deadlock {0}, pass {1}:" +
 				   " locker {2}, waiting for {3}:" +
 				   " ignore self-reference",
-				   rootRequest, pass, locker, ownerRequest);
+				   rootLocker, pass, locker, request);
 		    }
 		} else {
 		    WaiterInfo<K> ownerInfo = getWaiterInfo(owner);
@@ -228,21 +229,19 @@ public final class TxnLockManager<K> extends LockManager<K> {
 				       "checking deadlock {0}, pass {1}:" +
 				       " locker {2}, waiting for {3}:" +
 				       " ignore not waiting",
-				       rootRequest, pass, locker,
-				       ownerRequest);
+				       rootLocker, pass, locker, request);
 			}
 		    } else if (ownerInfo.pass == pass) {
 			/* Found a deadlock! */
-			cycleBoundary = ownerRequest;
-			victim = ownerRequest;
-			conflict = request;
+			cycleBoundary = owner;
+			victim = owner;
+			conflict = locker;
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(FINEST,
 				       "checking deadlock {0}, pass {1}:" +
 				       " locker {2}, waiting for {3}:" +
 				       " deadlock",
-				       rootRequest, pass, locker,
-				       ownerRequest);
+				       rootLocker, pass, locker, request);
 			}
 			return true;
 		    } else {
@@ -251,11 +250,10 @@ public final class TxnLockManager<K> extends LockManager<K> {
 				       "checking deadlock {0}, pass {1}:" +
 				       " locker {2}, waiting for {3}:" +
 				       " recurse",
-				       rootRequest, pass, locker,
-				       ownerRequest);
+				       rootLocker, pass, locker, request);
 			}
-			if (checkInternal(ownerRequest, ownerInfo)) {
-			    maybeUpdateVictim(ownerRequest);
+			if (checkInternal(owner, ownerInfo)) {
+			    maybeUpdateVictim(owner);
 			    return true;
 			}
 		    }
@@ -268,7 +266,7 @@ public final class TxnLockManager<K> extends LockManager<K> {
 	 * Returns information about the lockers that the specified locker is
 	 * waiting for.
 	 */
-	private WaiterInfo<K> getWaiterInfo(Locker<K> locker) {
+	private WaiterInfo<K> getWaiterInfo(TxnLocker<K> locker) {
 	    WaiterInfo<K> waiterInfo = waiterMap.get(locker);
 	    if (waiterInfo == null) {
 		List<LockRequest<K>> waitingFor;
@@ -296,42 +294,34 @@ public final class TxnLockManager<K> extends LockManager<K> {
 
 	/**
 	 * Updates the victim and conflict fields to reflect an additional
-	 * request in the deadlock chain.  Use the argument as the victim if it
+	 * locker in the deadlock chain.  Use the argument as the victim if it
 	 * has a newer requested start time than the previously selected
 	 * victim.
 	 */
-	private void maybeUpdateVictim(LockRequest<K> request) {
-	    assert request != null;
+	private void maybeUpdateVictim(TxnLocker<K> locker) {
+	    assert locker != null;
 	    if (conflict == null) {
-		conflict = request;
+		conflict = locker;
 	    }
-	    if (request == cycleBoundary) {
+	    if (locker == cycleBoundary) {
 		/* We've gone all the way around the circle, so we're done */
 		cycleBoundary = null;
 	    } else if (cycleBoundary != null &&
-		       (getRequestedStartTime(request) >
-			getRequestedStartTime(victim)))
+		       (locker.getRequestedStartTime() >
+			victim.getRequestedStartTime()))
 	    {
 		/*
-		 * We're still within the cycle and this request started later
+		 * We're still within the cycle and this locker started later
 		 * than the current victim, so use it instead.
 		 */
-		if (conflict == request) {
+		if (conflict == locker) {
 		    conflict = victim;
 		}
-		victim = request;
+		victim = locker;
 		logger.log(FINEST,
 			   "checking deadlock {0}, pass {1}: new victim: {2}",
-			   rootRequest, pass, victim);
+			   rootLocker, pass, victim);
 	    }
-	}
-
-	/**
-	 * Returns the requested start time of a request, which should have
-	 * been made on behalf of a TxnLocker.
-	 */
-	private long getRequestedStartTime(LockRequest<K> request) {
-	    return ((TxnLocker) request.getLocker()).getRequestedStartTime();
 	}
     }
 

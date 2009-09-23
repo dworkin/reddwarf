@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.logging.Level;
+import static java.util.logging.Level.FINEST;
 import java.util.logging.Logger;
 
 /**
@@ -93,19 +93,19 @@ final class Lock<K> {
 	Locker<K> locker, boolean forWrite, boolean waiting)
     {
 	assert checkSync(locker.lockManager);
-	Locker<K> conflict = null;
 	boolean upgrade = false;
+	Locker<K> conflict = null;
 	if (!owners.isEmpty()) {
 	    /* Check conflicting owners */
 	    for (LockRequest<K> ownerRequest : owners) {
 		if (locker == ownerRequest.locker) {
-		    if (forWrite && !ownerRequest.getForWrite()) {
-			/* Upgrade */
-			upgrade = true;
-		    } else {
+		    if (!forWrite || ownerRequest.getForWrite()) {
 			/* Already locked */
 			assert validateInUse();
 			return null;
+		    } else {
+			/* Upgrade */
+			upgrade = true;
 		    }
 		} else if (forWrite || ownerRequest.getForWrite()) {
 		    /* Found conflict */
@@ -119,7 +119,7 @@ final class Lock<K> {
 	    for (Iterator<LockRequest<K>> i = waiters.iterator();
 		 i.hasNext(); )
 	    {
-		 LockRequest<K> waiterRequest = i.next();
+		LockRequest<K> waiterRequest = i.next();
 		if (locker == waiterRequest.locker) {
 		    assert forWrite == waiterRequest.getForWrite();
 		    request = waiterRequest;
@@ -183,19 +183,6 @@ final class Lock<K> {
     }
 
     /**
-     * Returns the request associated with a locker that is waiting for this
-     * lock.
-     */
-    private LockRequest<K> getWaiter(Locker<K> locker) {
-	for (LockRequest<K> request : waiters) {
-	    if (request.locker == locker) {
-		return request;
-	    }
-	}
-	throw new AssertionError("Waiter not found: " + locker);
-    }
-
-    /**
      * Releases the ownership of this lock by the locker.  Attempts to
      * acquire locks for current waiters, removing the ones that acquire
      * the lock from the waiters list, adding them to the owners, and
@@ -208,8 +195,8 @@ final class Lock<K> {
      */
     List<Locker<K>> release(Locker<K> locker, boolean downgrade) {
 	assert checkSync(locker.lockManager);
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "release {0}, downgrade:{1}, {2}",
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST, "release {0}, downgrade:{1}, {2}",
 		       locker, downgrade, this);
 	}
 	boolean owned = false;
@@ -220,7 +207,6 @@ final class Lock<K> {
 		    i.remove();
 		    owned = true;
 		    if (downgrade) {
-			/* FIXME: Note downgrade; what if not supported? */
 			owners.add(
 			    locker.newLockRequest(
 				ownerRequest.key, false, false));
@@ -236,10 +222,10 @@ final class Lock<K> {
 		LockRequest<K> waiter = waiters.get(i);
 		LockAttemptResult<K> result =
 		    lock(waiter.locker, waiter.getForWrite(), true);
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST, "attempt to lock waiter {0} returns {1}",
-			waiter, result);
+		if (logger.isLoggable(FINEST)) {
+		    logger.log(FINEST,
+			       "attempt to lock waiter {0} returns {1}",
+			       waiter, result);
 		}
 		/*
 		 * Stop when the first conflict is detected.  This

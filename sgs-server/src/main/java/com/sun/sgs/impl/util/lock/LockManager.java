@@ -206,9 +206,9 @@ public class LockManager<K> {
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
      *		manager
-     * @throws	IllegalStateException if a previous lock request was aborted
-     *		due to deadlock, or if this locker is already waiting for a
-     *		lock
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
      */
     public LockConflict<K> lockNoWait(
 	Locker<K> locker, K key, boolean forWrite)
@@ -386,7 +386,7 @@ public class LockManager<K> {
 	}
 	locker.setWaitingFor(result);
 	conflict = new LockConflict<K>(
-	    result.request, LockConflictType.BLOCKED, result.conflict);
+	    LockConflictType.BLOCKED, result.conflict);
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER,
 		       "lock {0}, {1}, forWrite:{2}\n  returns {3}",
@@ -410,9 +410,8 @@ public class LockManager<K> {
 	    synchronized (locker) {
 		LockAttemptResult<K> result = locker.getWaitingFor();
 		if (result == null) {
-		    logger.log(
-			FINER,
-			"lock {0}\n  returns null (not waiting)", locker);
+		    logger.log(FINER, "lock {0}\n  returns null (not waiting)",
+			       locker);
 		    return null;
 		}
 		Lock<K> lock;
@@ -464,9 +463,7 @@ public class LockManager<K> {
 			return null;
 		    } else if (timedOut) {
 			conflict = new LockConflict<K>(
-			    result.request,
-			    LockConflictType.TIMEOUT,
-			    result.conflict);
+			    LockConflictType.TIMEOUT, result.conflict);
 			break;
 		    } else if (conflict != null) {
 			break;
@@ -482,8 +479,7 @@ public class LockManager<K> {
 			locker.wait(stop - now);
 		    } catch (InterruptedException e) {
 			conflict = new LockConflict<K>(
-			    result.request, LockConflictType.INTERRUPTED,
-			    result.conflict);
+			    LockConflictType.INTERRUPTED, result.conflict);
 			/* Loop again to check owners and waiters */
 		    }
 		    now = System.currentTimeMillis();
@@ -523,7 +519,7 @@ public class LockManager<K> {
 		Lock<K> lock = keyMap.get(key);
 		if (lock != null) {
 		    newOwners = lock.release(locker, downgrade);
-		    if (!lock.inUse(locker.lockManager)) {
+		    if (!lock.inUse(this)) {
 			keyMap.remove(key);
 		    }
 		}
@@ -536,7 +532,7 @@ public class LockManager<K> {
 	    assert newOwner.noteSync();
 	    try {
 		synchronized (newOwner) {
-		    newOwner.notify();
+		    newOwner.notifyAll();
 		}
 	    } finally {
 		assert newOwner.noteUnsync();

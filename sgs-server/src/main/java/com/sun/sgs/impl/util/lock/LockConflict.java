@@ -27,9 +27,6 @@ package com.sun.sgs.impl.util.lock;
  */
 public final class LockConflict<K> {
 
-    /** The lock request. */
-    final LockRequest<K> request;
-
     /** The type of conflict. */
     final LockConflictType type;
 
@@ -39,29 +36,16 @@ public final class LockConflict<K> {
     /**
      * Creates an instance of this class.
      *
-     * @param	request the lock request
      * @param	type the type of conflict
      * @param	conflictingLocker a locker that caused the conflict
      */
-    public LockConflict(LockRequest<K> request,
-			LockConflictType type,
+    public LockConflict(LockConflictType type,
 			Locker<K> conflictingLocker)
     {
-	assert request != null;
 	assert type != null;
 	assert conflictingLocker != null;
-	this.request = request;
 	this.type = type;
 	this.conflictingLocker = conflictingLocker;
-    }
-
-    /**
-     * Returns the lock request.
-     *
-     * @return	the lock request
-     */
-    public LockRequest getLockRequest() {
-	return request;
     }
 
     /**

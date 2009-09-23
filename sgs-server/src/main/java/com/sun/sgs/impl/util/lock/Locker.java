@@ -112,7 +112,6 @@ public abstract class Locker<K> {
      *
      * The default implementation of this method does nothing.
      *
-     * @param	conflict the conflicting request or {@code null}
      * @throws	IllegalStateException if the conflict is a deadlock
      */
     protected void clearConflict() { }

@@ -458,7 +458,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	/**
 	 * Creates an instance of this class.
 	 *
-	 * @param	lockRequest the underlying lock request
+	 * @param	locker the locker that requested the lock
+	 * @param	key the key identifying the lock
+	 * @param	forWrite whether a write lock was requested
+	 * @param	upgrade whether an upgrade was requested
 	 */
 	AccessedObjectImpl(LockerImpl locker,
 			   Key key,

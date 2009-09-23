@@ -225,11 +225,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	new Exporter<CachingDataStoreServer>(CachingDataStoreServer.class);
 
     /**
-     * A queue of node requests that are blocked and need the associated item
-     * to be called back.
+     * A queue of requests that are blocked and need the associated item to be
+     * called back.
      */
-    final BlockingQueue<NodeRequest> callbackRequests =
-	new LinkedBlockingQueue<NodeRequest>();
+    final BlockingQueue<CallbackRequest> callbackRequests =
+	new LinkedBlockingQueue<CallbackRequest>();
 
     /** A thread pool for performing callback requests. */
     private final ExecutorService callbackExecutor;
@@ -1204,7 +1204,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    LockConflict<Object> conflict =
 		lockManager.lockNoWait(nodeInfo, key, forWrite);
 	    if (conflict != null) {
-		callbackRequests.add((NodeRequest) conflict.getLockRequest());
+		callbackRequests.add(
+		    new CallbackRequest(nodeInfo, key, forWrite));
 		conflict = lockManager.waitForLock(nodeInfo);
 		if (conflict != null) {
 		    String accessMsg = "Access nodeId:" + nodeInfo.nodeId +
@@ -1394,36 +1395,62 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	public void run() {
 	    while (!shuttingDown()) {
 		try {
-		    callbackOwners(callbackRequests.take());
+		    callbackRequests.take().callbackOwners();
 		} catch (InterruptedException e) {
 		    continue;
 		}
 	    }
+	}
+    }
+
+    /**
+     * Records information about a lock request that was blocked and may
+     * require callbacks.
+     */
+    private class CallbackRequest {
+	
+	/** Information about the node making the request. */
+	final NodeInfo nodeInfo;
+
+	/** The key of the requested item. */
+	final Object key;
+
+	/** Whether the item was requested for write. */
+	final boolean forWrite;
+	
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	nodeInfo information about the node making the request
+	 *		request
+	 * @param	key the key of the requested item
+	 * @param	forWrite whether the item was requested for write
+	 */
+	CallbackRequest(NodeInfo nodeInfo, Object key, boolean forWrite) {
+	    this.nodeInfo = nodeInfo;
+	    this.key = key;
+	    this.forWrite = forWrite;
 	}
 
 	/**
 	 * Sends callback requests to all of the owners of the requested lock,
 	 * unless the server is shutting down.  Abandons further callbacks if
 	 * the requesting node is marked as failed.
-	 *
-	 * @param	request the blocked request whose owners should receive
-	 *		callback requests
 	 */
-	private void callbackOwners(NodeRequest request) {
+	void callbackOwners() {
 	    try {
 		callStarted();
 	    } catch (IllegalStateException e) {
 		return;
 	    }
 	    try {
-		NodeInfo nodeInfo = request.getNodeInfo();
 		nodeInfo.nodeCallStarted();
 		try {
 		    for (LockRequest<Object> owner
-			     : lockManager.getOwners(request.getKey()))
+			     : lockManager.getOwners(key))
 		    {
 			if (nodeInfo != owner.getLocker()) {
-			    callback((NodeRequest) owner, request);
+			    callback((NodeRequest) owner);
 			}
 		    }
 		} finally {
@@ -1437,15 +1464,13 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	/**
 	 * Sends a callback request to the owner on behalf of the requester.
 	 */
-	private void callback(NodeRequest owner, NodeRequest request) {
+	private void callback(NodeRequest owner) {
 	    if (owner.noteCallback()) {
-		boolean downgrade =
-		    owner.getForWrite() && !request.getForWrite();
+		boolean downgrade = owner.getForWrite() && !forWrite;
 		NodeInfo ownerNodeInfo = owner.getNodeInfo();
-		Object key = request.getKey();
 		CallbackTask task = new CallbackTask(
 		    ownerNodeInfo.callbackServer, key, downgrade,
-		    request.getNodeInfo().nodeId);
+		    nodeInfo.nodeId);
 		runIoTask(task, ownerNodeInfo.nodeId);
 		if (task.released) {
 		    if (downgrade) {
