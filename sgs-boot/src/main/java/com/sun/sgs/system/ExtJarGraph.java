@@ -22,7 +22,6 @@ package com.sun.sgs.system;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -213,7 +212,7 @@ class ExtJarGraph {
         }
         names.add(node.name);
         for (JarNode dNode : node.dNodes) {
-            loopCheck(dNode, names);
+            loopCheck(dNode, new HashSet<String>(names));
         }
     }
 
@@ -235,38 +234,81 @@ class ExtJarGraph {
             // separate collection
             Properties nodeProps = node.properties;
             String managers = (String) nodeProps.remove("com.sun.sgs.managers");
+            int managerCount = getElementCount(managers);
             String services = (String) nodeProps.remove("com.sun.sgs.services");
-            if ((managers != null) && (managers.length() != 0)) {
-                addToLine(managersLine, managers);
+            int serviceCount = getElementCount(services);
+
+            // verify that the manager and service counts line up, or if
+            // there are no managers then there is at most only one service
+            if (managerCount != 0) {
+                if (managerCount != serviceCount) {
+                    throw new IllegalStateException("Mis-matched Manager " +
+                                                    "and Service count for " +
+                                                    node.name);
+                }
             } else {
-                // if there were previously services listed and we're adding
-                // more now, then we need to add a colon on the manager line
-                // to get the spacing correct
-                if ((services != null) && (services.length() != 0) &&
-                    (servicesLine.length() != 0))
-                {
-                    managersLine.append(":");
+                if (serviceCount > 1) {
+                    throw new IllegalStateException("Missing Managers for " +
+                                                    node.name);
                 }
             }
-            if ((services != null) && (services.length() != 0)) {
+
+            // if there are services then add them after figuring out how to
+            // modify the manager line correctly
+            if (serviceCount != 0) {
+                if (managerCount == 0) {
+                    if (servicesLine.length() != 0) {
+                        // there are no new managers but there are previous
+                        // services so we need to pad a ":" to the line
+                        managersLine.append(":");
+                    }
+                } else {
+                    if ((servicesLine.length() != 0) &&
+                        (managersLine.length() == 0))
+                    {
+                        // there were previously services but no managers, so
+                        // pre-pend a ":" to the line
+                        addToLine(managersLine, ":" + managers);
+                    } else {
+                        // no padding is needed, just add the managers
+                        addToLine(managersLine, managers);
+                    }
+                }
                 addToLine(servicesLine, services);
             }
+
             String authenticators =
                 (String) nodeProps.remove("com.sun.sgs.app.authenticators");
             if ((authenticators != null) && (authenticators.length() != 0)) {
                 addToLine(authenticatorsLine, authenticators);
             }
-            // merge any remaining properties
-            Enumeration e = nodeProps.propertyNames();
-            while (e.hasMoreElements()) {
-                String key = (String) e.nextElement();
-                if (p.setProperty(key, nodeProps.getProperty(key)) != null) {
+            // merge any remaining properties, failing if the same property
+            // is assigned different values by separate extensions
+            for (String key : nodeProps.stringPropertyNames()) {
+                String value = (String) nodeProps.getProperty(key);
+                Object oldValue = p.setProperty(key, value);
+                if ((oldValue != null) && (!value.equals(oldValue))) {
                     throw new IllegalStateException("Multiple values for " +
                                                     "property: " + key);
                 }
             }
         }
     }
+
+    /** Count the number of colon-separated elements in the string. */
+    private int getElementCount(String str) {
+        if ((str == null) || (str.length() == 0)) {
+            return 0;
+        }
+        int count = 0;
+        int pos = -1;
+        do {
+            count++;
+            pos = str.indexOf(':', pos + 1);
+        } while (pos != -1);
+        return count;
+    }
+    
 
     /** Adds an element to a multi-element line. */
     private static void addToLine(StringBuilder buf, String str) {
