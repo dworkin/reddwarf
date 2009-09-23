@@ -1,4 +1,7 @@
 Version 0.9.11:
+- Introduced application level clock accessible via the watchdog service.
+  The task service uses this clock instead of system time to determine
+  when to run periodic and delayed tasks (issue #40)
 - Added support for pluggable transaction retry policy (issue #181)
 - Added details about TransactionListeners in Profiling (issue #182)
 - Added TaskManager.shouldContinue (issue #185)
