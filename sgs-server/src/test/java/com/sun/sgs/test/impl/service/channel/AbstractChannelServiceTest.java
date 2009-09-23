@@ -1173,17 +1173,17 @@ public abstract class AbstractChannelServiceTest extends Assert {
 				" to node: " + nodeId);
 			    info.isHeld = true;
 			    info.notifyAll();
-			}
-			while (info.hold) {
-			    try {
-				info.wait();
-			    } catch (InterruptedException e) {
+			    while (info.hold) {
+				try {
+				    info.wait();
+				} catch (InterruptedException e) {
+				}
 			    }
+			    info.isHeld = false;
+			    System.err.println(
+				">>RELEASE ChannelServer method: " + info.name +
+				" to node: " + nodeId);
 			}
-			info.isHeld = false;
-			System.err.println(
-			    ">>RELEASE ChannelServer method: " + info.name +
-			    " to node: " + nodeId);
 		    }
 		}
 	    }

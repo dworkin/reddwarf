@@ -60,6 +60,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -402,9 +403,11 @@ public final class ClientSessionServiceImpl
 		    } },
 		taskOwner);
 
-	    /* Register the node mapping listener. */
+	    /* Register the identity relocation and node mapping listeners. */
 	    nodeMapService.addIdentityRelocationListener(
 		new IdentityRelocationListenerImpl());
+	    nodeMapService.addNodeMappingListener(
+		new NodeMappingListenerImpl());
 
 	    /*
 	     * Create the protocol listener and acceptor.
@@ -660,6 +663,53 @@ public final class ClientSessionServiceImpl
 		// The specified identity does not correspond to a local
 		// client session.
 		handler.completed();
+	    }
+	}
+    }
+
+    /* -- Implement NodeMappingListener -- */
+    
+    private class NodeMappingListenerImpl implements NodeMappingListener {
+
+	/** {@inheritDoc} */
+	public void mappingAdded(Identity id, Node oldNode) {
+	}
+    
+	/** {@inheritDoc} */
+	public void mappingRemoved(Identity id, Node newNode) {
+
+	    ClientSessionHandler sessionHandler = loggedInIdentityMap.get(id);
+	    
+	    if (sessionHandler != null) {
+		// The specified identity corresponds to a local client session,
+		// which should have already been prepared to move
+		BigInteger sessionRefId = sessionHandler.sessionRefId;
+	    
+		// Remove session from table of relocation preparers.
+		if (prepareRelocationMap.remove(sessionRefId) != null) {
+		    // Notify client to start relocating its connection.
+		    try {
+			sessionHandler.relocatePreparationComplete();
+		    } catch (Exception e) {
+			logger.logThrow(
+ 			    Level.WARNING, e,
+			    "Problem completing reloction preparation for " +
+			    "session:{0} localNodeId:{1}",
+
+			    sessionRefId, localNodeId);
+		    }
+		} else {
+		    if (logger.isLoggable(Level.WARNING)) {
+			logger.log(
+			    Level.WARNING,
+			    "Disconnecting unprepared session:{0} whose " +
+			    "identity:{1} was remapped from localNodeId:{2} " +
+			    "to node:{3}",
+			    HexDumper.toHexString(sessionRefId.toByteArray()),
+			    id, localNodeId, newNode.getId());
+		    }
+		    sessionHandler.handleDisconnect(false, false);
+		}
 	    }
 	}
     }
@@ -1738,48 +1788,34 @@ public final class ClientSessionServiceImpl
 	}
 
 	/**
-	 * Notifies this instance that the {@code ClientSessionStatusListener}
-	 * for the specified {@code handler} has completed preparing for
-	 * relocation.  If all listeners have completed preparation, then the
-	 * client is informed that it can start relocating its connection, and
-	 * all {@code NodeMappingService} completion handlers are notified
-	 * that preparation is complete.
+	 * Notifies this instance that the {@code
+	 * ClientSessionStatusListener} for the specified {@code handler}
+	 * has completed preparing for relocation.  If all listeners have
+	 * completed preparation, then all {@code NodeMappingService}
+	 * completion handlers are notified that preparation is complete.
+	 * Once the node mapping service has removed the mapping (which
+	 * will be notified via the (@code NodeMappingListener.mappingRemoved}
+	 * method), the client can be informed that it can start relocating
+	 * its connection.
 	 */
 	synchronized void preparationCompleted(
 	    PrepareCompletionHandler listenerCompletionHandler)
 	{
 	    preparers.remove(listenerCompletionHandler);
 	    if (preparers.isEmpty()) {
-		// preparation for client session relocation is complete, so
-		// remove session from table of relocation preparers.
-		if (prepareRelocationMap.remove(sessionRefId) != null) {
-		    // Notify client to start relocating its connection.
-		    try {
-			ClientSessionHandler sessionHandler =
-				getHandler(sessionRefId);
-			if (sessionHandler != null) {
-			    sessionHandler.relocatePreparationComplete();
-			}
-		    } catch (Exception e) {
-			logger.logThrow(
-			    Level.WARNING, e,
-			    "Problem completing reloction preparation for " +
-			    "session:{0} backup:{1}",  sessionRefId);
+		// Notify NodeMappingService completion handlers that
+		// preparation is complete.
+		for (SimpleCompletionHandler nmsCompletionHandler :
+			 nmsCompletionHandlers)
+		{
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "Notifying NMS relocate preparation complete, " +
+			    "session:{0} localNode:{1} newNode{2}",
+			    sessionRefId, getLocalNodeId(), newNodeId);
 		    }
-		    // Notify NodeMappingService completion handlers that
-		    // preparation is complete.
-		    for (SimpleCompletionHandler nmsCompletionHandler :
-			     nmsCompletionHandlers)
-		    {
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.log(
-				Level.FINEST,
-				"Notifying NMS relocate preparation complete, " +
-				"session:{0} localNode:{1} newNode{2}",
-				sessionRefId, getLocalNodeId(), newNodeId);
-			}
-			nmsCompletionHandler.completed();
-		    }
+		    nmsCompletionHandler.completed();
 		}
 	    }
 	}
