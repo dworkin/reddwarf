@@ -24,7 +24,8 @@ import static java.util.logging.Level.FINER;
 /**
  * A class for managing lock conflicts where locks are not held by transactions
  * and the locker can make simultaneous requests from multiple threads.  This
- * class does not detect deadlocks.  All {@link Locker} objects supplied to
+ * class does not detect deadlocks, but provides support for {@linkplain
+ * #downgradeLock downgrading locks}.  All {@link Locker} objects supplied to
  * this class should be instances of {@link MultiLocker}.
  *
  * @param	<K> the type of key

@@ -26,9 +26,9 @@ import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
 
 /**
- * A class for managing lock conflicts as part of a transaction.  All {@link
- * Locker} objects supplied to this class should be instances of {@link
- * TxnLocker}.
+ * A class for managing lock conflicts as part of a transaction.  This class
+ * detects deadlocks.  All {@link Locker} objects supplied to this class should
+ * be instances of {@link TxnLocker}.
  *
  * @param	<K> the type of key
  */
