@@ -23,7 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;

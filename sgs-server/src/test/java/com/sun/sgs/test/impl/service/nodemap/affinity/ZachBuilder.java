@@ -19,7 +19,7 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
@@ -34,7 +34,7 @@ import org.junit.Assert;
  * A graph builder that returns a pre-made graph for the Zachary karate
  * club network.
  */
-class ZachBuilder implements GraphBuilder {
+class ZachBuilder implements BasicGraphBuilder {
 
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 

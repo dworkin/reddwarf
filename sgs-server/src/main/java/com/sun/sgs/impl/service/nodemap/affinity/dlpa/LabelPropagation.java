@@ -23,9 +23,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import java.io.IOException;
@@ -116,6 +115,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     // The groups collected in the last run
     private Collection<AffinityGroup> groups;
 
+    private final GraphBuilder builder;
+
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -133,8 +134,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                             boolean gatherStats)
         throws Exception
     {
-        super(builder, nodeId, properties, gatherStats);
-
+        super(nodeId, properties, gatherStats);
+        this.builder = builder;
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         
         String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,
@@ -293,7 +294,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             state = State.PREPARING;
         }
 
-        initializeLPARun();
+        initializeLPARun(builder);
 
         // If we cannot reach a proxy, we invalidate the run.
         boolean failed = false;

@@ -17,25 +17,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa;
+package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Graph builder interface.  Graph builder objects take task access information
  * and create a graph from it, and can return the graph.
  * <p>
- * The returned graph vertices are identities, and the edges are the 
+ * The returned graph vertices are identities, and the edges are the
  * object references the vertices have in common.  The edges can be either
  * weighted or parallel (both are being used for experiments).
  * <p>
- * All graph builders support the following properties:
+ * Graph builders support the following properties:
  * <p>
  * <dl style="margin-left: 1em">
  *
@@ -61,11 +57,19 @@ import java.util.concurrent.atomic.AtomicLong;
  *       retained, with a smaller amount discarded at the start of each
  *       new snapshot.<p>
  * </dl>
+ * <p>
+ * Graph builders are typically instantiated by the node {@link GraphListener}.
+ * In order to be instantiated by the {@code GraphListener}, they must
+ * implement a constructor taking the arguments
+ * {@code (NodeMappingService, ProfileCollector, Properties, long)},
+ * where the final argument is the local node id.
+ * <p>
+ * <b> NOTE </b> The first argument, the NMS, is currently only used
+ * by one variation of the algorithm.
  */
-public interface GraphBuilder {
-
+public interface BasicGraphBuilder {
     /** The base name for graph builder properties. */
-    String PROP_BASE = GraphBuilder.class.getName();
+    String PROP_BASE = "com.sun.sgs.impl.service.nodemap.affinity";
 
     /** The property controlling time snapshots, in milliseconds. */
     String PERIOD_PROPERTY = PROP_BASE + ".snapshot.period";
@@ -78,21 +82,27 @@ public interface GraphBuilder {
 
     /** The default snapshot count. */
     int DEFAULT_PERIOD_COUNT = 1;
+
+    /**
+     * Get the task which prunes the graph.
+     *
+     * @return the runnable which prunes the graph.
+     * @throws UnsupportedOperationException if this builder does not support
+     *    graph pruning.
+     */
+    Runnable getPruneTask();
+
     /**
      * Update the graph based on the objects accessed in a task.
      *
      * @param owner  the task owner (the object making the accesses)
      * @param detail detailed information about the object accesses, including
      * a list of the accessed objects
+     * @throws UnsupportedOperationException if this builder cannot access
+     *      the affinity graph.  Typically, this occurs because the builder
+     *      itself is distributed.
      */
     void updateGraph(Identity owner, AccessedObjectsDetail detail);
-
-    /**
-     * Get the task which prunes the graph.
-     * 
-     * @return the runnable which prunes the graph.
-     */
-    Runnable getPruneTask();
 
     /**
      * Returns the current graph, with identities as vertices, and
@@ -101,36 +111,11 @@ public interface GraphBuilder {
      * data collected.
      *
      * @return the graph of access information
+     * @throws UnsupportedOperationException if this builder cannot access
+     *      the affinity graph.  Typically, this occurs because the builder
+     *      itself is distributed.
      */
     UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph();
-
-    /**
-     * Returns a map of local object uses to the identities that used
-     * the objects, and a count of the number of uses. An empty map will
-     * be returned if there are no object uses.
-     *
-     * @return the map of local object uses
-     */
-    ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-            getObjectUseMap();
-
-    /**
-     * Returns a map of detected cross node data conflicts.  This is a map 
-     * of node IDs to object IDs, and a count of the number of conflicts on the
-     * object with that node.  An emtpy map will be returned if there are no
-     * conflicts.
-     * 
-     * @return the map of detected cross node data conflicts
-     */
-    ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> getConflictMap();
-
-    /**
-     * Note that a node has failed.  Does nothing if the {@code nodeId} is
-     * unknown or has already been noted as failed.
-     * 
-     * @param nodeId the id of the failed node
-     */
-    void removeNode(long nodeId);
 
     /**
      * Shut down this builder.

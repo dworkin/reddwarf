@@ -22,10 +22,11 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
@@ -129,7 +130,7 @@ public class TestLPAPerf {
 
     @Test
     public void testZachary() throws Exception {
-        GraphBuilder builder = new ZachBuilder();
+        BasicGraphBuilder builder = new ZachBuilder();
         Properties props = new Properties();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));

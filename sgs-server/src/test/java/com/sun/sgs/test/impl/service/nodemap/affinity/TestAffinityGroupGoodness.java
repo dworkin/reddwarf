@@ -22,8 +22,8 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
@@ -31,8 +31,6 @@ import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.Assert;
 import org.junit.Test;
 
@@ -43,7 +41,7 @@ public class TestAffinityGroupGoodness {
 
     @Test
     public void testToyModularityAndJaccard() {
-        GraphBuilder builder = new TestToyBuilder();
+        BasicGraphBuilder builder = new TestToyBuilder();
 
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         AffinitySet a = new AffinitySet(1);
@@ -87,7 +85,7 @@ public class TestAffinityGroupGoodness {
 
     @Test
     public void testZachModularity() {
-        GraphBuilder builder = new ZachBuilder();
+        BasicGraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
         AffinitySet a = new AffinitySet(1);
         a.addIdentity(new DummyIdentity("1"));
@@ -138,7 +136,7 @@ public class TestAffinityGroupGoodness {
 
     @Test
     public void testModularityCalc() {
-        GraphBuilder builder = new ZachBuilder();
+        BasicGraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
         AffinitySet a = new AffinitySet(49);
         a.addIdentity(new DummyIdentity("17"));
@@ -192,7 +190,7 @@ public class TestAffinityGroupGoodness {
      * A graph builder that returns a pre-made graph for a very simple toy
      * graph.
      */
-    private static class TestToyBuilder implements GraphBuilder {
+    private static class TestToyBuilder implements BasicGraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
         public TestToyBuilder() {
@@ -224,25 +222,6 @@ public class TestAffinityGroupGoodness {
         }
         /** {@inheritDoc} */
         public Runnable getPruneTask() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        /** {@inheritDoc} */
-        public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-                getConflictMap()
-        {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        /** {@inheritDoc} */
-        public void removeNode(long nodeId) {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        /** {@inheritDoc} */
-        public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-                getObjectUseMap()
-        {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 

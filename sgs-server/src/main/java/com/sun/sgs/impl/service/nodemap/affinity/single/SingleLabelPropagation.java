@@ -23,8 +23,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,6 +42,8 @@ import java.util.logging.Level;
  */
 public class SingleLabelPropagation extends AbstractLPA {
 
+    private final BasicGraphBuilder builder;
+
     /** The modularity of the last run, only valid on a single node. */
     private double modularity;
 
@@ -56,12 +58,13 @@ public class SingleLabelPropagation extends AbstractLPA {
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
-    public SingleLabelPropagation(GraphBuilder builder,
+    public SingleLabelPropagation(BasicGraphBuilder builder,
                                   Properties properties,
                                   boolean gatherStats)
         throws Exception
     {
-        super(builder, 1, properties, gatherStats);
+        super(1, properties, gatherStats);
+        this.builder = builder;
     }
 
     /** {@inheritDoc} */
@@ -111,7 +114,7 @@ public class SingleLabelPropagation extends AbstractLPA {
         // variations are returning snapshots.  If we got to only the
         // weighted graph builder, can make the graph field final and
         // set it in the constructor.
-        initializeLPARun();
+        initializeLPARun(builder);
 
         // Step 2.  Set t = 1;
         int t = 1;

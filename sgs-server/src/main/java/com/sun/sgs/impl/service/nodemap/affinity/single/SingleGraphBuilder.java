@@ -23,8 +23,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import
- com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.AffinityGraphBuilderStats;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
+ com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.AffinityGraphBuilderStats;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
@@ -48,7 +48,7 @@ import javax.management.JMException;
  * A minimal graph builder for single node testing.  This is mostly a copy
  * of the WeightedGraphBuilder, with the parts about node conflicts deleted.
  */
-public class SingleGraphBuilder implements GraphBuilder {
+public class SingleGraphBuilder implements BasicGraphBuilder {
     // Map for tracking object-> map of identity-> number accesses
     // (thus we keep track of the number of accesses each identity has made
     // for an object, to aid maintaining weighted edges)
@@ -196,30 +196,11 @@ public class SingleGraphBuilder implements GraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-            getObjectUseMap()
-    {
-        return objectMap;
-    }
-
-        /** {@inheritDoc} */
-    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-            getConflictMap()
-    {
-        return new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
-    }
-
-    /** {@inheritDoc} */
     public void shutdown() {
         pruneTask.cancel();
         if (lpa != null) {
             lpa.shutdown();
         }
-    }
-
-    /** {@inheritDoc} */
-    public void removeNode(long nodeId) {
-        // do nothing
     }
 
     /**

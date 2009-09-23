@@ -20,9 +20,9 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.GraphBuilder;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
@@ -77,9 +77,6 @@ public abstract class AbstractLPA {
     /** The default value for the number of threads to use. */
     public static final int DEFAULT_NUM_THREADS = 4;
 
-    /** The producer of our graphs. */
-    protected final GraphBuilder builder;
-
     /** The local node id. */
     protected final long localNodeId;
 
@@ -116,7 +113,6 @@ public abstract class AbstractLPA {
 
     /**
      * Constructs a new instance of the label propagation algorithm.
-     * @param builder the graph producer
      * @param nodeId the local node ID
      * @param properties the properties for configuring this service
      * @param gatherStats if {@code true}, gather extra statistics for each run.
@@ -126,12 +122,9 @@ public abstract class AbstractLPA {
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
-    public AbstractLPA(GraphBuilder builder, long nodeId,
-                            Properties properties,
-                            boolean gatherStats)
+    public AbstractLPA(long nodeId, Properties properties, boolean gatherStats)
         throws Exception
     {
-        this.builder = builder;
         localNodeId = nodeId;
         this.gatherStats = gatherStats;
 
@@ -147,8 +140,9 @@ public abstract class AbstractLPA {
 
     /**
      * Initialize ourselves for a run of the algorithm.
+     * @param builder the graph producer
      */
-    protected void initializeLPARun() {
+    protected void initializeLPARun(BasicGraphBuilder builder) {
         logger.log(Level.FINEST, "{0}: initializing LPA run", localNodeId);
         // Grab the graph (the weighted graph builder returns a pointer
         // to the live graph) and a snapshot of the vertices.
