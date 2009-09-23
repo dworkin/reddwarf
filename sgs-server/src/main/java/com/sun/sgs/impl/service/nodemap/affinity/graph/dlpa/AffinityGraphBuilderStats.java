@@ -147,16 +147,26 @@ public class AffinityGraphBuilderStats extends StandardMBean
         return description;
     }
 
-    // Package updators
-    void processingTimeInc(long inc) {
+    // Updators
+    /**
+     * Increments the processing time by the input argument.
+     * @param inc the amount to increment the processing time by
+     */
+    public void processingTimeInc(long inc) {
         processingTime.incrementCount(inc);
     }
 
-    void updateCountInc() {
+    /**
+     * Increments the update count.
+     */
+    public void updateCountInc() {
         updateCount.incrementCount();
     }
 
-    void pruneCountInc() {
+    /**
+     * Increments the prune count.
+     */
+    public void pruneCountInc() {
         pruneCount.incrementCount();
     }
 }

@@ -28,6 +28,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
+import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
@@ -113,31 +114,28 @@ public class TestLPAPerf {
 
     @Test
     public void warmupZach() throws Exception {
-        final int node = 1;
         // Warm up the compilers
         Properties props = new Properties();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
-        LabelPropagation lpa =
-           new LabelPropagation(new ZachBuilder(), node, props, false);
+        SingleLabelPropagation lpa =
+           new SingleLabelPropagation(new ZachBuilder(), props, false);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.singleNodeFindCommunities();
         }
-        lpaServer.removeNode(node);
         lpa.shutdown();
     }
 
     @Test
     public void testZachary() throws Exception {
-        final int node = 1;
         GraphBuilder builder = new ZachBuilder();
         Properties props = new Properties();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
-        // second argument true:  gather statistics
-        LabelPropagation lpa =
-            new LabelPropagation(builder, node, props, true);
+        // third argument true:  gather statistics
+        SingleLabelPropagation lpa =
+            new SingleLabelPropagation(builder, props, true);
 
         long avgTime = 0;
         int avgIter = 0;
@@ -170,7 +168,6 @@ public class TestLPAPerf {
                           avgIter/(double) RUNS,
                           avgMod/(double) RUNS,
                           minMod, maxMod);
-        lpaServer.removeNode(node);
         lpa.shutdown();
     }
 
