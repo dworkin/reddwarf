@@ -305,6 +305,46 @@ public class TestChannelServiceImplRelocatingSessions
 
     @Test
     @IntegrationTest
+    public void testChannelSendToOldNodeDuringRelocate()
+	throws Exception
+    {
+	String channelName = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	// channel coordinator is on server node
+	createChannel(channelName);
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
+	
+	// Client will log into "oldNode"
+	ClientGroup group = new ClientGroup(oldNode.getAppPort(), oneUser);
+	
+	try {
+	    // Initiate client relocation to new node.
+	    DummyClient relocatingClient = group.getClient(REX);
+	    joinUsers(channelName, oneUser);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    // Hold up "send" to old node.
+	    holdChannelServerMethodToNode(oldNode, "send");
+	    sendMessagesToChannel(channelName, 3);
+	    waitForHeldChannelServerMethodToNode(oldNode);
+	    moveIdentityAndWaitForRelocationNotification(
+		relocatingClient, oldNode, newNode);
+	    releaseChannelServerMethodHeld(oldNode);
+	    
+	    // Finish relocation.
+	    relocatingClient.relocate(0, true, true);
+	    
+	    // Make sure all members are joined and can receive messages.
+	    checkUsersJoined(channelName, oneUser);
+	    checkChannelMessagesReceived(group, channelName, 3);
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
+    @Test
+    @IntegrationTest
     public void testChannelJoinToOldNodeAfterRelocate()
 	throws Exception
     {

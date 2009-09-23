@@ -589,11 +589,14 @@ public final class ChannelServiceImpl
 
 		LocalChannelInfo channelInfo =
 		    localChannelMembersMap.get(channelRefId);
-		localMembers =
-		    channelInfo != null ?
-		    channelInfo.members.toArray(
-			new BigInteger[channelInfo.members.size()]) :
-		    new BigInteger[0];
+		if (channelInfo != null) {
+		    synchronized (channelInfo) {
+			localMembers = channelInfo.members.toArray(
+			    new BigInteger[channelInfo.members.size()]);
+		    }
+		} else {
+		    localMembers = new BigInteger[0];
+		}
 		return localMembers;
 		
 	    } finally {
@@ -625,10 +628,11 @@ public final class ChannelServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"send channelId:{0} message:{1} localNodeId:{2}",
+			"send channelId:{0} message:{1} timestamp:{2} " +
+			"localNodeId:{3}",
 			HexDumper.toHexString(channelRefId.toByteArray()),
 			HexDumper.format(message, 0x50),
-			localNodeId);
+			timestamp, localNodeId);
 		}
 		LocalChannelInfo channelInfo =
 		    localChannelMembersMap.get(channelRefId);
@@ -640,12 +644,13 @@ public final class ChannelServiceImpl
 		}
 
 
-		// Lock the membership list while iterating to avoid changes
+		// Lock the channel info (which locks the channel
+		// membership list) while iterating to avoid changes
 		// to membership during iteration.
 		ChannelSendTask task =
 		    new ChannelSendTask(channelRefId, channelInfo.delivery,
 					message);
-		synchronized (channelInfo.members) {
+		synchronized (channelInfo) {
 		    if (channelInfo.delivery.equals(Delivery.RELIABLE) &&
 			timestamp <= channelInfo.msgTimestamp)
 		    {
@@ -653,7 +658,18 @@ public final class ChannelServiceImpl
 			// coordinator recovery, so don't deliver messages
 			// with a timestamp that is less than or equal to
 			// the channel's timestamp of the last delivered
-			// message. 
+			// message.
+			if (logger.isLoggable(Level.FINE)) {
+			    logger.log(
+				Level.FINE,
+				"Dropping message with old timestamp, " +
+				"channelId:{0} message:{1} timestamp:{2} " +
+				"current timestamp:{3} localNodeId:{4}",
+				HexDumper.toHexString(
+				    channelRefId.toByteArray()),
+				HexDumper.format(message, 0x50), timestamp,
+				channelInfo.msgTimestamp, localNodeId);
+			}
 			return;
 		    }
 		    // Note: the message timestamp may not be consecutive
@@ -727,7 +743,7 @@ public final class ChannelServiceImpl
 		    return;
 		}
 		ChannelCloseTask task = new ChannelCloseTask(channelRefId);
-		synchronized (channelInfo.members) {
+		synchronized (channelInfo) {
 		    for (BigInteger sessionRefId : channelInfo.members) {
 
 			if (!handleChannelRequest(
@@ -784,6 +800,16 @@ public final class ChannelServiceImpl
 		if (!relocatingToLocalNode) {
 		    // The session is not locally-connected and is not
 		    // known to be relocating to the local node.
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.log(
+			    Level.FINE, "Dropping channel request for " +
+			    "non-local session:{0} channel:{1} timestamp:{2} " +
+			    "localNodeId:{3}",
+			    HexDumper.toHexString(sessionRefId.toByteArray()),
+			    HexDumper.toHexString(
+				task.channelRefId.toByteArray()),
+			    timestamp, localNodeId);
+		    }
 		    return false;
 		}
 		    
@@ -839,7 +865,8 @@ public final class ChannelServiceImpl
 			if (!pendingRequestsMap.isEmpty()) {
 			    try {
 				// TBD: bounded timeout?
-				pendingRequestsMap.wait();
+				pendingRequestsMap.wait(
+				    sessionRelocationTimeout);
 			    } catch (InterruptedException e) {
 			    }
 			}
@@ -926,14 +953,28 @@ public final class ChannelServiceImpl
 	if (channelInfo == null) {
 	    LocalChannelInfo newChannelInfo =
 		new LocalChannelInfo(delivery, timestamp);
-	    channelInfo = localChannelMembersMap.
-		putIfAbsent(channelRefId, newChannelInfo);
-	    if (channelInfo == null) {
-		addedChannelInfo = true;
-		channelInfo = newChannelInfo;
+	    synchronized (newChannelInfo) {
+		channelInfo = localChannelMembersMap.
+		    putIfAbsent(channelRefId, newChannelInfo);
+		if (channelInfo == null) {
+		    addedChannelInfo = true;
+		    channelInfo = newChannelInfo;
+		    if (isRelocating) {
+			// Message timestamp may be out of date with
+			// channel's current timestamp, so check and update
+			// if necessary.
+			long currentTimestamp =
+			    getCurrentChannelMessageTimestamp(channelRefId);
+			if (currentTimestamp > timestamp) {
+			    newChannelInfo.msgTimestamp = currentTimestamp;
+			}
+		    }
+		}
 	    }
 	}
-	channelInfo.members.add(sessionRefId);
+	synchronized (channelInfo) {
+	    channelInfo.members.add(sessionRefId);
+	}
 
 	// Update per-session channel set.
 	Map<BigInteger, LocalMemberInfo> channelMap =
@@ -951,67 +992,177 @@ public final class ChannelServiceImpl
 	channelMap.put(channelRefId,
 		       new LocalMemberInfo(channelInfo, timestamp));
 	
-	// If session is relocating, then its timestamp may be out of date
-	// with the channel's timestamp.
 	if (isRelocating) {
 	    if (addedChannelInfo) {
-		// TBD: Need to add local node to channel's server set and
-		// check persistent msg timestamp to see if messages are
-		// up to date, and if not, enqueue them for session.
-
-		// TBD: Also need to synchronized on channelInfo.members
-		// when checking for current message timestamp for channel
-		// since the members list is locked while updating the
-		// timestamp and delivering channel messages to client
-		// sessions. 
-
-		boolean success = false;
-		try {
-		    // Add relocating client session to channel
-		    success = runTransactionalCallable(
-		      new KernelCallable<Boolean>("addNodeIdToChannel") {
-			public Boolean call() {
-			    ChannelImpl channelImpl = (ChannelImpl)
-				getObjectForId(channelRefId);
-			    
-			    if (channelImpl == null || channelImpl.isClosed()) {
-				if (logger.isLoggable(Level.FINE)) {
-				    logger.log(
-					Level.FINE,
-					"Unable to update closed channel:{0} " +
-					"for session:{1}",
-					HexDumper.toHexString(
-					    channelRefId.toByteArray()),
-					HexDumper.toHexString(
-					    sessionRefId.toByteArray()));
-				}
-				return false;
-			    } else {
-				channelImpl.addServerNodeId(localNodeId);
-				return true;
-			    }
-			}
-		      });
-
-		    // TBD: need to fetch out of date messages, if any...
-		} catch (Exception e) {
-		    // TBD: exception handling...
-		}
-		if (!success) {
+		if (!addLocalNodeToChannel(channelRefId)) {
 		    // channel is closed, so send leave message.
-		    // TBD: if this returns false, there is a problem...
+		    // TBD: if this returns false, there may be a problem...
 		    serverImpl.handleChannelRequest(
 		        sessionRefId, timestamp,
 			new ChannelLeaveTask(channelRefId));
+		    return;
 		}
 		
-	    } else if (channelInfo.msgTimestamp > timestamp) {
+	    }
+
+	    // If session is relocating, then its timestamp may be out of
+	    // date with the channel's timestamp...
+	    if (delivery.equals(Delivery.RELIABLE) &&
+		channelInfo.msgTimestamp > timestamp)
+	    {
 		// TBD: Messages are out of date, go and fetch them; they
 		// could be cached at the local node.
+
+		// TBD: Also need to be synchronized on channelInfo.members
+		// when checking for current message timestamp for channel
+		// since the members list is locked while updating the
+		// timestamp and delivering channel messages to client
+		// sessions.  Is the latter true yet?
+
+		SortedMap<Long, byte[]> missingMessages =
+		    getChannelMessages(
+			channelRefId, timestamp + 1, channelInfo.msgTimestamp);
+		if (missingMessages != null) {
+		    for (Map.Entry<Long, byte[]> entry :
+			     missingMessages.entrySet())
+		    {
+			serverImpl.handleChannelRequest(
+			    sessionRefId, entry.getKey(),
+			    new ChannelSendTask(
+ 				channelRefId, channelInfo.delivery,
+				entry.getValue()));
+		    }
+		}
 	    }
 	}
     }
 
+    /**
+     * Adds local node to the server node list for the specified {@code
+     * channelRefId} and returns {@code true} if successful;  if the
+     * channel is closed, then returns {@code false}.  This method should
+     * be invoked outside of a transaction.
+     */
+    private boolean addLocalNodeToChannel(final BigInteger channelRefId) {
+	try {
+	    return runTransactionalCallable(
+		new KernelCallable<Boolean>("addLocalNodeIdToChannel") {
+		    public Boolean call() {
+			ChannelImpl channelImpl = (ChannelImpl)
+			    getObjectForId(channelRefId);
+			
+			if (channelImpl == null || channelImpl.isClosed()) {
+			    if (logger.isLoggable(Level.FINE)) {
+				logger.log(
+				    Level.FINE,
+				    "Unable to add localNodeId:{0} to " +
+				    "closed channel:{1}",
+				    localNodeId,
+				    HexDumper.toHexString(
+					channelRefId.toByteArray()));
+			    }
+			    return false;
+			} else {
+			    channelImpl.addServerNodeId(localNodeId);
+			    return true;
+			}
+		    }
+		});
+	} catch (Exception e) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Attempting to add localNodeId:{0} to channel:{1} throws",
+		    localNodeId,
+		    HexDumper.toHexString(channelRefId.toByteArray()));
+	    }
+	    return false;
+	}
+    }
+
+    /**
+     * Returns the current message timestamp for the channel with the
+     * specified {@code channelRefId}, or returns {@code 0L} if the channel
+     * is nonexistent or closed.
+     */
+    private long getCurrentChannelMessageTimestamp(
+	final BigInteger channelRefId)
+    {
+	try {
+	    return runTransactionalCallable(
+		new KernelCallable<Long>("getCurrentChannelMessageTimestamp") {
+		    public Long call() {
+			ChannelImpl channelImpl = (ChannelImpl)
+			    getObjectForId(channelRefId);
+			
+			if (channelImpl == null || channelImpl.isClosed()) {
+			    if (logger.isLoggable(Level.FINE)) {
+				logger.log(
+				    Level.FINE,
+				    "Unable to obtain current timestamp for" +
+				    "closed channel:{0}",
+				    HexDumper.toHexString(
+					channelRefId.toByteArray()));
+			    }
+			    return 0L;
+			} else {
+			    return channelImpl.getCurrentMessageTimestamp();
+			}
+		    }
+		});
+	} catch (Exception e) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Obtaining current timestamp for channel:{0} throws",
+		    localNodeId,
+		    HexDumper.toHexString(channelRefId.toByteArray()));
+	    }
+	    return 0L;
+	}
+    }
+
+    private SortedMap<Long, byte[]> getChannelMessages(
+ 	final BigInteger channelRefId, final long fromTimestamp,
+	final long toTimestamp)
+    {
+	try {
+	    return runTransactionalCallable(
+		new KernelCallable<SortedMap<Long, byte[]>>(
+		    "getChannelMessagesFromTimestamp")
+		{
+		    public SortedMap<Long, byte[]> call() {
+			ChannelImpl channelImpl = (ChannelImpl)
+			    getObjectForId(channelRefId);
+			
+			if (channelImpl == null || channelImpl.isClosed()) {
+			    if (logger.isLoggable(Level.FINE)) {
+				logger.log(
+				    Level.FINE,
+				    "Unable to obtain messages for" +
+				    "closed channel:{0}",
+				    HexDumper.toHexString(
+					channelRefId.toByteArray()));
+			    }
+			    return null;
+			} else {
+			    return channelImpl.
+				getChannelMessages(fromTimestamp, toTimestamp);
+			}
+		    }
+		});
+	} catch (Exception e) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Obtaining messages for channel:{0} throws",
+		    localNodeId,
+		    HexDumper.toHexString(channelRefId.toByteArray()));
+	    }
+	    return null;
+	}
+    }
+	
     /**
      * Removes the specified {@code sessionRefId} ONLY from the local channel
      * members set for the specified {@code channelRefId}.
@@ -1022,7 +1173,9 @@ public final class ChannelServiceImpl
 	LocalChannelInfo channelInfo =
 	    localChannelMembersMap.get(channelRefId);
 	if (channelInfo != null) {
-	    channelInfo.members.remove(sessionRefId);
+	    synchronized (channelInfo) {
+		channelInfo.members.remove(sessionRefId);
+	    }
 	}
     }
 
@@ -1083,8 +1236,13 @@ public final class ChannelServiceImpl
     {
 	LocalChannelInfo channelInfo =
 	    localChannelMembersMap.get(channelRefId);
-	return
-	    channelInfo != null && channelInfo.members.contains(sessionRefId);
+	if (channelInfo != null) {
+	    synchronized (channelInfo) {
+		return channelInfo.members.contains(sessionRefId);
+	    }
+	} else {
+	    return false;
+	}
     }
 
     /**
@@ -1278,7 +1436,7 @@ public final class ChannelServiceImpl
 		localChannelMembersMap.get(channelRefId);
 	    
 	    if (channelInfo != null) {
-		synchronized (channelInfo.members) {
+		synchronized (channelInfo) {
 		    return Collections.unmodifiableSet(channelInfo.members);
 		}
 	    } else {
@@ -1935,7 +2093,17 @@ public final class ChannelServiceImpl
 	}
     }
 
-    private static Object getObjectForId(BigInteger refId) {
+    /**
+     * Returns the managed object with the specified {@code refId}, or {@code
+     * null} if there is no object with the specified {@code refId}.
+     *
+     * @param	refId the object's identifier as obtained by
+     *		{@link ManagedReference#getId ManagedReference.getId}
+     *
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    static Object getObjectForId(BigInteger refId) {
 	try {
 	    return getDataService().createReferenceForId(refId).get();
 	} catch (ObjectNotFoundException e) {
@@ -1947,7 +2115,7 @@ public final class ChannelServiceImpl
      * A task that adds a relocating session's node to the channels in the
      * {@code channelRefId}'s array (specified during construction).  When
      * this task is complete, it notifies the old node that relocation
-     * preparation by invoking the {@code channelMembershipsUpdated}
+     * preparation is complete by invoking the {@code channelMembershipsUpdated}
      * method.
      */
     private class AddRelocatingSessionNodeToChannels
@@ -2002,6 +2170,11 @@ public final class ChannelServiceImpl
 	}
     }
 
+    /**
+     * An abstract class for processing a channel request (sent by the
+     * channel's coordinator) for the channel specified during
+     * construction.
+     */
     private static abstract class ChannelRequestTask {
 
 	protected final BigInteger channelRefId;
@@ -2009,7 +2182,17 @@ public final class ChannelServiceImpl
 	ChannelRequestTask(BigInteger channelRefId) {
 	    this.channelRefId = channelRefId;
 	}
-	
+
+	/**
+	 * Processes the channel request for the specified {@code
+	 * sessionRefId} and message {@code timestamp} which may update
+	 * local, transient structures, and then may deliver the
+	 * appropriate notification to the client session for the given
+	 * {@code sessionRefId}.
+	 *
+	 * @param sessionRefId a client session ID
+	 * @param timestamp a message timestamp
+	 */
 	public abstract void run(BigInteger sessionRefId, long timestamp);
     }
 	
@@ -2275,10 +2458,11 @@ public final class ChannelServiceImpl
     private static class LocalChannelInfo {
 	/** The channel's delivery guarantee. */
 	final Delivery delivery;
-	/** The channel's membership set. */
-	final Set<BigInteger> members =
-	    Collections.synchronizedSet(new HashSet<BigInteger>());
-	/** The last message delivered to the channel. */
+	/** The channel's membership set.  Note: user needs to synchronize
+	 * on the outer instance when accessing this set. */
+	final Set<BigInteger> members = new HashSet<BigInteger>();
+	/** The last message delivered to the channel. Note: user needs to
+	 * synchronize on the outer instance when accessing this timestamp. */
 	long msgTimestamp;
 
 	/** Constructs an instance. */
