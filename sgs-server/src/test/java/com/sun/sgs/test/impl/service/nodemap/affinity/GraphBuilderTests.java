@@ -25,70 +25,53 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
-import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
+import junit.framework.Assert;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 /**
- *  Tests for the graph listener and graph builders
- *
+ * Common tests and support for all graph builder/LPA implementations.
  */
-@RunWith(ParameterizedFilteredNameRunner.class)
-public class TestGraphListener {
-
-   @Parameterized.Parameters
-    public static Collection data() {
-        return Arrays.asList(
-            new Object[][] {{"default"},
-                            {WeightedGraphBuilder.class.getName()},
-                            {BipartiteGraphBuilder.class.getName()}});
-    }
-   
+public class GraphBuilderTests {
     private static Class<?> profileReportImplClass;
-    private static Constructor<?> profileReportImplConstructor;
-    private static Method setAccessedObjectsDetailMethod;
-    private static Field graphListenerField;
+    protected static Constructor<?> profileReportImplConstructor;
+    protected static Method setAccessedObjectsDetailMethod;
+    protected static Field graphListenerField;
     static {
         try {
             profileReportImplClass =
                 Class.forName("com.sun.sgs.impl.profile.ProfileReportImpl");
             profileReportImplConstructor =
                 UtilReflection.getConstructor(profileReportImplClass,
-                    KernelRunnable.class, Identity.class, 
+                    KernelRunnable.class, Identity.class,
                     long.class, int.class);
             setAccessedObjectsDetailMethod =
-                UtilReflection.getMethod(profileReportImplClass, 
+                UtilReflection.getMethod(profileReportImplClass,
                     "setAccessedObjectsDetail", AccessedObjectsDetail.class);
             graphListenerField =
                     UtilReflection.getField(NodeMappingServiceImpl.class,
@@ -97,58 +80,43 @@ public class TestGraphListener {
             e.printStackTrace();
         }
     }
-    private final static String APP_NAME = "TestDistLPABuilders";
+    protected final String appName;
 
     // The listener created for each test
-    private GraphListener listener;
+    protected GraphListener listener;
     // The builder used by the listener
-    private GraphBuilder builder;
+    protected BasicGraphBuilder builder;
 
-    // Passed into each test run
-    private final String builderName;
+    protected Properties props;
 
-    private Properties props;
-    
-    private SgsTestNode serverNode;
-    private SgsTestNode node;
+    protected SgsTestNode serverNode;
+    protected SgsTestNode node;
 
-    private int serverPort;
+    protected int serverPort;
     /**
      * Create this test class.
      * @param builderName the type of graph builder to use
      */
-    public TestGraphListener(String builderName) {
-        if (builderName.equals("default")) {
-            this.builderName = null;
-        } else {
-            this.builderName = builderName;
-        }
-        System.err.println("Graph builder used is: " + builderName);
-        
+    public GraphBuilderTests(String appName) {
+        this.appName = appName;
+
     }
 
     @Before
     public void beforeEachTest() throws Exception {
-        System.out.println("server port is " + serverPort);
         props = getProps(null);
-        System.out.println("server port is now " + serverPort);
-        serverNode = new SgsTestNode(APP_NAME, null, props);
+        serverNode = new SgsTestNode(appName, null, props);
         // Create a new app node
         props = getProps(serverNode);
         node = new SgsTestNode(serverNode, null, props);
         listener = (GraphListener)
                 graphListenerField.get(node.getNodeMappingService());
-        builder = (GraphBuilder) listener.getGraphBuilder();
+        builder = listener.getGraphBuilder();
     }
 
-    private Properties getProps(SgsTestNode serverNode) throws Exception {
+    protected Properties getProps(SgsTestNode serverNode) throws Exception {
         Properties p =
-                SgsTestNode.getDefaultProperties(APP_NAME, serverNode, null);
-        if (builderName == null) {
-            p.remove(GraphListener.GRAPH_CLASS_PROPERTY);
-        } else {
-            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
-        }
+                SgsTestNode.getDefaultProperties(appName, serverNode, null);
         if (serverNode == null) {
             serverPort = SgsTestNode.getNextUniquePort();
             p.setProperty(StandardProperties.NODE_TYPE,
@@ -157,6 +125,17 @@ public class TestGraphListener {
         p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
         return p;
+    }
+
+    protected void startNewNode(Properties addProps) throws Exception {
+        props = getProps(serverNode);
+        for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
+            props.put(entry.getKey(), entry.getValue());
+        }
+        node =  new SgsTestNode(serverNode, null, props);
+        listener =
+           (GraphListener) graphListenerField.get(node.getNodeMappingService());
+        builder = listener.getGraphBuilder();
     }
 
     @After
@@ -170,7 +149,7 @@ public class TestGraphListener {
             serverNode = null;
         }
     }
-    
+
     @Test
     public void testConstructor() {
         // empty graph
@@ -178,151 +157,140 @@ public class TestGraphListener {
         Assert.assertNotNull(graph);
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
-        // empty obj use
-        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> objUse =
-                builder.getObjectUseMap();
-        Assert.assertNotNull(objUse);
-        Assert.assertEquals(0, objUse.size());
-        // empty conflicts
-        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflicts =
-                builder.getConflictMap();
-        Assert.assertNotNull(conflicts);
-        Assert.assertEquals(0, conflicts.size());
-
     }
-    
+
     @Test
     public void testNoDetail() throws Exception {
         ProfileReport report = makeReport(new IdentityImpl("something"));
         listener.report(report);
-        
+
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         // no accessed objects
         Assert.assertEquals(0, graph.getVertexCount());
     }
-    
+
     @Test
     public void testOneAccess() throws Exception {
-        ProfileReport report = makeReport(new IdentityImpl("something"));       
+        ProfileReport report = makeReport(new IdentityImpl("something"));
         AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(1, graph.getVertexCount());
     }
-    
+
     @Test
     public void testOneEdge() throws Exception {
         // Note that the graph listener believes edges are the same
         // objects if their reported objIds are equal.
-        ProfileReport report = makeReport(new IdentityImpl("something"));     
+        ProfileReport report = makeReport(new IdentityImpl("something"));
         AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         report = makeReport(new IdentityImpl("somethingElse"));
-        
+
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
     }
-    
+
     @Test
     public void testOneEdgeTwice() throws Exception {
-        ProfileReport report = makeReport(new IdentityImpl("something"));     
+        ProfileReport report = makeReport(new IdentityImpl("something"));
         AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
-        report = makeReport(new IdentityImpl("somethingElse"));     
+
+        report = makeReport(new IdentityImpl("somethingElse"));
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
-        report = makeReport(new IdentityImpl("something"));     
+
+        report = makeReport(new IdentityImpl("something"));
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
-        
-        for (WeightedEdge e : graph.getEdges()) {
-            Assert.assertEquals(1, e.getWeight()); 
-        }
-    }
-    
-    @Test
-    public void testIncEdgeWeight() throws Exception {
-        ProfileReport report = makeReport(new IdentityImpl("something"));     
-        AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
-        detail.addAccess(new String("obj1"));
-        setAccessedObjectsDetailMethod.invoke(report, detail);
-        listener.report(report);
-        
-        report = makeReport(new IdentityImpl("somethingElse"));     
-        detail = new AccessedObjectsDetailTest();
-        detail.addAccess(new String("obj1"));
-        detail.addAccess(new String("obj1"));
-        setAccessedObjectsDetailMethod.invoke(report, detail);
-        listener.report(report);
-        
-        Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
-        System.out.println(graph);
-        Assert.assertEquals(1, graph.getEdgeCount());
-        Assert.assertEquals(2, graph.getVertexCount());
-        
+
         for (WeightedEdge e : graph.getEdges()) {
             Assert.assertEquals(1, e.getWeight());
         }
-        
-        report = makeReport(new IdentityImpl("something"));     
+    }
+
+    @Test
+    public void testIncEdgeWeight() throws Exception {
+        ProfileReport report = makeReport(new IdentityImpl("something"));
+        AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        report = makeReport(new IdentityImpl("somethingElse"));
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
+        System.out.println(graph);
+        Assert.assertEquals(1, graph.getEdgeCount());
+        Assert.assertEquals(2, graph.getVertexCount());
+
+        for (WeightedEdge e : graph.getEdges()) {
+            Assert.assertEquals(1, e.getWeight());
+        }
+
+        report = makeReport(new IdentityImpl("something"));
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         graph = builder.getAffinityGraph();
         System.out.println("Second time: " + graph);
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
-        
+
         for (WeightedEdge e : graph.getEdges()) {
-            Assert.assertEquals(2, e.getWeight()); 
+            Assert.assertEquals(2, e.getWeight());
         }
-        
-        report = makeReport(new IdentityImpl("something"));     
+
+        report = makeReport(new IdentityImpl("something"));
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         graph = builder.getAffinityGraph();
         Assert.assertEquals(1, graph.getEdgeCount());
         Assert.assertEquals(2, graph.getVertexCount());
-        
+
         for (WeightedEdge e : graph.getEdges()) {
             // don't expect edge weight to have been updated
             Assert.assertEquals(2, e.getWeight());
         }
     }
-    
+
     @Test
     public void testIgnoreSystem() throws Exception {
         ProfileReport report = makeReport(new SystemIdentity("system"));
@@ -330,20 +298,20 @@ public class TestGraphListener {
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         report = makeReport(new IdentityImpl("somethingElse"));
-        
+
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(1, graph.getVertexCount());
     }
-    
+
     @Test
     public void testFourReports() throws Exception {
         Identity identA = new IdentityImpl("A");
@@ -362,14 +330,14 @@ public class TestGraphListener {
         detail.addAccess(new String("obj2"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         report = makeReport(identB);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         detail.addAccess(new String("obj3"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         report = makeReport(identC);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj4"));
@@ -377,25 +345,25 @@ public class TestGraphListener {
         detail.addAccess(new String("obj3"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         report = makeReport(identD);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj4"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(4, graph.getEdgeCount());
         Assert.assertEquals(4, graph.getVertexCount());
-        
+
         // Identity A will now use obj3, so get links with B and C
         report = makeReport(identA);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj3"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         graph = builder.getAffinityGraph();
         System.out.println("New Graph: " + graph);
         Assert.assertEquals(4, graph.getVertexCount());
@@ -405,7 +373,7 @@ public class TestGraphListener {
         Assert.assertEquals(1, graph.findEdge(vertB, vertC).getWeight());
         Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
     }
-    
+
     @Test
     public void testThreeIdentMultOneObject() throws Exception {
         Identity identA = new IdentityImpl("A");
@@ -421,30 +389,30 @@ public class TestGraphListener {
         detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         report = makeReport(identB);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
         detail.addAccess(new String("obj1"));
-        detail.addAccess(new String("obj1"));   
+        detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-             
+
         report = makeReport(identC);
         detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
-        detail.addAccess(new String("obj1"));  
+        detail.addAccess(new String("obj1"));
         setAccessedObjectsDetailMethod.invoke(report, detail);
         listener.report(report);
-        
+
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         System.out.println(graph);
         Assert.assertEquals(3, graph.getEdgeCount());
         Assert.assertEquals(3, graph.getVertexCount());
-        
+
         System.out.println("Graph is : ");
         System.out.println(graph);
-        
+
         for (WeightedEdge e : graph.getEdges()) {
             // don't expect edge weight to have been updated
             Assert.assertEquals(2, e.getWeight());
@@ -466,11 +434,9 @@ public class TestGraphListener {
     @Test
     public void testGraphPrunerCountTwo() throws Exception {
         node.shutdown(false);
-        props = getProps(serverNode);
-        props.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
-        node =  new SgsTestNode(serverNode, null, props);
-        listener = (GraphListener) graphListenerField.get(node.getNodeMappingService());
-        builder = (GraphBuilder) listener.getGraphBuilder();
+        Properties p = new Properties();
+        p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
+        startNewNode(p);
 
         LabelVertex vertA = new LabelVertex(new IdentityImpl("A"));
         LabelVertex vertB = new LabelVertex(new IdentityImpl("B"));
@@ -520,7 +486,7 @@ public class TestGraphListener {
         graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
-  
+
         testFourReports();
         // 6th period
         builder.getPruneTask().run();
@@ -529,7 +495,7 @@ public class TestGraphListener {
         // 7th period
         builder.getPruneTask().run();
         graph = builder.getAffinityGraph();
-        Assert.assertEquals(4, graph.getVertexCount());           
+        Assert.assertEquals(4, graph.getVertexCount());
         Assert.assertEquals(4, graph.getEdgeCount());
         // Weights are doubled from testFourReports
         Assert.assertEquals(4, graph.findEdge(vertA, vertB).getWeight());
@@ -566,7 +532,7 @@ public class TestGraphListener {
     }
 
     // The reports added in testFourReports, without the assertions.
-    private void addFourReports() throws Exception {
+    protected void addFourReports() throws Exception {
         Identity identA = new IdentityImpl("A");
         Identity identB = new IdentityImpl("B");
         Identity identC = new IdentityImpl("C");
@@ -607,130 +573,6 @@ public class TestGraphListener {
         listener.report(report);
     }
 
-    @Test(expected=NullPointerException.class)
-    public void testNoteConflictDetectedBadObjId() throws Throwable {
-        if (builderName == null) {
-            // We'll also test it when explicitly called - much easier this way
-            throw new NullPointerException("empty test");
-        }
-        Class builderClass = Class.forName(builderName);
-        // args:  object, node, forUpdate
-        Method meth = UtilReflection.getMethod(builderClass,
-            "noteConflictDetected", Object.class, long.class, boolean.class);
-
-        Object obj = null;
-        long nodeId = 99L;
-        try {
-            meth.invoke(builder, obj, nodeId, false);
-        } catch (InvocationTargetException e) {
-            throw e.getCause();
-        }
-    }
-    
-    @Test
-    public void testNoteConflictDetected() throws Exception {
-        if (builderName == null) {
-            // We'll also test it when explicitly called - much easier this way
-            return;
-        }
-        Class builderClass = Class.forName(builderName);
-        // args:  object, node, forUpdate
-        Method meth = UtilReflection.getMethod(builderClass,
-            "noteConflictDetected", Object.class, long.class, boolean.class);
-        
-        Object obj = new String("obj");
-        long nodeId = 99L;
-        meth.invoke(builder, obj, nodeId, false);
-        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflictMap =
-                builder.getConflictMap();
-        Assert.assertEquals(1, conflictMap.size());
-        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
-        Assert.assertNotNull(objMap);
-        AtomicLong val = objMap.get(obj);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
-
-        meth.invoke(builder, obj, nodeId, false);
-        Assert.assertEquals(1, conflictMap.size());
-        objMap = conflictMap.get(nodeId);
-        Assert.assertNotNull(objMap);
-        val = objMap.get(obj);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(2, val.get());
-
-        // Add a different object to the same node
-        Object obj1 = new String("obj1");
-        meth.invoke(builder, obj1, nodeId, true);
-        Assert.assertEquals(1, conflictMap.size());
-        objMap = conflictMap.get(nodeId);
-        Assert.assertNotNull(objMap);
-        val = objMap.get(obj);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(2, val.get());
-        val = objMap.get(obj1);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
-    }
-
-    @Test
-    public void testRemoveNode() throws Exception {
-        if (builderName == null) {
-            // We'll also test it when explicitly called - much easier this way
-            return;
-        }
-        Class builderClass = Class.forName(builderName);
-        // args:  object, node, forUpdate
-        Method meth = UtilReflection.getMethod(builderClass,
-            "noteConflictDetected", Object.class, long.class, boolean.class);
-
-        Object obj = new String("obj");
-        Object obj1 = new String("obj1");
-        long nodeId = 99L;
-        long badNodeId = 102L;
-        meth.invoke(builder, obj, nodeId, false);
-        meth.invoke(builder, obj, badNodeId, false);
-        meth.invoke(builder, obj1, badNodeId, false);
-        meth.invoke(builder, obj1, badNodeId, true);
-        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflictMap =
-                builder.getConflictMap();
-        Assert.assertEquals(2, conflictMap.size());
-        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
-        Assert.assertNotNull(objMap);
-        AtomicLong val = objMap.get(obj);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
-        objMap = conflictMap.get(badNodeId);
-        Assert.assertNotNull(objMap);
-        val = objMap.get(obj);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
-        val = objMap.get(obj1);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(2, val.get());
-
-        // Now invalidate badNodeId
-        builder.removeNode(badNodeId);
-        Assert.assertEquals(1, conflictMap.size());
-        objMap = conflictMap.get(nodeId);
-        Assert.assertNotNull(objMap);
-        val = objMap.get(obj);
-        Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
-        objMap = conflictMap.get(badNodeId);
-        Assert.assertNull(objMap);
-    }
-
-    @Test
-    public void testRemoveNodeUnknownNodeId() {
-        builder.removeNode(22);
-    }
-
-    @Test
-    public void testRemoveNodeTwice() {
-        builder.removeNode(35);
-        builder.removeNode(35);
-    }
-
     @Test(expected=IllegalArgumentException.class)
     public void testGraphBuilderBadCount() throws Exception {
         props = getProps(serverNode);
@@ -759,25 +601,25 @@ public class TestGraphListener {
     }
 
     /* Utility methods and classes. */
-    private ProfileReport makeReport(Identity id) throws Exception {
+    protected ProfileReport makeReport(Identity id) throws Exception {
         return (ProfileReport) profileReportImplConstructor.newInstance(
                     null, id, System.currentTimeMillis(), 1);
     }
-    
-    /** 
-     * Private implementation of {@code AccessedObjectsDetail}. 
+
+    /**
+     * Private implementation of {@code AccessedObjectsDetail}.
      * It allows adding and getting accessed objects only.
      */
-    private static class AccessedObjectsDetailTest 
-        implements AccessedObjectsDetail 
+    protected static class AccessedObjectsDetailTest
+        implements AccessedObjectsDetail
     {
         private final LinkedHashSet<AccessedObject> accessList =
              new LinkedHashSet<AccessedObject>();
-        
+
         void addAccess(Object obj) {
             accessList.add(new AccessedObjectImpl(obj));
         }
-        
+
         public List<AccessedObject> getAccessedObjects() {
             return new ArrayList<AccessedObject>(accessList);
         }
@@ -789,9 +631,10 @@ public class TestGraphListener {
         public byte[] getConflictingId() {
             throw new UnsupportedOperationException("Not supported.");
         }
-        
-    } 
-    /** 
+
+    }
+
+    /**
      * Private implementation of {@code AccessedObject}. It supports
      * getting object ids only.
      */
@@ -799,7 +642,7 @@ public class TestGraphListener {
         private final Object objId;
 
         /** Creates an instance of {@code AccessedObjectImpl}. */
-        AccessedObjectImpl(Object objId) {  
+        AccessedObjectImpl(Object objId) {
             this.objId = objId;
         }
 

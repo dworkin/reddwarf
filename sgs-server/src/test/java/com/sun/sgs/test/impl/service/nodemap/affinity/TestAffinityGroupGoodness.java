@@ -29,15 +29,18 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Collection;
 import java.util.HashSet;
 import junit.framework.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
 /**
  *  Tests for static AffinityGroupGoodness methods.
  */
+@RunWith(FilteredNameRunner.class)
 public class TestAffinityGroupGoodness {
 
     @Test
