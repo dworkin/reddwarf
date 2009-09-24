@@ -130,6 +130,15 @@
       </excludes>
     </fileSet>
 
+    <!-- This is here just to get an empty ext directory -->
+    <fileSet>
+      <directory>${java.io.tmpdir}</directory>
+      <outputDirectory>ext</outputDirectory>
+      <excludes>
+        <exclude>**/*</exclude>
+      </excludes>
+    </fileSet>
+
   </fileSets>
 
   

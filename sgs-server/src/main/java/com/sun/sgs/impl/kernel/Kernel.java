@@ -53,6 +53,8 @@ import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
+import com.sun.sgs.management.KernelMXBean;
+
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileListener;
@@ -253,27 +255,23 @@ class Kernel {
             ProfileCollectorHandle profileCollectorHandle = 
                     new ProfileCollectorHandleImpl(profileCollector);
 
-            // Create the configuration MBean and register it.  This is
-            // used during the construction of later components.
-            ConfigManager config = new ConfigManager(appProperties);
-            try {
-                profileCollector.registerMBean(config, 
-                                               ConfigManager.MXBEAN_NAME);
-            } catch (JMException e) {
-                logger.logThrow(Level.WARNING, e, "Could not register MBean");
-                // Stop bringing up the kernel - the ConfigManager is used
-                // by other parts of the system, who rely on it being 
-                // successfully registered.
-                throw e;
-            }
+            // with profiling setup, register all MXBeans
+            registerMXBeans(appProperties);
 
-            // create the authenticators and identity coordinator
+            // create the authenticators and identity coordinator, folding in
+            // any extension library authenticators
             ArrayList<IdentityAuthenticator> authenticators =
                 new ArrayList<IdentityAuthenticator>();
-            String [] authenticatorClassNames =
+            String authList =
                 appProperties.getProperty(StandardProperties.AUTHENTICATORS,
-                                    DEFAULT_IDENTITY_AUTHENTICATOR).split(":");
-
+                                          DEFAULT_IDENTITY_AUTHENTICATOR);
+            String extAuthList =
+                appProperties.getProperty(BootProperties.
+                                          EXTENSION_AUTHENTICATORS_PROPERTY);
+            if (extAuthList != null) {
+                authList = extAuthList + ":" + authList;
+            }
+            String [] authenticatorClassNames = authList.split(":");
             for (String authenticatorClassName : authenticatorClassNames) {
                 authenticators.add(getAuthenticator(authenticatorClassName,
                                                     appProperties));
@@ -358,6 +356,32 @@ class Kernel {
             }
             // shut down whatever we've started
             shutdown();
+            throw e;
+        }
+    }
+
+    /** Private helper that registers MXBeans for management. */
+    private void registerMXBeans(Properties p) throws Exception {
+        // Create the configuration MBean and register it.  This is
+        // used during the construction of later components.
+        ConfigManager config = new ConfigManager(p);
+        try {
+            profileCollector.registerMBean(config, ConfigManager.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.WARNING, e, "Could not register MBean");
+            // Stop bringing up the kernel - the ConfigManager is used
+            // by other parts of the system, who rely on it being 
+            // successfully registered.
+            throw e;
+        }
+
+        // install the MXBean that exports a shutdown interface
+        KernelManager kernelManager = new KernelManager();
+        try {
+            profileCollector.registerMBean(kernelManager,
+                                           KernelManager.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.WARNING, e, "Could not register MBean");
             throw e;
         }
     }
@@ -482,15 +506,36 @@ class Kernel {
        throws Exception 
     {
         // before we start, figure out if we're running with only a sub-set
-        // of services, in which case there should be no external services
+        // of services in which case there should be no external services,
+        // and fold in any extension library services
         NodeType type = 
             NodeType.valueOf(
                 appProperties.getProperty(StandardProperties.NODE_TYPE));
         StandardService finalStandardService = null;
         String externalServices =
             appProperties.getProperty(StandardProperties.SERVICES);
+        String extensionServices =
+            appProperties.getProperty(BootProperties.
+                                      EXTENSION_SERVICES_PROPERTY);
         String externalManagers =
             appProperties.getProperty(StandardProperties.MANAGERS);
+        String extensionManagers =
+            appProperties.getProperty(BootProperties.
+                                      EXTENSION_MANAGERS_PROPERTY);
+
+        if ((externalServices == null) || (externalServices.length() == 0)) {
+            externalServices = extensionServices;
+            externalManagers = extensionManagers;
+        } else if ((extensionServices != null) &&
+                   (extensionServices.length() != 0))
+        {
+            externalServices = extensionServices + ":" + externalServices;
+            if (externalManagers == null) {
+                externalManagers = extensionManagers + ":";
+            } else {
+                externalManagers = extensionManagers + ":" + externalManagers;
+            }
+        }
         
         switch (type) {
             case appNode:
@@ -593,26 +638,35 @@ class Kernel {
 
         // finally, load any external services and their associated managers
         if ((externalServices != null) && (externalManagers != null)) {
-            String [] serviceClassNames = externalServices.split(":", -1);
-            String [] managerClassNames = externalManagers.split(":", -1);
-            if (serviceClassNames.length != managerClassNames.length) {
-                if (logger.isLoggable(Level.SEVERE)) {
-                    logger.log(Level.SEVERE, "External service count " +
-                               "({0}) does not match manager count ({1}).",
-                               serviceClassNames.length,
-                               managerClassNames.length);
-                }
-                throw new IllegalArgumentException("Mis-matched service " +
-                                                   "and manager count");
-            }
-
-            for (int i = 0; i < serviceClassNames.length; i++) {
-                if (!managerClassNames[i].equals("")) {
-                    setupService(serviceClassNames[i], managerClassNames[i],
+            loadExternalServices(externalServices, externalManagers,
                                  startupContext);
-                } else {
-                    setupServiceNoManager(serviceClassNames[i], startupContext);
-                }
+        }
+    }
+
+    /** Private helper used to load all extenal services and managers. */
+    private void loadExternalServices(String externalServices,
+                                      String externalManagers,
+                                      StartupKernelContext startupContext)
+        throws Exception
+    {
+        String [] serviceClassNames = externalServices.split(":", -1);
+        String [] managerClassNames = externalManagers.split(":", -1);
+        if (serviceClassNames.length != managerClassNames.length) {
+            if (logger.isLoggable(Level.SEVERE)) {
+                logger.log(Level.SEVERE, "External service count " +
+                           "({0}) does not match manager count ({1}).",
+                           serviceClassNames.length, managerClassNames.length);
+            }
+            throw new IllegalArgumentException("Mis-matched service " +
+                                               "and manager count");
+        }
+
+        for (int i = 0; i < serviceClassNames.length; i++) {
+            if (!managerClassNames[i].equals("")) {
+                setupService(serviceClassNames[i], managerClassNames[i],
+                             startupContext);
+            } else {
+                setupServiceNoManager(serviceClassNames[i], startupContext);
             }
         }
     }
@@ -1056,24 +1110,47 @@ class Kernel {
             }).start();
         }
     }
+
+    /** Basic implementation of the kernel management interface. */
+    public class KernelManager implements KernelMXBean {
+        /** {@inheritDoc} */
+        public void requestShutdown() {
+            shutdownCtrl.shutdownNode(this);
+        }
+    }
     
     /**
      * This method is used to automatically determine an application's set
      * of configuration properties.
      */
     private static Properties findProperties(String propLoc) throws Exception {
-        // load the application specific configuration file
-        // as the default set of options if it exists
+        // load the extension configuration file as the default set of
+        // properties if it exists
         Properties baseProperties = new Properties();
+        String extPropFile =
+            System.getProperty(BootProperties.EXTENSION_FILE_PROPERTY);
+        if (extPropFile != null) {
+            File extFile = new File(extPropFile);
+            if (extFile.isFile() && extFile.canRead()) {
+                baseProperties = loadProperties(extFile.toURI().toURL(), null);
+            } else {
+                logger.log(Level.SEVERE, "can't access file: " + extPropFile);
+                throw new IllegalArgumentException("can't access file " +
+                                                   extPropFile);
+            }
+        }
+
+        // next load the application specific property file, if this exists
         URL propsIn = ClassLoader.getSystemResource(
                 BootProperties.DEFAULT_APP_PROPERTIES);
+        Properties appProperties = baseProperties;
         if (propsIn != null) {
-            baseProperties = loadProperties(propsIn, null);
+            appProperties = loadProperties(propsIn, baseProperties);
         }
         
         // load the overriding set of configuration properties from the
         // file indicated by the filename argument
-        Properties fileProperties = baseProperties;
+        Properties fileProperties = appProperties;
         if (propLoc != null && !propLoc.equals("")) {
             File propFile = new File(propLoc);
             if (!propFile.isFile() || !propFile.canRead()) {
@@ -1082,7 +1159,7 @@ class Kernel {
                                                    propFile);
             }
             fileProperties = loadProperties(propFile.toURI().toURL(),
-                                            baseProperties);
+                                            appProperties);
         }
         
         // if a properties file exists in the user's home directory, use
@@ -1127,13 +1204,16 @@ class Kernel {
      * <li>Properties specified in the resource with the name 
      * {@link BootProperties#DEFAULT_APP_PROPERTIES}
      * This file is typically included as part of the application jar file.</li>
+     * <li>Properties specified in the file named by the optional
+     * {@link BootProperties#EXTENSION_FILE_PROPERTY} property.</li>
      * </ol>
      * 
-     * If no value is specified for a given
-     * property in any of these places, then a default is used
-     * or an <code>Exception</code> is thrown (depending on whether a default
-     * value is available).  Certain properties are required to be 
-     * specified somewhere in the application's configuration.
+     * If no value is specified for a given property in any of these places,
+     * then a default is used or an <code>Exception</code> is thrown
+     * (depending on whether a default value is available). Certain
+     * properties are required to be specified somewhere in the application's
+     * configuration.
+     * <p>
      * See {@link StandardProperties} for the required and optional properties.
      * 
      * @param args optional filename for <code>Properties</code> file 

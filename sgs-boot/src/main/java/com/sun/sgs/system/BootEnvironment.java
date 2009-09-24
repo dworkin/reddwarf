@@ -68,7 +68,12 @@ public final class BootEnvironment {
      * and application properties files.
      */
     public static final String SGS_DEPLOY = "SGS_DEPLOY";
-    
+
+    /**
+     * The directory where extension jar files should be placed.
+     */
+    public static final String SGS_EXT = "SGS_EXT";
+
     /**
      * The properties file used to configure the Project Darkstar kernel.
      * This file should be fed to the Project Darkstar Kernel.
@@ -109,11 +114,6 @@ public final class BootEnvironment {
     public static final String CUSTOM_CLASSPATH_ADD = "CUSTOM_CLASSPATH_ADD";
     
     /**
-     * Port to listen for SHUTDOWN command.
-     */
-    public static final String SHUTDOWN_PORT = "SHUTDOWN_PORT";
-    
-    /**
      * Location of the JDK to use when booting up the Kernel.
      */
     public static final String JAVA_HOME = "JAVA_HOME";
@@ -122,12 +122,27 @@ public final class BootEnvironment {
      * Command line arguments for the JVM.
      */
     public static final String JAVA_OPTS = "JAVA_OPTS";
+
+    /**
+     * Port number used for JMX connections.
+     */
+    public static final String JMX_PORT = "JMX_PORT";
+
+    /**
+     * Whether or not to disable JMX security controls.
+     */
+    public static final String DISABLE_JMX_SECURITY = "DISABLE_JMX_SECURITY";
     
     /**
      * The default value for the {@code SGS_DEPLOY} property.
      */
     public static final String DEFAULT_SGS_DEPLOY = 
             "${SGS_HOME}" + File.separator + "deploy";
+    /**
+     * The default value for the {@code SGS_EXT} property.
+     */
+    public static final String DEFAULT_SGS_EXT = 
+            "${SGS_HOME}" + File.separator + "ext";
     /**
      * The default value for the {@code SGS_PROPERTIES} property.
      */
@@ -156,15 +171,13 @@ public final class BootEnvironment {
     public static final String DEFAULT_APP_PROPERTIES = 
             "META-INF/app.properties";
     /**
-     * The default value for the {@code DEFAULT_SHUTDOWN_PORT} property.
+     * The default port used for JMX connections.
      */
-    public static final String DEFAULT_SHUTDOWN_PORT = "1138";
-    
+    public static final String DEFAULT_JMX_PORT = "62974";
     /**
-     * The default remote command used to initiate a shutdown.
+     * The default security state for JMX, which is disabled.
      */
-    public static final String SHUTDOWN_COMMAND = "SHUTDOWN";
-    
+    public static final String DEFAULT_DISABLE_JMX_SECURITY = "true";
     /**
      * The default directory of the BDB native libraries.
      */
@@ -324,9 +337,20 @@ public final class BootEnvironment {
             properties.setProperty(BootEnvironment.BDB_TYPE,
                                    BootEnvironment.DEFAULT_BDB_TYPE);
         }
-        if (properties.getProperty(BootEnvironment.SHUTDOWN_PORT) == null) {
-            properties.setProperty(BootEnvironment.SHUTDOWN_PORT,
-                                   BootEnvironment.DEFAULT_SHUTDOWN_PORT);
+        if (properties.getProperty(BootEnvironment.JMX_PORT) == null) {
+            properties.setProperty(BootEnvironment.JMX_PORT,
+                                   BootEnvironment.DEFAULT_JMX_PORT);
+        }
+        if (properties.
+            getProperty(BootEnvironment.DISABLE_JMX_SECURITY) == null)
+        {
+            properties.setProperty(BootEnvironment.DISABLE_JMX_SECURITY,
+                                   BootEnvironment.
+                                   DEFAULT_DISABLE_JMX_SECURITY);
+        }
+        if (properties.getProperty(BootEnvironment.SGS_EXT) == null) {
+            properties.setProperty(BootEnvironment.SGS_EXT,
+                                   BootEnvironment.DEFAULT_SGS_EXT);
         }
         
         //autodetect BDB libraries if necessary
