@@ -132,24 +132,22 @@ public class DummyWatchdogService implements WatchdogService {
      * {@inheritDoc}
      */
     public long currentAppTimeMillis() {
-        // do nothing for now
-        return 0;
+        // keep it simple for the dummy implementation
+        return System.currentTimeMillis();
     }
     
     /**
      * {@inheritDoc}
      */
     public long getAppTimeMillis(long systemTimeMillis) {
-        // do nothing for now
-        return 0;
+        return systemTimeMillis;
     }
 
     /**
      * {@inheritDoc}
      */
     public long getSystemTimeMillis(long appTimeMillis) {
-        // do nothing for now
-        return 0;
+        return appTimeMillis;
     }
 
     /** A basic, private implementation of Node. */

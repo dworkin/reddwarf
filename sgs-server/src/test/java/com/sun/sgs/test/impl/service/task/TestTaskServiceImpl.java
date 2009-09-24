@@ -1139,10 +1139,7 @@ public class TestTaskServiceImpl extends Assert {
         // sleep past the periodic tasks start times and start back up
         serverNode.shutdown(false);
         Thread.sleep(750);
-        long start = System.currentTimeMillis();
         setUp(null, false);
-        long end = System.currentTimeMillis();
-        System.err.println("STARTUP TIME : " + (end - start) + "ms");
 
         // verify the periodic tasks do not run immediately on startup
         Thread.sleep(100);
