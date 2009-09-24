@@ -592,8 +592,22 @@ public abstract class AbstractChannelServiceTest extends Assert {
 
     // -- other classes --
 
+    /**
+     * Creates a dummy client with the specified {@code name} and logs it
+     * into the specified {@code node}.  Note: this uses the
+     * {@code DirectiveNodeAssignment} policy to turn off round-robin node
+     * assignment. 
+     */
+    protected DummyClient createDummyClient(String name, SgsTestNode node) {
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	DummyClient client = new DummyClient(name);
+	client.connect(node.getAppPort());
+	assertTrue(client.login());
+	return client;
+    }
+
     // Dummy client code for testing purposes.
-    protected class DummyClient extends AbstractDummyClient {
+    public class DummyClient extends AbstractDummyClient {
 
 	private final Object lock = new Object();
 	private Set<String> channelNames = new HashSet<String>();

@@ -24,6 +24,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
@@ -616,9 +617,6 @@ public final class ChannelServiceImpl
 	 *
 	 * Sends the given {@code message} to all local members of the
 	 * specified channel.
-	 *
-	 * TBD: (optimization) this method should handle sending multiple
-	 * messages to a given channel.
 	 */
 	public void send(BigInteger channelRefId, byte[] message,
 			 long timestamp)
@@ -637,12 +635,8 @@ public final class ChannelServiceImpl
 		LocalChannelInfo channelInfo =
 		    localChannelMembersMap.get(channelRefId);
 		if (channelInfo == null) {
-		    // TBD: Should server node be removed from channel list
-		    // because there are no more members?  What if a join is
-		    // happening concurrently?  Would timestamps help here?
 		    return;
 		}
-
 
 		// Lock the channel info (which locks the channel
 		// membership list) while iterating to avoid changes
@@ -687,7 +681,6 @@ public final class ChannelServiceImpl
 			handleChannelRequest(sessionRefId, timestamp, task);
 		    }
 		}
-		
 	    } finally {
 		callFinished();
 	    }

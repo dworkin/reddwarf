@@ -1812,7 +1812,7 @@ public final class ClientSessionServiceImpl
 			logger.log(
 			    Level.FINEST,
 			    "Notifying NMS relocate preparation complete, " +
-			    "session:{0} localNode:{1} newNode{2}",
+			    "session:{0} localNodeId:{1} newNodeId:{2}",
 			    sessionRefId, getLocalNodeId(), newNodeId);
 		    }
 		    nmsCompletionHandler.completed();
