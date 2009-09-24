@@ -88,6 +88,11 @@ public class DummyTransactionListener implements TransactionListener {
 	}
     }
 
+    /** {@inheritDoc} */
+    public String getTypeName() {
+        return DummyTransactionListener.class.getName();
+    }
+
     /** Checks that and afterCompletion was called as specified. */
     public synchronized void assertCalledAfter(
 	CalledAfter assertCalledAfter)

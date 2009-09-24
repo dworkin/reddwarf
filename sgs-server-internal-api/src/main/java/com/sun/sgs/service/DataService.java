@@ -47,6 +47,21 @@ import java.math.BigInteger;
 public interface DataService extends DataManager, Service {
 
     /**
+     * Returns the node ID for the local node.  The node ID for a node remains
+     * fixed for the lifetime of the node (i.e., until it fails). The return
+     * value may be passed to {@link WatchdogService#getNode
+     * WatchdogService.getNode} to obtain the {@link Node} object for the local
+     * node. <p>
+     *
+     * This method may be invoked any time after this service is initialized,
+     * whether or not the calling context is inside or outside of a
+     * transaction.
+     *
+     * @return	the node ID for the local node
+     */
+    long getLocalNodeId();
+
+    /**
      * Obtains the object associated with the service binding of a name.
      * Callers need to notify the system before modifying the object or any of
      * the non-managed objects it refers to by calling {@link #markForUpdate

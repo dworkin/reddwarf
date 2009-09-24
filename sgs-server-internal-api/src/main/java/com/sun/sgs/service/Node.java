@@ -30,7 +30,7 @@ package com.sun.sgs.service;
 public interface Node {
 
     /**
-     * Returns the node ID.
+     * Returns the node ID, which is always non-negative.
      *
      * @return the node ID
      */

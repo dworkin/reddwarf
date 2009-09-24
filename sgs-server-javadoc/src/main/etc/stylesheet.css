@@ -1,0 +1,20 @@
+/* Extra stylesheet contents for generating Javadoc */
+
+/* Ordered lists where the outermost list is marked with the "outline"
+   class will be formatted to use different styles for different
+   nestings:
+
+   I. Uppercase roman
+     A. Uppercase alphabetic
+       1. Decimal
+         a. Lowercase alphabetic
+	   i. Lowercase roman
+
+   It will also use the "disc" style for unordered list bullets.
+*/
+ol.outline { list-style-type: upper-roman }
+ol.outline ol { list-style-type: upper-alpha }
+ol.outline ol ol { list-style-type: decimal }
+ol.outline ol ol ol { list-style-type: lower-alpha }
+ol.outline ol ol ol ol { list-style-type: lower-roman }
+ol.outline * ul { list-style: disc }

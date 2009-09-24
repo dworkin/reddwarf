@@ -30,6 +30,7 @@ import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
@@ -38,7 +39,6 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
-import java.util.logging.Logger;
 
 /**
  * A skeletal implementation of {@code DataStore} that does logging, checks
@@ -89,11 +89,11 @@ public abstract class AbstractDataStore
     /**
      * Creates an instance of this class.
      *
-     * @param	accessCoordinator the access coordinator
+     * @param	systemRegistry the registry of available system components
      * @param	logger the main logger for this class
      * @param	abortLogger the logger for transaction abort exceptions
      */
-    protected AbstractDataStore(AccessCoordinator accessCoordinator,
+    protected AbstractDataStore(ComponentRegistry systemRegistry,
 				LoggerWrapper logger,
 				LoggerWrapper abortLogger)
     {
@@ -102,6 +102,8 @@ public abstract class AbstractDataStore
 	this.logger = logger;
 	this.abortLogger = logger;
 	String className = getClass().getName();
+	AccessCoordinator accessCoordinator =
+	    systemRegistry.getComponent(AccessCoordinator.class);
 	objectAccesses = accessCoordinator.registerAccessSource(
 	    className + ".objects", Long.class);
 	nameAccesses = accessCoordinator.registerAccessSource(
@@ -109,6 +111,41 @@ public abstract class AbstractDataStore
     }
 
     /* -- Implement DataStore -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation does nothing.
+     */
+    public void ready() throws Exception { }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation does logging and calls {@link
+     * #getLocalNodeIdInternal} to perform the actual operation.
+     */
+    public long getLocalNodeId() {
+	logger.log(FINEST, "getLocalNodeId");
+	try {
+	    long result = getLocalNodeIdInternal();
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(
+		    FINEST, "getLocalNodeId returns nodeId:{0}", result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    throw handleException(null, FINEST, e, "getLocalNodeId");
+	}
+    }
+
+    /**
+     * Performs the actual operation for {@link #getLocalNodeId
+     * getLocalNodeId}.
+     *
+     * @return	the local node ID
+     */
+    protected abstract long getLocalNodeIdInternal();
 
     /**
      * {@inheritDoc} <p>
@@ -956,7 +993,7 @@ public abstract class AbstractDataStore
 	try {
 	    objectAccesses.reportObjectAccess(txn, oid, type);
 	} catch (IllegalArgumentException e) {
-	    throw new IllegalStateException(
+	    throw new TransactionNotActiveException(
 	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
 	}
     }
@@ -974,7 +1011,7 @@ public abstract class AbstractDataStore
 	try {
 	    nameAccesses.reportObjectAccess(txn, getNameForAccess(name), type);
 	} catch (IllegalArgumentException e) {
-	    throw new IllegalStateException(
+	    throw new TransactionNotActiveException(
 	        "Problem with transaction " + txn + ": " + e.getMessage(), e);
 	}
     }
@@ -1005,7 +1042,7 @@ public abstract class AbstractDataStore
      * @param	oid the object ID
      * @throws	IllegalArgumentException if {@code oid} is negative
      */
-    protected static void checkOid(long oid) {
+    public static void checkOid(long oid) {
 	if (oid < 0) {
 	    throw new IllegalArgumentException(
 		"Object ID must not be negative");

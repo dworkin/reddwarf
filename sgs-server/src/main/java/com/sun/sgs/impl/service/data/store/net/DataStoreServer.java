@@ -33,6 +33,14 @@ import java.rmi.Remote;
 public interface DataStoreServer extends Remote {
 
     /**
+     * Returns a new node ID for use with a newly started node.
+     *
+     * @return	the new node ID
+     * @throws	IOException if a network problem occurs
+     */
+    long newNodeId() throws IOException;
+
+    /**
      * Reserves an object ID for a new object.  Note that calling other
      * operations using this ID are not required to find the objects until
      * {@link #setObject setObject} is called.  Aborting a transaction is also

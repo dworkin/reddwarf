@@ -48,11 +48,12 @@ import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 
+import com.sun.sgs.test.util.Constants;
 import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.io.Serializable;
 
@@ -65,14 +66,16 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import junit.framework.TestCase;
-
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 
 /** Test the TaskServiceImpl class */
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestTaskServiceImpl extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public class TestTaskServiceImpl extends Assert {
 
     // the pending namespace in the TaskService
     // NOTE: this assumes certain private structure in the task service
@@ -100,6 +103,9 @@ public class TestTaskServiceImpl extends TestCase {
     private DataService dataService;
     private NodeMappingService mappingService;
     private TaskService taskService;
+
+    /** The continue threshold from the TaskServiceImpl. */
+    private long continueThreshold;
         
     private static Field getField(Class cl, String name) throws Exception {
 	Field field = cl.getDeclaredField(name);
@@ -110,16 +116,15 @@ public class TestTaskServiceImpl extends TestCase {
      * Test management.
      */
 
-    public TestTaskServiceImpl(String name) throws Exception {
-        super(name);
+    public TestTaskServiceImpl() throws Exception {
         Class cl = TaskServiceImpl.class;
 	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
 	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
 	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
-    protected void setUp() throws Exception {
-        System.err.println("Testcase: " + getName());
+    @Before
+    public void setUp() throws Exception {
         setUp(null);
     }
 
@@ -136,6 +141,9 @@ public class TestTaskServiceImpl extends TestCase {
         dataService = serverNode.getDataService();
         mappingService = serverNode.getNodeMappingService();
         taskService = serverNode.getTaskService();
+
+        continueThreshold = Long.valueOf(serviceProps.getProperty(
+                "com.sun.sgs.impl.service.task.continue.threshold"));
         
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
@@ -147,7 +155,8 @@ public class TestTaskServiceImpl extends TestCase {
             }, taskOwner);
     }
 
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         serverNode.shutdown(true);
     }
     
@@ -155,6 +164,7 @@ public class TestTaskServiceImpl extends TestCase {
      * Constructor tests.
      */
 
+    @Test
     public void testConstructorNullArgs() throws Exception {
         try {
             new TaskServiceImpl(null, systemRegistry, txnProxy);
@@ -176,6 +186,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
+    @Test
     public void testConstructorNoScheduler() throws Exception {
         Class<?> criClass = 
             Class.forName("com.sun.sgs.impl.kernel.ComponentRegistryImpl");
@@ -194,6 +205,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
     
     /**  Version tests */
+    @Test
     public void testConstructedVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -209,7 +221,8 @@ public class TestTaskServiceImpl extends TestCase {
 		    }
 		}}, taskOwner);
     }
-    
+
+    @Test
     public void testConstructorWithCurrentVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -221,6 +234,7 @@ public class TestTaskServiceImpl extends TestCase {
 	new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
     }
 
+    @Test
     public void testConstructorWithMajorVersionMismatch() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -238,6 +252,7 @@ public class TestTaskServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorWithMinorVersionMismatch() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
@@ -259,6 +274,7 @@ public class TestTaskServiceImpl extends TestCase {
      * getName tests.
      */
 
+    @Test
     public void testGetName() {
         assertNotNull(taskService.getName());
     }
@@ -267,6 +283,7 @@ public class TestTaskServiceImpl extends TestCase {
      * TaskManager tests.
      */
 
+    @Test
     public void testScheduleTaskNullArgs() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -293,6 +310,7 @@ public class TestTaskServiceImpl extends TestCase {
             }, taskOwner);
     }
 
+    @Test
     public void testScheduleTaskNotSerializable() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -320,6 +338,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testScheduleTaskNotManagedObject() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -346,6 +365,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testScheduleTaskIsManagedObject() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -372,6 +392,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testScheduleNegativeTime() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -399,6 +420,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testScheduleTaskNoTransaction() {
         Task task = new ManagedTask();
         try {
@@ -421,6 +443,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
+    @Test
     public void testRunImmediateTasks() throws Exception {
         // test with application identity
         runImmediateTest(taskOwner);
@@ -449,6 +472,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Some immediate tasks did not run");
     }
 
+    @Test
     public void testRunNonRetriedTasks() throws Exception {
         // NOTE: this test assumes a certain structure in the TaskService.
 
@@ -497,6 +521,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testRunPendingTasks() throws Exception {
         // test with application identity
         runPendingTest(taskOwner);
@@ -526,6 +551,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Some pending tasks did not run");
     }
 
+    @Test
     public void testRunPeriodicTasks() throws Exception {
         // test with application identity
         runPeriodicTest(taskOwner);
@@ -537,7 +563,7 @@ public class TestTaskServiceImpl extends TestCase {
         runPeriodicTest(newOwner);
     }
 
-    public void runPeriodicTest(final Identity owner) throws Exception {
+    private void runPeriodicTest(final Identity owner) throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
@@ -572,6 +598,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testCancelPeriodicTasksBasic() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -616,6 +643,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Basic cancel of periodic tasks failed");
     }
 
+    @Test
     public void testCancelPeriodicTasksTxnCommitted() throws Exception {
         final CancelPeriodicTask task = new CancelPeriodicTask();
         txnScheduler.runTask(task, taskOwner);
@@ -647,6 +675,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
+    @Test
     public void testCancelPeriodicTasksTxnAborted() throws Exception {
         CancelPeriodTaskAbort task = new CancelPeriodTaskAbort();
         try {
@@ -673,6 +702,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
+    @Test
     public void testCancelPeriodicTasksTwice() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -725,6 +755,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
+    @Test
     public void testCancelPeriodicTasksTaskRemoved() throws Exception {
          txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -768,10 +799,38 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("cancel of periodic tasks failed");
     }
 
+    @Test
+    public void testShouldContinueTrue() throws Exception {
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    assertTrue(taskService.shouldContinue());
+                }
+        }, taskOwner);
+    }
+
+    @Test
+    public void testShouldContinueFalse() throws Exception {
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() throws Exception {
+                    Thread.sleep(continueThreshold +
+                                 Constants.MAX_CLOCK_GRANULARITY);
+                    assertFalse(taskService.shouldContinue());
+                }
+        }, taskOwner);
+    }
+
+    @Test(expected = TransactionNotActiveException.class)
+    public void testShouldContinueNoTransaction() throws Exception {
+        taskService.shouldContinue();
+    }
+
     /**
      * TaskService tests.
      */
 
+    @Test
     public void testScheduleNonDurableTaskNullArgs() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -792,6 +851,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testScheduleNonDurableTaskNegativeTime() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -807,6 +867,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
     }
 
+    @Test
     public void testScheduleNonDurableTaskNoTransaction() {
         KernelRunnableImpl task = new KernelRunnableImpl(null);
         try {
@@ -823,6 +884,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
+    @Test
     public void testRunImmediateNonDurableTasks() throws Exception {
         final CountDownLatch latch = new CountDownLatch(3);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -843,6 +905,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
+    @Test
     public void testRunPendingNonDurableTasks() throws Exception {
         final CountDownLatch latch = new CountDownLatch(3);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -863,6 +926,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
+    @Test
     public void testRunNonDurableTransactionalTasks() throws Exception {
         final CountDownLatch latch = new CountDownLatch(2);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -885,6 +949,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
+    @Test
     public void testRunNonDurableNonTransactionalTasks() throws Exception {
         final CountDownLatch latch = new CountDownLatch(2);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -911,6 +976,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
+    @Test
     public void testRecoveryCleanup() throws Exception {
         final SgsTestNode node = new SgsTestNode(serverNode, null, null);
         final SgsTestNode node2 = new SgsTestNode(serverNode, null, null);
@@ -948,6 +1014,7 @@ public class TestTaskServiceImpl extends TestCase {
         node2.shutdown(false);
     }
 
+    @Test
     public void testRunImmediateWithNewIdentity() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -961,6 +1028,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Immediate task did not have new identity");
     }
 
+    @Test
     public void testRunDelayedWithNewIdentity() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -975,6 +1043,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Delayed task did not have new identity");
     }
 
+    @Test
     public void testRunPeriodicWithNewIdentity() throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -990,6 +1059,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Immediate task did not have new identity");
     }
 
+    @Test
     public void testRunNonDurableWithNewIdentity() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -1003,6 +1073,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertTrue(latch.await(100L, TimeUnit.MILLISECONDS));
     }
 
+    @Test
     public void testRunDelayedNonDurableWithNewIdentity() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {

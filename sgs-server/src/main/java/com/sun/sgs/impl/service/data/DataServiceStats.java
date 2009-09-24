@@ -43,6 +43,7 @@ class DataServiceStats implements DataServiceMXBean {
     final ProfileOperation removeBindingOp;
     final ProfileOperation removeObjOp;
     final ProfileOperation setBindingOp;
+    final ProfileOperation getLocalNodeIdOp;
     final ProfileOperation createRefForIdOp;
     final ProfileOperation getServiceBindingOp;
     final ProfileOperation getServiceBindingForUpdateOp;
@@ -78,6 +79,8 @@ class DataServiceStats implements DataServiceMXBean {
         setBindingOp =
             consumer.createOperation("setBinding", type, level);
         // Service operations
+        getLocalNodeIdOp =
+            consumer.createOperation("getLocalNodeId", type, level);
         createRefForIdOp =
             consumer.createOperation("createReferenceForId", type, level);
         getServiceBindingOp =
@@ -112,6 +115,11 @@ class DataServiceStats implements DataServiceMXBean {
     /** {@inheritDoc} */
     public long getGetBindingForUpdateCalls() {
         return ((AggregateProfileOperation) getBindingForUpdateOp).getCount();
+    }
+
+    /** {@inheritDoc} */
+    public long getGetLocalNodeIdCalls() {
+        return ((AggregateProfileOperation) getLocalNodeIdOp).getCount();
     }
 
     /** {@inheritDoc} */

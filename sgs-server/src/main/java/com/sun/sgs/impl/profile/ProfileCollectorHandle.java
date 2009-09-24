@@ -25,6 +25,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.TransactionListenerDetail;
 
 /**
  * The object which manages how {@link ProfileCollector}s keep track
@@ -85,6 +86,21 @@ public interface ProfileCollectorHandle {
      *                               this thread
      */
     void addParticipant(ProfileParticipantDetail participantDetail);
+
+    /**
+     * Tells the collector about a listener of a transaction when that
+     * listener is finished with its work (i.e., after its
+     * <code>afterCompletion</code>} method has been called). The
+     * transaction must be the current transaction for the current task,
+     * and therefore <code>noteTransactional</code> must first have been
+     * called in the context of the current thread.
+     *
+     * @param listenerDetail the detail associated with the listener
+     *
+     * @throws IllegalStateException if no transactional task is bound to
+     *                               this thread
+     */
+    void addListener(TransactionListenerDetail listenerDetail);
 
     /**
      * Sets the detail for all objects accessed during the task as

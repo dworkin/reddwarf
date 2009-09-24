@@ -45,8 +45,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	"com.sun.sgs.impl.service.data.store.net";
 
     /** Creates an instance. */
-    public TestDataStoreClientPerformance(String name) {
-	super(name);
+    public TestDataStoreClientPerformance() {
 	count = Integer.getInteger("test.count", 20);
     }
 
@@ -69,7 +68,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props, accessCoordinator),
+	    new DataStoreClient(props, env.systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;

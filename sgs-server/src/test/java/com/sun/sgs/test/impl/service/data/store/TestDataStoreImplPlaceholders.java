@@ -47,6 +47,10 @@ import org.junit.runner.RunWith;
 @RunWith(FilteredNameRunner.class)
 public class TestDataStoreImplPlaceholders extends Assert {
 
+    /** The basic test environment. */
+    private static final BasicDataStoreTestEnv env =
+	new BasicDataStoreTestEnv(System.getProperties());
+
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
@@ -100,7 +104,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
     @BeforeClass
     public static void initialize() throws Exception {
 	cleanDirectory(dbDirectory);
-	store = new DataStoreImpl(props, accessCoordinator);
+	store = new DataStoreImpl(props, env.systemRegistry, env.txnProxy);
     }
 
     /** Create a transaction and an object in the data store. */
@@ -244,7 +248,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	txn.commit();
 	txn = null;
 	store.shutdown();
-	store = new DataStoreImpl(props, accessCoordinator);
+	store = new DataStoreImpl(props, env.systemRegistry, env.txnProxy);
 	long nextId = -1;
 	for (int i = 0; true; i++) {
 	    if (i % 40 == 0) {

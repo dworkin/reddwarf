@@ -468,10 +468,9 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.watchdog.server.renew.interval", "1500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
-            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "1000"
+            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "1000",
+            "com.sun.sgs.impl.service.task.continue.threshold", "10"
         );
-        
-        
 
         return retProps;
     }
@@ -480,7 +479,7 @@ public class SgsTestNode {
      * Returns the nodeId for this test node.
      */
     public long getNodeId() {
-        return getWatchdogService().getLocalNodeId();
+        return getDataService().getLocalNodeId();
     }
 
     /**

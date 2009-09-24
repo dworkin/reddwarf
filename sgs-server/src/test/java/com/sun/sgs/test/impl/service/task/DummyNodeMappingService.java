@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingListener;
@@ -83,7 +84,7 @@ public class DummyNodeMappingService implements NodeMappingService,
         availableNodes = new ConcurrentLinkedQueue<Node>();
         watchdogService = tp.getService(WatchdogService.class);
         watchdogService.addNodeListener(this);
-        localId = watchdogService.getLocalNodeId();
+        localId = tp.getService(DataService.class).getLocalNodeId();
         serviceMap.put(localId, this);
     }
 
