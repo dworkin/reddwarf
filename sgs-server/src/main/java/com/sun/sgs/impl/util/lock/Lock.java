@@ -360,10 +360,10 @@ final class Lock<K> {
     }
 
     /**
-     * Removes a locker from the list of waiters for this lock and returns the
-     * lock request, which must be present.
+     * Removes a locker from the list of waiters for this lock.  The locker
+     * should be present in the list.
      */
-    LockRequest<K> flushWaiter(Locker<K> locker) {
+    void flushWaiter(Locker<K> locker) {
 	assert checkSync(locker.lockManager);
 	for (Iterator<LockRequest<K>> iter = waiters.iterator();
 	     iter.hasNext(); )
@@ -371,7 +371,7 @@ final class Lock<K> {
 	    LockRequest<K> request = iter.next();
 	    if (request.locker == locker) {
 		iter.remove();
-		return request;
+		return;
 	    }
 	}
 	throw new AssertionError("Waiter was not found: " + locker);

@@ -66,11 +66,7 @@ import java.util.logging.Logger;
  * deadlock victim, determining the age using the originally requested start
  * time for the task associated with the transaction.  The implementation does
  * not deny requests that would not result in deadlock.  When requests block,
- * it services the requests in the order that they arrive, except for upgrade
- * requests, which it puts ahead of non-upgrade requests.  The justification
- * for special treatment of upgrade requests is that an upgrade request is
- * useless if a conflicting request goes first and causes the waiter to lose
- * its read lock. <p>
+ * it services the requests in the order that they arrive. <p>
  *
  * The methods that this class provides to implement {@code AccessReporter} are
  * not thread safe, and should either be called from a single thread or else
@@ -171,7 +167,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	long txnTimeout = wrappedProps.getLongProperty(
 	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
 	    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT);
-	long defaultLockTimeout = computeLockTimeout(txnTimeout);
+	long defaultLockTimeout = Math.max(
+	    1L, (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION));
 	long lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
 	int numKeyMaps = wrappedProps.getIntProperty(
@@ -261,19 +258,6 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	locker.releaseAll();
 	txnMap.remove(txn);
 	profileCollectorHandle.setAccessedObjectsDetail(locker);
-    }
-
-    /**
-     * Computes the lock timeout based on the specified transaction timeout and
-     * {@link #DEFAULT_LOCK_TIMEOUT_PROPORTION}.
-     */
-    private static long computeLockTimeout(long txnTimeout) {
-	long result = (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
-	/* Lock timeout should be at least 1 */
-	if (result < 1) {
-	    result = 1;
-	}
-	return result;
     }
 
     /* -- Other classes -- */
@@ -505,9 +489,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	    if (object == this) {
 		return true;
 	    } else if (object instanceof AccessedObjectImpl) {
-		AccessedObjectImpl request = (AccessedObjectImpl) object;
-		return getKey().equals(request.getKey()) &&
-		    getForWrite() == request.getForWrite();
+		AccessedObjectImpl other = (AccessedObjectImpl) object;
+		return getKey().equals(other.getKey()) &&
+		    getForWrite() == other.getForWrite();
 	    } else {
 		return false;
 	    }

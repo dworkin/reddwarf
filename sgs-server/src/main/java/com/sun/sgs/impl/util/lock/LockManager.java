@@ -50,7 +50,7 @@ import java.util.logging.Logger;
  * <ul>
  *
  * <li>Synchronization is only used on {@link Locker} objects and on the {@code
- *     Map}s that hold {@code Lock} objects
+ *     Map}s that hold {@link Lock} objects
  *
  * <li>A thread can synchronize on at most one locker and one lock at a time,
  *     always synchronizing on the locker first
@@ -67,7 +67,7 @@ import java.util.logging.Logger;
  *     Callers of non-{@code Object} methods on the {@code Lock} class should
  *     make sure that they are synchronized on the associated key map.
  *
- * <li>The {@link Locker} class and its subclasses only use synchronization for
+ * <li>The {@code Locker} class and its subclasses only use synchronization for
  *     getter and setter methods
  *
  * <li>Blocks synchronized on a {@code Lock} should not synchronize on anything
@@ -334,9 +334,9 @@ public class LockManager<K> {
      * @param	forWrite whether to request a write lock
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
-     * @throws	IllegalStateException if a previous lock request was aborted
-     *		due to deadlock, or if this locker is already waiting for a
-     *		lock
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
      */
     LockConflict<K> lockNoWaitInternal(
 	Locker<K> locker, K key, boolean forWrite)
@@ -501,12 +501,13 @@ public class LockManager<K> {
     /**
      * Releases a lock, but only downgrading it if {@code downgrade} is true.
      * Like {@link #releaseLock}, but permits specifying if the lock is being
-     * downgraded rather than fully released, and does not check that the
-     * correct lock manager was supplied.
+     * downgraded rather than fully released.
      *
      * @param	locker the locker holding the lock
      * @param	key the key identifying the lock
      * @param	downgrade whether the lock should only be downgraded
+     * @throws	IllegalArgumentException if {@code locker} has a different lock
+     *		manager 
      */
     void releaseLockInternal(Locker<K> locker, K key, boolean downgrade) {
 	checkLockManager(locker);

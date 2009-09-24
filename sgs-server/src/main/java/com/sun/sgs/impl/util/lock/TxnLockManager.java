@@ -22,13 +22,33 @@ package com.sun.sgs.impl.util.lock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
+import java.util.logging.Logger;
 
 /**
- * A class for managing lock conflicts as part of a transaction.  This class
- * detects deadlocks.  All {@link Locker} objects supplied to this class should
- * be instances of {@link TxnLocker}.
+ * A class for managing lock conflicts as part of a transaction, and calls on
+ * behalf of a locker should only be made from a single thread at a time.  All
+ * {@link Locker} objects supplied to this class should be instances of {@link
+ * TxnLocker}. <p>
+ *
+ * This implementation checks for deadlock whenever a lock request is blocked
+ * due to a conflict.  It selects as the deadlock victim the locker with the
+ * latest requested start time.  The implementation does not deny requests that
+ * would not result in deadlock.  When requests block, it services the requests
+ * in the order that they arrive. <p>
+ *
+ * This class uses the {@link Logger} named {@code com.sun.sgs.impl.util.lock}
+ * to log information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#FINER FINER} - Releasing locks; requesting, waiting for,
+ *	and returning from lock requests
+ * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
+ *	requesting locks before waiting, releasing locks, results of attempting
+ *	to assign locks to waiters
+ * </ul>
  *
  * @param	<K> the type of key
  */
@@ -91,7 +111,11 @@ public final class TxnLockManager<K> extends LockManager<K> {
     /* -- Package access methods -- */
 
     /**
+     * {@inheritDoc} <p>
+     *
      * This implementation calls the deadlock checker if the request blocks.
+     *
+     * @throws	IllegalStateException {@inheritDoc}     
      */
     @Override
     LockConflict<K> lockNoWaitInternal(

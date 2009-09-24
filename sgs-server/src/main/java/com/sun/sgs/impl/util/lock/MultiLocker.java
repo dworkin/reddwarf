@@ -56,6 +56,8 @@ public class MultiLocker<K> extends Locker<K> {
      *
      * This implementation sets the value for the current thread in the {@link
      * MultiLockManager}.
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
      */
     @Override
     void setWaitingFor(LockAttemptResult<K> waitingFor) {

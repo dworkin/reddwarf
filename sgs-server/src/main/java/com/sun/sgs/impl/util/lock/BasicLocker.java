@@ -28,9 +28,9 @@ package com.sun.sgs.impl.util.lock;
 public class BasicLocker<K> extends Locker<K> {
 
     /**
-     * The result of the lock request that this transaction is waiting for,
-     * or {@code null} if it is not waiting.  Synchronize on this locker
-     * when accessing this field.
+     * The result of the lock request that this locker is waiting for, or
+     * {@code null} if it is not waiting.  Synchronize on this locker when
+     * accessing this field.
      */
     private LockAttemptResult<K> waitingFor;
 
@@ -50,8 +50,8 @@ public class BasicLocker<K> extends Locker<K> {
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation returns the lock attempt request associated with the
-     * current thread, if any.
+     * This implementation returns the lock attempt request associated with
+     * this locker, if any.
      */
     @Override
     LockAttemptResult<K> getWaitingFor() {
@@ -64,8 +64,10 @@ public class BasicLocker<K> extends Locker<K> {
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation sets the lock attempt request associated with the
-     * current thread.
+     * This implementation sets the lock attempt request associated with this
+     * locker.
+     *
+     * @throws	IllegalArgumentException {@inheritDoc}
      */
     @Override
     void setWaitingFor(LockAttemptResult<K> waitingFor) {

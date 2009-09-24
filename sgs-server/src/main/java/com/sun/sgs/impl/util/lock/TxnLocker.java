@@ -35,8 +35,8 @@ public class TxnLocker<K> extends BasicLocker<K> {
     protected final Transaction txn;
 
     /**
-     * The time in milliseconds when the task associated with this
-     * transaction was originally requested to start.
+     * The time in milliseconds when the associated transaction was originally
+     * requested to start.
      */
     protected final long requestedStartTime;
 
@@ -78,17 +78,17 @@ public class TxnLocker<K> extends BasicLocker<K> {
     /* -- Public methods -- */
 
     /**
-     * Returns the transaction associated with this request.
+     * Returns the transaction associated with this locker.
      *
-     * @return	the transaction associated with this request
+     * @return	the transaction associated with this locker
      */
     public Transaction getTransaction() {
 	return txn;
     }
 
     /**
-     * Returns the time in milliseconds that the task associated with the
-     * transaction was originally requested to start, as specified in the
+     * Returns the time in milliseconds that the transaction associated with
+     * this locker was originally requested to start, as specified in the
      * constructor.
      *
      * @return	the requested start time in milliseconds
@@ -130,8 +130,9 @@ public class TxnLocker<K> extends BasicLocker<K> {
      * {@inheritDoc} <p>
      *
      * This implementation checks for deadlocks and notifies waiters.
+     *
+     * @throws	IllegalStateException {@inheritDoc}
      */
-    /** {@inheritDoc} */
     @Override
     protected void clearConflict() {
 	assert checkAllowSync();

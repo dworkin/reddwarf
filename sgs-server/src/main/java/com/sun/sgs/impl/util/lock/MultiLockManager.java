@@ -19,14 +19,27 @@
 
 package com.sun.sgs.impl.util.lock;
 
+import java.util.logging.Level;
 import static java.util.logging.Level.FINER;
+import java.util.logging.Logger;
 
 /**
  * A class for managing lock conflicts where locks are not held by transactions
  * and the locker can make simultaneous requests from multiple threads.  This
  * class does not detect deadlocks, but provides support for {@linkplain
  * #downgradeLock downgrading locks}.  All {@link Locker} objects supplied to
- * this class should be instances of {@link MultiLocker}.
+ * this class should be instances of {@link MultiLocker}. <p>
+ *
+ * This class uses the {@link Logger} named {@code com.sun.sgs.impl.util.lock}
+ * to log information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#FINER FINER} - Releasing locks; requesting, waiting for,
+ *	and returning from lock requests
+ * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
+ *	requesting locks before waiting, releasing locks, results of attempting
+ *	to assign locks to waiters
+ * </ul>
  *
  * @param	<K> the type of key
  */
@@ -100,7 +113,7 @@ public final class MultiLockManager<K> extends LockManager<K> {
      * @param	locker the locker holding the lock
      * @param	key the key identifying the lock
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager , or if {@code locker} is not an instance of {@link
+     *		manager, or if {@code locker} is not an instance of {@link
      *		MultiLocker}
      */
     public void downgradeLock(Locker<K> locker, K key) {
@@ -124,10 +137,8 @@ public final class MultiLockManager<K> extends LockManager<K> {
     }
 
     /**
-     * Sets the lock that this thread is waiting for, or marks that it is not
-     * waiting if the argument is {@code null}.  If {@code waitingFor} is not
-     * {@code null}, then it should represent a conflict, and it's {@code
-     * conflict} field must not be {@code null}.
+     * Records the lock that this thread is waiting for, or marks that it is
+     * not waiting if the argument is {@code null}.
      *
      * @param	waitingFor the lock or {@code null}
      */
