@@ -19,6 +19,7 @@
 
 package com.sun.sgs.system;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.BufferedOutputStream;
@@ -38,7 +39,9 @@ import java.util.Scanner;
  */
 public final class Boot {
     private static final Logger logger = Logger.getLogger(Boot.class.getName());
-    
+
+    private static volatile Process sgsProcess = null;
+
     /**
      * This class should not be instantiated.
      */
@@ -88,17 +91,33 @@ public final class Boot {
         }
         String javaCmd = javaHome + File.separator + "bin" +
                 File.separator + "java";
-        
+
         //build the command
+        ExtJarGraph extGraph = new ExtJarGraph();
         List<String> executeCmd = new ArrayList<String>();
         executeCmd.add(javaCmd);
         executeCmd.add("-classpath");
-        executeCmd.add(bootClassPath(properties));
+        executeCmd.add(bootClassPath(properties, extGraph));
         executeCmd.add("-Djava.library.path=" + bootNativePath(properties));
         executeCmd.add("-Djava.util.logging.config.class=" +
                        BootEnvironment.DEFAULT_SGS_LOGGING_CLASS);
         executeCmd.add("-Djava.util.logging.config.file=" + 
                        properties.getProperty(BootEnvironment.SGS_LOGGING));
+        String extPropertiesFile = extGraph.getPropertiesFile();
+        if (extPropertiesFile != null) {
+            executeCmd.add("-Dcom.sun.sgs.ext.properties=" + extPropertiesFile);
+        }
+
+        // command-line properties for JMX management
+        executeCmd.add("-Dcom.sun.management.jmxremote.port=" +
+                       properties.getProperty(BootEnvironment.JMX_PORT));
+        if (!properties.
+            getProperty(BootEnvironment.DISABLE_JMX_SECURITY).equals("false"))
+        {
+            executeCmd.add("-Dcom.sun.management.jmxremote.authenticate=false");
+            executeCmd.add("-Dcom.sun.management.jmxremote.ssl=false");
+        }
+
         for (String i : bootCommandLineProps(properties)) {
             executeCmd.add(i);
         }
@@ -143,28 +162,40 @@ public final class Boot {
                 throw e;
             }
         }
-        
-        //instantiate the shutdown handler first so that any problems
-        //opening the socket server happen before the subprocess starts
-        ShutdownHandler shutdownHandler = new ShutdownHandler(
-                Integer.valueOf(
-                properties.getProperty(BootEnvironment.SHUTDOWN_PORT)));
 
+        // install a handler to cleanup when the process is killed directly
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+                public void run() {
+                    if (sgsProcess != null) {
+                        sgsProcess.destroy();
+                        closeStream(sgsProcess.getOutputStream());
+                        closeStream(sgsProcess.getInputStream());
+                        closeStream(sgsProcess.getErrorStream());
+                    }
+                }
+                private void closeStream(Closeable c) {
+                    try {
+                        c.close();
+                    } catch (IOException ioe) { }
+                }
+            });
+        
         //run the process
         try {
-            Process p = pb.start();
-            new Thread(new StreamPipe(p.getInputStream(), output)).start();
-            shutdownHandler.setProcess(p);
-            new Thread(shutdownHandler).start();
-            p.waitFor();
+            sgsProcess = pb.start();
+            new Thread(new StreamPipe(sgsProcess.getInputStream(),
+                                      output)).start();
+            sgsProcess.waitFor();
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to start process", e);
             throw e;
         } catch (InterruptedException i) {
             logger.log(Level.WARNING, "Thread interrupted", i);
         } finally {
+            if (sgsProcess != null) {
+                sgsProcess.destroy();
+            }
             output.close();
-            shutdownHandler.close();
         }
     }
     
@@ -173,7 +204,7 @@ public final class Boot {
      * kernel.  The classpath consists of any jar files that live directly
      * in the {@code $SGS_HOME/lib}
      * directory.  It also recursively includes jar files from the
-     * {@code $SGS_DEPLOY} directory. <p>
+     * {@code $SGS_DEPLOY} and {@code SGS_EXT} directories. <p>
      * 
      * Additionally, files included in the path from the {@code $SGS_HOME/lib}
      * directory are filtered based on the value of {@code $BDB_TYPE}.
@@ -190,9 +221,10 @@ public final class Boot {
      * </ul>
      * 
      * @param env environment with SGS_HOME set
+     * @param extGraph collection for the extension jar files
      * @return classpath to use to run the kernel
      */
-    private static String bootClassPath(Properties env) {
+    private static String bootClassPath(Properties env, ExtJarGraph extGraph) {
         //determine SGS_HOME
         String sgsHome = env.getProperty(BootEnvironment.SGS_HOME);
         if (sgsHome == null) {
@@ -256,6 +288,18 @@ public final class Boot {
                 buf.append(File.pathSeparator + jar.getAbsolutePath());
             } else {
                 buf.append(jar.getAbsolutePath());
+            }
+        }
+
+        //recursively add jars from SGS_EXT
+        File sgsExtDir = new File(env.getProperty(BootEnvironment.SGS_EXT));
+        List<String> extJarNames = new ArrayList<String>();
+        extJars(sgsExtDir, extJarNames, extGraph);
+        for (String jarName : extJarNames) {
+            if (buf.length() != 0) {
+                buf.append(File.pathSeparator + jarName);
+            } else {
+                buf.append(jarName);
             }
         }
 
@@ -417,6 +461,36 @@ public final class Boot {
         }
 
         return appPropsFound;
+    }
+
+    /**
+     * Helper method that recursively searches the given directory for
+     * extension jar files, adding them to a list and separate graph of
+     * discovered extensions.
+     *
+     * @param directory the directory to search for jar files
+     * @param jarFileNames list of file names for the discovered, valid jars 
+     * @param graph a collection of discovered extension jar files
+     */
+    private static void extJars(File directory, List<String> jarFileNames,
+                                ExtJarGraph graph)
+    {
+        if (directory.isDirectory() && directory.canRead()) {
+            for (File f : directory.listFiles()) {
+                if (f.isFile() && f.getName().endsWith(".jar")) {
+                    try {
+                        graph.addJarFile(new JarFile(f));
+                        jarFileNames.add(f.getAbsolutePath());
+                    } catch (IOException e) {
+                        //not a jar file, log and ignore
+                        logger.log(Level.WARNING, "Extension file " +
+                                   f.getAbsolutePath() + " is not a jar file");
+                    }
+                } else if (f.isDirectory()) {
+                    extJars(f, jarFileNames, graph);
+                }
+            }
+        }
     }
     
 }

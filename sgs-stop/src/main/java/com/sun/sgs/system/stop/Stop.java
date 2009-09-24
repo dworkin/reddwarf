@@ -19,14 +19,17 @@
 
 package com.sun.sgs.system.stop;
 
+import com.sun.sgs.management.KernelMXBean;
 import com.sun.sgs.system.BootEnvironment;
 import com.sun.sgs.system.SubstitutionProperties;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.net.InetAddress;
-import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMX;
+import javax.management.MBeanServerConnection;
+import javax.management.ObjectName;
+import javax.management.remote.JMXConnector;
+import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXServiceURL;
 
 /**
  * Initiates a shutdown of a running Project Darkstar server.
@@ -52,10 +55,12 @@ public final class Stop {
      * by the system resource {@link BootEnvironment#SGS_BOOT}.
      * <p>
      * A shutdown command is sent to the running Project Darkstar Server
-     * by connecting to localhost on the port specified by the 
-     * {@link BootEnvironment#SHUTDOWN_PORT} property in the configuration.
-     * A {@link BootEnvironment#SHUTDOWN_COMMAND} command is sent over
-     * the connected port.
+     * by connecting to the JMX server on the localhost at the port specified
+     * by the {@link BootEnvironment#JMX_PORT} property in the configuration,
+     * or the value of {@link BootEnvironment#DEFAULT_JMX_PORT} if no value
+     * is given for the property. The {@code KernelMXBean.requestShutdown()}
+     * method is invoked to start shutdown. Note that shutdown may not
+     * complete until after {@code main()} has already returned.
      * 
      * @param args optional filename of configuration file
      * @throws Exception if there is a problem
@@ -73,34 +78,20 @@ public final class Stop {
         } else {
             properties = BootEnvironment.loadProperties(args[0]);
         }
-        
-        //get shutdown port
-        Integer port = Integer.valueOf(
-                properties.getProperty(BootEnvironment.SHUTDOWN_PORT));
-        
-        //connect to shutdown port and initiate shutdown command
-        Socket socket = null;
-        PrintStream out = null;
-        try {
-            logger.log(Level.INFO, "Sending " + 
-                       BootEnvironment.SHUTDOWN_COMMAND + 
-                       " to port " + port + 
-                       " on " + InetAddress.getByName(null));
-            socket = new Socket(InetAddress.getByName(null), port);
-            out = new PrintStream(socket.getOutputStream());
-            out.println(BootEnvironment.SHUTDOWN_COMMAND);
-            logger.log(Level.INFO, BootEnvironment.SHUTDOWN_COMMAND + 
-                       " send successfully");
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Unable to initiate shutdown", e);
-        } finally {
-            if (socket != null) {
-                socket.close();
-            }
-            
-            if (out != null) {
-                out.close();
-            }
-        }
+
+        // get the JMX port and make the connection
+        String port = properties.getProperty(BootEnvironment.JMX_PORT,
+                                             BootEnvironment.DEFAULT_JMX_PORT);
+        JMXServiceURL url =
+            new JMXServiceURL("service:jmx:rmi:///jndi/rmi://localhost:" +
+                              port + "/jmxrmi");
+        JMXConnector jmxc = JMXConnectorFactory.connect(url, null);
+        MBeanServerConnection mbsc = jmxc.getMBeanServerConnection();
+
+        // call the requestShutdown() interface on the server
+        ObjectName name = new ObjectName(KernelMXBean.MXBEAN_NAME);
+        KernelMXBean proxy = JMX.newMXBeanProxy(mbsc, name, KernelMXBean.class);
+        proxy.requestShutdown();
     }
+
 }
