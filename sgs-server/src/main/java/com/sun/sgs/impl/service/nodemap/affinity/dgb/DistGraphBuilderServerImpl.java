@@ -104,17 +104,19 @@ public class DistGraphBuilderServerImpl
      * Creates a distributed graph builder server.
      * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
+     * @param nms the node mapping service currently being created
      * @param properties  application properties
      * @throws Exception if an error occurs
      */
     DistGraphBuilderServerImpl(ComponentRegistry systemRegistry,
                                TransactionProxy txnProxy,
+                               NodeMappingService nms,
                                Properties properties)
             throws Exception
     {
         transactionScheduler =
 	    systemRegistry.getComponent(TransactionScheduler.class);
-	nms = txnProxy.getService(NodeMappingService.class);
+	this.nms = nms;
 	taskOwner = txnProxy.getCurrentOwner();
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(

@@ -491,10 +491,11 @@ public class NodeMappingServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
 
-            // Create our graph listener
+            // Create our graph listener.  We need to send ourself along
+            // because we won't be available to the txnProxy yet.
             graphListener =
                 new GraphListener(properties, systemRegistry,
-                                  txnProxy, localNodeId);
+                                  txnProxy, this, localNodeId);
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
                             "Failed to create NodeMappingServiceImpl");

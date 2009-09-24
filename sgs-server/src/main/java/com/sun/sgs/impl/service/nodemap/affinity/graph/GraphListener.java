@@ -31,6 +31,7 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
 import java.beans.PropertyChangeEvent;
 import java.lang.reflect.Constructor;
@@ -84,6 +85,7 @@ public class GraphListener implements ProfileListener {
      * @param properties application properties
      * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
+     * @param nms the node mapping service currently being created
      * @param nodeId the local node id
      * 
      * @throws Exception if an error occurs
@@ -91,6 +93,7 @@ public class GraphListener implements ProfileListener {
     public GraphListener(Properties properties,
                          ComponentRegistry systemRegistry,
                          TransactionProxy txnProxy,
+                         NodeMappingService nms,
                          long nodeId)
         throws Exception
     {
@@ -109,7 +112,7 @@ public class GraphListener implements ProfileListener {
         }
         if (builderName != null) {
             builder = createBuilder(Class.forName(builderName),
-                                    systemRegistry, txnProxy,
+                                    systemRegistry, txnProxy, nms,
                                     col, properties, nodeId);
         } else if (type != NodeType.singleNode) {
             builder = new WeightedGraphBuilder(col, properties, nodeId);
@@ -133,6 +136,7 @@ public class GraphListener implements ProfileListener {
      */
     private BasicGraphBuilder createBuilder(Class<?> bClass,
             ComponentRegistry systemRegistry, TransactionProxy txnProxy,
+            NodeMappingService nms,
             ProfileCollector col,
             Properties props, long nodeId)
         throws Exception
@@ -151,10 +155,12 @@ public class GraphListener implements ProfileListener {
                 // Look for a version that takes additional args because
                 // services/transactions must be used
                 ctor = bClass.getConstructor(ComponentRegistry.class,
-                        TransactionProxy.class, Properties.class, long.class);
+                        TransactionProxy.class,
+                        NodeMappingService.class, Properties.class, long.class);
                 // return a new instance
                 return (BasicGraphBuilder)
-                    (ctor.newInstance(systemRegistry, txnProxy, props, nodeId));
+                    (ctor.newInstance(systemRegistry, txnProxy, nms,
+                                      props, nodeId));
             }
         } catch (InvocationTargetException e) {
             // Try to unwrap any nested exceptions - they will be wrapped

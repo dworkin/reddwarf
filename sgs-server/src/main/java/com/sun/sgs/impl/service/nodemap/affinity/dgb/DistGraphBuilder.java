@@ -30,6 +30,7 @@ import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
@@ -60,12 +61,14 @@ public class DistGraphBuilder implements BasicGraphBuilder {
      * Creates the client side of a distributed graph builder.
      * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
+     * @param nms the node mapping service currently being created
      * @param properties  application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
     public DistGraphBuilder(ComponentRegistry systemRegistry,
                             TransactionProxy txnProxy,
+                            NodeMappingService nms,
                             Properties properties, long nodeId)
         throws Exception
     {
@@ -78,7 +81,7 @@ public class DistGraphBuilder implements BasicGraphBuilder {
         if (nodeType == NodeType.coreServerNode) {
             serverImpl = 
                 new DistGraphBuilderServerImpl(systemRegistry,
-                                               txnProxy, properties);
+                                               txnProxy, nms, properties);
             server = null;
         } else {
             String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,
