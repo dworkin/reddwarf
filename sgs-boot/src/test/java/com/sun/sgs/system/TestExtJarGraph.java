@@ -101,7 +101,10 @@ public class TestExtJarGraph {
     @Test public void testSingleJar() throws Exception {
         ExtJarGraph graph = new ExtJarGraph();
         graph.addJarFile(new JarFile(JAR_A));
-        graph.getPropertiesFile();
+        String fileName = graph.getPropertiesFile();
+        Properties p = new Properties();
+        p.load(new FileInputStream(fileName));
+        Assert.assertTrue(p.getProperty("a.property").equals("A"));
     }
 
     @Test(expected = IllegalStateException.class)
@@ -121,13 +124,6 @@ public class TestExtJarGraph {
         graph.getPropertiesFile();
     }
 
-    @Ignore("not ready")
-    @Test(expected = IllegalStateException.class)
-    public void testJarMalformedProperties() throws Exception {
-        ExtJarGraph graph = new ExtJarGraph();
-        graph.addJarFile(new JarFile(JAR_INVALID_PROPERTIES));
-    }
-
     @Test(expected = IllegalStateException.class)
     public void testJarConflictingProperties() throws Exception {
         ExtJarGraph graph = new ExtJarGraph();
@@ -144,7 +140,10 @@ public class TestExtJarGraph {
         ExtJarGraph graph = new ExtJarGraph();
         graph.addJarFile(new JarFile(JAR_A));
         graph.addJarFile(new JarFile(JAR_A_PROPERTY_DUPLICATE));
-        graph.getPropertiesFile();
+        String fileName = graph.getPropertiesFile();
+        Properties p = new Properties();
+        p.load(new FileInputStream(fileName));
+        Assert.assertTrue(p.getProperty("a.property").equals("A"));
     }
 
     @Test(expected = IllegalStateException.class)
@@ -193,7 +192,11 @@ public class TestExtJarGraph {
         graph.addJarFile(new JarFile(JAR_A));
         graph.addJarFile(new JarFile(JAR_B));
         graph.addJarFile(new JarFile(JAR_C));
-        graph.getPropertiesFile();
+        String fileName = graph.getPropertiesFile();
+        Properties p = new Properties();
+        p.load(new FileInputStream(fileName));
+        Assert.assertTrue(p.getProperty("a.property").equals("A"));
+        Assert.assertTrue(p.getProperty("b.property").equals("B"));
     }
 
     @Test public void testValidDepdency() throws Exception {
@@ -244,20 +247,6 @@ public class TestExtJarGraph {
 
     @Test(expected = IllegalStateException.class)
     public void testRootedCircularDepdency() throws Exception {
-        ExtJarGraph graph = new ExtJarGraph();
-        try {
-            graph.addJarFile(new JarFile(JAR_B_DEPENDS_ON_A));
-            graph.addJarFile(new JarFile(JAR_C_DEPENDS_ON_A));
-            graph.addJarFile(new JarFile(JAR_A_DEPENDS_ON_B));
-        } catch (IllegalStateException ise) {
-            throw new RuntimeException("Unexpected Failure", ise);
-        }
-        graph.getPropertiesFile();
-    }
-
-    @Ignore("not ready")
-    @Test(expected = IllegalStateException.class)
-    public void testDisconnectedCircularDepdency() throws Exception {
         ExtJarGraph graph = new ExtJarGraph();
         try {
             graph.addJarFile(new JarFile(JAR_B_DEPENDS_ON_A));
