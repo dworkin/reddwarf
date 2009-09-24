@@ -530,10 +530,8 @@ public final class ChannelServiceImpl
 		    logger.log(
 			Level.FINEST, "join name:{0} channelId:{1} " +
 			"sessionId:{2} localNodeId:{3}",
-			name,
-			HexDumper.toHexString(channelRefId.toByteArray()),
-			HexDumper.toHexString(sessionRefId.toByteArray()),
-			localNodeId);
+			name, toHexString(channelRefId),
+			toHexString(sessionRefId), localNodeId);
 		}
 
 		return handleChannelRequest(
@@ -562,8 +560,7 @@ public final class ChannelServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST, "leave channelId:{0} sessionId:{1}",
-			HexDumper.toHexString(channelRefId.toByteArray()),
-			HexDumper.toHexString(sessionRefId.toByteArray()));
+			toHexString(channelRefId), toHexString(sessionRefId));
 		}
 		
 		return handleChannelRequest(
@@ -584,8 +581,7 @@ public final class ChannelServiceImpl
 		    logger.log(
 			Level.FINEST,
 			"getSessions channelId:{0} localNodeId:{1}",
-			HexDumper.toHexString(channelRefId.toByteArray()),
-			localNodeId);
+			toHexString(channelRefId), localNodeId);
 		}
 
 		LocalChannelInfo channelInfo =
@@ -605,9 +601,7 @@ public final class ChannelServiceImpl
 		    logger.log(
 			Level.FINEST,
 			"getSessions channelId:{0} localNodeId:{1} returns:{2}",
-			HexDumper.toHexString(channelRefId.toByteArray()),
-			localNodeId,
-			localMembers);
+			toHexString(channelRefId), localNodeId, localMembers);
 		}
 		callFinished();
 	    }
@@ -627,8 +621,7 @@ public final class ChannelServiceImpl
 		    logger.log(
 			Level.FINEST,
 			"send channelId:{0} message:{1} timestamp:{2} " +
-			"localNodeId:{3}",
-			HexDumper.toHexString(channelRefId.toByteArray()),
+			"localNodeId:{3}", toHexString(channelRefId),
 			HexDumper.format(message, 0x50),
 			timestamp, localNodeId);
 		}
@@ -659,8 +652,7 @@ public final class ChannelServiceImpl
 				"Dropping message with old timestamp, " +
 				"channelId:{0} message:{1} timestamp:{2} " +
 				"current timestamp:{3} localNodeId:{4}",
-				HexDumper.toHexString(
-				    channelRefId.toByteArray()),
+				toHexString(channelRefId),
 				HexDumper.format(message, 0x50), timestamp,
 				channelInfo.msgTimestamp, localNodeId);
 			}
@@ -798,9 +790,8 @@ public final class ChannelServiceImpl
 			    Level.FINE, "Dropping channel request for " +
 			    "non-local session:{0} channel:{1} timestamp:{2} " +
 			    "localNodeId:{3}",
-			    HexDumper.toHexString(sessionRefId.toByteArray()),
-			    HexDumper.toHexString(
-				task.channelRefId.toByteArray()),
+			    toHexString(sessionRefId),
+			    toHexString(task.channelRefId),
 			    timestamp, localNodeId);
 		    }
 		    return false;
@@ -847,7 +838,8 @@ public final class ChannelServiceImpl
 		
 	    } else {
 		// The session is locally-connected, so process the
-		// request locally.
+		// request locally.  If the session just relocated, make
+		// sure the pending requests (if any) are processed first.
 		SortedMap<Long, PendingRequests> pendingRequestsMap =
 		    relocatedSessionPendingRequests.get(sessionRefId);
 		if (pendingRequestsMap != null) {
@@ -857,7 +849,7 @@ public final class ChannelServiceImpl
 			// relocation to be processed.
 			if (!pendingRequestsMap.isEmpty()) {
 			    try {
-				// TBD: bounded timeout?
+				
 				pendingRequestsMap.wait(
 				    sessionRelocationTimeout);
 			    } catch (InterruptedException e) {
@@ -870,7 +862,14 @@ public final class ChannelServiceImpl
 		    return true;
 		    
 		} catch (Exception e) {
-		    // TBD: what to do here? Is this the correct return value?
+		    if (logger.isLoggable(Level.WARNING)) {
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "Running channel request task:{0} for " +
+			    "session:{1} and timestamp:{2} on node:{3} " +
+			    "throws", task, toHexString(sessionRefId),
+			    timestamp, localNodeId);
+		    }
 		    return false;
 		}
 	    }
@@ -878,7 +877,7 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Adds a task to service the event queue for the channel with the
+     * Adds a task to service the event queue of the channel with the
      * specified {@code channelRefId}.<p>
      *
      * The service event queue request is enqueued in the given
@@ -897,7 +896,7 @@ public final class ChannelServiceImpl
 	    logger.log(
 		Level.FINEST,
 		"add task to service event queue, channelId:{0}",
-		HexDumper.toHexString(channelRefId.toByteArray()));
+		toHexString(channelRefId));
 	}
 
 	TaskQueue taskQueue = coordinatorTaskQueues.get(channelRefId);
@@ -1050,9 +1049,7 @@ public final class ChannelServiceImpl
 				    Level.FINE,
 				    "Unable to add localNodeId:{0} to " +
 				    "closed channel:{1}",
-				    localNodeId,
-				    HexDumper.toHexString(
-					channelRefId.toByteArray()));
+				    localNodeId, toHexString(channelRefId));
 			    }
 			    return false;
 			} else {
@@ -1066,8 +1063,7 @@ public final class ChannelServiceImpl
 		logger.logThrow(
 		    Level.WARNING, e,
 		    "Attempting to add localNodeId:{0} to channel:{1} throws",
-		    localNodeId,
-		    HexDumper.toHexString(channelRefId.toByteArray()));
+		    localNodeId, toHexString(channelRefId));
 	    }
 	    return false;
 	}
@@ -1094,8 +1090,7 @@ public final class ChannelServiceImpl
 				    Level.FINE,
 				    "Unable to obtain current timestamp for" +
 				    "closed channel:{0}",
-				    HexDumper.toHexString(
-					channelRefId.toByteArray()));
+				    toHexString(channelRefId));
 			    }
 			    return 0L;
 			} else {
@@ -1108,8 +1103,7 @@ public final class ChannelServiceImpl
 		logger.logThrow(
 		    Level.WARNING, e,
 		    "Obtaining current timestamp for channel:{0} throws",
-		    localNodeId,
-		    HexDumper.toHexString(channelRefId.toByteArray()));
+		    localNodeId, toHexString(channelRefId));
 	    }
 	    return 0L;
 	}
@@ -1134,8 +1128,7 @@ public final class ChannelServiceImpl
 				    Level.FINE,
 				    "Unable to obtain messages for" +
 				    "closed channel:{0}",
-				    HexDumper.toHexString(
-					channelRefId.toByteArray()));
+				    toHexString(channelRefId));
 			    }
 			    return null;
 			} else {
@@ -1149,8 +1142,7 @@ public final class ChannelServiceImpl
 		logger.logThrow(
 		    Level.WARNING, e,
 		    "Obtaining messages for channel:{0} throws",
-		    localNodeId,
-		    HexDumper.toHexString(channelRefId.toByteArray()));
+		    localNodeId, toHexString(channelRefId));
 	    }
 	    return null;
 	}
@@ -1264,8 +1256,7 @@ public final class ChannelServiceImpl
 	    logger.log(
 		Level.FINEST, "CACHE eventType:{0}, channelRefId:{1}, " +
 		"sessionRefId:{2}, eventTimestamp:{3}, expirationTimestamp:{4}",
-		eventType, HexDumper.toHexString(channelRefId.toByteArray()),
-		HexDumper.toHexString(sessionRefId.toByteArray()),
+		eventType, toHexString(channelRefId), toHexString(sessionRefId),
 		eventTimestamp, expirationTimestamp);
 	}
 	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
@@ -1329,10 +1320,8 @@ public final class ChannelServiceImpl
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
 		       "channel:{0}, session:{1}, isChannelMember:{2}, " +
-		       "timestamp:{3}",
-		       HexDumper.toHexString(channelRefId.toByteArray()),
-		       HexDumper.toHexString(sessionRefId.toByteArray()),
-		       isChannelMember, timestamp);
+		       "timestamp:{3}", toHexString(channelRefId),
+		       toHexString(sessionRefId), isChannelMember, timestamp);
 	}
 	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
 	if (queue != null) {
@@ -1350,8 +1339,7 @@ public final class ChannelServiceImpl
 			    if (logger.isLoggable(Level.FINEST)) {
 				logger.log(
 				    Level.FINEST, "join:{0}",
-				    HexDumper.toHexString(
-					info.sessionRefId.toByteArray()));
+				    toHexString(info.sessionRefId));
 			    }
 			    isChannelMember =
 				isChannelMember ||
@@ -1362,8 +1350,7 @@ public final class ChannelServiceImpl
 			    if (logger.isLoggable(Level.FINEST)) {
 				logger.log(
 				    Level.FINEST, "leave:{0}",
-				    HexDumper.toHexString(
-					info.sessionRefId.toByteArray()));
+				    toHexString(info.sessionRefId));
 			    }
 			    isChannelMember =
 				isChannelMember &&
@@ -1405,7 +1392,7 @@ public final class ChannelServiceImpl
 		    "eventTimestamp:{2}, expirationTimestamp:{3}",
 		    info.eventType,
 		    (info.sessionRefId != null ?
-		     HexDumper.toHexString(info.sessionRefId.toByteArray()) :
+		     toHexString(info.sessionRefId) :
 		     "null"), 
 		    info.eventTimestamp, info.expirationTimestamp);
 	    }
@@ -1462,8 +1449,7 @@ public final class ChannelServiceImpl
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(
 			    Level.FINEST, "channelId:{0} nodeIds:{1} " +
-			    "members:{2}",
-			    HexDumper.toHexString(channelRefId.toByteArray()),
+			    "members:{2}", toHexString(channelRefId),
 			    nodeIds, task.getMembers());
 		    }
 		    return task.getMembers();
@@ -2312,8 +2298,8 @@ public final class ChannelServiceImpl
 		} catch (IOException e) {
 		    logger.logThrow(Level.WARNING, e,  "channelMessage " +
 			"session:{0} channel:{0} throws",
-			HexDumper.toHexString(sessionRefId.toByteArray()),
-			HexDumper.toHexString(channelRefId.toByteArray()));
+			toHexString(sessionRefId),
+			toHexString(channelRefId));
 		}
 	    }
 	}
@@ -2339,8 +2325,8 @@ public final class ChannelServiceImpl
 		    logger.logThrow(
 			Level.WARNING, e, "channelLeave " +
 			"session:{0} channel:{0} throws",
-			HexDumper.toHexString(sessionRefId.toByteArray()),
-			HexDumper.toHexString(channelRefId.toByteArray()));
+			toHexString(sessionRefId),
+			toHexString(channelRefId));
 		}
 		removeLocalPerSessionChannel(channelRefId, sessionRefId);
 	    }
@@ -2542,7 +2528,7 @@ public final class ChannelServiceImpl
 			    Level.FINE, e,
 			    "Running task:{0} for relocated " +
 			    "session:{1} throws", task,
-			    HexDumper.toHexString(sessionRefId.toByteArray()));
+			    toHexString(sessionRefId));
 		    }
 		}
 	    }
@@ -2557,7 +2543,7 @@ public final class ChannelServiceImpl
 			    Level.FINE, e,
 			    "Running task:{0} for relocated " +
 			    "session:{1} throws", task,
-			    HexDumper.toHexString(sessionRefId.toByteArray()));
+			    toHexString(sessionRefId));
 		    }
 		}
 	    }

@@ -26,6 +26,7 @@ import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -39,6 +40,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.Properties;
 import java.util.logging.Level;
 
@@ -607,6 +609,15 @@ public abstract class AbstractService implements Service {
 	    buf.append("\tat " + traceElements[i].toString() + "\n");
 	}
 	return buf.toString();
+    }
+
+    /**
+     * Returns the specified {@code refId} as a hex-formatted string.
+     *
+     * @return the specified {@code refId} as a hex-formatted string
+     */
+    public static String toHexString(BigInteger refId) {
+	return HexDumper.toHexString(refId.toByteArray());
     }
 
     /**
