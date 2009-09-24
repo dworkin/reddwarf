@@ -20,12 +20,14 @@
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 
 /**
  * Graph builder interface.  Graph builder objects take task access information
- * and create a graph from it, and can return the graph.
+ * and create a graph from it, and can return the graph.  Builders are also
+ * responsible for instantiating the objects which will consume the graph.
  * <p>
  * The returned graph vertices are identities, and the edges are the
  * object references the vertices have in common.  The edges can be either
@@ -59,9 +61,9 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * </dl>
  * <p>
  * Graph builders are typically instantiated by the node {@link GraphListener}.
- * In order to be instantiated by the {@code GraphListener}, they must
+ * In order to be instantiated by the {@code GraphListener}, they should
  * implement a constructor taking the arguments
- * {@code (NodeMappingService, ProfileCollector, Properties, long)},
+ * {@code (ProfileCollector, Properties, long)},
  * where the final argument is the local node id.
  * <p>
  * <b> NOTE </b> The first argument, the NMS, is currently only used
@@ -121,4 +123,13 @@ public interface BasicGraphBuilder {
      * Shut down this builder.
      */
     void shutdown();
+
+    /**
+     * Returns the affinity group finder created by this builder,
+     * or null if none was created.  Some algorithms only create
+     * the finder on the server node.
+     *
+     * @return the affinity group finder or {@code null}
+     */
+    AffinityGroupFinder getAffinityGroupFinder();
 }

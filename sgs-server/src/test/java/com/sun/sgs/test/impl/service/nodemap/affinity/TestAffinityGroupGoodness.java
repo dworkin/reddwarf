@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
@@ -233,6 +234,11 @@ public class TestAffinityGroupGoodness {
         /** {@inheritDoc} */
         public void shutdown() {
             // do nothing
+        }
+
+        /** {@inheritDoc} */
+        public AffinityGroupFinder getAffinityGroupFinder() {
+            return null;
         }
     }
 }

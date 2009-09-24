@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
@@ -971,6 +972,11 @@ public class TestLPA {
         /** {@inheritDoc} */
         public void shutdown() {
             // do nothing
+        }
+
+        /** {@inheritDoc} */
+        public AffinityGroupFinder getAffinityGroupFinder() {
+            return null;
         }
     }
 }

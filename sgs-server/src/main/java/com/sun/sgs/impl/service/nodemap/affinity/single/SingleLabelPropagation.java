@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.single;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
@@ -40,8 +41,9 @@ import java.util.logging.Level;
  * "Near linear time algorithm to detect community structures in large-scale
  * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
  */
-public class SingleLabelPropagation extends AbstractLPA {
-
+public class SingleLabelPropagation extends AbstractLPA 
+        implements AffinityGroupFinder
+{
     private final BasicGraphBuilder builder;
 
     /** The modularity of the last run, only valid on a single node. */
@@ -90,6 +92,8 @@ public class SingleLabelPropagation extends AbstractLPA {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Find the communities, using a graph obtained from the graph builder
      * provided at construction time.  The communities are found using the
      * label propagation algorithm.
@@ -104,7 +108,7 @@ public class SingleLabelPropagation extends AbstractLPA {
      *
      * @return the affinity groups
      */
-    public Collection<AffinityGroup> singleNodeFindCommunities() {
+    public Collection<AffinityGroup> findAffinityGroups() {
         long startTime = System.currentTimeMillis();
 
         // Step 1.  Initialize all nodes in the network.
@@ -226,6 +230,10 @@ public class SingleLabelPropagation extends AbstractLPA {
         return groups;
     }
 
+    /** {@inheritDoc} */
+    public void removeNode(long nodeId) {
+        // do nothing
+    }
 
     /**
      * Returns the moduarity of the last algorithm run results. This is only
@@ -234,4 +242,6 @@ public class SingleLabelPropagation extends AbstractLPA {
      * @return the moduarity of the last algorithm run results
      */
     public double getModularity() { return modularity; }
+
+
 }

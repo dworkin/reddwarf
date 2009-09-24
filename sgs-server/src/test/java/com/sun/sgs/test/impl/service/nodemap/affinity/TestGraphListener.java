@@ -23,7 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
@@ -36,13 +36,13 @@ import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileReport;
+import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.Graph;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -52,7 +52,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.After;
 import org.junit.Assert;
@@ -79,6 +78,7 @@ public class TestGraphListener {
     private static Class<?> profileReportImplClass;
     private static Constructor<?> profileReportImplConstructor;
     private static Method setAccessedObjectsDetailMethod;
+    private static Field graphListenerField;
     static {
         try {
             profileReportImplClass =
@@ -90,38 +90,29 @@ public class TestGraphListener {
             setAccessedObjectsDetailMethod =
                 UtilReflection.getMethod(profileReportImplClass, 
                     "setAccessedObjectsDetail", AccessedObjectsDetail.class);
+            graphListenerField =
+                    UtilReflection.getField(NodeMappingServiceImpl.class,
+                                            "graphListener");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-    /** The default initial unique port for this test suite. */
-    private final static int DEFAULT_PORT = 20000;
+    private final static String APP_NAME = "TestDistLPABuilders";
 
-    /** The property that can be used to select an initial port. */
-    private final static String PORT_PROPERTY = "test.sgs.port";
-
-    /** The next unique port to use for this test suite. */
-    private final static AtomicInteger nextUniquePort;
-
-    static {
-        Integer systemPort = Integer.getInteger(PORT_PROPERTY);
-        int port = systemPort == null ? DEFAULT_PORT
-                                      : systemPort.intValue();
-        nextUniquePort = new AtomicInteger(port);
-    }
     // The listener created for each test
     private GraphListener listener;
     // The builder used by the listener
     private GraphBuilder builder;
-    // The collector used by the listener/builder
-    private static ProfileCollector collector;
-    // The server, needs to be of the same type as the lpa "client"
-    private static LabelPropagationServer lpaServer;
 
+    // Passed into each test run
     private final String builderName;
 
     private Properties props;
+    
+    private SgsTestNode serverNode;
+    private SgsTestNode node;
 
+    private int serverPort;
     /**
      * Create this test class.
      * @param builderName the type of graph builder to use
@@ -135,33 +126,49 @@ public class TestGraphListener {
         System.err.println("Graph builder used is: " + builderName);
         
     }
-    
+
     @Before
     public void beforeEachTest() throws Exception {
-        // Note that we aren't using the SgsTestNode.  It's easiest for all
-        // our other tests to disable the affinity group finding while
-        // using SgsTestNode.
-        props = new Properties();
-        collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
-        if (builderName != null) {
-            props.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+        System.out.println("server port is " + serverPort);
+        props = getProps(null);
+        System.out.println("server port is now " + serverPort);
+        serverNode = new SgsTestNode(APP_NAME, null, props);
+        // Create a new app node
+        props = getProps(serverNode);
+        node = new SgsTestNode(serverNode, null, props);
+        listener = (GraphListener)
+                graphListenerField.get(node.getNodeMappingService());
+        builder = (GraphBuilder) listener.getGraphBuilder();
+    }
+
+    private Properties getProps(SgsTestNode serverNode) throws Exception {
+        Properties p =
+                SgsTestNode.getDefaultProperties(APP_NAME, serverNode, null);
+        if (builderName == null) {
+            p.remove(GraphListener.GRAPH_CLASS_PROPERTY);
+        } else {
+            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
         }
-        props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
-                   String.valueOf(nextUniquePort.incrementAndGet()));
-        props.setProperty(StandardProperties.NODE_TYPE,
-                          NodeType.coreServerNode.name());
-        lpaServer = new LabelPropagationServer(collector, props);
-        props.setProperty(StandardProperties.NODE_TYPE,
-                          NodeType.appNode.name());
-        listener = new GraphListener(collector, props, 1);
-        builder = listener.getGraphBuilder();
+        if (serverNode == null) {
+            serverPort = SgsTestNode.getNextUniquePort();
+            p.setProperty(StandardProperties.NODE_TYPE,
+                          NodeType.coreServerNode.toString());
+        }
+        p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
+                String.valueOf(serverPort));
+        return p;
     }
 
     @After
-    public void afterEachTest() {
-        listener.shutdown();
-        collector.shutdown();
-        lpaServer.shutdown();
+    public void afterEachTest() throws Exception {
+        if (node != null) {
+            node.shutdown(false);
+            node = null;
+        }
+        if (serverNode != null) {
+            serverNode.shutdown(true);
+            serverNode = null;
+        }
     }
     
     @Test
@@ -458,10 +465,12 @@ public class TestGraphListener {
 
     @Test
     public void testGraphPrunerCountTwo() throws Exception {
-        Properties p = new Properties(props);
-        p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
-        listener = new GraphListener(collector, p, 2);
-        builder = listener.getGraphBuilder();
+        node.shutdown(false);
+        props = getProps(serverNode);
+        props.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
+        node =  new SgsTestNode(serverNode, null, props);
+        listener = (GraphListener) graphListenerField.get(node.getNodeMappingService());
+        builder = (GraphBuilder) listener.getGraphBuilder();
 
         LabelVertex vertA = new LabelVertex(new IdentityImpl("A"));
         LabelVertex vertB = new LabelVertex(new IdentityImpl("B"));
@@ -724,15 +733,27 @@ public class TestGraphListener {
 
     @Test(expected=IllegalArgumentException.class)
     public void testGraphBuilderBadCount() throws Exception {
-        String orig = props.getProperty(GraphBuilder.PERIOD_COUNT_PROPERTY);
+        props = getProps(serverNode);
         props.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "0");
+
+        SgsTestNode newNode = null;
         try {
-            listener = new GraphListener(collector, props, 2);
-        } finally {
-            if (orig == null) {
-                props.remove(GraphBuilder.PERIOD_COUNT_PROPERTY);
+            newNode = new SgsTestNode(serverNode, null, props);
+        } catch (InvocationTargetException e) {
+            // Try to unwrap any nested exceptions - they will be wrapped
+            // because the kernel instantiating via reflection
+            Throwable cause = e.getCause();
+            while (cause instanceof InvocationTargetException) {
+                cause = cause.getCause();
+            }
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
             } else {
-                props.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, orig);
+                throw e;
+            }
+        } finally {
+            if (newNode != null) {
+                newNode.shutdown(false);
             }
         }
     }

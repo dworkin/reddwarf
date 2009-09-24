@@ -493,7 +493,8 @@ public class NodeMappingServiceImpl
 
             // Create our graph listener
             graphListener =
-                    new GraphListener(collector, properties, localNodeId);
+                new GraphListener(properties, systemRegistry,
+                                  txnProxy, localNodeId);
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
                             "Failed to create NodeMappingServiceImpl");

@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity.single;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import
@@ -203,6 +204,11 @@ public class SingleGraphBuilder implements BasicGraphBuilder {
         }
     }
 
+    /** {@inheritDoc} */
+    public AffinityGroupFinder getAffinityGroupFinder() {
+        return lpa;
+    }
+    
     /**
      * The graph pruner.  It runs periodically, and is the only code
      * that removes edges and vertices from the graph.

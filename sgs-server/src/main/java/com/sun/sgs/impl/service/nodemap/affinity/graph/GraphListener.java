@@ -19,19 +19,22 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
-import
-     com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
+import
+     com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
+import com.sun.sgs.service.TransactionProxy;
 import java.beans.PropertyChangeEvent;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Properties;
 
 /**
@@ -72,36 +75,42 @@ public class GraphListener implements ProfileListener {
     public static final String GRAPH_CLASS_NONE = "None";
 
     // the affinity graph builder, null if there is none
-    private final GraphBuilder builder;
+    private final BasicGraphBuilder builder;
+
 
     /**
      * Constructs a new listener instance. 
      *
-     * @param col the profile collector
      * @param properties application properties
+     * @param systemRegistry the registry of available system components
+     * @param txnProxy the transaction proxy
      * @param nodeId the local node id
+     * 
      * @throws Exception if an error occurs
      */
-    public GraphListener(ProfileCollector col, Properties properties, 
+    public GraphListener(Properties properties,
+                         ComponentRegistry systemRegistry,
+                         TransactionProxy txnProxy,
                          long nodeId)
         throws Exception
     {
+        ProfileCollector col =
+                systemRegistry.getComponent(ProfileCollector.class);
+
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         NodeType type =
             NodeType.valueOf(
                 properties.getProperty(StandardProperties.NODE_TYPE));
-        String builderClass = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
-        if (GRAPH_CLASS_NONE.equals(builderClass)) {
+        String builderName = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
+        if (GRAPH_CLASS_NONE.equals(builderName)) {
             // do not instantiate anything
             builder = null;
             return;
         }
-        if (builderClass != null) {
-            builder = wrappedProps.getClassInstanceProperty(
-                GRAPH_CLASS_PROPERTY, GraphBuilder.class,
-                new Class[] {ProfileCollector.class,
-                             Properties.class, long.class},
-                col, properties, nodeId);
+        if (builderName != null) {
+            builder = createBuilder(Class.forName(builderName),
+                                    systemRegistry, txnProxy,
+                                    col, properties, nodeId);
         } else if (type != NodeType.singleNode) {
             builder = new WeightedGraphBuilder(col, properties, nodeId);
         } else {
@@ -117,7 +126,48 @@ public class GraphListener implements ProfileListener {
             col.addListener(this, false);
         }
     }
-    
+
+    /**
+     * Private helper to create a BasicGraphBuilder, searching for
+     * two different ctor signatures.
+     */
+    private BasicGraphBuilder createBuilder(Class<?> bClass,
+            ComponentRegistry systemRegistry, TransactionProxy txnProxy,
+            ProfileCollector col,
+            Properties props, long nodeId)
+        throws Exception
+    {
+        Constructor<?> ctor;
+        try {
+            try {
+                // find the appropriate constructor
+                ctor = bClass.getConstructor(ProfileCollector.class,
+                        Properties.class, long.class);
+                // return a new instance
+                return (BasicGraphBuilder)
+                        (ctor.newInstance(col, props, nodeId));
+
+            } catch (NoSuchMethodException e) {
+                // Look for a version that takes additional args because
+                // services/transactions must be used
+                ctor = bClass.getConstructor(ComponentRegistry.class,
+                        TransactionProxy.class, Properties.class, long.class);
+                // return a new instance
+                return (BasicGraphBuilder)
+                    (ctor.newInstance(systemRegistry, txnProxy, props, nodeId));
+            }
+        } catch (InvocationTargetException e) {
+            // Try to unwrap any nested exceptions - they will be wrapped
+            // because we are instantiating via reflection
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            } else {
+                throw e;
+            }
+        }
+    }
+
     /** {@inheritDoc} */
     public void propertyChange(PropertyChangeEvent event) {
 	// unused
@@ -150,7 +200,7 @@ public class GraphListener implements ProfileListener {
      * Returns the graph builder used by this listener.
      * @return the graph builder
      */
-    public GraphBuilder getGraphBuilder() {
+    public BasicGraphBuilder getGraphBuilder() {
         return builder;
     }
 }

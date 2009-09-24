@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
@@ -123,7 +124,7 @@ public class TestLPAPerf {
            new SingleLabelPropagation(new ZachBuilder(), props, false);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            lpa.singleNodeFindCommunities();
+            lpa.findAffinityGroups();
         }
         lpa.shutdown();
     }
@@ -146,7 +147,7 @@ public class TestLPAPerf {
         long maxTime = 0;
         long minTime = Integer.MAX_VALUE;
         for (int i = 0; i < RUNS; i++) {
-            Collection<AffinityGroup> groups = lpa.singleNodeFindCommunities();
+            Collection<AffinityGroup> groups = lpa.findAffinityGroups();
             long time = lpa.getTime();
             avgTime = avgTime + time;
             maxTime = Math.max(maxTime, time);
@@ -749,5 +750,11 @@ public class TestLPAPerf {
         public void shutdown() {
             // do nothing
         }
+
+        /** {@inheritDoc} */
+        public AffinityGroupFinder getAffinityGroupFinder() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
     }
 }
