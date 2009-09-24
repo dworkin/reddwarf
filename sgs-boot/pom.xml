@@ -79,7 +79,9 @@
   </build>
 
   <properties>
-
+    <findbugs-exclude.filter>
+      ${basedir}/src/main/etc/findbugs-exclude.xml
+    </findbugs-exclude.filter>
   </properties>
 
 </project>
