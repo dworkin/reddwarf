@@ -89,7 +89,7 @@ class ChannelWrapper
     }
 
     /** {@inheritDoc} */
-    public Channel join(final Set<ClientSession> sessions) {
+    public Channel join(final Set<? extends ClientSession> sessions) {
 	getChannel().join(sessions);
 	return this;
     }
@@ -101,7 +101,7 @@ class ChannelWrapper
     }
 
     /** {@inheritDoc} */
-    public Channel leave(final Set<ClientSession> sessions) {
+    public Channel leave(final Set<? extends ClientSession> sessions) {
 	getChannel().leave(sessions);
 	return this;
     }
