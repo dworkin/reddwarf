@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap;
+package com.sun.sgs.impl.service.nodemap.policy;
 
+import com.sun.sgs.service.NodeAssignPolicy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,19 +32,15 @@ import java.util.List;
 public abstract class AbstractNodePolicy implements NodeAssignPolicy {
 
     /**
-     * The list of available nodes.
+     * The list of available nodes. Access to this list must be synchronized.
      */
     protected final List<Long> availableNodes = new ArrayList<Long>();
 
     /** 
      * Creates a new instance of the AbstractNodePolicy.
      */
-    public AbstractNodePolicy() {          
+    protected AbstractNodePolicy() {
     }
-
-    /** {@inheritDoc} */
-    public abstract long chooseNode(long requestingNode)
-            throws NoNodesAvailableException;
 
     /** {@inheritDoc} */
     public synchronized boolean nodesAvailable() {

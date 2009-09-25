@@ -30,7 +30,7 @@ package com.sun.sgs.service;
 public interface Node {
 
     /**
-     * Health of a node.
+     * Health of a component or node.
      */
     enum Health {
 
@@ -59,20 +59,22 @@ public interface Node {
         RED;
 
         /**
-         * Returns true if the this health is worse then the specified health.
+         * Returns {@code true} if this health is worse than the specified
+         * health.
          *
          * @param health a health object to compare
          *
-         * @return true if this health is worse than the specified health
+         * @return {@code true} if this health is worse than the specified
+         * health
          */
         public boolean worseThan(Health health) {
             return compareTo(health) > 0;
         }
 
         /**
-         * Returns true if this health represents an operational state.
+         * Returns {@code true} if this health represents an operational state.
          *
-         * @return true if this health represents an operational state
+         * @return {@code true} if this health represents an operational state
          */
         public boolean isAlive() {
             return !equals(Health.RED);

@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
-import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
+import com.sun.sgs.service.NoNodesAvailableException;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;

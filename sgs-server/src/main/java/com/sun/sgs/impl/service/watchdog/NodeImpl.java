@@ -169,7 +169,7 @@ class NodeImpl
     
     /** {@inheritDoc} */
     public synchronized boolean isAlive() {
-	return health != Health.RED;
+	return health.isAlive();
     }
 
     /** {@inheritDoc} */

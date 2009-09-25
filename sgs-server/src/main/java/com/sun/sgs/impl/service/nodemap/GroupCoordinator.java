@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.service.NoNodesAvailableException;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.util.Properties;

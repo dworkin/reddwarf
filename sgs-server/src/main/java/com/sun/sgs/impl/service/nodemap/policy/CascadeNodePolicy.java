@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap;
+package com.sun.sgs.impl.service.nodemap.policy;
 
+import com.sun.sgs.service.NoNodesAvailableException;
 import java.util.Properties;
 
 /**
@@ -40,9 +41,8 @@ public class CascadeNodePolicy extends AbstractNodePolicy {
     /** 
      * Creates a new instance of the {@code CascadeNodePolicy}.
      * @param props service properties
-     * @param server node mapping server which is using this policy
      */
-    public CascadeNodePolicy(Properties props, NodeMappingServerImpl server) {
+    public CascadeNodePolicy(Properties props) {
        super();
     }
     

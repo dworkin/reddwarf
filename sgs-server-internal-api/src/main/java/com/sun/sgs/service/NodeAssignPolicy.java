@@ -15,20 +15,25 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
-package com.sun.sgs.impl.service.nodemap;
+package com.sun.sgs.service;
 
 /**
+ * Interface for node assignment.  The actual policy to be used is configurable
+ * in the node mapping server. A {@code NodeAssignPolicy} must have a public
+ * constructor that takes the following argument:
  *
- * Interface for node assignment.  I expect that we'll replace
- * these every so often, so the actual policy to be used is configurable
- * in the node mapping server.
- * <p>
- * This will probably morph into node assignment plus node balancing policy.
+ * <ul>
+ * <li>{@link java.util.Properties}</li>
+ * </ul>
  * 
  */
-interface NodeAssignPolicy {
+public interface NodeAssignPolicy {
     
     /**
      *  An id representing the server node.

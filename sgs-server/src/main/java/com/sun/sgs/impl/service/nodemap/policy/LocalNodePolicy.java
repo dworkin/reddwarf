@@ -17,8 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap;
+package com.sun.sgs.impl.service.nodemap.policy;
 
+
+import com.sun.sgs.service.NoNodesAvailableException;
+import com.sun.sgs.service.NodeAssignPolicy;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,7 +40,7 @@ public class LocalNodePolicy extends AbstractNodePolicy {
      * @param props service properties
      * @param server node mapping server which is using this policy
      */
-    public LocalNodePolicy(Properties props, NodeMappingServerImpl server) {
+    public LocalNodePolicy(Properties props) {
        super();
     }
     

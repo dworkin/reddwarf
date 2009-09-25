@@ -19,6 +19,9 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.service.NodeAssignPolicy;
+import com.sun.sgs.service.NoNodesAvailableException;
+import com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy;
 import com.sun.sgs.impl.service.nodemap.coordinator.simple.SimpleCoordinator;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
@@ -318,12 +321,13 @@ public final class NodeMappingServerImpl
         String policyClassName = wrappedProps.getProperty(
 		ASSIGN_POLICY_CLASS_PROPERTY);
         if (policyClassName == null) {
-            assignPolicy = new RoundRobinPolicy(properties, this);
+            assignPolicy = new RoundRobinPolicy(properties);
         } else {
             assignPolicy = wrappedProps.getClassInstanceProperty(
-                ASSIGN_POLICY_CLASS_PROPERTY, NodeAssignPolicy.class,
-                new Class[] { Properties.class, NodeMappingServerImpl.class }, 
-                properties, this);
+                                            ASSIGN_POLICY_CLASS_PROPERTY,
+                                            NodeAssignPolicy.class,
+                                            new Class[] { Properties.class },
+                                            properties);
         }
         logger.log(Level.CONFIG, "Node assign policy: {0}",
                    assignPolicy.getClass().getName());
@@ -1250,15 +1254,17 @@ public final class NodeMappingServerImpl
             logger.log(Level.FINER, "Offload request for {0}", node);
         }
 
-        try {
-            groupCoordinator.offload(node);
-        } catch (NoNodesAvailableException ex) {
-            logger.log(Level.WARNING,
-                       "Unable to offload node, no other nodes available");
-        }
+        // If the node is alive, move one identity (or group of identities) else
+        // if the node is dead, offload all identities
 
-        // if the node is dead, offload any identities that are left
-        if (!node.isAlive()) {
+        if (node.isAlive()) {
+            try {
+                groupCoordinator.offload(node);
+            } catch (NoNodesAvailableException ex) {
+                logger.log(Level.WARNING,
+                           "Unable to offload node, no other nodes available");
+            }
+        } else {
 
             // Look up each identity on the failed node and move it
             String nodekey = NodeMapUtil.getPartialNodeKey(node.getId());

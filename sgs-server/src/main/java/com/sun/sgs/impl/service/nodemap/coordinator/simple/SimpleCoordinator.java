@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.coordinator.simple;
 
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.IdentityMO;
-import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
+import com.sun.sgs.service.NoNodesAvailableException;
 import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -59,8 +59,7 @@ public class SimpleCoordinator implements GroupCoordinator {
         // noop
     }
 
-    // Note that this method will only ever offload a single identity. If the
-    // node is deal, the node mapping server will remove the rest.
+    // Note that this method will only ever offload a single identity.
     @Override
     public void offload(Node oldNode) throws NoNodesAvailableException {
         GetIdTask task =

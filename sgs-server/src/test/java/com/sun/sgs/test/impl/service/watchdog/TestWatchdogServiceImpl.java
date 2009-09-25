@@ -1246,6 +1246,164 @@ public class TestWatchdogServiceImpl extends Assert {
         }
     }
 
+    /* --- test node health reporting procedures --- */
+
+    @Test(expected = NullPointerException.class)
+    public void testReportNodeHealthNullHealth() {
+	watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                     null, getClass().getName());
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void testReportNodeHealthNullClassName() {
+	watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                     Node.Health.GREEN, null);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testReportNodeHealthInTransaction() throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		watchdogService.reportHealth(1, Node.Health.GREEN,
+                                             getClass().getName());
+	    }}, taskOwner);
+    }
+
+    /**
+     * Check that a node can report a change in node health
+     */
+    @Test public void testReportLocalHealth() {
+        try {
+            final String appName = "TestReportLocalHealth";
+            Properties properties = createProperties(
+                    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+                    WatchdogServerPropertyPrefix + ".port",
+		    	Integer.toString(65530));
+
+            // Create a dummy shutdown controller to log calls to the shutdown
+            // method. NOTE: The controller does not actually shutdown the node
+            WatchdogServiceImpl watchdogService =
+                    new WatchdogServiceImpl(properties, systemRegistry,
+                    txnProxy, dummyShutdownCtrl);
+
+            // Report a health change
+            watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                         Node.Health.YELLOW, appName);
+
+            try {
+                assertTrue(watchdogService.getLocalNodeHealth().
+                                                    equals(Node.Health.YELLOW));
+            } catch (Exception e) {
+                fail(e);
+            }
+
+            // The shutdown controller should not be incremented as a result
+            // of the health set to YELLOW
+            assertEquals(0, dummyShutdownCtrl.getShutdownCount());
+            watchdogService.shutdown();
+        } catch (Exception e) {
+            fail(e);
+        }
+    }
+
+    private void fail(Exception e) {
+        fail("Not expecting an Exception: " + e.getLocalizedMessage());
+    }
+
+    /**
+     * Check that a node can report multiple changes in node health.
+     */
+    @Test public void testCycleLocalHealth() {
+        try {
+            final String appName = "TestReportLocalHealth";
+            Properties properties = createProperties(
+                    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+                    WatchdogServerPropertyPrefix + ".port",
+		    	Integer.toString(65530));
+
+            // Create a dummy shutdown controller to log calls to the shutdown
+            // method. NOTE: The controller does not actually shutdown the node
+            WatchdogServiceImpl watchdogService =
+                    new WatchdogServiceImpl(properties, systemRegistry,
+                    txnProxy, dummyShutdownCtrl);
+
+            // Report multiple health changes
+            watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                         Node.Health.YELLOW, appName);
+            try {
+                assertTrue(watchdogService.getLocalNodeHealth().
+                                                    equals(Node.Health.YELLOW));
+            } catch (Exception e) {
+                fail(e);
+            }
+            watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                         Node.Health.GREEN, appName);
+            try {
+                assertTrue(watchdogService.getLocalNodeHealth().
+                                                    equals(Node.Health.GREEN));
+            } catch (Exception e) {
+                fail(e);
+            }
+
+            // The shutdown controller should not be incremented as a result
+            // of the health changes
+            assertEquals(0, dummyShutdownCtrl.getShutdownCount());
+            watchdogService.shutdown();
+        } catch (Exception e) {
+            fail(e);
+        }
+    }
+
+    /**
+     * Check that a node can report multiple changes in node health.
+     */
+    @Test public void testMultiLocalHealthReporters() {
+        try {
+            final String appName = "TestReportLocalHealth";
+            Properties properties = createProperties(
+                    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+                    WatchdogServerPropertyPrefix + ".port",
+		    	Integer.toString(65530));
+
+            // Create a dummy shutdown controller to log calls to the shutdown
+            // method. NOTE: The controller does not actually shutdown the node
+            WatchdogServiceImpl watchdogService =
+                    new WatchdogServiceImpl(properties, systemRegistry,
+                    txnProxy, dummyShutdownCtrl);
+
+            // Report multiple health changes. The sequence is:
+            //  A -> YELLOW
+            //  B -> ORANGE     - node health should report ORANGE
+            //  B -> GREEN      - node health should report YELLOW
+            //  A -> GREEN      - node health should report GREEN
+            try {
+                watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                             Node.Health.YELLOW, appName + "A");
+                watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                             Node.Health.ORANGE, appName + "B");
+                assertTrue(watchdogService.getLocalNodeHealth().
+                                                    equals(Node.Health.ORANGE));
+                watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                         Node.Health.GREEN, appName + "B");
+                assertTrue(watchdogService.getLocalNodeHealth().
+                                                    equals(Node.Health.YELLOW));
+                watchdogService.reportHealth(watchdogService.getLocalNodeId(),
+                                         Node.Health.GREEN, appName + "A");
+                assertTrue(watchdogService.getLocalNodeHealth().
+                                                    equals(Node.Health.GREEN));
+            } catch (Exception e) {
+                fail(e);
+            }
+
+            // The shutdown controller should not be incremented as a result
+            // of the health changes
+            assertEquals(0, dummyShutdownCtrl.getShutdownCount());
+            watchdogService.shutdown();
+        } catch (Exception e) {
+            fail(e);
+        }
+    }
+
     /* --- test shutdown procedures --- */
 
     @Test(expected = NullPointerException.class)
@@ -1287,7 +1445,7 @@ public class TestWatchdogServiceImpl extends Assert {
             try {
                 assertFalse(watchdogService.isLocalNodeAliveNonTransactional());
             } catch (Exception e) {
-                fail("Not expecting an Exception: " + e.getLocalizedMessage());
+                fail(e);
             }
             
             // The shutdown controller should be incremented as a result of the 
@@ -1295,7 +1453,7 @@ public class TestWatchdogServiceImpl extends Assert {
             assertEquals(1, dummyShutdownCtrl.getShutdownCount());
             watchdogService.shutdown();
         } catch (Exception e) {
-            fail("Not expecting an Exception");
+            fail(e);
         }
     }
 
@@ -1319,7 +1477,7 @@ public class TestWatchdogServiceImpl extends Assert {
         } catch (IllegalStateException ise) {
             // May happen if service is shutting down.
         } catch (Exception e) {
-            fail ("Not expecting an Exception");
+            fail (e);
         }
     }
 

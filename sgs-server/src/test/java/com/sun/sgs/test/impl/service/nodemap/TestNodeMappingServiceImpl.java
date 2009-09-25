@@ -22,7 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.LocalNodePolicy;
+import com.sun.sgs.impl.service.nodemap.policy.LocalNodePolicy;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.util.AbstractService.Version;
@@ -37,7 +37,6 @@ import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
-import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.UtilReflection;
@@ -97,6 +96,7 @@ public class TestNodeMappingServiceImpl {
             
             VERSION_KEY = (String) 
                     getField(nodeMapUtilClass, "VERSION_KEY").get(null);
+            System.out.println("VERSION_KEY: " + VERSION_KEY + " nMUClass: " + nodeMapUtilClass);
             MAJOR_VERSION = 
                     getField(nodeMapUtilClass, "MAJOR_VERSION").getInt(null);
             MINOR_VERSION =
@@ -429,86 +429,6 @@ public class TestNodeMappingServiceImpl {
             }, taskOwner);
         }
     }
-    
-    @Test
-    public void testRoundRobinAutoMove() throws Exception {
-        // Remove what happened at setup().  I know, I know...
-        tearDown();
-	serviceProps = SgsTestNode.getDefaultProperties(
-	    "TestNodeMappingServiceImpl", null, null);
-        
-        final int MOVE_COUNT = 5;
-        // Create a new nodeMappingServer which will move an identity
-        // automatically every so often.  
-        serviceProps.setProperty(
-                "com.sun.sgs.impl.service.nodemap.policy.movecount", 
-                String.valueOf(MOVE_COUNT));
-
-        setUp(serviceProps);
-        addNodes(null);
-
-        final List<Identity> ids = new ArrayList<Identity>();
-        final List<Node> assignments = new ArrayList<Node>();
-        
-        final WatchdogService watchdog = serverNode.getWatchdogService();
-        // First, Gather up any ids assigned by the other services
-        // The set of nodes the watchdog knows about
-        final Set<Node> nodes = new HashSet<Node>();
-        
-        // Gather up the nodes
-        txnScheduler.runTask(
-            new TestAbstractKernelRunnable() {
-                public void run() throws Exception {
-                    Iterator<Node> iter = watchdog.getNodes();
-                    while (iter.hasNext()) {
-                        nodes.add(iter.next());
-                    }       
-
-                }
-        }, taskOwner);
-        
-        // For each node, gather up the identities
-        for (final Node node : nodes) {
-        txnScheduler.runTask(
-            new TestAbstractKernelRunnable() {
-                public void run() throws Exception {
-                    Iterator<Identity> idIter = 
-                        nodeMappingService.getIdentities(node.getId());
-                    while (idIter.hasNext()) {
-                        Identity id = idIter.next();
-                        ids.add(id);
-                        assignments.add(nodeMappingService.getNode(id));
-                    }    
-                }
-            }, taskOwner);
-        }
-        
-        // Now start adding our identities.  The round robin policy
-        // should cause a random identity to move while we do this.
-        for (int i = 0; i < MOVE_COUNT; i++) {
-            Identity id = new IdentityImpl("identity" + i);
-            ids.add(id);
-            nodeMappingService.assignNode(DataService.class, id);
-            verifyMapCorrect(id);
-
-            GetNodeTask task = new GetNodeTask(id);
-            txnScheduler.runTask(task, taskOwner);
-            assignments.add(task.getNode());
-        }
-
-        // We expected an automatic move to have occurred.
-        boolean foundDiff = false;
-        final int size = ids.size();
-        for (int i = 0; i < size; i++) {
-            GetNodeTask task = new GetNodeTask(ids.get(i));
-            txnScheduler.runTask(task, taskOwner);
-            Node current = task.getNode();
-            foundDiff = foundDiff || 
-                        (current.getId() != assignments.get(i).getId());
-        }
-
-        assertTrue("expected an id to move", foundDiff);
-     }
     
     @Test
     public void testLocalNodePolicy() throws Exception {

@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.service.NoNodesAvailableException;
+import com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.WatchdogService;
@@ -37,7 +39,7 @@ public class DirectiveNodeAssignmentPolicy extends RoundRobinPolicy {
     public DirectiveNodeAssignmentPolicy(
 	Properties props, NodeMappingServerImpl server)
     {
-	super(props, server);
+	super(props);
         this.server = server;
 	instance = this;
     }

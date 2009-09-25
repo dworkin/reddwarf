@@ -242,15 +242,15 @@ public final class WatchdogServiceImpl
 
     /**
      * The set of health reports for this node by component. The actual health
-     * of this node is the lowest (worse) condition reported, or GREEN is no
-     * reports exits.
+     * of this node is the lowest (worse) condition reported, or
+     * {@code Health.GREEN} if no reports exits.
      */
     private final Map<String, Health> healthReports =
             new HashMap<String, Health>();
 
-    /** The local node's health. Initially, the field is {@code
-     * Health.GREEN}. Accesses to this field should be protected
-     * by {@code lock}.
+    /**
+     * The local node's health. Initially, the field is {@code Health.GREEN}.
+     * Accesses to this field should be protected by {@code lock}.
      */
     private Health health = Health.GREEN;
 
@@ -572,14 +572,13 @@ public final class WatchdogServiceImpl
                 healthReports.put(component, newHealth);
             }
 
-            Health actualHealth = Health.GREEN;
+            newHealth = Health.GREEN;
             for (Map.Entry<String, Health> report : healthReports.entrySet()) {
-                if (report.getValue().worseThan(actualHealth)) {
-                    actualHealth = report.getValue();
+                if (report.getValue().worseThan(newHealth)) {
+                    newHealth = report.getValue();
                     component = report.getKey();
                 }
             }
-            newHealth = actualHealth;
         }
 
         /*
@@ -728,6 +727,10 @@ public final class WatchdogServiceImpl
 	return health;
     }
 
+    /**
+     * Returns the component that has reported the local node health. Note that
+     * this may not be the last component to report.
+     */
     String getReportingComponent() {
         return reportingComponent;
     }
@@ -775,9 +778,9 @@ public final class WatchdogServiceImpl
 	    notifyNodeListeners(node);
 	}
 
-        logger.log(
-	    Level.SEVERE,
-	    "Node:{0} forced to shutdown due to service failure", localNodeId);
+        logger.log(Level.SEVERE,
+	           "Node:{0} forced to shutdown due to failure of {1}",
+                   localNodeId, component);
 
         shutdownController.shutdownNode(this);
     }
