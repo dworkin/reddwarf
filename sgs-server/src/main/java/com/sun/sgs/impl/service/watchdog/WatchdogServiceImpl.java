@@ -440,7 +440,7 @@ public final class WatchdogServiceImpl
 	synchronized (renewThread) {
 	    renewThread.notifyAll();
 	}
-        if(timesyncTaskHandle != null) {
+        if (timesyncTaskHandle != null) {
             timesyncTaskHandle.cancel();
         }
 	try {
@@ -961,7 +961,7 @@ public final class WatchdogServiceImpl
             long after = System.currentTimeMillis();
 
             // calculate local offset value based on round trip time
-            timeOffset = after - (appTime + (after - before)/2L);
+            timeOffset = after - (appTime + (after - before) / 2L);
         }
     }
 }

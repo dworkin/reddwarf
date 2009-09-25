@@ -1133,7 +1133,7 @@ public final class WatchdogServerImpl
                 // system crashes
                 time.set(time.get() + drift.get() / 2);
             } catch (NameNotBoundException nnbe) {
-                time = new ManagedSerializable<Long>(new Long(0));
+                time = new ManagedSerializable<Long>(Long.valueOf(0));
                 drift = new ManagedSerializable<Long>(timestampInterval);
                 dataService.setServiceBinding(APP_TIME_BINDING, time);
                 dataService.setServiceBinding(APP_TIME_DRIFT_BINDING, drift);
