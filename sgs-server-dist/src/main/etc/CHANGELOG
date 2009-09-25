@@ -4,7 +4,7 @@ Version 0.9.11:
 - Added TaskManager.shouldContinue (issue #185)
 - Added support for JMX-based shutdown (issue #193)
 - Added support for including extension libraries on startup (issue #194)
-- Fix issues #168, #169, #171, #173, #178, #187
+- Fix issues #168, #169, #171, #173, #178, #187, #191
 
 Version 0.9.10:
 - Add DataManager.getObjectId (issue #99) and
