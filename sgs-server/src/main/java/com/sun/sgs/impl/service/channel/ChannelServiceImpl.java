@@ -773,6 +773,15 @@ public final class ChannelServiceImpl
 	    RelocationInfo info = relocatingSessions.get(sessionRefId);
 	    if (info != null) {
 		// Session is relocating from this node.
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE, "Dropping channel request for " +
+			"relocating session:{0} channel:{1} timestamp:{2} " +
+			"localNodeId:{3}",
+			toHexString(sessionRefId),
+			toHexString(task.channelRefId),
+			timestamp, localNodeId);
+		}
 		return false;
 	    }
 
@@ -940,6 +949,15 @@ public final class ChannelServiceImpl
 				       long timestamp,
 				       boolean isRelocating)
     {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"Adding local member session:{0} to channel:{1} " +
+		"timestamp:{2} isRelocating:{3} " +
+		"localNodeId:{4}", toHexString(sessionRefId),
+		toHexString(channelRefId), timestamp,
+		isRelocating, localNodeId);
+	}
 	// Update channel's local membership set.
 	boolean addedChannelInfo = false;
 	LocalChannelInfo channelInfo =
@@ -954,13 +972,25 @@ public final class ChannelServiceImpl
 		    addedChannelInfo = true;
 		    channelInfo = newChannelInfo;
 		    if (isRelocating) {
+			// If the relocating session establishes the
+			// channel info on the local node, then the local
+			// node needs to be added to the channel's list.
+			if (!addLocalNodeToChannel(channelRefId)) {
+			    // channel is closed, so send leave message.
+			    // TBD: if this returns false, there may be a
+			    // problem...
+			    serverImpl.handleChannelRequest(
+ 				sessionRefId, timestamp,
+				new ChannelLeaveTask(channelRefId));
+			    return;
+			}
 			// Message timestamp may be out of date with
 			// channel's current timestamp, so check and update
 			// if necessary.
 			long currentTimestamp =
 			    getCurrentChannelMessageTimestamp(channelRefId);
 			if (currentTimestamp > timestamp) {
-			    newChannelInfo.msgTimestamp = currentTimestamp;
+			    channelInfo.msgTimestamp = currentTimestamp;
 			}
 		    }
 		}
@@ -985,22 +1015,12 @@ public final class ChannelServiceImpl
 	}
 	channelMap.put(channelRefId,
 		       new LocalMemberInfo(channelInfo, timestamp));
-	
-	if (isRelocating) {
-	    if (addedChannelInfo) {
-		if (!addLocalNodeToChannel(channelRefId)) {
-		    // channel is closed, so send leave message.
-		    // TBD: if this returns false, there may be a problem...
-		    serverImpl.handleChannelRequest(
-		        sessionRefId, timestamp,
-			new ChannelLeaveTask(channelRefId));
-		    return;
-		}
-		
-	    }
 
+	if (isRelocating) {
 	    // If session is relocating, then its timestamp may be out of
 	    // date with the channel's timestamp...
+
+	  synchronized (channelInfo) {
 	    if (delivery.equals(Delivery.RELIABLE) &&
 		channelInfo.msgTimestamp > timestamp)
 	    {
@@ -1012,6 +1032,16 @@ public final class ChannelServiceImpl
 		// since the members list is locked while updating the
 		// timestamp and delivering channel messages to client
 		// sessions.  Is the latter true yet?
+
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"Retrieving missed messages for session:{0} " +
+			"channel:{1} fromTimestamp:{2} toTimestamp:{3} " +
+			"localNodeId:{4}", toHexString(sessionRefId),
+			toHexString(channelRefId), timestamp + 1,
+			channelInfo.msgTimestamp, localNodeId);
+		}
 
 		SortedMap<Long, byte[]> missingMessages =
 		    getChannelMessages(
@@ -1028,7 +1058,9 @@ public final class ChannelServiceImpl
 		    }
 		}
 	    }
+	  }
 	}
+
     }
 
     /**

@@ -683,8 +683,127 @@ public class TestChannelServiceImplRelocatingSessions
 	    relocatingClient.disconnect();
 	    otherClient.disconnect();
 	}
+    }
+    
+    @Test
+    @IntegrationTest
+    public void  testChannelSendDuringRelocatePreparation()
+	throws Exception
+    {
+	String channelName = "foo";
+	createChannel(channelName);
+
+	// All clients will log into server node.
+	ClientGroup group = new ClientGroup(someUsers);
+	SgsTestNode newNode = addNode();
+	MySessionStatusListener mySessionStatusListener =
+	    new MySessionStatusListener();
+	serverNode.getClientSessionService().
+	    addSessionStatusListener(mySessionStatusListener);
 	
-	
+	try {
+
+	    joinUsers(channelName, someUsers);
+	    checkUsersJoined(channelName, someUsers);
+	    
+	    // Initiate client relocation to new node.
+	    DummyClient relocatingClient = group.getClient(MOE);
+	    moveIdentity(relocatingClient, serverNode, newNode);
+	    SimpleCompletionHandler handler =
+		mySessionStatusListener.waitForPrepare();
+	    
+	    // Join all users (including relocating client) to channel during
+	    // prepare phase.
+	    //	    sendMessagesToChannel(channelName, 3);
+	    sendMessagesToChannel(channelName, 20);
+	    //Thread.sleep(200);
+	    // Mark preparation completed.
+	    handler.completed();
+	    
+	    // Finish relocation.
+	    relocatingClient.relocate(0, true, true);
+
+	    // Make sure all members are joined and can receive messages.
+	    checkUsersJoined(channelName, someUsers);
+	    //checkChannelMessagesReceived(group, channelName, 3);
+	    checkChannelMessagesReceived(group, channelName, 20);
+	    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
+    @Test
+    @IntegrationTest
+    public void testChannelSendDuringRelocate()
+	throws Exception
+    {
+	String channelName = "foo";
+	// channel coordinator is on server node
+	createChannel(channelName);
+
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
+	String[] users = new String[]{ "relocatingClient"};
+	DummyClient relocatingClient = createDummyClient(users[0], oldNode);
+
+	try {
+	    joinUsers(channelName, users);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(relocatingClient, channelName, 2);
+	    
+	    // Prepare client for relocation & send messages.
+	    moveIdentityAndWaitForRelocationNotification(
+		relocatingClient, oldNode, newNode);
+	    sendMessagesToChannel(channelName, 3);
+	    
+	    // Finish relocation.
+	    relocatingClient.relocate(0, true, true);
+	    checkChannelMessagesReceived(relocatingClient, channelName, 3);
+	    
+	} finally {
+	    relocatingClient.disconnect();
+	}
+    }
+
+    @Test
+    @IntegrationTest
+    public void testChannelSendDuringRelocateWithMemberOnNewNode()
+	throws Exception
+    {
+	String channelName = "foo";
+	// channel coordinator is on server node
+	createChannel(channelName);
+
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
+	String[] users = new String[]{ "relocatingClient", "otherClient"};
+	DummyClient relocatingClient = createDummyClient(users[0], oldNode);
+	DummyClient otherClient = createDummyClient(users[1], newNode);
+
+	try {
+	    joinUsers(channelName, users);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    otherClient.assertJoinedChannel(channelName);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(relocatingClient, channelName, 2);
+	    checkChannelMessagesReceived(otherClient, channelName, 2);
+	    
+	    // Prepare client for relocation & send messages.
+	    moveIdentityAndWaitForRelocationNotification(
+		relocatingClient, oldNode, newNode);
+	    sendMessagesToChannel(channelName, 3);
+	    checkChannelMessagesReceived(otherClient, channelName, 3);
+	    
+	    // Finish relocation.
+	    relocatingClient.relocate(0, true, true);
+	    checkChannelMessagesReceived(relocatingClient, channelName, 3);
+	    
+	} finally {
+	    relocatingClient.disconnect();
+	    otherClient.disconnect();
+	}
     }
     
     // -- Other methods --
