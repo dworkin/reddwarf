@@ -1496,7 +1496,7 @@ public class TestWatchdogServiceImpl extends Assert {
         assertTrue(afterTime < beforeTime + 100);
     }
 
-    @Test public void testCurrentAppTimeMillisAfterCleanShutdown()
+    @Test public void testCurrentAppTimeMillisAfterShutdownAndCleanDatabase()
             throws Exception {
         Thread.sleep(1000);
         assertTrue(watchdogService.currentAppTimeMillis() >

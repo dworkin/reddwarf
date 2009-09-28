@@ -128,7 +128,8 @@ import javax.management.JMException;
  * <dd style="padding-top: .5em">
  *      Specifies the amount of time in milliseconds that this service will
  *      wait between synchronizing its local time with the global time
- *      of the {@code WatchdogServer}.
+ *      of the {@code WatchdogServer}.  The value must be greater than or
+ *      equal to {@code 1000} and no greater than {@link Long#MAX_VALUE}.
  * 
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.management.jmxremote.port
@@ -369,7 +370,7 @@ public final class WatchdogServiceImpl
 
             timesyncInterval = wrappedProps.getLongProperty(
                     TIMESYNC_INTERVAL_PROPERTY, DEFAULT_TIMESYNC_INTERVAL,
-                    0, Long.MAX_VALUE);
+                    1000, Long.MAX_VALUE);
             
             // create our profiling info and register our MBean
             ProfileCollector collector = 

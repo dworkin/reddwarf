@@ -183,9 +183,9 @@ public interface WatchdogService extends Service {
 
     /**
      * Converts a system time value representing the total elapsed time in
-     * milliseconds since the Unix epoch to an "application time" value.  An
-     * application time value is the total elapsed time in milliseconds since
-     * the currently running application's
+     * milliseconds since midnight, January 1, 1970 UTC to an "application time"
+     * value.  An application time value is the total amount of  time in
+     * milliseconds that the current application has been running since the
      * {@link AppListener#initialize(java.util.Properties) initialize} method
      * was called on its {@code AppListener} object.
      *
@@ -195,12 +195,12 @@ public interface WatchdogService extends Service {
     long getAppTimeMillis(long systemTimeMillis);
 
     /**
-     * Converts an "application time" value representing the total elapsed
-     * time in milliseconds since the currently running application's
-     * {@link AppListener#initialize(java.util.Properties) initialize} method
-     * was called on its {@code AppListener} object to a system time value.
-     * A system time value is the total elapsed time in milliseconds since
-     * the Unix epoch.
+     * Converts an "application time" value representing the total amount of
+     * time in milliseconds that the current application has been running since
+     * the {@link AppListener#initialize(java.util.Properties) initialize}
+     * method was called on its {@code AppListener} object to a system time
+     * value.  A system time value is the total elapsed time in milliseconds
+     * since midnight, January 1, 1970 UTC.
      *
      * @param appTimeMillis an application time value
      * @return the given application time converted into system time

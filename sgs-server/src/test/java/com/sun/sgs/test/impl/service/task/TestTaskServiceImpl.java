@@ -1128,7 +1128,7 @@ public class TestTaskServiceImpl extends Assert {
                     Counter counter = getClearedCounter();
                     for (int i = 0; i < 3; i++) {
                         taskService.schedulePeriodicTask(
-                                new NonManagedTask(taskOwner), 20L * i, 500L);
+                                new NonManagedTask(taskOwner), 20L * i, 1000L);
                         counter.increment();
                         counter.increment();
                     }
@@ -1138,16 +1138,17 @@ public class TestTaskServiceImpl extends Assert {
         // shutdown the server, retaining the data store
         // sleep past the periodic tasks start times and start back up
         serverNode.shutdown(false);
-        Thread.sleep(750);
+        Thread.sleep(1250);
         setUp(null, false);
 
-        // verify the periodic tasks do not run immediately on startup
+        // verify that the periodic tasks have only run once and have not
+        // immediately run a second time on startup
         Thread.sleep(100);
-        assertCounterNotClearXAction(
+        assertCounterValueXAction(3,
                 "Periodic tasks incorrectly ran immediately after restart");
 
         // verify that the periodic tasks do run after waiting
-        Thread.sleep(500);
+        Thread.sleep(1000);
         assertCounterClearXAction(
                 "Some periodic tasks did not run on time after restart");
     }
@@ -1161,6 +1162,25 @@ public class TestTaskServiceImpl extends Assert {
         dataService.markForUpdate(counter);
         counter.clear();
         return counter;
+    }
+
+    private void assertCounterValue(int value, String message) {
+        Counter counter = (Counter) dataService.getBinding("counter");
+        if (counter.value() != value) {
+            System.err.println("Counter assert failed: " + counter);
+            fail(message);
+        }
+    }
+
+    private void assertCounterValueXAction(final int value,
+                                           final String message)
+            throws Exception {
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    assertCounterValue(value, message);
+                }
+        }, taskOwner);
     }
 
     private void assertCounterClear(String message) {
@@ -1220,6 +1240,7 @@ public class TestTaskServiceImpl extends Assert {
         public void increment() { count++; }
         public void decrement() { count--; }
         public boolean isZero() { return count == 0; }
+        public int value() { return count; }
         public String toString() { return "Counter value = " + count; }
     }
 

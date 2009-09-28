@@ -57,7 +57,7 @@ class PendingTask implements ManagedObject, Serializable {
     private String taskType;
     private long startTime;
     private long period;
-    private long lastStartTime;
+    private long runCount;
     
     // identifies whether this instance is free for re-use
     private boolean reusable;
@@ -114,7 +114,7 @@ class PendingTask implements ManagedObject, Serializable {
         this.taskType = t.getClass().getName();
         this.startTime = s;
         this.period = p;
-        this.lastStartTime = TaskServiceImpl.NEVER;
+        this.runCount = 0;
 
         this.reusable = false;
         this.runningNode = -1;
@@ -134,7 +134,7 @@ class PendingTask implements ManagedObject, Serializable {
         taskType = null;
         startTime = TaskServiceImpl.START_NOW;
         period = TaskServiceImpl.PERIOD_NONE;
-        lastStartTime = TaskServiceImpl.NEVER;
+        runCount = 0;
         runningNode = -1;
     }
 
@@ -160,11 +160,10 @@ class PendingTask implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the actual time when this task last started or
-     * {@code TaskServiceImpl.NEVER} if the task has never been run.
+     * Returns the total number of times this task has been run.
      */
-    long getLastStartTime() {
-        return lastStartTime;
+    long getRunCount() {
+        return runCount;
     }
 
     /**
@@ -176,9 +175,12 @@ class PendingTask implements ManagedObject, Serializable {
         return runningNode;
     }
 
-    void setLastStartTime(long lastStartTime) {
+    /**
+     * Increments the total run count for this task by exactly {@code 1}.
+     */
+    void incrementRunCount() {
         AppContext.getDataManager().markForUpdate(this);
-        this.lastStartTime = lastStartTime;
+        this.runCount++;
     }
 
     /**

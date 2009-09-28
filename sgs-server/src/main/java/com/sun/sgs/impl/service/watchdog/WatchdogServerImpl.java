@@ -92,7 +92,7 @@ import java.util.Arrays;
  *	{@code 10000} milliseconds (10 seconds).<p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.watchdog.server.timestamp.interval
+ *	com.sun.sgs.impl.service.watchdog.server.timeflush.interval
  *	</b></code><br>
  *	<i>Default:</i> {@code 5000} (five seconds)
  *
@@ -100,7 +100,9 @@ import java.util.Arrays;
  *      that the server will wait between updates to the global application time
  *      stored in the data store.  A larger value will take less system
  *      resources but will allow the possibility of the global application clock
- *      to drift by at least the given value if the system crashes.<p>
+ *      to drift by at least the given value if the system crashes.  The
+ *      interval must be greater than or equal to {@code 100} milliseconds and
+ *      less than or equal to {@code 300000} milliseconds.<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.id.block.size
@@ -165,18 +167,18 @@ public final class WatchdogServerImpl
     /** The upper bound for the renew interval. */
     private static final int RENEW_INTERVAL_UPPER_BOUND = Integer.MAX_VALUE;
 
-    /** The property name for the timestamp interval. */
-    private static final String TIMESTAMP_INTERVAL_PROPERTY =
-            SERVER_PROPERTY_PREFIX + ".timestamp.interval";
+    /** The property name for the timeflush interval. */
+    private static final String TIMEFLUSH_INTERVAL_PROPERTY =
+            SERVER_PROPERTY_PREFIX + ".timeflush.interval";
 
-    /** The default time in milliseconds to wait between timestamps. */
-    private static final long DEFAULT_TIMESTAMP_INTERVAL = 5000L;
+    /** The default time in milliseconds to wait between timeflushes. */
+    private static final long DEFAULT_TIMEFLUSH_INTERVAL = 5000L;
 
     /**
      * The name binding used to store the current global time in the data store.
      */
     private static final String APP_TIME_BINDING = PKG_NAME +
-                                                       ".AppTime";
+                                                       ".appTime";
 
     /**
      * The name binding used to store the most recent timestamp interval
@@ -184,7 +186,7 @@ public final class WatchdogServerImpl
      * data store.
      */
     private static final String APP_TIME_DRIFT_BINDING = PKG_NAME +
-                                                         ".AppTimeDrift";
+                                                         ".appTimeDrift";
 
     /** The server port. */
     private final int serverPort;
@@ -192,8 +194,8 @@ public final class WatchdogServerImpl
     /** The renew interval. */
     final long renewInterval;
 
-    /** The timestamp interval. */
-    final long timestampInterval;
+    /** The timeflush interval. */
+    final long timeflushInterval;
 
     /** The node ID for this server. */
     final long localNodeId;
@@ -245,8 +247,8 @@ public final class WatchdogServerImpl
     /** The offset to use when reporting the global application time. */
     private long timeOffset;
 
-    /** a handle to the periodic global time update task */
-    private RecurringTaskHandle timeUpdateTaskHandle = null;
+    /** a handle to the periodic global time flush task */
+    private RecurringTaskHandle timeflushTaskHandle = null;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -308,9 +310,9 @@ public final class WatchdogServerImpl
 		       "]: renewInterval:" + renewInterval);
 	}
 
-        timestampInterval = wrappedProps.getLongProperty(
-                TIMESTAMP_INTERVAL_PROPERTY, DEFAULT_TIMESTAMP_INTERVAL,
-                0, Long.MAX_VALUE);
+        timeflushInterval = wrappedProps.getLongProperty(
+                TIMEFLUSH_INTERVAL_PROPERTY, DEFAULT_TIMEFLUSH_INTERVAL,
+                100, 300000);
 
 	FailedNodesRunnable failedNodesRunnable = new FailedNodesRunnable();
 	transactionScheduler.runTask(failedNodesRunnable, taskOwner);
@@ -391,12 +393,12 @@ public final class WatchdogServerImpl
             throw new AssertionError("Failed to initiate global time");
         }
 
-        // kick off a periodic time update task
-        timeUpdateTaskHandle = transactionScheduler.scheduleRecurringTask(
-                new TimestampRunner(timestampInterval),
+        // kick off a periodic time flush task
+        timeflushTaskHandle = transactionScheduler.scheduleRecurringTask(
+                new TimeflushRunner(timeflushInterval),
                 taskOwner, System.currentTimeMillis(),
-                timestampInterval);
-        timeUpdateTaskHandle.start();
+                timeflushInterval);
+        timeflushTaskHandle.start();
     }
 
     /** {@inheritDoc} */
@@ -444,12 +446,12 @@ public final class WatchdogServerImpl
         }
 	aliveNodes.clear();
 
-        // stop the time update task and take the final timestamp
-        if (timeUpdateTaskHandle != null) {
-            timeUpdateTaskHandle.cancel();
+        // stop the time flush task and take the final timestamp
+        if (timeflushTaskHandle != null) {
+            timeflushTaskHandle.cancel();
         }
         try {
-            transactionScheduler.runTask(new TimestampRunner(0), taskOwner);
+            transactionScheduler.runTask(new TimeflushRunner(0), taskOwner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.logThrow(Level.FINE, e,
@@ -1134,7 +1136,7 @@ public final class WatchdogServerImpl
                 time.set(time.get() + drift.get() / 2);
             } catch (NameNotBoundException nnbe) {
                 time = new ManagedSerializable<Long>(Long.valueOf(0));
-                drift = new ManagedSerializable<Long>(timestampInterval);
+                drift = new ManagedSerializable<Long>(timeflushInterval);
                 dataService.setServiceBinding(APP_TIME_BINDING, time);
                 dataService.setServiceBinding(APP_TIME_DRIFT_BINDING, drift);
             }
@@ -1147,14 +1149,14 @@ public final class WatchdogServerImpl
      * Private runnable that periodically records the current global time
      * in the data store
      */
-    private final class TimestampRunner implements KernelRunnable {
+    private final class TimeflushRunner implements KernelRunnable {
         private final long drift;
-        public TimestampRunner(long drift) {
+        public TimeflushRunner(long drift) {
             this.drift = drift;
         }
         /** {@inheritDoc} */
         public String getBaseTaskType() {
-            return TimestampRunner.class.getName();
+            return TimeflushRunner.class.getName();
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
