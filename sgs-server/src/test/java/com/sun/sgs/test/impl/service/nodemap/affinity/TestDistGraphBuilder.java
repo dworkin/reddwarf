@@ -21,7 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
+import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.kernel.NodeType;
@@ -46,9 +46,8 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
     private static Field serverImplField;
     static {
         try {
-            Class builderClass = DistGraphBuilder.class;
             serverImplField =
-                    UtilReflection.getField(builderClass, "serverImpl");
+                UtilReflection.getField(DistGraphBuilder.class, "serverImpl");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -60,6 +59,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
     }
 
     @Before
+    @Override
     public void beforeEachTest() throws Exception {
         props = getProps(null);
         serverNode = new SgsTestNode(appName, null, props);
@@ -95,7 +95,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
             p.setProperty(StandardProperties.NODE_TYPE,
                           NodeType.coreServerNode.toString());
         }
-        p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
+        p.setProperty(DistGraphBuilderServerImpl.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
         p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY,
                       DistGraphBuilder.class.getName());
@@ -104,6 +104,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
 
     @Ignore
     @Test
+    @Override
     public void testGraphPruner() throws Exception {
         // this variation doesn't support pruning yet
         super.testGraphPruner();
@@ -111,6 +112,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
 
     @Ignore
     @Test
+    @Override
     public void testGraphPrunerCountTwo() throws Exception {
         // this variation doesn't support pruning yet
         super.testGraphPrunerCountTwo();
@@ -118,6 +120,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
 
     @Ignore
     @Test
+    @Override
     public void testGraphBuilderBadCount() throws Exception {
         // this variation doesn't support pruning yet so we don't parse the arg
         super.testGraphBuilderBadCount();

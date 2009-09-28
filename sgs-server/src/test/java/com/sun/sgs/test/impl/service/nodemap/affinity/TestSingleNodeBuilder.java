@@ -44,6 +44,7 @@ public class TestSingleNodeBuilder extends GraphBuilderTests {
     }
 
     @Before
+    @Override
     public void beforeEachTest() throws Exception {
         // no server node required
         props = getProps(null);

@@ -337,7 +337,10 @@ public class TestLPAPerf {
                 objUseMap.put("o5", tempMap);
                 tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
                 tempMap.put(idents[1], new AtomicLong(1));
-                objUseMap.put("o6", tempMap);
+                objUseMap.put("o84", tempMap);
+                tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[4], new AtomicLong(1));
+                objUseMap.put("o87", tempMap);
                 tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
                 tempMap.put(idents[10], new AtomicLong(1));
                 objUseMap.put("o7", tempMap);
@@ -484,8 +487,19 @@ public class TestLPAPerf {
                 // Obj uses
                 tempMap.put(idents[2], new AtomicLong(1));
                 tempMap.put(idents[8], new AtomicLong(1));
-                tempMap.put(idents[14], new AtomicLong(1));
                 objUseMap.put("o1", tempMap);
+                tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[14], new AtomicLong(1));
+                objUseMap.put("o84", tempMap);
+                tempMap.put(idents[2], new AtomicLong(1));
+                tempMap.put(idents[14], new AtomicLong(1));
+                objUseMap.put("o85", tempMap);
+                tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[14], new AtomicLong(1));
+                objUseMap.put("o86", tempMap);
+                tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[14], new AtomicLong(1));
+                objUseMap.put("o87", tempMap);
                 tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
                 tempMap.put(idents[5], new AtomicLong(1));
                 objUseMap.put("o2", tempMap);
@@ -573,12 +587,15 @@ public class TestLPAPerf {
                 conflict.put("o32", new AtomicLong(1));
                 conflict.put("o51", new AtomicLong(1));
                 conflict.put("o53", new AtomicLong(1));
+                conflict.put("o84", new AtomicLong(1));
+                conflict.put("o87", new AtomicLong(1));
                 conflictMap.put(NODE1, conflict);
                 conflict = new ConcurrentHashMap<Object, AtomicLong>();
                 conflict.put("o1", new AtomicLong(1));
                 conflict.put("o10", new AtomicLong(1));
                 conflict.put("o14", new AtomicLong(1));
                 conflict.put("o22", new AtomicLong(1));
+                conflict.put("o86", new AtomicLong(1));
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE3) {
                 graph.addEdge(new WeightedEdge(), nodes[9], nodes[3]);
@@ -594,6 +611,9 @@ public class TestLPAPerf {
                 tempMap.put(idents[3], new AtomicLong(1));
                 objUseMap.put("o1", tempMap);
                 tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
+                tempMap.put(idents[3], new AtomicLong(1));
+                objUseMap.put("o86", tempMap);
+                tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
                 tempMap.put(idents[6], new AtomicLong(1));
                 objUseMap.put("o3", tempMap);
                 tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
@@ -604,7 +624,7 @@ public class TestLPAPerf {
                 objUseMap.put("o5", tempMap);
                 tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
                 tempMap.put(idents[9], new AtomicLong(1));
-                tempMap.put(idents[3], new AtomicLong(1));
+                tempMap.put(idents[3], new AtomicLong(1));          
                 objUseMap.put("o6", tempMap);
                 tempMap = new ConcurrentHashMap<Identity, AtomicLong>();
                 tempMap.put(idents[3], new AtomicLong(1));

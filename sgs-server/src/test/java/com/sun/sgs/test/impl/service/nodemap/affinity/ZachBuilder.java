@@ -40,7 +40,6 @@ class ZachBuilder implements BasicGraphBuilder {
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
     public ZachBuilder() {
-        super();
         graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
         // Create a graph for the Zachary network:
         // W. W. Zachary, An information flow model for conflict and
