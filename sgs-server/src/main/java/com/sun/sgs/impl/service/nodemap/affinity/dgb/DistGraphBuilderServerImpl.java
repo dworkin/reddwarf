@@ -34,6 +34,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
@@ -126,8 +127,10 @@ public class DistGraphBuilderServerImpl
             new Exporter<DistGraphBuilderServer>(DistGraphBuilderServer.class);
         exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
 
+        ProfileCollector col =
+                systemRegistry.getComponent(ProfileCollector.class);
         // Create the LPA algorithm
-        lpa = new SingleLabelPropagation(this, properties, false);
+        lpa = new SingleLabelPropagation(this, col, properties);
     }
 
     /** {@inheritDoc} */

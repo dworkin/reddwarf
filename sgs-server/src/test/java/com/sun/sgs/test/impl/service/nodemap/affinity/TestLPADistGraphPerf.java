@@ -32,7 +32,9 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.NodeType;
+import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -53,6 +55,7 @@ import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * Test of single node performance of label propagation.
@@ -382,11 +385,13 @@ public class TestLPADistGraphPerf {
             System.out.println("GRAPH IS " + graph);
             Assert.assertEquals(34, graph.getVertexCount());
             Assert.assertEquals(78, graph.getEdgeCount());
-    //        AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
-    //            collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
-    //        assertNotNull(bean);
-    //        bean.clear();
-
+            ProfileCollector col =
+                serverNode.getSystemRegistry().
+                    getComponent(ProfileCollector.class);
+            AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
+                col.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
+            assertNotNull(bean);
+            bean.clear();
 
             double avgMod = 0.0;
             double maxMod = 0.0;
@@ -407,11 +412,10 @@ public class TestLPADistGraphPerf {
                       " avg iters : %4.2f, avg modularity: %.4f, " +
                       " modularity range [%.4f - %.4f] %n",
                       RUNS, numThreads,
-    //                  bean.getAvgRunTime(),
-    //                  bean.getMinRunTime(),
-    //                  bean.getMaxRunTime(),
-    //                  bean.getAvgIterations(),
-                      0.0, 0, 0, 0.0,
+                      bean.getAvgRunTime(),
+                      bean.getMinRunTime(),
+                      bean.getMaxRunTime(),
+                      bean.getAvgIterations(),
                       avgMod/(double) RUNS,
                       minMod, maxMod);
         } finally {

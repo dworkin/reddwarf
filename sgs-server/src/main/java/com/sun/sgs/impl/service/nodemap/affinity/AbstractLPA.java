@@ -89,11 +89,6 @@ public abstract class AbstractLPA {
     /** The number of threads this algorithm should use. */
     protected final int numThreads;
 
-    /** If true, gather statistics for each run. */
-    protected final boolean gatherStats;
-    /** The time spent in the last run, only valid if gatherStats is true. */
-    protected long time;
-
     /**
      * The number of iterations required for the last run,
      * only valid if gatherStats is true.
@@ -115,18 +110,15 @@ public abstract class AbstractLPA {
      * Constructs a new instance of the label propagation algorithm.
      * @param nodeId the local node ID
      * @param properties the properties for configuring this service
-     * @param gatherStats if {@code true}, gather extra statistics for each run.
-     *            Useful for testing.
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
-    public AbstractLPA(long nodeId, Properties properties, boolean gatherStats)
+    public AbstractLPA(long nodeId, Properties properties)
         throws Exception
     {
         localNodeId = nodeId;
-        this.gatherStats = gatherStats;
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         numThreads = wrappedProps.getIntProperty(
@@ -306,22 +298,4 @@ public abstract class AbstractLPA {
         }
         return groupMap.values();
     }
-
-    // Utility methods, mostly used for performance testing.
-    /**
-     * Returns the time used for the last algorithm run.  This is only
-     * valid if we were constructed to gather statistics.
-     *
-     * @return the time used for the last algorithm run
-     */
-    public long getTime()         { return time; }
-
-    /**
-     * Returns the iterations required for the last algorithm run.  This is only
-     * valid if we were constructed to gather statistics.
-     *
-     * @return the iterations required for the last algorithm run
-     */
-    public int getIterations()    { return iterations; }
-
 }

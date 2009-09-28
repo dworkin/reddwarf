@@ -121,7 +121,7 @@ public class TestLPAPerf {
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
         SingleLabelPropagation lpa =
-           new SingleLabelPropagation(new ZachBuilder(), props, false);
+           new SingleLabelPropagation(new ZachBuilder(), collector, props);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.findAffinityGroups();
@@ -137,39 +137,38 @@ public class TestLPAPerf {
                     String.valueOf(numThreads));
         // third argument true:  gather statistics
         SingleLabelPropagation lpa =
-            new SingleLabelPropagation(builder, props, true);
+            new SingleLabelPropagation(builder, collector, props);
 
-        long avgTime = 0;
-        int avgIter = 0;
+        AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
+            collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
+        assertNotNull(bean);
+        bean.clear();
+        
         double avgMod  = 0.0;
         double maxMod = 0.0;
         double minMod = 1.0;
-        long maxTime = 0;
-        long minTime = Integer.MAX_VALUE;
         for (int i = 0; i < RUNS; i++) {
             Collection<AffinityGroup> groups = lpa.findAffinityGroups();
-            long time = lpa.getTime();
-            avgTime = avgTime + time;
-            maxTime = Math.max(maxTime, time);
-            minTime = Math.min(minTime, time);
+            double mod =
+                AffinityGroupGoodness.calcModularity(
+                                new ZachBuilder().getAffinityGraph(), groups);
 
-            avgIter = avgIter + lpa.getIterations();
-            double mod = lpa.getModularity();
             avgMod = avgMod + mod;
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
         }
         System.out.printf("SING (%d runs, %d threads): " +
-                          "avg time : %4.2f ms, " +
-                          " time range [%d - %d ms] " +
-                          " avg iters : %4.2f, avg modularity: %.4f, " +
-                          " modularity range [%.4f - %.4f] %n",
-                          RUNS, numThreads,
-                          avgTime/(double) RUNS,
-                          minTime, maxTime,
-                          avgIter/(double) RUNS,
-                          avgMod/(double) RUNS,
-                          minMod, maxMod);
+                  "avg time : %4.2f ms, " +
+                  " time range [%d - %d ms] " +
+                  " avg iters : %4.2f, avg modularity: %.4f, " +
+                  " modularity range [%.4f - %.4f] %n",
+                  RUNS, numThreads,
+                  bean.getAvgRunTime(),
+                  bean.getMinRunTime(),
+                  bean.getMaxRunTime(),
+                  bean.getAvgIterations(),
+                  avgMod/(double) RUNS,
+                  minMod, maxMod);
         lpa.shutdown();
     }
 
@@ -189,15 +188,15 @@ public class TestLPAPerf {
             LabelPropagation lp1 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                        DistributedZachBuilder.NODE1, props, true);
+                        DistributedZachBuilder.NODE1, props);
             LabelPropagation lp2 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                        DistributedZachBuilder.NODE2, props, true);
+                        DistributedZachBuilder.NODE2, props);
             LabelPropagation lp3 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                        DistributedZachBuilder.NODE3, props, true);
+                        DistributedZachBuilder.NODE3, props);
         }
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
@@ -223,15 +222,15 @@ public class TestLPAPerf {
         LabelPropagation lp1 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                    DistributedZachBuilder.NODE1, props, true);
+                    DistributedZachBuilder.NODE1, props);
         LabelPropagation lp2 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                    DistributedZachBuilder.NODE2, props, true);
+                    DistributedZachBuilder.NODE2, props);
         LabelPropagation lp3 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                    DistributedZachBuilder.NODE3, props, true);
+                    DistributedZachBuilder.NODE3, props);
 
         AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
             collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);

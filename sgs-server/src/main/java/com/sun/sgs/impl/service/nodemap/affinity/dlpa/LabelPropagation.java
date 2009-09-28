@@ -122,19 +122,16 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * @param builder the graph producer
      * @param nodeId the local node ID
      * @param	properties the properties for configuring this service
-     * @param gatherStats if {@code true}, gather extra statistics for each run.
-     *            Useful for testing.
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
     public LabelPropagation(GraphBuilder builder, long nodeId,
-                            Properties properties,
-                            boolean gatherStats)
+                            Properties properties)
         throws Exception
     {
-        super(nodeId, properties, gatherStats);
+        super(nodeId, properties);
         this.builder = builder;
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         
@@ -529,17 +526,6 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         synchronized (stateLock) {
             state = State.IDLE;
             stateLock.notifyAll();
-        }
-        if (gatherStats) {
-            // Record our statistics for this run, used for testing.
-            time = System.currentTimeMillis() - startTime;
-            if (logger.isLoggable(Level.FINE)) {
-                StringBuffer sb = new StringBuffer();
-                sb.append("(" + localNodeId + ")");
-                sb.append(" LPA (" + numThreads + ") took " +
-                          time + " milliseconds");
-                logger.log(Level.FINE, sb.toString());
-            }
         }
     }
 

@@ -93,7 +93,7 @@ public class SingleGraphBuilder implements BasicGraphBuilder {
                 1, Integer.MAX_VALUE);
 
         // Create the LPA algorithm
-        lpa = new SingleLabelPropagation(this, properties, false);
+        lpa = new SingleLabelPropagation(this, col, properties);
 
         // Create our JMX MBean
         stats = new AffinityGraphBuilderStats(col,

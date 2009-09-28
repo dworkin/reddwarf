@@ -26,6 +26,8 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
+import com.sun.sgs.management.AffinityGroupFinderMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -35,6 +37,7 @@ import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
+import javax.management.JMException;
 
 /**
  * An implementation of the algorithm presented in
@@ -46,27 +49,34 @@ public class SingleLabelPropagation extends AbstractLPA
 {
     private final BasicGraphBuilder builder;
 
-    /** The modularity of the last run, only valid on a single node. */
-    private double modularity;
-
+    // Our JMX info
+    private final SingleNodeFinderStats stats;
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
-     * @param	properties the properties for configuring this service
-     * @param gatherStats if {@code true}, gather extra statistics for each run.
-     *            Useful for testing.
+     * @param col the profile collector
+     * @param properties the properties for configuring this service
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
     public SingleLabelPropagation(BasicGraphBuilder builder,
-                                  Properties properties,
-                                  boolean gatherStats)
+                                  ProfileCollector col,
+                                  Properties properties)
         throws Exception
     {
-        super(1, properties, gatherStats);
+        super(1, properties);
         this.builder = builder;
+        // Create our JMX MBean
+        stats = new SingleNodeFinderStats(col, -1);
+        try {
+            col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
     }
 
     /** {@inheritDoc} */
@@ -110,6 +120,8 @@ public class SingleLabelPropagation extends AbstractLPA
      */
     public Collection<AffinityGroup> findAffinityGroups() {
         long startTime = System.currentTimeMillis();
+
+        stats.runsCountInc();
 
         // Step 1.  Initialize all nodes in the network.
         //          Their labels are their Identities.
@@ -202,30 +214,27 @@ public class SingleLabelPropagation extends AbstractLPA
         }
         // The groups collected in the last run
         Collection<AffinityGroup> groups = gatherGroups(vertices, true);
-
-        if (gatherStats) {
-            // Record our statistics for this run, used for testing.
-            time = System.currentTimeMillis() - startTime;
-            iterations = t;
-            // Note that the graph might be changing while we ran
-            // the algorithm.
-            modularity = AffinityGroupGoodness.calcModularity(graph, groups);
-
-            if (logger.isLoggable(Level.FINE)) {
-                StringBuffer sb = new StringBuffer();
-                sb.append(" LPA (" + numThreads + ") took " +
-                          time + " milliseconds, " +
-                          iterations + " iterations, and found " +
-                          groups.size() + " groups ");
-                sb.append(" modularity " + modularity);
-                for (AffinityGroup group : groups) {
-                    sb.append(" id: " + group.getId() + ": members ");
-                    for (Identity id : group.getIdentities()) {
-                        sb.append(id + " ");
-                    }
+        long runTime = System.currentTimeMillis() - startTime;
+        stats.runtimeSample(runTime);
+        stats.iterationsSample(t);
+        stats.setNumGroups(groups.size());
+        
+        if (logger.isLoggable(Level.FINE)) {
+            double modularity =
+                    AffinityGroupGoodness.calcModularity(graph, groups);
+            StringBuffer sb = new StringBuffer();
+            sb.append(" LPA (" + numThreads + ") took " +
+                      runTime + " milliseconds, " +
+                      t + " iterations, and found " +
+                      groups.size() + " groups ");
+            sb.append(" modularity " + modularity);
+            for (AffinityGroup group : groups) {
+                sb.append(" id: " + group.getId() + ": members ");
+                for (Identity id : group.getIdentities()) {
+                    sb.append(id + " ");
                 }
-                logger.log(Level.FINE, sb.toString());
             }
+            logger.log(Level.FINE, sb.toString());
         }
         return groups;
     }
@@ -234,14 +243,4 @@ public class SingleLabelPropagation extends AbstractLPA
     public void removeNode(long nodeId) {
         // do nothing
     }
-
-    /**
-     * Returns the moduarity of the last algorithm run results. This is only
-     * valid if we were constructed to gather statistics.
-     *
-     * @return the moduarity of the last algorithm run results
-     */
-    public double getModularity() { return modularity; }
-
-
 }

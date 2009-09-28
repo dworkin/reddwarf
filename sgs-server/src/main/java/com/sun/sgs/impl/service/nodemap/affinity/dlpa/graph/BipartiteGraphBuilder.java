@@ -116,7 +116,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
             lpa = null;
         } else if (type == NodeType.appNode) {
             lpaServer = null;
-            lpa = new LabelPropagation(this, nodeId, props, false);
+            lpa = new LabelPropagation(this, nodeId, props);
         } else {
             lpaServer = null;
             lpa = null;

@@ -126,7 +126,7 @@ public class WeightedGraphBuilder implements GraphBuilder {
             lpa = null;
         } else if (type == NodeType.appNode) {
             lpaServer = null;
-            lpa = new LabelPropagation(this, nodeId, properties, false);
+            lpa = new LabelPropagation(this, nodeId, properties);
         } else {
             lpaServer = null;
             lpa = null;
