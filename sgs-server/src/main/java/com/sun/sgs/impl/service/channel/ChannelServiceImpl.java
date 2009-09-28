@@ -975,7 +975,9 @@ public final class ChannelServiceImpl
 			// If the relocating session establishes the
 			// channel info on the local node, then the local
 			// node needs to be added to the channel's list.
-			if (!addLocalNodeToChannel(channelRefId)) {
+			long currentTimestamp =
+			    addLocalNodeToChannel(channelRefId);
+			if (currentTimestamp == -1L) {
 			    // channel is closed, so send leave message.
 			    // TBD: if this returns false, there may be a
 			    // problem...
@@ -985,10 +987,8 @@ public final class ChannelServiceImpl
 			    return;
 			}
 			// Message timestamp may be out of date with
-			// channel's current timestamp, so check and update
+			// channel's current timestamp, so update
 			// if necessary.
-			long currentTimestamp =
-			    getCurrentChannelMessageTimestamp(channelRefId);
 			if (currentTimestamp > timestamp) {
 			    channelInfo.msgTimestamp = currentTimestamp;
 			}
@@ -1017,22 +1017,17 @@ public final class ChannelServiceImpl
 		       new LocalMemberInfo(channelInfo, timestamp));
 
 	if (isRelocating) {
-	    // If session is relocating, then its timestamp may be out of
-	    // date with the channel's timestamp...
-
+	    /*
+	     * If session is relocating, then it may have missed some
+	     * channel messages.  If the channel is relieable and the
+	     * session's message timestamp for the channel is less than the
+	     * channel's current timestamp, then retrieve missing messages.
+	     * TBD: Cache saved messages at the local node?
+	     */
 	  synchronized (channelInfo) {
 	    if (delivery.equals(Delivery.RELIABLE) &&
 		channelInfo.msgTimestamp > timestamp)
 	    {
-		// TBD: Messages are out of date, go and fetch them; they
-		// could be cached at the local node.
-
-		// TBD: Also need to be synchronized on channelInfo.members
-		// when checking for current message timestamp for channel
-		// since the members list is locked while updating the
-		// timestamp and delivering channel messages to client
-		// sessions.  Is the latter true yet?
-
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
@@ -1060,20 +1055,19 @@ public final class ChannelServiceImpl
 	    }
 	  }
 	}
-
     }
 
     /**
-     * Adds local node to the server node list for the specified {@code
-     * channelRefId} and returns {@code true} if successful;  if the
-     * channel is closed, then returns {@code false}.  This method should
-     * be invoked outside of a transaction.
+     * Adds the local node ID to the server node list for the specified
+     * {@code channelRefId} and returns the current message timestamp for
+     * the channel, or returns {@code -1L} if the channel is nonexistent or
+     * closed. This method should be invoked outside of a transaction.
      */
-    private boolean addLocalNodeToChannel(final BigInteger channelRefId) {
+    private long addLocalNodeToChannel(final BigInteger channelRefId) {
 	try {
 	    return runTransactionalCallable(
-		new KernelCallable<Boolean>("addLocalNodeIdToChannel") {
-		    public Boolean call() {
+		new KernelCallable<Long>("addLocalNodeIdToChannel") {
+		    public Long call() {
 			ChannelImpl channelImpl = (ChannelImpl)
 			    getObjectForId(channelRefId);
 			
@@ -1085,10 +1079,10 @@ public final class ChannelServiceImpl
 				    "closed channel:{1}",
 				    localNodeId, toHexString(channelRefId));
 			    }
-			    return false;
+			    return -1L;
 			} else {
 			    channelImpl.addServerNodeId(localNodeId);
-			    return true;
+			    return channelImpl.getCurrentMessageTimestamp();
 			}
 		    }
 		});
@@ -1099,50 +1093,16 @@ public final class ChannelServiceImpl
 		    "Attempting to add localNodeId:{0} to channel:{1} throws",
 		    localNodeId, toHexString(channelRefId));
 	    }
-	    return false;
+	    return -1L;
 	}
     }
 
     /**
-     * Returns the current message timestamp for the channel with the
-     * specified {@code channelRefId}, or returns {@code 0L} if the channel
-     * is nonexistent or closed.
+     * Returns a sorted map (keyed by timestamp) containing saved channel
+     * messages for the channel with the specified {@code channelRefId}
+     * with timestamps between {@code fromTimestamp} and {@code
+     * toTimestamp} inclusive.
      */
-    private long getCurrentChannelMessageTimestamp(
-	final BigInteger channelRefId)
-    {
-	try {
-	    return runTransactionalCallable(
-		new KernelCallable<Long>("getCurrentChannelMessageTimestamp") {
-		    public Long call() {
-			ChannelImpl channelImpl = (ChannelImpl)
-			    getObjectForId(channelRefId);
-			
-			if (channelImpl == null || channelImpl.isClosed()) {
-			    if (logger.isLoggable(Level.FINE)) {
-				logger.log(
-				    Level.FINE,
-				    "Unable to obtain current timestamp for" +
-				    "closed channel:{0}",
-				    toHexString(channelRefId));
-			    }
-			    return 0L;
-			} else {
-			    return channelImpl.getCurrentMessageTimestamp();
-			}
-		    }
-		});
-	} catch (Exception e) {
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "Obtaining current timestamp for channel:{0} throws",
-		    localNodeId, toHexString(channelRefId));
-	    }
-	    return 0L;
-	}
-    }
-
     private SortedMap<Long, byte[]> getChannelMessages(
  	final BigInteger channelRefId, final long fromTimestamp,
 	final long toTimestamp)

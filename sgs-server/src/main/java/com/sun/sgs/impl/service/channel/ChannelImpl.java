@@ -472,17 +472,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     SortedMap<Long, byte[]> getChannelMessages(
 	long fromTimestamp, long toTimestamp)
     {
-	if (fromTimestamp > toTimestamp) {
-	    return null;
-	}
 	SortedMap<Long, byte[]> messages = new TreeMap<Long, byte[]>();
-	BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
-	    getSavedMessagesMap(channelRefId);
-	for (long ts = fromTimestamp; ts <= toTimestamp; ts++) {
-	    ChannelMessageInfo messageInfo =
-		savedMessagesMap.get(Long.toString(ts));
-	    if (messageInfo != null) {
-		messages.put(ts, messageInfo.message);
+	if (fromTimestamp <= toTimestamp) {
+	    BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
+		getSavedMessagesMap(channelRefId);
+	    for (long ts = fromTimestamp; ts <= toTimestamp; ts++) {
+		ChannelMessageInfo messageInfo =
+		    savedMessagesMap.get(Long.toString(ts));
+		if (messageInfo != null) {
+		    messages.put(ts, messageInfo.message);
+		}
 	    }
 	}
 	return messages;
