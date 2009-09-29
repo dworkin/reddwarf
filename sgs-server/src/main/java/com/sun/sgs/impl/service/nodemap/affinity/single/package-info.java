@@ -18,9 +18,11 @@
  */
 
 /**
- * Provides classes used by the single node version of the label propagation
- * algorithm.  This is useful for testing, but not for load balancing within
- * a Darkstar cluster.
+ * Provides classes for a single node implementation of the label propagation
+ * algorithm described in "Near linear time algorithm to detect community
+ * structures in large-scale networks" by Raghavan, Albert and Kumara (2007).
+ * <p>
+ * This implementation is useful for testing the algorithm.
  */
 
 package com.sun.sgs.impl.service.nodemap.affinity.single;

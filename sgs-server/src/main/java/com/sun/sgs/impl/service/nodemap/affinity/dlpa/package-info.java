@@ -18,8 +18,27 @@
  */
 
 /**
- * Provides classes used to implement the fully distributed version of the
- * label propagation algorithm.
+ * Provides classes for a multi-node, distributed algorithm implementation
+ * of the label propagation algorithm described in "Near linear time algorithm
+ * to detect community structures in large-scale networks" by Raghavan, Albert
+ * and Kumara (2007).
+ * <p>
+ * In this implementation, the algorithm is distributed.  Each node's
+ * builder maintains a portion of the graph of identities linked by common
+ * object uses.  The builders also are notified of data cache conflicts,
+ * as reported by the caching data store.
+ * <p>
+ * The algorithm is driven by the core server node, which instructs each
+ * node when to start an algorithm run and synchronizes each iteration of
+ * the algorithm.
+ * <p>
+ * Affinity groups returned by this implementation are of type
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup
+ * RelocatingAffintyGroup}.
+ * <p>
+ * If a node fails or becomes unreachable during a run of the algorithm, the
+ * run is deemed failed and invalid.  No attempt is made to mark unreachable
+ * nodes as failed within the Darkstar cluster.
  */
 package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 

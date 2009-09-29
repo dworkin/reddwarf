@@ -18,9 +18,23 @@
  */
 
 /**
- * Provides classes used for a distributed graph builder implementation,
- * using a single node label propagation algorithm (the graph information
- * for all nodes is sent to a single node).
+ * Provides classes for a multi-node, distributed graph builder, implementation
+ * of the label propagation algorithm described in "Near linear time algorithm
+ * to detect community structures in large-scale networks" by Raghavan, Albert
+ * and Kumara (2007).
+ * <p>
+ * In this implementation, the graph builder is distributed.  Each node's
+ * builder sends graph update information to the core server node, which
+ * can then operate as if this were a single node implementation.
+ * <p>
+ * It is expected this implementation will be useful for testing, as it
+ * is decoupled from the caching data store.
+ * <p>
+ * Affinity groups returned by this implementation are of type
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup
+ * RelocatingAffintyGroup}.
+ * <p>
+ * If a node fails or becomes unreachable during a run of the algorithm, no
+ * special actions are taken.
  */
 package com.sun.sgs.impl.service.nodemap.affinity.dgb;
-
