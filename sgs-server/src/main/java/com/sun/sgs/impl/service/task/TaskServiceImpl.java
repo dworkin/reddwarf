@@ -274,6 +274,10 @@ public class TaskServiceImpl
     // the internal value used to represent a task that does not repeat
     static final long PERIOD_NONE = -1;
 
+    // the internal value used to represent a periodic task that has never been
+    // run
+    static final long NEVER = -1;
+
     // the identifier for the local node
     private final long nodeId;
 
@@ -1221,8 +1225,8 @@ public class TaskServiceImpl
                 if (!ptask.isPeriodic()) {
                     ptask.setReusable();
                 } else {
-                    ptask.setStartTime(ptask.getStartTime() +
-                                       ptask.getPeriod());
+                    ptask.setLastStartTime(
+                            watchdogService.currentAppTimeMillis());
                 }
             } catch (Exception e) {
                 // catch exceptions just before they go back to the scheduler
@@ -1355,6 +1359,20 @@ public class TaskServiceImpl
                 return;
             }
 
+            // get the times associated with this task, and if the start
+            // time has already passed, figure out the next period
+            // interval from now to use as the new start time
+            long originalStartTime = ptask.getStartTime();
+            long lastStartTime = ptask.getLastStartTime();
+            long period = ptask.getPeriod();
+            long restartTime;
+            if (lastStartTime == NEVER || lastStartTime < originalStartTime) {
+                restartTime = originalStartTime;
+            } else {
+                long runCount = (lastStartTime - originalStartTime) / period;
+                restartTime = originalStartTime + period * (runCount + 1);
+            }
+
             // mark the task as running on this node so that it doesn't
             // also run somewhere else
             dataService.markForUpdate(ptask);
@@ -1363,7 +1381,7 @@ public class TaskServiceImpl
             RecurringTaskHandle handle = 
                 transactionScheduler.scheduleRecurringTask(
                     runner, identity,
-                    watchdogService.getSystemTimeMillis(ptask.getStartTime()),
+                    watchdogService.getSystemTimeMillis(restartTime),
                     ptask.getPeriod());
             ctxFactory.joinTransaction().
                 addRecurringTask(objId, handle, identity);
