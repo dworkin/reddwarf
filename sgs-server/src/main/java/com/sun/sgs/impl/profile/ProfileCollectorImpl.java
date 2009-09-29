@@ -405,6 +405,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
+    /** {@inheritDoc} */
+    void notifyNodeIdAssigned(long nodeId) {
+        
+    }
+
     /**
      * Tells the collector that a new task is starting in the context of
      * the calling thread.

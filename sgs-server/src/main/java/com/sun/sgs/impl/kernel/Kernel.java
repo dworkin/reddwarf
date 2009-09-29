@@ -566,6 +566,8 @@ class Kernel {
         setupService(dataServiceClass, dataManagerClass, startupContext);
 	shutdownCtrl.setDataService(
 	    startupContext.getService(DataService.class));
+        // get the nodeId from the data service and notify the profile collector
+        
 
         // load the watch-dog service, which has no associated manager
 

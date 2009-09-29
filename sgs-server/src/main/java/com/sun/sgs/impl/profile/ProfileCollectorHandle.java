@@ -45,6 +45,11 @@ public interface ProfileCollectorHandle {
     void notifyThreadRemoved();
 
     /**
+     * Notifies the collector that the node has been assigned its identifier.
+     */
+    void notifyNodeIdAssigned(long nodeId);
+
+    /**
      * Tells the collector that a new task is starting in the context of
      * the calling thread. If another task was alrady being profiled in the
      * context of the calling thread then that profiling data is pushed
