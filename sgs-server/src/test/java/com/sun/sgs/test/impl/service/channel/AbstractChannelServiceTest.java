@@ -930,14 +930,18 @@ public abstract class AbstractChannelServiceTest extends Assert {
     private class GetSessionTask extends TestAbstractKernelRunnable {
 
 	private final String name;
-	private ClientSession session;
+	private ClientSession session = null;
 	
 	GetSessionTask(String name) {
 	    this.name = name;
 	}
 
 	public void run() {
-	    session = (ClientSession) dataService.getBinding(name);
+	    try {
+		session = (ClientSession) dataService.getBinding(name);
+	    } catch (ObjectNotFoundException e) {
+		session = null;
+	    }
 	}
 
 	ClientSession getSession() {

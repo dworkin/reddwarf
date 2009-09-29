@@ -30,7 +30,9 @@ import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -805,6 +807,91 @@ public class TestChannelServiceImplRelocatingSessions
 	    otherClient.disconnect();
 	}
     }
+
+    @Test
+    @IntegrationTest
+    public void testSessionCleanupIfSessionFailsToPrepare()
+	throws Exception
+    {
+	String channelName = "foo";
+	// channel coordinator is on server node
+	createChannel(channelName);
+
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
+	MySessionStatusListener oldNodeListener =
+	    new MySessionStatusListener(true);
+	oldNode.getClientSessionService().
+	    addSessionStatusListener(oldNodeListener);
+	MySessionStatusListener newNodeListener =
+	    new MySessionStatusListener(false);
+	newNode.getClientSessionService().
+	    addSessionStatusListener(newNodeListener);
+	String[] users = new String[]{ "relocatingClient" };
+	DummyClient relocatingClient = createDummyClient(users[0], oldNode);
+
+	try {
+	    // Make sure that channel service is involved in relocation.
+	    joinUsers(channelName, users);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    assertTrue(newNodeListener.disconnectedSessions.isEmpty());
+	    assertTrue(oldNodeListener.disconnectedSessions.isEmpty());
+	    
+	    // Prepare client for relocation.
+	    moveIdentity(relocatingClient, oldNode, newNode);
+
+	    // Wait for relocation timeout
+	    Thread.sleep(5000);
+	    checkUsersJoined(channelName, noUsers);
+	    assertNull(relocatingClient.getSession());
+	    assertFalse(newNodeListener.disconnectedSessions.isEmpty());
+	    assertFalse(oldNodeListener.disconnectedSessions.isEmpty());	    
+	    
+	} finally {
+	    relocatingClient.disconnect();
+	}
+    }
+    
+    @Test
+    @IntegrationTest
+    public void testSessionCleanupIfSessionFailsToRelocate()
+	throws Exception
+    {
+	String channelName = "foo";
+	// channel coordinator is on server node
+	createChannel(channelName);
+
+	SgsTestNode oldNode = addNode();
+	SgsTestNode newNode = addNode();
+	MySessionStatusListener newNodeListener =
+	    new MySessionStatusListener(false);
+	newNode.getClientSessionService().
+	    addSessionStatusListener(newNodeListener);
+	String[] users = new String[]{ "relocatingClient" };
+	DummyClient relocatingClient = createDummyClient(users[0], oldNode);
+
+	try {
+	    // Make sure that channel service is involved in relocation.
+	    joinUsers(channelName, users);
+	    relocatingClient.assertJoinedChannel(channelName);
+	    sendMessagesToChannel(channelName, 2);
+	    checkChannelMessagesReceived(relocatingClient, channelName, 2);
+	    assertTrue(newNodeListener.disconnectedSessions.isEmpty());
+	    
+	    // Prepare client for relocation & wait for notification
+	    moveIdentityAndWaitForRelocationNotification(
+		relocatingClient, oldNode, newNode);
+
+	    // Wait for relocation timeout
+	    Thread.sleep(5000);
+	    checkUsersJoined(channelName, noUsers);
+	    assertNull(relocatingClient.getSession());
+	    assertFalse(newNodeListener.disconnectedSessions.isEmpty());
+	    
+	} finally {
+	    relocatingClient.disconnect();
+	}
+    }
     
     // -- Other methods --
 
@@ -852,8 +939,24 @@ public class TestChannelServiceImplRelocatingSessions
 	implements ClientSessionStatusListener
     {
 	private SimpleCompletionHandler handler = null;
+	private final boolean controlledPreparation;
+
+	private Set<BigInteger> disconnectedSessions =
+	    Collections.synchronizedSet(new HashSet<BigInteger>());
+	private Set<BigInteger> relocatedSessions =
+	    Collections.synchronizedSet(new HashSet<BigInteger>());
+
+	MySessionStatusListener() {
+	    this(true);
+	}
+
+	MySessionStatusListener(boolean controlledPreparation) {
+	    this.controlledPreparation = controlledPreparation;
+	}
 	    
-	public void disconnected(final BigInteger sessionRefId) {}
+	public void disconnected(BigInteger sessionRefId) {
+	    disconnectedSessions.add(sessionRefId);
+	}
 
 	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
 				      SimpleCompletionHandler handler)
@@ -862,9 +965,13 @@ public class TestChannelServiceImplRelocatingSessions
 		this.handler = handler;
 		notifyAll();
 	    }
+	    if (!controlledPreparation) {
+		setPrepared();
+	    }
 	}
 	
 	public void relocated(BigInteger sessionRefId) {
+	    relocatedSessions.add(sessionRefId);
 	}
 
 	SimpleCompletionHandler waitForPrepare() {

@@ -628,7 +628,7 @@ public final class ClientSessionServiceImpl
 		PrepareRelocationInfo oldPrepareInfo =
 		    prepareRelocationMap.putIfAbsent(sessionRefId, prepareInfo);
 		if (oldPrepareInfo == null) {
-		    if (sessionHandler.isRelocating()) {
+		    if (sessionHandler.isRelocating() || !sessionHandler.isConnected()) {
 			// Request to prepare identity for relocation is
 			// received after preparation has already been completed
 			// and session is in the process of relocating.
@@ -649,9 +649,13 @@ public final class ClientSessionServiceImpl
 			} },
 		      id);
 
-		    // TBD: add task to monitor preparation and disconnect
-		    // client session if preparation has not completed in
-		    // time.
+		    // Add a task to monitor preparation and relocation and
+		    // disconnect client session if preparation and
+		    // relocation has not completed in time.
+		    taskScheduler.scheduleTask(
+ 			new MonitorSessionRelocatingFromLocalNodeTask(
+			    sessionRefId),
+			id, System.currentTimeMillis() + 5000L);
 		    
 		} else {
 		    // Duplicate request to prepare for relocation;  add
@@ -689,7 +693,7 @@ public final class ClientSessionServiceImpl
 		if (prepareRelocationMap.remove(sessionRefId) != null) {
 		    // Notify client to start relocating its connection.
 		    try {
-			sessionHandler.relocatePreparationComplete();
+			sessionHandler.setRelocatePreparationComplete();
 		    } catch (Exception e) {
 			logger.logThrow(
  			    Level.WARNING, e,
@@ -1081,7 +1085,7 @@ public final class ClientSessionServiceImpl
 		
 		// Schedule task to monitor relocation.
 		taskScheduler.scheduleTask(
-		    new MonitorRelocatingSessionTask(key, info),
+		    new MonitorSessionRelocatingToLocalNodeTask(key, info),
 		    identity,
 		    System.currentTimeMillis() + 5000L);
 				      
@@ -1356,34 +1360,65 @@ public final class ClientSessionServiceImpl
     }
     
     /**
-     * Removes the specified session from the internal session  handler
-     * map.  This method is invoked by the handler when the session becomes
-     * disconnected.
+     * Removes the specified session from the internal session handler map,
+     * cleans up other session-related transient data, and if {@code
+     * isDisconnecting} is {@code true} notifies all {@link
+     * ClientSessionStatusListener}s of the session's disconnection.  This
+     * method is invoked by the handler when the session becomes
+     * disconnected.  If a session is disconnected due to the session
+     * relocating to another node, then {@code isDisconnecting} will be
+     * {@code false}.
      */
-    void removeHandler(BigInteger sessionRefId, boolean relocating) {
+    void removeHandler(BigInteger sessionRefId, boolean isDisconnecting) {
 	if (shuttingDown()) {
 	    return;
 	}
 	// Notify session listeners of disconnection
-	if (!relocating) {
-	    for (ClientSessionStatusListener statusListener :
-		     sessionStatusListeners)
-	    {
-		try {
-		    statusListener.disconnected(sessionRefId);
-		} catch (Exception e) {
-		}
-	    }
+	if (isDisconnecting) {
+	    notifyStatusListenersOfDisconnection(sessionRefId);
 	}
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
     }
 
+    /**
+     * Notifies all registered {@code ClientSessionStatusListener}s that
+     * the session with the specified {@code sessionRefId} has disconnected.
+     */
+    private void notifyStatusListenersOfDisconnection(
+	BigInteger sessionRefId)
+    {
+	for (ClientSessionStatusListener statusListener :
+		 sessionStatusListeners)
+	{
+	    try {
+		statusListener.disconnected(sessionRefId);
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e, "notifying listener:{0} of " +
+			"disconnected session:{1} throws", statusListener,
+			HexDumper.toHexString(sessionRefId.toByteArray()));
+		}
+	    }
+	}
+    }
+    
+    /**
+     * Schedules a transactional task to service the event queue for the
+     * session with the specified {@code sessionId}.  If there is no
+     * locally-connected session with the specified {@code sessionId}, then
+     * no action is taken.  <p>
+     *
+     * This method should be invoked outside of a transaction.
+     *
+     * @param	sessionId a session ID
+     */
     void addServiceEventQueueTask(final byte[] sessionId) {
 	final BigInteger sessionRefId = new BigInteger(1, sessionId);
 	if (!handlers.containsKey(sessionRefId)) {
-	    // The session is not local, so this node should not
-	    // service the event queue.
+	    // The session is not local or is disconnected, so this node
+	    // should not service the event queue.
 	    return;
 	}
 
@@ -1401,10 +1436,8 @@ public final class ClientSessionServiceImpl
 	    new AbstractKernelRunnable("ServiceEventQueue") {
 		public void run() {
 		    if (getHandler(sessionRefId) != null) {
-			// TBD: should the handler just be passsed here?
 			ClientSessionImpl.serviceEventQueue(sessionId);
 		    }
-		    // TBD: or else what?
 		} }, taskOwner);
     }
 
@@ -1662,12 +1695,53 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * A task (run after a delay) that checks to see if a client
-     * session with the associated relocation key has attempted to
-     * relocate to this node.  If not, the associated client session
+     * A task (run after a delay) that checks to see if a client session
+     * with the {@code sessionRefId} specified during construction has
+     * relocated from the local node. If not, the associated client session
      * is cleaned up.
      */
-    private class MonitorRelocatingSessionTask
+    private class MonitorSessionRelocatingFromLocalNodeTask
+	extends AbstractKernelRunnable
+    {
+	final BigInteger sessionRefId;
+
+	/**
+	 * Constructs an instance with the specified {@code sessionRefId}.
+	 * @param	sessionRefId a session ID
+	 */
+	MonitorSessionRelocatingFromLocalNodeTask(BigInteger sessionRefId) {
+	    super(null);
+	    this.sessionRefId = sessionRefId;
+	}
+
+	/**
+	 * If the associated client hasn't finished preparing to relocate
+	 * before this task runs, then clean up the client session.  Either
+	 * the original server failed to inform the client that it should
+	 * relocate or the client session has failed.  In either case, the
+	 * client session needs to be removed.
+	 */
+	public void run() {
+
+	    ClientSessionHandler sessionHandler = handlers.get(sessionRefId);
+	    if (sessionHandler != null) {
+		prepareRelocationMap.remove(sessionRefId);
+		// TBD: notify NMS that preparation is complete, or just
+		// wait for it to clean up the info associated with the
+		// identity?
+		sessionHandler.handleDisconnect(false, true);
+	    }
+	}
+    }
+    
+    /**
+     * A task (run after a delay) that checks to see if a client session
+     * with the associated relocation key has finished relocating to this
+     * node.  If not, the associated client session is cleaned up and all
+     * client session status listeners are notified that the client session
+     * has been disconnected.
+     */
+    private class MonitorSessionRelocatingToLocalNodeTask
 	extends AbstractKernelRunnable
     {
 	final BigInteger relocationKey;
@@ -1678,7 +1752,7 @@ public final class ClientSessionServiceImpl
 	 * @param	relocationKey a relocation key
 	 * @param	info a client session's relocation info
 	 */
-	MonitorRelocatingSessionTask(
+	MonitorSessionRelocatingToLocalNodeTask(
 	    BigInteger relocationKey, RelocationInfo info)
 	{
 	    super(null);
@@ -1696,18 +1770,21 @@ public final class ClientSessionServiceImpl
 	 */
 	public void run() {
 	    if (relocationKeys.remove(relocationKey) != null) {
-		relocatingSessions.remove(info.sessionRefId);
 		transactionScheduler.scheduleTask(
  		    new AbstractKernelRunnable("RemoveNonrelocatedSession") {
 			public void run() {
 			    ClientSessionImpl sessionImpl =
 				ClientSessionImpl.getSession(
 				    dataService, info.sessionRefId);
-			    sessionImpl.notifyListenerAndRemoveSession(
-				dataService, false, true);
+			    if (sessionImpl != null) {
+				sessionImpl.notifyListenerAndRemoveSession(
+				    dataService, false, true);
+			    }
 			} }, info.identity);
+		relocatingSessions.remove(info.sessionRefId);
+		relocatingIdentities.remove(info.identity);
+		notifyStatusListenersOfDisconnection(info.sessionRefId);
 	    }
-	    relocatingIdentities.remove(info.identity);
 	}
     }
 
@@ -1852,4 +1929,3 @@ public final class ClientSessionServiceImpl
 	}
     }
 }
-

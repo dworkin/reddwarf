@@ -1777,9 +1777,6 @@ public final class ChannelServiceImpl
 			    sessionRefId, localNodeId,
 			    channelRefIds, deliveryOrdinals, msgTimestamps);
 		    
-		    // TBD: Schedule task to disconnect session if the
-		    // channel memberships updated message hasn't been received
-		    // by a certain period of time.
 		} catch (IOException e) {
 		    // TBD: probably want to disconnect the session...
 		}
@@ -1968,7 +1965,6 @@ public final class ChannelServiceImpl
     {
 	/** {@inheritDoc} */
 	public void nodeStarted(Node node) {
-	    // TBD: cache channel server for node?
 	}
 
 	/** {@inheritDoc} */
@@ -2191,11 +2187,6 @@ public final class ChannelServiceImpl
 	    addLocalChannelMember(
  		channelRefId, delivery, sessionRefId, timestamp, false);
 
-	    
-	    // TBD: If the session is disconnecting, then session needs
-	    // to be removed from channel's membership list, and the
-	    // channel needs to be removed from the channelMap
-	    
 	    // Send channel join protocol message.
 	    SessionProtocol protocol =
 		sessionService.getSessionProtocol(sessionRefId);
@@ -2204,8 +2195,7 @@ public final class ChannelServiceImpl
 		    protocol.channelJoin(name, channelRefId, delivery);
 		} catch (IOException e) {
 		    // TBD: session disconnecting?
-		    logger.logThrow(Level.WARNING, e,
-				    "channelJoin throws");
+		    logger.logThrow(Level.WARNING, e, "channelJoin throws");
 		}
 	    }
 	}
@@ -2229,7 +2219,6 @@ public final class ChannelServiceImpl
 	    removeLocalChannelMember(channelRefId, sessionRefId);
 	    
 	    // Send channel leave protocol message.
-	    // TBD: does this need to be sent if the channelSet == null?
 	    SessionProtocol protocol =
 		sessionService.getSessionProtocol(sessionRefId);
 	    if (protocol != null) {
@@ -2284,7 +2273,6 @@ public final class ChannelServiceImpl
 		    // don't deliver the message.
 		    return;
 		}
-		// TBD: make sure this is the next message timestamp?
 		memberInfo.msgTimestamp = timestamp;
 		try {
 		    protocol.channelMessage(
@@ -2362,7 +2350,6 @@ public final class ChannelServiceImpl
 		    }
 		} catch (Exception e) {
 		    // problem contacting server; continue
-		    // TBD: log exception?
 		    if (logger.isLoggable(Level.FINE)) {
 			logger.logThrow(
 			    Level.FINE, e,

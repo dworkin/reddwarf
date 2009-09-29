@@ -102,7 +102,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private volatile boolean loggedIn;
 
     /** The lock for accessing the following fields: {@code state},
-     * {@code disconnectHandled}, and {@code shutdown}.
+     * {@code disconnectHandled}, {@code relocatePrepareCompletionHandler},
+     * and {@code shutdown}.
      */
     private final Object lock = new Object();
 
@@ -114,8 +115,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /** If non-null, contains the completion handler for
      * preparing this session to relocate to a new node. */
-    private volatile SimpleCompletionHandler
-	relocatePrepareCompletionHandler = null;
+    private MoveAction relocatePrepareCompletionHandler = null;
 
     /**
      * If non-null, contains the completion handler for relocating this
@@ -309,7 +309,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @return	{@code true} if this handler is connected
      */
-    private boolean isConnected() {
+    boolean isConnected() {
 
 	State currentState = getCurrentState();
 	return
@@ -318,20 +318,42 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Returns {@code true} if this client session is relocating to another
-     * node.
+     * Returns {@code true} if this client session has begun preparing to
+     * relocate to another node.
      */
-    boolean isRelocating() {
-	return relocatePrepareCompletionHandler != null;
+     boolean isRelocating() {
+	 synchronized (lock) {
+	     return relocatePrepareCompletionHandler != null;
+	 }
+    }
+
+    /**
+     * Returns {@code true} if this client session is disconnecting from
+     * the local node AND terminating the associated client session.  The
+     * client session is considered to be disconnecting iff the following
+     * conditions are true:
+     *
+     * 1) this handler has been marked for disconnection
+     * 2) the session is not relocating, OR if the session is relocating,
+     * its relocation has not completed.
+     */
+    private boolean isTerminating() {
+	synchronized (lock) {
+	    return !isConnected() &&
+		(relocatePrepareCompletionHandler != null ||
+		 !relocatePrepareCompletionHandler.isCompleted);
+	}
     }
 
     /**
      * Indicates that all parties are done with relocation preparation, and
      * notifies the client that it is relocating to another node.
      */    
-    void relocatePreparationComplete() {
-	if (isRelocating()) {
-	    relocatePrepareCompletionHandler.completed();
+    void setRelocatePreparationComplete() {
+	synchronized (lock) {
+	    if (relocatePrepareCompletionHandler != null) {
+		relocatePrepareCompletionHandler.completed();
+	    }
 	}
     }
 
@@ -486,7 +508,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	if (sessionRefId != null) {
-	    sessionService.removeHandler(sessionRefId, isRelocating());
+	    sessionService.removeHandler(
+ 		sessionRefId, isTerminating());
 	}
 	
 	// TBD: Due to the scheduler's behavior, this notification
@@ -494,7 +517,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	// 'notifyLoggedIn' callback.  Also, this notification may
 	// also happen even though 'notifyLoggedIn' was not invoked.
 	// Are these behaviors okay?  -- ann (3/19/07)
-	if (!isRelocating()) {
+	if (isTerminating()) {
 	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
 		    public void run() {
 			identity.notifyLoggedOut();
@@ -514,7 +537,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 	}
 
-	if (sessionRefId != null && !isRelocating()) {
+	if (sessionRefId != null && isTerminating()) {
 	    scheduleTask(
 	      new AbstractKernelRunnable("NotifyListenerAndRemoveSession") {
 	        public void run() {
@@ -1229,7 +1252,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	/** The relocation key. */
 	private byte[] relocationKey;
 
-	private boolean completed = false;
+	private boolean isCompleted = false;
 
 	/**
 	 * Constructs an instance with the specified {@code newNode}.
@@ -1265,7 +1288,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * Notify client to relocate its session to the new node
 		 * specifying the relocation key.
 		 */
-		relocatePrepareCompletionHandler = this;
+		synchronized (lock) {
+		    relocatePrepareCompletionHandler = this;
+		}
 
 		sessionService.notifyPrepareToRelocate(
 		    sessionRefId, newNode.getId());
@@ -1287,10 +1312,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	public void completed() {
 	    synchronized (this) {
 		assert relocationKey != null;
-		if (completed) {
+		if (isCompleted) {
 		    return;
 		}
-		completed = true;
+		isCompleted = true;
 	    }
 	    
 	    try {
