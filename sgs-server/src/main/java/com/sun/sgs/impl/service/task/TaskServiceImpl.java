@@ -1221,7 +1221,8 @@ public class TaskServiceImpl
                 if (!ptask.isPeriodic()) {
                     ptask.setReusable();
                 } else {
-                    ptask.incrementRunCount();
+                    ptask.setStartTime(ptask.getStartTime() +
+                                       ptask.getPeriod());
                 }
             } catch (Exception e) {
                 // catch exceptions just before they go back to the scheduler
@@ -1354,12 +1355,6 @@ public class TaskServiceImpl
                 return;
             }
 
-            // get the times associated with this task, and if the start
-            // time has already passed, figure out the next period
-            // interval from now to use as the new start time
-            long restartTime = ptask.getStartTime() +
-                               ptask.getRunCount() * ptask.getPeriod();
-
             // mark the task as running on this node so that it doesn't
             // also run somewhere else
             dataService.markForUpdate(ptask);
@@ -1368,7 +1363,7 @@ public class TaskServiceImpl
             RecurringTaskHandle handle = 
                 transactionScheduler.scheduleRecurringTask(
                     runner, identity,
-                    watchdogService.getSystemTimeMillis(restartTime),
+                    watchdogService.getSystemTimeMillis(ptask.getStartTime()),
                     ptask.getPeriod());
             ctxFactory.joinTransaction().
                 addRecurringTask(objId, handle, identity);

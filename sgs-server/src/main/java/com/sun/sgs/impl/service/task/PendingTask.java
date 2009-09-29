@@ -57,7 +57,6 @@ class PendingTask implements ManagedObject, Serializable {
     private String taskType;
     private long startTime;
     private long period;
-    private long runCount;
     
     // identifies whether this instance is free for re-use
     private boolean reusable;
@@ -114,7 +113,6 @@ class PendingTask implements ManagedObject, Serializable {
         this.taskType = t.getClass().getName();
         this.startTime = s;
         this.period = p;
-        this.runCount = 0;
 
         this.reusable = false;
         this.runningNode = -1;
@@ -134,7 +132,6 @@ class PendingTask implements ManagedObject, Serializable {
         taskType = null;
         startTime = TaskServiceImpl.START_NOW;
         period = TaskServiceImpl.PERIOD_NONE;
-        runCount = 0;
         runningNode = -1;
     }
 
@@ -160,27 +157,12 @@ class PendingTask implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the total number of times this task has been run.
-     */
-    long getRunCount() {
-        return runCount;
-    }
-
-    /**
      * Returns the node where the associated task is running if the task
      * is periodic, or -1 if the task is non-periodic or the node hasn't
      * been assigned.
      */
     long getRunningNode() {
         return runningNode;
-    }
-
-    /**
-     * Increments the total run count for this task by exactly {@code 1}.
-     */
-    void incrementRunCount() {
-        AppContext.getDataManager().markForUpdate(this);
-        this.runCount++;
     }
 
     /**
@@ -195,6 +177,16 @@ class PendingTask implements ManagedObject, Serializable {
         }
         AppContext.getDataManager().markForUpdate(this);
         runningNode = nodeId;
+    }
+
+    /**
+     * Sets the start time for this task.
+     *
+     * @param startTime the new start time
+     */
+    void setStartTime(long startTime) {
+        AppContext.getDataManager().markForUpdate(this);
+        this.startTime = startTime;
     }
 
     /** Checks if this is a periodic task. */

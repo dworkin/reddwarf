@@ -1128,7 +1128,7 @@ public class TestTaskServiceImpl extends Assert {
                     Counter counter = getClearedCounter();
                     for (int i = 0; i < 3; i++) {
                         taskService.schedulePeriodicTask(
-                                new NonManagedTask(taskOwner), 20L * i, 1000L);
+                                new NonManagedTask(taskOwner), 100L * i, 1000L);
                         counter.increment();
                         counter.increment();
                     }
@@ -1138,12 +1138,12 @@ public class TestTaskServiceImpl extends Assert {
         // shutdown the server, retaining the data store
         // sleep past the periodic tasks start times and start back up
         serverNode.shutdown(false);
-        Thread.sleep(1250);
+        Thread.sleep(1500);
         setUp(null, false);
 
         // verify that the periodic tasks have only run once and have not
         // immediately run a second time on startup
-        Thread.sleep(100);
+        Thread.sleep(300);
         assertCounterValueXAction(3,
                 "Periodic tasks incorrectly ran immediately after restart");
 
@@ -1167,7 +1167,8 @@ public class TestTaskServiceImpl extends Assert {
     private void assertCounterValue(int value, String message) {
         Counter counter = (Counter) dataService.getBinding("counter");
         if (counter.value() != value) {
-            System.err.println("Counter assert failed: " + counter);
+            System.err.println("Counter assert failed: expected " + value +
+                               ", actual " + counter.value());
             fail(message);
         }
     }

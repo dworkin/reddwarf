@@ -174,8 +174,8 @@ public interface WatchdogService extends Service {
      * comparisons across task boundaries.  Unpredictable conditions such as
      * network latency mean that the resulting value may be subject to some
      * skew.  Additionally, the <em>global</em> accuracy of the clock time
-     * may drift as much as a few seconds due to inherent inaccuracies
-     * recovering application time after a system crash.
+     * may drift as much as a few seconds in either direction due to inherent
+     * inaccuracies recovering application time after a system crash.
      *
      * @return the current global application time in milliseconds
      */
