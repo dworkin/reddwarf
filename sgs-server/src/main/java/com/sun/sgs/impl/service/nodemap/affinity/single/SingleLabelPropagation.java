@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
@@ -50,7 +51,7 @@ public class SingleLabelPropagation extends AbstractLPA
     private final BasicGraphBuilder builder;
 
     // Our JMX info
-    private final SingleNodeFinderStats stats;
+    private final AffinityGroupFinderStats stats;
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -69,7 +70,7 @@ public class SingleLabelPropagation extends AbstractLPA
         super(1, properties);
         this.builder = builder;
         // Create our JMX MBean
-        stats = new SingleNodeFinderStats(col, -1);
+        stats = new AffinityGroupFinderStats(this, col, -1);
         try {
             col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
         } catch (JMException e) {

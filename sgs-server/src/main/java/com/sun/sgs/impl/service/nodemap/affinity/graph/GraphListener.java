@@ -123,9 +123,9 @@ public class GraphListener implements ProfileListener {
             builder = null;
         }
 
-        // Add the self as listener if we are an app node
-
-        if (type == NodeType.appNode) {
+        // Add the self as listener if there is a builder and we are
+        // not a core server node.
+        if (builder != null && type != NodeType.coreServerNode) {
             col.addListener(this, false);
         }
     }

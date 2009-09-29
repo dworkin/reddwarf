@@ -113,4 +113,9 @@ public interface AffinityGroupFinderMXBean {
      * @return the time of the last call to {@code clear}
      */
     long getLastClearTime();
+
+    /**
+     * Finds affinity groups.
+     */
+    void findAffinityGroups();
 }

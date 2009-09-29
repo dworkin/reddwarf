@@ -129,7 +129,7 @@ public class DistGraphBuilderServerImpl
 
         ProfileCollector col =
                 systemRegistry.getComponent(ProfileCollector.class);
-        // Create the LPA algorithm
+        // Create the LPA algorithm. This also creates the JMX MXBean.
         lpa = new SingleLabelPropagation(this, col, properties);
     }
 
