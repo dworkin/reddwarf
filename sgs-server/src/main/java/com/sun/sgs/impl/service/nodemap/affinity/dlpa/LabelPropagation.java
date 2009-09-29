@@ -415,7 +415,6 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     private void startIterationInteral(int iteration) {
         // We should have been prepared by now.
         assert (vertices != null);
-        long startTime = System.currentTimeMillis();
        
         // Block any additional threads entering this iteration
         synchronized (stateLock) {

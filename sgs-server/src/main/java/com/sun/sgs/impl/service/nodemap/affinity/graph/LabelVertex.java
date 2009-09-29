@@ -75,9 +75,6 @@ public final class LabelVertex {
 
     /** {@inheritDoc} */
     public int hashCode() {
-//        if (hashCode == 0) {
-//            hashCode = id.hashCode();
-//        }
         // If the id is simply a number, it's very useful for testing/debugging
         // to use that number as the label.
         if (hashCode == 0) {

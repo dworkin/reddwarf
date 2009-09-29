@@ -33,6 +33,10 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * object references the vertices have in common.  The edges can be either
  * weighted or parallel (both are being used for experiments).
  * <p>
+ * Graphs are pruned as time goes by, both to ensure that endless resources
+ * are consumed, and to ensure that while the graph contains enough history
+ * to be useful, it doesn't contain too much very old history.
+ * <p>
  * Graph builders support the following properties:
  * <p>
  * <dl style="margin-left: 1em">
@@ -65,9 +69,6 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * implement a constructor taking the arguments
  * {@code (ProfileCollector, Properties, long)},
  * where the final argument is the local node id.
- * <p>
- * <b> NOTE </b> The first argument, the NMS, is currently only used
- * by one variation of the algorithm.
  */
 public interface BasicGraphBuilder {
     /** The base name for graph builder properties. */
@@ -84,15 +85,6 @@ public interface BasicGraphBuilder {
 
     /** The default snapshot count. */
     int DEFAULT_PERIOD_COUNT = 1;
-
-    /**
-     * Get the task which prunes the graph.
-     *
-     * @return the runnable which prunes the graph.
-     * @throws UnsupportedOperationException if this builder does not support
-     *    graph pruning.
-     */
-    Runnable getPruneTask();
 
     /**
      * Update the graph based on the objects accessed in a task.
@@ -132,4 +124,13 @@ public interface BasicGraphBuilder {
      * @return the affinity group finder or {@code null}
      */
     AffinityGroupFinder getAffinityGroupFinder();
+
+    /**
+     * Get the task which prunes the graph.  This is useful for testing.
+     *
+     * @return the runnable which prunes the graph.
+     * @throws UnsupportedOperationException if this builder does not support
+     *    graph pruning.
+     */
+    Runnable getPruneTask();
 }

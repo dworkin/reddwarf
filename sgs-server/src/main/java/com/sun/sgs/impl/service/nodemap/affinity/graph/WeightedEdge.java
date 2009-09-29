@@ -39,7 +39,6 @@ public class WeightedEdge {
      * @param value the initial weight
      */
     public WeightedEdge(long value) {
-        super();
         weight = new AtomicLong(value);
     }
 

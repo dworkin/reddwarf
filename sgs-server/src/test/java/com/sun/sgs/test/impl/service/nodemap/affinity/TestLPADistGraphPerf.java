@@ -176,7 +176,6 @@ public class TestLPADistGraphPerf {
             detail.addAccess(new String("o2"));
             detail.addAccess(new String("o3"));
             detail.addAccess(new String("o5"));
-            detail.addAccess(new String("o6"));
             detail.addAccess(new String("o8"));
             detail.addAccess(new String("o11"));
             detail.addAccess(new String("o12"));
