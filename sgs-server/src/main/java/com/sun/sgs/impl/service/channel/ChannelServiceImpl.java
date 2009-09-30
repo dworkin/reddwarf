@@ -564,15 +564,19 @@ public final class ChannelServiceImpl
 			Level.FINEST, "leave channelId:{0} sessionId:{1}",
 			toHexString(channelRefId), toHexString(sessionRefId));
 		}
-		
-		return handleChannelRequest(
-		    sessionRefId, msgTimestamp,
-		    new ChannelLeaveTask(channelRefId));
+
+		ChannelLeaveTask task = new ChannelLeaveTask(channelRefId);
+		boolean success = handleChannelRequest(
+		    sessionRefId, msgTimestamp, task);
+		task.cleanupIfNoLocalChannelMembership();
+		return success;
 		
 	    } finally {
 		callFinished();
 	    }
 	}
+
+	
 
 	/** {@inheritDoc} */
 	public BigInteger[] getSessions(BigInteger channelRefId) {
@@ -2207,6 +2211,8 @@ public final class ChannelServiceImpl
      */
     private class ChannelLeaveTask extends ChannelRequestTask {
 
+	volatile boolean isCompleted = false;
+
 	ChannelLeaveTask(BigInteger channelRefId) {
 	    super(channelRefId);
 	}
@@ -2227,6 +2233,45 @@ public final class ChannelServiceImpl
 		} catch (IOException e) {
 		    logger.logThrow(Level.WARNING, e,
 				    "channelLeave throws");
+		}
+	    }
+	    isCompleted = true;
+	}
+
+	/**
+	 * If this task removed the last local channel member, then remove
+	 * the local node ID from the channel's server list, and remove the
+	 * channel from the map of local channel members.
+	 */
+	public void cleanupIfNoLocalChannelMembership() {
+	    if (isCompleted) {
+		// Check if there are no more channel members on this
+		// node and, if so, remove the node from the channel's
+		// server list.
+		LocalChannelInfo channelInfo =
+		    localChannelMembersMap.get(channelRefId);
+		if (channelInfo != null) {
+		    synchronized (channelInfo) {
+			if (channelInfo.members.isEmpty()) {
+			    try {
+				runTransactionalTask(
+				  new AbstractKernelRunnable(
+				      "removeNodeIdFromChannel") {
+				    public void run() {
+					ChannelImpl channel = (ChannelImpl)
+					    getObjectForId(channelRefId);
+					if (channel != null) {
+					    channel.removeServerNodeId(
+						localNodeId);
+					}
+				    } });
+				    
+			    } catch (Exception e) {
+				// Transaction scheduler will print out warning.
+			    }
+			    localChannelMembersMap.remove(channelRefId);
+			}
+		    }
 		}
 	    }
 	}

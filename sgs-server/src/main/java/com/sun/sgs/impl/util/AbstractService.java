@@ -529,18 +529,20 @@ public abstract class AbstractService implements Service {
      * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
      *
-     * @param ioTask a task with IO-related operations
-     * @param nodeId the node that is the target of the IO operations
-     * @throws IllegalStateException if this method is invoked within a
-     * transactional context
+     * @param	ioTask a task with IO-related operations
+     * @param	nodeId the node that is the target of the IO operations
+     * @return	{@code true} if the task was successfully executed and
+     * 		{@code false} if the specified node is no longer alive
+     * @throws	IllegalStateException if this method is invoked within a
+     *		transactional context
      */
-    public void runIoTask(IoRunnable ioTask, long nodeId) {
+    public boolean runIoTask(IoRunnable ioTask, long nodeId) {
         int maxAttempts = maxIoAttempts;
         checkNonTransactionalContext();
         do {
             try {
                 ioTask.run();
-                return;
+                return true;
             } catch (IOException e) {
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.logThrow(Level.FINEST, e,
@@ -565,6 +567,7 @@ public abstract class AbstractService implements Service {
                 }
             }
         } while (isAlive(nodeId));
+	return false;
     }
     
     /**

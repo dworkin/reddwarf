@@ -340,7 +340,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private boolean isTerminating() {
 	synchronized (lock) {
 	    return !isConnected() &&
-		(relocatePrepareCompletionHandler != null ||
+		(relocatePrepareCompletionHandler == null ||
 		 !relocatePrepareCompletionHandler.isCompleted);
 	}
     }

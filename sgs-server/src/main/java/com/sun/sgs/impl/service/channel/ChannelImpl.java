@@ -417,9 +417,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    /*
 	     * Enqueue join requests, each with underlying (unwrapped)
 	     * client session object.
-	     *
-	     * TBD: (optimization) add a single event instead of one for
-	     * each session.
 	     */
 	    EventQueue eventQueue = eventQueueRef.get();
 	    for (ClientSession session : sessions) {
@@ -602,9 +599,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    /*
 	     * Enqueue leave requests, each with underlying (unwrapped)
 	     * client session object.
-	     *
-	     * TBD: (optimization) add a single event instead of one for
-	     * each session.
 	     */
 	    for (ClientSession session : sessions) {
 		addEvent(new LeaveEvent(unwrapSession(session),
@@ -715,9 +709,19 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	if (listenerRef == null) {
 	    send(sender, message);
 	} else {
-	    // TBD: exception handling?
-	    listenerRef.get().receivedMessage(
-		getWrappedChannel(), sender, message.asReadOnlyBuffer());
+	    try {
+		listenerRef.get().receivedMessage(
+		    getWrappedChannel(), sender, message.asReadOnlyBuffer());
+	    } catch (RuntimeException e) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.logThrow(
+			Level.FINE, e,
+			"Dropping message:{0} for channel:{1} because " +
+			"notifying ChannelListener throws",
+			HexDumper.format(message, 0x50),
+			HexDumper.toHexString(channelRefId.toByteArray()));
+		}
+	    }
 	}
     }
 
@@ -918,7 +922,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      *
      * @param	a server node's ID
      */
-    private void removeServerNodeId(long nodeId) {
+    void removeServerNodeId(long nodeId) {
 	if (servers.remove(nodeId)) {
 	    getDataService().markForUpdate(this);
 	}
@@ -1486,8 +1490,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	void serviceEventQueue() {
 	    ChannelImpl channel = getChannel();
 	    if (!channel.checkCoordinator()) {
-		// TBD: should a serviceEventQueue request be forwarded to
-		// the true channel coordinator?
 		logger.log(
 		    Level.WARNING,
 		    "Attempt at node:{0} channel:{1} to service events; " +
@@ -1690,9 +1692,17 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	boolean completed() {
 	    logger.log(Level.FINEST, "completed event:{0}", this);
-	    // TBD: markForUpdate can throw ONFE if this event has been
-	    // removed.
-	    getDataService().markForUpdate(this);
+	    try {
+		getDataService().markForUpdate(this);
+	    } catch (ObjectNotFoundException e) {
+		// markForUpdate can throw ONFE if this event has been
+		// removed.
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Marking event:{0} completed throws", this);
+		}
+	    }
 	    completed = true;
 	    return completed;
 	}
@@ -1791,6 +1801,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 	
 	/**
+	 * Returns the channel associated with this task, or null if the channel
+	 * no longer exists. This method must be invoked within a transaction.
+	 */
+	protected ChannelImpl getChannel() {
+	    return (ChannelImpl) getObjectForId(channelRefId);
+	}
+
+	/**
 	 * Marks the associated event complete and adds a task to
 	 * resume servicing the channel's event queue.  This must be
 	 * called outside of a transaction.
@@ -1816,9 +1834,38 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		} ); 
 	    } catch (Exception e) {
-		// TBD: This shouldn't happen, so log message?
+		// Transaction schedule will print out warning.
 	    } finally {
 		channelService.addServiceEventQueueTask(channelRefId);
+	    }
+	}
+
+	/**
+	 * Updates this task's {@code sessionNodeId} and returns {@code true}
+	 * if the session's node ID has changed, and returns {@code false} if
+	 * the session's node ID is unchanged or the session no longer
+	 * exists.  This method must be invoked within a transaction.
+	 *
+	 * @param addNodeId if {@code true}, adds the specified
+	 *	  {@code nodeId} to the channel's set of server node IDs
+	 * @return {@code true} if the session's node ID is updated, otherwise
+	 *	   {@code false}
+	 */
+	protected void removeNodeIdFromChannel(final long nodeId) {
+	    
+	    try {
+		channelService.runTransactionalTask(
+ 		  new AbstractKernelRunnable("removeNodeIdFromChannel") {
+		    public void run() {
+			ChannelImpl channel = getChannel();
+			if (channel != null) {
+			    channel.removeServerNodeId(nodeId);
+			}
+		    }
+		  });
+		
+	    } catch (Exception e) {
+		// Transaction scheduler will print out warning.
 	    }
 	}
     }
@@ -1893,6 +1940,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    if (!channelService.isAlive(sessionNodeId)) {
 			// If the session's node hasn't changed, then it is
 			// disconnected because its node crashed.
+			removeNodeIdFromChannel(sessionNodeId);
 			if (updateSessionNodeId()) {
 			    continue; // relocating
 			} else {
@@ -1948,14 +1996,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Returns the channel associated with this task, or null if the channel
-	 * no longer exists. This method must be invoked within a transaction.
-	 */
-	protected ChannelImpl getChannel() {
-	    return (ChannelImpl) getObjectForId(channelRefId);
-	}
-
-	/**
 	 * Updates this task's {@code sessionNodeId} and returns {@code true}
 	 * if the session's node ID has changed, and returns {@code false} if
 	 * the session's node ID is unchanged or the session no longer
@@ -1992,7 +2032,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		});
 	    
 	    } catch (Exception e) {
-		// TBD: This shouldn't happen, so log message?
+		// Transaction scheduler will print out warning.
 		return false;
 	    }
 	}
@@ -2339,7 +2379,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		 * Send "send" notification to channel's servers.
 		 */ 
 		for (final long nodeId : serverNodeIds) {
-		    channelService.runIoTask(
+		    boolean success = channelService.runIoTask(
 		      new IoRunnable() {
 			public void run() throws IOException {
 			    ChannelServer server = getChannelServer(nodeId);
@@ -2348,6 +2388,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    }
 			} },
 		      nodeId);
+		    if (!success) {
+			// Server node has failed, so remove it from
+			// channel's server list.
+			removeNodeIdFromChannel(nodeId);
+		    }
 		}
 	    } finally {
 		completed();
@@ -2486,7 +2531,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		} );
 	    } catch (Exception e) {
-		// TBD: This shouldn't happen, so log message?
+		// Transaction schedule will print out warning.
 	    }
 	}
     }
@@ -2614,10 +2659,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		 * failure) fails before it has a chance to schedule a task
 		 * to remove the server node ID for another failed node
 		 * (cascading failure during recovery).
-		 *
-		 * TBD: a failed server node could be removed from the list
-		 * if a server node failure is discovered when sending a
-		 * channel message.
 		 */
 		for (long serverNodeId : channel.getServerNodeIds()) {
 		    Node serverNode = watchdogService.getNode(serverNodeId);
