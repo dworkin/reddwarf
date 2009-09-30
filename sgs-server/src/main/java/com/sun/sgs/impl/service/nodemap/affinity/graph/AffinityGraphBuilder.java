@@ -70,7 +70,7 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * {@code (ProfileCollector, Properties, long)},
  * where the final argument is the local node id.
  */
-public interface BasicGraphBuilder {
+public interface AffinityGraphBuilder {
     /** The base name for graph builder properties. */
     String PROP_BASE = "com.sun.sgs.impl.service.nodemap.affinity";
 

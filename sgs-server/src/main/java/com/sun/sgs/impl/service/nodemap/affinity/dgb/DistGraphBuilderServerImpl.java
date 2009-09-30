@@ -26,7 +26,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
@@ -68,7 +68,7 @@ import javax.management.JMException;
  * 
  */
 public class DistGraphBuilderServerImpl 
-    implements DistGraphBuilderServer, BasicGraphBuilder, AffinityGroupFinder
+    implements DistGraphBuilderServer, AffinityGraphBuilder, AffinityGroupFinder
 {
     /** Our property base name. */
     private static final String PROP_NAME =
@@ -153,7 +153,7 @@ public class DistGraphBuilderServerImpl
                 new AffinityGroupFinderStats(this, col, -1);
         // Use -1 for period count and snapshot, as not yet implemented.
         builderStats = new AffinityGraphBuilderStats(col, affinityGraph,
-                -1, -1);
+                                                     -1, -1);
         try {
             col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
             col.registerMBean(builderStats,
@@ -169,6 +169,9 @@ public class DistGraphBuilderServerImpl
 
     /** {@inheritDoc} */
     public void updateGraph(Identity owner, Object[] objIds) {
+        long startTime = System.currentTimeMillis();
+        builderStats.updateCountInc();
+
         LabelVertex vowner = new LabelVertex(owner);
 
         // For each object accessed in this task...
@@ -221,9 +224,11 @@ public class DistGraphBuilderServerImpl
                 }
             }
         }  // objId loop
+
+        builderStats.processingTimeInc(System.currentTimeMillis() - startTime);
     }
 
-    // Implement BasicGraphBuilder
+    // Implement AffinityGraphBuilder
 
     /** {@inheritDoc} */
     public void shutdown() {

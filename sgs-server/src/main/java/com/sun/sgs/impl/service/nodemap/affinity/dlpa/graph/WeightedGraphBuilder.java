@@ -67,7 +67,7 @@ import javax.management.JMException;
  * been used by which identities.  Edges between identities are weighted, and
  * represent the number of object accesses the two identities have in common.
  */
-public class WeightedGraphBuilder implements GraphBuilder {
+public class WeightedGraphBuilder implements DLPAGraphBuilder {
     /** Our property base name. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";

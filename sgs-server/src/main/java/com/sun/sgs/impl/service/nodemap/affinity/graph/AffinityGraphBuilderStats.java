@@ -41,7 +41,7 @@ public class AffinityGraphBuilderStats extends StandardMBean
         implements AffinityGraphBuilderMXBean
 {
     /** Our consumer name. */
-    private static final String NAME = "com.sun.sgs.AffinityGraphBuilder";
+    public static final String CONS_NAME = "com.sun.sgs.AffinityGraphBuilder";
     /** The graph we are building. */
     private final Graph<?, ?> graph;
 
@@ -73,8 +73,8 @@ public class AffinityGraphBuilderStats extends StandardMBean
         this.graph = graph;
         this.snapCount = snapCount;
         this.snapPeriod = snapPeriod;
-        ProfileConsumer consumer = collector.getConsumer(NAME);
-        ProfileLevel level = ProfileLevel.MIN;
+        ProfileConsumer consumer = collector.getConsumer(CONS_NAME);
+        ProfileLevel level = ProfileLevel.MEDIUM;
         ProfileDataType type = ProfileDataType.AGGREGATE;
 
         processingTime = (AggregateProfileCounter)

@@ -24,7 +24,7 @@ import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
@@ -838,7 +838,7 @@ public class TestLPA {
         }
     }
     // Simple builder spread across 3 nodes
-    private class PartialToyBuilder implements GraphBuilder {
+    private class PartialToyBuilder implements DLPAGraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
         private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
                 conflictMap;

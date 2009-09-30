@@ -24,7 +24,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -63,7 +63,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
     // Passed into each test run
     private final String builderName;
 
-    private GraphBuilder graphBuilder;
+    private DLPAGraphBuilder graphBuilder;
     /**
      * Create this test class.
      * @param builderName the type of graph builder to use
@@ -82,7 +82,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
     @Before
     public void beforeEachTest() throws Exception {
         super.beforeEachTest();
-        graphBuilder = (GraphBuilder) listener.getGraphBuilder();
+        graphBuilder = (DLPAGraphBuilder) listener.getGraphBuilder();
     }
 
     protected Properties getProps(SgsTestNode serverNode) throws Exception {

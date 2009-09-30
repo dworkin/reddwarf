@@ -23,11 +23,12 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
@@ -131,7 +132,7 @@ public class TestLPAPerf {
 
     @Test
     public void testZachary() throws Exception {
-        BasicGraphBuilder builder = new ZachBuilder();
+        AffinityGraphBuilder builder = new ZachBuilder();
         Properties props = new Properties();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
@@ -143,6 +144,9 @@ public class TestLPAPerf {
             collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         bean.clear();
+        // Be sure the consumer is turned on
+        collector.getConsumer(AffinityGroupFinderStats.CONS_NAME).
+                    setProfileLevel(ProfileLevel.MAX);
         
         double avgMod  = 0.0;
         double maxMod = 0.0;
@@ -236,6 +240,9 @@ public class TestLPAPerf {
             collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         bean.clear();
+        // Be sure the consumer is turned on
+        collector.getConsumer(AffinityGroupFinderStats.CONS_NAME).
+                    setProfileLevel(ProfileLevel.MAX);
         
         double avgMod  = 0.0;
         double maxMod = 0.0;
@@ -266,7 +273,7 @@ public class TestLPAPerf {
     }
     
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
-    private class DistributedZachBuilder implements GraphBuilder {
+    private class DistributedZachBuilder implements DLPAGraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
         private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
             conflictMap;

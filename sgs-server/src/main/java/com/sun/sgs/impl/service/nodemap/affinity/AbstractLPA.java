@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -136,7 +136,7 @@ public abstract class AbstractLPA {
      * Initialize ourselves for a run of the algorithm.
      * @param builder the graph producer
      */
-    protected void initializeLPARun(BasicGraphBuilder builder) {
+    protected void initializeLPARun(AffinityGraphBuilder builder) {
         logger.log(Level.FINEST, "{0}: initializing LPA run", localNodeId);
         // Grab the graph (the weighted graph builder returns a pointer
         // to the live graph) and a snapshot of the vertices.

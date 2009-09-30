@@ -30,7 +30,7 @@
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener} which
  * consumes task information about which identities are using which objects.
  * The graph listener creates a
- * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder}
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder}
  * based on the property value {@value
  * com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener#GRAPH_CLASS_PROPERTY}.
  * The builder ensures that the correct supporting LPA implementation is

@@ -25,8 +25,8 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
@@ -85,7 +85,7 @@ public class GraphBuilderTests {
     // The listener created for each test
     protected GraphListener listener;
     // The builder used by the listener
-    protected BasicGraphBuilder builder;
+    protected AffinityGraphBuilder builder;
 
     protected Properties props;
 
@@ -435,7 +435,7 @@ public class GraphBuilderTests {
     public void testGraphPrunerCountTwo() throws Exception {
         node.shutdown(false);
         Properties p = new Properties();
-        p.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "2");
+        p.setProperty(DLPAGraphBuilder.PERIOD_COUNT_PROPERTY, "2");
         startNewNode(p);
 
         LabelVertex vertA = new LabelVertex(new IdentityImpl("A"));
@@ -576,7 +576,7 @@ public class GraphBuilderTests {
     @Test(expected=IllegalArgumentException.class)
     public void testGraphBuilderBadCount() throws Exception {
         props = getProps(serverNode);
-        props.setProperty(GraphBuilder.PERIOD_COUNT_PROPERTY, "0");
+        props.setProperty(DLPAGraphBuilder.PERIOD_COUNT_PROPERTY, "0");
 
         SgsTestNode newNode = null;
         try {

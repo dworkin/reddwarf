@@ -22,7 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -73,7 +73,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
         // For this combo, that lives on the server
         GraphListener coreListener = (GraphListener)
                 graphListenerField.get(serverNode.getNodeMappingService());
-        builder = (BasicGraphBuilder)
+        builder = (AffinityGraphBuilder)
                 serverImplField.get(coreListener.getGraphBuilder());
     }
 
@@ -82,7 +82,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
         super.startNewNode(addProps);
         GraphListener coreListener = (GraphListener)
                 graphListenerField.get(serverNode.getNodeMappingService());
-        builder = (BasicGraphBuilder)
+        builder = (AffinityGraphBuilder)
                 serverImplField.get(coreListener.getGraphBuilder());
     }
 

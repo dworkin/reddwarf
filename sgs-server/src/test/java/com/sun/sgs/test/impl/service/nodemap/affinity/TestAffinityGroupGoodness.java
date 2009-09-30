@@ -24,7 +24,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
@@ -45,7 +45,7 @@ public class TestAffinityGroupGoodness {
 
     @Test
     public void testToyModularityAndJaccard() {
-        BasicGraphBuilder builder = new TestToyBuilder();
+        AffinityGraphBuilder builder = new TestToyBuilder();
 
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         AffinitySet a = new AffinitySet(1);
@@ -89,7 +89,7 @@ public class TestAffinityGroupGoodness {
 
     @Test
     public void testZachModularity() {
-        BasicGraphBuilder builder = new ZachBuilder();
+        AffinityGraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
         AffinitySet a = new AffinitySet(1);
         a.addIdentity(new DummyIdentity("1"));
@@ -140,7 +140,7 @@ public class TestAffinityGroupGoodness {
 
     @Test
     public void testModularityCalc() {
-        BasicGraphBuilder builder = new ZachBuilder();
+        AffinityGraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
         AffinitySet a = new AffinitySet(49);
         a.addIdentity(new DummyIdentity("17"));
@@ -194,7 +194,7 @@ public class TestAffinityGroupGoodness {
      * A graph builder that returns a pre-made graph for a very simple toy
      * graph.
      */
-    private static class TestToyBuilder implements BasicGraphBuilder {
+    private static class TestToyBuilder implements AffinityGraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
         public TestToyBuilder() {

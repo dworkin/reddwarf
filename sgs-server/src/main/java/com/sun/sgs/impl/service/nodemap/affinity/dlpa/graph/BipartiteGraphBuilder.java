@@ -64,7 +64,7 @@ import javax.management.JMException;
  * does not contain parallel edges.
  * 
  */
-public class BipartiteGraphBuilder implements GraphBuilder {
+public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     /** Our property base name. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";

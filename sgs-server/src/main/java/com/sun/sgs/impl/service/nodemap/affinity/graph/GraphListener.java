@@ -74,7 +74,7 @@ public class GraphListener implements ProfileListener {
     public static final String GRAPH_CLASS_NONE = "None";
 
     /** The affinity graph builder, null if there is none. */
-    private final BasicGraphBuilder builder;
+    private final AffinityGraphBuilder builder;
 
     /**
      * Constructs a new listener instance. 
@@ -128,10 +128,10 @@ public class GraphListener implements ProfileListener {
     }
 
     /**
-     * Private helper to create a BasicGraphBuilder, searching for
+     * Private helper to create an AffinityGraphBuilder, searching for
      * two different ctor signatures.
      */
-    private BasicGraphBuilder createBuilder(Class<?> bClass,
+    private AffinityGraphBuilder createBuilder(Class<?> bClass,
             ComponentRegistry systemRegistry, TransactionProxy txnProxy,
             NodeMappingService nms,
             ProfileCollector col,
@@ -145,7 +145,7 @@ public class GraphListener implements ProfileListener {
                 ctor = bClass.getConstructor(ProfileCollector.class,
                         Properties.class, long.class);
                 // return a new instance
-                return (BasicGraphBuilder)
+                return (AffinityGraphBuilder)
                         (ctor.newInstance(col, props, nodeId));
 
             } catch (NoSuchMethodException e) {
@@ -155,7 +155,7 @@ public class GraphListener implements ProfileListener {
                         TransactionProxy.class,
                         NodeMappingService.class, Properties.class, long.class);
                 // return a new instance
-                return (BasicGraphBuilder)
+                return (AffinityGraphBuilder)
                     (ctor.newInstance(systemRegistry, txnProxy, nms,
                                       props, nodeId));
             }
@@ -203,7 +203,7 @@ public class GraphListener implements ProfileListener {
      * Returns the graph builder used by this listener.
      * @return the graph builder
      */
-    public BasicGraphBuilder getGraphBuilder() {
+    public AffinityGraphBuilder getGraphBuilder() {
         return builder;
     }
 }

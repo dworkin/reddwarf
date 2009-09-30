@@ -22,10 +22,11 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
@@ -35,6 +36,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -170,7 +172,7 @@ public class TestLPADistGraphPerf {
             }
             
             // Node 1 uses.
-            BasicGraphBuilder builder1 = listener1.getGraphBuilder();
+            AffinityGraphBuilder builder1 = listener1.getGraphBuilder();
             AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
             detail.addAccess(new String("o1"));
             detail.addAccess(new String("o2"));
@@ -248,7 +250,7 @@ public class TestLPADistGraphPerf {
             builder1.updateGraph(idents[34], detail);
 
             // Node 2
-            BasicGraphBuilder builder2 = listener2.getGraphBuilder();
+            AffinityGraphBuilder builder2 = listener2.getGraphBuilder();
             detail = new AccessedObjectsDetailTest();
             detail.addAccess(new String("o1"));
             detail.addAccess(new String("o17"));
@@ -307,7 +309,7 @@ public class TestLPADistGraphPerf {
             builder2.updateGraph(idents[32], detail);
 
             // Node 3
-            BasicGraphBuilder builder3 = listener3.getGraphBuilder();
+            AffinityGraphBuilder builder3 = listener3.getGraphBuilder();
             detail = new AccessedObjectsDetailTest();
             detail.addAccess(new String("o1"));
             detail.addAccess(new String("o6"));
@@ -375,10 +377,14 @@ public class TestLPADistGraphPerf {
             System.out.println("MODEL GRAPH IS " + graphModel);
             GraphListener serverListener = (GraphListener)
                     graphListenerField.get(serverNode.getNodeMappingService());
-            BasicGraphBuilder builder = serverListener.getGraphBuilder();
-            // We know what the basic graph should look like
-            BasicGraphBuilder serverBuilder = 
-                    (BasicGraphBuilder) builder.getAffinityGroupFinder();
+            AffinityGraphBuilder builder = serverListener.getGraphBuilder();
+            // The graph can only be found on the server side.  Let's make
+            // sure it looks like the expected Zachary graph.
+            // The core server graph listener builds a DistGraphBuilder,
+            // which (on the core node) creates the DistGraphBuilderServerImpl.
+            // We can find it if we look for the group finder.
+            AffinityGraphBuilder serverBuilder =
+                    (AffinityGraphBuilder) builder.getAffinityGroupFinder();
             UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
                     serverBuilder.getAffinityGraph();
             System.out.println("GRAPH IS " + graph);
@@ -392,6 +398,9 @@ public class TestLPADistGraphPerf {
             assertNotNull(bean);
             bean.clear();
 
+            // Be sure the consumer is turned on
+            col.getConsumer(AffinityGroupFinderStats.CONS_NAME).
+                    setProfileLevel(ProfileLevel.MAX);
             double avgMod = 0.0;
             double maxMod = 0.0;
             double minMod = 1.0;

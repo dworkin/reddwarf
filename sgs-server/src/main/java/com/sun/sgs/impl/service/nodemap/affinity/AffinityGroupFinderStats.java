@@ -42,7 +42,7 @@ public class AffinityGroupFinderStats extends StandardMBean
         implements AffinityGroupFinderMXBean
 {
     /** Our consumer name. */
-    private static final String NAME = "com.sun.sgs.AffinityGroupFinder";
+    public static final String CONS_NAME = "com.sun.sgs.AffinityGroupFinder";
     /** Configuration info -- what if we allow this be modified? */
     private final int stopIteration;
 
@@ -85,8 +85,8 @@ public class AffinityGroupFinderStats extends StandardMBean
         stopIteration = stopIter;
         this.finder = finder;
 
-        ProfileConsumer consumer = collector.getConsumer(NAME);
-        ProfileLevel level = ProfileLevel.MEDIUM;
+        ProfileConsumer consumer = collector.getConsumer(CONS_NAME);
+        ProfileLevel level = ProfileLevel.MIN;
         ProfileDataType type = ProfileDataType.AGGREGATE;
 
         iterations = (AggregateProfileSample)

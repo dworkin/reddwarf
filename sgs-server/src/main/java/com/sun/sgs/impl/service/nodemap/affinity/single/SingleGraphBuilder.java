@@ -25,7 +25,7 @@ import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
@@ -52,7 +52,7 @@ import javax.management.JMException;
  * A minimal graph builder for single node testing.  This is mostly a copy
  * of the WeightedGraphBuilder, with the parts about node conflicts deleted.
  */
-public class SingleGraphBuilder implements BasicGraphBuilder {
+public class SingleGraphBuilder implements AffinityGraphBuilder {
     /** Our property base name. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";

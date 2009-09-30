@@ -24,7 +24,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.GraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import java.io.IOException;
@@ -61,7 +61,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     private final LPAServer server;
 
     /** Our graph builder, which provides us with our input. */
-    private final GraphBuilder builder;
+    private final DLPAGraphBuilder builder;
 
     /** A map of cached nodeId->LPAClient.  The contents of this map
      * can change.
@@ -133,13 +133,13 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
      * @param nodeId the local node ID
-     * @param	properties the properties for configuring this service
+     * @param properties the properties for configuring this service
      *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
-    public LabelPropagation(GraphBuilder builder, long nodeId,
+    public LabelPropagation(DLPAGraphBuilder builder, long nodeId,
                             Properties properties)
         throws Exception
     {

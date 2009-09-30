@@ -25,7 +25,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
@@ -48,9 +48,10 @@ import javax.management.JMException;
 public class SingleLabelPropagation extends AbstractLPA 
         implements AffinityGroupFinder
 {
-    private final BasicGraphBuilder builder;
+    /** Our graph builder. */
+    private final AffinityGraphBuilder builder;
 
-    // Our JMX info
+    /** Our JMX info. */
     private final AffinityGroupFinderStats stats;
 
     /**
@@ -63,7 +64,7 @@ public class SingleLabelPropagation extends AbstractLPA
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
-    public SingleLabelPropagation(BasicGraphBuilder builder,
+    public SingleLabelPropagation(AffinityGraphBuilder builder,
                                   ProfileCollector col,
                                   Properties properties)
         throws Exception
@@ -83,7 +84,7 @@ public class SingleLabelPropagation extends AbstractLPA
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
-    public SingleLabelPropagation(BasicGraphBuilder builder,
+    public SingleLabelPropagation(AffinityGraphBuilder builder,
                                   ProfileCollector col,
                                   Properties properties,
                                   AffinityGroupFinderStats stats)
@@ -146,7 +147,6 @@ public class SingleLabelPropagation extends AbstractLPA
      */
     public Collection<AffinityGroup> findAffinityGroups() {
         long startTime = System.currentTimeMillis();
-
         stats.runsCountInc();
 
         // Step 1.  Initialize all nodes in the network.

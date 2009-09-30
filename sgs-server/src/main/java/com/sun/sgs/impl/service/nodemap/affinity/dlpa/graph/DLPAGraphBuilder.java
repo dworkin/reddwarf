@@ -20,15 +20,17 @@
 package com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Graph builder interface for use with the distributed label propagation
- * algorithm implementation.
+ * algorithm implementation.  It includes necessary additional information
+ * for that algorithm (object use information and cache conflicts, used to
+ * find graph links to other nodes), as well as a way to remove failed nodes.
  */
-public interface GraphBuilder extends BasicGraphBuilder {
+public interface DLPAGraphBuilder extends AffinityGraphBuilder {
     /**
      * Returns a map of local object uses to the identities that used
      * the objects, and a count of the number of uses. An empty map will

@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -52,7 +52,7 @@ import java.util.logging.Logger;
  * <p>
  * If the server cannot be contacted, we report the failure to the watchdog.
  */
-public class DistGraphBuilder implements BasicGraphBuilder {
+public class DistGraphBuilder implements AffinityGraphBuilder {
     /** Our property base name. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
