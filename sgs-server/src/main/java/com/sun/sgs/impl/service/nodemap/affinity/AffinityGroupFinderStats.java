@@ -267,8 +267,8 @@ public class AffinityGroupFinderStats extends StandardMBean
     }
 
     /**
-     * Set the number of groups found.
-     * @param value
+     * Set the number of groups found in the last run.
+     * @param value the number of groups found in the last run.
      */
     public void setNumGroups(int value) {
         numGroups = value;

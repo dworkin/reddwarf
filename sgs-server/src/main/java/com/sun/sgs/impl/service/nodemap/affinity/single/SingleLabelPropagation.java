@@ -41,7 +41,7 @@ import java.util.logging.Level;
 import javax.management.JMException;
 
 /**
- * An implementation of the algorithm presented in
+ * A single-node implementation of the algorithm presented in
  * "Near linear time algorithm to detect community structures in large-scale
  * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
  */
@@ -52,6 +52,7 @@ public class SingleLabelPropagation extends AbstractLPA
 
     // Our JMX info
     private final AffinityGroupFinderStats stats;
+
     /**
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
@@ -67,17 +68,41 @@ public class SingleLabelPropagation extends AbstractLPA
                                   Properties properties)
         throws Exception
     {
+        this(builder, col, properties, null);
+    }
+
+    /**
+     * Constructs a new instance of the label propagation algorithm.
+     * @param builder the graph producer
+     * @param col the profile collector
+     * @param stats pre-constructed JMX Mbean or {@code null} if one should be
+     *              constructed
+     * @param properties the properties for configuring this service
+     *
+     * @throws IllegalArgumentException if {@code numThreads} is
+     *       less than {@code 1}
+     * @throws Exception if any other error occurs
+     */
+    public SingleLabelPropagation(BasicGraphBuilder builder,
+                                  ProfileCollector col,
+                                  Properties properties,
+                                  AffinityGroupFinderStats stats)
+        throws Exception
+    {
         super(1, properties);
         this.builder = builder;
-        // Create our JMX MBean
-        stats = new AffinityGroupFinderStats(this, col, -1);
-        try {
-            col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
-        } catch (JMException e) {
-            // Continue on if we couldn't register this bean, although
-            // it's probably a very bad sign
-            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        if (stats == null) {
+            // Create our JMX MBean
+            stats = new AffinityGroupFinderStats(this, col, -1);
+            try {
+                col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
+            } catch (JMException e) {
+                // Continue on if we couldn't register this bean, although
+                // it's probably a very bad sign
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
         }
+        this.stats = stats;
     }
 
     /** {@inheritDoc} */

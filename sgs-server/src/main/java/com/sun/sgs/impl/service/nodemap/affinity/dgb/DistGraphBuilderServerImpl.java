@@ -22,7 +22,10 @@ package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import
+    com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
@@ -33,6 +36,8 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.management.AffinityGraphBuilderMXBean;
+import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
@@ -48,6 +53,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.management.JMException;
 
 /**
  *  The server side of a distributed graph builder for label propagation.
@@ -101,6 +107,10 @@ public class DistGraphBuilderServerImpl
     // The supporting node mapping service.
     private final NodeMappingService nms;
 
+    // Our JMX exposed information.  The group finder stats is held
+    // in {@code lpa}.
+    private final AffinityGraphBuilderStats builderStats;
+
     /**
      * Creates a distributed graph builder server.
      * @param systemRegistry the registry of available system components
@@ -129,8 +139,23 @@ public class DistGraphBuilderServerImpl
 
         ProfileCollector col =
                 systemRegistry.getComponent(ProfileCollector.class);
-        // Create the LPA algorithm. This also creates the JMX MXBean.
-        lpa = new SingleLabelPropagation(this, col, properties);
+        // Create our group finder and graph builder JMX MBeans
+        AffinityGroupFinderStats stats =
+                new AffinityGroupFinderStats(this, col, -1);
+        // Use -1 for period count and snapshot, as not yet implemented.
+        builderStats = new AffinityGraphBuilderStats(col, affinityGraph,
+                -1, -1);
+        try {
+            col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
+            col.registerMBean(builderStats,
+                                     AffinityGraphBuilderMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
+        // Create the LPA algorithm, telling it to use our group finder MBean.
+        lpa = new SingleLabelPropagation(this, col, properties, stats);
     }
 
     /** {@inheritDoc} */
@@ -222,7 +247,7 @@ public class DistGraphBuilderServerImpl
     public Collection<AffinityGroup> findAffinityGroups() {
         Collection<AffinityGroup> groups = lpa.findAffinityGroups();
         // Need to translate each group into a relocating affinity group
-                // Create our final return values
+        // Create our final return values
         Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
         for (AffinityGroup ag : groups) {
             Map<Identity, Long> idMap = new HashMap<Identity, Long>();
