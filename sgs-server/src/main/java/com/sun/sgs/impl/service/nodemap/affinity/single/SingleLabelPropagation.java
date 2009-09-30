@@ -43,7 +43,7 @@ import javax.management.JMException;
 /**
  * A single-node implementation of the algorithm presented in
  * "Near linear time algorithm to detect community structures in large-scale
- * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
+ * networks" Raghavan, Albert and Kumara 2007.
  */
 public class SingleLabelPropagation extends AbstractLPA 
         implements AffinityGroupFinder

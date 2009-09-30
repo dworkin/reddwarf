@@ -56,14 +56,16 @@ import javax.management.JMException;
  * each node when finished.
  */
 public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
-    private static final String PKG_NAME =
+    /** Our property base name. */
+    private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
-    // Our logger
+    /** Our logger. */
     private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PKG_NAME));
+            new LoggerWrapper(Logger.getLogger(PROP_NAME));
 
     /** The property name for the server port. */
-    public static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
+    public static final String SERVER_PORT_PROPERTY =
+            PROP_NAME + ".server.port";
     
     /** The default value of the server port. */
     public static final int DEFAULT_SERVER_PORT = 44537;
@@ -71,58 +73,70 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     /** The name we export ourselves under. */
     public static final String SERVER_EXPORT_NAME = "LabelPropagationServer";
 
-    // The time, in minutes, to wait for all nodes to respond asynchronously
+    /** The time, in minutes, to wait for all nodes to
+     * respond to asynchronous calls.
+     */
     private static final int TIMEOUT = 1;  // minutes
 
-    // The maximum number of iterations we will run.  Interesting to set high
-    // for testing, but 5 has been shown to be adequate in most papers.
-    // For distributed case, seem to always converge within 10, and setting
-    // to 5 cuts off some of the highest modularity solutions (running
-    // distributed Zachary test network).
+    /** The maximum number of iterations we will run.  Interesting to set high
+     * for testing, but 5 has been shown to be adequate in most papers.
+     * For distributed case, seem to always converge within 10, and setting
+     * to 5 cuts off some of the highest modularity solutions (running
+     * distributed Zachary test network).
+     */
     private static final int MAX_ITERATIONS = 10;
 
-    // The exporter for this server
+    /** The exporter for this serve. */
     private final Exporter<LPAServer> exporter;
     
-    // A map from node id to client proxy objects.
+    /* A map from node id to client proxy objects. */
     private final Map<Long, LPAClient> clientProxyMap =
             new ConcurrentHashMap<Long, LPAClient>();
 
-    // A barrier that consists of the set of nodes we expect to hear back
-    // from asynchronous calls.  Once this set is empty, we can move on to the
-    // next step of the algorithm.  This is required, rather than a simple
-    // Barrier, because our calls must be idempotent.
+    /** A barrier that consists of the set of nodes we expect to hear back
+     * from asynchronous calls.  Once this set is empty, we can move on to the
+     * next step of the algorithm.  This is required, rather than a simple
+     * Barrier, because our calls must be idempotent.
+     */
     private Set<Long> nodeBarrier = new HashSet<Long>();
 
-    // A latch to ensure our main thread waits for all nodes to complete
-    // each step of the algorithm before proceeding.
-    // This is replaced on each iteration.
+    /** A latch to ensure our main thread waits for all nodes to complete
+     * each step of the algorithm before proceeding.
+     * This is replaced on each iteration.
+     */
     private CountDownLatch latch;
 
     // Algorithm iteration information
+    /** The current iteration of the algorithm, used for sanity checking. */
     private int currentIteration;
+    /** True if we believe all nodes have converged. */
     private boolean nodesConverged;
 
-    // Set to true if something has gone wrong and the results from
-    // this algorithm run should be ignored
+    /** Set to true if something has gone wrong and the results from
+     * this algorithm run should be ignored.
+     */
     private boolean runFailed;
 
-    // A thread pool.  Will create as many threads as needed, with a timeout
-    // of 60 sec before unused threads are reaped.
+    /** A thread pool.  Will create as many threads as needed, with a timeout
+     * of 60 sec before unused threads are reaped.
+     */
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    // A lock to ensure we block a run of the algorithm if a current run
-    // is still going.  TBD:  what behavior do we want?  Throw an exception?
-    // "merge" the two run attempts - e.g. second run just returns the result
-    // of the ongoing first one?  Abort the first one?
+    /** A lock to ensure we block a run of the algorithm if a current run
+     * is still going.  TBD:  what behavior do we want?  Throw an exception?
+     * "merge" the two run attempts - e.g. second run just returns the result
+     * of the ongoing first one?  Abort the first one?
+     */
     private final Object runningLock = new Object();
+    /** True if we're in the midst of an algorithm run. */
     private boolean running = false;
 
-    // The iteration number, used to ensure that LPAClients are reporting
-    // results from the expected iteration.
+    /**  The iteration number, used to ensure that LPAClients are reporting
+     * results from the expected iteration.
+     */
     private final AtomicLong runNumber = new AtomicLong();
 
-    // Our JMX info
+    /** Our JMX info. */
     private final AffinityGroupFinderStats stats;
     
     /**

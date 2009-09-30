@@ -64,15 +64,17 @@ import java.util.logging.Logger;
  *  {@code true} to print some high level statistics about each algorithm run.
  */
 public abstract class AbstractLPA {
-    /** Our package name. */
-    protected static final String PKG_NAME =
+    /** Our base property name. */
+    protected static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
-    /** Our logger. */
+    /** Our logger.  Note this is shared between graph builders and group
+     * finders.
+     */
     protected static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PKG_NAME));
+            new LoggerWrapper(Logger.getLogger(PROP_NAME));
 
     /** The property name for the number of threads to use. */
-    public static final String NUM_THREADS_PROPERTY = PKG_NAME + ".numThreads";
+    public static final String NUM_THREADS_PROPERTY = PROP_NAME + ".numThreads";
 
     /** The default value for the number of threads to use. */
     public static final int DEFAULT_NUM_THREADS = 4;
@@ -162,6 +164,7 @@ public abstract class AbstractLPA {
      * Perform any algorithm specific initialization for an algorithm run.
      */
     protected abstract void doOtherInitialization();
+
     /**
      * Sets the label of {@code vertex} to the label used most frequently
      * by {@code vertex}'s neighbors.  Returns {@code true} if {@code vertex}'s
@@ -205,16 +208,15 @@ public abstract class AbstractLPA {
         // of our neighbors use a particular label.
         Map<Integer, Long> labelMap = new HashMap<Integer, Long>();
 
-        // Put our neighbors vertex into the map.  We allow parallel edges, and
-        // use edge weights.
-        // NOTE can remove some code if we decide we don't need parallel edges
+        // Put our neighbors labels into the label map.  We assume there
+        // are no parallel edges, but edges will have weights.
         Collection<LabelVertex> neighbors = graph.getNeighbors(vertex);
         if (neighbors == null) {
             // JUNG returns null if vertex is not present
             return new ArrayList<Integer>();
         }
 
-        StringBuffer logSB = new StringBuffer();
+        StringBuffer logSB = new StringBuffer();     // for logging
         for (LabelVertex neighbor : neighbors) {
             Integer label = neighbor.getLabel();
             Long value = labelMap.containsKey(label) ?
@@ -270,7 +272,7 @@ public abstract class AbstractLPA {
      * Return the affinity groups found within the given vertices, putting all
      * nodes with the same label in a group.  The affinity group's id
      * will be the common label of the group.  Also, as an optimization,
-     * can reinitialize the labels to their initial setting.
+     * can reinitialize the labels in the graph to their initial setting.
      *
      * @param vertices the vertices that we gather groups from
      * @param reinitialize if {@code true}, reinitialize the labels
@@ -293,6 +295,9 @@ public abstract class AbstractLPA {
             }
             ag.addIdentity(vertex.getIdentity());
             if (reinitialize) {
+                // At the end of an algorithm run, we save a pass through
+                // all vertices in the graph if we reinitialize the vertices
+                // while we gather the final groups.
                 vertex.initializeLabel();
             }
         }

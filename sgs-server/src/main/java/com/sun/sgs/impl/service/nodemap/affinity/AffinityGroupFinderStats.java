@@ -41,17 +41,18 @@ import javax.management.StandardMBean;
 public class AffinityGroupFinderStats extends StandardMBean
         implements AffinityGroupFinderMXBean
 {
+    /** Our consumer name. */
     private static final String NAME = "com.sun.sgs.AffinityGroupFinder";
-    // Configuration info -- what if we allow this be modified?
+    /** Configuration info -- what if we allow this be modified? */
     private final int stopIteration;
 
-    // The affinity group finder
+    /** The affinity group finder. */
     private final AffinityGroupFinder finder;
 
     /** The number of groups found in the last algorithm run. */
     protected int numGroups;
 
-    // Statistics are gathered for these items (min, max, avg).
+    // Statistics are gathered for samples (min, max, avg).
     /** The number of iterations in the last algorithm run. */
     protected final AggregateProfileSample iterations;
     /** The time (milliseconds) for the last algorithm run. */
@@ -66,8 +67,9 @@ public class AffinityGroupFinderStats extends StandardMBean
      */
     protected final AggregateProfileCounter stopped;
 
-    // The last time {@link #clear} was called, or when this object
-    // was created if {@code clear} has not been called.
+    /** The last time {@link #clear} was called, or when this object
+     * was created if {@code clear} has not been called.
+     */
     private volatile long lastClear = System.currentTimeMillis();
 
     /**
@@ -84,7 +86,7 @@ public class AffinityGroupFinderStats extends StandardMBean
         this.finder = finder;
 
         ProfileConsumer consumer = collector.getConsumer(NAME);
-        ProfileLevel level = ProfileLevel.MIN;
+        ProfileLevel level = ProfileLevel.MEDIUM;
         ProfileDataType type = ProfileDataType.AGGREGATE;
 
         iterations = (AggregateProfileSample)

@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.graph;
 import com.sun.sgs.auth.Identity;
 
 /**
- * Vertices for the Label Propagation Algorithm graph.
+ * Vertices for a Label Propagation Algorithm graph.
  * Labels change as we iterate through the algorithm, and once it has
  * the algorithm has converged after several iterations, vertices
  * with the same label are in the same cluster.
@@ -92,7 +92,6 @@ public final class LabelVertex {
         return "[" + id.toString() + ":" + label + "]";
     }
 
-    // Package private methods, used by the label propagation algorithm.
     /**
      * Sets the label to a new value.
      * @param newLabel the new label value

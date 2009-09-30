@@ -18,7 +18,7 @@
  */
 
 /**
- * Provides classes for a multi-node, distributed graph builder, implementation
+ * Provides classes for a multi-node distributed graph builder implementation
  * of the label propagation algorithm described in "Near linear time algorithm
  * to detect community structures in large-scale networks" by Raghavan, Albert
  * and Kumara (2007).

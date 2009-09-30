@@ -60,12 +60,10 @@ import java.util.Properties;
  * </dl>
  */
 public class GraphListener implements ProfileListener {
-    // the base name for properties
+    /** The base name for properties. */
     private static final String PROP_BASE =
             "com.sun.sgs.impl.service.nodemap.affinity";
-    /**
-     * The public property for specifying the graph builder class.
-     */
+    /** The property for specifying the graph builder class. */
     public static final String GRAPH_CLASS_PROPERTY =
         PROP_BASE + ".graphbuilder.class";
     
@@ -75,9 +73,8 @@ public class GraphListener implements ProfileListener {
      */
     public static final String GRAPH_CLASS_NONE = "None";
 
-    // the affinity graph builder, null if there is none
+    /** The affinity graph builder, null if there is none. */
     private final BasicGraphBuilder builder;
-
 
     /**
      * Constructs a new listener instance. 

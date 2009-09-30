@@ -40,17 +40,23 @@ import javax.management.StandardMBean;
 public class AffinityGraphBuilderStats extends StandardMBean
         implements AffinityGraphBuilderMXBean
 {
+    /** Our consumer name. */
     private static final String NAME = "com.sun.sgs.AffinityGraphBuilder";
-    // The graph
+    /** The graph we are building. */
     private final Graph<?, ?> graph;
 
     // Configuration info
+    /** Snapshot count. */
     private final int snapCount;
+    /** Snapshot period. */
     private final long snapPeriod;
 
     // Counters that are updated by the builders
+    /** Time spent processing the graph. */
     private final AggregateProfileCounter processingTime;
+    /** Number of graph updates. */
     private final AggregateProfileCounter updateCount;
+    /** Number of graph prunes. */
     private final AggregateProfileCounter pruneCount;
 
     /**

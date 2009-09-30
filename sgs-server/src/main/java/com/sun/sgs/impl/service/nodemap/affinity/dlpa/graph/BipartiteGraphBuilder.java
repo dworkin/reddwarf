@@ -28,6 +28,7 @@ import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.NodeType;
@@ -50,6 +51,8 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
@@ -62,34 +65,44 @@ import javax.management.JMException;
  * 
  */
 public class BipartiteGraphBuilder implements GraphBuilder {
-    // The graph of object accesses.
+    /** Our property base name. */
+    private static final String PROP_NAME =
+            "com.sun.sgs.impl.service.nodemap.affinity";
+    /** Our logger. */
+    protected static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(PROP_NAME));
+    
+    /** The graph of object accesses. */
     private final CopyableGraph<Object, WeightedEdge>
         bipartiteGraph = 
             new CopyableGraph<Object, WeightedEdge>();
 
-    // Our recorded cross-node accesses.  We keep track of this through
-    // conflicts detected in data cache kept across nodes;  when a
-    // local node is evicted from the cache because of a request from another
-    // node for it, we are told of the eviction.
-    // Map of object to map of remote nodes it was accessed on, with a weight
-    // for each node.
+    /** Our recorded cross-node accesses.  We keep track of this through
+     * conflicts detected in data cache kept across nodes;  when a
+     * local node is evicted from the cache because of a request from another
+     * node for it, we are told of the eviction.
+     * Map of object to map of remote nodes it was accessed on, with a weight
+     * for each node.
+     */
     private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
         conflictMap =
             new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
 
-    // The TimerTask which prunes our data structures over time.  As the data
-    // structures above are modified, the pruneTask notes the ways they have
-    // changed.  Groups of changes are chunked into periods, each the length
-    // of the time snapshot (configured at construction time). We
-    // periodically remove the changes made in the earliest snapshot.
+    /** The TimerTask which prunes our data structures over time.  As the data
+     * structures above are modified, the pruneTask notes the ways they have
+     * changed.  Groups of changes are chunked into periods, each the length
+     * of the time snapshot (configured at construction time). We
+     * periodically remove the changes made in the earliest snapshot.
+     */
     private final PruneTask pruneTask;
 
-    // Our JMX exposed information
+    /** Our JMX exposed information. */
     private final AffinityGraphBuilderStats stats;
 
-    // Our label propagation algorithm parts:  there is a different piece
-    // on the core server node.
+    // The instantiated algorithm parts.
+    /** The core server node portion or null if not valid. */
     private final LabelPropagationServer lpaServer;
+    /** The app node portion or null if not valid. */
     private final LabelPropagation lpa;
     /**
      * Constructs a new bipartite graph builder.
@@ -131,7 +144,7 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }
         pruneTask = new PruneTask(periodCount);
         Timer pruneTimer = new Timer("AffinityGraphPruner", true);
@@ -262,7 +275,6 @@ public class BipartiteGraphBuilder implements GraphBuilder {
         return foldedGraph;
     }
 
-    /** {@inheritDoc} */
     /** {@inheritDoc} */
     public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
             getConflictMap()

@@ -34,7 +34,9 @@ import java.util.Set;
 public class AffinitySet implements AffinityGroup, Serializable {
     /** Serialization version. */
     private static final long serialVersionUID = 1L;
+    /** The identity of the affinity group. */
     private final long id;
+    /** The set of identities comprising the group. */
     private final HashSet<Identity> identities = new HashSet<Identity>();
 
     /**

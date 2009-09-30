@@ -29,7 +29,7 @@ public interface AffinityGroupFinder {
     /**
      * Finds affinity groups across all nodes in the Darkstar cluster.
      * If an error is encountered during a run, an empty collection is
-     * returned.  Errors include nodes not responding.
+     * returned.  Errors include nodes not responding to server requests.
      *
      * @return the affinity groups
      */

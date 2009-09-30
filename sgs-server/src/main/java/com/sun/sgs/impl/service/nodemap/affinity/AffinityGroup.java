@@ -25,7 +25,11 @@ import java.util.Set;
 /**
  * An affinity group in the system.  Affinity groups are sets of
  * identities that have formed a community.
- * 
+ * <p>
+ * Affinity groups have an identity.  Affinity groups cannot be compared
+ * between algorithm runs.  In particular, two groups found in separate runs
+ * which have the same affinity group identity cannot be assumed to be
+ * related in any way.
  */
 public interface AffinityGroup {
     /**

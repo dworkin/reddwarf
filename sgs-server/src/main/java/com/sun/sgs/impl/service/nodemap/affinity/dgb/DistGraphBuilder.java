@@ -25,37 +25,67 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractService;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- *  The portion of the distributed affinity graph builder which resides on
- *  a local node.  This code forwards graph information to its server,
- *  which builds a single large graph for all information in the system.
+ * The portion of the distributed affinity graph builder which resides on
+ * a local node.  This code forwards graph information to its server,
+ * which builds a single large graph for all information in the system.
+ * <p>
+ * If the server cannot be contacted, we report the failure to the watchdog.
  */
 public class DistGraphBuilder implements BasicGraphBuilder {
-    // Our package name 
-    private static final String PKG_NAME =
+    /** Our property base name. */
+    private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
-    // The property name for the server host
+    /** The property name for the server host. */
     private static final String SERVER_HOST_PROPERTY =
-            PKG_NAME + ".server.host";
+            PROP_NAME + ".server.host";
 
-    // The remote server, or null if we're on the core server node
+    /** Our logger. */
+    protected static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(PROP_NAME));
+
+    /** The default number of IO task retries **/
+    private static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
+    /** The default time interval to wait between IO task retries **/
+    private static final int DEFAULT_RETRY_WAIT_TIME = 100;
+
+    /** The time (in milliseconds) to wait between retries for IO
+     * operations.
+     */
+    private final int retryWaitTime;
+
+    /** The maximum number of retry attempts for IO operations. */
+    private final int maxIoAttempts;
+
+    /** The remote server, or null if we're on the core server node. */
     private final DistGraphBuilderServer server;
-    // The server implementation, or null if we're on an app node
+    /** The server implementation, or null if we're on an app node. */
     private final DistGraphBuilderServerImpl serverImpl;
+
+    /** The watchdog service. */
+    private final WatchdogService watchdogService;
+    /** Our local node id. */
+    private final long localNodeId;
 
     /**
      * Creates the client side of a distributed graph builder.
@@ -73,6 +103,17 @@ public class DistGraphBuilder implements BasicGraphBuilder {
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+
+        watchdogService = txnProxy.getService(WatchdogService.class);
+
+        retryWaitTime = wrappedProps.getIntProperty(
+                AbstractService.IO_TASK_WAIT_TIME_PROPERTY,
+                DEFAULT_RETRY_WAIT_TIME, 0, Integer.MAX_VALUE);
+        maxIoAttempts = wrappedProps.getIntProperty(
+                AbstractService.IO_TASK_RETRIES_PROPERTY,
+                DEFAULT_MAX_IO_ATTEMPTS, 0, Integer.MAX_VALUE);
+
+        localNodeId = nodeId;
 
         NodeType nodeType =
                 wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE,
@@ -103,18 +144,17 @@ public class DistGraphBuilder implements BasicGraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
-        Object[] ids = new Object[detail.getAccessedObjects().size()];
+    public void updateGraph(final Identity owner, AccessedObjectsDetail detail)
+    {
+        final Object[] ids = new Object[detail.getAccessedObjects().size()];
         int index = 0;
         for (AccessedObject access : detail.getAccessedObjects()) {
             ids[index++] = access.getObjectId();
         }
-        try {
-            server.updateGraph(owner, ids);
-        } catch (IOException e) {
-            // jane retry
-            System.out.println(e);
-        }
+        runIoTask(new IoRunnable() {
+                    public void run() throws IOException {
+                        server.updateGraph(owner, ids);
+                    } }, localNodeId);
     }
 
     /**
@@ -144,5 +184,48 @@ public class DistGraphBuilder implements BasicGraphBuilder {
     /** {@inheritDoc} */
     public Runnable getPruneTask() {
         throw new UnsupportedOperationException("pruning not yet implemented");
+    }
+
+    /**
+     * Executes the specified {@code ioTask} by invoking its {@link
+     * IoRunnable#run run} method. If the specified task throws an
+     * {@code IOException}, this method will retry the task for a fixed
+     * number of times. The method will stop retrying if the node with
+     * the given {@code nodeId} is no longer alive. The number of retries
+     * and the wait time between retries are configurable properties.
+     *
+     * @param ioTask a task with IO-related operations
+     * @param nodeId the node that is the target of the IO operations
+     */
+    private void runIoTask(IoRunnable ioTask, long nodeId) {
+        int maxAttempts = maxIoAttempts;
+        do {
+            try {
+                ioTask.run();
+                return;
+            } catch (IOException e) {
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.logThrow(Level.FINEST, e,
+                            "IoRunnable {0} throws", ioTask);
+                }
+                if (maxAttempts-- == 0) {
+                    logger.logThrow(Level.WARNING, e,
+                            "A communication error occured while running an" +
+                            "IO task. Reporting node {0} as failed.", nodeId);
+
+                    // Report failure of remote node since are
+                    // having trouble contacting it
+                    watchdogService.
+                            reportFailure(nodeId, this.getClass().toString());
+
+                    break;
+                }
+                try {
+                    // TBD: what back-off policy do we want here?
+                    Thread.sleep(retryWaitTime);
+                } catch (InterruptedException ie) {
+                }
+            }
+        } while (watchdogService.isLocalNodeAliveNonTransactional());
     }
 }

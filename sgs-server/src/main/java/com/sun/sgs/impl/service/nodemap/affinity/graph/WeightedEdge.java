@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * An edge with an associated weight.
  */
 public class WeightedEdge {
+    /** The weight. */
     private final AtomicLong weight;
 
     /**

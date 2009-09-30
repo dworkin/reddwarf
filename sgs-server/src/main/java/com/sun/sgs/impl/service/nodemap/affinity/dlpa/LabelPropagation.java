@@ -49,45 +49,54 @@ import java.util.logging.Level;
 /**
  * A distributed implementation of the algorithm presented in
  * "Near linear time algorithm to detect community structures in large-scale
- * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007
+ * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007.
+ * <p>
+ * This is the portion of code that is on each application node.
  */
 public class LabelPropagation extends AbstractLPA implements LPAClient {
-    // The property name for the server host
-    static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
+    /** The property name for the server host. */
+    static final String SERVER_HOST_PROPERTY = PROP_NAME + ".server.host";
 
-    // The server : our master
+    /** The server : our master. */
     private final LPAServer server;
-    
-    // A map of cached nodeId->LPAClient
+
+    /** Our graph builder, which provides us with our input. */
+    private final GraphBuilder builder;
+
+    /** A map of cached nodeId->LPAClient.  The contents of this map
+     * can change.
+     */
     private final Map<Long, LPAClient> nodeProxies = 
             new ConcurrentHashMap<Long, LPAClient>();
 
-    // The exporter
+    /** Our exporter. */
     private final Exporter<LPAClient> clientExporter;
 
-    // Lock to ensure we aren't modifying the vertices list at the same
-    // time we're processing an asynchronous call from another node.
+    /** Lock to ensure we aren't modifying the vertices list at the same
+     * time we're processing an asynchronous call from another node.
+     */
     private final Object verticesLock = new Object();
 
-    // The map of conflicts in the system, nodeId->objId, count
-    // Updates are multi-threaded.
+    /** The map of conflicts in the system, nodeId->objId, count.
+     * Updates are multi-threaded.
+     */
     private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
         nodeConflictMap =
             new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
 
-    // Map identity -> label and count
-    // This sums all uses of that identity on other nodes. The count takes
-    // weights for object uses into account.
-    // Updates are currently single threaded, node by node.
+    /** Map of identity -> label and count
+     * This sums all uses of that identity on other nodes. The count takes
+     * weights for object uses into account.
+     * Updates are currently single threaded, node by node.
+     */
     private final ConcurrentMap<Identity, Map<Integer, Long>>
         remoteLabelMap =
             new ConcurrentHashMap<Identity, Map<Integer, Long>>();
 
-    // Synchronization for state, runNumber, and iteration
-    private final Object stateLock = new Object();
 
-    // States of this instance, ensuring that calls from the server are
-    // idempotent
+    /** States of this instance, ensuring that calls from the server are
+     * idempotent.
+     */
     private enum State {
         // Preparing for an algorithm run
         PREPARING,
@@ -104,18 +113,21 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     /** The current state of this instance. */
     private State state = State.IDLE;
 
-    // The current algorithm run number, used to ensure we're returning
-    // values for the correct algorithm run.
+    /** The current algorithm run number, used to ensure we're returning
+     * values for the correct algorithm run.
+     */
     private volatile long runNumber = -1;
 
-    // The current iteration being run, used to detect multiple calls
-    // for an iteration.
+    /** The current iteration being run, used to detect multiple calls
+     * for an iteration.
+     */
     private volatile int iteration = -1;
 
-    // The groups collected in the last run
-    private Collection<AffinityGroup> groups;
+    /** Synchronization for state, runNumber, and iteration. */
+    private final Object stateLock = new Object();
 
-    private final GraphBuilder builder;
+    /** The groups collected in the last run. */
+    private Collection<AffinityGroup> groups;
 
     /**
      * Constructs a new instance of the label propagation algorithm.
@@ -238,6 +250,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         new Thread(pr, name).start();
     }
 
+    /**
+     * Private class for running asynchronous method.
+     */
     private class PrepareRun implements Runnable {
         final long run;
         PrepareRun(long run) {
@@ -395,6 +410,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         new Thread(ir, name).start();
     }
 
+    /**
+     * Private class for running asynchronous method.
+     */
     private class IterationRun implements Runnable {
         final int iter;
         IterationRun(int iter) {

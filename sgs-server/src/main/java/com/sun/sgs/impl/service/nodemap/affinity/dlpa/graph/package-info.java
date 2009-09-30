@@ -19,7 +19,7 @@
 
 /**
  * Provides classes used to create the graphs for the fully distributed
- * label propagation algorithm implementation
+ * label propagation algorithm implementation.
  */
 package com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph;
 

@@ -26,6 +26,7 @@ import
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
@@ -43,6 +44,8 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
@@ -50,30 +53,40 @@ import javax.management.JMException;
  * of the WeightedGraphBuilder, with the parts about node conflicts deleted.
  */
 public class SingleGraphBuilder implements BasicGraphBuilder {
-    // Map for tracking object-> map of identity-> number accesses
-    // (thus we keep track of the number of accesses each identity has made
-    // for an object, to aid maintaining weighted edges)
-    // Concurrent modifications are protected by locking the affinity graph
+    /** Our property base name. */
+    private static final String PROP_NAME =
+            "com.sun.sgs.impl.service.nodemap.affinity";
+    /** Our logger. */
+    protected static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(PROP_NAME));
+
+    /** Map for tracking object-> map of identity-> number accesses
+     * (thus we keep track of the number of accesses each identity has made
+     * for an object, to aid maintaining weighted edges)
+     * Concurrent modifications are protected by locking the affinity graph.
+     */
     private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
         objectMap =
            new ConcurrentHashMap<Object, ConcurrentMap<Identity, AtomicLong>>();
 
-    // Our graph of object accesses
+    /** Our graph of object accesses. */
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
         affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
-    // The TimerTask which prunes our data structures over time.  As the data
-    // structures above are modified, the pruneTask notes the ways they have
-    // changed.  Groups of changes are chunked into periods, each the length
-    // of the time snapshot (configured at construction time). We
-    // periodically remove the changes made in the earliest snapshot.
+    /** The TimerTask which prunes our data structures over time.  As the data
+     * structures above are modified, the pruneTask notes the ways they have
+     * changed.  Groups of changes are chunked into periods, each the length
+     * of the time snapshot (configured at construction time). We
+     * periodically remove the changes made in the earliest snapshot.
+     */
     private final PruneTask pruneTask;
 
-    // Our JMX exposed information
+    /** Our JMX exposed information. */
     private final AffinityGraphBuilderStats stats;
 
-    // Our label propagation algorithm
+    /** Our label propagation algorithm. */
     private final SingleLabelPropagation lpa;
+    
     /**
      * Creates a weighted graph builder.
      * @param col the profile collector
@@ -103,7 +116,7 @@ public class SingleGraphBuilder implements BasicGraphBuilder {
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }
         pruneTask = new PruneTask(periodCount);
         Timer pruneTimer = new Timer("AffinityGraphPruner", true);

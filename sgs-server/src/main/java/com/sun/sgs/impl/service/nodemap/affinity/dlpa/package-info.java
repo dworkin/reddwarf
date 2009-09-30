@@ -28,9 +28,13 @@
  * object uses.  The builders also are notified of data cache conflicts,
  * as reported by the caching data store.
  * <p>
- * The algorithm is driven by the core server node, which instructs each
- * node when to start an algorithm run and synchronizes each iteration of
- * the algorithm.
+ * The algorithm is driven by the 
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAServer}, which
+ * instructs each
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient} when to
+ * start an algorithm run and synchronizes each iteration of the algorithm.
+ * Information about affinity groups are communicated as the serializable
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet}.
  * <p>
  * Affinity groups returned by this implementation are of type
  * {@link com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup

@@ -51,6 +51,8 @@ public final class AffinityGroupGoodness {
      * See "Finding community structure in networks using eigenvectors
      * of matrices" 2006 Mark Newman and "Finding community structure in
      * very large networks" 2004 Clauset, Newman, Moore.
+     * <p>
+     * Note that modularity can only be calculated on a complete graph.
      *
      * @param graph the graph which was devided into communities
      * @param groups the communities found in the graph
@@ -119,11 +121,14 @@ public final class AffinityGroupGoodness {
     }
 
     /**
-     * Calculates Jaccard's index for a pair of affinity groups, which is
-     * a measurement of similarity.  The value will be between {@code 0.0}
-     * and {@code 1.0}, with higher values indicating stronger similarity
-     * between two samples.
-     *
+     * Calculates Jaccard's index for a pair of affinity group collections,
+     * which is a measurement of similarity of the groups found in the two
+     * collections.  The value will be between {@code 0.0} and {@code 1.0},
+     * with higher values indicating stronger similarity between two samples.
+     * <p>
+     * Because Jaccard's index uses computed groups, rather than a graph,
+     * it can be useful when the graphs are distributed or incomplete.
+     * <p>
      * @param sample1 the first sample
      * @param sample2 the second sample
      * @return the Jaccard index, a value between {@code 0.0} and {@code 1.0},
@@ -176,10 +181,18 @@ public final class AffinityGroupGoodness {
         return ((double) a / (double) (a + b + c));
     }
 
+    /**
+     * Returns {@code true} if two identities are in the same
+     * {@code AffinityGroup} in a given affinity group collection.
+     * @param id1 the first identity
+     * @param id2 the second identity
+     * @param sample the affinity group collection
+     * @return
+     */
     private static boolean inSameGroup(Identity id1, Identity id2,
-                                       Collection<AffinityGroup> group)
+                                       Collection<AffinityGroup> sample)
     {
-        for (AffinityGroup g : group) {
+        for (AffinityGroup g : sample) {
             Set<Identity> idents = g.getIdentities();
             if (idents.contains(id1) && idents.contains(id2)) {
                 return true;

@@ -30,6 +30,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.BasicGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
@@ -53,6 +54,8 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
@@ -67,11 +70,15 @@ import javax.management.JMException;
 public class DistGraphBuilderServerImpl 
     implements DistGraphBuilderServer, BasicGraphBuilder, AffinityGroupFinder
 {
-    // Our package name
-    private static final String PKG_NAME =
+    /** Our property base name. */
+    private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
     /** The property name for the server port. */
-    public static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
+    public static final String SERVER_PORT_PROPERTY =
+            PROP_NAME + ".server.port";
+    /** Our logger. */
+    protected static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(PROP_NAME));
 
     /** The default value of the server port. */
     public static final int DEFAULT_SERVER_PORT = 44537;
@@ -80,35 +87,37 @@ public class DistGraphBuilderServerImpl
     public static final String SERVER_EXPORT_NAME = 
             "DistributedGraphBuilderServer";
 
-    // The exporter for this server
+    /** The exporter for this server. */
     private final Exporter<DistGraphBuilderServer> exporter;
 
-    // Map for tracking object-> map of identity-> number accesses
-    // (thus we keep track of the number of accesses each identity has made
-    // for an object, to aid maintaining weighted edges)
-    // Concurrent modifications are protected by locking the affinity graph
+    /**  Map for tracking object-> map of identity-> number accesses
+     * (thus we keep track of the number of accesses each identity has made
+     * for an object, to aid maintaining weighted edges)
+     * Concurrent modifications are protected by locking the affinity graph.
+     */
     private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
         objectMap =
            new ConcurrentHashMap<Object, ConcurrentMap<Identity, AtomicLong>>();
 
-    // Our graph of object accesses
+    /** Our graph of object accesses.*/
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
         affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
-    // Our label propagation algorithm
+    /** Our label propagation algorithm. */
     private final SingleLabelPropagation lpa;
 
-    // The transaction scheduler.
+    /** The transaction scheduler. */
     private final TransactionScheduler transactionScheduler;
 
-    // The task owner.
+    /** The task owner. */
     private final Identity taskOwner;
 
-    // The supporting node mapping service.
+    /** The supporting node mapping service. */
     private final NodeMappingService nms;
 
-    // Our JMX exposed information.  The group finder stats is held
-    // in {@code lpa}.
+    /** Our JMX exposed information.  The group finder stats is held
+     * in {@code lpa}.
+     */
     private final AffinityGraphBuilderStats builderStats;
 
     /**
@@ -152,7 +161,7 @@ public class DistGraphBuilderServerImpl
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }
         // Create the LPA algorithm, telling it to use our group finder MBean.
         lpa = new SingleLabelPropagation(this, col, properties, stats);
@@ -241,8 +250,8 @@ public class DistGraphBuilderServerImpl
         throw new UnsupportedOperationException("pruning not yet implemented");
     }
 
-
     // Implement Affinity Group Finder
+
     /** {@inheritDoc} */
     public Collection<AffinityGroup> findAffinityGroups() {
         Collection<AffinityGroup> groups = lpa.findAffinityGroups();
@@ -270,12 +279,12 @@ public class DistGraphBuilderServerImpl
 
     /** {@inheritDoc} */
     public void removeNode(long nodeId) {
-        // do nothing
+        // do nothing, the server never contacts clients
     }
 
     /**
      *  Run the given task synchronously, and transactionally, retrying
-     *  if the exception is of type <@code ExceptionRetryStatus>.
+     *  if the exception is of type {@code ExceptionRetryStatus}.
      * @param task the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {
@@ -283,8 +292,7 @@ public class DistGraphBuilderServerImpl
     }
 
     /**
-     * This is a transactional task to obtain the node assignment for
-     * a given identity.
+     * A transactional task to obtain the node assignment for a given identity.
      */
     private class GetNodeTask extends AbstractKernelRunnable {
 

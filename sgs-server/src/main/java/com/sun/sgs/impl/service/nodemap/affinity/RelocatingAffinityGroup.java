@@ -27,8 +27,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 /**
- * Affinity group.  Key ideas swiped from Keith's branch to help us with
- * merging.
+ * An ffinity group which can relocate its member identities to other nodes.
+ * Key ideas swiped from Keith's branch to help us with merging.
  * <p>
  * These affinity groups can span multiple nodes and will eventually
  * relocate their members to a single node.  There probably needs to be
