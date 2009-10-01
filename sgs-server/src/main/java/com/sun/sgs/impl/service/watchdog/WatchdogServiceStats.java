@@ -43,6 +43,7 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     final ProfileOperation getBackupOp;
     final ProfileOperation getNodeOp;
     final ProfileOperation getNodesOp;
+    final ProfileOperation getLocalNodeHealthOp;
     final ProfileOperation isLocalNodeAliveOp;
     final ProfileOperation isLocalNodeAliveNonTransOp;
     
@@ -65,6 +66,8 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
             consumer.createOperation("getNode", type, level);
         getNodesOp =
             consumer.createOperation("getNodes", type, level);
+        getLocalNodeHealthOp =
+            consumer.createOperation("getLocalNodeHealth", type, level);
         isLocalNodeAliveOp =
             consumer.createOperation("isLocalNodeAlive", type, level);
         isLocalNodeAliveNonTransOp =
@@ -96,7 +99,12 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     public long getGetNodesCalls() {
         return ((AggregateProfileOperation) getNodesOp).getCount();
     }
-        
+
+    /** {@inheritDoc} */
+    public long getGetLocalNodeHealthCalls() {
+        return ((AggregateProfileOperation) getLocalNodeHealthOp).getCount();
+    }
+
     /** {@inheritDoc} */
     public long getIsLocalNodeAliveCalls() {
         return ((AggregateProfileOperation) isLocalNodeAliveOp).getCount();

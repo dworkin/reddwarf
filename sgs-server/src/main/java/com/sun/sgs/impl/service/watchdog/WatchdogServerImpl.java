@@ -31,6 +31,7 @@ import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.NodesMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -502,7 +503,16 @@ public final class WatchdogServerImpl
     /**
      * {@inheritDoc}
      */
-    public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
+    public void setNodeHealth(long nodeId, boolean isLocal,
+                              Health health, String component,
+                              int maxNumberOfAttempts)
+    {
+        if (!health.isAlive()) {
+            setNodeAsFailed(nodeId, isLocal, component, maxNumberOfAttempts);
+        }
+    }
+
+    private void setNodeAsFailed(long nodeId, boolean isLocal, String className,
             int maxNumberOfAttempts)
     {
         NodeImpl remoteNode = aliveNodes.get(nodeId);

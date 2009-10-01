@@ -25,6 +25,7 @@ package com.sun.sgs.service;
 
 import java.util.Iterator;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.service.Node.Health;
 
 /**
  * The {@code WatchdogService} monitors the health of server nodes and
@@ -33,6 +34,16 @@ import com.sun.sgs.app.TransactionException;
  * backup and recovery.
  */
 public interface WatchdogService extends Service {
+
+    /**
+     * Returns the health of the local node.  This method should only be
+     * called from within a transaction.
+     *
+     * @return	the health of the local node
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    Health getLocalNodeHealth();
 
     /**
      * Returns {@code true} if the local node is considered alive,
@@ -144,17 +155,35 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
 
     /**
-     * Informs the watchdog that a problem has occured in a service or
-     * component. The watchdog will notify the server of the failure and
-     * then proceeed to shutting down the node. The node specified as the
-     * {@code nodeId} can be a local node or a remote node. <p>
+     * Informs the watchdog of a node's health. Multiple components may report
+     * on a node's health. The watchdog will use these reports to determine the
+     * overall node's health. The node specified as the {@code nodeId} can be
+     * the local node or a remote node. The {@code component} parameter may be
+     * any identifying string, but is typically the class name of the component.
+     * <p>
      *
      * This method must be invoked outside of a transaction.
-     * 
+     *
+     * @param nodeId the id of the node
+     * @param health the health
+     * @param component the name of the component reporting health
+     */
+    void reportHealth(long nodeId, Health health, String component);
+
+    /**
+     * Informs the watchdog that a problem has occurred in a service or
+     * component. The watchdog will notify the server of the failure and
+     * then proceed to shutting down the node. The node specified as the
+     * {@code nodeId} can be the local node or a remote node. The
+     * {@code component} parameter may be any identifying string, but is
+     * typically the class name of the component.<p>
+     *
+     * This method must be invoked outside of a transaction.
+     *
      * @param nodeId the id of the node to shutdown
-     * @param className the class name of the service that failed
+     * @param component the name of the component that failed
      * @throws	IllegalStateException if this method is invoked from a
      *		transactional context
      */
-    void reportFailure(long nodeId, String className);
+    void reportFailure(long nodeId, String component);
 }
