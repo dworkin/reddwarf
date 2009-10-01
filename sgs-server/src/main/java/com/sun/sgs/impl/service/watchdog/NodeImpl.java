@@ -333,6 +333,21 @@ class NodeImpl
     }
 
     /**
+     * Sets the health of this node instance.
+     *
+     * @param dataService a data service
+     * @param newHealth the new health of this node
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    synchronized void setHealth(DataService dataService, Health newHealth) {
+	NodeImpl nodeImpl = getForUpdate(dataService);
+	this.health = newHealth;
+	nodeImpl.health = newHealth;
+    }
+
+    /**
      * Adds the specified {@code primaryId} to the list of primaries
      * for which this node is a backup, and updates the node's state
      * in the specified {@code dataService}.

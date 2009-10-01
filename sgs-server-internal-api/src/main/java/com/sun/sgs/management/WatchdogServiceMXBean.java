@@ -79,7 +79,15 @@ public interface WatchdogServiceMXBean {
      * @return the number of times {@code getNodes} has been called
      */
     long getGetNodesCalls();
-        
+
+    /**
+     * Returns the number of times {@link WatchdogService#getLocalNodeHealth
+     * getLocalNodeHealth} has been called.
+     *
+     * @return the number of times {@code getLocalNodeHealth} has been called
+     */
+    public long getGetLocalNodeHealthCalls();
+
     /**
      * Returns the number of times {@link WatchdogService#isLocalNodeAlive 
      * isLocalNodeAlive} has been called.

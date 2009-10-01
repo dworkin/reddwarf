@@ -37,6 +37,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
@@ -425,7 +426,58 @@ public class TestWatchdogServiceImpl extends Assert {
 	new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy,
 				dummyShutdownCtrl);  
     }
-    
+
+    /* -- Test getLocalNodeHealth -- */
+
+    @Test public void testGetLocalNodeHealth() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                checkHealth(watchdogService, Health.GREEN);
+            }
+        }, taskOwner);
+
+	DataService dataService = createDataService(serviceProps);
+	final WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy,
+				    dummyShutdownCtrl);
+	try {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() throws Exception {
+                    checkHealth(watchdogService, Health.GREEN);
+                }
+            }, taskOwner);
+
+	    watchdogService.shutdown();
+	    // wait for watchdog's renew to fail...
+	    Thread.sleep(renewTime * 4);
+
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() throws Exception {
+                    checkHealth(watchdog, Health.RED);
+                }
+            }, taskOwner);
+
+	} finally {
+	    watchdog.shutdown();
+	    dataService.shutdown();
+	}
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testGetLocalNodeHealthServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy, dummyShutdownCtrl);
+	watchdog.shutdown();
+	watchdog.getLocalNodeHealth();
+    }
+
+    @Test(expected = TransactionNotActiveException.class)
+    public void testGetLocalNodeHealthNoTransaction() throws Exception {
+	watchdogService.getLocalNodeHealth();
+    }
+
     /* -- Test isLocalNodeAlive -- */
 
     @Test public void testIsLocalNodeAlive() throws Exception {
@@ -447,7 +499,7 @@ public class TestWatchdogServiceImpl extends Assert {
                 public void run() throws Exception {
                     if (! watchdogService.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
-                          "to return true");
+                             "to return true");
                     }
                 }
             }, taskOwner);
@@ -460,7 +512,7 @@ public class TestWatchdogServiceImpl extends Assert {
                 public void run() throws Exception {
                     if (watchdog.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
-                          "to return false");
+                             "to return false");
                     }
                 }
             }, taskOwner);
@@ -541,6 +593,51 @@ public class TestWatchdogServiceImpl extends Assert {
 	    public void run() {
 		watchdogService.isLocalNodeAliveNonTransactional();
 	    }}, taskOwner);
+    }
+
+    /* -- Test reportHealth -- */
+
+    @Test public void testReportHealth() throws Exception {
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+        
+        checkHealth(watchdogService, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "A");
+        checkHealth(watchdogService, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.ORANGE, "B");
+        checkHealth(watchdogService, Health.ORANGE);
+        watchdogService.reportHealth(nodeId, Health.ORANGE, "C");
+        checkHealth(watchdogService, Health.ORANGE);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "B");
+        checkHealth(watchdogService, Health.ORANGE);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "C");
+        checkHealth(watchdogService, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkHealth(watchdogService, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "C");
+        checkHealth(watchdogService, Health.GREEN);
+    }
+
+    // Utility method to check that that the reported health matches the
+    // expected health value
+    private void checkHealth(final WatchdogService watchdog,
+                             final Health expected)
+        throws Exception
+    {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                Health health = watchdog.getLocalNodeHealth();
+
+                if (health == null) {
+                    fail("Expected WatchdogService.getLocalNodeHealth() " +
+                          "to return non-null health");
+                }
+                if (!health.equals(expected)) {
+                    fail("Expected WatchdogService.getLocalNodeHealth() " +
+                          "to return: " + expected +
+                          ", instead received: " + health);
+                }
+            }
+        }, taskOwner);
     }
 
     /* -- Test getNodes -- */
