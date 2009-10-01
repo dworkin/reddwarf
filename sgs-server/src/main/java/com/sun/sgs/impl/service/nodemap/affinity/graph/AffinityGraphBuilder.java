@@ -91,7 +91,7 @@ public interface AffinityGraphBuilder {
      *
      * @param owner  the task owner (the object making the accesses)
      * @param detail detailed information about the object accesses, including
-     * a list of the accessed objects
+     *               a list of the accessed objects
      * @throws UnsupportedOperationException if this builder cannot access
      *      the affinity graph.  Typically, this occurs because the builder
      *      itself is distributed.

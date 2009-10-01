@@ -25,7 +25,6 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
@@ -128,6 +127,10 @@ public class GraphBuilderTests {
     }
 
     protected void startNewNode(Properties addProps) throws Exception {
+        if (node != null) {
+            node.shutdown(false);
+            node = null;
+        }
         props = getProps(serverNode);
         for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
             props.put(entry.getKey(), entry.getValue());
@@ -435,7 +438,7 @@ public class GraphBuilderTests {
     public void testGraphPrunerCountTwo() throws Exception {
         node.shutdown(false);
         Properties p = new Properties();
-        p.setProperty(DLPAGraphBuilder.PERIOD_COUNT_PROPERTY, "2");
+        p.setProperty(AffinityGraphBuilder.PERIOD_COUNT_PROPERTY, "2");
         startNewNode(p);
 
         LabelVertex vertA = new LabelVertex(new IdentityImpl("A"));
@@ -575,12 +578,12 @@ public class GraphBuilderTests {
 
     @Test(expected=IllegalArgumentException.class)
     public void testGraphBuilderBadCount() throws Exception {
+        Properties p = new Properties();
         props = getProps(serverNode);
-        props.setProperty(DLPAGraphBuilder.PERIOD_COUNT_PROPERTY, "0");
+        p.setProperty(AffinityGraphBuilder.PERIOD_COUNT_PROPERTY, "0");
 
-        SgsTestNode newNode = null;
         try {
-            newNode = new SgsTestNode(serverNode, null, props);
+            startNewNode(p);
         } catch (InvocationTargetException e) {
             // Try to unwrap any nested exceptions - they will be wrapped
             // because the kernel instantiating via reflection
@@ -592,10 +595,6 @@ public class GraphBuilderTests {
                 throw (Exception) cause;
             } else {
                 throw e;
-            }
-        } finally {
-            if (newNode != null) {
-                newNode.shutdown(false);
             }
         }
     }

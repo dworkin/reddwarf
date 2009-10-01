@@ -29,10 +29,9 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.Properties;
 import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /**
@@ -79,6 +78,14 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
 
     @Override
     protected void startNewNode(Properties addProps) throws Exception {
+        // Our "node" is really the core server node, so we need to stop
+        // and start it.
+        super.afterEachTest();
+        props = getProps(null);
+        for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
+            props.put(entry.getKey(), entry.getValue());
+        }
+        serverNode = new SgsTestNode(appName, null, props);
         super.startNewNode(addProps);
         GraphListener coreListener = (GraphListener)
                 graphListenerField.get(serverNode.getNodeMappingService());
@@ -100,29 +107,5 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
         p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY,
                       DistGraphBuilder.class.getName());
         return p;
-    }
-
-    @Ignore
-    @Test
-    @Override
-    public void testGraphPruner() throws Exception {
-        // this variation doesn't support pruning yet
-        super.testGraphPruner();
-    }
-
-    @Ignore
-    @Test
-    @Override
-    public void testGraphPrunerCountTwo() throws Exception {
-        // this variation doesn't support pruning yet
-        super.testGraphPrunerCountTwo();
-    }
-
-    @Ignore
-    @Test
-    @Override
-    public void testGraphBuilderBadCount() throws Exception {
-        // this variation doesn't support pruning yet so we don't parse the arg
-        super.testGraphBuilderBadCount();
     }
 }

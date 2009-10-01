@@ -24,11 +24,12 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
+import com.sun.sgs.impl.service.nodemap.affinity.single.SingleGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -59,13 +60,10 @@ import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
- *  The server side of a distributed graph builder for label propagation.
- *  It builds a single graph representing all information for the entire
- *  system, and uses a single node label propagation implementation to
- *  process the graph.
- *  <p>
- * NOTE:  this version does not support graph pruning.
- * 
+ * The server side of a distributed graph builder for label propagation.
+ * It builds a single graph representing all information for the entire
+ * system using the single node graph builder, and uses a single node label
+ * propagation implementation to process the graph.
  */
 public class DistGraphBuilderServerImpl 
     implements DistGraphBuilderServer, AffinityGraphBuilder, AffinityGroupFinder
@@ -103,6 +101,9 @@ public class DistGraphBuilderServerImpl
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
         affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
+    /** Our backing builder. */
+    private final SingleGraphBuilder builder;
+
     /** Our label propagation algorithm. */
     private final SingleLabelPropagation lpa;
 
@@ -126,12 +127,14 @@ public class DistGraphBuilderServerImpl
      * @param txnProxy the transaction proxy
      * @param nms the node mapping service currently being created
      * @param properties  application properties
+     * @param nodeId the core server node id
      * @throws Exception if an error occurs
      */
     DistGraphBuilderServerImpl(ComponentRegistry systemRegistry,
                                TransactionProxy txnProxy,
                                NodeMappingService nms,
-                               Properties properties)
+                               Properties properties,
+                               long nodeId)
             throws Exception
     {
         transactionScheduler =
@@ -139,21 +142,27 @@ public class DistGraphBuilderServerImpl
 	this.nms = nms;
 	taskOwner = txnProxy.getCurrentOwner();
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        int requestedPort = wrappedProps.getIntProperty(
-                SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
-        // Export ourself.
-        exporter =
-            new Exporter<DistGraphBuilderServer>(DistGraphBuilderServer.class);
-        exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
 
         ProfileCollector col =
                 systemRegistry.getComponent(ProfileCollector.class);
+        // Create our backing graph builder.  We wrap this object so we
+        // can return a different type from findAffinityGroups.
+        builder = new SingleGraphBuilder(col, properties, nodeId, false);
+ 
         // Create our group finder and graph builder JMX MBeans
         AffinityGroupFinderStats stats =
                 new AffinityGroupFinderStats(this, col, -1);
-        // Use -1 for period count and snapshot, as not yet implemented.
-        builderStats = new AffinityGraphBuilderStats(col, affinityGraph,
-                                                     -1, -1);
+
+        int periodCount = wrappedProps.getIntProperty(
+                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
+                1, Integer.MAX_VALUE);
+        long snapshot =
+            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        builderStats = new AffinityGraphBuilderStats(col,
+                                                     builder.getAffinityGraph(),
+                                                     periodCount, snapshot);
+        // We must set the stats before exporting ourself!
+        builder.setStats(builderStats);
         try {
             col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
             col.registerMBean(builderStats,
@@ -165,74 +174,29 @@ public class DistGraphBuilderServerImpl
         }
         // Create the LPA algorithm, telling it to use our group finder MBean.
         lpa = new SingleLabelPropagation(this, col, properties, stats);
+
+        int requestedPort = wrappedProps.getIntProperty(
+                SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
+        // Export ourself.
+        exporter =
+            new Exporter<DistGraphBuilderServer>(DistGraphBuilderServer.class);
+        exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
     }
+
+    // Implement DistGraphBuilderServer
 
     /** {@inheritDoc} */
     public void updateGraph(Identity owner, Object[] objIds) {
-        long startTime = System.currentTimeMillis();
-        builderStats.updateCountInc();
-
-        LabelVertex vowner = new LabelVertex(owner);
-
-        // For each object accessed in this task...
-        for (Object objId : objIds) {
-            // find the identities that have already used this object
-            ConcurrentMap<Identity, AtomicLong> idMap = objectMap.get(objId);
-            if (idMap == null) {
-                // first time we've seen this object
-                ConcurrentMap<Identity, AtomicLong> newMap =
-                        new ConcurrentHashMap<Identity, AtomicLong>();
-                idMap = objectMap.putIfAbsent(objId, newMap);
-                if (idMap == null) {
-                    idMap = newMap;
-                }
-            }
-            AtomicLong value = idMap.get(owner);
-            if (value == null) {
-                AtomicLong newVal = new AtomicLong();
-                value = idMap.putIfAbsent(owner, newVal);
-                if (value == null) {
-                    value = newVal;
-                }
-            }
-            long currentVal = value.incrementAndGet();
-
-            synchronized (affinityGraph) {
-                affinityGraph.addVertex(vowner);
-                // add or update edges between task owner and identities
-                for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
-                    Identity ident = entry.getKey();
-
-                    // Our folded graph has no self-loops:  only add an
-                    // edge if the identity isn't the owner
-                    if (!ident.equals(owner)) {
-                        LabelVertex vident = new LabelVertex(ident);
-                        // Check to see if we already have an edge between
-                        // the two vertices.  If so, update its weight.
-                        WeightedEdge edge =
-                                affinityGraph.findEdge(vowner, vident);
-                        if (edge == null) {
-                            WeightedEdge newEdge = new WeightedEdge();
-                            affinityGraph.addEdge(newEdge, vowner, vident);
-                        } else {
-                            AtomicLong otherValue = entry.getValue();
-                            if (currentVal <= otherValue.get()) {
-                                edge.incrementWeight();
-                            }
-                        }
-                    }
-                }
-            }
-        }  // objId loop
-
-        builderStats.processingTimeInc(System.currentTimeMillis() - startTime);
+        builder.updateGraph(owner, objIds);
     }
 
     // Implement AffinityGraphBuilder
 
     /** {@inheritDoc} */
     public void shutdown() {
-        exporter.unexport();
+        // This method is in both AffinityGraphBuilder and AffinityGroupFinder
+        builder.shutdown();
+        lpa.shutdown();
     }
 
     /** {@inheritDoc} */
@@ -247,15 +211,15 @@ public class DistGraphBuilderServerImpl
 
     /** {@inheritDoc} */
     public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
-        return affinityGraph;
+        return builder.getAffinityGraph();
     }
 
     /** {@inheritDoc} */
     public Runnable getPruneTask() {
-        throw new UnsupportedOperationException("pruning not yet implemented");
+        return builder.getPruneTask();
     }
 
-    // Implement Affinity Group Finder
+    // Implement AffinityGroupFinder
 
     /** {@inheritDoc} */
     public Collection<AffinityGroup> findAffinityGroups() {

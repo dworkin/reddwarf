@@ -121,8 +121,8 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
                                              NodeType.singleNode);
         if (nodeType == NodeType.coreServerNode) {
             serverImpl = 
-                new DistGraphBuilderServerImpl(systemRegistry,
-                                               txnProxy, nms, properties);
+                new DistGraphBuilderServerImpl(systemRegistry, txnProxy, nms,
+                                               properties, nodeId);
             server = null;
         } else {
             String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,

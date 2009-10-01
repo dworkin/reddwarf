@@ -82,13 +82,13 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     private final PruneTask pruneTask;
 
     /** Our JMX exposed information. */
-    private final AffinityGraphBuilderStats stats;
+    private volatile AffinityGraphBuilderStats stats;
 
     /** Our label propagation algorithm. */
     private final SingleLabelPropagation lpa;
     
     /**
-     * Creates a weighted graph builder.
+     * Creates a weighted graph builder and its JMX MBean.
      * @param col the profile collector
      * @param properties  application properties
      * @param nodeId the local node id
@@ -96,6 +96,26 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
      */
     public SingleGraphBuilder(ProfileCollector col, Properties properties,
                                 long nodeId)
+        throws Exception
+    {
+        this(col, properties, nodeId, true);
+    }
+
+    /**
+     * Creates a weighted graph builder.  The JMX stats object may not be
+     * created; this is useful for wrapper objects to break object dependencies.
+     * If {@code needStats} is {@code false}, the stats object must be provided
+     * with a call to {@code setStats} or a {@code NullPointerException will
+     * be thrown on the first call to {@code updateGraph}.
+     * 
+     * @param col the profile collector
+     * @param properties  application properties
+     * @param nodeId the local node id
+     * @param needStats {@code true} if stats should be constructed
+     * @throws Exception if an error occurs
+     */
+    public SingleGraphBuilder(ProfileCollector col, Properties properties,
+                                long nodeId, boolean needStats)
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -108,16 +128,20 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         // Create the LPA algorithm
         lpa = new SingleLabelPropagation(this, col, properties);
 
-        // Create our JMX MBean
-        stats = new AffinityGraphBuilderStats(col,
-                    affinityGraph, periodCount, snapshot);
-        try {
-            col.registerMBean(stats, AffinityGraphBuilderMXBean.MXBEAN_NAME);
-        } catch (JMException e) {
-            // Continue on if we couldn't register this bean, although
-            // it's probably a very bad sign
-            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        if (needStats) {
+            // Create our JMX MBean
+            stats = new AffinityGraphBuilderStats(col,
+                        affinityGraph, periodCount, snapshot);
+            try {
+                col.registerMBean(stats,
+                                  AffinityGraphBuilderMXBean.MXBEAN_NAME);
+            } catch (JMException e) {
+                // Continue on if we couldn't register this bean, although
+                // it's probably a very bad sign
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
         }
+        
         pruneTask = new PruneTask(periodCount);
         Timer pruneTimer = new Timer("AffinityGraphPruner", true);
         pruneTimer.schedule(pruneTask, snapshot, snapshot);
@@ -126,19 +150,33 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     /**
      * {@inheritDoc}
      * <p>
-     * This method is called by a single thread but must protect itself
-     * from changes to data structures made by the pruner.
+     * We don't currently use read/write access info.
      */
     public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+        final Object[] ids = new Object[detail.getAccessedObjects().size()];
+        int index = 0;
+        for (AccessedObject access : detail.getAccessedObjects()) {
+            ids[index++] = access.getObjectId();
+        }
+        updateGraph(owner, ids);
+    }
+
+    /**
+     * Updates the graph with the given identity and object ids.
+     * <p>
+     * This method is may be called by multiple threads and must protect itself
+     * from changes to data structures made by the pruner.
+     * @param owner the identity which accessed the objects
+     * @param objIds the object ids of objects accessed by the identity
+     */
+    public void updateGraph(Identity owner, Object[] objIds) {
         long startTime = System.currentTimeMillis();
         stats.updateCountInc();
 
         LabelVertex vowner = new LabelVertex(owner);
 
         // For each object accessed in this task...
-        for (AccessedObject obj : detail.getAccessedObjects()) {
-            Object objId = obj.getObjectId();
-
+        for (Object objId : objIds) {
             // find the identities that have already used this object
             ConcurrentMap<Identity, AtomicLong> idMap = objectMap.get(objId);
             if (idMap == null) {
@@ -198,7 +236,6 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
 
         stats.processingTimeInc(System.currentTimeMillis() - startTime);
     }
-
     /** {@inheritDoc} */
     public Runnable getPruneTask() {
         return pruneTask;
@@ -221,7 +258,19 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     public AffinityGroupFinder getAffinityGroupFinder() {
         return lpa;
     }
-    
+
+    /**
+     * Sets the JMX MBean for this builder.  This is useful for classes
+     * which wrap this object.  Note that stats must be set before the
+     * first call to updateGraph, or a {@code NullPointerException} will
+     * occur.
+     *
+     * @param stats our JMX information
+     */
+    public void setStats(AffinityGraphBuilderStats stats) {
+        this.stats = stats;
+    }
+
     /**
      * The graph pruner.  It runs periodically, and is the only code
      * that removes edges and vertices from the graph.
@@ -350,7 +399,6 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
 
         /**
          * Note that an edge's weight has been incremented.
-         * Called by a single thread.
          * @param edge the edge
          */
         void incrementEdge(WeightedEdge edge) {
@@ -364,7 +412,6 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
 
         /**
          * Note that an object has been accessed.
-         * Called by a single thread.
          * @param objId the object
          * @param owner the accessor
          */
