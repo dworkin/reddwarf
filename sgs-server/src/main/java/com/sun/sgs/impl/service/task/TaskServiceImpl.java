@@ -1376,6 +1376,12 @@ public class TaskServiceImpl
             long originalStartTime = ptask.getStartTime();
             long lastStartTime = ptask.getLastStartTime();
             long restartTime;
+            // TBD: remove the check for lastStartTime < originalStartTime
+            // when the fix is put in place such that the lastStartTime is
+            // the "authoritative" start time and not an observed application
+            // time.  This check is only needed because the TransactionScheduler
+            // implementation allows for a remote possibility of running a task
+            // before it is actually scheduled to run (less than 15ms before).
             if (lastStartTime == NEVER || lastStartTime < originalStartTime) {
                 restartTime = originalStartTime;
             } else {
