@@ -1221,12 +1221,23 @@ public class TaskServiceImpl
                                "run at {1}", objId, ptask.getStartTime());
                 }
                 // finally, run the task itself, and set for re-use as needed
+                if (ptask.isPeriodic()) {
+                    // Persistently record the start time of periodic tasks so
+                    // that if the task is handed off, we can approximate what
+                    // time to use as the new restart time of the periodic task.
+                    // Note that this is not a permanent solution as it leaves
+                    // open the possibility that executions of periodic tasks
+                    // could be skipped when handed off.
+                    // TBD: Update this so that the persistent task data is
+                    // updated with the "authoritative" start time of the
+                    // task as it is reported by the TransactionScheduler,
+                    // Profiler, or some other location yet to be determined.
+                    ptask.setLastStartTime(
+                            watchdogService.currentAppTimeMillis());
+                }
                 ptask.run();
                 if (!ptask.isPeriodic()) {
                     ptask.setReusable();
-                } else {
-                    ptask.setLastStartTime(
-                            watchdogService.currentAppTimeMillis());
                 }
             } catch (Exception e) {
                 // catch exceptions just before they go back to the scheduler
@@ -1364,11 +1375,11 @@ public class TaskServiceImpl
             // interval from now to use as the new start time
             long originalStartTime = ptask.getStartTime();
             long lastStartTime = ptask.getLastStartTime();
-            long period = ptask.getPeriod();
             long restartTime;
             if (lastStartTime == NEVER || lastStartTime < originalStartTime) {
                 restartTime = originalStartTime;
             } else {
+                long period = ptask.getPeriod();
                 long runCount = (lastStartTime - originalStartTime) / period;
                 restartTime = originalStartTime + period * (runCount + 1);
             }
