@@ -105,7 +105,7 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
      * Creates a weighted graph builder.  The JMX stats object may not be
      * created; this is useful for wrapper objects to break object dependencies.
      * If {@code needStats} is {@code false}, the stats object must be provided
-     * with a call to {@code setStats} or a {@code NullPointerException will
+     * with a call to {@code setStats} or a {@code NullPointerException} will
      * be thrown on the first call to {@code updateGraph}.
      * 
      * @param col the profile collector

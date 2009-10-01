@@ -105,11 +105,11 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     public static final String IO_TASK_WAIT_TIME_PROPERTY =
             IO_TASK_PROPERTY_PREFIX + ".wait.time";
 
-    /** The default number of IO task retries **/
-    public static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
+    /** The default number of IO task retries. **/
+    static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
 
-    /** The default time interval to wait between IO task retries **/
-    public static final int DEFAULT_RETRY_WAIT_TIME = 100;
+    /** The default time interval to wait between IO task retries. **/
+    static final int DEFAULT_RETRY_WAIT_TIME = 100;
 
     /** The time (in milliseconds) to wait between retries for IO
      * operations. */

@@ -803,7 +803,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * Runnable which calls another node to get its labels.  This is
      * not an anonymous class because we need to obtain a result.
      */
-    private class GetRemoteLabelsRunnable implements IoRunnable {
+    private static class GetRemoteLabelsRunnable implements IoRunnable {
         private Map<Object, Map<Integer, List<Long>>> labels;
         private final HashSet<Object> objects;
         private final LPAClient proxy;
