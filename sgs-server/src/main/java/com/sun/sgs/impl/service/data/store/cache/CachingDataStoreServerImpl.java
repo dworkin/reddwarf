@@ -69,6 +69,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
@@ -76,6 +77,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import static java.util.logging.Level.CONFIG;
+import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
@@ -507,7 +509,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		txnDone = true;
 		txn.commit();
 		return (data == null) ? null
-		    : new GetObjectResults(data, getWaiting(oid, false));
+		    : new GetObjectResults(
+			data, getWaiting(oid) != GetWaitingResult.NO_WAITERS);
 	    } finally {
 		if (!txnDone) {
 		    txn.abort();
@@ -537,9 +540,11 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		byte[] result = oidsDb.get(txn, encodeLong(oid), true);
 		txnDone = true;
 		txn.commit();
+		GetWaitingResult waiters = getWaiting(oid);
 		return (result == null) ? null
 		    : new GetObjectForUpdateResults(
-			result, getWaiting(oid, false), getWaiting(oid, true));
+			result, waiters == GetWaitingResult.WRITERS,
+			waiters == GetWaitingResult.READERS);
 	    } finally {
 		if (!txnDone) {
 		    txn.abort();
@@ -580,7 +585,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		    ", but does not own that object for read");
 	    }
 	    lock(nodeInfo, oid, true);
-	    return getWaiting(oid, false);
+	    return getWaiting(oid) != GetWaitingResult.NO_WAITERS;
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -613,8 +618,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			nextOid = !found ? -1 : decodeLong(cursor.getKey());
 		    }
 		    result = !found ? null
-			: new NextObjectResults(nextOid, cursor.getValue(),
-						getWaiting(oid, false));
+			: new NextObjectResults(
+			    nextOid, cursor.getValue(),
+			    getWaiting(oid) != GetWaitingResult.NO_WAITERS);
 		} finally {
 		    cursor.close();
 		}
@@ -670,7 +676,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    lock(nodeInfo, nextNameKey, false);
 	    return new GetBindingResults(
 		found, found ? null : nextName, oid,
-		getWaiting(nextNameKey, false));
+		getWaiting(nextNameKey) != GetWaitingResult.NO_WAITERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -716,10 +722,12 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    if (!found) {
 		lock(nodeInfo, nextNameKey, true);
 	    }
+	    GetWaitingResult waiting =
+		getWaiting(found ? nameKey : nextNameKey);
 	    return new GetBindingForUpdateResults(
 		found, found ? null : nextName, oid,
-		getWaiting(found ? nameKey : nextNameKey, true),
-		getWaiting(found ? nameKey : nextNameKey, false));
+		waiting == GetWaitingResult.WRITERS,
+		waiting == GetWaitingResult.READERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -774,13 +782,15 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		lock(nodeInfo, nameKey, true);
 	    }
 	    lock(nodeInfo, nextNameKey, oid != -1);
+	    GetWaitingResult waitingName = getWaiting(nameKey);
+	    GetWaitingResult waitingNextName = getWaiting(nextNameKey);
 	    return new GetBindingForRemoveResults(
 		found, nextName, oid,
-		found && getWaiting(nameKey, true),
-		found && getWaiting(nameKey, false),
+		found && waitingName == GetWaitingResult.WRITERS,
+		found && waitingName == GetWaitingResult.READERS,
 		nextOid,
-		getWaiting(nextNameKey, true),
-		getWaiting(nextNameKey, false));
+		waitingNextName == GetWaitingResult.WRITERS,
+		waitingNextName == GetWaitingResult.READERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -824,7 +834,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
 	    lock(nodeInfo, nextNameKey, false);
 	    return new NextBoundNameResults(
-		nextName, oid, getWaiting(nextNameKey, false));
+		nextName, oid,
+		getWaiting(nextNameKey) != GetWaitingResult.NO_WAITERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -1129,6 +1140,9 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    synchronized (nodeInfoMap) {
 		nodeInfoMap.remove(nodeId);
 	    }
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(FINEST, "Releasing all locks for " + nodeInfo);
+	    }
 	    scheduleTask(new ReleaseNodeLocksTask(nodeInfo));
 	}
     }
@@ -1275,11 +1289,34 @@ public class CachingDataStoreServerImpl extends AbstractComponent
     }
 
     /**
-     * Returns whether there is a request waiting to access to specified key
-     * for read or write.
+     * Checks whether there are requests waiting to access to specified key for
+     * read or write.  Returns NO_WAITERS if there are no waiters, READERS if
+     * there are only readers, and WRITERS if there are any writers.
      */
-    private boolean getWaiting(Object key, boolean forWrite) {
-	return !lockManager.getWaiters(key).isEmpty();
+    private GetWaitingResult getWaiting(Object key) {
+	List<LockRequest<Object>> waiters = lockManager.getWaiters(key);
+	if (waiters.isEmpty()) {
+	    return GetWaitingResult.NO_WAITERS;
+	}
+	for (LockRequest<Object> waiter : waiters) {
+	    if (waiter.getForWrite()) {
+		return GetWaitingResult.WRITERS;
+	    }
+	}
+	return GetWaitingResult.READERS;
+    }
+
+    /** The return type of getWaiting. */
+    private enum GetWaitingResult {
+
+	/** No waiters. */
+	NO_WAITERS,
+
+	/** The waiters are all waiting for read. */
+	READERS,
+
+	/** There are waiters waiting for write. */
+	WRITERS;
     }
 
     /**

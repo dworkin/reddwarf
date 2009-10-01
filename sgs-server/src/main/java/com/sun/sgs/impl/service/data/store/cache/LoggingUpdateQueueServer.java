@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import java.util.Arrays;
 import static java.util.logging.Level.FINEST;
 
 /**
@@ -45,6 +46,8 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 	this.logger = logger;
     }
 
+    /* -- Implement UpdateQueueServer -- */
+
     @Override
     public void commit(long nodeId,
 		       long[] oids,
@@ -58,15 +61,9 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 	if (logger.isLoggable(FINEST)) {
 	    logger.log(FINEST,
 		       "commit nodeId:" + nodeId +
-		       ", oids:" +
-		       (oids == null ? "null" :
-			oids.length == 0 ? "[]" :
-			"[" + oids[0] + "...]") +
+		       ", oids:" + Arrays.toString(oids) +
 		       ", newOids:" + newOids +
-		       ", names:" +
-		       (names == null ? "null" :
-			names.length == 0 ? "[]" :
-			"[" + names[0] + "...]") +
+		       ", names:" + Arrays.toString(names) +
 		       ", newNames:" + newNames);
 	}
 	try {
@@ -75,15 +72,9 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "commit nodeId:" + nodeId +
-			   ", oids:" +
-			   (oids == null ? "null" :
-			    oids.length == 0 ? "[]" :
-			    "[" + oids[0] + "...]") +
+			   ", oids:" + Arrays.toString(oids) +
 			   ", newOids:" + newOids +
-			   ", names:" +
-			   (names == null ? "null" :
-			    names.length == 0 ? "[]" :
-			    "[" + names[0] + "...]") +
+			   ", names:" + Arrays.toString(names) +
 			   ", newNames:" + newNames +
 			   " returns");
 	    }
@@ -91,15 +82,9 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 	    if (logger.isLoggable(FINEST)) {
 		logger.logThrow(FINEST, e,
 				"commit nodeId:" + nodeId +
-				", oids:" +
-				(oids == null ? "null" :
-				 oids.length == 0 ? "[]" :
-				 "[" + oids[0] + "...]") +
+				", oids:" + Arrays.toString(oids) +
 				", newOids:" + newOids +
-				", names:" + 
-				(names == null ? "null" :
-				 names.length == 0 ? "[]" :
-				 "[" + names[0] + "...]") +
+				", names:" + Arrays.toString(names) +
 				", newNames:" + newNames +
 				" throws");
 	    }

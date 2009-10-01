@@ -17,14 +17,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.test.impl.service.data.store.net;
-
-import com.sun.sgs.test.impl.service.data.BasicDataServiceMultiTest;
-import com.sun.sgs.test.util.SgsTestNode;
-import java.util.Properties;
+package com.sun.sgs.impl.service.data.store.cache;
 
 /**
- * Perform multi-node tests on the {@code DataService} using the network data
- * store.
+ * A {@code CompletionHandler} that reports node failure if an operation fails.
  */
-public class TestDataServiceClientMulti extends BasicDataServiceMultiTest { }
+abstract class FailingCompletionHandler implements CompletionHandler {
+
+    /** The caching data store. */
+    private final CachingDataStore store;
+
+    /**
+     * Creates an instance of this class.
+     *
+     * @param	store the caching data store
+     */
+    FailingCompletionHandler(CachingDataStore store) {
+	this.store = store;
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation reports the failure to the caching data store.
+     */
+    @Override
+    public void failed(Throwable exception) {
+	store.reportFailure(exception);
+    }
+}

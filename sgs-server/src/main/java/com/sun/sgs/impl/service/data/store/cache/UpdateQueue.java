@@ -37,9 +37,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Semaphore;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -61,17 +63,26 @@ class UpdateQueue {
 
     /**
      * Maps transaction context IDs to information about the associated
-     * transaction.  The entries are ordered with the lowest context ID first
-     * in order to find the items that are no longer waiting for earlier
-     * transactions to complete.  Synchronize on this object when adding new
-     * entries to insure that they are added in order.
+     * transaction for transactions that are either active or waiting to be
+     * submitted to the request queue.  The entries are ordered with the lowest
+     * context ID first in order to find the items that are no longer waiting
+     * for earlier transactions to complete.  Synchronize on this object when
+     * adding new entries to insure that they are added in order.
      */
-    private final NavigableMap<Long, PendingTxnInfo> pendingMap =
+    private final NavigableMap<Long, PendingTxnInfo> pendingSubmitMap =
 	new ConcurrentSkipListMap<Long, PendingTxnInfo>();
 
     /**
+     * Stores the context IDs of transactions that have had their commit
+     * requests submitted to the request queue but that have not been
+     * acknowledged by the server yet.
+     */
+    private final NavigableSet<Long> pendingAcknowledgeSet =
+	new ConcurrentSkipListSet<Long>();
+
+    /**
      * The context ID to use for the next new transaction.  Synchronize on
-     * {@code pendingMap} when accessing this field.
+     * {@code pendingSubmitMap} when accessing this field.
      */
     private long nextContextId = 1;
 
@@ -111,9 +122,9 @@ class UpdateQueue {
     long beginTxn() {
 	PendingTxnInfo info = new PendingTxnInfo();
 	long contextId;
-	synchronized (pendingMap) {
+	synchronized (pendingSubmitMap) {
 	    contextId = nextContextId++;
-	    pendingMap.put(contextId, info);
+	    pendingSubmitMap.put(contextId, info);
 	}
 	return contextId;
     }
@@ -172,7 +183,7 @@ class UpdateQueue {
      *		negative value, or if {@code newNames} is negative or greater
      *		than the length of {@code names}
      */
-    void commit(long contextId,
+    void commit(final long contextId,
 		long[] oids,
 		byte[][] oidValues,
 		int newOids,
@@ -180,20 +191,22 @@ class UpdateQueue {
 		long[] nameValues,
 		int newNames)
     {
+	pendingAcknowledgeSet.add(contextId);
 	completed(contextId);
-	addRequest(
-	    contextId,
+	queue.addRequest(
 	    new Commit(oids, oidValues, newOids, names, nameValues, newNames,
-		       store.new FailingCompletionHandler() {
+		       new FailingCompletionHandler(store) {
 			   @Override
 		           public void completed() {
+			       pendingAcknowledgeSet.remove(contextId);
 			       commitAvailable.release();
 			   }
 		       }));
     }
 
     /**
-     * Notes that a transaction has been aborted.
+     * Notes that a transaction has been aborted, or that it committed without
+     * any modifications.
      *
      * @param	contextId the transaction context ID
      * @param	prepared whether the transaction had been prepared
@@ -284,10 +297,16 @@ class UpdateQueue {
      * @return	the lowest pending context ID or {@code Long.MIN_VALUE}
      */
     long lowestPendingContextId() {
+	long lowestSubmit;
 	try {
-	    return pendingMap.firstKey();
+	    lowestSubmit = pendingSubmitMap.firstKey();
 	} catch (NoSuchElementException e) {
-	    return Long.MIN_VALUE;
+	    lowestSubmit = Long.MIN_VALUE;
+	}
+	try {
+	    return pendingAcknowledgeSet.first();
+	} catch (NoSuchElementException e) {
+	    return lowestSubmit;
 	}
     }
 
@@ -295,13 +314,13 @@ class UpdateQueue {
 
     /**
      * Adds a request to the table if the associated transaction is still
-     * pending, and otherwise adds it directory to the update queue.
+     * pending, and otherwise adds it directly to the update queue.
      *
      * @param	contextId the transaction context ID
      * @param	request the request
      */
     private void addRequest(long contextId, Request request) {
-	PendingTxnInfo info = pendingMap.get(contextId);
+	PendingTxnInfo info = pendingSubmitMap.get(contextId);
 	if (info == null || !info.addRequest(request)) {
 	    queue.addRequest(request);
 	}
@@ -312,17 +331,17 @@ class UpdateQueue {
      * either by committing or aborting.
      */
     private void completed(long contextId) {
-	PendingTxnInfo info = pendingMap.get(contextId);
+	PendingTxnInfo info = pendingSubmitMap.get(contextId);
 	assert info != null;
 	info.setComplete();
 	try {
-	    if (contextId != pendingMap.firstKey()) {
+	    if (contextId != pendingSubmitMap.firstKey()) {
 		return;
 	    }
 	} catch (NoSuchElementException e) {
 	    return;
 	}
-	pendingMap.remove(contextId);
+	pendingSubmitMap.remove(contextId);
 	List<Request> requests = info.getRequests();
 	if (requests == null) {
 	    return;
@@ -331,7 +350,7 @@ class UpdateQueue {
 	    queue.addRequest(request);
 	}
 	while (true) {
-	    Entry<Long, PendingTxnInfo> entry = pendingMap.firstEntry();
+	    Entry<Long, PendingTxnInfo> entry = pendingSubmitMap.firstEntry();
 	    if (entry == null) {
 		break;
 	    }
@@ -339,7 +358,7 @@ class UpdateQueue {
 	    if (requests == null) {
 		break;
 	    }
-	    pendingMap.remove(entry.getKey());
+	    pendingSubmitMap.remove(entry.getKey());
 	    for (Request request : requests) {
 		queue.addRequest(request);
 	    }

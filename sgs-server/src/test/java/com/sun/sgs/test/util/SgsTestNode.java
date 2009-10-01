@@ -27,7 +27,10 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
+import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
@@ -41,6 +44,7 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.service.store.DataStore;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.Serializable;
@@ -247,8 +251,7 @@ public class SgsTestNode {
             props.setProperty(ProfileCollectorImpl.CREATE_MBEAN_SERVER_PROPERTY,
                              "true");
         }
-	dbDirectory = 
-	    props.getProperty("com.sun.sgs.impl.service.data.store.DataStoreImpl.directory");
+	dbDirectory = props.getProperty(DataStoreImpl.DIRECTORY_PROPERTY);
         assert(dbDirectory != null);
         if (clean) {
             deleteDirectory(dbDirectory);
@@ -449,12 +452,14 @@ public class SgsTestNode {
             com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 String.valueOf(getNextUniquePort()),
             StandardProperties.APP_LISTENER, listenerClass.getName(),
-            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-                dir + ".db",
-            "com.sun.sgs.impl.service.data.store.net.server.port", 
-                String.valueOf(requestedDataPort),
-            "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
-                "com.sun.sgs.impl.service.data.store.net.DataStoreClient",
+	    DataStoreImpl.DIRECTORY_PROPERTY, dir + ".db",
+	    CachingDataStoreServerImpl.DIRECTORY_PROPERTY, dir + ".db",
+	    "com.sun.sgs.impl.service.data.store.net.server.port",
+		String.valueOf(requestedDataPort),
+	    CachingDataStore.SERVER_PORT_PROPERTY,
+		String.valueOf(requestedDataPort),
+	    DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
+		DataStoreClient.class.getName(),
             "com.sun.sgs.impl.service.watchdog.server.port",
                 String.valueOf(requestedWatchdogPort),
 	    "com.sun.sgs.impl.service.channel.server.port",
@@ -536,12 +541,29 @@ public class SgsTestNode {
         storeField.setAccessible(true);
 	DataStoreProfileProducer profileWrapper =
 	    (DataStoreProfileProducer) storeField.get(service);
-        DataStoreClient dsClient =
-	    (DataStoreClient) profileWrapper.getDataStore();
-        Field serverPortField =
-	    DataStoreClient.class.getDeclaredField("serverPort");
-        serverPortField.setAccessible(true);
-        return (Integer) serverPortField.get(dsClient);
+	DataStore dataStore = profileWrapper.getDataStore();
+	if (dataStore instanceof DataStoreClient) {
+	    DataStoreClient dsClient = (DataStoreClient) dataStore;
+	    Field serverPortField =
+		DataStoreClient.class.getDeclaredField("serverPort");
+	    serverPortField.setAccessible(true);
+	    return (Integer) serverPortField.get(dsClient);
+	} else if (dataStore instanceof CachingDataStore) {
+	    CachingDataStore cachingDataStore = (CachingDataStore) dataStore;
+	    Field localServerField =
+		CachingDataStore.class.getDeclaredField("localServer");
+	    localServerField.setAccessible(true);
+	    CachingDataStoreServerImpl server = (CachingDataStoreServerImpl)
+		localServerField.get(cachingDataStore);
+	    Field serverPortField =
+		CachingDataStoreServerImpl.class.getDeclaredField(
+		    "serverPort");
+	    serverPortField.setAccessible(true);
+	    return (Integer) serverPortField.get(server);
+	} else {
+	    throw new IllegalArgumentException(
+		"Can't find data server port: " + service);
+	}
     }
 
     /**

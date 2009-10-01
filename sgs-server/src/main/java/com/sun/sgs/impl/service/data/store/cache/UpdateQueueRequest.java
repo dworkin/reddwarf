@@ -31,6 +31,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.EOFException;
 import java.io.IOException;
+import java.util.Arrays;
 
 /** The subclass of all requests used by {@link UpdateQueue}. */
 abstract class UpdateQueueRequest implements Request {
@@ -183,15 +184,9 @@ abstract class UpdateQueueRequest implements Request {
 	@Override
 	public String toString() {
 	    return "Commit[" +
-		"oids:" +
-		(oids == null ? "null" :
-		 oids.length == 0 ? "[]" :
-		 "[" + oids[0] + "...]") +
+		"oids:" + Arrays.toString(oids) +
 		", newOids:" + newOids +
-		", names:" +
-		(names == null ? "null" :
-		 names.length == 0 ? "[]" :
-		 "[" + names[0] + "...]") +
+		", names:" + Arrays.toString(names) +
 		", newNames:" + newNames +
 		"]";
 	}

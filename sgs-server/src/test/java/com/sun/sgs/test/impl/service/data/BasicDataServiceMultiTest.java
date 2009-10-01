@@ -47,18 +47,19 @@ public abstract class BasicDataServiceMultiTest extends Assert {
     /** The application name. */
     protected final String appName = getClass().getName();
 
-    /**
-     * The number of application nodes to create.  Run the setup method after
-     * changing the value of this field.
-     */
-    protected int numAppNodes = 2;
-
     /** Creates an instance of this class. */
     protected BasicDataServiceMultiTest() { }
 
-    /** Creates the server node and application nodes. */
+    /** Creates the server node and three application nodes. */
     @Before
     public void setUp() throws Exception {
+	setUp(3);
+    }
+
+    /**
+     * Creates the server node and the specified number of application nodes.
+     */
+    protected void setUp(int numAppNodes) throws Exception {
 	if (serverNode == null) {
 	    serverNode = new SgsTestNode(
 		appName, null, getServerProperties());
@@ -67,7 +68,7 @@ public abstract class BasicDataServiceMultiTest extends Assert {
 	    appNodes.remove(0).shutdown(true);
 	}
 	while (numAppNodes > appNodes.size()) {
-	    appNodes.add(new SgsTestNode(serverNode, null, null));
+	    appNodes.add(new SgsTestNode(serverNode, null, getAppProperties()));
 	}
     }
 
@@ -88,10 +89,23 @@ public abstract class BasicDataServiceMultiTest extends Assert {
      * Returns the configuration properties to pass to the {@link SgsTestNode}
      * constructor to create the server node.
      *
-     * @return	the server configuration properties
+     * @return	the server node configuration properties
      * @throws	Exception if a problem occurs
      */
-    protected abstract Properties getServerProperties() throws Exception;
+    protected Properties getServerProperties() throws Exception {
+	return SgsTestNode.getDefaultProperties(appName, null, null);
+    }
+
+    /**
+     * Returns the configuration properties to pass to the {@link SgsTestNode}
+     * constructor to create an application node.
+     *
+     * @return	the application node configuration properties
+     * @throws	Exception if a problem occurs
+     */
+    protected Properties getAppProperties() throws Exception {
+	return SgsTestNode.getDefaultProperties(appName, serverNode, null);
+    }
 
     /* -- Tests -- */
 

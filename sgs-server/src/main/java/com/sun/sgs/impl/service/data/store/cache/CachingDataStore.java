@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -282,7 +283,7 @@ public class CachingDataStore extends AbstractDataStore
     private final EvictionThread evictionThread = new EvictionThread();
 
     /** The node ID for the local node. */
-    private final long nodeId;
+    final long nodeId;
 
     /** Manages sending updates to the server. */
     final UpdateQueue updateQueue;
@@ -459,11 +460,14 @@ public class CachingDataStore extends AbstractDataStore
 		localServer = null;
 	    }
 	    server = lookupServer(serverHost, serverPort);
-	    callbackExporter.export(this, callbackPort);
+	    LoggingCallbackServer callbackServer =
+		new LoggingCallbackServer(this, logger);
+	    callbackExporter.export(callbackServer, callbackPort);
 	    CallbackServer callbackProxy = callbackExporter.getProxy();
 	    RegisterNodeResult registerNodeResult =
 		registerNode(callbackProxy);
 	    nodeId = registerNodeResult.nodeId;
+	    callbackServer.setLocalNodeId(nodeId);
 	    updateQueue = new UpdateQueue(
 		this, serverHost, registerNodeResult.updateQueuePort,
 		updateQueueSize);
@@ -758,8 +762,7 @@ public class CachingDataStore extends AbstractDataStore
 	    if (results != null) {
 		if (results.callbackEvict) {
 		    scheduleTask(new EvictObjectTask(oid));
-		}
-		if (results.callbackDowngrade) {
+		} else if (results.callbackDowngrade) {
 		    scheduleTask(new DowngradeObjectTask(oid));
 		}
 	    }
@@ -1534,8 +1537,7 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(nameKey));
-	    }
-	    if (results.callbackDowngrade) {
+	    } else if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(nameKey));
 	    }
 	}
@@ -1626,8 +1628,7 @@ public class CachingDataStore extends AbstractDataStore
 	    }
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(nextNameKey));
-	    }
-	    if (results.callbackDowngrade) {
+	    } else if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(nextNameKey));
 	    }
 	}
@@ -1700,8 +1701,7 @@ public class CachingDataStore extends AbstractDataStore
 	    BindingKey evictKey = results.found ? nameKey : serverNextNameKey;
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(evictKey));
-	    }
-	    if (results.callbackDowngrade) {
+	    } else if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(evictKey));
 	    }
 	}
@@ -1933,14 +1933,12 @@ public class CachingDataStore extends AbstractDataStore
 	    /* Schedule evictions and downgrades */
 	    if (results.callbackEvict) {
 		scheduleTask(new EvictBindingTask(nameKey));
-	    }
-	    if (results.callbackDowngrade) {
+	    } else if (results.callbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(nameKey));
 	    }
 	    if (results.nextCallbackEvict) {
 		scheduleTask(new EvictBindingTask(serverNextNameKey));
-	    }
-	    if (results.nextCallbackDowngrade) {
+	    } else if (results.nextCallbackDowngrade) {
 		scheduleTask(new DowngradeBindingTask(serverNextNameKey));
 	    }
 	}
@@ -2334,7 +2332,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestDowngradeObject */
 
     /** {@inheritDoc} */
-    public boolean requestDowngradeObject(long oid, long nodeId) {
+    public boolean requestDowngradeObject(long oid, long conflictNodeId) {
 	Object lock = cache.getObjectLock(oid);
 	synchronized (lock) {
 	    ObjectCacheEntry entry = cache.getObjectEntry(oid);
@@ -2368,6 +2366,7 @@ public class CachingDataStore extends AbstractDataStore
     {
 	private final long oid;
 	DowngradeObjectTask(long oid) {
+	    super(CachingDataStore.this);
 	    this.oid = oid;
 	}
 	public void run() {
@@ -2402,7 +2401,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestEvictObject */
 
     /** {@inheritDoc} */
-    public boolean requestEvictObject(long oid, long nodeId) {
+    public boolean requestEvictObject(long oid, long conflictNodeId) {
 	Object lock = cache.getObjectLock(oid);
 	synchronized (lock) {
 	    ObjectCacheEntry entry = cache.getObjectEntry(oid);
@@ -2432,17 +2431,6 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@link CompletionHandler} that reports node failure if an operation
-     * fails.
-     */
-    abstract class FailingCompletionHandler implements CompletionHandler {
-	@Override
-	public void failed(Throwable exception) {
-	    reportFailure(exception);
-	}
-    }
-
-    /**
      * A {@code CompletionHandler} that updates the cache for an object that
      * has been evicted.
      */
@@ -2451,6 +2439,7 @@ public class CachingDataStore extends AbstractDataStore
     {
 	final long oid;
 	EvictObjectCompletionHandler(long oid) {
+	    super(CachingDataStore.this);
 	    this.oid = oid;
 	    pendingEvictions.incrementAndGet();
 	}
@@ -2505,7 +2494,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestDowngradeBinding */
 
     /** {@inheritDoc} */
-    public boolean requestDowngradeBinding(String name, long nodeId) {
+    public boolean requestDowngradeBinding(String name, long conflictNodeId) {
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
@@ -2571,6 +2560,9 @@ public class CachingDataStore extends AbstractDataStore
      * completion.
      */
     private class NullCompletionHandler extends FailingCompletionHandler {
+	NullCompletionHandler() {
+	    super(CachingDataStore.this);
+	}
 	public void completed() { }
     }
 
@@ -2649,6 +2641,7 @@ public class CachingDataStore extends AbstractDataStore
     private class DowngradeCompletionHandler extends FailingCompletionHandler {
 	private final BindingKey nameKey;
 	DowngradeCompletionHandler(BindingKey nameKey) {
+	    super(CachingDataStore.this);
 	    this.nameKey = nameKey;
 	}
 	public void completed() {
@@ -2662,7 +2655,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestEvictBinding */
 
     /** {@inheritDoc} */
-    public boolean requestEvictBinding(String name, long nodeId) {
+    public boolean requestEvictBinding(String name, long conflictNodeId) {
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
@@ -2731,6 +2724,7 @@ public class CachingDataStore extends AbstractDataStore
     {
 	private final BindingKey nameKey;
 	EvictBindingCompletionHandler(BindingKey nameKey) {
+	    super(CachingDataStore.this);
 	    this.nameKey = nameKey;
 	    pendingEvictions.incrementAndGet();
 	}
@@ -2760,6 +2754,7 @@ public class CachingDataStore extends AbstractDataStore
 	EvictUnboundNameCompletionHandler(BindingKey nameKey,
 					  BindingKey entryKey)
 	{
+	    super(CachingDataStore.this);
 	    this.nameKey = nameKey;
 	    this.entryKey = entryKey;
 	}
@@ -2815,7 +2810,9 @@ public class CachingDataStore extends AbstractDataStore
 			return;
 		    }
 		    assert !entry.getReading() && !entry.getUpgrading() &&
-			!entry.getDowngrading();
+			!entry.getDowngrading()
+			: "Entry should not be reading, upgrading," +
+			  " or downgrading: " + entry;
 		    /* Evict */
 		    if (nameKey.equals(entry.key)) {
 			entry.setEvicting();
@@ -2980,7 +2977,9 @@ public class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * Schedules a kernel task with the transaction scheduler.
+     * Schedules a kernel task with the transaction scheduler.  Tasks that
+     * throw non-retryable exceptions will have those exceptions reported as
+     * node failures.
      *
      * @param	task the task
      */
@@ -2991,7 +2990,16 @@ public class CachingDataStore extends AbstractDataStore
 		    try {
 			task.run();
 		    } catch (Throwable t) {
-			logger.logThrow(WARNING, t, "Task {0} failed", task);
+			logger.logThrow(WARNING, t, "Task {0} throws", task);
+			if (t instanceof ExceptionRetryStatus &&
+			    ((ExceptionRetryStatus) t).shouldRetry())
+			{
+			    if (t instanceof RuntimeException) {
+				throw (RuntimeException) t;
+			    } else if (t instanceof Error) {
+				throw (Error) t;
+			    }
+			}
 			reportFailure(t);
 		    }
 		}
@@ -3052,22 +3060,23 @@ public class CachingDataStore extends AbstractDataStore
      */
     boolean inUse(BasicCacheEntry<?, ?> entry) {
 	assert Thread.holdsLock(cache.getEntryLock(entry));
-	return entry.getContextId() < updateQueue.lowestPendingContextId() ||
+	return
+	    !(entry.getContextId() < updateQueue.lowestPendingContextId()) ||
 	    (entry instanceof BindingCacheEntry &&
 	     ((BindingCacheEntry) entry).getPendingPrevious());
     }
 
     /**
-     * Checks if an entry is both modified and currently in use, either by an
+     * Checks if an entry is both writable and currently in use, either by an
      * active or pending transaction, or because it is a binding entry that has
-     * a pending operation on a previous entry.	 The lock associated with the
+     * a pending operation on a previous entry.  The lock associated with the
      * entry should be held.
      *
      * @param	entry the cache entry
-     * @return	whether the entry is modified and currently in use
+     * @return	whether the entry is writable and currently in use
      */
     boolean inUseForWrite(BasicCacheEntry<?, ?> entry) {
-	return entry.getModified() && inUse(entry);
+	return entry.getWritable() && inUse(entry);
     }
 
     /**
@@ -3202,7 +3211,7 @@ public class CachingDataStore extends AbstractDataStore
 			continue;
 		    }
 		    EntryInfo entryInfo = new EntryInfo(
-			inUse(entry), entry.getModified(),
+			inUse(entry), entry.getWritable(),
 			entry.getContextId());
 		    if (bestEntry == null || entryInfo.preferTo(bestInfo)) {
 			bestEntry = entry;

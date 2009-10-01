@@ -36,12 +36,13 @@ public interface CallbackServer extends Remote {
      * the server that it has downgraded the object.
      *
      * @param	oid the object ID
-     * @param	nodeId the ID of the node requesting the downgrade
+     * @param	conflictNodeId the ID of the node requesting the downgrade
      * @return	{@code true} if the object has been downgraded as requested, or
      *		else {@code false} if the downgrade is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestDowngradeObject(long oid, long nodeId) throws IOException;
+    boolean requestDowngradeObject(long oid, long conflictNodeId)
+	throws IOException;
 
     /**
      * Requests that the node give up access to an object.  If the method
@@ -51,12 +52,13 @@ public interface CallbackServer extends Remote {
      * object.
      *
      * @param	oid the object ID
-     * @param	nodeId the ID of the node requesting the eviction
+     * @param	conflictNodeId the ID of the node requesting the eviction
      * @return	{@code true} if the object has been evicted as requested, or
      *		else {@code false} if the eviction is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestEvictObject(long oid, long nodeId) throws IOException;
+    boolean requestEvictObject(long oid, long conflictNodeId)
+	throws IOException;
 
     /**
      * Requests that the node downgrade write access to a name binding from
@@ -67,12 +69,12 @@ public interface CallbackServer extends Remote {
      * downgraded the name binding.
      *
      * @param	name the name
-     * @param	nodeId the ID of the node requesting the downgrade
+     * @param	conflictNodeId the ID of the node requesting the downgrade
      * @return	{@code true} if the name binding has been downgraded as
      *		requested, or else {@code false} if the downgrade is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestDowngradeBinding(String name, long nodeId)
+    boolean requestDowngradeBinding(String name, long conflictNodeId)
 	throws IOException;
 
     /**
@@ -83,10 +85,11 @@ public interface CallbackServer extends Remote {
      * server that it has evicted the name binding.
      *
      * @param	name the name
-     * @param	nodeId the ID of the node requesting the eviction
+     * @param	conflictNodeId the ID of the node requesting the eviction
      * @return	{@code true} if the name binding has been evicted as
      *		requested, or else {@code false} if the eviction is delayed
      * @throws	IOException if a network problem occurs
      */
-    boolean requestEvictBinding(String name, long nodeId) throws IOException;
+    boolean requestEvictBinding(String name, long conflictNodeId)
+	throws IOException;
 }

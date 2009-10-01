@@ -19,9 +19,9 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
-import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
 import java.util.logging.Logger;
 
@@ -53,8 +53,11 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 
     /**
      * Performs the I/O operation.  If the operation throws an {@code
-     * IOException}, then it will be retried until the retry timeout is
-     * reached.  Other exceptions will be treated as a permanent failure.
+     * IOException}, or an exception that implements {@link
+     * ExceptionRetryStatus} and whose {@link ExceptionRetryStatus#shouldRetry
+     * shouldRetry} method returns {@code true}, then it will be retried until
+     * the retry timeout is reached.  Other exceptions will be treated as a
+     * permanent failure.
      *
      * @return	the result of the I/O operation
      * @throws	IOException if the I/O operation fails
@@ -97,9 +100,23 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 		    return;
 		}
 		try {
-		    logger.log(FINEST, "Calling {0}", this);
+		    if (logger.isLoggable(FINEST)) {
+			logger.log(FINEST,
+				   "Calling nodeId:" + store.nodeId +
+				   " " + this);
+		    }
 		    result = callOnce();
 		    break;
+		} catch (RuntimeException e) {
+		    if (e instanceof ExceptionRetryStatus &&
+			((ExceptionRetryStatus) e).shouldRetry() &&
+			shouldRetry())
+		    {
+			logger.logThrow(FINEST, e, "Retrying: {0}", this);
+		    } else {
+			store.reportFailure(e);
+			return;
+		    }
 		} catch (IOException e) {
 		    if (shouldRetry()) {
 			logger.logThrow(
@@ -111,10 +128,17 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 		}
 	    }
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST, "Calling {0} returns {1}", this, result);
+		logger.log(FINEST,
+			   "Calling nodeId:" + store.nodeId + " " + this +
+			   " returns " + result);
 	    }
 	    runWithResult(result);
 	} catch (Throwable e) {
+	    if (logger.isLoggable(FINEST)) {
+		logger.logThrow(
+		    FINEST, e,
+		    "Calling nodeId:" + store.nodeId + " " + this + " throws");
+	    }
 	    store.reportFailure(e);
 	    return;
 	}
