@@ -30,7 +30,7 @@ import com.sun.sgs.auth.Identity;
  * This will probably morph into node assignment plus node balancing policy.
  * 
  */
-interface NodeAssignPolicy {
+public interface NodeAssignPolicy {
     
     /**
      *  An id representing the server node.

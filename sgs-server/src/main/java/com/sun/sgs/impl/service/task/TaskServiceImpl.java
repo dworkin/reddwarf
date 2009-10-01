@@ -565,16 +565,28 @@ public class TaskServiceImpl
 
         // persist the task regardless of where it will ultimately run
         Identity owner = getTaskOwner(task);
-        TaskRunner runner = getRunner(task, owner, startTime, PERIOD_NONE);
+        BigInteger objId = allocatePendingTask(
+                task, owner, startTime, PERIOD_NONE);
 
-        // check where the owner is active to get the task running
-        if (!isMappedLocally(owner)) {
-            if (handoffTask(generateObjName(owner, runner.getObjId()), owner)) {
-                return;
+        if (runWithNewIdentity(task)) {
+            // if the owner is a new identity, we're done.
+            // the persisted task will be picked up by the node that the
+            // identity is eventually assigned to
+            return;
+        } else {
+            TaskRunner runner = new TaskRunner(
+                    objId, task.getClass().getName(), owner);
+
+            // check where the owner is active to get the task running
+            if (!isMappedLocally(owner)) {
+                if (handoffTask(generateObjName(owner, runner.getObjId()),
+                                owner)) {
+                    return;
+                }
+                runner.markIgnoreIsLocal();
             }
-            runner.markIgnoreIsLocal();
+            scheduleTask(runner, owner, startTime, true);
         }
-        scheduleTask(runner, owner, startTime, true);
     }
 
     /**
@@ -604,27 +616,37 @@ public class TaskServiceImpl
 
         // persist the task regardless of where it will ultimately run
         Identity owner = getTaskOwner(task);
-        TaskRunner runner = getRunner(task, owner, startTime, period);
-        BigInteger objId = runner.getObjId();
+        BigInteger objId = allocatePendingTask(
+                task, owner, startTime, period);
+        
+        if (runWithNewIdentity(task)) {
+            // if the owner is a new identity, we're done.
+            // the persisted task will be picked up by the node that the
+            // identity is eventually assigned to
+            return new PeriodicTaskHandleImpl(generateObjName(owner, objId));
+        } else {
+            TaskRunner runner = new TaskRunner(
+                    objId, task.getClass().getName(), owner);
 
-        // check where the owner is active to get the task running
-        if (!isMappedLocally(owner)) {
-            String objName = generateObjName(owner, objId);
-            if (handoffTask(objName, owner)) {
-                return new PeriodicTaskHandleImpl(objName);
+            // check where the owner is active to get the task running
+            if (!isMappedLocally(owner)) {
+                String objName = generateObjName(owner, objId);
+                if (handoffTask(objName, owner)) {
+                    return new PeriodicTaskHandleImpl(objName);
+                }
+                runner.markIgnoreIsLocal();
             }
-            runner.markIgnoreIsLocal();
-        }
-        PendingTask ptask = 
-                (PendingTask) (dataService.createReferenceForId(objId).
-                getForUpdate());
-        ptask.setRunningNode(nodeId);
+            PendingTask ptask =
+                    (PendingTask) (dataService.createReferenceForId(objId).
+                    getForUpdate());
+            ptask.setRunningNode(nodeId);
 
-        RecurringTaskHandle handle =
-            transactionScheduler.scheduleRecurringTask(runner, owner,
-                                                       startTime, period);
-        ctxFactory.joinTransaction().addRecurringTask(objId, handle, owner);
-        return new PeriodicTaskHandleImpl(generateObjName(owner, objId));
+            RecurringTaskHandle handle =
+                    transactionScheduler.scheduleRecurringTask(
+                    runner, owner, startTime, period);
+            ctxFactory.joinTransaction().addRecurringTask(objId, handle, owner);
+            return new PeriodicTaskHandleImpl(generateObjName(owner, objId));
+        }
     }
 
     /**
@@ -683,16 +705,9 @@ public class TaskServiceImpl
     private TaskRunner getRunner(Task task, Identity identity, long startTime,
                                  long period)
     {
-        logger.log(Level.FINEST, "setting up a pending task");
-
         // create a new pending task that will be used when the runner runs
         BigInteger objId =
             allocatePendingTask(task, identity, startTime, period);
-
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST, "created pending task {0} for {1}",
-                       objId, identity);
-        }
 
         return new TaskRunner(objId, task.getClass().getName(), identity);
     }
@@ -711,6 +726,8 @@ public class TaskServiceImpl
     private BigInteger allocatePendingTask(Task task, Identity identity,
                                            long startTime, long period)
     {
+        logger.log(Level.FINEST, "setting up a pending task");
+
         PendingTask ptask = null;
         BigInteger objId = null;
         Set<BigInteger> set = availablePendingMap.get(identity);
@@ -756,6 +773,11 @@ public class TaskServiceImpl
         }
 
         ptask.resetValues(task, startTime, period);
+
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "created pending task {0} for {1}",
+                       objId, identity);
+        }
         
         return objId;
     }
@@ -1466,7 +1488,7 @@ public class TaskServiceImpl
                                 "identity {0} so task {1} will run locally",
                                 identity.getName(), objName);
             }
-            assignNode(identity);
+            scheduleNonDurableTask(new AssignNodeRunner(identity), false);
             return false;
         }
 
@@ -1507,16 +1529,6 @@ public class TaskServiceImpl
         }
 
         return true;
-    }
-
-    /** Private helper that kicks off a thread to do node assignment. */
-    private void assignNode(final Identity identity) {
-        (new Thread(new Runnable() {
-                public void run() {
-                    nodeMappingService.assignNode(TaskServiceImpl.class,
-                                                  identity);
-                }
-            })).start();
     }
 
     /**
@@ -1777,10 +1789,20 @@ public class TaskServiceImpl
         }
     }
 
+    private boolean runWithNewIdentity(Task task) {
+        if (task.getClass().getAnnotation(RunWithNewIdentity.class) != null) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     /** Private method to get or create an owner for a task. */
     private Identity getTaskOwner(Object task) {
         if (task.getClass().getAnnotation(RunWithNewIdentity.class) != null) {
-            return new DynamicIdentity(nodeId);
+            Identity id = new DynamicIdentity(nodeId);
+            scheduleNonDurableTask(new AssignNodeRunner(id), false);
+            return id;
         } else {
             return txnProxy.getCurrentOwner();
         }
@@ -1817,6 +1839,28 @@ public class TaskServiceImpl
         /** {@inheritDoc} */
         public int hashCode() {
             return name.hashCode();
+        }
+    }
+
+    /**
+     * A private runnable that calls out to the {@code NodeMappingService}
+     * to assign an identity to a node.  This task should only be run as
+     * a non-transactional task.
+     */
+    private class AssignNodeRunner implements KernelRunnable {
+        private Identity id;
+
+        /** Constructs a new {@code AssignNodeRunner}. */
+        public AssignNodeRunner(Identity id) {
+            this.id = id;
+        }
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return AssignNodeRunner.class.getName();
+        }
+        /** {@inheritDoc} */
+        public void run() throws Exception {
+            nodeMappingService.assignNode(TaskServiceImpl.class, id);
         }
     }
 

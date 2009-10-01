@@ -48,7 +48,7 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.UtilProperties;
 
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.io.File;
 import java.io.Serializable;
@@ -57,11 +57,12 @@ import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.TestCase;
-
 import org.junit.runner.RunWith;
 
-import static org.junit.Assert.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 
 /**
@@ -72,8 +73,8 @@ import static org.junit.Assert.*;
  * that cannot be done with the production service. This assumes that basic
  * interaction tests are already passing from {code TestTaskServiceImpl}.
  */
-@RunWith(FilteredJUnit3TestRunner.class)
-public class TestMultiNodeTaskServiceImpl extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public class TestMultiNodeTaskServiceImpl extends Assert {
 
     /** The node that creates the servers */
     private SgsTestNode serverNode;
@@ -96,12 +97,8 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     /** Test Management. */
     
-    public TestMultiNodeTaskServiceImpl(String name) {
-        super(name);
-    }
-
-    protected void setUp() throws Exception {
-        System.err.println("Testcase: " + getName());
+    @Before
+    public void setUp() throws Exception {
 
         lastNodeUsed = new AtomicLong(-1);
 
@@ -141,7 +138,8 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
             }, taskOwner);
     }
 
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes)
                 node.shutdown(false);
@@ -151,6 +149,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     /** Tests. */
 
+    @Test
     public void testMoveImmediateTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
         long expectedNode = additionalNodes[0].getNodeId();
@@ -158,7 +157,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     taskServiceZero.scheduleTask(new TestTask());
                     counter.increment();
                 }
@@ -169,6 +168,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         assertEquals(expectedNode, lastNodeUsed.get());
     }
 
+    @Test
     public void testMoveDelayedTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
         long expectedNode = additionalNodes[0].getNodeId();
@@ -176,7 +176,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     taskServiceZero.scheduleTask(new TestTask(), 100L);
                     counter.increment();
                 }
@@ -187,6 +187,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         assertEquals(expectedNode, lastNodeUsed.get());
     }
 
+    @Test
     public void testMoveAfterScheduledDelayedTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
         DummyNodeMappingService.assignIdentity(getClass(), id,
@@ -194,7 +195,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     taskServiceZero.scheduleTask(new TestTask(), 100L);
                     counter.increment();
                 }
@@ -208,6 +209,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         assertEquals(expectedNode, lastNodeUsed.get());
     }
 
+    @Test
     public void testMovePeriodicTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
         long expectedNode = serverNode.getNodeId();
@@ -215,7 +217,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     taskServiceZero.schedulePeriodicTask(new TestTask(), 0L,
                                                          500L);
                     counter.increment();
@@ -233,6 +235,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         assertEquals(expectedNode, lastNodeUsed.get());
     }
 
+    @Test
     public void testMoveAfterScheduledPeriodicTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
         DummyNodeMappingService.assignIdentity(getClass(), id,
@@ -240,7 +243,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     taskServiceZero.schedulePeriodicTask(new TestTask(), 100L,
                                                          500L);
                     counter.increment();
@@ -255,6 +258,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         assertEquals(expectedNode, lastNodeUsed.get());
     }
 
+    @Test
     public void testCancelPeriodicHandle() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
         DummyNodeMappingService.assignIdentity(getClass(), id,
@@ -262,7 +266,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     PeriodicTaskHandle h =
                         taskServiceZero.schedulePeriodicTask(new TestTask(),
                                                              250L, 500L);
@@ -286,6 +290,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Unexpected run of a periodic task");
     }
 
+    @Test
     public void testActiveCountBasic() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
         assertEquals(DummyNodeMappingService.getActiveCount(id), 0);
@@ -295,7 +300,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     taskServiceZero.scheduleTask(new TestTask(), 300L);
                 }
             }, id);
@@ -309,7 +314,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         txnSchedulerZero.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Counter counter = getClearedCounter();
+                    Counter counter = getClearedCounter(dataServiceZero);
                     for (int i = 0; i < 5; i++)
                         taskServiceZero.scheduleTask(new TestTask(), 300L);
                 }
@@ -383,9 +388,9 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         }
     }
 
-    private Counter getClearedCounter() {
-        Counter counter = (Counter) dataServiceZero.getBinding("counter");
-        dataServiceZero.markForUpdate(counter);
+    private Counter getClearedCounter(DataService dataService) {
+        Counter counter = (Counter) dataService.getBinding("counter");
+        dataService.markForUpdate(counter);
         counter.clear();
         return counter;
     }

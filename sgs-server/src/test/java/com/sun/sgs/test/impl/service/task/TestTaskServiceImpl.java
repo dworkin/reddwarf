@@ -35,6 +35,8 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
+
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 
 import com.sun.sgs.impl.util.AbstractService.Version;
@@ -45,6 +47,7 @@ import com.sun.sgs.kernel.TransactionScheduler;
 
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 
@@ -65,6 +68,8 @@ import java.util.Properties;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -89,6 +94,8 @@ public class TestTaskServiceImpl extends Assert {
     
     /** The node that creates the servers */
     private SgsTestNode serverNode;
+    /** Any additional nodes, for tests needing more than one node */
+    private SgsTestNode additionalNodes[];
 
     public static TransactionProxy txnProxy;
     private ComponentRegistry systemRegistry;
@@ -106,6 +113,8 @@ public class TestTaskServiceImpl extends Assert {
 
     /** The continue threshold from the TaskServiceImpl. */
     private long continueThreshold;
+
+    private static AtomicLong lastNodeUsed;
         
     private static Field getField(Class cl, String name) throws Exception {
 	Field field = cl.getDeclaredField(name);
@@ -125,7 +134,7 @@ public class TestTaskServiceImpl extends Assert {
 
     @Before
     public void setUp() throws Exception {
-        setUp(null);
+        setUp(createProperties(null));
     }
 
     protected void setUp(Properties props) throws Exception {     
@@ -153,11 +162,35 @@ public class TestTaskServiceImpl extends Assert {
                     dataService.setBinding("counter", new Counter());
                 }
             }, taskOwner);
+
+        lastNodeUsed = new AtomicLong(-1);
     }
 
     @After
     public void tearDown() throws Exception {
         serverNode.shutdown(true);
+    }
+
+    private void addNodes(Properties props, int numNodes) throws Exception {
+        additionalNodes = new SgsTestNode[numNodes];
+        for (int i = 0; i < numNodes; i++) {
+            SgsTestNode node =  new SgsTestNode(serverNode, null, props);
+            additionalNodes[i] = node;
+        }
+    }
+
+    private Properties createProperties(SgsTestNode n) throws Exception {
+        Properties p = SgsTestNode.getDefaultProperties(
+                "TestTaskServiceImpl", n, null);
+        p.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
+                      "com.sun.sgs.test.impl.service.task.NonLocalNodePolicy");
+        p.setProperty(StandardProperties.MANAGERS,
+                      "com.sun.sgs.test.impl.service.task." +
+                      "TestTaskServiceImpl$NodeIdManagerImpl");
+        p.setProperty(StandardProperties.SERVICES,
+                      "com.sun.sgs.test.impl.service.task." +
+                      "TestTaskServiceImpl$NodeIdService");
+        return p;
     }
     
     /**
@@ -1050,13 +1083,13 @@ public class TestTaskServiceImpl extends Assert {
                 public void run() {
                     Counter counter = getClearedCounter();
                     taskService.schedulePeriodicTask(
-                            new NewIdentityTask(taskOwner), 0, 200L);
+                            new NewIdentityTask(taskOwner), 0, 300L);
                     counter.increment();
                     counter.increment();
                 }
             }, taskOwner);
-        Thread.sleep(300L);
-        assertCounterClearXAction("Immediate task did not have new identity");
+        Thread.sleep(500L);
+        assertCounterClearXAction("Periodic task did not have new identity");
     }
 
     @Test
@@ -1085,6 +1118,75 @@ public class TestTaskServiceImpl extends Assert {
                 }
             }, taskOwner);
         assertTrue(latch.await(100L, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testRunImmediateWithNewIdentityOnNewNode() throws Exception {
+        addNodes(createProperties(serverNode), 1);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    Counter counter = getClearedCounter();
+                    taskService.scheduleTask(new NewIdentityTask(taskOwner));
+                    counter.increment();
+                }
+            }, taskOwner);
+
+        Thread.sleep(300);
+        assertCounterClearXAction("An immediate task did not run");
+        assertEquals(additionalNodes[0].getNodeId(), lastNodeUsed.get());
+    }
+
+    @Test
+    public void testRunDelayedWithNewIdentityOnNewNode() throws Exception {
+        addNodes(createProperties(serverNode), 1);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    Counter counter = getClearedCounter();
+                    taskService.scheduleTask(new NewIdentityTask(taskOwner),
+                                             200L);
+                    counter.increment();
+                }
+            }, taskOwner);
+
+        Thread.sleep(500);
+        assertCounterClearXAction("A delayed task did not run");
+        assertEquals(additionalNodes[0].getNodeId(), lastNodeUsed.get());
+    }
+
+    @Test
+    public void testRunPeriodicWithNewIdentityOnNewNode() throws Exception {
+        addNodes(createProperties(serverNode), 1);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    Counter counter = getClearedCounter();
+                    taskService.schedulePeriodicTask(new NewIdentityTask(taskOwner),
+                                                        100L, 500L);
+                    counter.increment();
+                }
+            }, taskOwner);
+
+        Thread.sleep(400);
+        assertCounterClearXAction("A periodic task did not run");
+        assertEquals(additionalNodes[0].getNodeId(), lastNodeUsed.get());
+
+        // increment the counter before next run
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    Counter counter = getClearedCounter();
+                    counter.increment();
+                }
+            }, taskOwner);
+
+        Thread.sleep(500);
+        assertCounterClearXAction("A periodic task did not run");
+        assertEquals(additionalNodes[0].getNodeId(), lastNodeUsed.get());
     }
 
     /**
@@ -1141,6 +1243,8 @@ public class TestTaskServiceImpl extends Assert {
 
     public static abstract class AbstractTask implements Task, Serializable {
         public void run() throws Exception {
+            TestTaskServiceImpl.lastNodeUsed.
+                set(AppContext.getManager(NodeIdManager.class).getNodeId());
             DataManager dataManager = AppContext.getDataManager();
             Counter counter = (Counter) dataManager.getBinding("counter");
             dataManager.markForUpdate(counter);
@@ -1235,6 +1339,7 @@ public class TestTaskServiceImpl extends Assert {
              this.callingIdentity = callingIdentity;
          }
          public void run() throws Exception {
+             System.err.println("Task run at : " + System.currentTimeMillis());
              // check that we were always run with a new identity
              if (txnProxy.getCurrentOwner().equals(callingIdentity)) {
                  throw new RuntimeException("Not running with new identity");
@@ -1274,6 +1379,30 @@ public class TestTaskServiceImpl extends Assert {
             }
             latch.countDown();
         }
+    }
+
+    public interface NodeIdManager {
+        public long getNodeId();
+    }
+
+    public static class NodeIdManagerImpl implements NodeIdManager {
+        private final NodeIdManager backingManager;
+        public NodeIdManagerImpl(NodeIdManager backingManager) {
+            this.backingManager = backingManager;
+        }
+        public long getNodeId() { return backingManager.getNodeId(); }
+    }
+
+    public static class NodeIdService implements Service, NodeIdManager {
+        private final long nodeId;
+        public NodeIdService(Properties p, ComponentRegistry cr,
+                             TransactionProxy tp) {
+            nodeId = tp.getService(DataService.class).getLocalNodeId();
+        }
+        public String getName() { return getClass().getName(); }
+        public void ready() throws Exception {}
+        public void shutdown() { }
+        public long getNodeId() { return nodeId; }
     }
 
 }
