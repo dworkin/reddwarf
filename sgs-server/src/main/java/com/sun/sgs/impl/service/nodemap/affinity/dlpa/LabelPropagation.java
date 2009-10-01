@@ -27,6 +27,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IoRunnable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
@@ -129,7 +130,14 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     /** The groups collected in the last run. */
     private Collection<AffinityGroup> groups;
 
+    /** The time (in milliseconds) to wait between retries for IO
+     * operations. */
+    private final int retryWaitTime;
+
+    /** The maximum number of retry attempts for IO operations. */
+    private final int maxIoAttempts;
     /**
+     *
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
      * @param nodeId the local node ID
@@ -146,6 +154,15 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         super(nodeId, properties);
         this.builder = builder;
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        // Retry behavior
+        retryWaitTime = wrappedProps.getIntProperty(
+                LabelPropagationServer.IO_TASK_WAIT_TIME_PROPERTY,
+                LabelPropagationServer.DEFAULT_RETRY_WAIT_TIME, 0,
+                Integer.MAX_VALUE);
+        maxIoAttempts = wrappedProps.getIntProperty(
+                LabelPropagationServer.IO_TASK_RETRIES_PROPERTY,
+                LabelPropagationServer.DEFAULT_MAX_IO_ATTEMPTS, 0,
+                Integer.MAX_VALUE);
         
         String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,
 			wrappedProps.getProperty(
@@ -266,8 +283,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
 
     /**
      * Prepare for an algorithm run.  If we are unable to contact the server
-     * to report we are finished, log the failure and request that this
-     * node be shut down.  JANE TODO
+     * to report we are finished, log the failure.
      * <p>
      * Each pair of nodes needs to exchange conflict information to ensure
      * that both pairs know the complete set for both (e.g. if node 1 has a
@@ -317,18 +333,20 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
              nodeConflictMap.entrySet())
         {
             Long nodeId = entry.getKey();
-            LPAClient proxy = getProxy(nodeId);
+            final LPAClient proxy = getProxy(nodeId);
 
             if (proxy != null) {
                 logger.log(Level.FINEST, "{0}: exchanging edges with {1}",
                            localNodeId, nodeId);
-                Map<Object, AtomicLong> map = entry.getValue();
+                final Map<Object, AtomicLong> map = entry.getValue();
                 assert (map != null);
-                try {
-                    proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
+
+                boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
+                    public void run() throws IOException {
+                        proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
                                          localNodeId);
-                } catch (IOException e) {
-                    // JANE retry
+                    } }, nodeId, maxIoAttempts, retryWaitTime);
+                if (!ok) {
                     failed = true;
                 }
             } else {
@@ -340,12 +358,15 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         }
 
         // Tell the server we're ready for the iterations to begin
-        try {
-            server.readyToBegin(localNodeId, failed);
-        } catch (IOException e) {
-            // JANE retry
-            logger.logThrow(Level.WARNING, e,
-                            "{0}: could not contact server", localNodeId);
+        final boolean runFailed = failed;
+        boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
+            public void run() throws IOException {
+                server.readyToBegin(localNodeId, runFailed);
+            } }, -1, maxIoAttempts, retryWaitTime);
+        if (!ok) {
+            failed = true;
+            logger.log(Level.WARNING, "{0}: could not contact server",
+                                      localNodeId);
         }
         synchronized (stateLock) {
             state = State.IDLE;
@@ -427,10 +448,10 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * Run an iteration of the algorithm.
      * <p>
      * If we are unable to contact the server to report we are finished,
-     * log the failure and request that this node be shut down.  JANE TODO
+     * log the failure.
      * @param iteration the iteration to run
      */
-    private void startIterationInteral(int iteration) {
+    private void startIterationInteral(final int iteration) {
         // We should have been prepared by now.
         assert (vertices != null);
        
@@ -532,12 +553,17 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             }
         }
         // Tell the server we've finished this iteration
-        // JANE need retry
-        try {
-            server.finishedIteration(localNodeId, !changed, failed, iteration);
-        } catch (IOException e) {
-            logger.logThrow(Level.WARNING, e,
-                            "{0}: could not contact server", localNodeId);
+        final boolean converged = !changed;
+        final boolean runFailed = failed;
+        boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
+            public void run() throws IOException {
+                server.finishedIteration(localNodeId, converged,
+                                         runFailed, iteration);
+            } }, -1, maxIoAttempts, retryWaitTime);
+        if (!ok) {
+            failed = true;
+            logger.log(Level.WARNING, "{0}: could not contact server",
+                                      localNodeId);
         }
 
         synchronized (stateLock) {
@@ -694,13 +720,16 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
                        localNodeId, nodeId);
             Map<Object, Map<Integer, List<Long>>> labels = null;
-            try {
-                labels =
-                    proxy.getRemoteLabels(new HashSet<Object>(map.keySet()));
-            } catch (IOException e) {
-                // JANE RETRY
+            GetRemoteLabelsRunnable task = 
+                new GetRemoteLabelsRunnable(proxy,
+                                            new HashSet<Object>(map.keySet()));
+            boolean ok = LabelPropagationServer.runIoTask(task, nodeId,
+                                                maxIoAttempts, retryWaitTime);
+            if (ok) {
+                labels = task.getLabels();
+            } else {
                 failed = true;
-                logger.logThrow(Level.WARNING, e,
+                logger.log(Level.WARNING,
                         "{0}: could not contact node {1}", localNodeId, nodeId);
             }
 
@@ -769,7 +798,27 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
 
         return failed;
     }
-    
+
+    /**
+     * Runnable which calls another node to get its labels.  This is
+     * not an anonymous class because we need to obtain a result.
+     */
+    private class GetRemoteLabelsRunnable implements IoRunnable {
+        private Map<Object, Map<Integer, List<Long>>> labels;
+        private final HashSet<Object> objects;
+        private final LPAClient proxy;
+        GetRemoteLabelsRunnable(LPAClient proxy, HashSet<Object> objects) {
+            this.proxy = proxy;
+            this.objects = objects;
+        }
+        public void run() throws IOException {
+            labels = proxy.getRemoteLabels(objects);
+        }
+        public Map<Object, Map<Integer, List<Long>>> getLabels() {
+            return labels;
+        }
+    }
+
     /**
      * Returns the client for the given nodeId, asking the server if necessary.
      * @param nodeId
@@ -778,11 +827,14 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     private LPAClient getProxy(long nodeId) {
         LPAClient proxy = nodeProxies.get(nodeId);
         if (proxy == null) {
-            // Ask the server for it.
-            try {
-                proxy = server.getLPAClientProxy(nodeId);
-            } catch (IOException e) {
-                // JANE retries
+            GetProxyRunnable task = new GetProxyRunnable(nodeId);
+            boolean ok = LabelPropagationServer.runIoTask(task, -1,
+                                            maxIoAttempts, retryWaitTime);
+            if (ok) {
+                proxy = task.getProxy();
+            } else {
+                logger.log(Level.WARNING, "{0}: could not contact server",
+                                          localNodeId);
             }
             if (proxy != null) {
                 nodeProxies.put(nodeId, proxy);
@@ -791,6 +843,24 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             }
         }
         return proxy;
+    }
+
+    /**
+     * Runnable which gets a proxy from the server.  This is
+     * not an anonymous class because we need to obtain a result.
+     */
+    private class GetProxyRunnable implements IoRunnable {
+        private final long nodeId;
+        private LPAClient proxy;
+        GetProxyRunnable(long nodeId) {
+            this.nodeId = nodeId;
+        }
+        public void run() throws IOException {
+            proxy = server.getLPAClientProxy(nodeId);
+        }
+        public LPAClient getProxy() {
+            return proxy;
+        }
     }
 
     // For debugging.

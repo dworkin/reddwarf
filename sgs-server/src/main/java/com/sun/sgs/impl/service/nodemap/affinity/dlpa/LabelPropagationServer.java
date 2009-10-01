@@ -27,6 +27,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import java.io.IOException;
@@ -85,6 +86,37 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      * distributed Zachary test network).
      */
     private static final int MAX_ITERATIONS = 10;
+
+        /** Prefix for io task related properties. */
+    public static final String IO_TASK_PROPERTY_PREFIX =
+            "com.sun.sgs.impl.util.io.task";
+
+    /**
+     * An optional property that specifies the maximum number of retries for
+     * IO tasks in services.
+     */
+    public static final String IO_TASK_RETRIES_PROPERTY =
+            IO_TASK_PROPERTY_PREFIX + ".max.retries";
+
+    /**
+     * An optional property that specifies the wait time between successive
+     * IO task retries.
+     */
+    public static final String IO_TASK_WAIT_TIME_PROPERTY =
+            IO_TASK_PROPERTY_PREFIX + ".wait.time";
+
+    /** The default number of IO task retries **/
+    public static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
+
+    /** The default time interval to wait between IO task retries **/
+    public static final int DEFAULT_RETRY_WAIT_TIME = 100;
+
+    /** The time (in milliseconds) to wait between retries for IO
+     * operations. */
+    private final int retryWaitTime;
+
+    /** The maximum number of retry attempts for IO operations. */
+    private final int maxIoAttempts;
 
     /** The exporter for this serve. */
     private final Exporter<LPAServer> exporter;
@@ -150,6 +182,14 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             throws IOException
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        // Retry behavior
+        retryWaitTime = wrappedProps.getIntProperty(
+                IO_TASK_WAIT_TIME_PROPERTY, DEFAULT_RETRY_WAIT_TIME, 0,
+                Integer.MAX_VALUE);
+        maxIoAttempts = wrappedProps.getIntProperty(
+                IO_TASK_RETRIES_PROPERTY, DEFAULT_MAX_IO_ATTEMPTS, 0,
+                Integer.MAX_VALUE);
+
         int requestedPort = wrappedProps.getIntProperty(
                 SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
         // Export ourself.
@@ -288,8 +328,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             try {
                 client.shutdown();
             } catch (IOException e) {
-                // JANE retry?  But it's OK if we cannot reach the client,
-                // as the entire system might be coming down.
+                // It's OK if we cannot reach the client.  The entire system
+                // might be coming down.
             }
         }
         exporter.unexport();
@@ -357,23 +397,25 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         latch = new CountDownLatch(clean.size());
 
         final long runNum = runNumber.incrementAndGet();
-        for (Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
+        for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
+            long nodeId = ce.getKey();
             try {
-                ce.getValue().prepareAlgorithm(runNum);
-            } catch (IOException ioe) {
-                runFailed = true;
-                ioe.printStackTrace();
-                // JANE NEED retry here.  If the retries fail,
-                // be sure to count down the latch
-                latch.countDown();
-                // If we cannot reach the proxy after retries, we need
-                // to remove it from the
-                // clientProxyMap.
-                removeNode(ce.getKey());
+                boolean ok = runIoTask(new IoRunnable() {
+                    public void run() throws IOException {
+                        ce.getValue().prepareAlgorithm(runNum);
+                    } }, nodeId, maxIoAttempts, retryWaitTime);
+                if (!ok) {
+                    runFailed = true;
+                    latch.countDown();
+                    // If we cannot reach the proxy after retries, we need
+                    // to remove it from the
+                    // clientProxyMap.
+                    removeNode(nodeId);
+                }
             } catch (Exception e) {
                 logger.logThrow(Level.INFO, e,
                     "exception from node {0} while preparing",
-                    ce.getKey());
+                    nodeId);
                 runFailed = true;
                 latch.countDown();
             }
@@ -400,23 +442,27 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             assert (nodeBarrier.isEmpty());
             nodeBarrier.addAll(clean);
             latch = new CountDownLatch(cleanSize);
-            for (Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
+            for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet())
+            {
+                long nodeId = ce.getKey();
                 try {
-                    ce.getValue().startIteration(currentIteration);
-                } catch (IOException ioe) {
-                    runFailed = true;
-                    ioe.printStackTrace();
-                    // JANE NEED retry here.  If the retries fail,
-                    // be sure to count down the latch
-                    latch.countDown();
-                    // If we cannot reach the proxy after retries,
-                    // we need to remove it from the clientProxyMap.
-                    removeNode(ce.getKey());
+                    boolean ok = runIoTask(new IoRunnable() {
+                    public void run() throws IOException {
+                        ce.getValue().startIteration(currentIteration);
+                    } }, nodeId, maxIoAttempts, retryWaitTime);
+                    if (!ok) {
+                        runFailed = true;
+                        latch.countDown();
+                        // If we cannot reach the proxy after retries, we need
+                        // to remove it from the
+                        // clientProxyMap.
+                        removeNode(nodeId);
+                    }
                 } catch (Exception e) {
                     logger.logThrow(Level.INFO, e,
                         "exception from node {0} while running " +
                         "iteration {1}",
-                        ce.getKey(), currentIteration);
+                        nodeId, currentIteration);
                     runFailed = true;
                     latch.countDown();
                 }
@@ -458,17 +504,19 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             executor.execute(new Runnable() {
                 public void run() {
                     try {
-                        returnedGroups.put(nodeId,
+                        boolean ok = runIoTask(new IoRunnable() {
+                            public void run() throws IOException {
+                                returnedGroups.put(nodeId,
                                       proxy.getAffinityGroups(runNum, true));
-                        latch.countDown();
-                    } catch (IOException ioe) {
-                        ioe.printStackTrace();
-                        // JANE NEED retry here.  If the retries fail,
-                        // be sure to count down the latch
-                        if (nodeBarrier.remove(nodeId)) {
+                            } }, nodeId, maxIoAttempts, retryWaitTime);
+                        if (ok) {
                             latch.countDown();
+                        } else {
+                            if (nodeBarrier.remove(nodeId)) {
+                                latch.countDown();
+                            }
+                            removeNode(ce.getKey());
                         }
-                        removeNode(ce.getKey());
                     } catch (Exception e) {
                         logger.logThrow(Level.INFO, e,
                             "exception from node {0} while returning groups",
@@ -536,5 +584,54 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         } catch (InterruptedException ex) {
             runFailed = true;
         }
+    }
+
+    /**
+     * Executes the specified {@code ioTask} by invoking its {@link
+     * IoRunnable#run run} method. If the specified task throws an
+     * {@code IOException}, this method will retry the task for a fixed
+     * number of times. The number of retries and the wait time between
+     * retries are configurable properties.
+     * <p>
+     * This is much the same as the like method in AbstractService, except
+     * we don't bother to check for a transactional context (we won't be in
+     * one), and we don't check to see if the current node is alive or
+     * try to shut down a node if we cannot reach it.
+     * TBD:  is this the correct behavior?  It has the advantage that we
+     * don't depend on any other services, and relies on the watchdog to
+     * detect all node failures.
+     *
+     * @param ioTask a task with IO-related operations
+     * @param nodeId the node that is the target of the IO operations
+     * @param maxTries the number of times to attempt the retry
+     * @param waitTime the amount of time to wait before retry
+     *
+     * @return {@code true} if the ioTask ran successfully
+     */
+    static boolean runIoTask(IoRunnable ioTask, long nodeId,
+                          int maxTries, int waitTime)
+    {
+        int maxAttempts = maxTries;
+        while (maxAttempts > 0) {
+            try {
+                ioTask.run();
+                return true;
+            } catch (IOException e) {
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.logThrow(Level.FINEST, e,
+                            "IoRunnable {0} throws", ioTask);
+                }
+                try {
+                    // TBD: what back-off policy do we want here?
+                    Thread.sleep(waitTime);
+                } catch (InterruptedException ie) {
+                }
+            }
+        }
+        logger.log(Level.WARNING,
+                "A communication error occured while running an" +
+                "IO task. Could not reach node {0}.", nodeId);
+
+        return false;
     }
 }

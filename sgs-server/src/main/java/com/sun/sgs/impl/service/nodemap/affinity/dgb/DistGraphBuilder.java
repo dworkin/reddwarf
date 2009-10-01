@@ -193,7 +193,14 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
      * number of times. The method will stop retrying if the node with
      * the given {@code nodeId} is no longer alive. The number of retries
      * and the wait time between retries are configurable properties.
-     *
+     * <p>
+     * This is much the same as the like method in AbstractService, except
+     * we don't bother to check for a transactional context (we won't be in
+     * one), and we use the watchdog's non-transactional call to find out
+     * if the local node is alive.  We cannot use the AbstractService version
+     * because we are not an AbstractService.  It may be useful to refactor
+     * that method into a static method somewhere.
+     * 
      * @param ioTask a task with IO-related operations
      * @param nodeId the node that is the target of the IO operations
      */

@@ -138,8 +138,11 @@ public abstract class AbstractLPA {
      */
     protected void initializeLPARun(AffinityGraphBuilder builder) {
         logger.log(Level.FINEST, "{0}: initializing LPA run", localNodeId);
-        // Grab the graph (the weighted graph builder returns a pointer
-        // to the live graph) and a snapshot of the vertices.
+        // Grab the graph and a snapshot of the vertices.
+
+        // Most graph builders return a pointer to the "live" graph,
+        // but the BipartiteGraphBuilder constructs the graph on the fly
+        // with each call.   As a result, graph cannot simply be a final field.
         graph = builder.getAffinityGraph();
         assert (graph != null);
 

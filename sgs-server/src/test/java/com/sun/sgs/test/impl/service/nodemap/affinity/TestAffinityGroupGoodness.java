@@ -79,7 +79,7 @@ public class TestAffinityGroupGoodness {
                                                  group2);
         Assert.assertEquals(0.08, modularity, .001);
 
-        // JANE need to test with graph with weighted edges!
+        // Currently no tests with weighted edges.
 
         double jaccard = AffinityGroupGoodness.calcJaccard(group1, group2);
         System.out.println("Jaccard index is " + jaccard);

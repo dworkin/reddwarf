@@ -152,10 +152,6 @@ public class SingleLabelPropagation extends AbstractLPA
         // Step 1.  Initialize all nodes in the network.
         //          Their labels are their Identities.
 
-        // JANE The WeightedGraphBuilder returns a live graphs, the other
-        // variations are returning snapshots.  If we got to only the
-        // weighted graph builder, can make the graph field final and
-        // set it in the constructor.
         initializeLPARun(builder);
 
         // Step 2.  Set t = 1;
