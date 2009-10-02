@@ -73,7 +73,7 @@ public class DummyWatchdogService implements WatchdogService {
     public void ready() {
         Node node = nodeMap.get(localId);
         for (NodeListener listener : listeners)
-            listener.nodeStarted(node);
+            listener.nodeHealthChange(node);
     }
 
     /** {@inheritDoc} */
@@ -82,7 +82,7 @@ public class DummyWatchdogService implements WatchdogService {
         nodeMap.remove(localId);
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
-            listener.nodeFailed(localNode);
+            listener.nodeHealthChange(localNode);
     }
 
     /** {@inheritDoc} */

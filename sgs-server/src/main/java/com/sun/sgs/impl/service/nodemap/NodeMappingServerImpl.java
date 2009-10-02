@@ -972,19 +972,13 @@ public final class NodeMappingServerImpl
      * The listener registered with the watchdog service.  These methods
      * will be notified if a node starts or stops.
      */
-    private class Listener implements NodeListener {    
-        Listener() {
-            
-        }
+    private class Listener implements NodeListener {
         
         /** {@inheritDoc} */
-        public void nodeStarted(Node node) {
-            // Do nothing.  We find out about nodes being available when
-            // our client services register with us.     
-        }
-        
-        /** {@inheritDoc} */
-        public void nodeFailed(Node node) {
+        public void nodeHealthChange(Node node) {
+            if (node.isAlive()) {
+                return; // TODO
+            }
             long nodeId = node.getId();          
             try {
                 // Remove the service node listener for the node and tell

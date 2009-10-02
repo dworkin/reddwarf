@@ -751,12 +751,7 @@ public final class WatchdogServiceImpl
 
     /**
      * Notifies the appropriate registered node listeners of the
-     * status change of the specified {@code node}.  If invoking
-     * {@link Node#isAlive isAlive} on the {@code node} returns
-     * {@code false}, the {@code NodeListener#nodeFailed nodeFailed}
-     * method is invoked on each node listener, otherwise the {@code
-     * NodeListener#nodeStarted nodeStarted} method is invoked on each
-     * node listener.
+     * status change of the specified {@code node}.
      *
      * @param	node a node
      * @throws  IllegalStateException if this service is shutting down
@@ -771,11 +766,7 @@ public final class WatchdogServiceImpl
 			if (!shuttingDown() &&
                             isLocalNodeAliveNonTransactional()) 
 			{
-			    if (node.isAlive()) {
-				nodeListener.nodeStarted(node);
-			    } else {
-				nodeListener.nodeFailed(node);
-			    }
+                            nodeListener.nodeHealthChange(node);
 			}
 		    }
 		}, taskOwner);
@@ -861,23 +852,23 @@ public final class WatchdogServiceImpl
         @Override
 	public void nodeStatusChanges(long[] ids,
                                       String[] hosts,
-                                      boolean[] status,
+                                      Health[] health,
                                       long[] backups)
 	{
-	    if (ids.length != hosts.length || hosts.length != status.length ||
-		status.length != backups.length)
+	    if (ids.length != hosts.length || hosts.length != health.length ||
+		health.length != backups.length)
 	    {
 		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
-		if (ids[i] == localNodeId && status[i]) {
+		if (ids[i] == localNodeId && health[i].isAlive()) {
 		    /* Don't notify the local node that it is alive. */
 		    continue;
 		}
 		Node node =
-                        new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
+                        new NodeImpl(ids[i], hosts[i], health[i], backups[i]);
 		notifyNodeListeners(node);
-		if (!status[i] && backups[i] == localNodeId) {
+		if (!health[i].isAlive() && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
 		}
 	    }

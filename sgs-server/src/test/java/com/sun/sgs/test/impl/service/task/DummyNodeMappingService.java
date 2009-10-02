@@ -160,13 +160,12 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** {@inheritDoc} */
-    public void nodeStarted(Node node) {
-        availableNodes.add(node);
-    }
-
-    /** {@inheritDoc} */
-    public void nodeFailed(Node node) {
-        
+    public void nodeHealthChange(Node node) {
+        if (node.isAlive()) {
+            availableNodes.add(node);
+        } else {
+            availableNodes.remove(node);
+        }
     }
 
     /** {@inheritDoc} */

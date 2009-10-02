@@ -98,21 +98,7 @@ class NodeImpl
      * @param	client a watchdog client
      */
     NodeImpl(long nodeId, String hostName, int jmxPort, WatchdogClient client) {
-        this (nodeId, hostName, jmxPort, client, true, INVALID_ID);
-    }
-
-    /**
-     * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, and {@code isAlive} status.  This
-     * instance's watchdog client is set to {@code null} and its
-     * backup is unassigned (backup ID is -1).
-     *
-     * @param 	nodeId a node ID
-     * @param 	hostName a host name, or {@code null}
-     * @param	isAlive if {@code true}, this node is considered alive
-     */
-    NodeImpl(long nodeId, String hostName, boolean isAlive) {
-	this(nodeId, hostName, -1, null, isAlive, INVALID_ID);
+        this (nodeId, hostName, jmxPort, client, Health.GREEN, INVALID_ID);
     }
 
     /**
@@ -137,36 +123,12 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	health   the node's health
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
-        this(nodeId, hostName, -1, null, isAlive, backupId);
-    }
-    
-    /**
-     * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code jmxPort}, {@code client}, 
-     * {@code isAlive} status, and {@code backupId}.
-     *
-     * @param 	nodeId a node ID
-     * @param   hostName a host name, or {@code null}
-     * @param   jmxPort  the port JMX is listening on, or {@code -1}
-     * @param	client   a watchdog client
-     * @param	isAlive if {@code true}, this node is considered alive
-     * @param	backupId the ID of the node's backup (-1 if no backup
-     *		is assigned)
-     */
-    private NodeImpl(long nodeId, String hostName, int jmxPort,
-                     WatchdogClient client, boolean isAlive, long backupId) 
-    {
-        this.id = nodeId;
-	this.host = hostName;
-        this.client = client;
-        this.health = isAlive ? Health.GREEN : Health.RED;
-        this.backupId = backupId;
-        this.jmxPort = jmxPort;
+    NodeImpl(long nodeId, String hostName, Health health, long backupId) {
+        this(nodeId, hostName, -1, null, health, backupId);
     }
 
     /**

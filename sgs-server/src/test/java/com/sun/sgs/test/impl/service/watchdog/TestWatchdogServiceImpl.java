@@ -851,6 +851,48 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
+    @Test public void testAddNodeListenerNodeHealth() throws Exception {
+        DummyNodeListener listener = new DummyNodeListener();
+	watchdogService.addNodeListener(listener);
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkNotification(listener, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "B");
+        checkNotification(listener, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "A");
+        checkNotification(listener, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "C");
+        checkNotification(listener, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkNotification(listener, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "C");
+        checkNotification(listener, Health.GREEN);
+
+        if (listener.getNumNotifications() != 6) {
+            fail("Expected 6 notifications, got " +
+                 listener.getNumNotifications());
+        }
+        Set<Node> nodes = listener.getStartedNodes();
+
+        if (nodes.size() != 1) {
+            fail("Expected 1 started node, got " + nodes.size());
+        }
+    }
+
+    private void checkNotification(DummyNodeListener listener, Health expected)
+        throws InterruptedException
+    {
+        // Wait for notification to work its way through
+        Thread.sleep(2000);
+        Node node = listener.getLastNotification();
+        if (node == null) {
+            fail("Expected a notification, did not get any");
+        }
+        if (node.getHealth() != expected) {
+            fail("Expected " + expected + ", got " + node.getHealth());
+        }
+    }
+
     /* -- test shutdown -- */
 
     @IntegrationTest
@@ -1403,7 +1445,7 @@ public class TestWatchdogServiceImpl extends Assert {
         } catch (IllegalStateException ise) {
             // May happen if service is shutting down.
         } catch (Exception e) {
-            fail ("Not expecting an Exception");
+            fail ("Not expecting an Exception: " + e.getLocalizedMessage());
         }
     }
 
@@ -1785,16 +1827,19 @@ public class TestWatchdogServiceImpl extends Assert {
 
     private static class DummyNodeListener implements NodeListener {
 
+        private int notifications = 0;
+        private Node lastNode = null;
 	private final Set<Node> failedNodes = new HashSet<Node>();
 	private final Set<Node> startedNodes = new HashSet<Node>();
-	
 
-	public void nodeStarted(Node node) {
-	    startedNodes.add(node);
-	}
-
-	public void nodeFailed(Node node) {
-	    failedNodes.add(node);
+	public void nodeHealthChange(Node node) {
+            notifications++;
+            lastNode = node;
+	    if (node.isAlive()) {
+                startedNodes.add(node);
+            } else {
+                failedNodes.add(node);
+            }
 	}
 
 	Set<Node> getFailedNodes() {
@@ -1804,6 +1849,16 @@ public class TestWatchdogServiceImpl extends Assert {
 	Set<Node> getStartedNodes() {
 	    return startedNodes;
 	}
+
+        int getNumNotifications() {
+            return notifications;
+        }
+
+        Node getLastNotification() {
+            Node node = lastNode;
+            lastNode = null;
+            return node;
+        }
     }
 
     /** Define a {@code ComponentRegistry} that holds a single component. */

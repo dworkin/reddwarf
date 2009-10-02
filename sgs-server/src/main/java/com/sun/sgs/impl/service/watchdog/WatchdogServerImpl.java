@@ -921,7 +921,7 @@ public final class WatchdogServerImpl
 	int size = changedNodes.size();
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
-	boolean[] status = new boolean[size];
+	Health[] health = new Health[size];
 	long[] backups = new long[size];
 
 	int i = 0;
@@ -929,7 +929,7 @@ public final class WatchdogServerImpl
 	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
-	    status[i] = changedNode.isAlive();
+	    health[i] = changedNode.getHealth();
 	    backups[i] = changedNode.getBackupId();
 	    i++;
 	}
@@ -943,7 +943,7 @@ public final class WatchdogServerImpl
 			Level.FINEST,
 			"notifying client:{0} of status change", notifyNode);
 		}
-		client.nodeStatusChanges(ids, hosts, status, backups);
+		client.nodeStatusChanges(ids, hosts, health, backups);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the
