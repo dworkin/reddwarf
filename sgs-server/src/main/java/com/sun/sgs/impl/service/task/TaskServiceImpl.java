@@ -269,16 +269,23 @@ public class TaskServiceImpl
     private final ContinuePolicy continuePolicy;
 
     // the internal value used to represent a task with no delay
-    private static final long START_NOW = 0;
+    static final long START_NOW = -1;
 
     // the internal value used to represent a task that does not repeat
     static final long PERIOD_NONE = -1;
+
+    // the internal value used to represent a periodic task that has never been
+    // run
+    static final long NEVER = -1;
 
     // the identifier for the local node
     private final long nodeId;
 
     // the mapping service used in the same context
     private final NodeMappingService nodeMappingService;
+
+    // the watchdog service
+    private final WatchdogService watchdogService;
 
     // the factory used to manage transaction state
     private final TransactionContextFactory<TxnState> ctxFactory;
@@ -354,8 +361,7 @@ public class TaskServiceImpl
                 
         // get the current node id for the hand-off namespace, and register
         // for recovery notices to manage cleanup of hand-off bindings
-        WatchdogService watchdogService = 
-                txnProxy.getService(WatchdogService.class);
+        watchdogService = txnProxy.getService(WatchdogService.class);
         nodeId = dataService.getLocalNodeId();
         localHandoffSpace = DS_HANDOFF_SPACE + nodeId;
         watchdogService.addRecoveryListener(this);
@@ -545,17 +551,17 @@ public class TaskServiceImpl
      */
     public void scheduleTask(Task task, long delay) {
         serviceStats.scheduleTaskDelayedOp.report();
-        long startTime = System.currentTimeMillis() + delay;
+        long appStartTime = watchdogService.currentAppTimeMillis() + delay;
 
         if (delay < 0) {
             throw new IllegalArgumentException("Delay must not be negative");
         }
 
-        scheduleSingleTask(task, startTime);
+        scheduleSingleTask(task, appStartTime);
     }
 
     /** Private helper for common scheduling code. */
-    private void scheduleSingleTask(Task task, long startTime) {
+    private void scheduleSingleTask(Task task, long appStartTime) {
         if (task == null) {
             throw new NullPointerException("Task must not be null");
         }
@@ -566,7 +572,7 @@ public class TaskServiceImpl
         // persist the task regardless of where it will ultimately run
         Identity owner = getTaskOwner(task);
         BigInteger objId = allocatePendingTask(
-                task, owner, startTime, PERIOD_NONE);
+                task, owner, appStartTime, PERIOD_NONE);
 
         if (runWithNewIdentity(task)) {
             // if the owner is a new identity, we're done.
@@ -585,7 +591,7 @@ public class TaskServiceImpl
                 }
                 runner.markIgnoreIsLocal();
             }
-            scheduleTask(runner, owner, startTime, true);
+            scheduleTask(runner, owner, appStartTime, true);
         }
     }
 
@@ -597,7 +603,7 @@ public class TaskServiceImpl
     {
         serviceStats.scheduleTaskPeriodicOp.report();
         // note the start time
-        long startTime = System.currentTimeMillis() + delay;
+        long appStartTime = watchdogService.currentAppTimeMillis() + delay;
 
         if (task == null) {
             throw new NullPointerException("Task must not be null");
@@ -611,13 +617,13 @@ public class TaskServiceImpl
 
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "scheduling a periodic task starting " +
-                       "at {0}", startTime);
+                       "at {0}", appStartTime);
         }
 
         // persist the task regardless of where it will ultimately run
         Identity owner = getTaskOwner(task);
         BigInteger objId = allocatePendingTask(
-                task, owner, startTime, period);
+                task, owner, appStartTime, period);
         
         if (runWithNewIdentity(task)) {
             // if the owner is a new identity, we're done.
@@ -643,7 +649,7 @@ public class TaskServiceImpl
 
             RecurringTaskHandle handle =
                     transactionScheduler.scheduleRecurringTask(
-                    runner, owner, startTime, period);
+                    runner, owner, appStartTime, period);
             ctxFactory.joinTransaction().addRecurringTask(objId, handle, owner);
             return new PeriodicTaskHandleImpl(generateObjName(owner, objId));
         }
@@ -694,7 +700,7 @@ public class TaskServiceImpl
 
         Identity owner = getTaskOwner(task);
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
-                     System.currentTimeMillis() + delay, false);
+                     watchdogService.currentAppTimeMillis() + delay, false);
     }
 
     /**
@@ -702,12 +708,12 @@ public class TaskServiceImpl
      * also generating a unique name for this task and persisting the
      * associated {@code PendingTask}.
      */
-    private TaskRunner getRunner(Task task, Identity identity, long startTime,
-                                 long period)
+    private TaskRunner getRunner(Task task, Identity identity, 
+                                 long appStartTime, long period)
     {
         // create a new pending task that will be used when the runner runs
         BigInteger objId =
-            allocatePendingTask(task, identity, startTime, period);
+            allocatePendingTask(task, identity, appStartTime, period);
 
         return new TaskRunner(objId, task.getClass().getName(), identity);
     }
@@ -724,7 +730,7 @@ public class TaskServiceImpl
 
     /** Helper that allocates a pending task, re-using one if possible. */
     private BigInteger allocatePendingTask(Task task, Identity identity,
-                                           long startTime, long period)
+                                           long appStartTime, long period)
     {
         logger.log(Level.FINEST, "setting up a pending task");
 
@@ -772,7 +778,7 @@ public class TaskServiceImpl
                 setServiceBinding(generateObjName(identity, objId), ptask);
         }
 
-        ptask.resetValues(task, startTime, period);
+        ptask.resetValues(task, appStartTime, period);
 
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "created pending task {0} for {1}",
@@ -788,11 +794,12 @@ public class TaskServiceImpl
      * tasks, but not for periodic tasks.
      */
     private void scheduleTask(KernelRunnable task, Identity owner,
-                              long startTime, boolean transactional)
+                              long appStartTime, boolean transactional)
     {
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "reserving a task starting " +
-                       (startTime == START_NOW ? "now" : "at " + startTime));
+                                     (appStartTime == START_NOW
+                                      ? "now" : "at " + appStartTime));
         }
 
         // reserve a space for this task
@@ -801,7 +808,7 @@ public class TaskServiceImpl
             TaskReservation res = null;
             // see if this should be scheduled as a task to run now, or as
             // a task to run after a delay, and which scheduler to use
-            if (startTime == START_NOW) {
+            if (appStartTime == START_NOW) {
                 if (transactional) {
                     res = transactionScheduler.reserveTask(task, owner);
                 } else {
@@ -809,10 +816,13 @@ public class TaskServiceImpl
                 }
             } else {
                 if (transactional) {
-                    res = transactionScheduler.reserveTask(task, owner,
-                                                           startTime);
+                    res = transactionScheduler.reserveTask(
+                            task, owner,
+                            watchdogService.getSystemTimeMillis(appStartTime));
                 } else {
-                    res = taskScheduler.reserveTask(task, owner, startTime);
+                    res = taskScheduler.reserveTask(
+                            task, owner,
+                            watchdogService.getSystemTimeMillis(appStartTime));
                 }
             }
             txnState.addReservation(res, owner);
@@ -1232,6 +1242,20 @@ public class TaskServiceImpl
                                "run at {1}", objId, ptask.getStartTime());
                 }
                 // finally, run the task itself, and set for re-use as needed
+                if (ptask.isPeriodic()) {
+                    // Persistently record the start time of periodic tasks so
+                    // that if the task is handed off, we can approximate what
+                    // time to use as the new restart time of the periodic task.
+                    // Note that this is not a permanent solution as it leaves
+                    // open the possibility that executions of periodic tasks
+                    // could be skipped when handed off.
+                    // TBD: Update this so that the persistent task data is
+                    // updated with the "authoritative" start time of the
+                    // task as it is reported by the TransactionScheduler,
+                    // Profiler, or some other location yet to be determined.
+                    ptask.setLastStartTime(
+                            watchdogService.currentAppTimeMillis());
+                }
                 ptask.run();
                 if (!ptask.isPeriodic()) {
                     ptask.setReusable();
@@ -1370,11 +1394,21 @@ public class TaskServiceImpl
             // get the times associated with this task, and if the start
             // time has already passed, figure out the next period
             // interval from now to use as the new start time
-            long start = ptask.getStartTime();
-            long now = System.currentTimeMillis();
-            long period = ptask.getPeriod();
-            if (start < now) {
-                start += (((int) ((now - start) / period)) + 1) * period;
+            long originalStartTime = ptask.getStartTime();
+            long lastStartTime = ptask.getLastStartTime();
+            long restartTime;
+            // TBD: remove the check for lastStartTime < originalStartTime
+            // when the fix is put in place such that the lastStartTime is
+            // the "authoritative" start time and not an observed application
+            // time.  This check is only needed because the TransactionScheduler
+            // implementation allows for a remote possibility of running a task
+            // before it is actually scheduled to run (less than 15ms before).
+            if (lastStartTime == NEVER || lastStartTime < originalStartTime) {
+                restartTime = originalStartTime;
+            } else {
+                long period = ptask.getPeriod();
+                long runCount = (lastStartTime - originalStartTime) / period;
+                restartTime = originalStartTime + period * (runCount + 1);
             }
 
             // mark the task as running on this node so that it doesn't
@@ -1382,9 +1416,11 @@ public class TaskServiceImpl
             dataService.markForUpdate(ptask);
             ptask.setRunningNode(nodeId);
 
-            RecurringTaskHandle handle =
-                transactionScheduler.scheduleRecurringTask(runner, identity,
-                                                           start, period);
+            RecurringTaskHandle handle = 
+                transactionScheduler.scheduleRecurringTask(
+                    runner, identity,
+                    watchdogService.getSystemTimeMillis(restartTime),
+                    ptask.getPeriod());
             ctxFactory.joinTransaction().
                 addRecurringTask(objId, handle, identity);
         }
