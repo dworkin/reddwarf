@@ -83,7 +83,7 @@ public interface SchedulerQueue {
      *
      * @return the number of tasks provided
      */
-    int getNextTasks(Collection<ScheduledTask> tasks, int max);
+    int getNextTasks(Collection<? super ScheduledTask> tasks, int max);
 
     /**
      * Reserves a space for a task.

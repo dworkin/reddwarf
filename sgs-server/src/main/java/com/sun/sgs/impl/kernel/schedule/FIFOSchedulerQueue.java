@@ -96,7 +96,7 @@ public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
     /**
      * {@inheritDoc}
      */
-    public int getNextTasks(Collection<ScheduledTask> tasks, int max) {
+    public int getNextTasks(Collection<? super ScheduledTask> tasks, int max) {
         return queue.drainTo(tasks, max);
     }
 
