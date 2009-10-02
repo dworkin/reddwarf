@@ -46,6 +46,20 @@ public interface WatchdogService extends Service {
     Health getLocalNodeHealth();
 
     /**
+     * Returns the health of the local node.  This method returns the most
+     * recent information known to this service and may not be
+     * definitive.  For definitive information, use the {@link
+     * #getLocalNodeHealth getLocalNodeHealth} method. <p>
+     *
+     * This method may be invoked any time after this service is
+     * intialized, whether or not the calling context is inside or outside
+     * of a transaction.
+     *
+     * @return	the health of the local node
+     */
+    Health getLocalNodeHealthNonTransactional();
+
+    /**
      * Returns {@code true} if the local node is considered alive,
      * otherwise returns {@code false}.  This method should only be
      * called from within a transaction.

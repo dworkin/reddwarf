@@ -23,6 +23,7 @@
 
 package com.sun.sgs.management;
 
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.WatchdogService;
 
 /**
@@ -39,7 +40,22 @@ import com.sun.sgs.service.WatchdogService;
 public interface WatchdogServiceMXBean {
     /** The name for uniquely identifying this MBean. */
     String MXBEAN_NAME = "com.sun.sgs.service:type=WatchdogService";
-    
+
+    /**
+     * Return the health of the local node.
+     *
+     * @return the health of the local node.
+     */
+    Health getNodeHealth();
+
+    /**
+     * Set the health of the local node. If the node's health is below the
+     * specified health, then the node's health will not change.
+     *
+     * @param health a node health
+     */
+    void setNodeHealth(Health health);
+
     /**
      * Returns the number of times {@link WatchdogService#addNodeListener 
      * addNodeListener} has been called.
@@ -86,7 +102,17 @@ public interface WatchdogServiceMXBean {
      *
      * @return the number of times {@code getLocalNodeHealth} has been called
      */
-    public long getGetLocalNodeHealthCalls();
+    long getGetLocalNodeHealthCalls();
+
+    /**
+     * Returns the number of times
+     * {@link WatchdogService#getLocalNodeHealthNonTransactional
+     * getLocalNodeHealthNonTransactional} has been called.
+     *
+     * @return the number of times {@code getLocalNodeHealthNonTransactional}
+     *         has been called
+     */
+    long getGetLocalNodeHealthNonTransactionalCalls();
 
     /**
      * Returns the number of times {@link WatchdogService#isLocalNodeAlive 

@@ -467,6 +467,13 @@ public final class WatchdogServiceImpl
     }
 
     /** {@inheritDoc} */
+    public Health getLocalNodeHealthNonTransactional() {
+	checkState();
+        serviceStats.getLocalNodeHealthNonTransOp.report();
+	return health;
+    }
+
+    /** {@inheritDoc} */
     public boolean isLocalNodeAliveNonTransactional() {
 	checkState();
         serviceStats.isLocalNodeAliveNonTransOp.report();

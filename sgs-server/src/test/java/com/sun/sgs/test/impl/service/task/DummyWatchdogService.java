@@ -91,6 +91,11 @@ public class DummyWatchdogService implements WatchdogService {
     }
 
     /** {@inheritDoc} */
+    public Health getLocalNodeHealthNonTransactional() {
+        return health;
+    }
+
+    /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
         return health.isAlive();
     }
