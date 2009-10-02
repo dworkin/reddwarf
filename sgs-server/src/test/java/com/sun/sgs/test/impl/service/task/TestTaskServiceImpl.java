@@ -125,11 +125,11 @@ public class TestTaskServiceImpl extends Assert {
 
     @Before
     public void setUp() throws Exception {
-        setUp(null);
+        setUp(null, true);
     }
 
-    protected void setUp(Properties props) throws Exception {     
-        serverNode = new SgsTestNode("TestTaskServiceImpl", null, props);
+    protected void setUp(Properties props, boolean clean) throws Exception {
+        serverNode = new SgsTestNode("TestTaskServiceImpl", null, props, clean);
 
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
@@ -147,12 +147,14 @@ public class TestTaskServiceImpl extends Assert {
         
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
-        txnScheduler.runTask(
-            new TestAbstractKernelRunnable() {
-                public void run() throws Exception {
-                    dataService.setBinding("counter", new Counter());
-                }
-            }, taskOwner);
+        if (clean) {
+            txnScheduler.runTask(
+                    new TestAbstractKernelRunnable() {
+                        public void run() throws Exception {
+                            dataService.setBinding("counter", new Counter());
+                        }
+                    }, taskOwner);
+        }
     }
 
     @After
@@ -1087,6 +1089,70 @@ public class TestTaskServiceImpl extends Assert {
         assertTrue(latch.await(100L, TimeUnit.MILLISECONDS));
     }
 
+    @Test
+    public void testRunDelayedAcrossShutdown() throws Exception {
+        // schedule a delayed task to run
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    AppContext.getDataManager();
+                    Counter counter = getClearedCounter();
+                    taskService.scheduleTask(new NonManagedTask(taskOwner),
+                                             500L);
+                    counter.increment();
+                }
+        }, taskOwner);
+
+        // shutdown the server immediately , retaining the data store
+        // sleep past the delayed task start time and start back up
+        serverNode.shutdown(false);
+        Thread.sleep(500);
+        setUp(null, false);
+
+        // verify the delayed task does not run immediately on startup
+        Thread.sleep(100);
+        assertCounterNotClearXAction(
+                "Delayed task incorrectly ran immediately after restart");
+
+        // verify that the delayed task does run after waiting
+        Thread.sleep(500);
+        assertCounterClearXAction(
+                "Delayed task did not run on time after restart");
+    }
+
+    @Test
+    public void testRunPeriodicAcrossShutdown() throws Exception {
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    Counter counter = getClearedCounter();
+                    for (int i = 0; i < 3; i++) {
+                        taskService.schedulePeriodicTask(
+                                new NonManagedTask(taskOwner), 100L * i, 1000L);
+                        counter.increment();
+                        counter.increment();
+                    }
+                }
+        }, taskOwner);
+
+        // shutdown the server, retaining the data store
+        // sleep past the periodic tasks start times and start back up
+        serverNode.shutdown(false);
+        Thread.sleep(1500);
+        setUp(null, false);
+
+        // verify that the periodic tasks have only run once and have not
+        // immediately run a second time on startup
+        Thread.sleep(300);
+        assertCounterValueXAction(3,
+                "Periodic tasks incorrectly ran immediately after restart");
+
+        // verify that the periodic tasks do run after waiting
+        Thread.sleep(1000);
+        assertCounterClearXAction(
+                "Some periodic tasks did not run on time after restart");
+    }
+
     /**
      * Utility routines.
      */
@@ -1096,6 +1162,26 @@ public class TestTaskServiceImpl extends Assert {
         dataService.markForUpdate(counter);
         counter.clear();
         return counter;
+    }
+
+    private void assertCounterValue(int value, String message) {
+        Counter counter = (Counter) dataService.getBinding("counter");
+        if (counter.value() != value) {
+            System.err.println("Counter assert failed: expected " + value +
+                               ", actual " + counter.value());
+            fail(message);
+        }
+    }
+
+    private void assertCounterValueXAction(final int value,
+                                           final String message)
+            throws Exception {
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    assertCounterValue(value, message);
+                }
+        }, taskOwner);
     }
 
     private void assertCounterClear(String message) {
@@ -1113,6 +1199,25 @@ public class TestTaskServiceImpl extends Assert {
             new TestAbstractKernelRunnable() {
                 public void run() {
                     assertCounterClear(message);
+                }
+        }, taskOwner);
+    }
+
+    private void assertCounterNotClear(String message) {
+        Counter counter = (Counter) dataService.getBinding("counter");
+        if (counter.isZero()) {
+            System.err.println("Counter assert failed: " + counter);
+            fail(message);
+        }
+    }
+
+    private void assertCounterNotClearXAction(final String message)
+        throws Exception
+    {
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    assertCounterNotClear(message);
                 }
         }, taskOwner);
     }
@@ -1136,6 +1241,7 @@ public class TestTaskServiceImpl extends Assert {
         public void increment() { count++; }
         public void decrement() { count--; }
         public boolean isZero() { return count == 0; }
+        public int value() { return count; }
         public String toString() { return "Counter value = " + count; }
     }
 

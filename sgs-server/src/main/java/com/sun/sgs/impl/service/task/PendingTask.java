@@ -57,6 +57,7 @@ class PendingTask implements ManagedObject, Serializable {
     private String taskType;
     private long startTime;
     private long period;
+    private long lastStartTime;
     
     // identifies whether this instance is free for re-use
     private boolean reusable;
@@ -113,6 +114,7 @@ class PendingTask implements ManagedObject, Serializable {
         this.taskType = t.getClass().getName();
         this.startTime = s;
         this.period = p;
+        this.lastStartTime = TaskServiceImpl.NEVER;
 
         this.reusable = false;
         this.runningNode = -1;
@@ -130,8 +132,9 @@ class PendingTask implements ManagedObject, Serializable {
         task = null;
         taskRef = null;
         taskType = null;
-        startTime = 0;
+        startTime = TaskServiceImpl.START_NOW;
         period = TaskServiceImpl.PERIOD_NONE;
+        lastStartTime = TaskServiceImpl.NEVER;
         runningNode = -1;
     }
 
@@ -166,6 +169,14 @@ class PendingTask implements ManagedObject, Serializable {
     }
 
     /**
+     * Returns the last time when this task actually started, or
+     * {@code TaskServiceImpl.NEVER} if the task has never been run.
+     */
+    long getLastStartTime() {
+        return lastStartTime;
+    }
+
+    /**
      * Sets the node where the associated task is running if the task is
      * periodic. If the task is not periodic, {@code IllegalStateException}
      * is thrown.
@@ -177,6 +188,16 @@ class PendingTask implements ManagedObject, Serializable {
         }
         AppContext.getDataManager().markForUpdate(this);
         runningNode = nodeId;
+    }
+
+    /**
+     * Sets the last start time for this task.
+     *
+     * @param lastStartTime the new start time
+     */
+    void setLastStartTime(long lastStartTime) {
+        AppContext.getDataManager().markForUpdate(this);
+        this.lastStartTime = lastStartTime;
     }
 
     /** Checks if this is a periodic task. */
