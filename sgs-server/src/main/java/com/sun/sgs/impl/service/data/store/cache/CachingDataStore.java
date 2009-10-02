@@ -2261,7 +2261,8 @@ public class CachingDataStore extends AbstractDataStore
 	TxnContext context = contextMap.join(txn);
 	long nextNew = context.nextNewObjectId(oid);
 	long last = oid;
-	while (true) {
+	for (int i = 0; true; i++) {
+	    assert i < 1000 : "Too many retries";
 	    NextObjectResults results;
 	    try {
 		results = server.nextObjectId(nodeId, last);
