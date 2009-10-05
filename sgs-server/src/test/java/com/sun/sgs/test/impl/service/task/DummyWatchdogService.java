@@ -128,6 +128,28 @@ public class DummyWatchdogService implements WatchdogService {
 	// Silently do nothing.
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public long currentAppTimeMillis() {
+        // keep it simple for the dummy implementation
+        return System.currentTimeMillis();
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    public long getAppTimeMillis(long systemTimeMillis) {
+        return systemTimeMillis;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long getSystemTimeMillis(long appTimeMillis) {
+        return appTimeMillis;
+    }
+
     /** A basic, private implementation of Node. */
     private class NodeImpl implements Node {
         private final long nodeId;
