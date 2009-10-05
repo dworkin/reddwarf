@@ -23,15 +23,14 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.auth.Identity;
-
 /**
+ * Interface for node assignment. The actual policy to be used is configurable
+ * in the node mapping server. A class implementing the {@code NodeAssignPolicy}
+ * interface must have a public constructor that takes the following argument:
  *
- * Interface for node assignment.  I expect that we'll replace
- * these every so often, so the actual policy to be used is configurable
- * in the node mapping server.
- * <p>
- * This will probably morph into node assignment plus node balancing policy.
+ * <ul>
+ * <li>{@link java.util.Properties}</li>
+ * </ul>
  * 
  */
 public interface NodeAssignPolicy {
@@ -42,19 +41,15 @@ public interface NodeAssignPolicy {
     long SERVER_NODE = -1L;
     
     /**
-     * Choose a node to assign the identity to.  It is assumed that
-     * we've already checked to see if the identity is in the map
-     * before calling this method.
+     * Choose a node to assign an identity to.
      *
-     * @param id the identity which needs an assignment.
      * @param requestingNode the id of the node making the request, or 
      *         {@code SERVER_NODE} if the system is making the request
      * @return the chosen node's id
      *
      * @throws NoNodesAvailableException if there are no live nodes to assign to
      */
-    long chooseNode(Identity id, long requestingNode) 
-            throws NoNodesAvailableException;
+    long chooseNode(long requestingNode) throws NoNodesAvailableException;
     
     /**
      * Inform the policy that a node is now available.
@@ -71,8 +66,7 @@ public interface NodeAssignPolicy {
     void nodeUnavailable(long nodeId);
     
     /**
-     * Reset the policy, in particular its idea of what nodes have
-     * started and stopped.
+     * Reset the policy, in particular its idea of what nodes are available.
      */
     void reset();
 }

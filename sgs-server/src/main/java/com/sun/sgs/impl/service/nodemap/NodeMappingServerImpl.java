@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy;
 import com.sun.sgs.service.NoNodesAvailableException;
 import com.sun.sgs.service.NodeAssignPolicy;
 import com.sun.sgs.app.ExceptionRetryStatus;
@@ -260,9 +261,7 @@ public final class NodeMappingServerImpl
     {     
         super(properties, systemRegistry, txnProxy, logger);
 
-        logger.log(Level.CONFIG, 
-                   "Creating NodeMappingServerImpl properties:{0}", 
-                   properties); 
+        logger.log(Level.CONFIG, "Creating NodeMappingServerImpl"); 
         
         watchdogService = txnProxy.getService(WatchdogService.class);
        
@@ -273,14 +272,15 @@ public final class NodeMappingServerImpl
         String policyClassName = wrappedProps.getProperty(
 		ASSIGN_POLICY_CLASS_PROPERTY);	    
         if (policyClassName == null) {
-            assignPolicy = new RoundRobinPolicy(properties, this);
+            assignPolicy = new RoundRobinPolicy(properties);
         } else {
             assignPolicy = wrappedProps.getClassInstanceProperty(
                 ASSIGN_POLICY_CLASS_PROPERTY, NodeAssignPolicy.class,
-                new Class[] { Properties.class, NodeMappingServerImpl.class }, 
-                properties, this);
+                new Class[] { Properties.class }, properties);
         }
-        
+
+        logger.log(Level.CONFIG, "Node assign policy: {0}",
+                   assignPolicy.getClass().getName());
         /*
          * Check service version.
          */
@@ -307,6 +307,10 @@ public final class NodeMappingServerImpl
         relocationExpireTime = wrappedProps.getLongProperty(
                 RELOCATION_EXPIRE_PROPERTY, DEFAULT_RELOCATION_EXPIRE_TIME,
                 1, Long.MAX_VALUE);
+
+        logger.log(Level.CONFIG,
+                   "Remove expire time: {0}, relocate expire time {1}",
+                   removeExpireTime, relocationExpireTime);
 
         // Register our node listener with the watchdog service.
         watchdogNodeListener = new Listener();
@@ -776,7 +780,7 @@ public final class NodeMappingServerImpl
         // as it could take a while.  
         final long newNodeId;
         try {
-            newNodeId = assignPolicy.chooseNode(id, requestingNode);
+            newNodeId = assignPolicy.chooseNode(requestingNode);
         } catch (NoNodesAvailableException ex) {
             logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}" +
                     " failed because no live nodes are available", 
@@ -1010,7 +1014,6 @@ public final class NodeMappingServerImpl
                     moveIdentities(node);
                     break;
             }
-
         }
 
         private void moveIdentities(Node node) {
