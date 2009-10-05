@@ -111,10 +111,13 @@ public class GraphListener implements ProfileListener {
                                     systemRegistry, txnProxy, nms,
                                     col, properties, nodeId);
         } else if (type != NodeType.singleNode) {
-            // Should this graph listener check to make sure the
-            // caching data store is configured?
-            builder = new WeightedGraphBuilder(col, txnProxy,
-                                               properties, nodeId);
+            // Default is currently NONE, might become the distributed LPA/
+            // weighted graph listener in the future.
+            builder = null;
+//            // Should this graph listener check to make sure the
+//            // caching data store is configured?
+//            builder = new WeightedGraphBuilder(col, txnProxy,
+//                                               properties, nodeId);
         } else {
             // If we're in single node, and no builder was requested,
             // don't bother creating anything.  Affinity groups will make

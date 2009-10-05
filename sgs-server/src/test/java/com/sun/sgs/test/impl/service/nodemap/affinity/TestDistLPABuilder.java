@@ -53,9 +53,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
    @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(
-            new Object[][] {{"default"},
-                            {WeightedGraphBuilder.class.getName()},
+            new Object[][] {{WeightedGraphBuilder.class.getName()},
                             {BipartiteGraphBuilder.class.getName()}});
+        // TBD:  if default is changed from NONE
+//            new Object[][] {{"default"},
+//                            {WeightedGraphBuilder.class.getName()},
+//                            {BipartiteGraphBuilder.class.getName()}});
     }
    
     private final static String APP_NAME = "TestDistLPABuilders";
@@ -103,6 +106,44 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         return p;
     }
     
+    // TBD change if the default changes
+    @Test
+    public void testDefault() throws Exception {
+        SgsTestNode newNode = null;
+        try {
+            Properties p = getProps(serverNode);
+            p.remove(GraphListener.GRAPH_CLASS_PROPERTY);
+            newNode =  new SgsTestNode(serverNode, null, p);
+            GraphListener newListener =
+               (GraphListener) graphListenerField.get(
+                                    newNode.getNodeMappingService());
+            Assert.assertNull(newListener.getGraphBuilder());
+        } finally {
+            if (newNode != null) {
+                newNode.shutdown(false);
+            }
+        }
+    }
+
+    @Test
+    public void testNoListener() throws Exception {
+        SgsTestNode newNode = null;
+        try {
+            Properties p = getProps(serverNode);
+            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY,
+                          GraphListener.GRAPH_CLASS_NONE);
+            newNode =  new SgsTestNode(serverNode, null, p);
+            GraphListener newListener =
+               (GraphListener) graphListenerField.get(
+                                    newNode.getNodeMappingService());
+            Assert.assertNull(newListener.getGraphBuilder());
+        } finally {
+            if (newNode != null) {
+                newNode.shutdown(false);
+            }
+        }
+    }
+
     @Test
     public void testConstructor1() {
         // empty obj use
