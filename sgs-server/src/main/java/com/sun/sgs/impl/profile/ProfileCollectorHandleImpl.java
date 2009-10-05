@@ -55,6 +55,11 @@ public class ProfileCollectorHandleImpl implements ProfileCollectorHandle {
     }
 
     /** {@inheritDoc} */
+    public void notifyNodeIdAssigned(long nodeId) {
+        profileCollector.notifyNodeIdAssigned(nodeId);
+    }
+
+    /** {@inheritDoc} */
     public void startTask(KernelRunnable task, Identity owner,
             long scheduledStartTime, int readyCount)
     {

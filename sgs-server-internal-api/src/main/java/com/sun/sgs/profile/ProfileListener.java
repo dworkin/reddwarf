@@ -91,6 +91,12 @@ public interface ProfileListener {
      *   <td>the current number of threads : <code>Integer</code></td>
      *   <td>the previous number of threads : <code>Integer</code></td>
      * </tr>
+     * <tr>
+     *   <td><code>com.sun.sgs.profile.nodeid</code></td>
+     *   <td>the local node has been assigned a unique identifier</td>
+     *   <td>the identifier for the local node: <code>Long</code></td>
+     *   <td><code>null</code></td>
+     * </tr>
      *
      * </table>
      *

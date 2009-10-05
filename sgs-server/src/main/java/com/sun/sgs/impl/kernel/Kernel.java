@@ -194,8 +194,9 @@ class Kernel {
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
     
-    // collector of profile information
+    // collector of profile information, and an associated handle
     private final ProfileCollectorImpl profileCollector;
+    private final ProfileCollectorHandleImpl profileCollectorHandle;
     
     // shutdown controller that can be passed to components who need to be able 
     // to issue a kernel shutdown. the watchdog also constains a reference for
@@ -252,8 +253,8 @@ class Kernel {
             
             profileCollector = new ProfileCollectorImpl(profileLevel, 
                                               appProperties, systemRegistry);
-            ProfileCollectorHandle profileCollectorHandle = 
-                    new ProfileCollectorHandleImpl(profileCollector);
+            profileCollectorHandle = 
+                new ProfileCollectorHandleImpl(profileCollector);
 
             // with profiling setup, register all MXBeans
             registerMXBeans(appProperties);
@@ -564,8 +565,12 @@ class Kernel {
             appProperties.getProperty(StandardProperties.DATA_MANAGER,
                                       DEFAULT_DATA_MANAGER);
         setupService(dataServiceClass, dataManagerClass, startupContext);
-	shutdownCtrl.setDataService(
-	    startupContext.getService(DataService.class));
+        // provide the data service to the shutdown controller, and notify
+        // the profile collector that the node now has an id
+        DataService dataService = startupContext.getService(DataService.class);
+	shutdownCtrl.setDataService(dataService);
+        profileCollectorHandle.
+            notifyNodeIdAssigned(dataService.getLocalNodeId());
 
         // load the watch-dog service, which has no associated manager
 
