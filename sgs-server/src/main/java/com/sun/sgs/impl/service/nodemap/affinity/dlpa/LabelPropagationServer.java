@@ -615,8 +615,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      * one).
      *
      * @param ioTask a task with IO-related operations
-     * @param watchdog the watchdog service for the local node, in case of
-     *         failure
+     * @param wdog the watchdog service for the local node, in case of failure
      * @param nodeId the node that should be shut down in case of failure
      * @param maxTries the number of times to attempt the retry
      * @param waitTime the amount of time to wait before retry

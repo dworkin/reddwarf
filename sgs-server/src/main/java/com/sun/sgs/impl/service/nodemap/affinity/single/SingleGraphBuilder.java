@@ -32,7 +32,7 @@ import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.service.TransactionProxy;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
@@ -91,12 +91,12 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     /**
      * Creates a weighted graph builder and its JMX MBean.
      * @param col the profile collector
-     * @param wdog the watchdog service (unused)
+     * @param txnProxy the transaction proxy (unused)
      * @param properties application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public SingleGraphBuilder(ProfileCollector col, WatchdogService wdog,
+    public SingleGraphBuilder(ProfileCollector col, TransactionProxy txnProxy,
                               Properties properties, long nodeId)
         throws Exception
     {

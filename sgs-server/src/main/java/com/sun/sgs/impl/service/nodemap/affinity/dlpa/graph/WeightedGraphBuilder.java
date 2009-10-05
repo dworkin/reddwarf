@@ -35,6 +35,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.util.Pair;
@@ -120,12 +121,12 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     /**
      * Creates a weighted graph builder.
      * @param col the profile collector
-     * @param wdog the watchdog service, used for error reporting
+     * @param txnProxy the transaction proxy
      * @param properties  application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public WeightedGraphBuilder(ProfileCollector col, WatchdogService wdog,
+    public WeightedGraphBuilder(ProfileCollector col, TransactionProxy txnProxy,
                                 Properties properties, long nodeId)
         throws Exception
     {
@@ -136,6 +137,7 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
                 1, Integer.MAX_VALUE);
 
+        WatchdogService wdog = txnProxy.getService(WatchdogService.class);
         // Create the LPA algorithm pieces
         NodeType type =
             NodeType.valueOf(
@@ -150,7 +152,11 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
             lpaServer = null;
             lpa = null;
         }
-        
+
+        // TBD:  Register with the caching data store here.
+        // Get the data store from the txnProxy, making sure it's the correct
+        // type.  Register ourselves as a listener for conflict info.
+
         // Create our JMX MBean
         stats = new AffinityGraphBuilderStats(col,
                     affinityGraph, periodCount, snapshot);
@@ -283,7 +289,7 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     }
     
     /**
-     * This will be the implementation of our conflict detection listener.
+     * TBD: This will be the implementation of our conflict detection listener.
      * <p>
      * Note that forUpdate is currently not used.
      * 

@@ -35,6 +35,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
@@ -108,12 +109,13 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     /**
      * Constructs a new bipartite graph builder.
      * @param col the profile collector
-     * @param wdog the watchdog service, used for error reporting
+     * @param txnProxy the transaction proxy
      * @param props application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public BipartiteGraphBuilder(ProfileCollector col, WatchdogService wdog,
+    public BipartiteGraphBuilder(ProfileCollector col, 
+                                 TransactionProxy txnProxy,
                                  Properties props, long nodeId)
         throws Exception
     {
@@ -128,6 +130,7 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
         NodeType type =
             NodeType.valueOf(
                 props.getProperty(StandardProperties.NODE_TYPE));
+        WatchdogService wdog = txnProxy.getService(WatchdogService.class);
         if (type == NodeType.coreServerNode) {
             lpaServer = new LabelPropagationServer(col, wdog, props);
             lpa = null;
@@ -138,6 +141,10 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
             lpaServer = null;
             lpa = null;
         }
+        // TBD:  Register with the caching data store here.
+        // Get the data store from the txnProxy, making sure it's the correct
+        // type.  Register ourselves as a listener for conflict info.
+
         // Create our JMX MBean
         stats = new AffinityGraphBuilderStats(col,
                     bipartiteGraph, periodCount, snapshot);
@@ -316,7 +323,7 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     }
 
     /** 
-     * This will be the implementation of our conflict detection listener.
+     * TBD: This will be the implementation of our conflict detection listener.
      *
      * @param objId the object that was evicted
      * @param nodeId the node that caused the eviction

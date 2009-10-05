@@ -33,7 +33,6 @@ import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.WatchdogService;
 import java.beans.PropertyChangeEvent;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -112,8 +111,10 @@ public class GraphListener implements ProfileListener {
                                     systemRegistry, txnProxy, nms,
                                     col, properties, nodeId);
         } else if (type != NodeType.singleNode) {
-            WatchdogService wdog = txnProxy.getService(WatchdogService.class);
-            builder = new WeightedGraphBuilder(col, wdog, properties, nodeId);
+            // Should this graph listener check to make sure the
+            // caching data store is configured?
+            builder = new WeightedGraphBuilder(col, txnProxy,
+                                               properties, nodeId);
         } else {
             // If we're in single node, and no builder was requested,
             // don't bother creating anything.  Affinity groups will make
@@ -142,15 +143,13 @@ public class GraphListener implements ProfileListener {
         Constructor<?> ctor;
         try {
             try {
-                WatchdogService wdog =
-                        txnProxy.getService(WatchdogService.class);
                 // find the appropriate constructor
                 ctor = bClass.getConstructor(ProfileCollector.class,
-                        WatchdogService.class,
+                        TransactionProxy.class,
                         Properties.class, long.class);
                 // return a new instance
                 return (AffinityGraphBuilder)
-                        (ctor.newInstance(col, wdog, props, nodeId));
+                        (ctor.newInstance(col, txnProxy, props, nodeId));
 
             } catch (NoSuchMethodException e) {
                 // Look for a version that takes additional args because
