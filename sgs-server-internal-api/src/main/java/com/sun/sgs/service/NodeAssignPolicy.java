@@ -15,9 +15,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
-package com.sun.sgs.impl.service.nodemap;
+package com.sun.sgs.service;
 
 import com.sun.sgs.auth.Identity;
 
@@ -30,7 +34,7 @@ import com.sun.sgs.auth.Identity;
  * This will probably morph into node assignment plus node balancing policy.
  * 
  */
-interface NodeAssignPolicy {
+public interface NodeAssignPolicy {
     
     /**
      *  An id representing the server node.
@@ -55,15 +59,16 @@ interface NodeAssignPolicy {
     /**
      * Inform the policy that a node is now available.
      *
-     * @param nodeId the started node
+     * @param nodeId the node ID
      */
-    void nodeStarted(long nodeId);
+    void nodeAvailable(long nodeId);
     
     /**
-     * Inform the policy that a node has stopped.
-     * @param nodeId  the stopped node
+     * Inform the policy that a node is no longer available.
+     *
+     * @param nodeId  the node ID
      */
-    void nodeStopped(long nodeId);
+    void nodeUnavailable(long nodeId);
     
     /**
      * Reset the policy, in particular its idea of what nodes have

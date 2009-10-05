@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.service.NoNodesAvailableException;
+import com.sun.sgs.service.NodeAssignPolicy;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -641,7 +643,8 @@ public final class NodeMappingServerImpl
         
         try {
             notifyMap.put(nodeId, client);
-            assignPolicy.nodeStarted(nodeId);
+            // TODO -- this assumes the registering node is healthy... that OK?
+            assignPolicy.nodeAvailable(nodeId);
             logger.log(Level.FINEST, 
                        "Registered node listener for {0} ", nodeId);
         } finally {
@@ -658,7 +661,7 @@ public final class NodeMappingServerImpl
         
         try {
             // Tell the assign policy to stop assigning to the node
-            assignPolicy.nodeStopped(nodeId);
+            assignPolicy.nodeUnavailable(nodeId);
             notifyMap.remove(nodeId);
             logger.log(Level.FINEST, 
                        "Unregistered node listener for {0} ", nodeId);
@@ -976,17 +979,42 @@ public final class NodeMappingServerImpl
         
         /** {@inheritDoc} */
         public void nodeHealthChange(Node node) {
-            if (node.isAlive()) {
-                return; // TODO
+            long nodeId = node.getId();
+
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "Node {0} health change to {1}",
+                           nodeId, node.getHealth());
             }
-            long nodeId = node.getId();          
-            try {
-                // Remove the service node listener for the node and tell
-                // the assign policy.
-                unregisterNodeListener(nodeId);
-            } catch (IOException ex) {
-                // won't happen, this is a local call
+            switch (node.getHealth()) {
+                case GREEN :
+                    // only registered nodes can be assigned identities
+                    if (notifyMap.containsKey(nodeId)) {
+                        assignPolicy.nodeAvailable(nodeId);
+                    }
+                    break;
+
+                case YELLOW :
+                    // fall through
+                case ORANGE :
+                    assignPolicy.nodeUnavailable(nodeId);
+                    break;
+
+                case RED :
+                    try {
+                        // Remove the service node listener for the node and
+                        // tell the assign policy.
+                        unregisterNodeListener(nodeId);
+                    } catch (IOException ex) {
+                        // won't happen, this is a local call
+                    }
+                    moveIdentities(node);
+                    break;
             }
+
+        }
+
+        private void moveIdentities(Node node) {
+            long nodeId = node.getId();
             
             // Look up each identity on the failed node and move it
             String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);

@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.service.NoNodesAvailableException;
+import com.sun.sgs.service.NodeAssignPolicy;
 import com.sun.sgs.auth.Identity;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,12 +73,12 @@ public class LocalNodePolicy implements NodeAssignPolicy {
     }
 
     /** {@inheritDoc} */
-    public synchronized void nodeStarted(long nodeId) {
+    public synchronized void nodeAvailable(long nodeId) {
         liveNodes.add(nodeId);
     }
 
     /** {@inheritDoc} */
-    public synchronized void nodeStopped(long nodeId) {
+    public synchronized void nodeUnavailable(long nodeId) {
         liveNodes.remove(nodeId);
     }
     

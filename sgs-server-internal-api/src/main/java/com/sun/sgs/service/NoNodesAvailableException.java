@@ -15,9 +15,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Sun designates this particular file as subject to the "Classpath"
+ * exception as provided by Sun in the LICENSE file that accompanied
+ * this code.
  */
 
-package com.sun.sgs.impl.service.nodemap;
+package com.sun.sgs.service;
 
 /**
  *
@@ -27,7 +31,7 @@ package com.sun.sgs.impl.service.nodemap;
  * Note that this exception is very specific;  perhaps we'll want a more
  * general exception to be thrown from {@link NodeAssignPolicy#chooseNode}. 
  */
-class NoNodesAvailableException extends Exception {
+public class NoNodesAvailableException extends Exception {
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
