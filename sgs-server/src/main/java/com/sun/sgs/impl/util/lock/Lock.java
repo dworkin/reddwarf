@@ -74,19 +74,19 @@ final class Lock<K> {
     }
 
     /**
-     * Attempts to obtain this lock.  If {@code waiting} is {@code true},
-     * the locker is already waiting for the lock.  Adds the locker as an
-     * owner of the lock if the lock was obtained, and removes the locker
-     * from the waiters list if it was waiting.  Returns {@code null} if
-     * the locker already owned this lock.  Otherwise, returns a {@code
-     * LockAttemptResult} containing the {@link LockRequest}, and with the
-     * {@code conflict} field set to {@code null} if the lock was acquired,
-     * else set to a conflicting transaction if the lock could not be
-     * obtained.
+     * Attempts to obtain this lock.  If {@code waiting} is {@code true}, the
+     * locker is known to be waiting for the lock, although it may also be
+     * waiting otherwise.  Adds the locker as an owner of the lock if the lock
+     * was obtained, and removes the locker from the waiters list if it was
+     * waiting.  Returns {@code null} if the locker already owned this lock.
+     * Otherwise, adds the locker to the waiters list, and returns a {@code
+     * LockAttemptResult} containing the {@link LockRequest}, with its {@code
+     * conflict} field set to {@code null} if the lock was acquired or a
+     * conflicting transaction if the lock could not be obtained.
      *
      * @param	locker the locker requesting the lock
      * @param	forWrite whether a write lock is requested
-     * @param	waiting whether the locker is already a waiter
+     * @param	waiting whether the locker is known to be a waiter
      * @return	a {@code LockAttemptResult} or {@code null}
      */
     LockAttemptResult<K> lock(
@@ -98,7 +98,7 @@ final class Lock<K> {
 	if (!owners.isEmpty()) {
 	    /* Check conflicting owners */
 	    for (LockRequest<K> ownerRequest : owners) {
-		if (locker == ownerRequest.locker) {
+		if (locker == ownerRequest.getLocker()) {
 		    if (!forWrite || ownerRequest.getForWrite()) {
 			/* Already locked */
 			assert validateInUse();
@@ -109,7 +109,7 @@ final class Lock<K> {
 		    }
 		} else if (forWrite || ownerRequest.getForWrite()) {
 		    /* Found conflict */
-		    conflict = ownerRequest.locker;
+		    conflict = ownerRequest.getLocker();
 		}
 	    }
 	}
@@ -120,7 +120,7 @@ final class Lock<K> {
 		 i.hasNext(); )
 	    {
 		LockRequest<K> waiterRequest = i.next();
-		if (locker == waiterRequest.locker) {
+		if (locker == waiterRequest.getLocker()) {
 		    assert forWrite == waiterRequest.getForWrite();
 		    request = waiterRequest;
 		    if (conflict == null) {
@@ -131,14 +131,14 @@ final class Lock<K> {
 			   (forWrite || waiterRequest.getForWrite()))
 		{
 		    /* Found a conflicting waiter */
-		    conflict = waiterRequest.locker;
+		    conflict = waiterRequest.getLocker();
 		}
 	    }
 	}
 	assert !waiting || request != null : "Should have found waiter";
 	if (conflict == null && upgrade) {
 	    /* Upgrading -- remove the read lock request from owners */
-	    assert owners.size() == 1 && owners.get(0).locker == locker;
+	    assert owners.size() == 1 && owners.get(0).getLocker() == locker;
 	    owners.remove(0);
 	}
 	if (conflict == null) {
@@ -202,14 +202,14 @@ final class Lock<K> {
 	boolean owned = false;
 	for (Iterator<LockRequest<K>> i = owners.iterator(); i.hasNext(); ) {
 	    LockRequest<K> ownerRequest = i.next();
-	    if (locker == ownerRequest.locker) {
+	    if (locker == ownerRequest.getLocker()) {
 		if (!downgrade || ownerRequest.getForWrite()) {
 		    i.remove();
 		    owned = true;
 		    if (downgrade) {
 			owners.add(
 			    locker.newLockRequest(
-				ownerRequest.key, false, false));
+				ownerRequest.getKey(), false, false));
 		    }
 		}
 		break;
@@ -221,7 +221,7 @@ final class Lock<K> {
 	    for (int i = 0; i < waiters.size(); i++) {
 		LockRequest<K> waiter = waiters.get(i);
 		LockAttemptResult<K> result =
-		    lock(waiter.locker, waiter.getForWrite(), true);
+		    lock(waiter.getLocker(), waiter.getForWrite(), true);
 		if (logger.isLoggable(FINEST)) {
 		    logger.log(FINEST,
 			       "attempt to lock waiter {0} returns {1}",
@@ -242,7 +242,7 @@ final class Lock<K> {
 		    found = true;
 		    lockersToNotify = new ArrayList<Locker<K>>();
 		}
-		lockersToNotify.add(waiter.locker);
+		lockersToNotify.add(waiter.getLocker());
 	    }
 	}
 	assert !inUse(locker.lockManager) || validateInUse();
@@ -285,7 +285,7 @@ final class Lock<K> {
 	    }
 	    for (int j = i + 1; j < numWaiters; j++) {
 		LockRequest<K> waiter2 = waiters.get(j);
-		if (waiter.locker == waiter2.locker) {
+		if (waiter.getLocker() == waiter2.getLocker()) {
 		    throw new AssertionError(
 			"Locker waits twice: " + this + ", " +
 			waiter + ", " + waiter2);
@@ -294,7 +294,7 @@ final class Lock<K> {
 	    boolean foundOwner = false;
 	    for (int j = 0; j < numOwners; j++) {
 		LockRequest<K> owner = owners.get(j);
-		if (waiter.locker == owner.locker) {
+		if (waiter.getLocker() == owner.getLocker()) {
 		    foundOwner = true;
 		    if (!waiter.getUpgrade()) {
 			throw new AssertionError(
@@ -361,7 +361,7 @@ final class Lock<K> {
 
     /**
      * Removes a locker from the list of waiters for this lock.  The locker
-     * should be present in the list.
+     * must be present in the list.
      */
     void flushWaiter(Locker<K> locker) {
 	assert checkSync(locker.lockManager);
@@ -369,7 +369,7 @@ final class Lock<K> {
 	     iter.hasNext(); )
 	{
 	    LockRequest<K> request = iter.next();
-	    if (request.locker == locker) {
+	    if (request.getLocker() == locker) {
 		iter.remove();
 		return;
 	    }
@@ -382,9 +382,9 @@ final class Lock<K> {
      * specified request.
      */
     boolean isOwner(LockRequest<K> request) {
-	assert checkSync(request.locker.lockManager);
+	assert checkSync(request.getLocker().lockManager);
 	for (LockRequest<K> owner : owners) {
-	    if (request.locker == owner.locker) {
+	    if (request.getLocker() == owner.getLocker()) {
 		return !request.getForWrite() || owner.getForWrite();
 	    }
 	}

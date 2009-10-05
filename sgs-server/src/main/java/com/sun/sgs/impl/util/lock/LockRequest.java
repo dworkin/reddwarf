@@ -30,13 +30,13 @@ public class LockRequest<K> {
     private enum Type { READ, WRITE, UPGRADE; }
 
     /** The locker that requested the lock. */
-    final Locker<K> locker;
+    private final Locker<K> locker;
 
     /** The key identifying the lock. */
-    final K key;
+    private final K key;
 
     /** The request type. */
-    final Type type;
+    private final Type type;
 
     /**
      * Creates a lock request.

@@ -279,7 +279,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	/**
 	 * Whether the transaction has ended.  Used when assertions are enabled
 	 * to check the thread safety of accesses to the requests field.
-	 * Synchronize on the requests field when accessing this field.
+	 * Synchronize on the requests field, rather than the locker object
+	 * itself, when accessing this field, to avoid lock ordering problems.
 	 */
 	private boolean ended = false;
 
