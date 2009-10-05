@@ -30,6 +30,8 @@ import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
@@ -117,6 +119,17 @@ import javax.management.JMException;
  *	node status change notifications from the watchdog server.  The value
  *	must be greater than or equal to {@code 0} and no greater than
  *	{@code 65535}.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *      com.sun.sgs.impl.service.watchdog.timesync.interval
+ *      </b></code><br>
+ *      <i>Default:</i> {@code 300000} (five minutes) <br>
+ *
+ * <dd style="padding-top: .5em">
+ *      Specifies the amount of time in milliseconds that this service will
+ *      wait between synchronizing its local time with the global time
+ *      of the {@code WatchdogServer}.  The value must be greater than or
+ *      equal to {@code 1000} and no greater than {@link Long#MAX_VALUE}.
  * 
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.management.jmxremote.port
@@ -185,6 +198,13 @@ public final class WatchdogServiceImpl
     /** The default value of the client port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
 
+    /** The property name for the timesync interval. */
+    private static final String TIMESYNC_INTERVAL_PROPERTY =
+            PKG_NAME + ".timesync.interval";
+
+    /** The default time in milliseconds to wait between timesync. */
+    private static final long DEFAULT_TIMESYNC_INTERVAL = 300000L;
+
     /** The minimum renew interval. */
     private static final long MIN_RENEW_INTERVAL = 25;
 
@@ -243,6 +263,15 @@ public final class WatchdogServiceImpl
     
     /** Our profiled data */
     private final WatchdogServiceStats serviceStats;
+
+    /** The interval between synchronizations of global time with the server. */
+    private final long timesyncInterval;
+
+    /** The local offset to use when reporting the application time. */
+    private volatile long timeOffset;
+
+     /** a handle to the periodic time sync task */
+    private RecurringTaskHandle timesyncTaskHandle = null;
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -338,6 +367,10 @@ public final class WatchdogServiceImpl
 		    localNodeId, clientHost, clientProxy, jmxPort);
             }
             renewThread.start();
+
+            timesyncInterval = wrappedProps.getLongProperty(
+                    TIMESYNC_INTERVAL_PROPERTY, DEFAULT_TIMESYNC_INTERVAL,
+                    1000, Long.MAX_VALUE);
             
             // create our profiling info and register our MBean
             ProfileCollector collector = 
@@ -391,6 +424,15 @@ public final class WatchdogServiceImpl
 	// chance to register.
         if (serverImpl != null) {
             serverImpl.ready();
+            this.timeOffset = serverImpl.getTimeOffset();
+        } else {
+            TimeSyncRunner timeSyncRunner = new TimeSyncRunner();
+            timeSyncRunner.run();
+            timesyncTaskHandle = taskScheduler.scheduleRecurringTask(
+                    timeSyncRunner, taskOwner,
+                    System.currentTimeMillis() + timesyncInterval,
+                    timesyncInterval);
+            timesyncTaskHandle.start();
         }
     }
 
@@ -399,6 +441,9 @@ public final class WatchdogServiceImpl
 	synchronized (renewThread) {
 	    renewThread.notifyAll();
 	}
+        if (timesyncTaskHandle != null) {
+            timesyncTaskHandle.cancel();
+        }
 	try {
 	    // The following 'join' call relies on an undocumented feature:
 	    // 'join' can also be invoked on a thread that isn't started.
@@ -532,6 +577,33 @@ public final class WatchdogServiceImpl
         if (isLocal) {
             setFailedThenNotify(true);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long currentAppTimeMillis() {
+        return System.currentTimeMillis() - timeOffset;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long getAppTimeMillis(long systemTimeMillis) {
+        if (systemTimeMillis < timeOffset) {
+            throw new IllegalArgumentException(
+                    "System time : " + systemTimeMillis +
+                    " is before the start time of this application.");
+        }
+
+        return systemTimeMillis - timeOffset;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long getSystemTimeMillis(long appTimeMillis) {
+        return appTimeMillis + timeOffset;
     }
 
     /**
@@ -872,5 +944,25 @@ public final class WatchdogServiceImpl
 		}
 	    }
 	}
+    }
+
+    /**
+     * Private runnable that is used to periodically synchronize the local
+     * time offset with that maintained in the global {@code WatchdogServer}.
+     */
+    private final class TimeSyncRunner implements KernelRunnable {
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return TimeSyncRunner.class.getName();
+        }
+        /** {@inheritDoc} */
+        public void run() throws Exception {
+            long before = System.currentTimeMillis();
+            long appTime = serverProxy.currentAppTimeMillis();
+            long after = System.currentTimeMillis();
+
+            // calculate local offset value based on round trip time
+            timeOffset = after - (appTime + (after - before) / 2L);
+        }
     }
 }

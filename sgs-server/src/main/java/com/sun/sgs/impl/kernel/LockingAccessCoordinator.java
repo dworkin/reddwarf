@@ -844,8 +844,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	/* -- Implement AccessedObjectsDetail -- */
 
 	/** {@inheritDoc} */
-	public List<? extends AccessedObject> getAccessedObjects() {
-	    return Collections.unmodifiableList(requests);
+	public List<AccessedObject> getAccessedObjects() {
+	    return Collections.<AccessedObject>unmodifiableList(requests);
 	}
 
 	/** {@inheritDoc} */
