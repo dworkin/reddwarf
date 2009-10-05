@@ -88,19 +88,6 @@ public class DistGraphBuilderServerImpl
     /** The exporter for this server. */
     private final Exporter<DistGraphBuilderServer> exporter;
 
-    /**  Map for tracking object-> map of identity-> number accesses
-     * (thus we keep track of the number of accesses each identity has made
-     * for an object, to aid maintaining weighted edges)
-     * Concurrent modifications are protected by locking the affinity graph.
-     */
-    private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-        objectMap =
-           new ConcurrentHashMap<Object, ConcurrentMap<Identity, AtomicLong>>();
-
-    /** Our graph of object accesses.*/
-    private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
-        affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
-
     /** Our backing builder. */
     private final SingleGraphBuilder builder;
 

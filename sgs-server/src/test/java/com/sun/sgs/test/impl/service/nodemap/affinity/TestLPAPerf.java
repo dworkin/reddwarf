@@ -106,7 +106,7 @@ public class TestLPAPerf {
     public static void before() throws Exception {
         Properties props = new Properties();
         collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
-        lpaServer = new LabelPropagationServer(collector, props);
+        lpaServer = new LabelPropagationServer(collector, null, props);
     }
 
     @AfterClass
@@ -187,20 +187,20 @@ public class TestLPAPerf {
                        String.valueOf(serverPort));
             props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
-            server = new LabelPropagationServer(collector, props);
+            server = new LabelPropagationServer(collector, null, props);
 
             LabelPropagation lp1 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                        DistributedZachBuilder.NODE1, props);
+                        null, DistributedZachBuilder.NODE1, props);
             LabelPropagation lp2 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                        DistributedZachBuilder.NODE2, props);
+                        null, DistributedZachBuilder.NODE2, props);
             LabelPropagation lp3 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                        DistributedZachBuilder.NODE3, props);
+                        null, DistributedZachBuilder.NODE3, props);
         }
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
@@ -219,22 +219,22 @@ public class TestLPAPerf {
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
         LabelPropagationServer server = 
-                new LabelPropagationServer(collector, props);
+                new LabelPropagationServer(collector, null, props);
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
 
         LabelPropagation lp1 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                    DistributedZachBuilder.NODE1, props);
+                    null, DistributedZachBuilder.NODE1, props);
         LabelPropagation lp2 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                    DistributedZachBuilder.NODE2, props);
+                    null, DistributedZachBuilder.NODE2, props);
         LabelPropagation lp3 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                    DistributedZachBuilder.NODE3, props);
+                    null, DistributedZachBuilder.NODE3, props);
 
         AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
             collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);

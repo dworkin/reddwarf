@@ -28,6 +28,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
@@ -55,8 +56,18 @@ import java.util.logging.Level;
  * This is the portion of code that is on each application node.
  */
 public class LabelPropagation extends AbstractLPA implements LPAClient {
+    /** Our class name. */
+    private static final String CLASS_NAME =
+            LabelPropagation.class.getName();
+    
     /** The property name for the server host. */
     static final String SERVER_HOST_PROPERTY = PROP_NAME + ".server.host";
+
+    /**
+     * Our local watchdog service, used in case of IO failures.
+     * Can be null for testing.
+     */
+    private final WatchdogService wdog;
 
     /** The server : our master. */
     private final LPAServer server;
@@ -140,6 +151,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      *
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
+     * @param wdog the watchdog service, used for error reporting
      * @param nodeId the local node ID
      * @param properties the properties for configuring this service
      *
@@ -147,12 +159,13 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      *       less than {@code 1}
      * @throws Exception if any other error occurs
      */
-    public LabelPropagation(DLPAGraphBuilder builder, long nodeId,
-                            Properties properties)
+    public LabelPropagation(DLPAGraphBuilder builder, WatchdogService wdog,
+                            long nodeId, Properties properties)
         throws Exception
     {
         super(nodeId, properties);
         this.builder = builder;
+        this.wdog = wdog;
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         // Retry behavior
         retryWaitTime = wrappedProps.getIntProperty(
@@ -345,7 +358,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                     public void run() throws IOException {
                         proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
                                          localNodeId);
-                    } }, nodeId, maxIoAttempts, retryWaitTime);
+                    } }, 
+                    wdog, nodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
                 if (!ok) {
                     failed = true;
                 }
@@ -362,7 +376,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
             public void run() throws IOException {
                 server.readyToBegin(localNodeId, runFailed);
-            } }, -1, maxIoAttempts, retryWaitTime);
+            } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
         if (!ok) {
             failed = true;
             logger.log(Level.WARNING, "{0}: could not contact server",
@@ -559,7 +573,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             public void run() throws IOException {
                 server.finishedIteration(localNodeId, converged,
                                          runFailed, iteration);
-            } }, -1, maxIoAttempts, retryWaitTime);
+            } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
         if (!ok) {
             failed = true;
             logger.log(Level.WARNING, "{0}: could not contact server",
@@ -723,8 +737,10 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             GetRemoteLabelsRunnable task = 
                 new GetRemoteLabelsRunnable(proxy,
                                             new HashSet<Object>(map.keySet()));
-            boolean ok = LabelPropagationServer.runIoTask(task, nodeId,
-                                                maxIoAttempts, retryWaitTime);
+            boolean ok = 
+                LabelPropagationServer.runIoTask(task, wdog, nodeId,
+                                                 maxIoAttempts, retryWaitTime,
+                                                 CLASS_NAME);
             if (ok) {
                 labels = task.getLabels();
             } else {
@@ -828,8 +844,10 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         LPAClient proxy = nodeProxies.get(nodeId);
         if (proxy == null) {
             GetProxyRunnable task = new GetProxyRunnable(nodeId);
-            boolean ok = LabelPropagationServer.runIoTask(task, -1,
-                                            maxIoAttempts, retryWaitTime);
+            boolean ok = 
+                LabelPropagationServer.runIoTask(task, wdog, localNodeId,
+                                                 maxIoAttempts, retryWaitTime,
+                                                 CLASS_NAME);
             if (ok) {
                 proxy = task.getProxy();
             } else {

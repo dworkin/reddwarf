@@ -30,6 +30,7 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -60,6 +61,10 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     /** Our property base name. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
+    /** Our class name. */
+    private static final String CLASS_NAME =
+            LabelPropagationServer.class.getName();
+
     /** Our logger. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PROP_NAME));
@@ -110,6 +115,12 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     /** The default time interval to wait between IO task retries. **/
     static final int DEFAULT_RETRY_WAIT_TIME = 100;
+
+    /**
+     * Our local watchdog service, used in case of IO failures.
+     * Can be null for testing.
+     */
+    private final WatchdogService wdog;
 
     /** The time (in milliseconds) to wait between retries for IO
      * operations. */
@@ -175,12 +186,15 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      * Constructs a new label propagation server. Only one should exist
      * within a Darkstar cluster.
      * @param col the profile collector
+     * @param wdog the watchdog service, used for error reporting
      * @param properties the application properties
      * @throws IOException if an error occurs
      */
-    public LabelPropagationServer(ProfileCollector col, Properties properties)
+    public LabelPropagationServer(ProfileCollector col, WatchdogService wdog,
+            Properties properties)
             throws IOException
     {
+        this.wdog = wdog;
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         // Retry behavior
         retryWaitTime = wrappedProps.getIntProperty(
@@ -403,7 +417,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 boolean ok = runIoTask(new IoRunnable() {
                     public void run() throws IOException {
                         ce.getValue().prepareAlgorithm(runNum);
-                    } }, nodeId, maxIoAttempts, retryWaitTime);
+                    } }, wdog, nodeId, maxIoAttempts, retryWaitTime,
+                         CLASS_NAME);
                 if (!ok) {
                     runFailed = true;
                     latch.countDown();
@@ -449,7 +464,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                     boolean ok = runIoTask(new IoRunnable() {
                     public void run() throws IOException {
                         ce.getValue().startIteration(currentIteration);
-                    } }, nodeId, maxIoAttempts, retryWaitTime);
+                    } }, wdog, nodeId, maxIoAttempts, retryWaitTime,
+                         CLASS_NAME);
                     if (!ok) {
                         runFailed = true;
                         latch.countDown();
@@ -508,7 +524,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                             public void run() throws IOException {
                                 returnedGroups.put(nodeId,
                                       proxy.getAffinityGroups(runNum, true));
-                            } }, nodeId, maxIoAttempts, retryWaitTime);
+                            } }, wdog, nodeId, maxIoAttempts, retryWaitTime,
+                                 CLASS_NAME);
                         if (ok) {
                             latch.countDown();
                         } else {
@@ -595,21 +612,21 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      * <p>
      * This is much the same as the like method in AbstractService, except
      * we don't bother to check for a transactional context (we won't be in
-     * one), and we don't check to see if the current node is alive or
-     * try to shut down a node if we cannot reach it.
-     * TBD:  is this the correct behavior?  It has the advantage that we
-     * don't depend on any other services, and relies on the watchdog to
-     * detect all node failures.
+     * one).
      *
      * @param ioTask a task with IO-related operations
-     * @param nodeId the node that is the target of the IO operations
+     * @param watchdog the watchdog service for the local node, in case of
+     *         failure
+     * @param nodeId the node that should be shut down in case of failure
      * @param maxTries the number of times to attempt the retry
      * @param waitTime the amount of time to wait before retry
+     * @param name name of caller, in case of failure
      *
      * @return {@code true} if the ioTask ran successfully
      */
-    static boolean runIoTask(IoRunnable ioTask, long nodeId,
-                          int maxTries, int waitTime)
+    static boolean runIoTask(IoRunnable ioTask, WatchdogService wdog, 
+                            long nodeId, int maxTries, int waitTime,
+                            String name)
     {
         int maxAttempts = maxTries;
         while (maxAttempts > 0) {
@@ -631,7 +648,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         logger.log(Level.WARNING,
                 "A communication error occured while running an" +
                 "IO task. Could not reach node {0}.", nodeId);
-
+        wdog.reportFailure(nodeId, name);
         return false;
     }
 }

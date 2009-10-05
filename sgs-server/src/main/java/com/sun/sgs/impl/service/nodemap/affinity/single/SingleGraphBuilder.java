@@ -32,6 +32,7 @@ import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
@@ -90,12 +91,13 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     /**
      * Creates a weighted graph builder and its JMX MBean.
      * @param col the profile collector
-     * @param properties  application properties
+     * @param wdog the watchdog service (unused)
+     * @param properties application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public SingleGraphBuilder(ProfileCollector col, Properties properties,
-                                long nodeId)
+    public SingleGraphBuilder(ProfileCollector col, WatchdogService wdog,
+                              Properties properties, long nodeId)
         throws Exception
     {
         this(col, properties, nodeId, true);
@@ -109,13 +111,14 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
      * be thrown on the first call to {@code updateGraph}.
      * 
      * @param col the profile collector
-     * @param properties  application properties
+     * @param properties application properties
      * @param nodeId the local node id
      * @param needStats {@code true} if stats should be constructed
      * @throws Exception if an error occurs
      */
-    public SingleGraphBuilder(ProfileCollector col, Properties properties,
-                                long nodeId, boolean needStats)
+    public SingleGraphBuilder(ProfileCollector col,
+                              Properties properties, long nodeId,
+                              boolean needStats)
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);

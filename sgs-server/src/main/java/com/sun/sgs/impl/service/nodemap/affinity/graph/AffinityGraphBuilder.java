@@ -67,8 +67,11 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * Graph builders are typically instantiated by the node {@link GraphListener}.
  * In order to be instantiated by the {@code GraphListener}, they should
  * implement a constructor taking the arguments
- * {@code (ProfileCollector, Properties, long)},
- * where the final argument is the local node id.
+ * {@code (ProfileCollector, WatchdogService, Properties, long)},
+ * where the final argument is the local node id.  The watchdog service argument
+ * can be {@code null}, as it is used only for node failure reporting for
+ * remote communications.  Not all implementations use remote communications,
+ * and testing is simplified if {@code null} is passed in.
  */
 public interface AffinityGraphBuilder {
     /** The base name for graph builder properties. */

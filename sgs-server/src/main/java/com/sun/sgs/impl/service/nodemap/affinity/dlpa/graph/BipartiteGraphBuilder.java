@@ -35,6 +35,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
@@ -107,12 +108,13 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     /**
      * Constructs a new bipartite graph builder.
      * @param col the profile collector
+     * @param wdog the watchdog service, used for error reporting
      * @param props application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public BipartiteGraphBuilder(ProfileCollector col, Properties props, 
-                                 long nodeId)
+    public BipartiteGraphBuilder(ProfileCollector col, WatchdogService wdog,
+                                 Properties props, long nodeId)
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
@@ -127,11 +129,11 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
             NodeType.valueOf(
                 props.getProperty(StandardProperties.NODE_TYPE));
         if (type == NodeType.coreServerNode) {
-            lpaServer = new LabelPropagationServer(col, props);
+            lpaServer = new LabelPropagationServer(col, wdog, props);
             lpa = null;
         } else if (type == NodeType.appNode) {
             lpaServer = null;
-            lpa = new LabelPropagation(this, nodeId, props);
+            lpa = new LabelPropagation(this, wdog, nodeId, props);
         } else {
             lpaServer = null;
             lpa = null;

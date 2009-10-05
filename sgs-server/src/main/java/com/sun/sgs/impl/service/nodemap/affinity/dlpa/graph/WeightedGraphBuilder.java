@@ -35,6 +35,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
@@ -119,12 +120,13 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     /**
      * Creates a weighted graph builder.
      * @param col the profile collector
+     * @param wdog the watchdog service, used for error reporting
      * @param properties  application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public WeightedGraphBuilder(ProfileCollector col, Properties properties,
-                                long nodeId)
+    public WeightedGraphBuilder(ProfileCollector col, WatchdogService wdog,
+                                Properties properties, long nodeId)
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -139,11 +141,11 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
             NodeType.valueOf(
                 properties.getProperty(StandardProperties.NODE_TYPE));
         if (type == NodeType.coreServerNode) {
-            lpaServer = new LabelPropagationServer(col, properties);
+            lpaServer = new LabelPropagationServer(col, wdog, properties);
             lpa = null;
         } else if (type == NodeType.appNode) {
             lpaServer = null;
-            lpa = new LabelPropagation(this, nodeId, properties);
+            lpa = new LabelPropagation(this, wdog, nodeId, properties);
         } else {
             lpaServer = null;
             lpa = null;
