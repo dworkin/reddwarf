@@ -46,32 +46,10 @@
     <Bug pattern="DM_EXIT"/>
   </Match>
      
-  <!-- Findbugs can't tell why we're doing a notify at this point, but
-       it is because we have identified new lock owners that need to be
-       informed of their new status. -->
-  <Match>
-    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator"/>
-    <Method name="endTransaction"/>
-    <Bug pattern="NN_NAKED_NOTIFY"/>
-  </Match>
-
-  <!-- There really is only one waiter, so no need to use notifyAll, and
-       notify is faster -->
-  <Match>
-    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator"/>
-    <Method name="endTransaction"/>
-    <Bug pattern="NO_NOTIFY_NOT_NOTIFYALL"/>
-  </Match>
-  <Match>
-    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator$Locker"/>
-    <Method name="setConflict"/>
-    <Bug pattern="NO_NOTIFY_NOT_NOTIFYALL"/>
-  </Match>
-
   <!-- AccessedObjectsDetail.getConflictingId is documented to return
        null -->
   <Match>
-    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator$Locker"/>
+    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator$LockerImpl"/>
     <Method name="getConflictingId"/>
     <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
   </Match>
@@ -119,16 +97,6 @@
     <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
 
-  <!-- Package com.sun.sgs.impl.profile -->
-
-  <!-- Not worth replacing an anonymous class with a static inner class. -->
-  <Match>
-    <Or>
-      <Class name="com.sun.sgs.impl.profile.ProfileCollectorImpl$1"/>
-    </Or>
-    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
-  </Match>
-
   <!-- Package com.sun.sgs.impl.nio -->
 
   <!-- It is OK to pass null to FutureTask.set to mark the future as
@@ -140,6 +108,26 @@
       <Method name="start"/>
     </Or>
     <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.profile -->
+
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.profile.ProfileCollectorImpl$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.protocol.simple -->
+
+  <!-- Dead but overwritten parameter. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl"/>
+    <Method name="loginFailure"/>
+    <Parameter name="reason"/>
+    <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
   </Match>
 
   <!-- Package com.sun.sgs.impl.service.data -->
@@ -387,21 +375,6 @@
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>
 
-  <!-- Dead but overwritten parameter. -->
-  <Match>
-    <Class name="com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl"/>
-    <Method name="loginFailure"/>
-    <Parameter name="reason"/>
-    <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
-  </Match>
-
-  <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->
-  <Match>
-    <Class name="com.sun.sgs.impl.util.BindingKeyedCollectionsImpl"/>
-    <Field name="txnProxy"/>
-    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
-  </Match>
-
   <!-- Default value is ok for transient field -->
   <Match>
     <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
@@ -427,4 +400,23 @@
     <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
   
+  <!-- Package com.sun.sgs.impl.util -->
+
+  <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->
+  <Match>
+    <Class name="com.sun.sgs.impl.util.BindingKeyedCollectionsImpl"/>
+    <Field name="txnProxy"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.util.lock -->
+
+  <!-- LockManager.releaseLockInternal notifies the new owners, but 
+       changing the owners list happened elsewhere -->
+  <Match>
+    <Class name="com.sun.sgs.impl.util.lock.LockManager"/>
+    <Method name="releaseLockInternal"/>
+    <Bug pattern="NN_NAKED_NOTIFY"/>
+  </Match>
+
 </FindBugsFilter>
