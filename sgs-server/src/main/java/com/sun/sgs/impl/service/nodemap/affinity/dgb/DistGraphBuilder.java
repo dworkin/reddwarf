@@ -91,15 +91,14 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
      * Creates the client side of a distributed graph builder.
      * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
-     * @param nms the node mapping service currently being created
      * @param properties  application properties
      * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
     public DistGraphBuilder(ComponentRegistry systemRegistry,
                             TransactionProxy txnProxy,
-                            NodeMappingService nms,
-                            Properties properties, long nodeId)
+                            Properties properties,
+                            long nodeId)
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -121,7 +120,7 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
                                              NodeType.singleNode);
         if (nodeType == NodeType.coreServerNode) {
             serverImpl = 
-                new DistGraphBuilderServerImpl(systemRegistry, txnProxy, nms,
+                new DistGraphBuilderServerImpl(systemRegistry, txnProxy,
                                                properties, nodeId);
             server = null;
         } else {

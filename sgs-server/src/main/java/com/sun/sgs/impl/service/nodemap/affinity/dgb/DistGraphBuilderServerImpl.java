@@ -42,7 +42,6 @@ import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
@@ -52,18 +51,22 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
  * The server side of a distributed graph builder for label propagation.
+ *
  * It builds a single graph representing all information for the entire
  * system using the single node graph builder, and uses a single node label
  * propagation implementation to process the graph.
+ *
+ * This LPA implementation is expected to be useful for simple multi-node
+ * testing.  It may have scalability problems due to the amount of data
+ * being sent from each node, and the size of the affinity graph and
+ * related data structures.  It has no dependencies on new multi-node parts
+ * of the system.
  */
 public class DistGraphBuilderServerImpl 
     implements DistGraphBuilderServer, AffinityGraphBuilder, AffinityGroupFinder
@@ -100,8 +103,8 @@ public class DistGraphBuilderServerImpl
     /** The task owner. */
     private final Identity taskOwner;
 
-    /** The supporting node mapping service. */
-    private final NodeMappingService nms;
+    /** Our transaction proxy. */
+    private final TransactionProxy txnProxy;
 
     /** Our JMX exposed information.  The group finder stats is held
      * in {@code lpa}.
@@ -112,21 +115,19 @@ public class DistGraphBuilderServerImpl
      * Creates a distributed graph builder server.
      * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
-     * @param nms the node mapping service currently being created
      * @param properties  application properties
      * @param nodeId the core server node id
      * @throws Exception if an error occurs
      */
     DistGraphBuilderServerImpl(ComponentRegistry systemRegistry,
                                TransactionProxy txnProxy,
-                               NodeMappingService nms,
                                Properties properties,
                                long nodeId)
             throws Exception
     {
         transactionScheduler =
 	    systemRegistry.getComponent(TransactionScheduler.class);
-	this.nms = nms;
+	this.txnProxy = txnProxy;
 	taskOwner = txnProxy.getCurrentOwner();
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
@@ -208,7 +209,16 @@ public class DistGraphBuilderServerImpl
 
     // Implement AffinityGroupFinder
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * 
+     * The returned groups contain node assignment information for the
+     * identities.  This information is looked up from the node mapping service.
+     * Alternatively, we could create a new graph node type and track this
+     * information based on which application node called updateGraph.  While
+     * this would be some work, it might be worthwhile to implement if we
+     * find this LPA implementation is useful in deployed systems.
+     */
     public Collection<AffinityGroup> findAffinityGroups() {
         Collection<AffinityGroup> groups = lpa.findAffinityGroups();
         // Need to translate each group into a relocating affinity group
@@ -218,13 +228,16 @@ public class DistGraphBuilderServerImpl
             Map<Identity, Long> idMap = new HashMap<Identity, Long>();
             for (Identity id : ag.getIdentities()) {
                 try {
-                    GetNodeTask getNodeTask = new GetNodeTask(id);
-                    runTransactionally(getNodeTask);
-                    idMap.put(id, getNodeTask.getNode().getId());
+                    GetNodeIdTask getNodeIdTask = new GetNodeIdTask(id);
+                    runTransactionally(getNodeIdTask);
+                    idMap.put(id, getNodeIdTask.getNodeId());
                 } catch (UnknownIdentityException e) {
                     // just leave this one out
                 } catch (Exception e) {
-                    // ?
+                    // We don't know what the assignment is.
+                    logger.log(Level.INFO,
+                               "Unknown node assignment for identity {0}", id);
+                    idMap.put(id, Long.valueOf(-1));
                 }
             }
             retVal.add(new RelocatingAffinityGroup(ag.getId(), idMap));
@@ -250,22 +263,23 @@ public class DistGraphBuilderServerImpl
     /**
      * A transactional task to obtain the node assignment for a given identity.
      */
-    private class GetNodeTask extends AbstractKernelRunnable {
+    private class GetNodeIdTask extends AbstractKernelRunnable {
 
 	private final Identity id;
-	private volatile Node node = null;
+	private volatile long nodeId = -1;
 
-	GetNodeTask(Identity id) {
+	GetNodeIdTask(Identity id) {
 	    super(null);
 	    this.id = id;
 	}
 
 	public void run() throws Exception {
-	    node = nms.getNode(id);
+	    nodeId = txnProxy.getService(NodeMappingService.class).
+                         getNode(id).getId();
 	}
 
-	Node getNode() {
-	    return node;
+	long getNodeId() {
+	    return nodeId;
 	}
     }
 }

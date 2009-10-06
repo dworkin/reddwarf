@@ -22,8 +22,6 @@ package com.sun.sgs.impl.service.nodemap.affinity.graph;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
-import
-     com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
@@ -108,17 +106,16 @@ public class GraphListener implements ProfileListener {
         }
         if (builderName != null) {
             builder = createBuilder(Class.forName(builderName),
-                                    systemRegistry, txnProxy, nms,
+                                    systemRegistry, txnProxy,
                                     col, properties, nodeId);
-        } else if (type != NodeType.singleNode) {
-            // Default is currently NONE, might become the distributed LPA/
-            // weighted graph listener in the future.
-            builder = null;
-//            // Should this graph listener check to make sure the
-//            // caching data store is configured?
-//            builder = new WeightedGraphBuilder(col, txnProxy,
-//                                               properties, nodeId);
+//        } else if (type != NodeType.singleNode) {
+//            // Default is currently NONE, might become the distributed LPA/
+//            // weighted graph listener in the future.
+//            builder = null;
         } else {
+            // Either we're in multi-node, but the current default is
+            // no action, or we're in single node and no builder was requested.
+            //
             // If we're in single node, and no builder was requested,
             // don't bother creating anything.  Affinity groups will make
             // no sense.
@@ -138,7 +135,6 @@ public class GraphListener implements ProfileListener {
      */
     private AffinityGraphBuilder createBuilder(Class<?> bClass,
             ComponentRegistry systemRegistry, TransactionProxy txnProxy,
-            NodeMappingService nms,
             ProfileCollector col,
             Properties props, long nodeId)
         throws Exception
@@ -156,14 +152,13 @@ public class GraphListener implements ProfileListener {
 
             } catch (NoSuchMethodException e) {
                 // Look for a version that takes additional args because
-                // services/transactions must be used
+                // transactions must be used
                 ctor = bClass.getConstructor(ComponentRegistry.class,
                         TransactionProxy.class,
-                        NodeMappingService.class, Properties.class, long.class);
+                        Properties.class, long.class);
                 // return a new instance
                 return (AffinityGraphBuilder)
-                    (ctor.newInstance(systemRegistry, txnProxy, nms,
-                                      props, nodeId));
+                    (ctor.newInstance(systemRegistry, txnProxy, props, nodeId));
             }
         } catch (InvocationTargetException e) {
             // Try to unwrap any nested exceptions - they will be wrapped
