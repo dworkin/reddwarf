@@ -115,6 +115,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     // the number of threads currently in the scheduler
     private volatile int schedulerThreadCount;
 
+    // the identifier for the local node
+    private volatile long localNodeId = -1;
+
     // A map from registered listener to whether it can be removed or shutdown
     private final ConcurrentHashMap<ProfileListener, Boolean> listeners;
 
@@ -302,6 +305,13 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                 listener.propertyChange(event); 
             }
         }
+
+        if (localNodeId > -1) {
+            event =
+                new PropertyChangeEvent(this, "com.sun.sgs.profile.nodeid",
+                                        null, localNodeId);
+            listener.propertyChange(event);
+        }
     }
  
     /** {@inheritDoc}  */
@@ -400,6 +410,19 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 				    schedulerThreadCount + 1, 
 				    schedulerThreadCount);
 
+        for (ProfileListener listener : listeners.keySet()) {
+            listener.propertyChange(event);
+        }
+    }
+
+    /**
+     * Notifies the collector that the node has been assigned its identifier.
+     */
+    void notifyNodeIdAssigned(long nodeId) {
+        localNodeId = nodeId;
+        PropertyChangeEvent event =
+            new PropertyChangeEvent(this, "com.sun.sgs.profile.nodeid",
+                                    null, nodeId);
         for (ProfileListener listener : listeners.keySet()) {
             listener.propertyChange(event);
         }

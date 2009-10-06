@@ -357,6 +357,13 @@ public class TestProfileCollectorImpl {
         SimpleTestListener test = new SimpleTestListener();
         profileCollector.removeListener(test);
     }
-    
+
+    @Test
+    public void testLocalNodeIdReported() {
+        long expectedNodeId = serverNode.getNodeId();
+        SimpleTestListener test = new SimpleTestListener();
+        profileCollector.addListener(test, false);
+        assertEquals(expectedNodeId, test.reportedNodeId);
+    }
 
 }

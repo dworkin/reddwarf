@@ -24,6 +24,7 @@
 package com.sun.sgs.service;
 
 import java.util.Iterator;
+import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.TransactionException;
 
 /**
@@ -157,4 +158,52 @@ public interface WatchdogService extends Service {
      *		transactional context
      */
     void reportFailure(long nodeId, String className);
+
+    /**
+     * Returns the current global application time in milliseconds. This
+     * method returns the amount of time in milliseconds that the current
+     * application has been running since the
+     * {@link AppListener#initialize(java.util.Properties) initialize} method
+     * was called on the application's {@code AppListener} object. Any time
+     * that passes while the application is not running does not affect this
+     * value. This means that this method can effectively be used to
+     * measure the global wall clock time of the current application's
+     * running state.
+     * <p>
+     * Note: This method cannot be reliably used to make fine-grained time
+     * comparisons across task boundaries.  Unpredictable conditions such as
+     * network latency mean that the resulting value may be subject to some
+     * skew.  Additionally, the <em>global</em> accuracy of the clock time
+     * may drift as much as a few seconds in either direction due to inherent
+     * inaccuracies recovering application time after a system crash.
+     *
+     * @return the current global application time in milliseconds
+     */
+    long currentAppTimeMillis();
+
+    /**
+     * Converts a system time value representing the total elapsed time in
+     * milliseconds since midnight, January 1, 1970 UTC to an "application time"
+     * value.  An application time value is the total amount of  time in
+     * milliseconds that the current application has been running since the
+     * {@link AppListener#initialize(java.util.Properties) initialize} method
+     * was called on its {@code AppListener} object.
+     *
+     * @param systemTimeMillis a system time value
+     * @return the given system time converted into application time
+     */
+    long getAppTimeMillis(long systemTimeMillis);
+
+    /**
+     * Converts an "application time" value representing the total amount of
+     * time in milliseconds that the current application has been running since
+     * the {@link AppListener#initialize(java.util.Properties) initialize}
+     * method was called on its {@code AppListener} object to a system time
+     * value.  A system time value is the total elapsed time in milliseconds
+     * since midnight, January 1, 1970 UTC.
+     *
+     * @param appTimeMillis an application time value
+     * @return the given application time converted into system time
+     */
+    long getSystemTimeMillis(long appTimeMillis);
 }
