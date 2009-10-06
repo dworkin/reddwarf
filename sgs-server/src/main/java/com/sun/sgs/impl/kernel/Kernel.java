@@ -194,8 +194,9 @@ class Kernel {
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
     
-    // collector of profile information
+    // collector of profile information, and an associated handle
     private final ProfileCollectorImpl profileCollector;
+    private final ProfileCollectorHandleImpl profileCollectorHandle;
     
     // shutdown controller that can be passed to components who need to be able 
     // to issue a kernel shutdown. the watchdog also constains a reference for
@@ -252,8 +253,8 @@ class Kernel {
             
             profileCollector = new ProfileCollectorImpl(profileLevel, 
                                               appProperties, systemRegistry);
-            ProfileCollectorHandle profileCollectorHandle = 
-                    new ProfileCollectorHandleImpl(profileCollector);
+            profileCollectorHandle = 
+                new ProfileCollectorHandleImpl(profileCollector);
 
             // with profiling setup, register all MXBeans
             registerMXBeans(appProperties);
@@ -564,8 +565,11 @@ class Kernel {
             appProperties.getProperty(StandardProperties.DATA_MANAGER,
                                       DEFAULT_DATA_MANAGER);
         setupService(dataServiceClass, dataManagerClass, startupContext);
-	shutdownCtrl.setDataService(
-	    startupContext.getService(DataService.class));
+        // provide the node id to the shutdown controller and profile collector
+        long nodeId =
+            startupContext.getService(DataService.class).getLocalNodeId();
+	shutdownCtrl.setNodeId(nodeId);
+        profileCollectorHandle.notifyNodeIdAssigned(nodeId);
 
         // load the watch-dog service, which has no associated manager
 
@@ -1019,18 +1023,15 @@ class Kernel {
     private final class KernelShutdownControllerImpl implements
             KernelShutdownController 
     {
-	private DataService dataService = null;
+	private volatile long nodeId = -1;
         private WatchdogService watchdogSvc = null;
         private boolean shutdownQueued = false;
         private boolean isReady = false;
         private final Object shutdownQueueLock = new Object();
 
-        /**
-         * Provides the shutdown controller with the {@code DataService}, for
-         * use during shutdown.
-         */
-        public void setDataService(DataService dataService) {
-	    this.dataService = dataService;
+        /** Provides the shutdown controller with the local node id. */
+        public void setNodeId(long id) {
+	    nodeId = id;
         }
 
         /**
@@ -1074,12 +1075,10 @@ class Kernel {
                     } else {
                         // component shutdown; we go through the watchdog to
                         // cleanup and notify the server first
-                        if (dataService != null &&
-			    watchdogSvc != null)
-			{
-                            watchdogSvc.reportFailure(
-				dataService.getLocalNodeId(),
-				caller.getClass().toString());
+                        if (nodeId != -1 && watchdogSvc != null) {
+                            watchdogSvc.
+                                reportFailure(nodeId,
+                                              caller.getClass().toString());
                         } else {
                             // shutdown directly if data service and watchdog
                             // have not been setup
