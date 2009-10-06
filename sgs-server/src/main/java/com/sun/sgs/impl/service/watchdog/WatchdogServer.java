@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.app.AppListener;
 import com.sun.sgs.service.Node.Health;
 import java.io.IOException;
 import java.rmi.Remote;
@@ -116,4 +117,22 @@ public interface WatchdogServer extends Remote {
                        Health health, String component,
                        int maxNumberOfAttempts)
 	    throws IOException;
+
+    /**
+     * Returns the global application time in milliseconds as it is maintained
+     * by the central node.  This method returns the amount of time in
+     * milliseconds that the current application has been running since the
+     * {@link AppListener#initialize(java.util.Properties) initialize} method
+     * was called on the application's {@code AppListener} object.
+     * <p>
+     * Note: Since this method is typically called as part of a {@code Remote}
+     * interface, appropriate measures should be taken to account for possible
+     * network latency.
+     *
+     * @return the global application time in milliseconds according to the
+     *         central time server
+     * @throws	IOException if a communication error occurs while
+     * 		invoking this method
+     */
+    long currentAppTimeMillis() throws IOException;
 }
