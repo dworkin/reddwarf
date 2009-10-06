@@ -19,7 +19,10 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
-/** A cache entry for an object. */
+/**
+ * A cache entry for an object.  This class is part of the implementation of
+ * {@link CachingDataStore}.
+ */
 final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     /**

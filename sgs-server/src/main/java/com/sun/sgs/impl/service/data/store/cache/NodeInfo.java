@@ -29,7 +29,8 @@ import java.util.Set;
 
 /**
  * A {@link Locker} that stores information about a node, including storing
- * information about locks held and whether the node has been shutdown.
+ * information about locks held and whether the node has been shutdown.  This
+ * class is part of the implementation of {@link CachingDataStoreServerImpl}.
  */
 class NodeInfo extends MultiLocker<Object> {
 

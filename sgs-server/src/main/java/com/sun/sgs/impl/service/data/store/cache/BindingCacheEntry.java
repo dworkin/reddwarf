@@ -30,7 +30,9 @@ import java.util.logging.Logger;
 /**
  * A cache entry for a name binding.  Only the {@link #key} field may be
  * accessed without holding the associated lock.  For all other fields and
- * methods, the lock should be held.
+ * methods, the lock should be held. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 

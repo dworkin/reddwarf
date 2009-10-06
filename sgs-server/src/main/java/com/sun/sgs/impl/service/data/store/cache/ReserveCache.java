@@ -24,7 +24,9 @@ package com.sun.sgs.impl.service.data.store.cache;
  * reserve cache space, the {@code used} methods record that it has been used,
  * and the {@code done} method releases any space that is unused.  Callers
  * should make sure that they are not holding locks on the cache when calling
- * the constructors to avoid deadlocks with eviction.
+ * the constructors to avoid deadlocks with eviction. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 class ReserveCache {
 

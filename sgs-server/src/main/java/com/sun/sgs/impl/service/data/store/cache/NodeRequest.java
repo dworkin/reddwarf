@@ -21,7 +21,10 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.util.lock.LockRequest;
 
-/** A lock request from a node. */
+/**
+ * A lock request from a node.  This class is part of the implementation of
+ * {@link CachingDataStoreServerImpl}.
+ */
 class NodeRequest extends LockRequest<Object> {
 
     /**

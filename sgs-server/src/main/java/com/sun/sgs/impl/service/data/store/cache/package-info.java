@@ -18,8 +18,9 @@
  */
 
 /**
- * Provides an implementation of {@link com.sun.sgs.service.store.DataStore}
- * that supports caching clients that communicate to a shared data store server
- * over the network.
+ * Provides the {@link CachingDataStore} class, which implements {@link
+ * com.sun.sgs.service.store.DataStore}, caches data on each node, and
+ * communicates over the network with a central {@link
+ * CachingDataStoreServerImpl}.
  */
 package com.sun.sgs.impl.service.data.store.cache;

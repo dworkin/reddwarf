@@ -157,7 +157,7 @@ class TxnContext {
 		    ObjectCacheEntry entry = cache.getObjectEntry(saved.key);
 		    entry.setValue(saved.restoreValue);
 		    if (entry.getModified()) {
-			entry.setNotModified();
+			entry.setNotModified(lock);
 		    }
 		    if (saved.restoreValue == null) {
 			entry.setEvictedImmediate(lock);
@@ -184,7 +184,7 @@ class TxnContext {
 			if (entry != null) {
 			    entry.setValue(saved.restoreValue);
 			    if (entry.getModified()) {
-				entry.setNotModified();
+				entry.setNotModified(lock);
 			    }
 			    entry.setPreviousKey(
 				saved.restorePreviousKey,
@@ -384,7 +384,8 @@ class TxnContext {
      * @param	data the new data value
      */
     void noteModifiedObject(ObjectCacheEntry entry, byte[] data) {
-	assert Thread.holdsLock(store.getCache().getObjectLock(entry.key));
+	Object lock = store.getCache().getObjectLock(entry.key);
+	assert Thread.holdsLock(lock);
 	if (!entry.getModified()) {
 	    if (modifiedObjects == null) {
 		modifiedObjects = new LinkedList<SavedObjectValue>();
@@ -392,7 +393,7 @@ class TxnContext {
 	    SavedObjectValue saved = new SavedObjectValue(entry);
 	    assert !modifiedObjects.contains(saved);
 	    modifiedObjects.add(saved);
-	    entry.setCachedDirty();
+	    entry.setCachedDirty(lock);
 	}
 	entry.setValue(data);
 	entry.noteAccess(contextId);
@@ -405,7 +406,8 @@ class TxnContext {
      * @param	oid the new object ID
      */
     void noteModifiedBinding(BindingCacheEntry entry, long oid) {
-	assert Thread.holdsLock(store.getCache().getBindingLock(entry.key));
+	Object lock = store.getCache().getBindingLock(entry.key);
+	assert Thread.holdsLock(lock);
 	if (!entry.getModified()) {
 	    if (modifiedBindings == null ||
 		!modifiedBindings.containsKey(entry.key))
@@ -417,14 +419,13 @@ class TxnContext {
 		modifiedBindings.put(
 		    entry.key, new SavedBindingValue(entry));
 	    }
-	    entry.setCachedDirty();
+	    entry.setCachedDirty(lock);
 	}
 	entry.setValue(oid);
 	entry.noteAccess(contextId);
 	if (oid == -1) {
-	    entry.setNotModified();
-	    entry.setEvictedImmediate(
-		store.getCache().getBindingLock(entry.key));
+	    entry.setNotModified(lock);
+	    entry.setEvictedImmediate(lock);
 	    store.getCache().removeBindingEntry(entry.key);
 	}
     }
@@ -492,10 +493,11 @@ class TxnContext {
 			}
 			long oid = saved.key;
 			oids[i] = oid;
-			synchronized (cache.getObjectLock(oid)) {
+			Object lock = cache.getObjectLock(oid);
+			synchronized (lock) {
 			    ObjectCacheEntry entry = cache.getObjectEntry(oid);
 			    oidValues[i] = entry.getValue();
-			    entry.setNotModified();
+			    entry.setNotModified(lock);
 			}
 			i++;
 		    }
@@ -530,7 +532,8 @@ class TxnContext {
 			    }
 			    names[i] = name;
 			}
-			synchronized (cache.getBindingLock(key)) {
+			Object lock = cache.getBindingLock(key);
+			synchronized (lock) {
 			    BindingCacheEntry entry =
 				cache.getBindingEntry(key);
 			    if (name != null) {
@@ -538,7 +541,7 @@ class TxnContext {
 				    (entry == null) ? -1 : entry.getValue();
 			    }
 			    if (entry != null) {
-				entry.setNotModified();
+				entry.setNotModified(lock);
 			    }
 			}
 			if (name != null) {

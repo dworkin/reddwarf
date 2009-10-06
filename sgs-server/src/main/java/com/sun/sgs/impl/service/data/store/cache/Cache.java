@@ -31,7 +31,10 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** The cache of objects and bindings. */
+/**
+ * The cache of objects and bindings.  This class is part of the implementation
+ * of {@link CachingDataStore}.
+ */
 class Cache {
 
     /** The data store. */

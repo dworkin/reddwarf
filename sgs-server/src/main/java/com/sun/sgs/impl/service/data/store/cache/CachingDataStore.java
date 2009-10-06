@@ -85,22 +85,102 @@ import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
-/*
- * How will I make sure that the cache availability semaphore stays in sync
- * with the cache contents?  Forgetting to acquire or release would be bad!
- *
- * Make sure to set tick on entries when they are encached, not used, to insure
- * they don't get evicted immediately.
- *
- * Handle eviction of removed bindings -- need to clear the previous key
- * information.
- */
 /**
  * Provides an implementation of {@link DataStore} that caches data on the
  * local node and communicates with a {@link CachingDataStoreServer}. <p>
  *
  * The {@link #CachingDataStore constructor} supports the following
  * configuration properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #CALLBACK_PORT_PROPERTY}</b></code>
+ *	<br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_CALLBACK_PORT}</code>
+ *
+ * <dd style="padding-top: .5em">The network port used to accept callback
+ *	requests.  The value should be a non-negative number less than
+ *	<code>65536</code>.  If the value specified is <code>0</code>, then an
+ *	anonymous port will be chosen. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #EVICTION_BATCH_SIZE_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_EVICTION_BATCH_SIZE}</code>
+ *
+ * <dd style="padding-top: .5em">The number of entries to consider when
+ *	selecting a single candidate for eviction. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #EVICTION_RESERVE_SIZE_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_EVICTION_RESERVE_SIZE}</code>
+ *
+ * <dd style="padding-top: .5em">The number of cache entries to hold in reserve
+ *	for use while searching for eviction candidates. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #LOCK_TIMEOUT_PROPERTY}</b></code>
+ *	<br>
+ *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
+ *	transaction timeout.
+ *
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ *	that an attempt to obtain a lock will be allowed to continue before
+ *	being aborted.  The value must be greater than <code>0</code>, and
+ *	should be less than the transaction timeout. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #MAX_RETRY_PROPERTY}</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_MAX_RETRY}</code>
+ *
+ * <dd style="padding-top: .5em">The number of milliseconds to continue
+ *	retrying I/O operations before determining that the failure is
+ *	permanent.  The value must be non-negative. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #NUM_LOCKS_PROPERTY}</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_NUM_LOCKS}</code>
+ *
+ * <dd style="padding-top: .5em">The number of locks used by the cache.  The
+ *	value must be greater than <code>0</code>.  The number of cache locks
+ *	controls the amount of concurrency. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #RETRY_WAIT_PROPERTY}</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_RETRY_WAIT}</code>
+ *
+ * <dd style="padding-top: .5em">The number of milliseconds to wait before
+ *	retrying a failed I/O operation.  The value must be non-negative. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #SERVER_HOST_PROPERTY}</b></code><br>
+ *	<i>Default:</i> the value of the <code>{@value
+ *	StandardProperties#SERVER_HOST}</code> property, if present, or
+ *	<code>localhost</code> if this node is starting the server
+ *
+ * <dd style="padding-top: .5em">The name of the host running the {@code
+ *	CachingDataStoreServer}. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #SERVER_PORT_PROPERTY}</b></code>
+ *	<br>
+ *	<i>Default:</i>	<code>{@value #DEFAULT_SERVER_PORT}</code>
+ *
+ * <dd style="padding-top: .5em">The network port used to make server requests.
+ *	The value should be a non-negative number less than <code>65536</code>.
+ *	The value <code>0</code> can only be specified if the <code>{@link
+ *	StandardProperties#NODE_TYPE} property is not <code>appNode</code> and
+ *	means that an anonymous port will be chosen for running the server. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #CACHE_SIZE_PROPERTY}</b></code>
+ *	<br>
+ *	<i>Default:</i>	<code>{@value #DEFAULT_CACHE_SIZE}</code>
+ *
+ * <dd style="padding-top: .5em">The maximum number of entries, including name
+ *	bindings and objects, that can be stored in the cache. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #UPDATE_QUEUE_SIZE_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i>	<code>{@value #DEFAULT_UPDATE_QUEUE_SIZE}</code>
+ *
+ * <dd style="padding-top: .5em">The maximum number of requests that can be
+ *	queued waiting to send to the server.  The value must be no smaller
+ *	than <code>{@value #MIN_CACHE_SIZE}</code>. <p>
+ *
+ * </dl>
  */
 public class CachingDataStore extends AbstractDataStore
     implements CallbackServer, FailureReporter
@@ -556,6 +636,7 @@ public class CachingDataStore extends AbstractDataStore
     /* DataStore.getLocalNodeId */
 
     /** {@inheritDoc} */
+    @Override
     protected long getLocalNodeIdInternal() {
 	return nodeId;
     }
@@ -563,6 +644,7 @@ public class CachingDataStore extends AbstractDataStore
     /* DataStore.createObject */
 
     /** {@inheritDoc} */
+    @Override
     protected long createObjectInternal(Transaction txn) {
 	TxnContext context = contextMap.join(txn);
 	long oid = newObjectIdCache.getNewObjectId();
@@ -580,6 +662,7 @@ public class CachingDataStore extends AbstractDataStore
     /* DataStore.markForUpdate */
 
     /** {@inheritDoc} */
+    @Override
     protected void markForUpdateInternal(Transaction txn, long oid) {
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
@@ -595,7 +678,7 @@ public class CachingDataStore extends AbstractDataStore
 		    continue;
 		case READABLE:
 		    /* Upgrade */
-		    entry.setFetchingUpgrade();
+		    entry.setFetchingUpgrade(lock);
 		    scheduleFetch(new UpgradeObjectRunnable(context, oid));
 		    AwaitWritableResult result =
 			entry.awaitWritable(lock, stop);
@@ -645,6 +728,7 @@ public class CachingDataStore extends AbstractDataStore
     /* DataStore.getObject */
 
     /** {@inheritDoc} */
+    @Override
     protected byte[] getObjectInternal(
 	Transaction txn, long oid, boolean forUpdate)
     {
@@ -676,7 +760,7 @@ public class CachingDataStore extends AbstractDataStore
 			    continue;
 			case READABLE:
 			    /* Upgrade */
-			    entry.setFetchingUpgrade();
+			    entry.setFetchingUpgrade(lock);
 			    scheduleFetch(
 				new UpgradeObjectRunnable(context, oid));
 			    AwaitWritableResult result =
@@ -772,6 +856,7 @@ public class CachingDataStore extends AbstractDataStore
     /* DataStore.setObject */
 
     /** {@inheritDoc} */
+    @Override
     protected void setObjectInternal(Transaction txn, long oid, byte[] data) {
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
@@ -794,7 +879,7 @@ public class CachingDataStore extends AbstractDataStore
 			continue;
 		    case READABLE:
 			/* Upgrade */
-			entry.setFetchingUpgrade();
+			entry.setFetchingUpgrade(lock);
 			scheduleFetch(new UpgradeObjectRunnable(context, oid));
 			AwaitWritableResult result =
 			    entry.awaitWritable(lock, stop);
@@ -823,6 +908,7 @@ public class CachingDataStore extends AbstractDataStore
     /* DataStore.setObjects */
 
     /** {@inheritDoc} */
+    @Override
     protected void setObjectsInternal(
 	Transaction txn, long[] oids, byte[][] dataArray)
     {
@@ -834,6 +920,7 @@ public class CachingDataStore extends AbstractDataStore
     /* DataStore.removeObject */
 
     /** {@inheritDoc} */
+    @Override
     protected void removeObjectInternal(Transaction txn, long oid) {
 	setObjectInternal(txn, oid, null);
     }
@@ -872,6 +959,7 @@ public class CachingDataStore extends AbstractDataStore
      *		<li> Next entry does not cover name <ul>
      *		  <li> Try again </ul> </ol> </ol> </ul> </ol> </ol>
      */
+    @Override
     protected BindingValue getBindingInternal(Transaction txn, String name) {
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
@@ -1353,6 +1441,7 @@ public class CachingDataStore extends AbstractDataStore
      *	   <li> Call server
      *	   <li> Try again </ul> </ol> </ol>
      */
+    @Override
     protected BindingValue setBindingInternal(
 	Transaction txn, String name, long oid)
     {
@@ -1483,7 +1572,7 @@ public class CachingDataStore extends AbstractDataStore
 	    entry.awaitNotPendingPrevious(lock, stop);
 	    if (!entry.getWritable()) {
 		/* Upgrade */
-		entry.setFetchingUpgrade();
+		entry.setFetchingUpgrade(lock);
 		scheduleFetch(
 		    new GetBindingForUpdateUpgradeRunnable(
 			context, entry.key));
@@ -1759,6 +1848,7 @@ public class CachingDataStore extends AbstractDataStore
      *	  <li> Call server
      *	  <li> Try again </ul> </ol> </ol>
      */
+    @Override
     protected BindingValue removeBindingInternal(
 	Transaction txn, String name)
     {
@@ -1852,7 +1942,7 @@ public class CachingDataStore extends AbstractDataStore
 	    entry.awaitNotPendingPrevious(lock, stop);
 	    if (entry.getReadable()) {
 		/* Upgrade */
-		entry.setFetchingUpgrade();
+		entry.setFetchingUpgrade(lock);
 		return true;
 	    } else {
 		/* Not in cache -- try again */
@@ -2058,6 +2148,7 @@ public class CachingDataStore extends AbstractDataStore
      *	     <li> Next entry does not cover name <ul>
      *	       <li> Try again </ul> </ol> </ol> </ul> </ol>
      */
+    @Override
     protected String nextBoundNameInternal(Transaction txn, String name) {
 	TxnContext context = contextMap.join(txn);
 	long stop = context.getStopTime();
@@ -2167,6 +2258,7 @@ public class CachingDataStore extends AbstractDataStore
     /* Shutdown */
 
     /** {@inheritDoc} */
+    @Override
     protected void shutdownInternal() {
 	synchronized (shutdownSync) {
 	    switch (shutdownState) {
@@ -2226,6 +2318,7 @@ public class CachingDataStore extends AbstractDataStore
     /* getClassId */
 
     /** {@inheritDoc} */
+    @Override
     protected int getClassIdInternal(Transaction txn, byte[] classInfo) {
 	contextMap.join(txn);
 	try {
@@ -2238,6 +2331,7 @@ public class CachingDataStore extends AbstractDataStore
     /* getClassInfo */
 
     /** {@inheritDoc} */
+    @Override
     protected byte[] getClassInfoInternal(Transaction txn, int classId)
 	throws ClassInfoNotFoundException
     {
@@ -2257,6 +2351,7 @@ public class CachingDataStore extends AbstractDataStore
     /* nextObjectId */
 
     /** {@inheritDoc} */
+    @Override
     protected long nextObjectIdInternal(Transaction txn, long oid) {
 	TxnContext context = contextMap.join(txn);
 	long nextNew = context.nextNewObjectId(oid);
@@ -2306,23 +2401,27 @@ public class CachingDataStore extends AbstractDataStore
     /* -- Implement AbstractDataStore's TransactionParticipant methods -- */
 
     /** {@inheritDoc} */
+    @Override
     protected boolean prepareInternal(Transaction txn) {
 	return contextMap.prepare(txn);
     }
 
     /** {@inheritDoc} */
+    @Override
     protected void prepareAndCommitInternal(Transaction txn) {
 	contextMap.prepareAndCommit(txn);
 	maybeCheckBindings(CheckBindingsType.TXN);
     }
 
     /** {@inheritDoc} */
+    @Override
     protected void commitInternal(Transaction txn) {
 	contextMap.commit(txn);
 	maybeCheckBindings(CheckBindingsType.TXN);
     }
 
     /** {@inheritDoc} */
+    @Override
     protected void abortInternal(Transaction txn) {
 	contextMap.abort(txn);
 	maybeCheckBindings(CheckBindingsType.TXN);
@@ -2333,6 +2432,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestDowngradeObject */
 
     /** {@inheritDoc} */
+    @Override
     public boolean requestDowngradeObject(long oid, long conflictNodeId) {
 	Object lock = cache.getObjectLock(oid);
 	synchronized (lock) {
@@ -2372,14 +2472,15 @@ public class CachingDataStore extends AbstractDataStore
 	}
 	public void run() {
 	    reportObjectAccess(txnProxy.getCurrentTransaction(), oid, READ);
-	    synchronized (cache.getObjectLock(oid)) {
+	    Object lock = cache.getObjectLock(oid);
+	    synchronized (lock) {
 		ObjectCacheEntry entry = cache.getObjectEntry(oid);
 		/* Check if cached for write and not downgrading */
 		if (entry != null &&
 		    entry.getWritable() &&
 		    !entry.getDowngrading())
 		{
-		    entry.setEvictingDowngrade();
+		    entry.setEvictingDowngrade(lock);
 		    updateQueue.downgradeObject(
 			entry.getContextId(), oid, this);
 		}
@@ -2402,6 +2503,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestEvictObject */
 
     /** {@inheritDoc} */
+    @Override
     public boolean requestEvictObject(long oid, long conflictNodeId) {
 	Object lock = cache.getObjectLock(oid);
 	synchronized (lock) {
@@ -2470,14 +2572,15 @@ public class CachingDataStore extends AbstractDataStore
 	}
 	public void run() {
 	    reportObjectAccess(txnProxy.getCurrentTransaction(), oid, WRITE);
-	    synchronized (cache.getObjectLock(oid)) {
+	    Object lock = cache.getObjectLock(oid);
+	    synchronized (lock) {
 		ObjectCacheEntry entry = cache.getObjectEntry(oid);
 		/* Check if cached and not evicting  */
 		if (entry != null &&
 		    entry.getReadable() &&
 		    !entry.getDecaching())
 		{
-		    entry.setEvicting();
+		    entry.setEvicting(lock);
 		    updateQueue.evictObject(entry.getContextId(), oid, this);
 		} else {
 		    pendingEvictions.decrementAndGet();
@@ -2495,6 +2598,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestDowngradeBinding */
 
     /** {@inheritDoc} */
+    @Override
     public boolean requestDowngradeBinding(String name, long conflictNodeId) {
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
@@ -2610,7 +2714,7 @@ public class CachingDataStore extends AbstractDataStore
 		    } 
 		    assert !entry.getUpgrading();
 		    /* Downgrade */
-		    entry.setEvictingDowngrade();
+		    entry.setEvictingDowngrade(lock);
 		    updateQueue.downgradeBinding(
 			entry.getContextId(), entry.key.getName(),
 			new DowngradeCompletionHandler(entry.key));
@@ -2656,6 +2760,7 @@ public class CachingDataStore extends AbstractDataStore
     /* CallbackServer.requestEvictBinding */
 
     /** {@inheritDoc} */
+    @Override
     public boolean requestEvictBinding(String name, long conflictNodeId) {
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
@@ -2816,7 +2921,7 @@ public class CachingDataStore extends AbstractDataStore
 			  " or downgrading: " + entry;
 		    /* Evict */
 		    if (nameKey.equals(entry.key)) {
-			entry.setEvicting();
+			entry.setEvicting(lock);
 			updateQueue.evictBinding(
 			    entry.getContextId(), nameKey.getName(),
 			    new EvictBindingCompletionHandler(nameKey));
@@ -3221,17 +3326,27 @@ public class CachingDataStore extends AbstractDataStore
 		}
 	    }
 	    if (bestEntry != null) {
-		synchronized (cache.getEntryLock(bestEntry)) {
+		Object lock = cache.getEntryLock(bestEntry);
+		synchronized (lock) {
 		    if (!bestEntry.getDecached() &&
 			bestInfo.contextId == bestEntry.getContextId())
 		    {
 			if (!inUse(bestEntry)) {
 			    logger.log(FINEST, "Evicting immediately: {0}",
 				       bestEntry);
+			    bestEntry.setEvicting(lock);
 			    if (bestEntry instanceof ObjectCacheEntry) {
-				evictObjectNow((ObjectCacheEntry) bestEntry);
+				Long key = ((ObjectCacheEntry) bestEntry).key;
+				updateQueue.evictObject(
+				    bestEntry.getContextId(), key,
+				    new EvictObjectCompletionHandler(key));
 			    } else {
-				evictBindingNow((BindingCacheEntry) bestEntry);
+				BindingKey key =
+				    ((BindingCacheEntry) bestEntry).key;
+				updateQueue.evictBinding(
+				    bestEntry.getContextId(),
+				    key.getNameAllowLast(),
+				    new EvictBindingCompletionHandler(key));
 			    }
 			} else {
 			    logger.log(FINEST, "Scheduling eviction: {0}",
@@ -3245,22 +3360,6 @@ public class CachingDataStore extends AbstractDataStore
 		    }
 		}
 	    }
-	}
-
-	/** Evict a object cache entry that is not in use immediately. */
-	private void evictObjectNow(ObjectCacheEntry entry) {
-	    entry.setEvicting();
-	    updateQueue.evictObject(
-		entry.getContextId(), entry.key,
-		new EvictObjectCompletionHandler(entry.key));
-	}
-
-	/** Evict a binding cache entry that is not in use immediately. */
-	private void evictBindingNow(BindingCacheEntry entry) {
-	    entry.setEvicting();
-	    updateQueue.evictBinding(
-		entry.getContextId(), entry.key.getNameAllowLast(),
-		new EvictBindingCompletionHandler(entry.key));
 	}
     }
 

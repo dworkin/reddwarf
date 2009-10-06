@@ -23,40 +23,45 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.service.TransactionInterruptedException;
 
 /**
- * A cache entry.  Only the {@link #key} field may be accessed without holding
- * the associated lock.  For all other fields and methods, the lock should be
- * held.
+ * The base class for all entries stored in a node's data store cache.  Each
+ * entry stores a key that identifies the entry, the value associated with that
+ * key, a context ID that identifies the most recent transaction that has
+ * accessed the entry, and information about the current state of the entry.
+ * Only the {@link #key} field may be accessed without holding the associated
+ * lock (see {@link Cache#getBindingLock} and {@link Cache.getObjectLock}.  For
+ * all other fields and methods, the lock must be held. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  *
  * @param	<K> the key type
  * @param	<V> the value type
- * @see		Cache#getBindingLock
- * @see		Cache#getObjectLock
+ * @see		Cache
  */
 abstract class BasicCacheEntry<K, V> {
 
-    /** The entry is not cached. */
-    private static final int NOT_CACHED			= 0x01;
+    /** The entry is being made readable. */
+    private static final int READING			= 0x01;
 
     /** The entry is readable. */
     private static final int READABLE			= 0x02;
 
+    /** The entry is being made writable. */
+    private static final int UPGRADING			= 0x04;
+
     /** The entry is writable. */
-    private static final int WRITABLE			= 0x04;
+    private static final int WRITABLE			= 0x08;
 
     /** The entry is modified. */
-    private static final int MODIFIED			= 0x08;
-
-    /** The entry is being read. */
-    private static final int READING			= 0x10;
-
-    /** The entry is being made writable. */
-    private static final int UPGRADING			= 0x20;
+    private static final int MODIFIED			= 0x10;
 
     /** The entry is being made not writable. */
-    private static final int DOWNGRADING		= 0x40;
+    private static final int DOWNGRADING		= 0x20;
 
     /** The entry is being removed from the cache. */
-    private static final int DECACHING			= 0x80;
+    private static final int DECACHING			= 0x40;
+
+    /** The entry is not cached. */
+    private static final int NOT_CACHED			= 0x80;
 
     /**
      * The possible entry states. <p>
@@ -92,16 +97,16 @@ abstract class BasicCacheEntry<K, V> {
      * <li>{@code CACHED_WRITE} => {@code EVICTING_WRITE}
      * <li>{@code EVICTING_WRITE} => {@code NOT_CACHED}
      * </ul>
-     * </ul>
+     * </ul> <p>
      *
-     * If an access coordinator read or write lock is held on an item, then
-     * there can be no initiation of eviction by another thread.  If the write
-     * lock is held, then there can be no fetch for write operations starting
-     * or completing.
+     * If an access coordinator read or write lock is held on an entry's key,
+     * and the entry is currently in use, then eviction of that entry cannot be
+     * initiated by another thread.  In addition, if the write lock is held,
+     * then fetch for write operations cannot be started or completed.
      */
-    /* Here's an ASCII diagram of the state transitions:
+    /* Here's an ASCII diagram of the permitted state transitions:
      *
-     * |     READING         READABLE  UPGRADING    WRITABLE  MODIFYING
+     * |     READING         READABLE  UPGRADING    WRITABLE       MODIFYING
      * |
      * |>---------------FETCHING_WRITE------------->|
      * |                                            |
@@ -114,7 +119,7 @@ abstract class BasicCacheEntry<K, V> {
      * |<---------------EVICTING_WRITE-------------<|
      * |
      * DECACHED
-     *        DECACHING      READABLE  DOWNGRADING  WRITABLE  COMMIT/ABORT
+     *        DECACHING      READABLE  DOWNGRADING  WRITABLE       COMMIT/ABORT
      */
     enum State {
 
@@ -134,8 +139,7 @@ abstract class BasicCacheEntry<K, V> {
 	CACHED_WRITE(READABLE | WRITABLE),
 
 	/**
-	 * The entry is available for read and write in the cache, and has been
-	 * modified.
+	 * The entry is available for read and write, and has been modified.
 	 */
 	CACHED_DIRTY(READABLE | WRITABLE | MODIFIED),
 
@@ -179,43 +183,56 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * The context ID of the transaction with the highest context ID that has
-     * accessed this entry.
+     * accessed this entry, or Integer.MIN_VALUE if not accessed.
      */
     private long contextId = Integer.MIN_VALUE;
 
-    /** The state of this entry. */
+    /**
+     * The state of this entry.  Make sure to notify the associated lock
+     * whenever the value of this field is changed.
+     */
     private State state;
 
     /**
      * Creates a cache entry with the specified key and state.
      *
      * @param	key the key
-     * @param	initialState the state
+     * @param	state the state
      */
-    BasicCacheEntry(K key, State initialState) {
+    BasicCacheEntry(K key, State state) {
 	this.key = key;
-	state = initialState;
+	this.state = state;
     }
 
     /* -- State methods -- */
 
-    /* State.CACHED_READ and READABLE */
+    /* READING */
 
     /**
-     * Returns whether this entry is available for read.
+     * Returns whether this entry is being made readable.
      *
-     * @return	whether this entry is available for read
+     * @return	whether this entry is being made readable
+     */
+    boolean getReading() {
+	return checkStateValue(READING);
+    }
+
+    /* READABLE */
+
+    /**
+     * Returns whether this entry is readable.
+     *
+     * @return	whether this entry is readable
      */
     boolean getReadable() {
 	return checkStateValue(READABLE);
     }
 
     /**
-     * Waits for this entry to become available for read.  Returns {@code true}
-     * if the entry is readable, else {@code false} if the entry has become
-     * decached.
+     * Waits for this entry to become readable.  Returns {@code true} if the
+     * entry is readable, else {@code false} if the entry has become decached.
      *
-     * @param	lock the associated lock, which should be held
+     * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
      * @return	{@code true} if the entry is readable, else {@code false} if it
      *		is decached
@@ -239,18 +256,19 @@ abstract class BasicCacheEntry<K, V> {
 	    /* Entry is not in the cache */
 	    return false;
 	}
-    }	    
+    }
+
+    /* State.CACHED_READ */
 
     /**
      * Sets this entry's state to {@link State#CACHED_READ} after fetching for
-     * read, and notifies the lock, which should be held.
+     * read, and notifies the lock, which must be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry is not in state {@link
      *		State#FETCHING_READ}
      */
     void setCachedRead(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.FETCHING_READ);
 	state = State.CACHED_READ;
 	lock.notifyAll();
@@ -258,14 +276,13 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * Sets this entry's state to {@link State#CACHED_READ} after downgrading,
-     * and notifies the lock, which should be held.
+     * and notifies the lock, which must be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry is not in state {@link
      *		State#EVICTING_DOWNGRADE}
      */
     void setEvictedDowngrade(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.EVICTING_DOWNGRADE);
 	state = State.CACHED_READ;
 	lock.notifyAll();
@@ -274,57 +291,33 @@ abstract class BasicCacheEntry<K, V> {
     /**
      * Sets this entry's state to {@link State#CACHED_READ} directly from
      * {@link State#CACHED_WRITE} after an immediate downgrade when not in use,
-     * and notifies the lock, which should be held.
+     * and notifies the lock, which must be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry is not in state {@link
      *		State#CACHED_WRITE}
      */
     void setEvictedDowngradeImmediate(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.CACHED_WRITE);
 	state = State.CACHED_READ;
 	lock.notifyAll();
     }
 
-    /* READING */
-
-
-    /**
-     * Returns whether this entry is being read.
-     *
-     * @return	whether this entry is being read
-     */
-    boolean getReading() {
-	return checkStateValue(READING);
-    }
-
-    /* State.FETCHING_UPGRADE and UPGRADING */
+    /* UPGRADING */
 
     /**
-     * Returns whether this entry is being upgraded.
+     * Returns whether this entry is being made writable.
      *
-     * @return	whether this entry is being upgraded
+     * @return	whether this entry is being made writable
      */
     boolean getUpgrading() {
 	return checkStateValue(UPGRADING);
     }
 
     /**
-     * Sets this entry's state to {@link State#FETCHING_UPGRADE}.
+     * Waits for this entry to finish being made writable.
      *
-     * @throws	IllegalStateException if the entry is not in state {@link
-     *		State#CACHED_READ}
-     */
-    void setFetchingUpgrade() {
-	verifyState(State.CACHED_READ);
-	state = State.FETCHING_UPGRADE;
-    }
-
-    /**
-     * Waits for this entry to finish being upgraded.
-     *
-     * @param	lock the associated lock, which should be held
+     * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
      * @throws	IllegalStateException if the entry is not being upgraded
      * @throws	TransactionTimeoutException if the operation does not succeed
@@ -335,7 +328,23 @@ abstract class BasicCacheEntry<K, V> {
 	awaitNot(UPGRADING, lock, stop);
     }
 
-    /* State.CACHED_WRITE and WRITABLE */
+    /* State.FETCHING_UPGRADE */
+
+    /**
+     * Sets this entry's state to {@link State#FETCHING_UPGRADE}, and notifies
+     * the lock, which must be held.
+     *
+     * @param	lock the associated lock
+     * @throws	IllegalStateException if the entry is not in state {@link
+     *		State#CACHED_READ}
+     */
+    void setFetchingUpgrade(Object lock) {
+	verifyState(State.CACHED_READ);
+	state = State.FETCHING_UPGRADE;
+	lock.notifyAll();
+    }
+
+    /* WRITABLE */
 
     /**
      * Returns whether this entry is available for write.
@@ -366,13 +375,15 @@ abstract class BasicCacheEntry<K, V> {
      * and else {@link AwaitWritableResult#DECACHED} if the entry has become
      * decached.
      *
-     * @param	lock the associated lock, which should be held
+     * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
      * @throws	TransactionTimeoutException if the operation does not succeed
      *		before the specified stop time
      */
     AwaitWritableResult awaitWritable(Object lock, long stop) {
-	while (true) {
+	assert Thread.holdsLock(lock);
+	for (int i = 0; true; i++) {
+	    assert i < 1000 : "Too many retries";
 	    if (checkStateValue(WRITABLE)) {
 		/* Already cached for write */
 		return AwaitWritableResult.WRITABLE;
@@ -402,17 +413,17 @@ abstract class BasicCacheEntry<K, V> {
 	}
     }
 
+    /* State.CACHED_WRITE */
+
     /**
      * Sets this entry's state to {@link State#CACHED_WRITE} when it was being
-     * fetched for write, and notifies the associated lock, which should be
-     * held.
+     * fetched for write, and notifies the associated lock, which must be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry's current state is not
      *		{@link State#FETCHING_WRITE}
      */
     void setCachedWrite(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.FETCHING_WRITE);
 	state = State.CACHED_WRITE;
 	lock.notifyAll();
@@ -420,14 +431,13 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * Sets this entry's state to {@link State#CACHED_WRITE} when it was being
-     * upgraded, and notifies the associated lock, which should be held.
+     * upgraded, and notifies the associated lock, which must be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry's current state is not
      *		{@link State#FETCHING_UPGRADE}
      */
     void setUpgraded(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.FETCHING_UPGRADE);
 	state = State.CACHED_WRITE;
 	lock.notifyAll();
@@ -436,7 +446,7 @@ abstract class BasicCacheEntry<K, V> {
     /**
      * Sets this entry's state to {@link State#CACHED_WRITE} when it was
      * upgraded because it was the next binding after an entry being
-     * successfully removed, and notifies the associated lock, which should be
+     * successfully removed, and notifies the associated lock, which must be
      * held.
      *
      * @param	lock the associated lock
@@ -444,7 +454,6 @@ abstract class BasicCacheEntry<K, V> {
      *		{@link State#CACHED_READ}
      */
     void setUpgradedImmediate(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.CACHED_READ);
 	state = State.CACHED_WRITE;
 	lock.notifyAll();
@@ -452,17 +461,20 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * Sets this entry's state to {@link State#CACHED_WRITE} when it was
-     * modified, for use at the end of a transaction.
+     * modified, for use at the end of a transaction, and notifies the lock,
+     * which must be held.
      *
+     * @param	lock the associated lock
      * @throws	IllegalStateException if the current state is not {@link
      *		State#CACHED_DIRTY}
      */
-    void setNotModified() {
+    void setNotModified(Object lock) {
 	verifyState(State.CACHED_DIRTY);
 	state = State.CACHED_WRITE;
+	lock.notifyAll();
     }
 
-    /* State.CACHED_DIRTY and MODIFIED */
+    /* MODIFIED */
 
     /**
      * Returns whether this entry is modified.
@@ -473,19 +485,23 @@ abstract class BasicCacheEntry<K, V> {
 	return checkStateValue(MODIFIED);
     }
 
+    /* State.CACHED_DIRTY */
+
     /**
-     * Sets this entry's state to {@link State#CACHED_DIRTY} when it is
-     * modified.
+     * Sets this entry's state to {@link State#CACHED_DIRTY} when it is being
+     * modified, and notifies the lock, which must be held.
      *
+     * @param	lock the associated lock
      * @throws	IllegalStateException if this entry's current state is not
      *		{@link State#CACHED_WRITE}
      */
-    void setCachedDirty() {
+    void setCachedDirty(Object lock) {
 	verifyState(State.CACHED_WRITE);
 	state = State.CACHED_DIRTY;
+	lock.notifyAll();
     }
 
-    /* State.EVICTING_DOWNGRADE and DOWNGRADING */
+    /* DOWNGRADING */
 
     /**
      * Returns whether this entry is being downgraded
@@ -496,33 +512,23 @@ abstract class BasicCacheEntry<K, V> {
 	return checkStateValue(DOWNGRADING);
     }
 
+    /* State.EVICTING_DOWNGRADE */
+
     /**
-     * Sets this entry's state to {@link State#EVICTING_DOWNGRADE}.
+     * Sets this entry's state to {@link State#EVICTING_DOWNGRADE} when it is
+     * being downgraded, and notifies the lock, which must be held.
      *
+     * @param	lock the associated lock
      * @throws	IllegalStateException if this entry's current state is not
      *		{@link State#CACHED_WRITE}
      */
-    void setEvictingDowngrade() {
+    void setEvictingDowngrade(Object lock) {
 	verifyState(State.CACHED_WRITE);
 	state = State.EVICTING_DOWNGRADE;
+	lock.notifyAll();
     }
 
-    /**
-     * Waits for this entry to finish being downgraded.
-     *
-     * @param	lock the associated lock, which should be held
-     * @param	stop the time in milliseconds when waiting should fail
-     * @throws	IllegalStateException if the entry is not being downgraded
-     * @throws	TransactionTimeoutException if the operation does not succeed
-     *		before the specified stop time
-     */
-    void awaitNotDowngrading(Object lock, long stop) {
-	assert Thread.holdsLock(lock);
-	verifyState(State.EVICTING_DOWNGRADE, State.EVICTING_WRITE);
-	awaitNot(DOWNGRADING, lock, stop);
-    }
-
-    /* State.EVICTING_READ and DECACHING */
+    /* DECACHING */
 
     /**
      * Returns whether this entry is being decached.
@@ -533,18 +539,22 @@ abstract class BasicCacheEntry<K, V> {
 	return checkStateValue(DECACHING);
     }
 
+    /* State.EVICTING_READ */
+
     /**
      * Sets this entry's state to {@link State#EVICTING_READ} or {@link
      * State#EVICTING_WRITE}, depending on whether it is cached for read or
-     * write.
+     * write, and notifies the lock, which must be held.
      *
+     * @param	lock the associated lock
      * @throws	IllegalStateException if the entry's current state is not
      *		{@link State#CACHED_READ} or {@link State#CACHED_WRITE}
      */
-    void setEvicting() {
+    void setEvicting(Object lock) {
 	verifyState(State.CACHED_READ, State.CACHED_WRITE);
 	state = (state == State.CACHED_READ)
 	    ? State.EVICTING_READ : State.EVICTING_WRITE;
+	lock.notifyAll();
     }
 
     /* State.DECACHED */
@@ -561,7 +571,7 @@ abstract class BasicCacheEntry<K, V> {
     /**
      * Returns when this entry is decached.
      *
-     * @param	lock the associated lock, which should be held
+     * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
      * @throws	IllegalStateException if the entry is not decaching or decached
      * @throws	TransactionTimeoutException if the operation does not succeed
@@ -584,7 +594,6 @@ abstract class BasicCacheEntry<K, V> {
      *		{@link State#EVICTING_READ} or {@link State#EVICTING_WRITE}
      */
     void setEvicted(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.EVICTING_READ, State.EVICTING_WRITE);
 	state = State.DECACHED;
 	lock.notifyAll();
@@ -600,7 +609,6 @@ abstract class BasicCacheEntry<K, V> {
      *		{@link State#CACHED_READ} or {@link State#CACHED_WRITE}
      */
     void setEvictedImmediate(Object lock) {
-	assert Thread.holdsLock(lock);
 	verifyState(State.CACHED_READ, State.CACHED_WRITE);
 	state = State.DECACHED;
 	lock.notifyAll();
@@ -617,7 +625,6 @@ abstract class BasicCacheEntry<K, V> {
      *		{@link State#FETCHING_READ} or {@link State#FETCHING_WRITE}
      */
     void setEvictedAbandonFetching(Object lock) {
-	assert Thread.holdsLock(lock);
 	assert key == BindingKey.LAST;
 	verifyState(State.FETCHING_READ, State.FETCHING_WRITE);
 	state = State.DECACHED;
@@ -627,7 +634,7 @@ abstract class BasicCacheEntry<K, V> {
     /* -- Other methods -- */
 
     /**
-     * Returns the state of this entry
+     * Returns the state of this entry.
      *
      * @return	the state of this entry
      */
@@ -657,9 +664,9 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
-     * Updates the value of the entry.
+     * Updates the value of this entry.
      *
-     * @param	newValue the new value of the entry
+     * @param	newValue the new value
      */
     void setValue(V newValue) {
 	value = newValue;
@@ -725,12 +732,13 @@ abstract class BasicCacheEntry<K, V> {
      * {@code desiredStateValue}.
      * 
      * @param	value the value to check
-     * @param	lock the associated lock, which should be held
+     * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
      * @throws	TransactionTimeoutException if desired state value does not
      *		appear before the specified stop time
      */
     private void await(int desiredStateValue, Object lock, long stop) {
+	assert Thread.holdsLock(lock);
 	if (checkStateValue(desiredStateValue)) {
 	    return;
 	}
@@ -764,6 +772,7 @@ abstract class BasicCacheEntry<K, V> {
      *		appear before the specified stop time
      */
     private void awaitNot(int undesiredState, Object lock, long stop) {
+	assert Thread.holdsLock(lock);
 	if ((state.value & undesiredState) == 0) {
 	    return;
 	}

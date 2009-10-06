@@ -47,6 +47,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  * The facility that data store nodes use to send updates to the data server.
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 class UpdateQueue {
 

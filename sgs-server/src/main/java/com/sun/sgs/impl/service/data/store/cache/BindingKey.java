@@ -23,7 +23,10 @@ import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 
 /**
  * A key to represent binding names that is {@link Comparable} and provides a
- * non-{@code null} value to represent the a value beyond any possible name.
+ * non-{@code null} value to represent the a value beyond any possible
+ * name. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 abstract class BindingKey implements Comparable<BindingKey> {
 

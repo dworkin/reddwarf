@@ -43,6 +43,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionProxy;
@@ -127,6 +128,7 @@ public class TestDataServiceImpl extends Assert {
     private static final String APP_NAME = "TestDataServiceImpl";
     private static SgsTestNode serverNode = null;
     private static TransactionScheduler txnScheduler;
+    private static TaskService taskService;
     private static Identity taskOwner;
     private static TransactionProxy txnProxy;
 
@@ -213,6 +215,7 @@ public class TestDataServiceImpl extends Assert {
             componentRegistry = serverNode.getSystemRegistry();
             txnScheduler =
                     componentRegistry.getComponent(TransactionScheduler.class);
+	    taskService = serverNode.getTaskService();
             taskOwner = txnProxy.getCurrentOwner();
 
             service = (DataServiceImpl) serverNode.getDataService();
@@ -3322,104 +3325,121 @@ public class TestDataServiceImpl extends Assert {
 
     @Test 
     public void testNextObjectIdBoundaryIds() throws Exception {
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() {
-                BigInteger first = service.nextObjectId(null);
-                assertEquals(first, service.nextObjectId(null));
-                assertEquals(first, service.nextObjectId(BigInteger.ZERO));
-                BigInteger last = null;
-                while (true) {
-                    BigInteger id = service.nextObjectId(last);
+	new ChunkedTask() {
+	    boolean runChunk() {
+		ManagedBigInteger last;
+		try {
+		    last = (ManagedBigInteger)
+			service.getBindingForUpdate("last");
+		} catch (NameNotBoundException e) {
+		    last = new ManagedBigInteger(null);
+		    service.setBinding("last", last);
+		    BigInteger first = service.nextObjectId(null);
+		    assertEquals(first, service.nextObjectId(null));
+		    assertEquals(first, service.nextObjectId(BigInteger.ZERO));
+		}
+		while (taskService.shouldContinue()) {
+                    BigInteger id = service.nextObjectId(last.value);
                     if (id == null) {
-                        break;
+			assertEquals(
+			    null, service.nextObjectId(last.value));
+			assertEquals(
+			    null,
+			    service.nextObjectId(
+				BigInteger.valueOf(Long.MAX_VALUE)));
+			service.removeObject(last);
+			service.removeBinding("last");
+			return true;
                     }
-                    last = id;
+                    last.value = id;
                 }
-                assertEquals(null, service.nextObjectId(last));
-                assertEquals(
-                    null,
-                    service.nextObjectId(BigInteger.valueOf(Long.MAX_VALUE)));
-        }}, taskOwner);
+		return false;
+	    }
+	}.runAwaitDone();
     }
 
     @Test 
     public void testNextObjectIdRemoved() throws Exception {
-        class TestTask extends InitialTestRunnable {
+        class TestTask extends ChunkedTask {
             BigInteger dummyId;
             BigInteger dummy2Id;
-            public void run() throws Exception {
-                super.run();
-                DummyManagedObject dummy2 = new DummyManagedObject();
-                dummyId = service.createReference(dummy).getId();
-                dummy2Id = service.createReference(dummy2).getId();
-                /* Make sure dummyId is smaller than dummy2Id */
-                if (dummyId.compareTo(dummy2Id) > 0) {
-                    BigInteger temp = dummyId;
-                    dummyId = dummy2Id;
-                    dummy2Id = temp;
-                    DummyManagedObject dummyTemp = dummy;
-                    dummy = dummy2;
-                    dummy2 = dummyTemp;
-                    service.setBinding("dummy", dummy);
-                }
-                BigInteger id = dummyId;
-                while (true) {
-                    id = service.nextObjectId(id);
-                    assertNotNull("Didn't find dummy2Id after dummyId", id);
-                    if (id.equals(dummy2Id)) {
-                        break;
+            boolean runChunk() {
+		ManagedBigInteger last;
+		try {
+		    last = (ManagedBigInteger)
+			service.getBindingForUpdate("last");
+		    if (last.value == null) {
+			service.removeObject(last);
+			service.removeBinding("last");
+			return true;
+		    }
+		    dummy = (DummyManagedObject) service.getBinding("dummy");
+		} catch (NameNotBoundException e) {
+		    dummy = new DummyManagedObject();
+		    service.setBinding("dummy", dummy);
+		    DummyManagedObject dummy2 = new DummyManagedObject();
+		    dummyId = service.createReference(dummy).getId();
+		    dummy2Id = service.createReference(dummy2).getId();
+		    /* Make sure dummyId is smaller than dummy2Id */
+		    if (dummyId.compareTo(dummy2Id) > 0) {
+			BigInteger temp = dummyId;
+			dummyId = dummy2Id;
+			dummy2Id = temp;
+			DummyManagedObject dummyTemp = dummy;
+			dummy = dummy2;
+			dummy2 = dummyTemp;
+			service.setBinding("dummy", dummy);
+		    }
+		    last = new ManagedBigInteger(dummyId);
+		    service.setBinding("last", last);
+		}
+                while (taskService.shouldContinue()) {
+                    last.value = service.nextObjectId(last.value);
+                    assertNotNull("Didn't find dummy2Id after dummyId",
+				  last.value);
+                    if (last.value.equals(dummy2Id)) {
+			last.value = null;
+			break;
                     }
                 }
+		return false;
             }
         }
 
         final TestTask task = new TestTask();
-        txnScheduler.runTask(task, taskOwner);
+        task.runAwaitDone();
 
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() {
-                dummy = (DummyManagedObject) service.getBinding("dummy");
-                service.removeObject(dummy);
-                BigInteger id = null;
-                while (true) {
-                    id = service.nextObjectId(id);
-                    if (id == null) {
-                        break;
+	new ChunkedTask() {
+	    private boolean foundId2;
+            boolean runChunk() {
+		ManagedBigInteger last;
+		try {
+		    last = (ManagedBigInteger)
+			service.getBindingForUpdate("last");
+		} catch (NameNotBoundException e) {
+		    dummy = (DummyManagedObject) service.getBinding("dummy");
+		    service.removeObject(dummy);
+		    last = new ManagedBigInteger(null);
+		    service.setBinding("last", last);
+		}		    
+                while (taskService.shouldContinue()) {
+                    last.value = service.nextObjectId(last.value);
+		    if (last.value == task.dummy2Id) {
+			foundId2 = true;
+		    } else if (last.value == null) {
+			service.removeObject(last);
+			service.removeBinding("last");
+			assertTrue(
+			    "Didn't find dummy2Id after removed dummyId",
+			    foundId2);
+			return true;
                     }
                     assertFalse("Shouldn't find ID removed in this txn",
-                                task.dummyId.equals(id));
+                                task.dummyId.equals(last.value));
                 }
-                id = task.dummyId;
-                while (true) {
-                    id = service.nextObjectId(id);
-                    assertNotNull("Didn't find dummy2Id after removed dummyId", id);
-                    if (id.equals(task.dummy2Id)) {
-                        break;
-                    }
-                }
-        }}, taskOwner);
-
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() {
-                BigInteger id = null;
-                while (true) {
-                    id = service.nextObjectId(id);
-                    if (id == null) {
-                        break;
-                    }
-                    assertFalse("Shouldn't find ID removed in last txn",
-                                task.dummyId.equals(id));
-                }
-
-                id = task.dummyId;
-                while (true) {
-                    id = service.nextObjectId(id);
-                    assertNotNull("Didn't find dummy2Id after removed dummyId", id);
-                    if (id.equals(task.dummy2Id)) {
-                        break;
-                    }
-                }
-        }}, taskOwner);
+		return false;
+	    }
+	}.runAwaitDone();
     }
 
     /**
@@ -3459,19 +3479,30 @@ public class TestDataServiceImpl extends Assert {
                 service.removeObject(dummy.getNext());
         }}, taskOwner);
 
-        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-            public void run() {
+	new ChunkedTask() {
+            boolean runChunk() {
+		ManagedBigInteger last;
+		try {
+		    last = (ManagedBigInteger)
+			service.getBindingForUpdate("last");
+		} catch (NameNotBoundException e) {
+		    last = new ManagedBigInteger(task.dummyId);
+		    service.setBinding("last", last);
+		}
                 dummy = (DummyManagedObject) service.getBinding("dummy");
-                BigInteger id = task.dummyId;
-                while (true) {
-                    id = service.nextObjectId(id);
-                    if (id == null) {
-                        break;
+                while (taskService.shouldContinue()) {
+                    last.value = service.nextObjectId(last.value);
+                    if (last.value == null) {
+			service.removeObject(last);
+			service.removeBinding("last");
+			return true;
                     }
                     assertFalse("Shouldn't get removed dummy2 ID",
-                                id.equals(task.dummy2Id));
+                                last.value.equals(task.dummy2Id));
                 }
-        }}, taskOwner);
+		return false;
+	    }
+	}.runAwaitDone();
     }
 
     /* -- Unusual states -- */
@@ -5892,5 +5923,53 @@ public class TestDataServiceImpl extends Assert {
 	return
 	    t instanceof ExceptionRetryStatus &&
 	    ((ExceptionRetryStatus) t).shouldRetry();
+    }
+
+    /**
+     * A kernel runnable for conveniently breaking a task into separate
+     * transactions.
+     */
+    abstract static class ChunkedTask extends TestAbstractKernelRunnable {
+
+	/**
+	 * A count down latch that is set to 1 while waiting, and set to 0 when
+	 * done waiting.
+	 */
+	private CountDownLatch done = new CountDownLatch(1);
+
+	/** Creates an instance of this class. */
+	ChunkedTask() { }
+
+	/**
+	 * Runs a portion of the task, returning true if the entire task is
+	 * done.
+	 *
+	 * @return	whether the task is done
+	 */
+	abstract boolean runChunk();
+
+	/** Runs this task and waits until it is done. */
+	void runAwaitDone() throws InterruptedException {
+	    txnScheduler.scheduleTask(this, taskOwner);
+	    done.await(1, TimeUnit.SECONDS);
+	}
+
+	/** Runs the task chunks, rescheduling this task until it is done. */
+	public final void run() {
+	    if (runChunk()) {
+		done.countDown();
+	    } else {
+		txnScheduler.scheduleTask(this, taskOwner);
+	    }
+	}
+    }
+
+    /** A managed object that contains a big integer, which may be null. */
+    static class ManagedBigInteger implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1;
+	BigInteger value;
+	ManagedBigInteger(BigInteger value) {
+	    this.value = value;
+	}
     }
 }

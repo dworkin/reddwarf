@@ -38,6 +38,7 @@ import com.sun.sgs.impl.service.data.store.cache.
 import static com.sun.sgs.impl.service.transaction.
     TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -84,6 +85,69 @@ import java.util.logging.Logger;
 
 /**
  * An implementation of {@code CachingDataStoreServer}. <p>
+ *
+ * The {@link #CachingDataStoreServerImpl constructor} supports the following
+ * configuration properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #DIRECTORY_PROPERTY}</b></code> <br>
+ *	<i>Default:</i> <code><i>${com.sun.sgs.app.root}</i>/dsdb</code>
+ *
+ * <dd style="padding-top: .5em">The directory in which to store database
+ *	files. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #SERVER_PORT_PROPERTY}</b></code><br>
+ *	<i>Default:</i>	<code>{@value #DEFAULT_SERVER_PORT}</code>
+ *
+ * <dd style="padding-top: .5em">The network port used to accept server
+ *	requests.  The value should be a non-negative number less than
+ *	<code>65536</code>.  If the value specified is <code>0</code>, then an
+ *	anonymous port will be chosen. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #LOCK_TIMEOUT_PROPERTY}</b></code>
+ *	<br>
+ *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
+ *	transaction timeout
+ *
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ *	that an attempt to obtain a lock will be allowed to continue before
+ *	being aborted.  The value must be greater than <code>0</code>, and
+ *	should be less than the transaction timeout. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #NUM_CALLBACK_THREADS_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_NUM_CALLBACK_THREADS}</code>
+ *
+ * <dd style="padding-top: .5em">The number of threads to use for performing
+ *	callbacks.  The value must be greater than <code>0</code>. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #NUM_KEY_MAPS_PROPERTY}</b></code>
+ *	<br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_NUM_KEY_MAPS}</code>
+ *
+ * <dd style="padding-top: .5em">The number of maps to use for associating keys
+ *	and maps.  The value must be greater than <code>0</code>.  The number
+ *	of maps controls the amount of concurrency. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #TXN_TIMEOUT_PROPERTY}</b></code><br>
+ *	<i>Default:</i> The value of the <code>{@value
+ *	TransactionCoordinator#TXN_TIMEOUT_PROPERTY}</code> property, if
+ *	specified, or else <code>{@value
+ *	TransactionCoordinatorImpl#BOUNDED_TIMEOUT_DEFAULT}</code>
+ *
+ * <dd style="padding-top: .5em">The transaction timeout in milliseconds. <p>
+ * 
+ * <dt> <i>Property:</i> <code><b>{@value #UPDATE_QUEUE_PORT_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_UPDATE_QUEUE_PORT}</code>
+ *
+ * <dd style="padding-top: .5em">The network port used to accept requests to
+ *	the server's update queue.  The value should be a non-negative number
+ *	less than <code>65536</code>.  If the value specified is
+ *	<code>0</code>, then an anonymous port will be chosen. <p>
+ *
+ * </dl> <p>
  *
  * To avoid deadlocks, the implementation needs to insure that operations that
  * obtain multiple locks from the lock manager grab the lowest key first.  In
@@ -144,7 +208,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	PKG + ".num.callback.threads";
 
     /** The default number of callback threads. */
-    public static final int NUM_CALLBACK_THREADS_DEFAULT = 4;
+    public static final int DEFAULT_NUM_CALLBACK_THREADS = 4;
 
     /**
      * The property for specifying the number of maps to use for associating
@@ -154,7 +218,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	PKG + ".num.key.maps";
 
     /** The default number of key maps. */
-    public static final int NUM_KEY_MAPS_DEFAULT = 8;
+    public static final int DEFAULT_NUM_KEY_MAPS = 8;
 
     /** The property for specifying the transaction timeout in milliseconds. */
     public static final String TXN_TIMEOUT_PROPERTY = PKG + ".txn.timeout";
@@ -171,9 +235,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /** The number of node IDs to allocate at once. */
     private static final int NODE_ID_ALLOCATION_BLOCK_SIZE = 100;
-
-    /** The number of milliseconds to wait when allocating node IDs. */
-    private static final long NODE_ID_ALLOCATION_TIMEOUT = 1000;
 
     /** The transaction timeout. */
     private final long txnTimeout;
@@ -325,10 +386,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	long lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
 	int numCallbackThreads = wrappedProps.getIntProperty(
-	    NUM_CALLBACK_THREADS_PROPERTY, NUM_CALLBACK_THREADS_DEFAULT, 1,
+	    NUM_CALLBACK_THREADS_PROPERTY, DEFAULT_NUM_CALLBACK_THREADS, 1,
 	    Integer.MAX_VALUE);
 	int numKeyMaps = wrappedProps.getIntProperty(
-	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
+	    NUM_KEY_MAPS_PROPERTY, DEFAULT_NUM_KEY_MAPS, 1, Integer.MAX_VALUE);
 	int requestedServerPort = wrappedProps.getIntProperty(
 	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	int requestedUpdateQueuePort = wrappedProps.getIntProperty(
@@ -1377,8 +1438,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	synchronized (nextNodeIdSync) {
 	    if (nextNodeId > lastNodeId) {
 		boolean txnDone = false;
-		DbTransaction txn =
-		    env.beginTransaction(NODE_ID_ALLOCATION_TIMEOUT);
+		DbTransaction txn = env.beginTransaction(txnTimeout);
 		try {
 		    nextNodeId = DbUtilities.getNextNodeId(
 			infoDb, txn, NODE_ID_ALLOCATION_BLOCK_SIZE);
