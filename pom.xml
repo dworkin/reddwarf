@@ -15,7 +15,7 @@
   <artifactId>sgs-shared</artifactId>
   <name>Project Darkstar Shared</name>
   <packaging>jar</packaging>
-  <version>1.8</version>
+  <version>1.9</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
@@ -39,6 +39,13 @@
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
     </dependency>
+
+    <dependency>
+	<groupId>com.projectdarkstar.tools.test</groupId>
+	<artifactId>sgs-test-ext</artifactId>
+	<scope>test</scope>
+	<version>${sgs-test-ext.version}</version>
+      </dependency>
   </dependencies>
 
   <build>
@@ -117,6 +124,7 @@
     <findbugs-exclude.filter>
       ${basedir}/src/main/etc/findbugs-exclude.xml
     </findbugs-exclude.filter>
+    <sgs-test-ext.version>1.0</sgs-test-ext.version>
   </properties>
 
 </project>
