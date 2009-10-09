@@ -139,6 +139,87 @@ public final class StandardProperties {
     public static final String MANAGERS = NS + "managers";
 
     /**
+     * An optional colon-separated key that specifies which node types each
+     * configured extra <code>Service</code>/<code>Manager</code> pair should
+     * be started on.  Each
+     * item in this list must be set to a value in {@link ServiceNodeTypes} and
+     * is associated with the <code>Service</code>/<code>Manager</code> at the
+     * same respective index in the <code>SERVICES</code> and
+     * <code>MANAGERS</code> lists.
+     */
+    public static final String SERVICE_NODE_TYPES = NS + "services.node.types";
+
+    /**
+     * An enumeration of the possible values to assign in the
+     * <code>SERVICE_NODE_TYPES</code> list.  Each value represents which node
+     * types a <code>Service</code>/<code>Manager</code> pair will be started
+     * on.
+     */
+    public enum ServiceNodeTypes {
+        /**
+         * Service should be started on a {@link NodeType#singleNode} only.
+         */
+        SINGLE,
+        /**
+         * Service should be started on a {@link NodeType#coreServerNode} only.
+         */
+        CORE,
+        /**
+         * Service should be started on an {@link NodeType#appNode} only.
+         */
+        APP,
+        /**
+         * Service should be started on either a {@code singleNode} or a
+         * {@code coreServerNode}.
+         */
+        SINGLE_OR_CORE,
+        /**
+         * Service should be started on either a {@code singleNode} or an
+         * {@code appNode}.
+         */
+        SINGLE_OR_APP,
+        /**
+         * Service should be started on either a {@code coreServerNode} or an
+         * {@code appNode}.
+         */
+        CORE_OR_APP,
+        /**
+         * Service should be started on any node type.
+         */
+        ALL;
+
+        /**
+         * Returns {@code true} if this node types identifier indicates that
+         * the associated service should be started on the specified node type.
+         *
+         * @param nodeType the current {@code NodeType}
+         * @return {@code true} if the service should be started on the given
+         *         node type.
+         */
+        public boolean shouldStart(NodeType nodeType) {
+            switch(nodeType) {
+                case singleNode:
+                    return equals(SINGLE) ||
+                           equals(SINGLE_OR_CORE) ||
+                           equals(SINGLE_OR_APP) ||
+                           equals(ALL);
+                case coreServerNode:
+                    return equals(CORE) ||
+                           equals(SINGLE_OR_CORE) ||
+                           equals(CORE_OR_APP) ||
+                           equals(ALL);
+                case appNode:
+                    return equals(APP) ||
+                           equals(SINGLE_OR_APP) ||
+                           equals(CORE_OR_APP) ||
+                           equals(ALL);
+                default:
+                    return false;
+            }
+        }
+    }
+
+    /**
      * An enumeration of the known, standard {@code Service}s. The
      * ordering represents the order in which the services are configured.
      * For core server nodes in a multi-node configuration, the services
