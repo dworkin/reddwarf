@@ -31,11 +31,12 @@ public interface WatchdogClient extends Remote {
     /**
      * Notifies this client that the nodes specified by corresponding
      * information in the {@code ids}, {@code hosts}, 
-     * {@code status}, and {@code backups} arrays have a health change
+     * {@code health}, and {@code backups} arrays have a health change
      * and may need to
      * recover (if the backup ID is equal to the local node ID). The
      * {@code backups} array is only only consulted if the corresponding
-     * element in {@code status} is {@code false}.  If no node has been
+     * element in {@code health} returns {@code false} from
+     * {@code Health.isAlive()}. If no node has been
      * assigned as a backup, it is indicated by 
      * {@value com.sun.sgs.impl.service.watchdog.NodeImpl#INVALID_ID}.
      *

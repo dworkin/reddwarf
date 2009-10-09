@@ -1178,9 +1178,11 @@ public final class ChannelServiceImpl
 	implements NodeListener
     {
 	/** {@inheritDoc} */
-	public void nodeHealthChange(Node node) {
+	public void nodeHealthUpdate(Node node) {
             // Only worry about node failures
-            if (node.isAlive()) return;
+            if (node.isAlive()) {
+                return;
+            }
 
 	    final long nodeId = node.getId();
 	    channelServerCache.remove(nodeId);

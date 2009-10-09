@@ -168,12 +168,12 @@ class NodeImpl
     }
     
     /** {@inheritDoc} */
-    public synchronized boolean isAlive() {
-	return health.isAlive();
+    public boolean isAlive() {
+	return getHealth().isAlive();
     }
 
     /** {@inheritDoc} */
-    public Health getHealth() {
+    public synchronized Health getHealth() {
         return health;
     }
 
@@ -268,7 +268,7 @@ class NodeImpl
     }
     
     /**
-     * Sets the alive status of this node instance to {@code false},
+     * Sets the health of this node instance to {@code RED},
      * sets this node's backup to the specified {@code backup},
      * empties the set of primaries for which this node is recovering,
      * and updates the node's state in the specified {@code
@@ -295,7 +295,8 @@ class NodeImpl
     }
 
     /**
-     * Sets the health of this node instance.
+     * Sets the health of this node instance to a non-RED value. If the node
+     * health is to be set to RED use {@code setFailed}.
      *
      * @param dataService a data service
      * @param newHealth the new health of this node
@@ -304,6 +305,9 @@ class NodeImpl
      *		current transaction
      */
     synchronized void setHealth(DataService dataService, Health newHealth) {
+        if (!newHealth.isAlive()) {
+            throw new AssertionError("Call to setHealth with RED health");
+        }
 	NodeImpl nodeImpl = getForUpdate(dataService);
 	this.health = newHealth;
 	nodeImpl.health = newHealth;

@@ -15,13 +15,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * Sun designates this particular file as subject to the "Classpath"
- * exception as provided by Sun in the LICENSE file that accompanied
- * this code.
  */
 
-package com.sun.sgs.service;
+package com.sun.sgs.impl.service.nodemap;
+
+import com.sun.sgs.auth.Identity;
 
 /**
  * Interface for node assignment. The actual policy to be used is configurable
@@ -39,17 +37,32 @@ public interface NodeAssignPolicy {
      *  An id representing the server node.
      */
     long SERVER_NODE = -1L;
-    
+   
     /**
-     * Choose a node to assign an identity to.
+     * Choose a node to assign an identity, or set of identities to.
      *
      * @param requestingNode the id of the node making the request, or 
      *         {@code SERVER_NODE} if the system is making the request
+     *
      * @return the chosen node's id
      *
      * @throws NoNodesAvailableException if there are no live nodes to assign to
      */
     long chooseNode(long requestingNode) throws NoNodesAvailableException;
+
+    /**
+     * Choose a node to assign an identity to.
+     *
+     * @param requestingNode the id of the node making the request, or
+     *         {@code SERVER_NODE} if the system is making the request
+     * @param id the identity which needs an assignment.
+     *
+     * @return the chosen node's id
+     *
+     * @throws NoNodesAvailableException if there are no live nodes to assign to
+     */
+    long chooseNode(long requestingNode, Identity id)
+            throws NoNodesAvailableException;
     
     /**
      * Inform the policy that a node is now available.
@@ -66,7 +79,7 @@ public interface NodeAssignPolicy {
     void nodeUnavailable(long nodeId);
     
     /**
-     * Reset the policy, in particular its idea of what nodes are available.
+     * Reset the policy, informing it that no nodes are available.
      */
     void reset();
 }

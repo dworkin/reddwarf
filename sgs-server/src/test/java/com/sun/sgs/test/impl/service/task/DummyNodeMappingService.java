@@ -160,7 +160,7 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** {@inheritDoc} */
-    public void nodeHealthChange(Node node) {
+    public void nodeHealthUpdate(Node node) {
         if (node.isAlive()) {
             availableNodes.add(node);
         } else {

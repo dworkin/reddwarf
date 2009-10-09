@@ -483,7 +483,11 @@ public final class WatchdogServiceImpl
     public Health getLocalNodeHealth() {
 	checkState();
         serviceStats.getLocalNodeHealthOp.report();
-	if (!getIsAlive()) {
+        return getNodeHealthTransactional();
+    }
+
+    private Health getNodeHealthTransactional() {
+	if (!isLocalAlive()) {
 	    return Health.RED;
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
@@ -500,21 +504,11 @@ public final class WatchdogServiceImpl
     public boolean isLocalNodeAlive() {
 	checkState();
         serviceStats.isLocalNodeAliveOp.report();
-	if (!getIsAlive()) {
-	    return false;
-	} else {
-	    Node node = NodeImpl.getNode(dataService, localNodeId);
-	    if (node == null || !node.isAlive()) {
-                reportFailure(localNodeId, CLASSNAME);
-		return false;
-	    } else {
-		return true;
-	    }
-	}
+	return getNodeHealthTransactional().isAlive();
     }
 
     /** {@inheritDoc} */
-    public Health getLocalNodeHealthNonTransactional() {
+    public synchronized Health getLocalNodeHealthNonTransactional() {
 	checkState();
         serviceStats.getLocalNodeHealthNonTransOp.report();
 	return health;
@@ -524,7 +518,7 @@ public final class WatchdogServiceImpl
     public boolean isLocalNodeAliveNonTransactional() {
 	checkState();
         serviceStats.isLocalNodeAliveNonTransOp.report();
-	return getIsAlive();
+	return isLocalAlive();
     }
     
     /** {@inheritDoc} */
@@ -588,7 +582,7 @@ public final class WatchdogServiceImpl
         checkNull("component", component);
 	checkNonTransactionalContext();
 
-        if (shuttingDown() || !getIsAlive()) {
+        if (shuttingDown() || !isLocalAlive()) {
             return;
         }
 
@@ -614,12 +608,17 @@ public final class WatchdogServiceImpl
                 healthReports.put(component, nodeHealth);
             }
 
-            // Look at all the reports for this node, recording the most
-            // severe
-            for (Map.Entry<String, Health> report : healthReports.entrySet()) {
-                if (report.getValue().worseThan(nodeHealth)) {
-                    nodeHealth = report.getValue();
-                    component = report.getKey();
+            // If the report is an improvement over the current
+            // health, see if it improves the overall health
+            if (health.worseThan(nodeHealth)) {
+                // Look at all the reports for this node, recording the most
+                // severe
+                for (Map.Entry<String,
+                        Health> report : healthReports.entrySet()) {
+                    if (report.getValue().worseThan(nodeHealth)) {
+                        nodeHealth = report.getValue();
+                        component = report.getKey();
+                    }
                 }
             }
         }
@@ -679,8 +678,10 @@ public final class WatchdogServiceImpl
                                                   String component)
     {
 	if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "Set local health to {0}, reported by {1}",
-                       newHealth, component);
+            logger.log(Level.FINER,
+                       "Set local health to {0}, reported by {1}, " +
+                       "previous health was: {2}",
+                       newHealth, component, health);
         }
 
         if (!health.isAlive()) {
@@ -749,7 +750,7 @@ public final class WatchdogServiceImpl
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
-	    while (getIsAlive()) {
+	    while (isLocalAlive()) {
 
 		synchronized (this) {
 		    if (shuttingDown()) {
@@ -823,10 +824,9 @@ public final class WatchdogServiceImpl
     }
 
     /**
-     * Returns the local alive status: {@code true} if this node is
-     * considered alive.
+     * Returns {@code true} if this node is considered alive.
      */
-    private synchronized boolean getIsAlive() {
+    private synchronized boolean isLocalAlive() {
 	return health.isAlive();
     }
 
@@ -847,7 +847,7 @@ public final class WatchdogServiceImpl
 			if (!shuttingDown() &&
                             isLocalNodeAliveNonTransactional()) 
 			{
-                            nodeListener.nodeHealthChange(node);
+                            nodeListener.nodeHealthUpdate(node);
 			}
 		    }
 		}, taskOwner);

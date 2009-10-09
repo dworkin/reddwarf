@@ -176,12 +176,18 @@ public interface WatchdogService extends Service {
      * the local node or a remote node. The {@code component} parameter may be
      * any identifying string, but is typically the class name of the component.
      * <p>
+     * Once {@code reportHealth} has been called with a health that returns
+     * {@code false} from its {@code Health.isAlive} method, the health
+     * of the specified node can not be changed. <p>
      *
      * This method must be invoked outside of a transaction.
      *
      * @param nodeId the id of the node
      * @param health the health
      * @param component the name of the component reporting health
+     *
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
      */
     void reportHealth(long nodeId, Health health, String component);
 
@@ -192,6 +198,9 @@ public interface WatchdogService extends Service {
      * {@code nodeId} can be the local node or a remote node. The
      * {@code component} parameter may be any identifying string, but is
      * typically the class name of the component.<p>
+     *
+     * Once {@code reportFailure} has been called, the health of the
+     * specified node can not be changed. <p>
      *
      * This method must be invoked outside of a transaction.
      *

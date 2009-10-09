@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap.policy;
 
-import com.sun.sgs.service.NoNodesAvailableException;
+import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -30,7 +30,11 @@ public class RoundRobinPolicy extends AbstractNodePolicy {
 
     private final AtomicInteger nextNode = new AtomicInteger();
     
-    /** Creates a new instance of RoundRobinPolicy */
+    /**
+     * Creates a new instance of RoundRobinPolicy.
+     *
+     * @param props service properties
+     */
     public RoundRobinPolicy(Properties props) {
         super();
     }

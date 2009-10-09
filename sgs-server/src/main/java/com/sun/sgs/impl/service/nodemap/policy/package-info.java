@@ -19,6 +19,6 @@
 
 /**
  * Provides implementations of
- * {@link com.sun.sgs.service.NodeAssignPolicy}.
+ * {@link com.sun.sgs.impl.service.nodemap.NodeAssignPolicy}.
  */
 package com.sun.sgs.impl.service.nodemap.policy;

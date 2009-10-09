@@ -25,14 +25,11 @@ package com.sun.sgs.service;
 
 /**
  * A listener that can be registered with the {@link WatchdogService}
- * to be notified of node status change events.  Invocations to the
- * methods of a {@code NodeListener} are made outside of a
- * transaction.
- * <p>
- * TODO-- make sure this is true:--
- * For any given node, the {@link #nodeHealthChange nodeHealthChange} method
- * will never be invoked after the the method is invoked for that given node
- * and that node is not alive.
+ * to be notified of node status events.  Invocations to the
+ * methods of a {@code NodeListener} are made outside of a transaction. <p>
+ *
+ * The implementations for the methods of this interface should be
+ * idempotent because they may be invoked multiple times.
  *
  * @see WatchdogService#addNodeListener(NodeListener)
  */
@@ -40,10 +37,15 @@ public interface NodeListener {
     
     /**
      * Notifies this listener that the specified {@code node}'s health has
-     * changed. The node's health can be obtained by calling
+     * been updated. The node's health can be obtained by calling
      * {@link Node#getHealth getHealth} on the node status information object.
+     * Note that the node's health may not have changed since the
+     * last update. <p>
+     *
+     * Once a node has failed, i.e. {@link Node#isAlive() node.isAlive()}
+     * returns {@code false}, the node's health will not change.
      *
      * @param	node	node status information
      */
-    void nodeHealthChange(Node node);
+    void nodeHealthUpdate(Node node);
 }

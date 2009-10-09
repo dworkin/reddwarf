@@ -30,25 +30,25 @@ package com.sun.sgs.service;
 public interface Node {
 
     /**
-     * Health of a component or node.
+     * Health of a node.
      */
-    enum Health {
+    public enum Health {
 
 
         /**
-         * The component is operating normally and is available for additional
+         * The node is operating normally and is available for additional
          * work.
          */
         GREEN,
 
         /**
-         * The component is operating normally but is not available for
+         * The node is operating normally but is not available for
          * additional work.
          */
         YELLOW,
 
         /**
-         * The component is operational, but is in need of attention such as
+         * The node is operational, but is in need of attention such as
          * offloading some of its work.
          */
         ORANGE,

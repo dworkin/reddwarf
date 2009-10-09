@@ -19,8 +19,8 @@
 
 package com.sun.sgs.impl.service.nodemap.policy;
 
-import com.sun.sgs.service.NoNodesAvailableException;
-import com.sun.sgs.service.NodeAssignPolicy;
+import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
+import com.sun.sgs.impl.service.nodemap.NodeAssignPolicy;
 import java.util.Properties;
 
 /**

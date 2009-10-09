@@ -93,21 +93,21 @@ public interface WatchdogServer extends Remote {
     void recoveredNode(long nodeId, long backupId) throws IOException;
 
     /**
-     * Notifies the node with the given ID that its health be set. If the
-     * {@code health} is {@code Node.Health.RED} it indicates that the
+     * Notifies the node with the given ID that its health has been set. If the
+     * {@code health} is {@link Health#RED RED} it indicates that the
      * node has failed and should be shutdown. In this case, if the given node
      * is a remote node, this notification is a
      * result of a server running into difficulty communicating with a remote
      * node, so the server's watchdog service is responsible for notifying the
      * watchdog service in order to issue the shutdown. The {@code component}
      * parameter may be any identifying string, but is typically the class
-     * name of the component.
+     * name of the component that reported the specified health.
      *
      * @param nodeId the node's ID
      * @param isLocal specifies if the node is reporting health on itself or
      * a remote node
      * @param health the node's health
-     * @param component the component issuing the health
+     * @param component the component reported the specified health
      * @param maxNumberOfAttempts the maximum number of attempts to try and
      * resolve an {@code IOException}
      * @throws IOException if a communication error occurs while trying to set

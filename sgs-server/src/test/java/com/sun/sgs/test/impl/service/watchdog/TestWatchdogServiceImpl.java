@@ -618,6 +618,16 @@ public class TestWatchdogServiceImpl extends Assert {
         checkHealth(watchdogService, Health.GREEN);
     }
 
+    @Test public void testReportFailedHealth() throws Exception {
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+
+        checkHealth(watchdogService, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.RED, "A");
+        checkHealth(watchdogService, Health.RED);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkHealth(watchdogService, Health.RED);
+    }
+
     // Utility method to check that that the reported health matches the
     // expected health value
     private void checkHealth(final WatchdogService watchdog,
@@ -852,7 +862,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	}
     }
 
-    @Test public void testAddNodeListenerNodeHealth() throws Exception {
+    @Test public void testNodeHealthNotification() throws Exception {
         DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
         final long nodeId = serverNode.getDataService().getLocalNodeId();
@@ -871,6 +881,28 @@ public class TestWatchdogServiceImpl extends Assert {
 
         if (listener.getNumNotifications() != 6) {
             fail("Expected 6 notifications, got " +
+                 listener.getNumNotifications());
+        }
+        Set<Node> nodes = listener.getStartedNodes();
+
+        if (nodes.size() != 1) {
+            fail("Expected 1 started node, got " + nodes.size());
+        }
+    }
+
+    @Test public void testNodeHealthFailNotification() throws Exception {
+        DummyNodeListener listener = new DummyNodeListener();
+	watchdogService.addNodeListener(listener);
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkNotification(listener, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.RED, "A");
+        Thread.sleep(2000);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        Thread.sleep(2000);
+
+        if (listener.getNumNotifications() != 1) {
+            fail("Expected 1 notifications, got " +
                  listener.getNumNotifications());
         }
         Set<Node> nodes = listener.getStartedNodes();
@@ -1916,7 +1948,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	private final Set<Node> failedNodes = new HashSet<Node>();
 	private final Set<Node> startedNodes = new HashSet<Node>();
 
-	public void nodeHealthChange(Node node) {
+	public void nodeHealthUpdate(Node node) {
             notifications++;
             lastNode = node;
 	    if (node.isAlive()) {

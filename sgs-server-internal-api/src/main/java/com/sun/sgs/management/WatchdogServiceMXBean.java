@@ -49,8 +49,10 @@ public interface WatchdogServiceMXBean {
     Health getNodeHealth();
 
     /**
-     * Set the health of the local node. If the node's health is below the
-     * specified health, then the node's health will not change.
+     * Set the health of the local node. If the specified health is worse than
+     * the node's health, then the node's health is set to the specified health.
+     * If the specified health is better than the node's health, the node's
+     * health will not change.
      *
      * @param health a node health
      */

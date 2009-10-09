@@ -19,9 +19,6 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
-import com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy;
-import com.sun.sgs.service.NoNodesAvailableException;
-import com.sun.sgs.service.NodeAssignPolicy;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -160,7 +157,11 @@ public final class NodeMappingServerImpl
      */
     private static final String ASSIGN_POLICY_CLASS_PROPERTY =
             PKG_NAME + ".policy.class";
-    
+
+    /** The default node assign policy */
+    private static final String DEFAULT_ASSIGN_POLICY_CLASS =
+            "com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy";
+
     /** The property name for the amount of time to wait before removing an
      * identity from the node map.
      */
@@ -268,16 +269,13 @@ public final class NodeMappingServerImpl
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
                 SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
-        
-        String policyClassName = wrappedProps.getProperty(
-		ASSIGN_POLICY_CLASS_PROPERTY);	    
-        if (policyClassName == null) {
-            assignPolicy = new RoundRobinPolicy(properties);
-        } else {
-            assignPolicy = wrappedProps.getClassInstanceProperty(
-                ASSIGN_POLICY_CLASS_PROPERTY, NodeAssignPolicy.class,
-                new Class[] { Properties.class }, properties);
-        }
+
+        assignPolicy = wrappedProps.getClassInstanceProperty(
+                                            ASSIGN_POLICY_CLASS_PROPERTY,
+                                            DEFAULT_ASSIGN_POLICY_CLASS,
+                                            NodeAssignPolicy.class,
+                                            new Class[] { Properties.class },
+                                            properties);
 
         logger.log(Level.CONFIG, "Node assign policy: {0}",
                    assignPolicy.getClass().getName());
@@ -780,7 +778,7 @@ public final class NodeMappingServerImpl
         // as it could take a while.  
         final long newNodeId;
         try {
-            newNodeId = assignPolicy.chooseNode(requestingNode);
+            newNodeId = assignPolicy.chooseNode(requestingNode, id);
         } catch (NoNodesAvailableException ex) {
             logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}" +
                     " failed because no live nodes are available", 
@@ -982,11 +980,11 @@ public final class NodeMappingServerImpl
     private class Listener implements NodeListener {
         
         /** {@inheritDoc} */
-        public void nodeHealthChange(Node node) {
+        public void nodeHealthUpdate(Node node) {
             long nodeId = node.getId();
 
             if (logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINE, "Node {0} health change to {1}",
+                logger.log(Level.FINE, "Node {0} health update, health is: {1}",
                            nodeId, node.getHealth());
             }
             switch (node.getHealth()) {
@@ -1013,6 +1011,9 @@ public final class NodeMappingServerImpl
                     }
                     moveIdentities(node);
                     break;
+
+                default :
+                    throw new AssertionError("Bad node health");
             }
         }
 
