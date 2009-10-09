@@ -411,11 +411,6 @@ public class TestPropertiesWrapper extends Assert {
         wrapper.getEnumListProperty("values", null, Fruit.APPLE);
     }
 
-    @Test(expected = NullPointerException.class)
-    public void testGetEnumListPropertyNullDefault() {
-        wrapper.getEnumListProperty("values", Fruit.class, null);
-    }
-
     @Test
     public void testGetEnumListPropertyNoProperty() {
         List<Fruit> list = wrapper.getEnumListProperty(

@@ -550,7 +550,6 @@ public class PropertiesWrapper {
                                                            T defaultValue) {
         Objects.checkNull("name", name);
 	Objects.checkNull("enumType", enumType);
-	Objects.checkNull("defaultValue", defaultValue);
 
         List<T> list = new ArrayList<T>();
         String value = properties.getProperty(name);
