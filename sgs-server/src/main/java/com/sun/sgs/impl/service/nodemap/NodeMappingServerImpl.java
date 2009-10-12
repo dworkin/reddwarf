@@ -637,7 +637,13 @@ public final class NodeMappingServerImpl
         } 
     }
     
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     *
+     * Only nodes that have registered can be assigned identities. So this
+     * call will gate if a node is added to the assign policy in
+     * {@code nodeHealthUpdate()}.
+     */
     public void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException
     {
@@ -645,8 +651,6 @@ public final class NodeMappingServerImpl
         
         try {
             notifyMap.put(nodeId, client);
-            // TODO -- this assumes the registering node is healthy... that OK?
-            assignPolicy.nodeAvailable(nodeId);
             logger.log(Level.FINEST, 
                        "Registered node listener for {0} ", nodeId);
         } finally {
@@ -975,7 +979,7 @@ public final class NodeMappingServerImpl
         
     /** 
      * The listener registered with the watchdog service.  These methods
-     * will be notified if a node starts or stops.
+     * will be notified of node health updates.
      */
     private class Listener implements NodeListener {
         

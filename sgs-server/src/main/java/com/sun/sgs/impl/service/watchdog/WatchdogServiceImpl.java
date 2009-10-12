@@ -434,7 +434,11 @@ public final class WatchdogServiceImpl
 	    " to current version:" + currentVersion);
     }
     
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * 
+     * A health update will be sent to listeners.
+     */
     protected void doReady() throws Exception {
 	// TBD: the client shouldn't accept incoming calls until this
 	// service is ready which would give all RecoveryListeners a
@@ -451,6 +455,9 @@ public final class WatchdogServiceImpl
                     timesyncInterval);
             timesyncTaskHandle.start();
         }
+
+        // Report this component is healthy and ready for work
+        reportHealth(localNodeId, Health.GREEN, CLASSNAME);
     }
 
     /** {@inheritDoc} */

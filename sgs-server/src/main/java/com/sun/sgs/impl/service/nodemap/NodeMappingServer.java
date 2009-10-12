@@ -70,9 +70,10 @@ interface NodeMappingServer extends Remote {
     /**
      * Register a {@link NotifyClient} object to be called when changes
      * occur on a particular node.  Only one listener object can be 
-     * registered per {@code nodeId}, and registering a listener a 
-     * {@code nodeId} will clear any previously registered listener for
-     * that {@code nodeId}.
+     * registered per {@code nodeId}, and registering a listener
+     * will clear any previously registered listener for that {@code nodeId}.<p>
+     *
+     * Registration must only be made during service startup.
      *
      * @param client the callback client
      * @param nodeId the node which {@code client} is interested in changes to

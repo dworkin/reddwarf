@@ -42,6 +42,9 @@ public interface NodeListener {
      * Note that the node's health may not have changed since the
      * last update. <p>
      *
+     * On node startup a health update will be made to indicate the initial
+     * health of the node. <p>
+     *
      * Once a node has failed, i.e. {@link Node#isAlive() node.isAlive()}
      * returns {@code false}, the node's health will not change.
      *
