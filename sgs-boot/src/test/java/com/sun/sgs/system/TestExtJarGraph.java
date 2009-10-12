@@ -25,7 +25,6 @@ import java.util.Properties;
 import java.util.jar.JarFile;
 import org.junit.Assert;
 import org.junit.Test;
-import org.junit.Ignore;
 
 /** Test the ExtJarGraph class used to handle extension jar files. */
 public class TestExtJarGraph {
@@ -50,16 +49,18 @@ public class TestExtJarGraph {
         new File(JAR_DIRECTORY + "NoManifest.jar");
     private static final File JAR_NO_PROPERTIES =
         new File(JAR_DIRECTORY + "NoProperties.jar");
-    private static final File JAR_INVALID_PROPERTIES =
-        new File(JAR_DIRECTORY + "InvalidProperties.jar");
     private static final File JAR_MIS_MATCHED_SERVICES =
         new File(JAR_DIRECTORY + "MisMatchedServices.jar");
+    private static final File JAR_MIS_MATCHED_NODE_TYPES =
+        new File(JAR_DIRECTORY + "MisMatchedNodeTypes.jar");
     private static final File JAR_A_WITH_SERVICES =
         new File(JAR_DIRECTORY + "AWithServices.jar");
     private static final File JAR_B_WITH_SERVICES =
         new File(JAR_DIRECTORY + "BWithServices.jar");
     private static final File JAR_C_WITH_SERVICES =
         new File(JAR_DIRECTORY + "CWithServices.jar");
+    private static final File JAR_D_WITH_SERVICES =
+        new File(JAR_DIRECTORY + "DWithServices.jar");
     private static final File JAR_A_PROPERTY_COLLISION =
         new File(JAR_DIRECTORY + "APropertyCollision.jar");
     private static final File JAR_A_PROPERTY_DUPLICATE =
@@ -153,6 +154,13 @@ public class TestExtJarGraph {
         graph.getPropertiesFile();
     }
 
+    @Test(expected = IllegalStateException.class)
+    public void testJarMisMatchedNodeTypes() throws Exception {
+        ExtJarGraph graph = new ExtJarGraph();
+        graph.addJarFile(new JarFile(JAR_MIS_MATCHED_NODE_TYPES));
+        graph.getPropertiesFile();
+    }
+
     @Test public void testJarMergedServicesEmptyManager() throws Exception {
         ExtJarGraph graph = new ExtJarGraph();
         graph.addJarFile(new JarFile(JAR_A_WITH_SERVICES));
@@ -165,6 +173,8 @@ public class TestExtJarGraph {
                                  "com.example.Service3"));
         Assert.assertTrue(p.getProperty("com.sun.sgs.ext.managers").
                           equals(":com.example.Manager2:"));
+        Assert.assertTrue(p.getProperty("com.sun.sgs.ext.services.node.types").
+                          equals("ALL:CORE:APP"));
         Assert.assertTrue(p.getProperty("com.sun.sgs.ext.authenticators").
                           equals("com.example.Authenticator1"));
     }
@@ -179,12 +189,35 @@ public class TestExtJarGraph {
 
         Assert.assertTrue(p.getProperty("com.sun.sgs.ext.services").
                           equals("com.example.Service2:com.example.Service3:" +
-                                 "com.example.Service1"));
+                                 "com.example.Service4"));
         Assert.assertTrue(p.getProperty("com.sun.sgs.ext.managers").
-                          equals("com.example.Manager2::com.example.Manager1"));
+                          equals("com.example.Manager2::com.example.Manager4"));
+        Assert.assertTrue(p.getProperty("com.sun.sgs.ext.services.node.types").
+                          equals("CORE:APP:CORE_OR_APP"));
         Assert.assertTrue(p.getProperty("com.sun.sgs.ext.authenticators").
                           equals("com.example.Authenticator1:" +
                                  "com.example.Authenticator2"));
+    }
+
+    @Test
+    public void testJarMergedServicesNoNodeTypes() throws Exception {
+        ExtJarGraph graph = new ExtJarGraph();
+        graph.addJarFile(new JarFile(JAR_D_WITH_SERVICES));
+        graph.addJarFile(new JarFile(JAR_A_WITH_SERVICES));
+        String fileName = graph.getPropertiesFile();
+        Properties p = new Properties();
+        p.load(new FileInputStream(fileName));
+        Assert.assertTrue(p.getProperty("com.sun.sgs.ext.services").
+                equals("com.example.Service5:com.example.Service6:" +
+                       "com.example.Service7:com.example.Service1"));
+        Assert.assertTrue(p.getProperty("com.sun.sgs.ext.managers").
+                equals("com.example.Manager5:com.example.Manager6:" +
+                       "com.example.Manager7:"));
+        Assert.assertTrue(p.getProperty("com.sun.sgs.ext.services.node.types").
+                equals("ALL:ALL:ALL:ALL"));
+        Assert.assertTrue(p.getProperty("com.sun.sgs.ext.authenticators").
+                equals("com.example.Authenticator3:" +
+                       "com.example.Authenticator4"));
     }
 
     @Test public void testMultipleJarNoDependency() throws Exception {
