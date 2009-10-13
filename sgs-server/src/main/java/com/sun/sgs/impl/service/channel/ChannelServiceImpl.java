@@ -644,6 +644,8 @@ public final class ChannelServiceImpl
 		    new ChannelSendTask(channelRefId, channelInfo.delivery,
 					message);
 		synchronized (channelInfo) {
+		    // TBD: Is this check for ordered unreliable channels
+		    // as well? 
 		    if (channelInfo.delivery.equals(Delivery.RELIABLE) &&
 			timestamp <= channelInfo.msgTimestamp)
 		    {

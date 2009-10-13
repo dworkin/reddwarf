@@ -23,6 +23,7 @@ import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import static com.sun.sgs.impl.util.AbstractService.getStackTrace;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
@@ -43,8 +44,11 @@ public abstract class AbstractDummyClient extends Assert {
     
     private static final int WAIT_TIME = 5000;
 
+    private static final byte RELOCATE_PROTOCOL_VERSION = 5;
+
     /* -- client state -- */
     public final String name;
+    private final byte protocolVersion;
     protected volatile byte[] reconnectKey = new byte[0];
     private final Object lock = new Object();
 
@@ -76,9 +80,21 @@ public abstract class AbstractDummyClient extends Assert {
     private boolean relocateSuccess;
 	
 	
-    /** Constructs an instance with the given {@code name}. */
+    /**
+     * Constructs an instance with the given {@code name} with the latest
+     * protocol version.
+     */
     public AbstractDummyClient(String name) {
+	this(name, SimpleSgsProtocol.VERSION);
+    }
+
+    /**
+     * Constructs an instance with the given {@code name} and the specified
+     * protocol version.
+     */
+    public AbstractDummyClient(String name, byte protocolVersion) {
 	this.name = name;
+	this.protocolVersion = protocolVersion;
     }
 
     /**
@@ -193,7 +209,7 @@ public abstract class AbstractDummyClient extends Assert {
 	    new MessageBuffer(2 + MessageBuffer.getSize(name) +
 			      MessageBuffer.getSize(password));
 	buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
-	    putByte(SimpleSgsProtocol.VERSION).
+	    putByte(protocolVersion).
 	    putString(name).
 	    putString(password);
 	loginAck = false;
@@ -265,6 +281,7 @@ public abstract class AbstractDummyClient extends Assert {
      * received RELOCATE_NOTIFICATION.
      */
     public void waitForRelocationNotification(int expectedPort) {
+	checkRelocateProtocolVersion();
 	System.err.println(toString() +
 			   " waiting for relocation notification...");
 	synchronized (lock) {
@@ -310,6 +327,7 @@ public abstract class AbstractDummyClient extends Assert {
     public void relocate(int expectedPort, boolean useValidKey,
 			 boolean shouldSucceed)
     {
+	checkRelocateProtocolVersion();
 	synchronized (lock) {
 	    if (!relocateSession) {
 		waitForRelocationNotification(expectedPort);
@@ -431,7 +449,8 @@ public abstract class AbstractDummyClient extends Assert {
      * is closed or the timeout expires, which ever comes first.
      */
     public void disconnect() {
-	System.err.println(toString() + " disconnecting");
+	System.err.println(toString() + " disconnecting, stacktrace:\n" +
+			   getStackTrace());
 
 	synchronized (lock) {
 	    if (! connected) {
@@ -482,12 +501,14 @@ public abstract class AbstractDummyClient extends Assert {
     }
 
     public void setWaitForSuspendMessages() {
+	checkRelocateProtocolVersion();
 	synchronized (lock) {
 	    waitForSuspendMessages = true;
 	}
     }
     
-    public boolean waitForSuspendMessages() {
+    public void waitForSuspendMessages() {
+	checkRelocateProtocolVersion();	
 	synchronized (lock) {
 	    try {
 		if (!suspendMessages) {
@@ -495,11 +516,15 @@ public abstract class AbstractDummyClient extends Assert {
 		}
 	    } catch (InterruptedException ignore) {
 	    }
-	    return suspendMessages;
+	    if (!suspendMessages) {
+		fail(toString() +
+		     " time out waiting for SUSPEND_MESSAGES");
+	    }
 	}
     }
 
     public void sendSuspendMessagesComplete() {
+	checkRelocateProtocolVersion();
 	synchronized (lock) {
 	    ByteBuffer msg = ByteBuffer.allocate(1);
 	    msg.put(SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE).
@@ -557,6 +582,7 @@ public abstract class AbstractDummyClient extends Assert {
 		break;
 
 	    case SimpleSgsProtocol.SUSPEND_MESSAGES:
+		checkRelocateProtocolVersion();
 		synchronized (lock) {
 		    if (suspendMessages) {
 			break;
@@ -573,6 +599,7 @@ public abstract class AbstractDummyClient extends Assert {
 		
 		    
 	    case SimpleSgsProtocol.RELOCATE_NOTIFICATION:
+		checkRelocateProtocolVersion();
 		relocateHost = buf.getString();
 		relocatePort = buf.getInt();
 		relocateKey = buf.getBytes(buf.limit() - buf.position());
@@ -588,6 +615,7 @@ public abstract class AbstractDummyClient extends Assert {
 		break;
 
 	    case SimpleSgsProtocol.RELOCATE_SUCCESS:
+		checkRelocateProtocolVersion();
 		reconnectKey = buf.getBytes(buf.limit() - buf.position());
 		newReconnectKey(reconnectKey);
 		synchronized (lock) {
@@ -600,6 +628,7 @@ public abstract class AbstractDummyClient extends Assert {
 		break;
 		    
 	    case SimpleSgsProtocol.RELOCATE_FAILURE:
+		checkRelocateProtocolVersion();
 		String relocateFailureReason = buf.getString();
 		synchronized (lock) {
 		    relocateAck = true;
@@ -629,6 +658,20 @@ public abstract class AbstractDummyClient extends Assert {
     /** {@inheritDoc} */
     public String toString() {
 	return "[" + name + "]";
+    }
+
+    /**
+     * Throws an {@code AssertionFailedError} if this client's protocol
+     * version does not support suspend or relocate.
+     */
+    public void checkRelocateProtocolVersion() {
+	if (protocolVersion < RELOCATE_PROTOCOL_VERSION) {
+	    String badVersion =
+		toString() + " Protocol version: " + protocolVersion +
+		" does not support suspend or relocate";
+	    System.err.println(badVersion);
+	    fail(badVersion);
+	}
     }
 
     /**

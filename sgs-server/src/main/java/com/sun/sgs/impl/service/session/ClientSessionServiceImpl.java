@@ -620,6 +620,16 @@ public final class ClientSessionServiceImpl
 		loggedInIdentityMap.get(id);
 	    
 	    if (sessionHandler != null) {
+		if (!sessionHandler.isRelocatable()) {
+		    // Ignore request if client session does not suppport
+		    // relocation.  If request is ignored, then identity
+		    // mapping will not be modified.
+		    logger.log(
+			Level.SEVERE,
+			"Attempt to relocate client:{0} that does not " +
+			"support relocation", id);
+		    return;
+		}
 		// The specified identity corresponds to a local client session,
 		// so prepare to move it.
 		final BigInteger sessionRefId = sessionHandler.sessionRefId;
@@ -628,7 +638,9 @@ public final class ClientSessionServiceImpl
 		PrepareRelocationInfo oldPrepareInfo =
 		    prepareRelocationMap.putIfAbsent(sessionRefId, prepareInfo);
 		if (oldPrepareInfo == null) {
-		    if (sessionHandler.isRelocating() || !sessionHandler.isConnected()) {
+		    if (sessionHandler.isRelocating() ||
+			!sessionHandler.isConnected())
+		    {
 			// Request to prepare identity for relocation is
 			// received after preparation has already been completed
 			// and session is in the process of relocating.
@@ -1379,6 +1391,7 @@ public final class ClientSessionServiceImpl
 	}
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
+	prepareRelocationMap.remove(sessionRefId); // just in case...
     }
 
     /**
@@ -1729,6 +1742,10 @@ public final class ClientSessionServiceImpl
 		// TBD: notify NMS that preparation is complete, or just
 		// wait for it to clean up the info associated with the
 		// identity?
+		logger.log(
+		    Level.FINE, "Disconnecting session:{0} that timed out " +
+		    "relocating from node:{1}", sessionHandler.identity,
+		    localNodeId);
 		sessionHandler.handleDisconnect(false, true);
 	    }
 	}
@@ -1770,6 +1787,10 @@ public final class ClientSessionServiceImpl
 	 */
 	public void run() {
 	    if (relocationKeys.remove(relocationKey) != null) {
+		logger.log(
+		    Level.FINE, "Scheduling clean up of session:{0} that " +
+		    "failed to relocate to local node:{1}",
+		    info.identity, localNodeId);
 		transactionScheduler.scheduleTask(
  		    new AbstractKernelRunnable("RemoveNonrelocatedSession") {
 			public void run() {

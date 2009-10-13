@@ -31,6 +31,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.util.AbstractCompletionFuture;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import static com.sun.sgs.impl.util.AbstractService.getStackTrace;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
@@ -42,6 +43,7 @@ import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.RequestFailureException;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
+import com.sun.sgs.protocol.SessionRelocationProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -96,7 +98,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     volatile BigInteger sessionRefId;
 
     /** The identity for this session. */
-    private final Identity identity;
+    final Identity identity;
 
     /** The login status. */
     private volatile boolean loggedIn;
@@ -285,9 +287,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
     public void disconnect(RequestCompletionHandler<Void> completionHandler) {
 	RequestCompletionFuture future =
 	    new RequestCompletionFuture(completionHandler);
+	/*  TBD: this should probably be allowed to disconnect no matter what...
 	if (!readyForRequests(future)) {
 	    return;
 	}
+	*/
 	scheduleHandleDisconnect(false, true);
 	
 	// TBD: should we wait to notify until client disconnects connection?
@@ -315,6 +319,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	return
 	    currentState == State.CONNECTED ||
 	    currentState == State.LOGIN_HANDLED;
+    }
+
+    /**
+     * Returns {@code true} if this session's protocol handler supports
+     * relocation (i.e., implements the {@link SessionRelocationProtocol}
+     * interface; otherwise returns {@code false}.
+     */
+    boolean isRelocatable() {
+	return protocol instanceof SessionRelocationProtocol;
     }
 
     /**
@@ -386,7 +399,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		   relocateCompletionHandler.isCompleted()) {
 	    logger.log(
 		Level.FINE,
-		"request received while session is relocating:{0}", this);
+		"request received while session is relocating:{0}, " +
+		"stacktrace:\n{1}:", this, getStackTrace());
 	    future.setException(
 		new RequestFailureException(
 		    "session is relocating",
@@ -494,9 +508,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
 	synchronized (lock) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "handleDisconnect handler:{0} disconnectHandled:{1}",
-			   this, disconnectHandled);
+		logger.log(Level.FINEST, "handleDisconnect handler:{0} " +
+			   "disconnectHandled:{1} stacktrace:\n{2}",
+			   this, disconnectHandled, getStackTrace());
 	    }
 	    if (disconnectHandled) {
 		return;
@@ -569,6 +583,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private void scheduleHandleDisconnect(
 	final boolean graceful, final boolean closeConnection)
     {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "stacktrace:\n{0}", getStackTrace());
+	}
         synchronized (lock) {
 	    if (disconnectHandled) {
 		return;
@@ -1327,7 +1344,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		}
 
 		relocateCompletionHandler = new RelocateCompletionHandler();
-		protocol.relocate(
+		if (!isRelocatable()) {
+		    logger.log(
+			Level.WARNING,
+			"Disconnecting a non-relocatable session:{0} " +
+			"that was erroneously prepared to relocate", identity);
+		    handleDisconnect(false, true);
+		    return;
+		}
+		((SessionRelocationProtocol) protocol).relocate(
 		    newNode, descriptors, ByteBuffer.wrap(relocationKey),
 		    relocateCompletionHandler);
 
