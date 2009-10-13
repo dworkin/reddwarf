@@ -53,7 +53,7 @@ public interface WatchdogService extends Service {
      * #getLocalNodeHealth getLocalNodeHealth} method. <p>
      *
      * This method may be invoked any time after this service is
-     * intialized, whether or not the calling context is inside or outside
+     * initialized, whether or not the calling context is inside or outside
      * of a transaction.
      *
      * @return	the health of the local node
@@ -80,7 +80,7 @@ public interface WatchdogService extends Service {
      * #isLocalNodeAlive isLocalNodeAlive} method. <p>
      *
      * This method may be invoked any time after this service is
-     * intialized, whether or not the calling context is inside or outside
+     * initialized, whether or not the calling context is inside or outside
      * of a transaction.
      *
      * @return	{@code true} if the local node is considered alive, and
