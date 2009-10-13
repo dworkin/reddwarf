@@ -640,9 +640,9 @@ public final class NodeMappingServerImpl
     /**
      * {@inheritDoc}
      *
-     * Only nodes that have registered can be assigned identities. So this
-     * call will gate if a node is added to the assign policy in
-     * {@code nodeHealthUpdate()}.
+     * Only nodes that have registered can be assigned identities. Nodes will
+     * not be added to the server's {@code NodeAssignPolicy} unless they have
+     * registered a listener with this method.
      */
     public void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException
