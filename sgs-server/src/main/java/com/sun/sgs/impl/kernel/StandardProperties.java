@@ -239,8 +239,18 @@ public final class StandardProperties {
         /** Enumeration for the Channel Service. */
         ChannelService;
 
-        /** The last service that gets configured for an application. */
-        public static final StandardService LAST_SERVICE = ChannelService;
+        /** The last service that gets configured for an {@code appNode}. */
+        public static final StandardService LAST_APP_SERVICE = ChannelService;
+
+        /** The last service that gets configured for a {@code singleNode}. */
+        public static final StandardService LAST_SINGLE_SERVICE =
+                                            ChannelService;
+
+        /**
+         * The last service that gets configured for a
+         * {@code coreServerNode}.
+         */
+        public static final StandardService LAST_CORE_SERVICE = TaskService;
     }
 
     /**

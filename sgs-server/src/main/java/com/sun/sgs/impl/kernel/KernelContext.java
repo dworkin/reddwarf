@@ -24,6 +24,8 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagerNotFoundException;
 import com.sun.sgs.app.TaskManager;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.service.Service;
@@ -31,6 +33,9 @@ import com.sun.sgs.service.Service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.MissingResourceException;
+
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 
 /**
@@ -43,6 +48,10 @@ import java.util.MissingResourceException;
  *  handing out services and managers
  */
 class KernelContext {
+
+    // logger for this class
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(KernelContext.class.getName()));
 
     // the application's name
     private final String applicationName;
@@ -206,7 +215,12 @@ class KernelContext {
      */
     void notifyReady() throws Exception {
         for (Object service : serviceComponents) {
-            ((Service) service).ready();
+            Service s = (Service) service;
+            s.ready();
+
+            if (logger.isLoggable(Level.CONFIG)) {
+                logger.log(Level.CONFIG, "The {0} is ready", s.getName());
+            }
         }
     }
 

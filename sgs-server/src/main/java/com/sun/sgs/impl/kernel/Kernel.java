@@ -559,13 +559,17 @@ class Kernel {
         StandardService finalStandardService = null;
         switch (type) {
             case appNode:
+                finalStandardService = StandardService.LAST_APP_SERVICE;
+                break;
             case singleNode:
-            default:
-                finalStandardService = StandardService.LAST_SERVICE;
+                finalStandardService = StandardService.LAST_SINGLE_SERVICE;
                 break;
             case coreServerNode:
-                finalStandardService = StandardService.TaskService;
+                finalStandardService = StandardService.LAST_CORE_SERVICE;
                 break;
+            default:
+                throw new IllegalArgumentException("Invalid node type : " +
+                                                   type);
         }
 
         final int finalServiceOrdinal = finalStandardService.ordinal();
@@ -647,7 +651,7 @@ class Kernel {
         setupService(channelServiceClass, channelManagerClass, startupContext);
     }
 
-    /** Private helper used to load all extenal services and managers. */
+    /** Private helper used to load all external services and managers. */
     private void loadExternalServices(List<String> externalServices,
                                       List<String> externalManagers,
                                       List<ServiceNodeTypes> externalNodeTypes,
@@ -656,7 +660,7 @@ class Kernel {
         throws Exception
     {
         if (externalServices.size() != externalManagers.size() ||
-            externalManagers.size() != externalNodeTypes.size()) {
+            externalServices.size() != externalNodeTypes.size()) {
             if (logger.isLoggable(Level.SEVERE)) {
                 logger.log(Level.SEVERE, "External service count " +
                            "({0}), manager count ({1}), and node type count " +
@@ -670,6 +674,7 @@ class Kernel {
         }
 
         for (int i = 0; i < externalServices.size(); i++) {
+            // skip this service if it should not be started on this node type
             if (!externalNodeTypes.get(i).shouldStart(type)) {
                 continue;
             }
@@ -1250,7 +1255,7 @@ class Kernel {
      * {@link BootProperties#DEFAULT_APP_PROPERTIES}
      * This file is typically included as part of the application jar file.</li>
      * <li>Properties specified in the file named by the optional
-     * {@link BootProperties#EXTENSION_FILE_PROPERTY} property.</li>
+     * {@link BootProperties#EXTENSION_FILE_PROPERTY} system property.</li>
      * </ol>
      * 
      * If no value is specified for a given property in any of these places,

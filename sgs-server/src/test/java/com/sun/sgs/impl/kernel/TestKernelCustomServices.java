@@ -19,6 +19,9 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.auth.IdentityAuthenticator;
+import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties.ServiceNodeTypes;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
@@ -27,9 +30,12 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import javax.security.auth.login.LoginException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -47,6 +53,10 @@ public class TestKernelCustomServices {
     /** Set of services that have been started up during a test. */
     private static Set<String> runningServices = new HashSet<String>();
     private static Set<String> runningManagers = new HashSet<String>();
+
+    /** List of authenticators that have been created. */
+    private static List<String> availableAuthenticators =
+                                new ArrayList<String>();
 
     /** The main test node. */
     private SgsTestNode serverNode;
@@ -69,7 +79,10 @@ public class TestKernelCustomServices {
 
         runningServices.clear();
         runningManagers.clear();
+        availableAuthenticators.clear();
     }
+
+    /** Utility methods. */
 
     private Properties getSingleNodeProperties() throws Exception {
         return SgsTestNode.getDefaultProperties(
@@ -123,6 +136,8 @@ public class TestKernelCustomServices {
             props.setProperty(BootProperties.EXTENSION_SERVICE_NODE_TYPES_PROPERTY,
                               nodeTypes);
     }
+
+    /** The tests. */
 
     @Test
     public void noServices() throws Exception {
@@ -766,6 +781,120 @@ public class TestKernelCustomServices {
         Assert.assertTrue(runningManagers.contains(Manager1.class.getName()));
     }
 
+    @Test
+    public void noAuthenticators() throws Exception {
+        Properties props = getSingleNodeProperties();
+        startCoreNode(props);
+        Assert.assertTrue(availableAuthenticators.isEmpty());
+    }
+
+    @Test
+    public void invalidAuthenticator() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(StandardProperties.AUTHENTICATORS,
+                          InvalidAuthenticator.class.getName());
+        try {
+            startCoreNode(props);
+            Assert.fail("Startup should fail due to invalid authenticator");
+        } catch (Exception e) {
+            Assert.assertTrue(availableAuthenticators.isEmpty());
+        }
+    }
+
+    @Test
+    public void singleAuthenticator() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(StandardProperties.AUTHENTICATORS,
+                          Authenticator1.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator1.class.getName()));
+    }
+
+    @Test
+    public void multiAuthenticators() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(StandardProperties.AUTHENTICATORS,
+                          Authenticator1.class.getName() + ":" +
+                          Authenticator2.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator1.class.getName()));
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator2.class.getName()));
+    }
+
+    @Test
+    public void singleExtAuthenticator() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(BootProperties.EXTENSION_AUTHENTICATORS_PROPERTY,
+                          Authenticator1.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator1.class.getName()));
+    }
+
+    @Test
+    public void multiExtAuthenticators() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(BootProperties.EXTENSION_AUTHENTICATORS_PROPERTY,
+                          Authenticator1.class.getName() + ":" +
+                          Authenticator2.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator1.class.getName()));
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator2.class.getName()));
+    }
+
+    @Test
+    public void combinedSingleAuthenticators() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(StandardProperties.AUTHENTICATORS,
+                          Authenticator1.class.getName());
+        props.setProperty(BootProperties.EXTENSION_AUTHENTICATORS_PROPERTY,
+                          Authenticator2.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator1.class.getName()));
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator2.class.getName()));
+        Assert.assertTrue(
+                availableAuthenticators.indexOf(
+                Authenticator2.class.getName()) <
+                availableAuthenticators.indexOf(
+                Authenticator1.class.getName()));
+    }
+
+    @Test
+    public void combinedMultiAuthenticators() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(StandardProperties.AUTHENTICATORS,
+                          Authenticator1.class.getName() + ":" +
+                          Authenticator2.class.getName());
+        props.setProperty(BootProperties.EXTENSION_AUTHENTICATORS_PROPERTY,
+                          Authenticator3.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator1.class.getName()));
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator2.class.getName()));
+        Assert.assertTrue(availableAuthenticators.contains(
+                Authenticator3.class.getName()));
+        Assert.assertTrue(
+                availableAuthenticators.indexOf(
+                Authenticator3.class.getName()) <
+                availableAuthenticators.indexOf(
+                Authenticator1.class.getName()));
+        Assert.assertTrue(
+                availableAuthenticators.indexOf(
+                Authenticator1.class.getName()) <
+                availableAuthenticators.indexOf(
+                Authenticator2.class.getName()));
+    }
+
+
+    /** Dummy Services and Managers for use in the tests. */
 
     public static abstract class TestAbstractService implements Service {
         public String getName() {
@@ -849,6 +978,40 @@ public class TestKernelCustomServices {
 
     public static class InvalidManager extends TestAbstractManager {
         public InvalidManager() {}
+    }
+
+    public static abstract class AbstractAuthenticator
+            implements IdentityAuthenticator {
+
+        public AbstractAuthenticator(Properties p) {
+            availableAuthenticators.add(this.getClass().getName());
+        }
+
+        public Identity authenticateIdentity(IdentityCredentials credentials)
+                throws LoginException {
+            return null;
+        }
+
+        public String[] getSupportedCredentialTypes() {
+            return new String[0];
+        }
+
+    }
+
+    public static class Authenticator1 extends AbstractAuthenticator {
+        public Authenticator1(Properties p) { super(p); }
+    }
+
+    public static class Authenticator2 extends AbstractAuthenticator {
+        public Authenticator2(Properties p) { super(p); }
+    }
+
+    public static class Authenticator3 extends AbstractAuthenticator {
+        public Authenticator3(Properties p) { super(p); }
+    }
+
+    public static class InvalidAuthenticator extends AbstractAuthenticator {
+        public InvalidAuthenticator() { super(null); }
     }
 
 }
