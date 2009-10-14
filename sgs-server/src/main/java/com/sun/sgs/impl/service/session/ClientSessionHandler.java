@@ -287,11 +287,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
     public void disconnect(RequestCompletionHandler<Void> completionHandler) {
 	RequestCompletionFuture future =
 	    new RequestCompletionFuture(completionHandler);
-	/*  TBD: this should probably be allowed to disconnect no matter what...
+	// TBD: should this be allowed to disconnect no matter what?
 	if (!readyForRequests(future)) {
 	    return;
 	}
-	*/
 	scheduleHandleDisconnect(false, true);
 	
 	// TBD: should we wait to notify until client disconnects connection?

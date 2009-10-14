@@ -100,10 +100,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     protected final SimpleSgsProtocolAcceptor acceptor;
 
     /** The logger for this instance. */
-    private final LoggerWrapper logger;
+    protected final LoggerWrapper logger;
     
    /** The protocol listener. */
-    private final ProtocolListener listener;
+    protected final ProtocolListener listener;
 
     /** The identity. */
     private volatile Identity identity;
@@ -148,12 +148,12 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	 * for the buffers, so they don't go into hysteresis when they get
 	 * full. -JM
 	 */
-	scheduleReadOnReadHandler();
+	scheduleRead();
     }
     
     /**
      *
-     * The subclass should invoke {@link #scheduleReadOnReadHandler} after
+     * The subclass should invoke {@link #scheduleRead} after
      * constructing the instance to commence reading.
      *
      * @param	listener a protocol listener
@@ -177,6 +177,17 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	this.logger = logger;
 	this.reconnectKey = getNextReconnectKey();
 	deliverySet.add(Delivery.RELIABLE);
+    }
+
+    /**
+     * Returns the {@code SimplSgsProtocol} version supported by this
+     * implementation.
+     *
+     * @return the {@code SimplSgsProtocol} version supported by this
+     * implementation
+     */
+    protected byte getProtocolVersion() {
+	return PROTOCOL_v4;
     }
     
     /* -- Implement SessionProtocol -- */
@@ -258,24 +269,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	writeBuffer(buf, delivery);
     }
 
-    /**
-     * Writes the specified buffer, satisfying the specified delivery
-     * requirement.
-     *
-     * <p>This implementation writes the buffer reliably, because this
-     * protocol only supports reliable delivery.
-     *
-     * <p>A subclass can override the {@code writeBuffer} method if it
-     * supports other delivery guarantees and can make use of alternate
-     * transports for those other delivery requirements.
-     *
-     * @param	buf a byte buffer containing a protocol message
-     * @param	delivery a delivery requirement
-     */
-    protected void writeBuffer(ByteBuffer buf, Delivery delivery) {
-	writeOrEnqueueIfLoginNotHandled(buf);
-    }
-
     /** {@inheritDoc} */
     public void disconnect(DisconnectReason reason) throws IOException {
 	// TBD: The SimpleSgsProtocol does not yet support sending a
@@ -294,8 +287,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	MessageBuffer buf = new MessageBuffer(1 + reconnectKey.length);
 	buf.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 	    putBytes(reconnectKey);
-	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
-	flushMessageQueue();
+	writeNow(ByteBuffer.wrap(buf.getBuffer()), true);
     }
 
     /**
@@ -319,9 +311,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    new MessageBuffer(1 + redirectionData.length);
 		buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
 		    putBytes(redirectionData);
-		writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
-		flushMessageQueue();
-		acceptor.monitorDisconnection(this);
+		writeNow(ByteBuffer.wrap(buf.getBuffer()), true);
+		monitorDisconnection();
                 return;
             }
         }
@@ -350,9 +341,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    new MessageBuffer(1 + MessageBuffer.getSize(reason));
         buf.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
             putString(reason);
-        writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
-	flushMessageQueue();
-	acceptor.monitorDisconnection(this);
+        writeNow(ByteBuffer.wrap(buf.getBuffer()), true);
+	monitorDisconnection();
     }
     
     /**
@@ -362,8 +352,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	ByteBuffer buf = ByteBuffer.allocate(1);
 	buf.put(SimpleSgsProtocol.LOGOUT_SUCCESS).
 	    flip();
-	writeToWriteHandler(buf);
-	acceptor.monitorDisconnection(this);
+	writeNow(buf, false);
+	monitorDisconnection();
     }
 
     /* -- Implement Channel -- */
@@ -375,6 +365,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** {@inheritDoc} */
     public void close() {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "closing channel, protocol:{0}", this);
+	}
 	if (isOpen()) {
 	    try {
 		asyncMsgChannel.close();
@@ -384,8 +377,19 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	readHandler = new ClosedReadHandler();
         writeHandler = new ClosedWriteHandler();
 	if (protocolHandler != null) {
-	    protocolHandler.disconnect(new RequestHandler());
+	    SessionProtocolHandler handler = protocolHandler;
+	    protocolHandler = null;
+	    handler.disconnect(new RequestHandler());
 	}
+    }
+
+    /* -- Object method overrides -- */
+    
+    /** {@inheritDoc */
+    @Override
+    public String toString() {
+	return getClass().getName() + "[" +
+	    (identity != null ? identity : "<unknown>") + "]";
     }
 
     /* -- Methods for reading and writing -- */
@@ -393,16 +397,25 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /**
      * Schedules an asynchronous task to resume reading.
      */
-    protected void scheduleReadOnReadHandler() {
+    protected void scheduleRead() {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "scheduling read, protocol:{0}", this);
+	}
 	acceptor.scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
 		public void run() {
 		    logger.log(
 			Level.FINER, "resuming reads protocol:{0}", this);
-		    if (isOpen()) {
-			readHandler.read();
-		    }
+		    readNow();
 		} });
+    }
+
+    protected void readNow() {
+	if (isOpen()) {
+	    readHandler.read();
+	} else {
+	    close();
+	}
     }
 
     /**
@@ -412,12 +425,12 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      *
      * @param	buf a buffer containing a complete protocol message
      */
-    private void writeOrEnqueueIfLoginNotHandled(ByteBuffer buf) {
+    protected void writeOrEnqueueIfLoginNotHandled(ByteBuffer buf) {
 	synchronized (lock) {
 	    if (!loginHandled) {
 		messageQueue.add(buf);
 	    } else {
-		writeToWriteHandler(buf);
+		writeNow(buf, false);
 	    }
 	}
     }
@@ -426,8 +439,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      * Writes a message to the write handler.
      *
      * @param	buf a buffer containing a complete protocol message
+     * @param	flush if {@code true}, then set the {@code loginHandled}
+     *		flag and flush the message queue
      */
-    private void writeToWriteHandler(ByteBuffer message) {
+    protected void writeNow(ByteBuffer message, boolean flush) {
 	try {
 	    writeHandler.write(message);
 		    
@@ -435,22 +450,45 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "writeToWriteHandler protocol:{0} throws", this);
+		    "writeNow protocol:{0} throws", this);
+	    }
+	}
+
+	if (flush) {
+	    synchronized (lock) {
+		loginHandled = true;
+		for (ByteBuffer nextMessage : messageQueue) {
+		    try {
+			writeHandler.write(nextMessage);
+		    } catch (RuntimeException e) {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.logThrow(
+				Level.WARNING, e,
+				"writeNow protocol:{0} throws", this);
+			}
+		    }
+		}
+		messageQueue.clear();
 	    }
 	}
     }
 
     /**
-     * Writes all enqueued messages to the write handler.
+     * Writes the specified buffer, satisfying the specified delivery
+     * requirement.
+     *
+     * <p>This implementation writes the buffer reliably, because this
+     * protocol only supports reliable delivery.
+     *
+     * <p>A subclass can override the {@code writeBuffer} method if it
+     * supports other delivery guarantees and can make use of alternate
+     * transports for those other delivery requirements.
+     *
+     * @param	buf a byte buffer containing a protocol message
+     * @param	delivery a delivery requirement
      */
-    private void flushMessageQueue() {
-	synchronized (lock) {
-	    loginHandled = true;
-	    for (ByteBuffer nextMessage : messageQueue) {
-		writeToWriteHandler(nextMessage);
-	    }
-	    messageQueue.clear();
-	}
+    protected void writeBuffer(ByteBuffer buf, Delivery delivery) {
+	writeOrEnqueueIfLoginNotHandled(buf);
     }
     
     /**
@@ -554,6 +592,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    "processQueue protocol:{0} size:{1,number,#} head={2}",
 		    SimpleSgsProtocolImpl.this, pendingWrites.size(),
 		    HexDumper.format(message, 0x50));
+		message.mark();
             }
             try {
                 asyncMsgChannel.write(message, this);
@@ -677,7 +716,18 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                 message.get(payload);
 
                 // Dispatch
-                bytesReceived(payload);
+		MessageBuffer msg = new MessageBuffer(payload);
+		byte opcode = msg.getByte();
+		
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"processing opcode 0x{0}",
+			Integer.toHexString(opcode));
+		}
+		
+		handleMessageReceived(opcode, msg);
+		
 
             } catch (Exception e) {
 
@@ -694,31 +744,21 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                 close();
             }
         }
+    }
 
-	/** Processes the received message. */
-        private void bytesReceived(byte[] buffer) {
-
-	    MessageBuffer msg = new MessageBuffer(buffer);
-	    byte opcode = msg.getByte();
-	    byte version;
-
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
- 		    Level.FINEST,
-		    "processing opcode 0x{0}",
-		    Integer.toHexString(opcode));
-	    }
-	    
-	    switch (opcode) {
+    /** Processes the received message. */
+    protected void handleMessageReceived(byte opcode, MessageBuffer msg) {
+		
+	switch (opcode) {
 		
 	    case SimpleSgsProtocol.LOGIN_REQUEST:
 
-		version = msg.getByte();
-	        if (version != PROTOCOL_v4) {
+		byte version = msg.getByte();
+	        if (version != getProtocolVersion()) {
 	            if (logger.isLoggable(Level.SEVERE)) {
 	                logger.log(Level.SEVERE,
 	                    "got protocol version:{0}, " +
-	                    "expected {1}", version, PROTOCOL_v4);
+			    "expected {1}", version, getProtocolVersion());
 	            }
 		    close();
 	            break;
@@ -742,7 +782,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
  		    identity, SimpleSgsProtocolImpl.this, new LoginHandler());
 		
                 // Resume reading immediately
-		read();
+		readNow();
 
 		break;
 
@@ -798,7 +838,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		protocolHandler.logoutRequest(new LogoutHandler());
 
 		// Resume reading immediately
-                read();
+                readNow();
 
 		break;
 		
@@ -811,10 +851,18 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		}
 		close();
 		break;
-	    }
 	}
     }
 
+    /**
+     * Monitors the client's disconnection and closes this instance's
+     * underlying connection if the client hasn't closed the connection in
+     * a timely fashion.
+     */
+    protected void monitorDisconnection() {
+	acceptor.monitorDisconnection(this);	
+    }
+    
     /**
      * A completion handler that is notified when the associated login
      * request has completed processing. 
@@ -898,7 +946,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 			((RequestFailureException) cause).getReason();
 		    if (reason.equals(FailureReason.DISCONNECT_PENDING)) {
 			// Don't read any more from client because session
-			// is either disconnecting or relocating.
+			// is disconnecting.
 			return;
 		    }
 		    // Assume other failures are transient.
@@ -911,7 +959,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 			Level.WARNING, e, "Obtaining request result throws ");
 		}
 	    }
-	    scheduleReadOnReadHandler();
+	    scheduleRead();
 	}
     }
     
