@@ -49,7 +49,7 @@ import com.sun.sgs.test.io.ServerEndpoint;
 import com.sun.sgs.test.io.AcceptorListener;
 import com.sun.sgs.test.io.Acceptor;
 import com.sun.sgs.io.ConnectionListener;
-import com.sun.sgs.impl.io.AbstractSocketEndpoint;
+import com.sun.sgs.test.impl.io.AbstractSocketEndpoint;
 
 /**
  * This is an implementation of an {@link Acceptor} that uses a MINA 

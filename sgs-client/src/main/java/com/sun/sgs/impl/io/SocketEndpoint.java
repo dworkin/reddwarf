@@ -43,13 +43,28 @@ import org.apache.mina.transport.socket.nio.DatagramConnector;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.Connector;
+import java.util.concurrent.Executors;
 
 /**
  * An implementation of {@link Endpoint} that wraps a {@link SocketAddress}.
  */
-public class SocketEndpoint extends AbstractSocketEndpoint
+public class SocketEndpoint //extends AbstractSocketEndpoint
         implements Endpoint<SocketAddress>
 {
+
+    /** The socket address this endpoint encapsulates. */
+    protected final SocketAddress address;
+
+    /** The transport type this endpoint encapsulates. */
+    protected final TransportType transportType;
+
+    /** The {@code Executor} used by this endpoint's connector or acceptor. */
+    protected final Executor executor;
+
+    /** The default {@code Executor} for IO threads. */
+    private static final Executor defaultExecutor =
+        Executors.newCachedThreadPool(new DaemonThreadFactory());
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketEndpoint.class.getName()));
@@ -64,7 +79,7 @@ public class SocketEndpoint extends AbstractSocketEndpoint
      * @param type the type of transport
      */
     public SocketEndpoint(SocketAddress address, TransportType type) {
-        super(address, type);
+        this(address, type, defaultExecutor);
     }
 
     /**
@@ -78,7 +93,13 @@ public class SocketEndpoint extends AbstractSocketEndpoint
     public SocketEndpoint(SocketAddress address,
                           TransportType type, Executor executor)
     {
-        this(address, type, executor, 1);
+        if (address == null || type == null || executor == null) {
+            throw new NullPointerException("null arg");
+        }
+
+        this.address = address;
+        this.transportType = type;
+        this.executor = executor;
     }
 
     /**
@@ -102,11 +123,11 @@ public class SocketEndpoint extends AbstractSocketEndpoint
      * @throws IllegalArgumentException if {@code numProcessors} is
      *         zero or negative.
      */
-    public SocketEndpoint(SocketAddress address, TransportType type,
-            Executor executor, int numProcessors)
-    {
-        super(address, type, executor, numProcessors);
-    }
+//    public SocketEndpoint(SocketAddress address, TransportType type,
+//            Executor executor, int numProcessors)
+//    {
+//        super(address, type, executor, numProcessors);
+//    }
 
     /**
      * {@inheritDoc}
@@ -116,12 +137,16 @@ public class SocketEndpoint extends AbstractSocketEndpoint
         if (transportType.equals(TransportType.RELIABLE)) {
             minaConnector =
                 new org.apache.mina.transport.socket.nio.SocketConnector(
-                    numProcessors, executor);
+                    1, executor);
         } else {
             minaConnector = new DatagramConnector(executor);
         }
         SocketConnector connector = new SocketConnector(this, minaConnector);
         logger.log(Level.FINE, "returning {0}", connector);
         return connector;
+    }
+
+    public SocketAddress getAddress() {
+        return address;
     }
 }
