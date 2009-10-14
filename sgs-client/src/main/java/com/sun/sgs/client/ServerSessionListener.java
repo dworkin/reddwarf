@@ -85,14 +85,20 @@ public interface ServerSessionListener {
 
     /**
      * Notifies this listener that its associated server session is in the
-     * process of reconnecting with the server.
+     * process of reconnecting with a server.
      * <p>
-     * If a connection can be re-established with the server in a timely
+     * If a connection can be re-established with a server in a timely
      * manner, this listener's {@link #reconnected reconnected} method will
      * be invoked. Otherwise, if a connection cannot be re-established, this
      * listener's {@code disconnected} method will be invoked with
      * {@code false} indicating that the associated session is
      * disconnected from the server and the client must log in again.
+     *
+     * <p>After this method is invoked, the associated client should not
+     * send any messages to the server until this listener's {@code
+     * reconnected} method is invoked. Any messages sent during
+     * reconnection are not guaranteed to be received and/or processed by
+     * the server.
      */
     void reconnecting();
 

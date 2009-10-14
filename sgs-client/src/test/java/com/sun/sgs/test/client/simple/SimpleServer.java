@@ -67,6 +67,15 @@ public class SimpleServer implements ConnectionListener {
     private int port;
 
     volatile boolean redirect = false;
+
+    private volatile boolean isSuspended = false;
+    
+    private volatile boolean isSuspendComplete = false;
+
+    private volatile boolean isRelocating = false;
+
+    private int relocatePort;
+    
     
     final String TEST_CHANNEL_NAME = "Test Channel";
 
@@ -86,14 +95,14 @@ public class SimpleServer implements ConnectionListener {
      * Starts up the server.
      */
     public void start() {
-        System.out.println("Listening on port " + port);
+        System.out.println("SimpleServer: Listening on port " + port);
         try {
             acceptor.listen(new AcceptorListener() {
                 /**
                  * {@inheritDoc}
                  */
                 public ConnectionListener newConnection() {
-                    System.out.println("Server: New Connection");
+                    System.out.println("SimpleServer: New Connection");
                     return SimpleServer.this;
                 }
 
@@ -169,11 +178,12 @@ public class SimpleServer implements ConnectionListener {
      * {@inheritDoc}
      */
     public void bytesReceived(Connection conn, byte[] buffer) {
-        System.err.println("SimpleServer: messageReceived: ("
+        System.err.println("SimpleServer: messageReceived: (size="
                 + buffer.length + ") " + HexDumper.format(buffer));
 
         if (buffer.length < 1) {
-            System.err.println("protocol message too short, length:" +
+            System.err.println(
+		"SimpleServer: protocol message too short, length:" +
                 buffer.length);
             try {
                 conn.close();
@@ -187,10 +197,12 @@ public class SimpleServer implements ConnectionListener {
 
         byte command = msg.getByte();
         if (command == SimpleSgsProtocol.LOGIN_REQUEST) {
+            System.out.println("SimpleServer: Received LOGIN_REQUEST");
 
             byte version = msg.getByte();
             if (version != SimpleSgsProtocol.VERSION) {
-                System.out.println("Version number mismatch: " + version
+                System.out.println(
+			"SimpleServer: Version number mismatch: " + version
                         + " " + SimpleSgsProtocol.VERSION);
                 return;
             }
@@ -229,27 +241,40 @@ public class SimpleServer implements ConnectionListener {
             sendMessage(conn, reply.getBuffer());
         } else if (command == SimpleSgsProtocol.SESSION_MESSAGE) {
             String serverMessage = msg.getString();
-            System.out.println("Received general server message: "
-                    + serverMessage);
+            System.out.println(
+		"SimpleServer: Received SESSION_MESSAGE: "
+		+ serverMessage);
 
             if (serverMessage.equals("Join Channel")) {
                 startMessages(conn);
             } else if (serverMessage.equals("Leave Channel")) {
                 stopMessages(conn);
             } else if (serverMessage.equals("Relocate")) {
-		int port = msg.getInt();
-		relocate(conn, port);
+		isRelocating = true;
+		relocatePort = msg.getInt();
+		suspendMessages(conn);
 	    } else {
-		System.out.println("Unknown server message: " +
+		System.out.println("SimpleServer: Unknown server message: " +
 				   serverMessage);
 	    }
 	    
         } else if (command == SimpleSgsProtocol.LOGOUT_REQUEST) {
-	    System.out.println("Received logout request");
+	    System.out.println("SimpleServer: Received LOGOUT_REQUEST");
             MessageBuffer reply = new MessageBuffer(1);
             reply.putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
             sendMessage(conn, reply.getBuffer());
+
+
+	} else if (command == SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE) {
+	    System.out.println(
+		"SimpleServer: Received SUSPEND_MESSAGES_COMPLETE");
+	    isSuspendComplete = true;
+	    if (isRelocating) {
+		relocate(conn);
+	    }
+	    
         } else if (command == SimpleSgsProtocol.RELOCATE_REQUEST) {
+	    System.out.println("SimpleServer: Received RELOCATE_REQUEST");
             byte version = msg.getByte();
             if (version != SimpleSgsProtocol.VERSION) {
                 System.out.println("Version number mismatch: " + version
@@ -258,14 +283,14 @@ public class SimpleServer implements ConnectionListener {
             }
 	    byte[] relocateKey = msg.getBytes(msg.limit() - msg.position());
 	    if (!Arrays.equals(relocateKey, DEFAULT_RELOCATE_KEY)) {
-		System.out.println("Invalid relocateKey: " +
+		System.out.println("SimpleServer: Invalid relocateKey: " +
 				   HexDumper.toHexString(relocateKey));
 		return;
 	    }
 	    byte[] reconnectKey = new byte[] {
 		0x1a, 0x1b, 0x1c, 0x1d, 0x30, 0x31, 0x32, 0x33 
 	    };
-
+	    isSuspended = false;
             MessageBuffer reply = new MessageBuffer(1 + reconnectKey.length);
 	    reply.putByte(SimpleSgsProtocol.RELOCATE_SUCCESS).
 		  putBytes(reconnectKey);
@@ -312,7 +337,8 @@ public class SimpleServer implements ConnectionListener {
 
     private void sendMessage(Connection conn, byte[] message) {
         try {
-            System.out.println("sendMessage: (" + message.length + ") "
+            System.out.println(
+		"SimpleServer: sendMessage: (size=" + message.length + ") "
                     + HexDumper.format(message));
             conn.sendBytes(message);
         } catch (IOException ioe) {
@@ -320,13 +346,23 @@ public class SimpleServer implements ConnectionListener {
         }
     }
 
-    private void relocate(Connection conn, int port) {
+    private void suspendMessages(Connection conn) {
+	isSuspended = true;
+	System.out.println(
+	    "SimpleServer.suspendMessages: isSuspendComplete=false");
+	isSuspendComplete = false;
+	MessageBuffer reply  = new MessageBuffer(1);
+	reply.putByte(SimpleSgsProtocol.SUSPEND_MESSAGES);
+	sendMessage(conn, reply.getBuffer());
+    }
+    
+    private void relocate(Connection conn) {
 	MessageBuffer reply  =
 	    new MessageBuffer(1 + MessageBuffer.getSize(host) + 4 +
 			      DEFAULT_RELOCATE_KEY.length);
 	reply.putByte(SimpleSgsProtocol.RELOCATE_NOTIFICATION).
 	      putString(host).
-	      putInt(port).
+	      putInt(relocatePort).
 	      putBytes(DEFAULT_RELOCATE_KEY);
 	sendMessage(conn, reply.getBuffer());
     }
