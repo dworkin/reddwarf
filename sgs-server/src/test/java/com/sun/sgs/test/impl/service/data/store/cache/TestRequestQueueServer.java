@@ -31,6 +31,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.CountDownLatch;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Test;
@@ -54,7 +56,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     Socket socket;
 
     /** The client socket or {@code null}. */
-    Socket clientSocket;
+    volatile Socket clientSocket;
 
     /** The client connection thread or {@code null}. */
     InterruptableThread connect;
@@ -126,14 +128,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    1, dummyRequestHandler, emptyProperties);
 	serverSocket = new ServerSocket(PORT);
 	for (int i = 0; i < 2; i++) {
+	    final CountDownLatch ready = new CountDownLatch(1);
 	    connect = new InterruptableThread() {
 		boolean runOnce() throws IOException {
 		    clientSocket = new Socket("localhost", PORT);
+		    ready.countDown();
 		    return true;
 		}
 	    };
 	    connect.start();
 	    socket = serverSocket.accept();
+	    ready.await(10, SECONDS);
 	    server.handleConnection(socket);
 	    connect.shutdown();
 	}
@@ -154,14 +159,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	server = new RequestQueueServer<Request>(
 	    1, dummyRequestHandler, emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		return true;
 	    }
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	connect.shutdown();
 	server.disconnect();
@@ -254,14 +262,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	server = new RequestQueueServer<Request>(
 	    1, dummyRequestHandler, emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		return true;
 	    }
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	DataOutputStream out =
 	    new DataOutputStream(clientSocket.getOutputStream());
@@ -283,14 +294,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		return true;
 	    }
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	DataOutputStream out =
 	    new DataOutputStream(clientSocket.getOutputStream());
@@ -318,14 +332,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		return true;
 	    }
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	DataOutputStream out =
 	    new DataOutputStream(clientSocket.getOutputStream());
@@ -361,14 +378,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		return true;
 	    }
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	DataOutputStream out =
 	    new DataOutputStream(clientSocket.getOutputStream());
@@ -399,9 +419,11 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		DataOutputStream out =
 		    new DataOutputStream(clientSocket.getOutputStream());
 		out.writeShort(0);
@@ -415,6 +437,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
@@ -444,9 +467,11 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		DataOutputStream out =
 		    new DataOutputStream(clientSocket.getOutputStream());
 		out.writeShort(0);
@@ -458,6 +483,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	DataInputStream in =
 	    new DataInputStream(clientSocket.getInputStream());
@@ -471,9 +497,11 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	clientSocket.close();
 	Thread.sleep(extraWait);
 	assertTrue("Socket should be closed", socket.isClosed());
+	final CountDownLatch ready2 = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready2.countDown();
 		DataOutputStream out =
 		    new DataOutputStream(clientSocket.getOutputStream());
 		out.writeShort(1);
@@ -486,6 +514,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready2.await(10, SECONDS);
 	server.handleConnection(socket);
 	in = new DataInputStream(clientSocket.getInputStream());
 	/* Connection acknowledgement */
@@ -509,14 +538,17 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    },
 	    emptyProperties);
 	serverSocket = new ServerSocket(PORT);
+	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
 	    boolean runOnce() throws IOException {
 		clientSocket = new Socket("localhost", PORT);
+		ready.countDown();
 		return true;
 	    }
 	};
 	connect.start();
 	socket = serverSocket.accept();
+	ready.await(10, SECONDS);
 	server.handleConnection(socket);
 	DataOutputStream out =
 	    new DataOutputStream(clientSocket.getOutputStream());
