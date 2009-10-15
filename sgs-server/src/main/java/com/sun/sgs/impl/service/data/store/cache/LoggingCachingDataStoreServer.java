@@ -76,8 +76,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -104,8 +106,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -135,8 +139,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -168,8 +174,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -202,8 +210,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -234,8 +244,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -266,8 +278,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -301,8 +315,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -336,8 +352,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -368,8 +386,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -404,8 +424,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -433,8 +455,10 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		throw (IOException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }

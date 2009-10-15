@@ -132,9 +132,10 @@ import java.util.logging.Logger;
  *
  * <dt> <i>Property:</i> <code><b>{@value #TXN_TIMEOUT_PROPERTY}</b></code><br>
  *	<i>Default:</i> The value of the <code>{@value
- *	TransactionCoordinator#TXN_TIMEOUT_PROPERTY}</code> property, if
- *	specified, or else <code>{@value
- *	TransactionCoordinatorImpl#BOUNDED_TIMEOUT_DEFAULT}</code>
+ *	com.sun.sgs.impl.service.transaction.TransactionCoordinator#TXN_TIMEOUT_PROPERTY}
+ *	</code> property, if specified, or else <code>{@value
+ *	com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl#BOUNDED_TIMEOUT_DEFAULT}
+ *	</code>
  *
  * <dd style="padding-top: .5em">The transaction timeout in milliseconds. <p>
  * 
@@ -191,7 +192,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
      * The proportion of the transaction timeout to use for the lock timeout if
      * no lock timeout is specified.
      */
-    public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
+    public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.2;
 
     /**
      * The default value of the lock timeout property, if no transaction
@@ -641,9 +642,13 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		}
 	    }
 	    if (!found) {
-		throw new CacheConsistencyException(
-		    "Node " + nodeId + " attempted to upgrade object " + oid +
-		    ", but does not own that object for read");
+		CacheConsistencyException exception =
+		    new CacheConsistencyException(
+			"Node " + nodeId + " attempted to upgrade object " +
+			oid + ", but does not own that object for read");
+		logger.logThrow(
+		    WARNING, exception, "Cache consistency failure");
+		throw exception;
 	    }
 	    lock(nodeInfo, oid, true);
 	    return getWaiting(oid) != GetWaitingResult.NO_WAITERS;
@@ -1344,9 +1349,12 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		break;
 	    }
 	}
-	throw new CacheConsistencyException(
-	    "Node " + nodeInfo  + " does not own lock key:" + key +
-	    ", forWrite:" + forWrite);
+	CacheConsistencyException exception =
+	    new CacheConsistencyException(
+		"Node " + nodeInfo  + " does not own lock key:" + key +
+		", forWrite:" + forWrite);
+	logger.logThrow(WARNING, exception, "Cache consistency failure");
+	throw exception;
     }
 
     /**

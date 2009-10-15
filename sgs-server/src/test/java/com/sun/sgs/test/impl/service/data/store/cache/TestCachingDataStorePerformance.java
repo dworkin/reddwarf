@@ -40,7 +40,6 @@ import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.UPDATE_QUEUE_PORT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.NodeType;
-import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
 import com.sun.sgs.test.impl.service.data.store.TestDataStorePerformance;
@@ -107,9 +106,6 @@ public class TestCachingDataStorePerformance extends TestDataStorePerformance {
 	props.setProperty(CALLBACK_PORT_PROPERTY,
 			  String.valueOf(callbackPort));
 	props.setProperty(DIRECTORY_PROPERTY, directory);
-	txnProxy.setComponent(
-	    WatchdogService.class,
-	    new DummyWatchdogService(props, env.systemRegistry, txnProxy));
 	DataStore store = new DataStoreProfileProducer(
 	    new CachingDataStore(props, env.systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());

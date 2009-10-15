@@ -621,6 +621,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST, "getBinding txn:{0}, name:{1}", txn, name);
 	    }
+	    Throwable exception;
 	    try {
 		checkNull("name", name);
 		BindingValue result = super.getBindingInternal(txn, name);
@@ -632,10 +633,13 @@ public class DataStoreServerImpl implements DataStoreServer {
 		}
 		return result;
 	    } catch (RuntimeException e) {
-		throw handleException(
-		    txn, FINEST, e,
-		    "getBinding txn:" + txn + ", name:" + name);
+		exception = e;
+	    } catch (Error e) {
+		exception = e;
 	    }
+	    handleException(txn, FINEST, exception,
+			    "getBinding txn:" + txn + ", name:" + name);
+	    return null;	/* not reached */
 	}
 
 	/**
@@ -652,6 +656,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    FINEST, "setBinding txn:{0}, name:{1}, oid:{2,number,#}",
 		    txn, name, oid);
 	    }
+	    Throwable exception;
 	    try {
 		checkNull("name", name);
 		BindingValue result = super.setBindingInternal(txn, name, oid);
@@ -663,10 +668,14 @@ public class DataStoreServerImpl implements DataStoreServer {
 		}
 		return result;
 	    } catch (RuntimeException e) {
-		throw handleException(txn, FINEST, e,
-				      "setBinding txn:" + txn + ", name:" +
-				      name + ", oid:" + oid);
+		exception = e;
+	    } catch (Error e) {
+		exception = e;
 	    }
+	    handleException(txn, FINEST, exception,
+			    "setBinding txn:" + txn + ", name:" + name +
+			    ", oid:" + oid);
+	    return null;		/* not reached */
 	}
 
 	/**
@@ -682,6 +691,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		logger.log(
 		    FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
 	    }
+	    Throwable exception;
 	    try {
 		checkNull("name", name);
 		BindingValue result = super.removeBindingInternal(txn, name);
@@ -692,10 +702,13 @@ public class DataStoreServerImpl implements DataStoreServer {
 		}
 		return result;
 	    } catch (RuntimeException e) {
-		throw handleException(txn, FINEST, e,
-				      "removeBinding txn:" + txn +
-				      ", name:" + name);
+		exception = e;
+	    } catch (Error e) {
+		exception = e;
 	    }
+	    handleException(txn, FINEST, exception,
+			    "removeBinding txn:" + txn + ", name:" + name);
+	    return null;		/* not reached */
 	}
 
 	/** Provide access to newNodeId. */

@@ -759,6 +759,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	txnInfoTable = getTxnInfoTable(TxnInfo.class);
 	DbTransaction dbTxn = null;
 	boolean done = false;
+	Throwable exception;
 	try {
 	    File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
             if (!directoryFile.exists()) {
@@ -793,13 +794,11 @@ public class DataStoreImpl extends AbstractDataStore {
 	    removeUnusedAllocationPlaceholders(dbTxn);
 	    done = true;
 	    dbTxn.commit();
+	    return;
 	} catch (RuntimeException e) { 
-	    throw handleException(
-		null, Level.SEVERE, e, "DataStore initialization");
+	    exception = e;
 	} catch (Error e) {
-	    logger.logThrow(
-		Level.SEVERE, e, "DataStore initialization failed");
-	    throw e;
+	    exception = e;
 	} finally {
 	    if (dbTxn != null && !done) {
 		try {
@@ -809,6 +808,9 @@ public class DataStoreImpl extends AbstractDataStore {
 		}
 	    }
 	}
+	handleException(
+	    null, Level.SEVERE, exception, "DataStore initialization");
+	throw new AssertionError();	/* not reached */
     }
     
     /**
@@ -1177,14 +1179,14 @@ public class DataStoreImpl extends AbstractDataStore {
      * DataStoreException}.
      */
     @Override
-    protected RuntimeException handleException(
-	Transaction txn, Level level, RuntimeException e, String operation)
+    protected void handleException(
+	Transaction txn, Level level, Throwable e, String operation)
     {
 	if (e instanceof DbDatabaseException) {
 	    e = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
 	}
-	return super.handleException(txn, level, e, operation);
+	super.handleException(txn, level, e, operation);
     }
 
     /* -- Other public methods -- */
@@ -1222,12 +1224,17 @@ public class DataStoreImpl extends AbstractDataStore {
      * @return	the next available transaction ID
      */
     protected long getNextTxnId(int count, long timeout) {
+	Throwable exception;
 	try {
 	    return getNextId(DataStoreHeader.NEXT_TXN_ID_KEY, count, timeout);
 	} catch (RuntimeException e) {
-	    throw handleException(
-		null, Level.FINE, e, "getNextTxnId count:" + count);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(null, Level.FINE, exception,
+			"getNextTxnId count:" + count);
+	return 0;		/* not reached */
     }
 
     /**
@@ -1236,12 +1243,17 @@ public class DataStoreImpl extends AbstractDataStore {
      * @param	txn the transaction to join
      */
     protected void joinNewTransaction(Transaction txn) {
+	Throwable exception;
 	try {
 	    joinTransaction(txn);
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, Level.FINER, e, "joinNewTransaction txn:" + txn);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, Level.FINER, exception,
+			"joinNewTransaction txn:" + txn);
     }
 
     /**

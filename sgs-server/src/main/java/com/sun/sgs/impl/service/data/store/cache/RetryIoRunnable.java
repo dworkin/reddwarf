@@ -114,16 +114,14 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 		    {
 			logger.logThrow(FINEST, e, "Retrying: {0}", this);
 		    } else {
-			store.reportFailure(e);
-			return;
+			throw e;
 		    }
 		} catch (IOException e) {
 		    if (shouldRetry()) {
 			logger.logThrow(
 			    FINEST, e, "Retrying I/O failure: {0}", this);
 		    } else {
-			store.reportFailure(e);
-			return;
+			throw e;
 		    }
 		}
 	    }
@@ -139,7 +137,8 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 		    FINEST, e,
 		    "Calling nodeId:" + store.nodeId + " " + this + " throws");
 	    }
-	    store.reportFailure(e);
+	    store.reportFailure(
+		new Exception("Operation " + this + " failed: " + e, e));
 	    return;
 	}
     }

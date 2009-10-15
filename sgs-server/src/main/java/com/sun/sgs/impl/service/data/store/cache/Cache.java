@@ -234,7 +234,8 @@ class Cache {
      * @param	reserve for tracking cache reservations
      */
     void addBindingEntry(BindingCacheEntry entry, ReserveCache reserve) {
-	assert !bindingMap.containsKey(entry.key);
+	assert !bindingMap.containsKey(entry.key)
+	    : "Attempt to add new binding that is already present: " + entry;
 	bindingCount.incrementAndGet();
 	bindingMap.put(entry.key, entry);
 	reserve.used();
@@ -425,7 +426,7 @@ class Cache {
 	}
     }
 
-    /** Checks consistency of previous key fields of bindings. */
+    /** Checks the consistency of fields in bindings. */
     void checkBindings() {
 	long lockTimeout = store.getLockTimeout();
 	for (BindingCacheEntry entry : bindingMap.values()) {

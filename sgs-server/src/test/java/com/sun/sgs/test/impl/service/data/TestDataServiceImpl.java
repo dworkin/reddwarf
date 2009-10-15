@@ -27,6 +27,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
@@ -5145,6 +5146,64 @@ public class TestDataServiceImpl extends Assert {
 	}
     }
 
+    @Test
+    public void testCreateBindingsConcurrently() throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		taskService.scheduleTask(new CreateBindingsTask(1));
+		taskService.scheduleTask(new CreateBindingsTask(2));
+		taskService.scheduleTask(new CreateBindingsTask(3));
+	    }
+	}, taskOwner);
+	RepeatingConcurrentTask.awaitDone(20000);
+    }
+
+    static class CreateBindingsTask extends RepeatingConcurrentTask {
+	private static final long serialVersionUID = 1;
+	CreateBindingsTask(int index) {
+	    super(index, 10, 100);
+	}
+	void runInternal() {
+	    String name = String.format("create-%04d", index);
+	    System.err.println("Binding " + name);
+	    service.setBinding(name, new DummyManagedObject());
+	    index += nextIndexOffset;
+	}
+    }
+
+    @Test
+    public void testCreateRemoveBindingsConcurrently() throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		taskService.scheduleTask(new CreateRemoveBindingsTask(1));
+		taskService.scheduleTask(new CreateRemoveBindingsTask(2));
+		taskService.scheduleTask(new CreateRemoveBindingsTask(3));
+	    }
+	}, taskOwner);
+	RepeatingConcurrentTask.awaitDone(20000);
+    }
+
+    static class CreateRemoveBindingsTask extends RepeatingConcurrentTask {
+	private static final long serialVersionUID = 1;
+	private boolean remove = false;
+	CreateRemoveBindingsTask(int index) {
+	    super(index, 10, 100);
+	}
+	void runInternal() {
+	    String name = String.format("create-remove-%04d", index);
+	    if (!remove) {
+		System.err.println("Create binding " + name);
+		service.setBinding(name, new DummyManagedObject());
+		remove = true;
+	    } else {
+		System.err.println("Remove binding " + name);
+		service.removeBinding(name);
+		remove = false;
+		index += nextIndexOffset;
+	    }
+	}
+    }
+
     /* -- App and service binding methods -- */
 
     ManagedObject getBinding(boolean app, DataService service, String name) {
@@ -5970,6 +6029,129 @@ public class TestDataServiceImpl extends Assert {
 	BigInteger value;
 	ManagedBigInteger(BigInteger value) {
 	    this.value = value;
+	}
+    }
+
+    /**
+     * A task for tests that run several repeated tasks concurrently.  Note
+     * that only one set of these tasks can be run at a time because this class
+     * uses a static to track running tasks.
+     */
+    static abstract class RepeatingConcurrentTask
+	implements Serializable, Task
+    {
+	private static final long serialVersionUID = 1;
+
+	/** How many tasks are currently running. */
+	private static int tasksRunning = 0;
+
+	/** Any exception thrown by any task, or null. */
+	private static Throwable exception = null;
+
+	/** The index currently associated with this task. */
+	int index;
+
+	/** The offset for computing this task's next index. */
+	final int nextIndexOffset;
+
+	/** If index reaches or exceeds this value, then this task is done. */
+	private final int maxIndex;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	index the first index for this class
+	 * @param	nextIndexOffset the increment for computing the next
+	 *		index
+	 * @param	maxIndex the index to reach for completion
+	 */
+	RepeatingConcurrentTask(int index, int nextIndexOffset, int maxIndex) {
+	    this.index = index;
+	    this.nextIndexOffset = nextIndexOffset;
+	    this.maxIndex = maxIndex;
+	    if (index < nextIndexOffset) {
+		noteStart();
+	    }		    
+	}
+
+	/**
+	 * Calls {@link #runInternal} and reschedules this task if the final
+	 * index has not been reached, handling any exceptions.
+	 */
+	public final void run() {
+	    if (!checkDone()) {
+		try {
+		    runInternal();
+		    taskService.scheduleTask(this);
+		} catch (RuntimeException e) {
+		    if ((e instanceof ExceptionRetryStatus) &&
+			((ExceptionRetryStatus) e).shouldRetry())
+		    {
+			throw e;
+		    } else {
+			unexpectedException(e);
+		    }
+		} catch (Error e) {
+		    unexpectedException(e);
+		}
+	    }
+	}
+	
+	/** Performs one iteration of this task. */
+	abstract void runInternal();
+
+	/**
+	 * Waits the specified number of milliseconds for all outstanding
+	 * instances of this task to complete, throwing an exception if the
+	 * tasks do not complete in time or if any of them fail.
+	 *
+	 * @param	maxWait the number of milliseconds to wait
+	 */
+	static synchronized void awaitDone(long maxWait) {
+	    long stop = System.currentTimeMillis() + maxWait;
+	    while (tasksRunning > 0) {
+		long wait = stop - System.currentTimeMillis();
+		assertTrue("Timed out", wait > 0);
+		try {
+		    RepeatingConcurrentTask.class.wait(wait);
+		} catch (InterruptedException e) {
+		}
+	    }
+	    if (exception != null) {
+		throw new RuntimeException(
+		    "Unexpected exception: " + exception, exception);
+	    }
+	}
+
+	/** Checks if the task should be run and rescheduled. */
+	private boolean checkDone() {
+	    synchronized (RepeatingConcurrentTask.class) {
+		if (exception != null || index >= maxIndex) {
+		    noteFinish();
+		    return true;
+		} else {
+		    return false;
+		}
+	    }
+	}
+
+	/** Notes an unexpected exception and marks the task as finished. */
+	private static synchronized void unexpectedException(Throwable e) {
+	    exception = e;
+	    noteFinish();
+	}
+
+	/** Notes that a task has started. */
+	private static synchronized void noteStart() {
+	    tasksRunning++;
+	}
+
+	/** Notes that a task has finished. */
+	private static synchronized void noteFinish() {
+	    tasksRunning--;
+	    if (tasksRunning == 0) {
+		RepeatingConcurrentTask.class.notifyAll();
+	    }
 	}
     }
 }

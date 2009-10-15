@@ -311,16 +311,20 @@ class TxnContext {
 
     /**
      * Adds an entry to the cache that represents the last bound name in the
-     * cache.  The newly created entry will be marked as being fetched.	 The
-     * associated lock should be held, and the caller should have reserved
-     * space in the cache.
+     * cache, but returning {@code null} if the last entry is found to be
+     * already present.  The newly created entry will be marked as being
+     * fetched.  The associated lock should be held, and the caller should have
+     * reserved space in the cache.
      *
      * @param	reserve for tracking cache reservations
-     * @return	the new cache entry
+     * @return	the new cache entry or {@code null}
      */
     BindingCacheEntry noteLastBinding(ReserveCache reserve) {
 	Cache cache = store.getCache();
 	assert Thread.holdsLock(cache.getBindingLock(BindingKey.LAST));
+	if (cache.getBindingEntry(BindingKey.LAST) != null) {
+	    return null;
+	}
 	BindingCacheEntry entry = BindingCacheEntry.createLast();
 	cache.addBindingEntry(entry, reserve);
 	return entry;

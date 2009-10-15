@@ -214,6 +214,44 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		throw new AssertionError("Binding entry for removed binding:" +
 					 "\n  entry: " + this);
 	    }
+	    /*
+	     * Check for permitting fetching, evicting, and pending previous
+	     * states
+	     */
+	    if (getState() == State.FETCHING_READ) {
+		if (key != BindingKey.LAST) {
+		    throw new AssertionError(
+			"Fetching non-last binding entry for read: " + this);
+		} else if (!pendingPrevious) {
+		    throw new AssertionError(
+			"Fetching last binding entry for read without" +
+			"pending previous: " + this);
+		}
+	    } else if (getState() == State.FETCHING_UPGRADE) {
+		if (key == BindingKey.LAST) {
+		    throw new AssertionError(
+			"Upgrading last binding entry: " + this);
+		} else if (pendingPrevious) {
+		    throw new AssertionError(
+			"Upgrading binding entry that is pending previous: " +
+			this);
+		}
+	    } else if (getState() == State.FETCHING_WRITE) {
+		throw new AssertionError(
+		    "Fetching binding entry for write: " + this);
+	    } else if (getDecaching()) {
+		if (pendingPrevious) {
+		    throw new AssertionError(
+			"Evicting binding entry that is pending previous: " +
+			this);
+		}
+	    } else if (getDowngrading()) {
+		if (pendingPrevious) {
+		    throw new AssertionError(
+			"Downgrading binding entry that is" +
+			" pending previous: " + this);
+		}
+	    }
 	    try {
 		awaitNotPendingPrevious(
 		    lock, System.currentTimeMillis() + lockTimeout);
@@ -360,7 +398,9 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
      * Notes that there is an operation pending for an entry immediately
-     * previous to this entry in the cache.
+     * previous to this entry in the cache.  The entry should not be upgrading,
+     * downgrading, decaching, or, unless it is the entry for the last binding
+     * key, reading.
      *
      * @throws	IllegalStateException if there is an already pending operation
      *		for a previous entry
@@ -369,6 +409,11 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	if (pendingPrevious) {
 	    throw new IllegalStateException("Already pending previous");
 	}
+	assert !getUpgrading() && !getDowngrading() && !getDecaching()
+	    : "Setting binding entry pending previous while busy: " + this;
+	assert key == BindingKey.LAST || !getReading()
+	    : "Setting non-last binding entry pending previous while" +
+	    " reading: " + this;
 	pendingPrevious = true;
     }
 

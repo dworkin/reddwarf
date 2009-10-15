@@ -77,7 +77,9 @@ abstract class UpdateQueueRequest implements Request {
 	    if (exception == null) {
 		completionHandler.completed();
 	    } else {
-		completionHandler.failed(exception);
+		completionHandler.failed(
+		    new Exception("Request " + this + " failed: " + exception,
+				  exception));
 	    }
 	}
     }

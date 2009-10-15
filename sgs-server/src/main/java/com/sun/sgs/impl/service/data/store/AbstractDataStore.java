@@ -130,6 +130,7 @@ public abstract class AbstractDataStore
      */
     public long getLocalNodeId() {
 	logger.log(FINEST, "getLocalNodeId");
+	Throwable exception;
 	try {
 	    nodeId = getLocalNodeIdInternal();
 	    if (logger.isLoggable(FINEST)) {
@@ -138,8 +139,12 @@ public abstract class AbstractDataStore
 	    }
 	    return nodeId;
 	} catch (RuntimeException e) {
-	    throw handleException(null, FINEST, e, "getLocalNodeId");
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(null, FINEST, exception, "getLocalNodeId");
+	return 0;		/* not reached */
     }
 
     /**
@@ -161,6 +166,7 @@ public abstract class AbstractDataStore
 	    logger.log(FINEST,
 		       "createObject nodeId:" + nodeId + ", txn:" + txn);
 	}
+	Throwable exception;
 	try {
 	    long result = createObjectInternal(txn);
 	    if (logger.isLoggable(FINEST)) {
@@ -170,10 +176,13 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINEST, e,
-		"createObject nodeId:" + nodeId + ", txn:" + txn);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"createObject nodeId:" + nodeId + ", txn:" + txn);
+	return 0;	/* not reached */
     }
 
     /**
@@ -202,6 +211,7 @@ public abstract class AbstractDataStore
 		       "markForUpdate nodeId:" + nodeId + ", txn:" + txn +
 		       ", oid:" + oid);
 	}
+	Throwable exception;
 	try {
 	    reportObjectAccess(txn, oid, WRITE);
 	    markForUpdateInternal(txn, oid);
@@ -210,11 +220,15 @@ public abstract class AbstractDataStore
 			   "markForUpdate nodeId:" + nodeId + ", txn:" + txn +
 			   ", oid:" + oid + " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINEST, e,
-				  "markForUpdate nodeId:" + nodeId +
-				  ", txn:" + txn + ", oid:" + oid);
-	}		
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
+	}
+	handleException(txn, FINEST, exception,
+			"markForUpdate nodeId:" + nodeId + ", txn:" + txn +
+			", oid:" + oid);
     }
 
     /**
@@ -243,6 +257,7 @@ public abstract class AbstractDataStore
 		       "getObject nodeId:" + nodeId + ", txn:" + txn +
 		       ", oid:" + oid + ", forUpdate:" + forUpdate);
 	}
+	Throwable exception;
 	try {
 	    reportObjectAccess(txn, oid, forUpdate ? WRITE : READ);
 	    byte[] result = getObjectInternal(txn, oid, forUpdate);
@@ -254,12 +269,14 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINEST, e,
-		"getObject nodeId:" + nodeId + ", txn:" + txn +
-		", oid:" + oid + ", forUpdate:" + forUpdate);
-
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"getObject nodeId:" + nodeId + ", txn:" + txn +
+			", oid:" + oid + ", forUpdate:" + forUpdate);
+	return null;		/* not reached */
     }
 
     /**
@@ -293,6 +310,7 @@ public abstract class AbstractDataStore
 		       "setObject nodeId:" + nodeId + ", txn:" + txn +
 		       ", oid:" + oid);
 	}
+	Throwable exception;
 	try {
 	    checkNull("data", data);
 	    reportObjectAccess(txn, oid, WRITE);
@@ -302,11 +320,15 @@ public abstract class AbstractDataStore
 			   "setObject nodeId:" + nodeId + ", txn:" + txn +
 			   ", oid:" + oid + " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINEST, e,
-				  "setObject nodeId:" + nodeId +
-				  ", txn:" + txn + ", oid:" + oid);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"setObject nodeId:" + nodeId + ", txn:" + txn +
+			", oid:" + oid);
     }
 
     /**
@@ -340,6 +362,7 @@ public abstract class AbstractDataStore
 		       "setObjects nodeId:" + nodeId + ", txn:" + txn +
 		       ", oids:" + Arrays.toString(oids));
 	}
+	Throwable exception;
 	try {
 	    for (long oid : oids) {
 		reportObjectAccess(txn, oid, WRITE);
@@ -360,12 +383,15 @@ public abstract class AbstractDataStore
 			   "setObjects nodeId:" + nodeId + ", txn:" + txn +
 			   ", oids:" + Arrays.toString(oids) + " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINEST, e,
-		"setObjects nodeId:" + nodeId + ", txn:" + txn +
-		", oids:" + Arrays.toString(oids));
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"setObjects nodeId:" + nodeId + ", txn:" + txn +
+			", oids:" + Arrays.toString(oids));
     }
 
     /**
@@ -397,6 +423,7 @@ public abstract class AbstractDataStore
 		       "removeObject nodeId:" + nodeId + ", txn:" + txn +
 		       ", oid:" + oid);
 	}
+	Throwable exception;
 	try {
 	    reportObjectAccess(txn, oid, WRITE);
 	    removeObjectInternal(txn, oid);
@@ -405,11 +432,15 @@ public abstract class AbstractDataStore
 			   "removeObject nodeId:" + nodeId + ", txn:" + txn +
 			   ", oid:" + oid + " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINEST, e,
-				  "removeObject nodeId:" + nodeId +
-				  ", txn:" + txn + ", oid:" + oid);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"removeObject nodeId:" + nodeId + ", txn:" + txn +
+			", oid:" + oid);
     }
 
     /**
@@ -439,6 +470,7 @@ public abstract class AbstractDataStore
 		       "getBinding nodeId:" + nodeId + ", txn:" + txn +
 		       ", name:" + name);
 	}
+	Throwable exception;
 	try {
 	    checkNull("name", name);
 	    /*
@@ -465,10 +497,14 @@ public abstract class AbstractDataStore
 	    }
 	    return result.getObjectId();
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINEST, e,
-				  "getBinding nodeId:" + nodeId +
-				  ", txn:" + txn + ", name:" + name);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"getBinding nodeId:" + nodeId + ", txn:" + txn +
+			", name:" + name);
+	return 0;		/* not reached */
     }
 
     /**
@@ -504,6 +540,7 @@ public abstract class AbstractDataStore
 		       "setBinding nodeId:" + nodeId + ", txn:" + txn +
 		       ", name:" + name + ", oid:" + oid);
 	}
+	Throwable exception;
 	try {
 	    checkNull("name", name);
 	    reportNameAccess(txn, name, WRITE);
@@ -522,12 +559,15 @@ public abstract class AbstractDataStore
 			   "setBinding nodeId:" + nodeId + ", txn:" + txn +
 			   ", name:" + name + ", oid:" + oid + " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINEST, e,
-		"setBinding nodeId:" + nodeId + ", txn:" + txn +
-		", name:" + name + ", oid:" + oid);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"setBinding nodeId:" + nodeId + ", txn:" + txn +
+			", name:" + name + ", oid:" + oid);
     }
 
     /**
@@ -563,6 +603,7 @@ public abstract class AbstractDataStore
 		       "removeBinding nodeId:" + nodeId + ", txn:" + txn +
 		       ", name:" + name);
 	}
+	Throwable exception;
 	try {
 	    checkNull("name", name);
 	    /*
@@ -597,11 +638,15 @@ public abstract class AbstractDataStore
 			   "removeBinding nodeId:" + nodeId + ", txn:" + txn +
 			   ", name:" + name + " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINEST, e,
-				  "removeBinding nodeId:" + nodeId +
-				  ", txn:" + txn + ", name:" + name);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"removeBinding nodeId:" + nodeId + ", txn:" + txn +
+			", name:" + name);
     }
 
     /**
@@ -636,6 +681,7 @@ public abstract class AbstractDataStore
 		       "nextBoundName nodeId:" + nodeId + ", txn:" + txn +
 		       ", name:" + name);
 	}
+	Throwable exception;
 	try {
 	    String result = reportNextNameAccess(
 		txn, name, nextBoundNameInternal(txn, name), READ);
@@ -646,10 +692,14 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINEST, e,
-				  "nextBoundName nodeId:" + nodeId +
-				  ", txn:" + txn + ", name:" + name);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"nextBoundName nodeId:" + nodeId + ", txn:" + txn +
+			", name:" + name);
+	return null;		/* not reached */
     }
 
     /**
@@ -679,14 +729,19 @@ public abstract class AbstractDataStore
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER, "shutdown nodeId:" + nodeId);
 	}
+	Throwable exception;
 	try {
 	    shutdownInternal();
 	    if (logger.isLoggable(FINER)) {
 		logger.log(FINER, "shutdown nodeId:" + nodeId + " complete");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(null, FINER, e, "shutdown nodeId:" + nodeId);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(null, FINER, exception, "shutdown nodeId:" + nodeId);
     }
 
     /** Performs the actual operation for {@link #shutdown shutdown}. */
@@ -703,6 +758,7 @@ public abstract class AbstractDataStore
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER, "getClassId nodeId:" + nodeId + ", txn:" + txn);
 	}
+	Throwable exception;
 	try {
 	    checkNull("classInfo", classInfo);
 	    int result = getClassIdInternal(txn, classInfo);
@@ -713,10 +769,14 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINER, e, "getClassId nodeId:" + nodeId + ", txn:" + txn);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
-    }	    
+	handleException(txn, FINER, exception,
+			"getClassId nodeId:" + nodeId + ", txn:" + txn);
+	return 0;		/* not reached */
+    }
 
     /**
      * Performs the actual operation for {@link #getClassId getClassId}.
@@ -748,6 +808,7 @@ public abstract class AbstractDataStore
 		       "getClassInfo nodeId:" + nodeId + ", txn:" + txn +
 		       ", classId:" + classId);
 	}
+	Throwable exception;
 	try {
 	    if (classId < 1) {
 		throw new IllegalArgumentException(
@@ -761,10 +822,14 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINER, e,
-				  "getClassInfo nodeId:" + nodeId +
-				  ", txn:" + txn + ", classId:" + classId);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINER, exception,
+			"getClassInfo nodeId:" + nodeId + ", txn:" + txn +
+			", classId:" + classId);
+	return null;		/* not reached */
     }
 
     /**
@@ -796,6 +861,7 @@ public abstract class AbstractDataStore
 		       "nextObjectId nodeId:" + nodeId + ", txn:" + txn +
 		       ", oid:" + oid);
 	}
+	Throwable exception;
 	try {
 	    if (oid < -1) {
 		throw new IllegalArgumentException(
@@ -813,10 +879,14 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(txn, FINEST, e,
-				  "nextObjectId nodeId:" + nodeId +
-				  ", txn:" + txn + ", oid:" + oid);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINEST, exception,
+			"nextObjectId nodeId:" + nodeId + ", txn:" + txn +
+			", oid:" + oid);
+	return 0;		/* not reached */
     }
 
     /**
@@ -876,6 +946,7 @@ public abstract class AbstractDataStore
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER, "prepare nodeId:" + nodeId + ", txn:" + txn);
 	}
+	Throwable exception;
 	try {
 	    boolean result = prepareInternal(txn);
 	    if (logger.isLoggable(FINER)) {
@@ -885,9 +956,13 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINER, e, "prepare nodeId:" + nodeId + ", txn:" + txn);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINER, exception,
+			"prepare nodeId:" + nodeId + ", txn:" + txn);
+	return false;		/* not reached */
     }
 
     /**
@@ -912,6 +987,7 @@ public abstract class AbstractDataStore
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER, "commit nodeId:" + nodeId + ", txn:" + txn);
 	}
+	Throwable exception;
 	try {
 	    commitInternal(txn);
 	    if (logger.isLoggable(FINER)) {
@@ -919,10 +995,14 @@ public abstract class AbstractDataStore
 			   "commit nodeId:" + nodeId + ", txn:" + txn +
 			   " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINER, e, "commit nodeId:" + nodeId + ", txn:" + txn);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINER, exception,
+			"commit nodeId:" + nodeId + ", txn:" + txn);
     }
 
     /**
@@ -948,6 +1028,7 @@ public abstract class AbstractDataStore
 	    logger.log(FINER,
 		       "prepareAndCommit nodeId:" + nodeId + ", txn:", txn);
 	}
+	Throwable exception;
 	try {
 	    prepareAndCommitInternal(txn);
 	    if (logger.isLoggable(FINER)) {
@@ -955,11 +1036,14 @@ public abstract class AbstractDataStore
 			   "prepareAndCommit nodeId:" + nodeId +
 			   ", txn:" + txn + " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINER, e,
-		"prepareAndCommit nodeId:" + nodeId + ", txn:" + txn);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINER, exception,
+			"prepareAndCommit nodeId:" + nodeId + ", txn:" + txn);
     }
 
     /**
@@ -983,6 +1067,7 @@ public abstract class AbstractDataStore
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER, "abort nodeId:" + nodeId + ", txn:" + txn);
 	}
+	Throwable exception;
 	try {
 	    abortInternal(txn);
 	    if (logger.isLoggable(FINER)) {
@@ -990,10 +1075,14 @@ public abstract class AbstractDataStore
 			   "abort nodeId:" + nodeId + ", txn:" + txn +
 			   " returns");
 	    }
+	    return;
 	} catch (RuntimeException e) {
-	    throw handleException(
-		txn, FINER, e, "abort nodeId:" + nodeId + ", txn:" + txn);
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
 	}
+	handleException(txn, FINER, exception,
+			"abort nodeId:" + nodeId + ", txn:" + txn);
     }
     
     /**
@@ -1016,7 +1105,8 @@ public abstract class AbstractDataStore
     /**
      * Performs any operations needed when an exception is going to be thrown,
      * as well as allowing the implementation to replace the exception with a
-     * different one. <p>
+     * different one.  Throws the resulting exception, which should be a {@link
+     * RuntimeException} or an {@link Error}. <p>
      *
      * This implementation does logging, and aborts the transaction if it is
      * not {@code null} and the exception is a {@link
@@ -1026,12 +1116,11 @@ public abstract class AbstractDataStore
      * @param	level the logging level
      * @param	e the exception
      * @param	operation a description of the operation being performed
-     * @return	the exception to throw
      */
-    protected RuntimeException handleException(Transaction txn,
-					       Level level,
-					       RuntimeException e,
-					       String operation)
+    protected void handleException(Transaction txn,
+				   Level level,
+				   Throwable e,
+				   String operation)
     {
 	boolean abort = (e instanceof TransactionAbortedException);
 	if (abort && txn != null && !txn.isAborted()) {
@@ -1039,7 +1128,13 @@ public abstract class AbstractDataStore
 	}
 	LoggerWrapper thisLogger = abort ? abortLogger : logger;
 	thisLogger.logThrow(level, e, "{0} throws", operation);
-	return e;
+	if (e instanceof Error) {
+	    throw (Error) e;
+	} else if (e instanceof RuntimeException) {
+	    throw (RuntimeException) e;
+	} else {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
     }
 
     /**

@@ -28,7 +28,7 @@ import com.sun.sgs.service.TransactionInterruptedException;
  * key, a context ID that identifies the most recent transaction that has
  * accessed the entry, and information about the current state of the entry.
  * Only the {@link #key} field may be accessed without holding the associated
- * lock (see {@link Cache#getBindingLock} and {@link Cache.getObjectLock}.  For
+ * lock (see {@link Cache#getBindingLock} and {@link Cache#getObjectLock}.  For
  * all other fields and methods, the lock must be held. <p>
  *
  * This class is part of the implementation of {@link CachingDataStore}.
@@ -377,6 +377,7 @@ abstract class BasicCacheEntry<K, V> {
      *
      * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
+     * @return	the status of the entry
      * @throws	TransactionTimeoutException if the operation does not succeed
      *		before the specified stop time
      */

@@ -93,8 +93,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		throw (CacheConsistencyException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -124,8 +126,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		throw (CacheConsistencyException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -155,8 +159,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		throw (CacheConsistencyException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -186,8 +192,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		throw (CacheConsistencyException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }
@@ -217,8 +225,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		throw (CacheConsistencyException) e;
 	    } else if (e instanceof RuntimeException) {
 		throw (RuntimeException) e;
-	    } else {
+	    } else if (e instanceof Error) {
 		throw (Error) e;
+	    } else {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }

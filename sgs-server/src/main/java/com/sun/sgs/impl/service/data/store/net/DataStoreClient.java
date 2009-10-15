@@ -543,10 +543,10 @@ public final class DataStoreClient extends AbstractDataStore {
      * transaction if the transaction has been aborted on the server side.
      */
     @Override
-    protected RuntimeException handleException(Transaction txn,
-					       Level level,
-					       RuntimeException e,
-					       String operation)
+    protected void handleException(Transaction txn,
+				   Level level,
+				   Throwable e,
+				   String operation)
     {
 	if (e instanceof NetworkException) {
 	    /* Include the operation in the message */
@@ -578,7 +578,7 @@ public final class DataStoreClient extends AbstractDataStore {
 		txnInfo.serverAborted = true;
 	    }
 	}
-	return super.handleException(txn, level, e, operation);
+	super.handleException(txn, level, e, operation);
     }
 
     /* -- Other public methods -- */
