@@ -37,27 +37,22 @@ import org.apache.maven.plugin.MojoExecutionException;
 import java.io.File;
 
 /**
- * Abstract Mojo which provides common functionality to all Project Darkstar
- * Deploy Mojos.
+ * Deploys an extension jar or jar files into a Project Darkstar server
+ * installation.
+ *
+ * @goal extend
  */
-public abstract class AbstractDeployMojo extends AbstractDirectoryMojo {
-    
-    static final String DEPLOY = "deploy";
-    
-    /**
-     * The deploy directory of the Project Darkstar installation.
-     * Defaults to the "deploy" subdirectory under sgsHome.
-     * 
-     * @parameter
-     * @since 1.0-alpha-1
-     */
-    protected File deployDir;
-    
-    public File getDirectory() throws MojoExecutionException {
-        if(deployDir == null) {
-            deployDir = new File(sgsHome, DEPLOY);
-        }
+public class ExtendMojo extends AbstractExtendMojo {
 
-        return deployDir;
+    /**
+     * The extension jar files to deploy into the Project Darkstar server.
+     *
+     * @parameter
+     * @since 1.0-beta-1
+     */
+    private File[] files;
+
+    public File[] getFiles() throws MojoExecutionException {
+        return files;
     }
 }

@@ -4,7 +4,7 @@
   <groupId>com.projectdarkstar.maven.plugin</groupId>
   <artifactId>sgs-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
-  <version>1.0-alpha-4-SNAPSHOT</version>
+  <version>1.0-beta-1-SNAPSHOT</version>
   <name>Project Darkstar Maven Plugin</name>
   <url>https://sgs-maven-plugin.dev.java.net</url>
   <inceptionYear>2009</inceptionYear>
@@ -63,6 +63,7 @@
       <extension>
         <groupId>org.jvnet.wagon-svn</groupId>
         <artifactId>wagon-svn</artifactId>
+	<version>${wagon-svn.version}</version>
       </extension>
     </extensions>
 
@@ -162,5 +163,6 @@
 
     <junit.version>4.5</junit.version>
     <maven-plugin-testing-harness.version>1.1</maven-plugin-testing-harness.version>
+    <wagon-svn.version>1.9</wagon-svn.version>
   </properties>
 </project>

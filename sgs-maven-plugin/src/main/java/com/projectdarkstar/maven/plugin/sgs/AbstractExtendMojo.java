@@ -38,26 +38,27 @@ import java.io.File;
 
 /**
  * Abstract Mojo which provides common functionality to all Project Darkstar
- * Deploy Mojos.
+ * Extend Mojos.
  */
-public abstract class AbstractDeployMojo extends AbstractDirectoryMojo {
-    
-    static final String DEPLOY = "deploy";
-    
+public abstract class AbstractExtendMojo extends AbstractDirectoryMojo {
+
+    static final String EXTEND = "ext";
+
     /**
-     * The deploy directory of the Project Darkstar installation.
-     * Defaults to the "deploy" subdirectory under sgsHome.
-     * 
+     * The extend directory of the Project Darkstar installation.
+     * Defaults to the "ext" subdirectory under sgsHome.
+     *
      * @parameter
-     * @since 1.0-alpha-1
+     * @since 1.0-beta-1
      */
-    protected File deployDir;
-    
+    protected File extDir;
+
     public File getDirectory() throws MojoExecutionException {
-        if(deployDir == null) {
-            deployDir = new File(sgsHome, DEPLOY);
+        if(extDir == null) {
+            extDir = new File(sgsHome, EXTEND);
         }
 
-        return deployDir;
+        return extDir;
     }
 }
+
