@@ -389,6 +389,17 @@ public class TestPropertiesWrapper extends Assert {
         assertEquals(Integer.valueOf(2), list.get(2));
     }
 
+    @Test
+    public void testGetListPropertyNullDefaultValue() {
+        props.setProperty("values", "1::2");
+        List<Integer> list = wrapper.getListProperty(
+                "values", Integer.class, null);
+        assertEquals(3, list.size());
+        assertEquals(Integer.valueOf(1), list.get(0));
+        assertNull(list.get(1));
+        assertEquals(Integer.valueOf(2), list.get(2));
+    }
+
     @Test(expected=IllegalArgumentException.class)
     public void testGetListPropertyInvalidValue() {
         props.setProperty("values", "1:2:invalid");
@@ -399,6 +410,24 @@ public class TestPropertiesWrapper extends Assert {
     public void testGetListNoStringConstructor() {
         props.setProperty("values", "1:2:3");
         wrapper.getListProperty("values", Object.class, null);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testGetListAbstractClass() {
+        props.setProperty("values", "1:2:3");
+        wrapper.getListProperty("values", AbstractClass.class, null);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testGetListPrivateConstructor() {
+        props.setProperty("values", "1:2:3");
+        wrapper.getListProperty("values", PrivateConstructor.class, null);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testGetListPrivateClass() {
+        props.setProperty("values", "1:2:3");
+        wrapper.getListProperty("values", PrivateClass.class, null);
     }
 
     @Test(expected=NullPointerException.class)
@@ -445,6 +474,17 @@ public class TestPropertiesWrapper extends Assert {
         assertEquals(3, list.size());
         assertEquals(Fruit.APPLE, list.get(0));
         assertEquals(Fruit.PEAR, list.get(1));
+        assertEquals(Fruit.ORANGE, list.get(2));
+    }
+
+    @Test
+    public void testGetEnumListPropertyNullDefaultValue() {
+        props.setProperty("values", "APPLE::ORANGE");
+        List<Fruit> list = wrapper.getEnumListProperty(
+                "values", Fruit.class, null);
+        assertEquals(3, list.size());
+        assertEquals(Fruit.APPLE, list.get(0));
+        assertNull(list.get(1));
         assertEquals(Fruit.ORANGE, list.get(2));
     }
 
@@ -510,6 +550,20 @@ public class TestPropertiesWrapper extends Assert {
         wrapper.getClassListProperty("values");
     }
 
+    @Test
+    public void testGetClassListPropertyPrivateClass() {
+         props.setProperty(
+                "values",
+                "com.sun.sgs.test.impl.sharedutil.TestPropertiesWrapper$One:" +
+                "com.sun.sgs.test.impl.sharedutil.TestPropertiesWrapper$Two:" +
+                "com.sun.sgs.test.impl.sharedutil.TestPropertiesWrapper$" +
+                "PrivateClass");
+        List<Class<?>> list = wrapper.getClassListProperty("values");
+        assertEquals(One.class, list.get(0));
+        assertEquals(Two.class, list.get(1));
+        assertEquals(PrivateClass.class, list.get(2));
+    }
+
 
     /* -- Other classes and methods -- */
 
@@ -518,4 +572,16 @@ public class TestPropertiesWrapper extends Assert {
     public class One {}
     public class Two {}
     public class Three {}
+
+    public abstract class AbstractClass {
+        public AbstractClass(String s) {}
+    }
+
+    public class PrivateConstructor {
+        private PrivateConstructor(String s) {}
+    }
+
+    private class PrivateClass {
+        public PrivateClass(String s) {}
+    }
 }
