@@ -108,9 +108,9 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
 		    result = callOnce();
 		    break;
 		} catch (RuntimeException e) {
+		    ioSucceeded();
 		    if (e instanceof ExceptionRetryStatus &&
-			((ExceptionRetryStatus) e).shouldRetry() &&
-			shouldRetry())
+			((ExceptionRetryStatus) e).shouldRetry())
 		    {
 			logger.logThrow(FINEST, e, "Retrying: {0}", this);
 		    } else {

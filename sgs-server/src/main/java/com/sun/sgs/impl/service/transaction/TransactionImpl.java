@@ -244,7 +244,9 @@ final class TransactionImpl implements Transaction {
 	if (cause == null) {
 	    throw new NullPointerException("The cause cannot be null");
 	}
-	logger.log(Level.FINER, "abort {0}", this);
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "abort {0} cause:{1}", this, cause);
+	}
 	switch (state) {
 	case ACTIVE:
 	case PREPARING:

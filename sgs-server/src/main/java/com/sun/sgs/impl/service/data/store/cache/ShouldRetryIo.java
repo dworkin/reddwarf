@@ -74,4 +74,13 @@ class ShouldRetryIo {
 	}
 	return true;
     }
+
+    /**
+     * Notes that an I/O operation has succeeded.  Use this method when 
+     * I/O operation succeeds but retries are still needed, so that the timer
+     * for failing I/O operations is reset.
+     */
+    void ioSucceeded() {
+	failureStarted = -1;
+    }
 }
