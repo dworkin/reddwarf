@@ -589,7 +589,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Enqueues leave event(s) to this channel's event queue and notifies
      * this channel's coordinator to service the event(s).
      */
-    void leave(final Set<ClientSession> sessions) {
+    void leave(final Set<? extends ClientSession> sessions) {
 	try {
 	    checkClosed();
 	    if (sessions == null) {

@@ -63,6 +63,9 @@ public class DummyProfileCollectorHandle implements ProfileCollectorHandle {
     public void notifyThreadRemoved() {
 	throw new UnsupportedOperationException();
     }
+    public void notifyNodeIdAssigned(long id) {
+        throw new UnsupportedOperationException();
+    }
     public void startTask(KernelRunnable task, Identity owner,
 			  long scheduledStartTime, int readyCount)
     {

@@ -7,6 +7,16 @@ Version 0.9.11
 
   The method TaskManager.shouldContinue() has been added
 
+- Update use of generic collections in Channel interface
+
+  Channel.join(Set<ClientSession> session) has been changed to
+  Channel.join(Set<? extends ClientSession> session) and
+  Channel.leave(Set<ClientSession> session) has been changed to
+  Channel.leave(Set<? extends ClientSession> session)
+
+  This is a compatible change with any pre-existing code that uses
+  these methods.
+
 Version 0.9.10
 
 - Remove ManagedObject superinterface from AppListener

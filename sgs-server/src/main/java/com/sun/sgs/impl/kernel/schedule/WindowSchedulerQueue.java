@@ -111,7 +111,7 @@ public class WindowSchedulerQueue implements SchedulerQueue, TimedTaskListener {
     /**
      * {@inheritDoc}
      */
-    public int getNextTasks(Collection<ScheduledTask> tasks, int max) {
+    public int getNextTasks(Collection<? super ScheduledTask> tasks, int max) {
         for (int i = 0; i < max; i++) {
             QueueElement element = queue.poll();
             if (element == null) {

@@ -538,7 +538,7 @@ public abstract class BasicAccessCoordinatorTest
 	assertTrue("The expected argument must provide groups of four",
 		   expected.length % 4 == 0);
 	int numExpected = expected.length / 4;
-	List<? extends AccessedObject> accesses = detail.getAccessedObjects();
+	List<AccessedObject> accesses = detail.getAccessedObjects();
 	assertTrue("Expected " + numExpected + " accesses, found " +
 		   accesses.size(),
 		   numExpected == accesses.size());

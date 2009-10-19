@@ -209,7 +209,7 @@ public interface Channel extends ManagedObject {
      * @throws TransactionException if the operation failed because of
      *	       a problem with the current transaction
      */
-    Channel leave(Set<ClientSession> sessions);
+    Channel leave(Set<? extends ClientSession> sessions);
     
     /**
      * Removes all client sessions from this channel.

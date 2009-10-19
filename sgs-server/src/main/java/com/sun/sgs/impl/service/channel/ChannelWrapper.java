@@ -101,7 +101,7 @@ class ChannelWrapper
     }
 
     /** {@inheritDoc} */
-    public Channel leave(final Set<ClientSession> sessions) {
+    public Channel leave(final Set<? extends ClientSession> sessions) {
 	getChannel().leave(sessions);
 	return this;
     }
