@@ -41,6 +41,9 @@ public class RelocateFailureException extends Exception {
 	DUPLICATE_LOGIN,
 	/** Other operational failure (see exception {@link
 	 * Throwable#getCause cause} for detail). */ 
+	SERVER_UNAVAILABLE,
+	/** Other operational failure (see exception {@link
+	 * Throwable#getCause cause} for detail). */
 	OTHER
     };
 

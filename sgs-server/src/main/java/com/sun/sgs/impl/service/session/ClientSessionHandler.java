@@ -31,7 +31,6 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.util.AbstractCompletionFuture;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import static com.sun.sgs.impl.util.AbstractService.getStackTrace;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
@@ -293,7 +292,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 	scheduleHandleDisconnect(false, true);
 	
-	// TBD: should we wait to notify until client disconnects connection?
 	future.done();
     }
 
@@ -325,7 +323,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * relocation (i.e., implements the {@link SessionRelocationProtocol}
      * interface; otherwise returns {@code false}.
      */
-    boolean isRelocatable() {
+    boolean supportsRelocation() {
 	return protocol instanceof SessionRelocationProtocol;
     }
 
@@ -398,8 +396,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		   relocateCompletionHandler.isCompleted()) {
 	    logger.log(
 		Level.FINE,
-		"request received while session is relocating:{0}, " +
-		"stacktrace:\n{1}:", this, getStackTrace());
+		"request received while session is relocating:{0}", this);
 	    future.setException(
 		new RequestFailureException(
 		    "session is relocating",
@@ -508,8 +505,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	synchronized (lock) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "handleDisconnect handler:{0} " +
-			   "disconnectHandled:{1} stacktrace:\n{2}",
-			   this, disconnectHandled, getStackTrace());
+			   "disconnectHandled:{1}", this, disconnectHandled);
 	    }
 	    if (disconnectHandled) {
 		return;
@@ -525,12 +521,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
  		sessionRefId, isTerminating());
 	}
 	
-	// TBD: Due to the scheduler's behavior, this notification
-	// may happen out of order with respect to the
-	// 'notifyLoggedIn' callback.  Also, this notification may
-	// also happen even though 'notifyLoggedIn' was not invoked.
-	// Are these behaviors okay?  -- ann (3/19/07)
 	if (isTerminating()) {
+	    // TBD: Due to the scheduler's behavior, this notification
+	    // may happen out of order with respect to the
+	    // 'notifyLoggedIn' callback.  Also, this notification may
+	    // also happen even though 'notifyLoggedIn' was not invoked.
+	    // Are these behaviors okay?  -- ann (3/19/07)
 	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
 		    public void run() {
 			identity.notifyLoggedOut();
@@ -582,9 +578,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private void scheduleHandleDisconnect(
 	final boolean graceful, final boolean closeConnection)
     {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "stacktrace:\n{0}", getStackTrace());
-	}
         synchronized (lock) {
 	    if (disconnectHandled) {
 		return;
@@ -719,8 +712,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		"getting node assignment for identity:{0} throws", identity);
 	    notifySetupFailureAndDisconnect(
 		loggingIn ?
-		new LoginFailureException(LOGIN_REFUSED_REASON, e) :
-		new RelocateFailureException(RELOCATE_REFUSED_REASON, e));
+		new LoginFailureException(
+		    LOGIN_REFUSED_REASON,
+		    LoginFailureException.FailureReason.SERVER_UNAVAILABLE) :
+		new RelocateFailureException(
+		    RELOCATE_REFUSED_REASON,
+		    RelocateFailureException.FailureReason.SERVER_UNAVAILABLE));
 	    return;
 	}
 
@@ -1343,7 +1340,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		}
 
 		relocateCompletionHandler = new RelocateCompletionHandler();
-		if (!isRelocatable()) {
+		if (!supportsRelocation()) {
 		    logger.log(
 			Level.WARNING,
 			"Disconnecting a non-relocatable session:{0} " +
@@ -1354,25 +1351,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		((SessionRelocationProtocol) protocol).relocate(
 		    newNode, descriptors, ByteBuffer.wrap(relocationKey),
 		    relocateCompletionHandler);
-
-		/*
-		 * Schedule a task to close the client session if it is not
-		 * closed in a timely fashion.  This will also clean up local
-		 * client session state if not done so already.
-		 *
-		 * TBD: is this taken care of by the protocol layer
-		 * already because it monitors disconnecting clients?
-		 *
-		 * TBD: should this be done when the completion handler is
-		 * notified?
-		 */
-		sessionService.getTaskScheduler().scheduleTask(
-		    new AbstractKernelRunnable("CloseMovedClientSession") {
-			public void run() {
-			    handleDisconnect(false, true);
-			} },
-		    identity,
-		    System.currentTimeMillis() + 5000L);
 		
 	    } catch (IOException e) {
 		// If there is a problem contacting the client,

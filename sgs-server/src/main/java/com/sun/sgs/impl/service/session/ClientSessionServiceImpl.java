@@ -620,7 +620,7 @@ public final class ClientSessionServiceImpl
 		loggedInIdentityMap.get(id);
 	    
 	    if (sessionHandler != null) {
-		if (!sessionHandler.isRelocatable()) {
+		if (!sessionHandler.supportsRelocation()) {
 		    // Ignore request if client session does not suppport
 		    // relocation.  If request is ignored, then identity
 		    // mapping will not be modified.
@@ -1809,6 +1809,18 @@ public final class ClientSessionServiceImpl
 	}
     }
 
+    /**
+     * An abstraction to keep track of the progress of session's
+     * relocation preparation and notify all NodeMappingService's
+     * completion handlers when relocation preparation is complete.
+     *
+     *
+     * An instance of this class is constructed when the
+     * ClientSessionService's IdentityRelocationListener is notified to
+     * prepare to relocate (via the {@link
+     * IdentityRelocationListener#prepareToRelocate prepareToRelocate}
+     * method.
+     */
     private final class PrepareRelocationInfo {
 	
 	/** The session that is relocating. */
@@ -1821,14 +1833,39 @@ public final class ClientSessionServiceImpl
 	private final Set<SimpleCompletionHandler> nmsCompletionHandlers =
 	    new HashSet<SimpleCompletionHandler>();
 	
-	/** Completion handlers for {@code ClientSessionStatusListeners}
+	/** Completion handlers for {@code ClientSessionStatusListener}s
 	 * that need to prepare before the node mapping service completion
 	 * handler(s) are notified.
 	 */
 	private final Set<PrepareCompletionHandler> preparers =
 	    new HashSet<PrepareCompletionHandler>();
 
-	/** Constructs an instance. */
+	/** Indicates whether the {@code ClientSessionStatusListener}s have
+	 * been notified to prepare for relocation. */
+	private boolean isPreparing = false;
+
+	/**
+	 * Constructs an instance with the specified {@code sessionRefId},
+	 * {@code newNodeId}, and completion {@code handler} from the node
+	 * mapping service. <p>
+	 *
+	 * This constructor takes a snapshot of all registered {@code
+	 * ClientSessionStatusListener}s that need to be notified to
+	 * prepare to relocate after the client session service has
+	 * finished preparing the client session for relocation.  Once the
+	 * client session has been prepared to relocate, the client
+	 * session service invokes this instance's {@link
+	 * #prepareToRelocate} method so that it can notify each {@code
+	 * ClientSessionStatusListener} to prepare to relocate. <p>
+	 *
+	 * When all {@code ClientSessionStatusListener}s have finished
+	 * preparing, this instance notifies all node mapping service
+	 * completion handlers that relocation preparation has been
+	 * completed for the session.  There may be more than one
+	 * completion handler from the node mapping service because the
+	 * node mapping service may notify the client session service more
+	 * than once to prepare to relocate a given client session.
+	 */
 	PrepareRelocationInfo(BigInteger sessionRefId, long newNodeId,
 			      SimpleCompletionHandler handler)
 	{
@@ -1840,16 +1877,19 @@ public final class ClientSessionServiceImpl
 	    {
 		preparers.add(new PrepareCompletionHandler(listener));
 	    }
-	    
 	}
 
 	/**
-	 * Notifies all {@code ClientSessionStatusListeners} to prepare for
-	 * the client session (specified at construction) to relocate.
+	 * Notifies all {@code ClientSessionStatusListener}s to prepare for
+	 * the client session (specified at construction) to relocate.  If
+	 * preparing the {@code ClientSessionStatusListener}s is or has
+	 * already taken place, this method takes no action.
 	 */
 	synchronized void prepareToRelocate() {
-	    // TBD: check if already preparing?  Is this necessary?
-	
+	    if (isPreparing) {
+		return;
+	    }
+	    isPreparing = true;
 	    for (final PrepareCompletionHandler handler : preparers) {
 		taskScheduler.scheduleTask(
 		  new AbstractKernelRunnable("PrepareToRelocateSession") {
@@ -1872,7 +1912,7 @@ public final class ClientSessionServiceImpl
 	/**
 	 * Adds the specified completion {@code handler} from the {@code
 	 * NodeMappingService} to the set of completion handlers that need
-	 * to be notified when all {@code ClientSessionStatusListeners} are
+	 * to be notified when all {@code ClientSessionStatusListener}s are
 	 * finished preparing for relocation.
 	 */
 	synchronized void addNmsCompletionHandler(
@@ -1887,14 +1927,15 @@ public final class ClientSessionServiceImpl
 
 	/**
 	 * Notifies this instance that the {@code
-	 * ClientSessionStatusListener} for the specified {@code handler}
-	 * has completed preparing for relocation.  If all listeners have
-	 * completed preparation, then all {@code NodeMappingService}
-	 * completion handlers are notified that preparation is complete.
-	 * Once the node mapping service has removed the mapping (which
-	 * will be notified via the (@code NodeMappingListener.mappingRemoved}
-	 * method), the client can be informed that it can start relocating
-	 * its connection.
+	 * ClientSessionStatusListener} for the specified {@code
+	 * listenerCompletionhandler} has completed preparing for
+	 * relocation.  If all listeners have completed preparation, then
+	 * all {@code NodeMappingService} completion handlers are notified
+	 * that preparation is complete.  Once the node mapping service has
+	 * removed the mapping (and subsequently invoked this client session
+	 * service's {@code NodeMappingListener.mappingRemoved} method),
+	 * the client can be informed that it can start relocating its
+	 * connection.
 	 */
 	synchronized void preparationCompleted(
 	    PrepareCompletionHandler listenerCompletionHandler)
