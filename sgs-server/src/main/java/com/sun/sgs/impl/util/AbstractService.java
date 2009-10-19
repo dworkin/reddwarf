@@ -615,9 +615,9 @@ public abstract class AbstractService implements Service {
     }
 
     /**
-     * Returns the specified {@code refId} as a hex-formatted string.
+     * Returns the specified {@code bigInt} as a hex-formatted string.
      *
-     * @param	bigInt
+     * @param	bigInt a big integer to format
      * @return	the specified {@code bigInt} as a hex-formatted string
      */
     public static String toHexString(BigInteger bigInt) {

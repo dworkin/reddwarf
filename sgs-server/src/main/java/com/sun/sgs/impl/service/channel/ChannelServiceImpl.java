@@ -970,6 +970,15 @@ public final class ChannelServiceImpl
 	LocalChannelInfo channelInfo =
 	    localChannelMembersMap.get(channelRefId);
 	if (channelInfo == null) {
+	    // checkstyle complains about this double-locking idiom, but it
+	    // prevents having to create a new LocalChannelInfo object
+	    // (which is likely thrown away) each time a member is added to
+	    // a channel.  The 'putIfAbsent' used below to insert the local
+	    // channel info in the ConcurrentHashMap makes this locking
+	    // idiom safe.  The code below needs to synchronize on the
+	    // newly created channel info in case another thread attempts
+	    // to access the channel info before the timestamp is verfied
+	    // to be correct.
 	    LocalChannelInfo newChannelInfo =
 		new LocalChannelInfo(delivery, timestamp);
 	    synchronized (newChannelInfo) {

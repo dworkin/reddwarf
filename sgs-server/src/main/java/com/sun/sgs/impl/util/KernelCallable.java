@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.util;
 
 import java.util.concurrent.Callable;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -99,6 +98,7 @@ public abstract class KernelCallable<R>
      * method) in a transaction using the specified {@code txnScheduler}
      * and {@code taskOwner} and returns the result.
      *
+     * @param	<R> the return type of the {@code KernelCallable}
      * @param	callable a callable to invoke
      * @param	txnScheduler a transaction scheduler
      * @param	taskOwner an identity for the task's owner

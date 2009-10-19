@@ -133,11 +133,14 @@ public class SimpleSgsRelocationProtocolImpl
     }
 
     /**
-     * Returns the {@code SimplSgsProtocol} version supported by this
+     * Returns the {@code SimpleSgsProtocol} version supported by this
      * implementation.
      *
      * This implementation returns the latest {@code SimpleSgsProtocol}
      * version.
+     *
+     * @return the {@code SimpleSgsProtocol} version supported by this
+     * implementation
      */
     @Override
     protected byte getProtocolVersion() {
@@ -284,6 +287,11 @@ public class SimpleSgsRelocationProtocolImpl
     /** 
      * Handles v5 protocol messages (relocate and suspend), and delegates
      * to the super class to handle the v4 protocol messages.
+     *
+     * @param	opcode the message opcode
+     * @param	msg a message buffer containing the entire message, but
+     *		with the position advanced to the payload (just after the
+     *		opcode)
      */
     @Override
     protected void handleMessageReceived(byte opcode, MessageBuffer msg) {

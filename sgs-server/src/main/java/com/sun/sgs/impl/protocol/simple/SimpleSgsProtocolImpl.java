@@ -67,7 +67,7 @@ import java.util.logging.Logger;
 public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** The protocol version for this implementation. */
-    private static final byte PROTOCOLv4 = 0x04;
+    private static final byte PROTOCOL4 = 0x04;
     
    /** The number of bytes used to represent the message length. */
     private static final int PREFIX_LENGTH = 2;
@@ -180,14 +180,14 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Returns the {@code SimplSgsProtocol} version supported by this
+     * Returns the {@code SimpleSgsProtocol} version supported by this
      * implementation.
      *
-     * @return the {@code SimplSgsProtocol} version supported by this
+     * @return the {@code SimpleSgsProtocol} version supported by this
      * implementation
      */
     protected byte getProtocolVersion() {
-	return PROTOCOLv4;
+	return PROTOCOL4;
     }
     
     /* -- Implement SessionProtocol -- */

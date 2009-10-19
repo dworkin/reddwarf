@@ -1294,7 +1294,8 @@ public final class ClientSessionServiceImpl
      * specified {@code identity}, otherwise returns {@code false}
      */
     boolean validateUserLogin(Identity identity, ClientSessionHandler handler,
-			      boolean loggingIn) {
+			      boolean loggingIn)
+    {
 	if (loggingIn && relocatingIdentities.contains(identity)) {
 	    return false;
 	}
