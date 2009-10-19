@@ -119,13 +119,15 @@ public final class StandardProperties {
     public static final String CHANNEL_MANAGER = NS + "channelManager";
 
     /**
-     * An optional colon-separated key that specifies extra services to use.
+     * An optional colon-separated key that specifies additional services to
+     * use. Services will be started in the order that they are specified in
+     * this list.
      */
     public static final String SERVICES = NS + "services";
 
     /**
-     * An optional colon-separated key that specifies extra managers to use.
-     * This must contain the same number of classes as
+     * An optional colon-separated key that specifies additional managers to
+     * use.  This must contain the same number of classes as
      * <code>SERVICES</code>. Each manager in this list will be paired with
      * the corresponding <code>Service</code> from the <code>SERVICES</code>
      * list. To specify a <code>Service</code> with no manager, leave the
@@ -140,12 +142,14 @@ public final class StandardProperties {
 
     /**
      * An optional colon-separated key that specifies which node types each
-     * configured extra <code>Service</code>/<code>Manager</code> pair should
-     * be started on.  Each
+     * configured additional <code>Service</code>/<code>Manager</code> pair
+     * should be started on.  Each
      * item in this list must be set to a value in {@link ServiceNodeTypes} and
      * is associated with the <code>Service</code>/<code>Manager</code> at the
      * same respective index in the <code>SERVICES</code> and
-     * <code>MANAGERS</code> lists.
+     * <code>MANAGERS</code> lists.  If this property is omitted, all
+     * configured additional services will default to
+     * {@link ServiceNodeTypes#ALL}.
      */
     public static final String SERVICE_NODE_TYPES = NS + "services.node.types";
 
@@ -221,9 +225,16 @@ public final class StandardProperties {
 
     /**
      * An enumeration of the known, standard {@code Service}s. The
-     * ordering represents the order in which the services are configured.
-     * For core server nodes in a multi-node configuration, the services
-     * through the {@code TaskService} are started.
+     * ordering represents the order in which the services are started.
+     * Each {@link NodeType} will start up each service in the order
+     * specified up to and including the last service configured for that
+     * particular {@code NodeType}.  The last service is respectively specified
+     * for each node with the {@code LAST_APP_SERVICE},
+     * {@code LAST_SINGLE_SERVICE}, and {@code LAST_CORE_SERVICE} attributes.
+     * Any additional configured services will then be started after this
+     * last service.  Care should therefore be taken for additional services to
+     * only depend on standard services that are started on a particular
+     * {@code NodeType}.
      */
     public enum StandardService {
         /** Enumeration for the Data Service. */

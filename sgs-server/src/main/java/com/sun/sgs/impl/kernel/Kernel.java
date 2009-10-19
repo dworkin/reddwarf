@@ -495,10 +495,6 @@ class Kernel {
     {
         // retrieve any specified external services
         // and fold in any extension library services
-        NodeType type = 
-            NodeType.valueOf(
-                wrappedProperties.getProperty(StandardProperties.NODE_TYPE));
-
         List<String> externalServices = wrappedProperties.getListProperty(
                 StandardProperties.SERVICES, String.class, "");
         List<String> extensionServices = wrappedProperties.getListProperty(
@@ -543,6 +539,10 @@ class Kernel {
         allManagers.addAll(externalManagers);
         List<ServiceNodeTypes> allNodeTypes = extensionNodeTypes;
         allNodeTypes.addAll(externalNodeTypes);
+
+        NodeType type =
+            NodeType.valueOf(
+                wrappedProperties.getProperty(StandardProperties.NODE_TYPE));
 
         loadCoreServices(type, startupContext);
         loadExternalServices(allServices, 
