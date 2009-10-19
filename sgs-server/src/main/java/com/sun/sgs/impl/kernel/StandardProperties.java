@@ -119,13 +119,15 @@ public final class StandardProperties {
     public static final String CHANNEL_MANAGER = NS + "channelManager";
 
     /**
-     * An optional colon-separated key that specifies extra services to use.
+     * An optional colon-separated key that specifies additional services to
+     * use. Services will be started in the order that they are specified in
+     * this list.
      */
     public static final String SERVICES = NS + "services";
 
     /**
-     * An optional colon-separated key that specifies extra managers to use.
-     * This must contain the same number of classes as
+     * An optional colon-separated key that specifies additional managers to
+     * use.  This must contain the same number of classes as
      * <code>SERVICES</code>. Each manager in this list will be paired with
      * the corresponding <code>Service</code> from the <code>SERVICES</code>
      * list. To specify a <code>Service</code> with no manager, leave the
@@ -139,10 +141,100 @@ public final class StandardProperties {
     public static final String MANAGERS = NS + "managers";
 
     /**
+     * An optional colon-separated key that specifies which node types each
+     * configured additional <code>Service</code>/<code>Manager</code> pair
+     * should be started on.  Each
+     * item in this list must be set to a value in {@link ServiceNodeTypes} and
+     * is associated with the <code>Service</code>/<code>Manager</code> at the
+     * same respective index in the <code>SERVICES</code> and
+     * <code>MANAGERS</code> lists.  If this property is omitted, all
+     * configured additional services will default to
+     * {@link ServiceNodeTypes#ALL}.
+     */
+    public static final String SERVICE_NODE_TYPES = NS + "services.node.types";
+
+    /**
+     * An enumeration of the possible values to assign in the
+     * <code>SERVICE_NODE_TYPES</code> list.  Each value represents which node
+     * types a <code>Service</code>/<code>Manager</code> pair will be started
+     * on.
+     */
+    public enum ServiceNodeTypes {
+        /**
+         * Service should be started on a {@link NodeType#singleNode} only.
+         */
+        SINGLE,
+        /**
+         * Service should be started on a {@link NodeType#coreServerNode} only.
+         */
+        CORE,
+        /**
+         * Service should be started on an {@link NodeType#appNode} only.
+         */
+        APP,
+        /**
+         * Service should be started on either a {@code singleNode} or a
+         * {@code coreServerNode}.
+         */
+        SINGLE_OR_CORE,
+        /**
+         * Service should be started on either a {@code singleNode} or an
+         * {@code appNode}.
+         */
+        SINGLE_OR_APP,
+        /**
+         * Service should be started on either a {@code coreServerNode} or an
+         * {@code appNode}.
+         */
+        CORE_OR_APP,
+        /**
+         * Service should be started on any node type.
+         */
+        ALL;
+
+        /**
+         * Returns {@code true} if this node types identifier indicates that
+         * the associated service should be started on the specified node type.
+         *
+         * @param nodeType the current {@code NodeType}
+         * @return {@code true} if the service should be started on the given
+         *         node type.
+         */
+        public boolean shouldStart(NodeType nodeType) {
+            switch(nodeType) {
+                case singleNode:
+                    return equals(SINGLE) ||
+                           equals(SINGLE_OR_CORE) ||
+                           equals(SINGLE_OR_APP) ||
+                           equals(ALL);
+                case coreServerNode:
+                    return equals(CORE) ||
+                           equals(SINGLE_OR_CORE) ||
+                           equals(CORE_OR_APP) ||
+                           equals(ALL);
+                case appNode:
+                    return equals(APP) ||
+                           equals(SINGLE_OR_APP) ||
+                           equals(CORE_OR_APP) ||
+                           equals(ALL);
+                default:
+                    return false;
+            }
+        }
+    }
+
+    /**
      * An enumeration of the known, standard {@code Service}s. The
-     * ordering represents the order in which the services are configured.
-     * For core server nodes in a multi-node configuration, the services
-     * through the {@code TaskService} are started.
+     * ordering represents the order in which the services are started.
+     * Each {@link NodeType} will start up each service in the order
+     * specified up to and including the last service configured for that
+     * particular {@code NodeType}.  The last service is respectively specified
+     * for each node with the {@code LAST_APP_SERVICE},
+     * {@code LAST_SINGLE_SERVICE}, and {@code LAST_CORE_SERVICE} attributes.
+     * Any additional configured services will then be started after this
+     * last service.  Care should therefore be taken for additional services to
+     * only depend on standard services that are started on a particular
+     * {@code NodeType}.
      */
     public enum StandardService {
         /** Enumeration for the Data Service. */
@@ -158,8 +250,18 @@ public final class StandardProperties {
         /** Enumeration for the Channel Service. */
         ChannelService;
 
-        /** The last service that gets configured for an application. */
-        public static final StandardService LAST_SERVICE = ChannelService;
+        /** The last service that gets configured for an {@code appNode}. */
+        public static final StandardService LAST_APP_SERVICE = ChannelService;
+
+        /** The last service that gets configured for a {@code singleNode}. */
+        public static final StandardService LAST_SINGLE_SERVICE =
+                                            ChannelService;
+
+        /**
+         * The last service that gets configured for a
+         * {@code coreServerNode}.
+         */
+        public static final StandardService LAST_CORE_SERVICE = TaskService;
     }
 
     /**
