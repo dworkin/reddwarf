@@ -32,8 +32,11 @@
 
 package com.sun.sgs.impl.sharedutil;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -461,5 +464,176 @@ public class PropertiesWrapper {
 		"\", but must be one of: " +
 		Arrays.toString(enumType.getEnumConstants()));
 	}
+    }
+
+    /**
+     * Returns a list of objects of the type specified by {@code type}.  The
+     * objects are created from the property with the given {@code name} from
+     * the backing set of properties.  The property is assumed to be a colon
+     * separated list of {@code String}s, and each element in the list is
+     * instantiated by calling the given type's {@code Constructor} with a
+     * single {@code String} parameter.
+     * If any of the {@code String}s in the colon separated list is an empty
+     * string,
+     * the value of {@code defaultElement} will be used for that item in the
+     * returned {@code List}.  If the property with the given {@code name} is
+     * not found, an empty list will be returned.
+     *
+     * @param <T> the type of the objects in the returned {@code List}
+     * @param name the property name
+     * @param type the class which each object in the returned {@code List}
+     *             should be an instance of
+     * @param defaultElement the default value to use if an empty {@code String}
+     *                       is one of the items in the list
+     * @return a list of objects of the given type represented by the property
+     *         with the given name, or an empty list if the property is not
+     *         found
+     * @throws IllegalArgumentException if a problem occurs creating an instance
+     *         of the given class type, or the class type does not have a
+     *         constructor that takes a single {@code String} parameter
+     */
+    public <T> List<T> getListProperty(String name,
+                                       Class<T> type,
+                                       T defaultElement) {
+        Objects.checkNull("name", name);
+        Objects.checkNull("type", type);
+
+        List<T> list = new ArrayList<T>();
+        String value = properties.getProperty(name);
+        if (value == null) {
+            return list;
+        }
+
+        String[] values = value.split(":", -1);
+        Class<?>[] constructorParams = new Class<?>[]{String.class};
+        Constructor<T> constructor = null;
+        try {
+            constructor = type.getConstructor(constructorParams);
+        } catch (NoSuchMethodException nsme) {
+            throw new IllegalArgumentException(
+                        "The class " + type.getName() + " does not have a " +
+                        "constructor with the required parameter : String",
+                        nsme);
+        }
+        for (String v : values) {
+            if (v.equals("")) {
+                list.add(defaultElement);
+                continue;
+            }
+
+            try {
+                list.add(constructor.newInstance(v));
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        "Creating an instance of the class " + type.getName() +
+                        " throws: " + e, e);
+            }
+        }
+
+        return list;
+    }
+
+    /**
+     * Returns a list of {@code Enum}s of the type specified by
+     * {@code enumType}.  The
+     * objects are created from the property with the given {@code name} from
+     * the backing set of properties.  The property is assumed to be a colon
+     * separated list of {@code String}s, and each element in the list is
+     * instantiated by calling the
+     * {@link Enum#valueOf(java.lang.Class, java.lang.String) Enum.valueOf}
+     * method on each respective {@code String} in the list.
+     * If any of the {@code String}s in the colon separated list is an empty
+     * string,
+     * the value of {@code defaultElement} will be used for that item in the
+     * returned {@code List}.  If the property with the given {@code name} is
+     * not found, an empty list will be returned.
+     *
+     * @param <T> the {@code Enum} type of the objects in the returned
+     *            {@code List}
+     * @param name the property name
+     * @param enumType the {@code Enum} class which each object in the returned
+     *                 {@code List} should be an instance of
+     * @param defaultElement the default value to use if an empty {@code String}
+     *                     is one of the items in the list
+     * @return a list of {@code Enum} objects of the given type represented by
+     *         the property with the given name
+     * @throws IllegalArgumentException if any of the items in the list is
+     *         not a valid value for the given {@code Enum} type
+     */
+    public <T extends Enum<T>> List<T> getEnumListProperty(String name,
+                                                           Class<T> enumType,
+                                                           T defaultElement) {
+        Objects.checkNull("name", name);
+	Objects.checkNull("enumType", enumType);
+
+        List<T> list = new ArrayList<T>();
+        String value = properties.getProperty(name);
+        if (value == null) {
+            return list;
+        }
+
+        String[] values = value.split(":", -1);
+        for (String v : values) {
+            if (v.equals("")) {
+                list.add(defaultElement);
+                continue;
+            }
+
+            try {
+                list.add(Enum.valueOf(enumType, v));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                        "A value in the list of items in the " + name +
+                        " property was \"" + v +
+                        "\", but must be one of: " +
+                        Arrays.toString(enumType.getEnumConstants()));
+            }
+        }
+
+        return list;
+    }
+
+    /**
+     * Returns a {@code List} of {@link Class} typed objects.  The objects
+     * in the list are created from the property with the given {@code name}
+     * from the backing set of properties.  The property is assumed to be a
+     * colon separated list of Strings, where each String is a fully qualified
+     * class name of a class.  Any empty String appearing in the list
+     * will be added to the returned list as a {@code null}.  If the property
+     * with the given {@code name} is not found, an empty list will be returned.
+     *
+     * @param name the name of the property
+     * @return a list of {@code Class} objects represented by the property with
+     *         the given name
+     * @throws IllegalArgumentException if a {@code Class} cannot be found for
+     *         any of the items in the list
+     */
+    public List<Class<?>> getClassListProperty(String name) {
+        Objects.checkNull("name", name);
+
+        List<Class<?>> list = new ArrayList<Class<?>>();
+        String value = properties.getProperty(name);
+        if (value == null) {
+            return list;
+        }
+
+        String[] values = value.split(":", -1);
+        for (String v : values) {
+            if (v.equals("")) {
+                list.add(null);
+                continue;
+            }
+
+            try {
+                list.add(Class.forName(v));
+            } catch (ClassNotFoundException cnfe) {
+                throw new IllegalArgumentException(
+                        "A value in the list of items in the " + name +
+                        " property was \"" + v +
+                        "\", but a class was not found for this value", cnfe);
+            }
+        }
+
+        return list;
     }
 }	
