@@ -121,6 +121,8 @@
       <id>multi-node-server-core</id>
       <properties>
 	<node.type>RequestCore</node.type>
+	<jmx.port>62973</jmx.port>
+	<listen.port>62963</listen.port>
       </properties>
     </profile>
 
@@ -128,8 +130,6 @@
       <id>multi-node-server-app</id>
       <properties>
 	<node.type>RequestApp</node.type>
-	<jmx.port>62973</jmx.port>
-	<listen.port>62963</listen.port>
       </properties>
     </profile>
 

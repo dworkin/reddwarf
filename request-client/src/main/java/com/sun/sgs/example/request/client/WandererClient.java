@@ -108,7 +108,7 @@ public class WandererClient
 
     /** The application port. */
     private static final int PORT =
-	Integer.getInteger(PREFIX + ".port", 11469);
+	Integer.getInteger(PREFIX + ".port", 62964);
 
     /** The number of clients run by main. */
     private static final int CLIENTS =
