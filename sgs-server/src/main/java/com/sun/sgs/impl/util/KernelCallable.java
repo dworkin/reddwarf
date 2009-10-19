@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.channel;
+package com.sun.sgs.impl.util;
 
 import java.util.concurrent.Callable;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -42,7 +42,8 @@ import com.sun.sgs.kernel.TransactionScheduler;
  *	},
  *	txnScheduler, taskOwner);
  * </pre>
- * @param R the type of the result (the return value of the {@code call} method)
+ * @param <R> the type of the result (the return value of the {@code call}
+ *	      method)
  */
 public abstract class KernelCallable<R>
     extends AbstractKernelRunnable

@@ -751,9 +751,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 	    taskQueue = sessionService.createTaskQueue();
 	    /*
-	     * If logging in, store the client session in the data store
-	     * (which assigns it an ID--the ID of the reference to the
-	     * client session object).
+	     * If logging in, store the client session in the data store.
 	     */
 	    if (loggingIn) {
 		CreateClientSessionTask createTask =
@@ -773,12 +771,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 
 	    /*
-	     * Inform the session service that this handler is available
-	     * (by invoking "addHandler").  If logging in, schedule a task
-	     * to perform client login (which calls the AppListener.loggedIn
-	     * method), otherwise set the "relocating" flag in the client
-	     * session's state to false to indicate that relocation is
-	     * complete.
+	     * Inform the session service that this handler is available.  If
+	     * logging in, schedule a task to perform client login (which calls
+	     * the AppListener.loggedIn method), otherwise set the "relocating"
+	     * flag in the client session's state to false to indicate that
+	     * relocation is complete.
 	     */
 	    sessionService.addHandler(
 		sessionRefId, ClientSessionHandler.this,

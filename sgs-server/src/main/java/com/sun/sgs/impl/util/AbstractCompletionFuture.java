@@ -32,7 +32,7 @@ import java.util.concurrent.TimeoutException;
  * {@code ProtocolListener} and {@code SessionProtocolHandler}
  * APIs.
  *
- * @param T the future's result type
+ * @param <T> the future's result type
  */
 public abstract class AbstractCompletionFuture<T>
     implements Future<T>

@@ -40,6 +40,7 @@ import com.sun.sgs.impl.util.BindingKeyedMap;
 import com.sun.sgs.impl.util.CacheMap;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.impl.util.KernelCallable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
@@ -2150,7 +2151,7 @@ public final class ChannelServiceImpl
      * channel's coordinator) for the channel specified during
      * construction.
      */
-    private static abstract class ChannelRequestTask {
+    private abstract static class ChannelRequestTask {
 
 	protected final BigInteger channelRefId;
 

@@ -617,10 +617,11 @@ public abstract class AbstractService implements Service {
     /**
      * Returns the specified {@code refId} as a hex-formatted string.
      *
-     * @return the specified {@code refId} as a hex-formatted string
+     * @param	bigInt
+     * @return	the specified {@code bigInt} as a hex-formatted string
      */
-    public static String toHexString(BigInteger refId) {
-	return HexDumper.toHexString(refId.toByteArray());
+    public static String toHexString(BigInteger bigInt) {
+	return HexDumper.toHexString(bigInt.toByteArray());
     }
 
     /**

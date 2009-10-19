@@ -63,6 +63,8 @@ public interface ChannelServer extends Remote {
      * @return	the membership status of the session with the
      *		specified {@code sessionRefId} for the channel with
      *		the specified {@code channelRefId}
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
      */
     MembershipStatus isMember(BigInteger channelRefId, BigInteger sessionRefId)
 	throws IOException;
@@ -112,6 +114,11 @@ public interface ChannelServer extends Remote {
      * Returns an array containing the client session ID of each client
      * session on this node that is a member of the channel with the
      * specified {@code channelRefId}.
+     *
+     * @param	channelRefId a channel ID
+     * @return	an array of members' session IDs
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
      */
     BigInteger[] getSessions(BigInteger channelRefId)
 	throws IOException;

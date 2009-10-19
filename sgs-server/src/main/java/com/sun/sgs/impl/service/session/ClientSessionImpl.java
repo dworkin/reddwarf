@@ -363,6 +363,9 @@ public class ClientSessionImpl
     /**
      * Returns {@code true} if the session is relocating, and {@code
      * false} otherwise.
+     *
+     * @return	{@code true} if the session is relocating, and {@code
+     *		false} otherwise
      */
     public boolean isRelocating() {
 	return relocatingToNode != -1;
@@ -1090,8 +1093,8 @@ public class ClientSessionImpl
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
  		    Level.FINEST,
-		    "Adding event:{0} to event queue, localNodeId:{1}",
-		    event, ClientSessionServiceImpl.getInstance().getLocalNodeId());
+		    "Adding event:{0} to event queue, localNodeId:{1}", event,
+		    ClientSessionServiceImpl.getInstance().getLocalNodeId());
 	    }
 
 	    boolean success = getQueue().offer(event);
@@ -1174,7 +1177,8 @@ public class ClientSessionImpl
 			"session:{1} handler:{2} sessionNodeId:{3} " +
 			"relocatingToNodeId:{4}",
 			sessionService.getLocalNodeId(), getSessionRefId(),
-			handler, sessionImpl.nodeId, sessionImpl.relocatingToNode);
+			handler, sessionImpl.nodeId,
+			sessionImpl.relocatingToNode);
 		}
 		return;
 	    }

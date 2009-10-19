@@ -48,6 +48,7 @@ import com.sun.sgs.impl.util.BindingKeyedCollections;
 import com.sun.sgs.impl.util.BindingKeyedMap;
 import com.sun.sgs.impl.util.BindingKeyedSet;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.impl.util.KernelCallable;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
@@ -1014,7 +1015,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * A (periodic) task to reap messages saved past their expiration time.
      */
-    private static class SavedMessageReaper
+    private static final class SavedMessageReaper
 	implements KernelRunnable, Task, Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -1832,7 +1833,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				    channelRefId.toByteArray()));
 			}
 		    }
-		} ); 
+		}); 
 	    } catch (Exception e) {
 		// Transaction schedule will print out warning.
 	    } finally {
@@ -2529,7 +2530,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				    channelRefId.toByteArray()));
 			}
 		    }
-		} );
+		});
 	    } catch (Exception e) {
 		// Transaction schedule will print out warning.
 	    }
@@ -2760,6 +2761,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return false;
 		
 	    case UNKNOWN:
+	    default:
 		// FIXME: this is wrong; need to resample the session's
 		// node ID to see if it changed.  If it hasn't changed,
 		// then it is disconnected, otherwise, need to check

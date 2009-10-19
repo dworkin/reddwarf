@@ -52,8 +52,8 @@ import java.util.concurrent.Future;
  * cause of {@link RequestFailureException}.  The reason for the failure
  * can be obtained by invoking the {@link RequestFailureException#getReason
  * getReason} method on the {@code RequestFailureException}.  The request
- * may fail for one of the following {@linkplain
- * RequestFailureException.FailureReason reasons}:
+ * may fail for one of the following {@linkplain RequestFailureException
+ * reasons}: 
  * <ul>
  * <li>{@code LOGIN_PENDING}: the client session has not completed login
  * <li>{@code RELOCATION_PENDING}: the client session is relocating to

@@ -595,8 +595,9 @@ public final class WatchdogServerImpl
         }
 
         if (!isLocal) {
-            // Try to report the failure to the remote failed node so that the node
-            // can be shutdown itself. Try a few times if we run into an IOException.
+            // Try to report the failure to the remote failed node so that
+            // the node can be shutdown itself. Try a few times if we run
+            // into an IOException.
             int retries = maxNumberOfAttempts;
             while (retries-- > 0) {
                 try {
@@ -607,8 +608,8 @@ public final class WatchdogServerImpl
                         logger.logThrow(
 			    Level.WARNING, ioe, "Exception reporting failure " +
 			    "to node:{0} from node:{1}, className:{2} after " +
-			    "{3} attempt(s)",
-			    nodeId, localNodeId, className, maxNumberOfAttempts);
+			    "{3} attempt(s)", nodeId, localNodeId, className,
+			    maxNumberOfAttempts);
                     }
                 }
             }

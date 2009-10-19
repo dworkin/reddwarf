@@ -67,7 +67,7 @@ import java.util.logging.Logger;
 public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** The protocol version for this implementation. */
-    private static final byte PROTOCOL_v4 = 0x04;
+    private static final byte PROTOCOLv4 = 0x04;
     
    /** The number of bytes used to represent the message length. */
     private static final int PREFIX_LENGTH = 2;
@@ -152,9 +152,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
     
     /**
-     *
-     * The subclass should invoke {@link #scheduleRead} after
-     * constructing the instance to commence reading.
+     * Constructs a new instance of this class.  The subclass should invoke
+     * {@code scheduleRead} after constructing the instance to commence
+     * reading.
      *
      * @param	listener a protocol listener
      * @param	acceptor the {@code SimpleSgsProtocol} acceptor
@@ -187,7 +187,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      * implementation
      */
     protected byte getProtocolVersion() {
-	return PROTOCOL_v4;
+	return PROTOCOLv4;
     }
     
     /* -- Implement SessionProtocol -- */
@@ -385,7 +385,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /* -- Object method overrides -- */
     
-    /** {@inheritDoc */
+    /** {@inheritDoc} */
     @Override
     public String toString() {
 	return getClass().getName() + "[" +
@@ -410,6 +410,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		} });
     }
 
+    /**
+     * Starts reading.
+     */
     protected void readNow() {
 	if (isOpen()) {
 	    readHandler.read();
@@ -438,9 +441,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /**
      * Writes a message to the write handler.
      *
-     * @param	buf a buffer containing a complete protocol message
+     * @param	message a buffer containing a complete protocol message
      * @param	flush if {@code true}, then set the {@code loginHandled}
-     *		flag and flush the message queue
+     *		flag to {@code true} and flush the message queue
      */
     protected void writeNow(ByteBuffer message, boolean flush) {
 	try {
@@ -746,7 +749,18 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
         }
     }
 
-    /** Processes the received message. */
+    /**
+     * Processes the received message.  This implementation processes
+     * opcodes for {@code SimpleSgsProtocol} version {@code 0x04}.  A
+     * subclass can override this implementation to process additional
+     * opcodes, and then delegate to this implementation to process the
+     * version {@code 0x04} opcodes.
+     *
+     * @param	opcode the message opcode
+     * @param	msg a message buffer containing the entire message, but
+     *		with the position advanced to the payload (just after the
+     *		opcode)
+     */
     protected void handleMessageReceived(byte opcode, MessageBuffer msg) {
 		
 	switch (opcode) {

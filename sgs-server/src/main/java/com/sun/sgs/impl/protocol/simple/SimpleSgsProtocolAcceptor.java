@@ -140,10 +140,10 @@ public class SimpleSgsProtocolAcceptor
 	PKG_NAME + ".protocol.version";
 
     /** The protocol version 4. */
-    public static final int PROTOCOL_v4 = 4;
+    public static final int PROTOCOLv4 = 4;
 
     /** The default protocol version: {@value #DEFAULT_PROTOCOL_VERSION}. */
-    public static final int DEFAULT_PROTOCOL_VERSION = /* PROTOCOL_v4 */ 5;
+    public static final int DEFAULT_PROTOCOL_VERSION = /* PROTOCOLv4 */ 5;
             
     /** The name of the disconnect delay property. */
     public static final String DISCONNECT_DELAY_PROPERTY =
@@ -245,7 +245,7 @@ public class SimpleSgsProtocolAcceptor
 	    protocolVersion =
 		wrappedProps.getIntProperty(
 		PROTOCOL_VERSION_PROPERTY, DEFAULT_PROTOCOL_VERSION,
-		PROTOCOL_v4, SimpleSgsProtocol.VERSION);
+		PROTOCOLv4, SimpleSgsProtocol.VERSION);
 
 	    logger.log(Level.CONFIG, "protocol version:{0}", protocolVersion);
             
@@ -345,7 +345,7 @@ public class SimpleSgsProtocolAcceptor
         public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
-	    if (protocolVersion == PROTOCOL_v4) {
+	    if (protocolVersion == PROTOCOLv4) {
 		new SimpleSgsProtocolImpl(
 		    protocolListener, SimpleSgsProtocolAcceptor.this,
 		    byteChannel, readBufferSize);

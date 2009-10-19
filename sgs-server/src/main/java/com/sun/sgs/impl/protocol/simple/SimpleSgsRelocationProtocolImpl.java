@@ -113,9 +113,9 @@ public class SimpleSgsRelocationProtocolImpl
     }
     
     /**
-     *
-     * The subclass should invoke {@link #scheduleRead} after
-     * constructing the instance to commence reading.
+     * Constructs a new instance of this class.  The subclass should invoke
+     * {@link SimpleSgsProtocolImpl#scheduleRead} after constructing the
+     * instance to commence reading.
      *
      * @param	listener a protocol listener
      * @param	acceptor the {@code SimpleSgsProtocol} acceptor
@@ -133,7 +133,8 @@ public class SimpleSgsRelocationProtocolImpl
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the {@code SimplSgsProtocol} version supported by this
+     * implementation.
      *
      * This implementation returns the latest {@code SimpleSgsProtocol}
      * version.
@@ -280,11 +281,9 @@ public class SimpleSgsRelocationProtocolImpl
     }
 
 
-    /**  {@inheritDoc}.
-     *
-     * <p>This implementation handles protocol messages not handled by the
-     * v4 protocol (relocate and suspend), and delegates to the super class
-     * to handle the v4 protocol messages.
+    /** 
+     * Handles v5 protocol messages (relocate and suspend), and delegates
+     * to the super class to handle the v4 protocol messages.
      */
     @Override
     protected void handleMessageReceived(byte opcode, MessageBuffer msg) {
