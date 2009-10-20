@@ -3594,7 +3594,8 @@ public class TestDataServiceImpl extends Assert {
 		exception.set(new Exception("Unexpected call"));
 	    }
 	};
-	service.shutdown();
+        serverNode.shutdown(false);
+        serverNode = null;
 	try {
 	    service.addDataConflictListener(listener);
 	    fail("Expected IllegalStateException");
