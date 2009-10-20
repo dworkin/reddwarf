@@ -28,9 +28,9 @@ import static java.util.logging.Level.FINEST;
 import java.util.logging.Logger;
 
 /**
- * A class for managing lock conflicts as part of a transaction, and calls on
- * behalf of a locker should only be made from a single thread at a time.  All
- * {@link Locker} objects supplied to this class should be instances of {@link
+ * A class for managing lock conflicts of a transaction.  Calls on behalf of a
+ * locker should only be made from a single thread at a time.  All {@link
+ * Locker} objects supplied to this class should be instances of {@link
  * TxnLocker}. <p>
  *
  * This implementation checks for deadlock whenever a lock request is blocked
@@ -39,8 +39,9 @@ import java.util.logging.Logger;
  * would not result in deadlock.  When requests block, it services the requests
  * in the order that they arrive. <p>
  *
- * This class uses the {@link Logger} named {@code com.sun.sgs.impl.util.lock}
- * to log information at the following logging levels: <p>
+ * This class and its {@linkplain LockManager superclass} use the {@link
+ * Logger} named {@code com.sun.sgs.impl.util.lock} to log information at the
+ * following logging levels: <p>
  *
  * <ul>
  * <li> {@link Level#FINER FINER} - Releasing locks; requesting, waiting for,
@@ -233,7 +234,7 @@ public final class TxnLockManager<K> extends LockManager<K> {
 	{
 	    waiterInfo.pass = pass;
 	    for (LockRequest<K> request : waiterInfo.waitingFor) {
-		TxnLocker<K> owner = (TxnLocker<K>) request.locker;
+		TxnLocker<K> owner = (TxnLocker<K>) request.getLocker();
 		if (owner == locker) {
 		    if (logger.isLoggable(FINEST)) {
 			logger.log(FINEST,
@@ -295,7 +296,7 @@ public final class TxnLockManager<K> extends LockManager<K> {
 		if (result == null || locker.getConflict() != null) {
 		    waitingFor = null;
 		} else {
-		    K key = result.request.key;
+		    K key = result.request.getKey();
 		    Map<K, Lock<K>> keyMap = getKeyMap(key);
 		    assert Lock.noteSync(TxnLockManager.this, key);
 		    try {

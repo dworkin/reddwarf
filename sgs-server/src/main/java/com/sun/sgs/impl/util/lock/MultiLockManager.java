@@ -30,8 +30,9 @@ import java.util.logging.Logger;
  * #downgradeLock downgrading locks}.  All {@link Locker} objects supplied to
  * this class should be instances of {@link MultiLocker}. <p>
  *
- * This class uses the {@link Logger} named {@code com.sun.sgs.impl.util.lock}
- * to log information at the following logging levels: <p>
+ * This class and its {@linkplain LockManager superclass} use the {@link
+ * Logger} named {@code com.sun.sgs.impl.util.lock} to log information at the
+ * following logging levels: <p>
  *
  * <ul>
  * <li> {@link Level#FINER FINER} - Releasing locks; requesting, waiting for,

@@ -105,9 +105,9 @@ public abstract class Locker<K> {
     /**
      * Clears the conflict that should cause this locker's current request to
      * be denied.  If there is no conflict, then this method has no effect.  If
-     * the conflict is a deadlock, represented by a return value of {@link
-     * #getConflict getConflict} is not {@code null} and whose {@code type}
-     * field is {@link LockConflictType#DEADLOCK DEADLOCK}, then the conflict
+     * the conflict is a deadlock, represented by a non-{@code null} return
+     * value from {@link #getConflict getConflict} with a {@code type} field
+     * equal to {@link LockConflictType#DEADLOCK DEADLOCK}, then the conflict
      * cannot be cleared and {@code IllegalStateException} will be thrown. <p>
      *
      * The default implementation of this method does nothing.

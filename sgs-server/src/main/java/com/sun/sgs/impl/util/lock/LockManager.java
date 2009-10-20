@@ -440,7 +440,7 @@ public class LockManager<K> {
 			return null;
 		    }
 		    Lock<K> lock;
-		    K key = result.request.key;
+		    K key = result.request.getKey();
 		    Map<K, Lock<K>> keyMap = getKeyMap(key);
 		    assert Lock.noteSync(this, key);
 		    try {
