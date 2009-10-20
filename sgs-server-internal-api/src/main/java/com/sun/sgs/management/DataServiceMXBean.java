@@ -40,6 +40,15 @@ public interface DataServiceMXBean {
     String MXBEAN_NAME = "com.sun.sgs.service:type=DataService";
     
     /**
+     * Returns the number of times {@link DataService#addDataConflictListener
+     * DataService.addDataConflictListener} has been called.
+     *
+     * @return	the number of times {@code addDataConflictListener} has been
+     *		called
+     */
+    long getAddDataConflictListenerCalls();
+
+    /**
      * Returns the number of times 
      * {@link DataService#createReference createReference} 
      * has been called.

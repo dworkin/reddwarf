@@ -25,14 +25,18 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
+import static com.sun.sgs.impl.util.
+    AbstractComponent.checkNonTransactionalContext;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import com.sun.sgs.service.store.DataStore;
 import java.util.Arrays;
@@ -80,6 +84,9 @@ public abstract class AbstractDataStore
     /** The logger for transaction abort exceptions. */
     protected final LoggerWrapper abortLogger;
 
+    /** The transaction proxy. */
+    protected final TransactionProxy txnProxy;
+
     /** The reporter to notify of object accesses. */
     protected final AccessReporter<Long> objectAccesses;
 
@@ -93,15 +100,19 @@ public abstract class AbstractDataStore
      * Creates an instance of this class.
      *
      * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @param	logger the main logger for this class
      * @param	abortLogger the logger for transaction abort exceptions
      */
     protected AbstractDataStore(ComponentRegistry systemRegistry,
+				TransactionProxy txnProxy,
 				LoggerWrapper logger,
 				LoggerWrapper abortLogger)
     {
+	checkNull("txnProxy", txnProxy);
 	checkNull("logger", logger);
 	checkNull("abortLogger", abortLogger);
+	this.txnProxy = txnProxy;
 	this.logger = logger;
 	this.abortLogger = logger;
 	String className = getClass().getName();
@@ -904,6 +915,53 @@ public abstract class AbstractDataStore
      *		problem with the current transaction
      */
     protected abstract long nextObjectIdInternal(Transaction txn, long oid);
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation does logging, checks that the listener is not {@code
+     * null}, checks that there is no active transaction, and calls {@link
+     * #addDataConflictListenerInternal addDataConflictListenerInternal} to
+     * perform the actual operation.
+     */
+    public void addDataConflictListener(DataConflictListener listener) {
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST,
+		       "addDataConflictListener listener:" + listener);
+	}
+	Throwable exception;
+	try {
+	    checkNull("listener", listener);
+	    checkNonTransactionalContext(txnProxy);
+	    addDataConflictListenerInternal(listener);
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(FINEST,
+			   "addDataConflictListener listener:" + listener +
+			   " returns");
+	    }
+	    return;
+	} catch (RuntimeException e) {
+	    exception = e;
+	} catch (Error e) {
+	    exception = e;
+	}
+	handleException(null, FINEST, exception,
+			"addDataConflictListener listener:" + listener);
+    }
+
+
+    /**
+     * Performs the actual operation for {@link #addDataConflictListener
+     * addDataConflictListener}. <p>
+     *
+     * The default implementation does nothing.
+     *
+     * @param	listener the data conflict listener
+     */
+    protected void addDataConflictListenerInternal(
+	DataConflictListener listener)
+    {
+    }
 
     /** {@inheritDoc} */
     public void setObjectDescription(

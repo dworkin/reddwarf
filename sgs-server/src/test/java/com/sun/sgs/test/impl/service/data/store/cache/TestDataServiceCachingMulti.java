@@ -44,17 +44,20 @@ import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.impl.service.data.BasicDataServiceMultiTest;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import java.math.BigInteger;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 
 /**
@@ -260,6 +263,161 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	    } }.runTask();
 	}
 	done.await(10000, SECONDS);
+    }
+
+    /**
+     * Test that the data conflict listener is called appropriately for
+     * evictions and downgrades of objects and name bindings.  Also make sure
+     * that exceptions thrown by listeners are ignored.
+     */
+    @Test
+    public void testDataConflictListeners() throws Exception {
+	final AtomicReference<BigInteger> dummyId =
+	    new AtomicReference<BigInteger>();
+	new RunTask(serverNode) { public void run() {
+	    DummyManagedObject dummy = new DummyManagedObject();
+	    dataService.setBinding("dummy", dummy);
+	    dummyId.set(dataService.getObjectId(dummy));
+	    dataService.setBinding("dummy2", new DummyManagedObject());
+	} }.runTask();
+	SgsTestNode node0 = appNodes.get(0);
+	long nodeId0 = node0.getNodeId();
+	CheckingDataConflictListener listener0 =
+	    new CheckingDataConflictListener();
+	node0.getDataService().addDataConflictListener(listener0);
+	SgsTestNode node1 = appNodes.get(1);
+	long nodeId1 = node1.getNodeId();
+	CheckingDataConflictListener listener1 =
+	    new CheckingDataConflictListener();
+	node1.getDataService().addDataConflictListener(listener1);
+	/* Evict object: Node 0 writes object, node 1 writes object */
+	listener0.setExpected(dummyId.get(), nodeId1, true);
+	listener1.setExpected(null, 0, false);
+	new RunTask(node0) { public void run() {
+	    dataService.getBindingForUpdate("dummy");
+	} }.runTask();
+	new RunTask(node1) { public void run() {
+	    dataService.getBindingForUpdate("dummy");
+	} }.runTask();
+	listener0.await();
+	listener1.awaitNotCalled();
+	/* Downgrade object: Node 0 reads object */
+	listener0.setExpected(null, 0, false);
+	listener1.setExpected(dummyId.get(), nodeId0, false);
+	new RunTask(node0) { public void run() {
+	    dataService.getBinding("dummy");
+	} }.runTask();
+	listener1.await();
+	listener0.awaitNotCalled();
+	/* Evict binding: Node 0 writes binding */
+	listener0.setExpected(null, 0, false);
+	listener1.setExpected("a.dummy", nodeId0, true);
+	new RunTask(node0) { public void run() {
+	    dataService.setBinding("dummy", dataService.getBinding("dummy2"));
+	} }.runTask();
+	listener1.await();
+	listener0.awaitNotCalled();
+	/* Downgrade binding: Node 1 reads binding */
+	listener0.setExpected("a.dummy", nodeId1, false);
+	listener1.setExpected(null, 0, false);
+	new RunTask(node1) { public void run() {
+	    dataService.getBinding("dummy");
+	} }.runTask();
+	listener0.await();
+	listener1.awaitNotCalled();
+    }
+
+    /** A data conflict listener that checks its calls. */
+    private class CheckingDataConflictListener
+	implements DataConflictListener
+    {
+	private Object expectedAccessId = null;
+	private long expectedNodeId;
+	private boolean expectedForUpdate;
+	private boolean called;
+	private Throwable exception;
+
+	@Override
+	public synchronized void nodeConflictDetected(
+	    Object accessId, long nodeId, boolean forUpdate)
+	{
+	    try {
+		if (expectedAccessId == null) {
+		    throw new Exception("Unexpected notification");
+		} else {
+		    assertFalse("Listener should not have been called before",
+				called);
+		    assertEquals(expectedAccessId, accessId);
+		    assertEquals(expectedNodeId, nodeId);
+		    assertEquals(expectedForUpdate, forUpdate);
+		    called = true;
+		    notifyAll();
+		}
+	    } catch (Throwable t) {
+		exception = t;
+		notifyAll();
+	    }
+	    throw new RuntimeException("Listener throws");
+	}
+
+	/**
+	 * Specify the expected arguments to the next call to
+	 * nodeConflictDetected.  If expectedAccessId is null, then no
+	 * notification is expected.
+	 */
+	synchronized void setExpected(Object expectedAccessId,
+				      long expectedNodeId,
+				      boolean expectedForUpdate)
+	{
+	    this.expectedAccessId = expectedAccessId;
+	    this.expectedNodeId = expectedNodeId;
+	    this.expectedForUpdate = expectedForUpdate;
+	    called = false;
+	}
+
+	/** Wait for nodeConflictDetected to be called. */
+	synchronized void await() {
+	    long done = System.currentTimeMillis() + 5000;
+	    while (true) {
+		if (exception != null) {
+		    throw new RuntimeException(
+			"Unexpected exception: " + exception, exception);
+		}
+		if (called) {
+		    break;
+		}
+		long wait = done - System.currentTimeMillis();
+		if (wait <= 0) {
+		    fail("Listener not called");
+		}
+		try {
+		    wait(wait);
+		} catch (InterruptedException e) {
+		}
+	    }
+	}
+
+	/** Wait to be sure that nodeConflictDetected is not called. */
+	synchronized void awaitNotCalled() {
+	    long done = System.currentTimeMillis() + 1000;
+	    while (true) {
+		if (exception != null) {
+		    throw new RuntimeException(
+			"Unexpected exception: " + exception, exception);
+		}
+		if (called) {
+		    fail("Listener was called");
+		}
+		long wait = done - System.currentTimeMillis();
+		if (wait <= 0) {
+		    break;
+		}
+		try {
+		    wait(wait);
+		} catch (InterruptedException e) {
+		}
+	    }
+	}
     }
 
     /* -- Other classes and methods -- */

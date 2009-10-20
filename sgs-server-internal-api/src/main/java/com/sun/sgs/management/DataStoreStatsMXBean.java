@@ -43,6 +43,15 @@ public interface DataStoreStatsMXBean
     String MXBEAN_NAME = "com.sun.sgs.service:type=DataStoreStats";
 
     /**
+     * Returns the number of times {@link DataStore#addDataConflictListener
+     * DataStore.addDataConflictListener} has been called.
+     *
+     * @return	the number of times {@code addDataConflictListener} has been
+     *		called
+     */
+    long getAddDataConflictListenerCalls();
+
+    /**
      * Returns the number of times 
      * {@link DataStore#createObject(Transaction) createObject} 
      * has been called.

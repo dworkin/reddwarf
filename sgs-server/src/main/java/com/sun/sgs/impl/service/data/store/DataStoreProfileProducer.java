@@ -23,6 +23,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.management.DataStoreStatsMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
@@ -222,6 +223,12 @@ public class DataStoreProfileProducer
 	long result = dataStore.nextObjectId(txn, oid);
 	stats.nextObjectIdOp.report();
 	return result;
+    }
+
+    /** {@inheritDoc} */
+    public void addDataConflictListener(DataConflictListener listener) {
+	dataStore.addDataConflictListener(listener);
+	stats.addDataConflictListenerOp.report();
     }
 
     /** {@inheritDoc} */

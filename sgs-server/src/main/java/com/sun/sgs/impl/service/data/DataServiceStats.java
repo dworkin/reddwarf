@@ -34,6 +34,7 @@ import com.sun.sgs.profile.ProfileOperation;
 class DataServiceStats implements DataServiceMXBean {
 
     // the profiled operations
+    final ProfileOperation addDataConflictListenerOp;
     final ProfileOperation createRefOp;
     final ProfileOperation getBindingOp;
     final ProfileOperation getBindingForUpdateOp;
@@ -60,6 +61,8 @@ class DataServiceStats implements DataServiceMXBean {
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         
         // Manager operations
+	addDataConflictListenerOp =
+	    consumer.createOperation("addDataConflictListenerOp", type, level);
         createRefOp =
             consumer.createOperation("createReference", type, level);
         getBindingOp =
@@ -97,6 +100,12 @@ class DataServiceStats implements DataServiceMXBean {
             consumer.createOperation("setServiceBinding", type, level);
     }
     
+    /** {@inheritDoc} */
+    public long getAddDataConflictListenerCalls() {
+	return ((AggregateProfileOperation) addDataConflictListenerOp)
+	    .getCount();
+    }
+
     /** {@inheritDoc} */
     public long getCreateReferenceCalls() {
         return ((AggregateProfileOperation) createRefOp).getCount();

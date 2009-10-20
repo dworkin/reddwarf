@@ -222,7 +222,7 @@ public final class DataStoreClient extends AbstractDataStore {
 			   TransactionProxy txnProxy)
 	throws IOException, NotBoundException
     {
-	super(systemRegistry, 
+	super(systemRegistry, txnProxy,
 	      new LoggerWrapper(Logger.getLogger(PACKAGE + ".client")),
 	      new LoggerWrapper(Logger.getLogger(PACKAGE + ".client.abort")));
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",

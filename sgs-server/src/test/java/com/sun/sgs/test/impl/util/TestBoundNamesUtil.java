@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.util;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.math.BigInteger;
@@ -342,6 +343,7 @@ public class TestBoundNamesUtil extends TestCase {
 	    return null;
 	}
 	public BigInteger nextObjectId(BigInteger objectId) { return null; }
+	public void addDataConflictListener(DataConflictListener listener) { }
 	/* -- Stubs for Service -- */
 	public String getName() { return null; }
 	public void ready() { }

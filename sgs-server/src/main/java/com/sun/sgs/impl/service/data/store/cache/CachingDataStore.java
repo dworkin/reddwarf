@@ -62,19 +62,25 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import com.sun.sgs.service.store.DataStore;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -438,6 +444,21 @@ public class CachingDataStore extends AbstractDataStore
      */
     private final Object watchdogServiceSync = new Object();
 
+    /** A synchronized list of registered data conflict listeners. */
+    private final List<DataConflictListener> dataConflictListeners =
+	new ArrayList<DataConflictListener>();
+
+    /** A concurrent deque of conflicting data accesses */
+    private final BlockingDeque<DataConflict> dataConflicts =
+	new LinkedBlockingDeque<DataConflict>();
+
+    /**
+     * The thread that delivers information about conflicting accesses to data
+     * conflict listeners.
+     */
+    private final DataConflictThread dataConflictThread =
+	new DataConflictThread();
+
     /* -- Constructors -- */
 
     /**
@@ -453,7 +474,7 @@ public class CachingDataStore extends AbstractDataStore
 			    TransactionProxy txnProxy)
 	throws Exception
     {
-	super(systemRegistry, logger, abortLogger);
+	super(systemRegistry, txnProxy, logger, abortLogger);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	NodeType nodeType = wrappedProps.getEnumProperty(
 	    StandardProperties.NODE_TYPE, NodeType.class, NodeType.singleNode);
@@ -558,6 +579,7 @@ public class CachingDataStore extends AbstractDataStore
 	    cache = new Cache(this, cacheSize, numLocks, evictionThread);
 	    newObjectIdCache = new NewObjectIdCache(this, objectIdBatchSize);
 	    evictionThread.start();
+	    dataConflictThread.start();
 	} catch (Exception e) {
 	    shutdownInternal();
 	    throw e;
@@ -2301,7 +2323,12 @@ public class CachingDataStore extends AbstractDataStore
 	    contextMap.shutdown();
 	}
 	/* Stop facilities used by active transactions */
+	dataConflictThread.interrupt();
 	evictionThread.interrupt();
+	try {
+	    dataConflictThread.join(10000);
+	} catch (InterruptedException e) {
+	}
 	try {
 	    evictionThread.join(10000);
 	} catch (InterruptedException e) {
@@ -2414,6 +2441,14 @@ public class CachingDataStore extends AbstractDataStore
 	}
     }
 
+    /** {@inheritDoc} */
+    @Override
+    protected void addDataConflictListenerInternal(
+	DataConflictListener listener)
+    {
+	dataConflictListeners.add(listener);
+    }
+
     /* -- Implement AbstractDataStore's TransactionParticipant methods -- */
 
     /** {@inheritDoc} */
@@ -2450,6 +2485,9 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     @Override
     public boolean requestDowngradeObject(long oid, long conflictNodeId) {
+	boolean added = dataConflicts.offerLast(
+	    new DataConflict(BigInteger.valueOf(oid), conflictNodeId, false));
+	assert added;
 	Object lock = cache.getObjectLock(oid);
 	synchronized (lock) {
 	    ObjectCacheEntry entry = cache.getObjectEntry(oid);
@@ -2521,6 +2559,9 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     @Override
     public boolean requestEvictObject(long oid, long conflictNodeId) {
+	boolean added = dataConflicts.offerLast(
+	    new DataConflict(BigInteger.valueOf(oid), conflictNodeId, true));
+	assert added;
 	Object lock = cache.getObjectLock(oid);
 	synchronized (lock) {
 	    ObjectCacheEntry entry = cache.getObjectEntry(oid);
@@ -2616,6 +2657,9 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     @Override
     public boolean requestDowngradeBinding(String name, long conflictNodeId) {
+	boolean added = dataConflicts.offerLast(
+	    new DataConflict(getNameForAccess(name), conflictNodeId, false));
+	assert added;
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
@@ -2779,6 +2823,9 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     @Override
     public boolean requestEvictBinding(String name, long conflictNodeId) {
+	boolean added = dataConflicts.offerLast(
+	    new DataConflict(getNameForAccess(name), conflictNodeId, true));
+	assert added;
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
 	    assert i < 1000 : "Too many retries";
@@ -3417,6 +3464,104 @@ public class CachingDataStore extends AbstractDataStore
 	    } else {
 		return contextId < other.contextId;
 	    }
+	}
+    }
+
+    /**
+     * A {@code Thread} that delivers information about data access conflicts
+     * to data conflict listeners.
+     */
+    private class DataConflictThread extends Thread {
+
+	/** Creates an instance of this class. */
+	DataConflictThread() {
+	    super(CLASSNAME + ".dataConflict");
+	}
+
+	/* -- Implement Runnable -- */
+
+	@Override
+	public void run() {
+	    logger.log(FINEST, "Start access conflict thread");
+	    while (!getShutdownTxnsCompleted()) {
+		DataConflict conflict;
+		try {
+		    conflict = dataConflicts.takeFirst();
+		} catch (InterruptedException e) {
+		    continue;
+		}
+		/*
+		 * Listeners are only added, not removed, so it's OK to not
+		 * use a single synchronized for the calls to size and get.
+		 */
+		for (int i = 0; i < dataConflictListeners.size(); i++) {
+		    conflict.notify(dataConflictListeners.get(i));
+		}
+	    }
+	}
+    }
+
+    /**
+     * Manages information about a conflicting data access from another node.
+     */
+    private static class DataConflict {
+
+	/** The identifier for the object accessed. */
+	private final Object accessId;
+
+	/** The node ID for the remote node performing the access. */
+	private final long nodeId;
+
+	/** Whether the access was for update. */
+	private final boolean forUpdate;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	accessId the identifier for the object accessed
+	 * @param	nodeId the node ID for the remote node performing the
+	 *		access
+	 * @param	forUpdate whether the access was for update
+	 */
+	DataConflict(Object accessId, long nodeId, boolean forUpdate) {
+	    this.accessId = accessId;
+	    this.nodeId = nodeId;
+	    this.forUpdate = forUpdate;
+	}
+
+	/**
+	 * Notifies the listener of the access represented by this object.
+	 *
+	 * @param	listener the listener
+	 */
+	void notify(DataConflictListener listener) {
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(FINEST,
+			   "notify listener:" + listener +
+			   ", accessId:" + accessId +
+			   ", nodeId:" + nodeId +
+			   ", forUpdate:" + forUpdate);
+	    }
+	    try {
+		listener.nodeConflictDetected(accessId, nodeId, forUpdate);
+		if (logger.isLoggable(FINEST)) {
+		    logger.log(FINEST,
+			       "notify listener:" + listener +
+			       ", accessId:" + accessId +
+			       ", nodeId:" + nodeId +
+			       ", forUpdate:" + forUpdate +
+			       " returns");
+		}
+	    } catch (Throwable t) {
+		if (logger.isLoggable(FINEST)) {
+		    logger.logThrow(FINEST, t,
+				    "notify listener:" + listener +
+				    ", accessId:" + accessId +
+				    ", nodeId:" + nodeId +
+				    ", forUpdate:" + forUpdate +
+				    " throws");
+		}
+	    } 
 	}
     }
 }

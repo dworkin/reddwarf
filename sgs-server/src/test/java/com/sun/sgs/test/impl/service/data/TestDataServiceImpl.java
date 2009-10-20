@@ -43,6 +43,7 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
@@ -3547,6 +3548,61 @@ public class TestDataServiceImpl extends Assert {
 	testShutdown(nextObjectId);
     }
 
+    /* -- Test addDataConflictListener -- */
+
+    @Test(expected=NullPointerException.class)
+    public void testAddDataConflictListenerNullListener() {
+	service.addDataConflictListener(null);
+    }
+
+    @Test
+    public void testAddDataConflictListenerInTransaction() throws Exception {
+	final AtomicReference<Throwable> exception =
+	    new AtomicReference<Throwable>();
+	final DataConflictListener listener = new DataConflictListener() {
+	    public void nodeConflictDetected(
+		Object accessId, long nodeId, boolean forUpdate)
+	    {
+		exception.set(new Exception("Unexpected call"));
+	    }
+	};
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    service.addDataConflictListener(listener);
+		} catch (Throwable t) {
+		    exception.set(t);
+		}
+	    }
+	}, taskOwner);
+	Throwable e = exception.get();
+	if (e instanceof IllegalStateException) {
+	    System.err.println(e);
+	} else {
+	    fail("Expected IllegalStateException, found " + e);
+	}
+    }
+
+    @Test
+    public void testAddDataConflictListenerAfterShutdown() throws Exception {
+	final AtomicReference<Throwable> exception =
+	    new AtomicReference<Throwable>();
+	final DataConflictListener listener = new DataConflictListener() {
+	    public void nodeConflictDetected(
+		Object accessId, long nodeId, boolean forUpdate)
+	    {
+		exception.set(new Exception("Unexpected call"));
+	    }
+	};
+	service.shutdown();
+	try {
+	    service.addDataConflictListener(listener);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test ManagedReference.get -- */
 
     @Test 
@@ -5881,6 +5937,7 @@ public class TestDataServiceImpl extends Assert {
 	    return null;
 	}
 	public long nextObjectId(Transaction txn, long oid) { return -1; }
+	public void addDataConflictListener(DataConflictListener listener) { }
 	public void setObjectDescription(
 	    Transaction txn, long oid, Object description)
 	{ }

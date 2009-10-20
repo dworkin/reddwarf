@@ -485,10 +485,23 @@ public abstract class AbstractComponent {
      * transactional context.
      */
     protected void checkNonTransactionalContext() {
+	checkNonTransactionalContext(txnProxy);
+    }
+
+    /**
+     * Checks that the current thread is not in a transactional context
+     * and throws {@code IllegalStateException} if the thread is in a
+     * transactional context.
+     *
+     * @param	txnProxy the transaction proxy
+     */
+    public static void checkNonTransactionalContext(
+	TransactionProxy txnProxy)
+    {
 	try {
 	    txnProxy.getCurrentTransaction();
 	    throw new IllegalStateException(
-		"operation not allowed from a transactional context");
+		"Operation not allowed from a transactional context");
 	} catch (TransactionNotActiveException e) {
 	}
     }

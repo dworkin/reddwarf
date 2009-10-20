@@ -733,7 +733,7 @@ public class DataStoreImpl extends AbstractDataStore {
 			 ComponentRegistry systemRegistry,
 			 TransactionProxy txnProxy)
     {
-	super(systemRegistry,
+	super(systemRegistry, txnProxy,
 	      new LoggerWrapper(Logger.getLogger(CLASSNAME)),
 	      new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort")));
 	logger.log(

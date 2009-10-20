@@ -28,6 +28,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.kernel.AccessReporter;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.Transaction;
 import java.io.ObjectStreamClass;
 
@@ -301,6 +302,18 @@ public interface DataStore {
      *		problem with the current transaction
      */
     long nextObjectId(Transaction txn, long oid);
+
+    /**
+     * Registers a listener to be notified when the data store detects that
+     * another node has made a conflicting access to an object or name binding
+     * on this node.  Registered listeners are notified outside of a
+     * transaction. <p>
+     *
+     * This method must be invoked outside of a transaction.
+     *
+     * @param	listener a data conflict listener
+     */
+    void addDataConflictListener(DataConflictListener listener);
 
     /**
      * Associates a description with an object ID, for use in describing object

@@ -89,7 +89,7 @@ public class InMemoryDataStore extends AbstractDataStore {
 			     ComponentRegistry systemRegistry,
 			     TransactionProxy txnProxy)
     {
-	super(systemRegistry, logger, logger);
+	super(systemRegistry, txnProxy, logger, logger);
     }
 
     /* -- Implement AbstractDataStore methods -- */
