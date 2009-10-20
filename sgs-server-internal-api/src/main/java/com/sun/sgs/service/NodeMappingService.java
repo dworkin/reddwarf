@@ -95,12 +95,14 @@ public interface NodeMappingService extends Service {
      *
      * @param service the class of the caller
      * @param identity the identity to assign to a node
-     * 
-     *@throws IllegalStateException if this method is called while in a
-     *        transaction
+     *
+     * @return the ID of the node that the identity was assigned a node,
+     *         or -1 if the assignment failed
+     * @throws IllegalStateException if this method is called while in a
+     *         transaction
      *
      */
-    void assignNode(Class service, Identity identity);
+    long assignNode(Class service, Identity identity);
     
     /**
      * Inform the {@code NodeMappingService} that a service instance has 

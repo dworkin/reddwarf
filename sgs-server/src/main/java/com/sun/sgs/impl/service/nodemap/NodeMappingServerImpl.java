@@ -372,8 +372,8 @@ public final class NodeMappingServerImpl
     /* -- Implement NodeMappingServer -- */
 
     /** {@inheritDoc} */
-    public void assignNode(Class service, Identity identity, 
-                           long requestingNode)
+    public long assignNode(Class service, Identity identity,
+                              long requestingNode)
         throws IOException 
     {
         callStarted();    
@@ -392,7 +392,7 @@ public final class NodeMappingServerImpl
                 runTransactionally(checkTask);
 
                 if (checkTask.idFound() && checkTask.isAssignedToLiveNode()) {
-                    return;
+                    return checkTask.getNode().getId();
                 } else {
                     // The node is dead.  We need to map to a new node.
                     node = checkTask.getNode();
@@ -409,6 +409,7 @@ public final class NodeMappingServerImpl
                     mapToNewNode(identity, serviceName, node, requestingNode);
                 logger.log(Level.FINEST, 
                            "assignNode id:{0} to {1}", identity, newNodeId);
+                return newNodeId;
             } catch (NoNodesAvailableException ex) {
                 // This should only occur if no nodes are available, which
                 // can only happen if our client shutdown and unregistered
@@ -420,6 +421,7 @@ public final class NodeMappingServerImpl
         } finally {
             callFinished();
         }
+        return -1;
     }
     
     /**

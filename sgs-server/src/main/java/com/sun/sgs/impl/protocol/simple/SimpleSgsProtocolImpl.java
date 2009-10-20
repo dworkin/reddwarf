@@ -304,7 +304,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      *		by {@code node}
      */
     private void loginRedirect(
-	Node node, Set<ProtocolDescriptor> descriptors)
+	long nodeId, Set<ProtocolDescriptor> descriptors)
     {
         for (ProtocolDescriptor descriptor : descriptors) {
             if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
@@ -324,7 +324,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
         loginFailure("redirect failed", null);
         logger.log(Level.SEVERE,
                    "redirect node {0} does not support a compatable protocol",
-                   node);
+                   nodeId);
     }
 
     /**
@@ -865,7 +865,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    LoginRedirectException redirectException =
 			(LoginRedirectException) cause;
 		    
-                    loginRedirect(redirectException.getNode(),
+                    loginRedirect(redirectException.getNodeId(),
                                   redirectException.getProtocolDescriptors());
 		    
 		} else if (cause instanceof LoginFailureException) {

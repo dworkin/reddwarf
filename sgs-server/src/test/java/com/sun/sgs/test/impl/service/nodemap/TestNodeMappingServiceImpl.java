@@ -1173,12 +1173,9 @@ public class TestNodeMappingServiceImpl {
         Object oldServer = swapToEvilServer(nodeMappingService);
         
         Identity id = new IdentityImpl("first");
-        nodeMappingService.assignNode(NodeMappingService.class, id);
-
-        Thread.sleep(100);
+        
         try {
-            assertFalse(serverNode.getWatchdogService().
-                        isLocalNodeAliveNonTransactional());
+            nodeMappingService.assignNode(NodeMappingService.class, id);
         } catch (IllegalStateException e) {
             // All OK, the server is probably shutting down
         }
@@ -1229,12 +1226,9 @@ public class TestNodeMappingServiceImpl {
         nodeMappingService.assignNode(NodeMappingService.class, id);
 
         Object oldServer = swapToEvilServer(nodeMappingService);
-        nodeMappingService.setStatus(NodeMappingService.class, id, false);
         
-        Thread.sleep(100);
         try {
-            assertFalse(serverNode.getWatchdogService().
-                        isLocalNodeAliveNonTransactional());
+            nodeMappingService.setStatus(NodeMappingService.class, id, false);
         } catch (IllegalStateException e) {
             // All OK, the server is probably shutting down
         }
