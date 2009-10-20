@@ -23,6 +23,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.task.ContinuePolicy;
 import java.util.Properties;
 
 /**
@@ -47,7 +48,7 @@ import java.util.Properties;
  *
  * </dl> <p>
  */
-class FixedTimeContinuePolicy implements ContinuePolicy {
+public class FixedTimeContinuePolicy implements ContinuePolicy {
 
     // the name of the current package
     private static final String PKG_NAME = "com.sun.sgs.impl.service.task";
@@ -68,7 +69,13 @@ class FixedTimeContinuePolicy implements ContinuePolicy {
     // the transaction proxy
     private final TransactionProxy txnProxy;
 
-    
+    /**
+     * Construct a {@code FixedTimeContinuePolicy} instance.
+     *
+     * @param properties the system properties
+     * @param systemRegistry the system registry
+     * @param txnProxy the system's transaction proxy
+     */
     public FixedTimeContinuePolicy(Properties properties,
                                    ComponentRegistry systemRegistry,
                                    TransactionProxy txnProxy) {

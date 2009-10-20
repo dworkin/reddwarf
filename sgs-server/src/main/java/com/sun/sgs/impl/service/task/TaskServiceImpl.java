@@ -56,6 +56,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.service.task.ContinuePolicy;
 
 import java.io.Serializable;
 
@@ -382,21 +383,13 @@ public class TaskServiceImpl
         }
 
         // get the continue policy
-        String continuePolicyClass = wrappedProps.getProperty(
-                CONTINUE_POLICY_PROPERTY);
-        if (continuePolicyClass == null ||
-            continuePolicyClass.equals(CONTINUE_POLICY_DEFAULT)) {
-            continuePolicy = new FixedTimeContinuePolicy(
-                    properties, systemRegistry, txnProxy);
-
-        } else {
-            continuePolicy = wrappedProps.getClassInstanceProperty(
-                    CONTINUE_POLICY_PROPERTY,
-                    ContinuePolicy.class, new Class[]{Properties.class,
-                                                      ComponentRegistry.class,
-                                                      TransactionProxy.class},
-                    properties, systemRegistry, txnProxy);
-        }
+        continuePolicy = wrappedProps.getClassInstanceProperty(
+                CONTINUE_POLICY_PROPERTY,
+                CONTINUE_POLICY_DEFAULT,
+                ContinuePolicy.class, new Class[]{Properties.class,
+                                                  ComponentRegistry.class,
+                                                  TransactionProxy.class},
+                properties, systemRegistry, txnProxy);
 
         // create our profiling info and register our MBean
         ProfileCollector collector = 
