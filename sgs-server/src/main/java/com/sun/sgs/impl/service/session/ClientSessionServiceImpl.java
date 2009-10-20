@@ -1367,6 +1367,11 @@ public final class ClientSessionServiceImpl
 		try {
 		    statusListener.relocated(sessionRefId);
 		} catch (Exception e) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.logThrow(
+			    Level.FINE, e, "Invoking 'relocated' method " +
+			    "on listener:{0} throws", statusListener);
+		    }
 		}
 	    }
 	}

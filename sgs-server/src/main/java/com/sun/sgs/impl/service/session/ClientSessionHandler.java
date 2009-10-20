@@ -351,7 +351,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	synchronized (lock) {
 	    return !isConnected() &&
 		(relocatePrepareCompletionHandler == null ||
-		 !relocatePrepareCompletionHandler.isCompleted);
+		 !relocatePrepareCompletionHandler.isCompleted());
 	}
     }
 
@@ -1318,6 +1318,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    return false;
 	}
 
+	/**
+	 * Returns {@code true} if relocation preparation is completed.
+	 * @return {@code true} if relocation preparation is completed
+	 */
+	public synchronized boolean isCompleted() {
+	    return isCompleted;
+	}
+
 	/** {@inheritDoc} */
 	public void completed() {
 	    synchronized (this) {
@@ -1379,7 +1387,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
     }
 
-    private class RelocateCompletionHandler
+    /**
+     * A completion handler for notifying the client to relocate.
+     */
+    private static class RelocateCompletionHandler
 	implements RequestCompletionHandler<Void>
     {
 	private boolean isCompleted = false;

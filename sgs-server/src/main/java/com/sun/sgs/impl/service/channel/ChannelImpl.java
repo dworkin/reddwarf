@@ -380,6 +380,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue join request with underlying (unwrapped) client
 	     * session object.
 	     */
+	    int sessionMaxMessageLength = session.getMaxMessageLength();
+	    if (maxMessageLength > sessionMaxMessageLength) {
+		getDataService().markForUpdate(this);
+		maxMessageLength = sessionMaxMessageLength;
+	    }
 	    addEvent(
 		new JoinEvent(unwrapSession(session), eventQueueRef.get()));
 
@@ -879,19 +884,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns a new {@code BindingKeyedSet} with the specified {@code
-     * keyPrefix}.
-     *
-     * @param	<V> the value type
-     * @param	keyPrefix a key prefix for the set's service bindings
-     * @return	a new {@code BindingKeyedSet}
-     */
-    private static <V> BindingKeyedSet<V> newSet(String keyPrefix) {
-	return ChannelServiceImpl.getCollectionsFactory().
-	    newSet(keyPrefix);
-    }
-
-    /**
      * Returns a new {@code BindingKeyedMap} with the specified {@code
      * keyPrefix}.
      *
@@ -921,7 +913,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Removes the specified {@code nodeId} from the set of server nodes
      * for this channel.
      *
-     * @param	a server node's ID
+     * @param	nodeId a server node's ID
      */
     void removeServerNodeId(long nodeId) {
 	if (servers.remove(nodeId)) {
@@ -2457,7 +2449,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * A non-transactional task (with transactional components) to send a
      * "close" notification to each of the channel's server nodes so that
-     * each server node can inform the channel's respective members a
+     * each server node can send the channel's respective members a
      * leave notification.  This task also removes the channel's
      * persistent data when the notifications have been delivered.  If
      * {@code removeName}, specified during construction, is {@code true}
@@ -2471,7 +2463,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private final Set<Long> serverNodeIds;
 	private final boolean removeName;
 	// FIXME: This is a kludge for now.
-	private final long timestamp = Long.MAX_VALUE;
+	private static final long timestamp = Long.MAX_VALUE;
 
 	/**
 	 * Constructs an instance with the specified {@code channel}.  If
@@ -2532,7 +2524,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		});
 	    } catch (Exception e) {
-		// Transaction schedule will print out warning.
+		// Transaction scheduler will print out warning.
 	    }
 	}
     }
@@ -2558,27 +2550,27 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /* -- Static method invoked by ChannelServiceImpl -- */
 
     /**
-     * Handles a channel {@code message} that the specified {@code session}
+     * Handles a channel {@code message} that the specified {@code sender}
      * is sending on the channel with the specified {@code channelRefId}.
      *
      * @param	channelRefId the channel ID, as a {@code BigInteger}
-     * @param	session the client session sending the channel message
+     * @param	sender the client session sending the channel message
      * @param	message the channel message
      */
     static void handleChannelMessage(
-	BigInteger channelRefId, ClientSession session, ByteBuffer message)
+	BigInteger channelRefId, ClientSession sender, ByteBuffer message)
     {
-	assert session instanceof ClientSessionWrapper;
+	assert sender instanceof ClientSessionWrapper;
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
-	    channel.receivedMessage(session, message);
+	    channel.receivedMessage(sender, message);
 	} else {
 	    // Ignore message received for unknown channel.
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(
  		    Level.FINE,
 		    "Dropping message:{0}: from:{1} for unknown channel: {2}",
-		    HexDumper.format(message), session,
+		    HexDumper.format(message), sender,
 		    HexDumper.toHexString(channelRefId.toByteArray()));
 	    }
 	}
@@ -2616,10 +2608,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	/** The node ID of the failed node. */
+	/**
+	 * The node ID of the failed node.
+	 * @serial
+	 */
 	private final long failedNodeId;
 
-	/** The iterator for channels on the failed node. */
+	/**
+	 * The iterator for channels on the failed node.
+	 * @serial
+	 */
 	private final Iterator<String> channelIter;
 
 	/**
@@ -2758,15 +2756,17 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return true;
 		
 	    case NON_MEMBER:
-		return false;
 		
 	    case UNKNOWN:
-	    default:
 		// FIXME: this is wrong; need to resample the session's
 		// node ID to see if it changed.  If it hasn't changed,
 		// then it is disconnected, otherwise, need to check
 		// membership with the new session's new node.
 		return false;
+
+	    default:
+		throw new AssertionError();
+		
 	    }
 	} catch (IOException e) {
 	    // FIXME: this is wrong; need to resample the session's node

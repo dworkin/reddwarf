@@ -130,6 +130,13 @@
     <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
   </Match>
 
+  <Match>
+    <Class name="com.sun.sgs.impl.protocol.simple.SimpleSgsRelocationProtocolImpl"/>
+    <Method name="relocateFailure"/>
+    <Parameter name="reason"/>
+    <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.data -->
 
   <!-- OK if version field is not currently being read, it should still
@@ -170,18 +177,6 @@
   <Match>
     <Or>
       <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$2"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
-      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
-      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$7"/>
-      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
-      <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$5"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
   </Match>
@@ -252,10 +247,14 @@
   <!-- Not worth replacing an anonymous class with a static inner class. -->
   <Match>
     <Or>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$2"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$3"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$5"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
     </Or>
@@ -274,7 +273,7 @@
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
   <Match>
-    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$RemoveFailedSessionsFromLocalChannelsTask"/>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$RemoveFailedNodeFromLocalChannelsTask"/>
     <Field name="iter"/>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
@@ -285,13 +284,61 @@
     <Bug pattern="DM_USELESS_THREAD"/>
   </Match>
 
+  <!-- OK to ignore return value. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl"/>
+    <Or>
+      <Method name="removeExpiredChannelEvents"/>
+      <Method name="cacheEvent"/>
+    </Or>
+    <Or>
+      <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+      <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
+    </Or>
+  </Match>
+
+  <!-- OK to ignore some exceptions -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$NotifyTask"/>
+    <Method name="removeNodeIdFromChannel"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
+  </Match>
+
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseNotifyTask"/>
+    <Method name="run"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
+  </Match>
+
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelLeaveTask"/>
+    <Method name="cleanupIfNoLocalChannelMembership"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
+  </Match>
+
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelWrapper"/>
+    <Method name="toString"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
+  </Match>
+
+  <!-- OK that wait is not in a loop, because the operation's timeout
+   expires if the membership is not collected in a timely fashion. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl"/>
+    <Method name="collectChannelMembership"/>
+    <Bug pattern="WA_NOT_IN_LOOP"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.session -->
 
   <!-- Not worth replacing an anonymous class with a static inner class. -->
   <Match>
     <Or>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$7"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$5"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$ClientSessionServiceRecoveryListener$1"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$SessionServerImpl$1"/>
     </Or>
@@ -318,17 +365,22 @@
     <Bug pattern="DM_USELESS_THREAD"/>
   </Match>
 
-  <!-- OK to ignore exception in ClientSessionWrapper.toString method. -->
+  <!-- OK to ignore some exceptions. -->
   <Match>
-    <Or>
-      <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelWrapper"/>
-    </Or>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
     <Method name="toString"/>
     <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
 
+  <!-- ClientSessionServiceImpl$CommitActions isn't serializable
+   so it doesn't need a serialVersionUid -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$CommitActions"/>
+    <Bug pattern="SE_NO_SERIALVERSIONID"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.nodemap -->
+
   <!-- Not worth replacing an anonymous class with a static inner class. -->
   <Match>
     <Or>
@@ -338,6 +390,7 @@
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
   </Match>
+
   <!-- Package com.sun.sgs.impl.service.watchdog -->
 
   <!-- Access to abortCause is safe due to checking current thread at beginning of method -->
@@ -376,38 +429,6 @@
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>
 
-  <!-- Dead but overwritten parameter. -->
-  <Match>
-    <Class name="com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl"/>
-    <Or>
-      <Method name="loginFailure"/>
-      <Method name="relocateFailure"/>
-    </Or>
-    <Parameter name="reason"/>
-    <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
-  </Match>
-
-  <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->
-  <Match>
-    <Class name="com.sun.sgs.impl.util.BindingKeyedCollectionsImpl"/>
-    <Field name="txnProxy"/>
-    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
-  </Match>
-
-  <!-- ClientSessionServiceImpl$CommitActions isn't serializable
-   so it doesn't need a serialVersionUid -->
-  <Match>
-    <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$CommitActions"/>
-    <Bug pattern="SE_NO_SERIALVERSIONID"/>
-  </Match>
-
-  <!-- Default value is ok for transient field -->
-  <Match>
-    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
-    <Field name="expiration"/>
-    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
-  </Match>
-
   <!-- Default value is ok for transient field -->
   <Match>
     <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
@@ -425,7 +446,7 @@
     </Or>
     <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
-  
+
   <!-- Package com.sun.sgs.impl.util -->
 
   <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->

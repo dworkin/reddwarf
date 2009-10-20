@@ -784,10 +784,10 @@ public final class ChannelServiceImpl
 		    logger.log(
 			Level.FINE, "Dropping channel request for " +
 			"relocating session:{0} channel:{1} timestamp:{2} " +
-			"localNodeId:{3}",
+			"localNodeId:{3} newNodeId:{4}",
 			toHexString(sessionRefId),
 			toHexString(task.channelRefId),
-			timestamp, localNodeId);
+			timestamp, localNodeId, info.newNodeId);
 		}
 		return false;
 	    }
@@ -862,12 +862,11 @@ public final class ChannelServiceImpl
 		    relocatedSessionPendingRequests.get(sessionRefId);
 		if (pendingRequestsMap != null) {
 		    synchronized (pendingRequestsMap) {
-			// If this session is relocating to this node,
-			// wait for all channel requests enqueued during
-			// relocation to be processed.
-			if (!pendingRequestsMap.isEmpty()) {
+			// If the specified session is relocating to this
+			// node, wait for all channel requests enqueued
+			// during relocation to be processed.
+			while (!pendingRequestsMap.isEmpty()) {
 			    try {
-				
 				pendingRequestsMap.wait(
 				    sessionRelocationTimeout);
 			    } catch (InterruptedException e) {
@@ -1365,6 +1364,7 @@ public final class ChannelServiceImpl
 			    isChannelMember =
 				isChannelMember &&
 				(!info.sessionRefId.equals(sessionRefId));
+			    break;
 
 			default:
 			    break;
@@ -1743,6 +1743,7 @@ public final class ChannelServiceImpl
 		relocatedSessionPendingRequests.remove(sessionRefId);
 	    if (pendingRequestsMap != null) {
 		synchronized (pendingRequestsMap) {
+		    pendingRequestsMap.clear();
 		    pendingRequestsMap.notifyAll();
 		}
 	    }
@@ -1816,7 +1817,7 @@ public final class ChannelServiceImpl
 			pendingRequests.processRequests(sessionRefId);
 		    }
 		    pendingRequestsMap.clear();
-		    pendingRequestsMap.notify();
+		    pendingRequestsMap.notifyAll();
 		}
 		relocatedSessionPendingRequests.remove(sessionRefId);
 	    }
