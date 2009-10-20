@@ -32,6 +32,7 @@ import com.sun.sgs.auth.IdentityCoordinator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
 
+import com.sun.sgs.impl.kernel.StandardProperties.ServiceNodeTypes;
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
 import com.sun.sgs.impl.kernel.logging.TransactionAwareLogManager;
@@ -74,6 +75,7 @@ import java.lang.reflect.Constructor;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import java.util.Timer;
@@ -182,7 +184,7 @@ class Kernel {
     private static final TransactionProxy proxy = new TransactionProxyImpl();
     
     // the properties used to start the application
-    private final Properties appProperties;
+    private final PropertiesWrapper wrappedProperties;
 
     // the schedulers used for transactional and non-transactional tasks
     private final TransactionSchedulerImpl transactionScheduler;
@@ -217,7 +219,7 @@ class Kernel {
      *
      * @throws Exception if for any reason the kernel cannot be started
      */
-    protected Kernel(Properties appProperties) 
+    protected Kernel(Properties appProperties)
         throws Exception 
     {
         logger.log(Level.CONFIG, "Booting the Kernel");
@@ -227,11 +229,11 @@ class Kernel {
         
         // check the standard properties
         checkProperties(appProperties);
-        this.appProperties = appProperties;
+        this.wrappedProperties = new PropertiesWrapper(appProperties);
 
         try {
             // See if we're doing any profiling.
-            String level = appProperties.getProperty(PROFILE_LEVEL_PROPERTY,
+            String level = wrappedProperties.getProperty(PROFILE_LEVEL_PROPERTY,
                     ProfileLevel.MIN.name());
             ProfileLevel profileLevel;
             try {
@@ -252,37 +254,21 @@ class Kernel {
             systemRegistry = new ComponentRegistryImpl();
             
             profileCollector = new ProfileCollectorImpl(profileLevel, 
-                                              appProperties, systemRegistry);
+                                                        appProperties,
+                                                        systemRegistry);
             profileCollectorHandle = 
                 new ProfileCollectorHandleImpl(profileCollector);
 
             // with profiling setup, register all MXBeans
             registerMXBeans(appProperties);
 
-            // create the authenticators and identity coordinator, folding in
-            // any extension library authenticators
-            ArrayList<IdentityAuthenticator> authenticators =
-                new ArrayList<IdentityAuthenticator>();
-            String authList =
-                appProperties.getProperty(StandardProperties.AUTHENTICATORS,
-                                          DEFAULT_IDENTITY_AUTHENTICATOR);
-            String extAuthList =
-                appProperties.getProperty(BootProperties.
-                                          EXTENSION_AUTHENTICATORS_PROPERTY);
-            if (extAuthList != null) {
-                authList = extAuthList + ":" + authList;
-            }
-            String [] authenticatorClassNames = authList.split(":");
-            for (String authenticatorClassName : authenticatorClassNames) {
-                authenticators.add(getAuthenticator(authenticatorClassName,
-                                                    appProperties));
-            }
+            // create the authenticators and identity coordinator
             IdentityCoordinator identityCoordinator =
-                new IdentityCoordinatorImpl(authenticators);
+                    createIdentityCoordinator();
 
             // initialize the transaction coordinator
             TransactionCoordinator transactionCoordinator =
-                new TransactionCoordinatorImpl(appProperties, 
+                new TransactionCoordinatorImpl(appProperties,
                                                profileCollectorHandle);
 
 	    // possibly upgrade loggers to be transactional
@@ -299,7 +285,7 @@ class Kernel {
 
             // create the access coordinator
             AccessCoordinatorHandle accessCoordinator =
-		new PropertiesWrapper(appProperties).getClassInstanceProperty(
+		wrappedProperties.getClassInstanceProperty(
 		    ACCESS_COORDINATOR_PROPERTY,
 		    AccessCoordinatorHandle.class,
 		    new Class[] {
@@ -392,7 +378,7 @@ class Kernel {
      * for profiling data.
      */
     private void loadProfileListeners(ProfileCollector profileCollector) {
-        String listenerList = appProperties.getProperty(PROFILE_LISTENERS);
+        String listenerList = wrappedProperties.getProperty(PROFILE_LISTENERS);
 
         if (listenerList != null) {
             for (String listenerClassName : listenerList.split(":")) {
@@ -433,7 +419,8 @@ class Kernel {
      * @throws Exception if there is any error in startup
      */
     private void createAndStartApplication() throws Exception {
-        String appName = appProperties.getProperty(StandardProperties.APP_NAME);
+        String appName = wrappedProperties.getProperty(
+                StandardProperties.APP_NAME);
 
         if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "{0}: starting application", appName);
@@ -506,64 +493,93 @@ class Kernel {
     private void fetchServices(StartupKernelContext startupContext) 
        throws Exception 
     {
-        // before we start, figure out if we're running with only a sub-set
-        // of services in which case there should be no external services,
+        // retrieve any specified external services
         // and fold in any extension library services
-        NodeType type = 
-            NodeType.valueOf(
-                appProperties.getProperty(StandardProperties.NODE_TYPE));
-        StandardService finalStandardService = null;
-        String externalServices =
-            appProperties.getProperty(StandardProperties.SERVICES);
-        String extensionServices =
-            appProperties.getProperty(BootProperties.
-                                      EXTENSION_SERVICES_PROPERTY);
-        String externalManagers =
-            appProperties.getProperty(StandardProperties.MANAGERS);
-        String extensionManagers =
-            appProperties.getProperty(BootProperties.
-                                      EXTENSION_MANAGERS_PROPERTY);
+        List<String> externalServices = wrappedProperties.getListProperty(
+                StandardProperties.SERVICES, String.class, "");
+        List<String> extensionServices = wrappedProperties.getListProperty(
+                BootProperties.EXTENSION_SERVICES_PROPERTY, String.class, "");
 
-        if ((externalServices == null) || (externalServices.length() == 0)) {
-            externalServices = extensionServices;
-            externalManagers = extensionManagers;
-        } else if ((extensionServices != null) &&
-                   (extensionServices.length() != 0))
-        {
-            externalServices = extensionServices + ":" + externalServices;
-            if (externalManagers == null) {
-                externalManagers = extensionManagers + ":";
-            } else {
-                externalManagers = extensionManagers + ":" + externalManagers;
+        List<String> externalManagers = wrappedProperties.getListProperty(
+                StandardProperties.MANAGERS, String.class, "");
+        List<String> extensionManagers = wrappedProperties.getListProperty(
+                BootProperties.EXTENSION_MANAGERS_PROPERTY, String.class, "");
+
+        List<ServiceNodeTypes> externalNodeTypes =
+                wrappedProperties.getEnumListProperty(
+                StandardProperties.SERVICE_NODE_TYPES,
+                ServiceNodeTypes.class,
+                ServiceNodeTypes.ALL);
+        List<ServiceNodeTypes> extensionNodeTypes =
+                wrappedProperties.getEnumListProperty(
+                BootProperties.EXTENSION_SERVICE_NODE_TYPES_PROPERTY,
+                ServiceNodeTypes.class,
+                ServiceNodeTypes.ALL);
+
+        if (externalServices.size() == 1 && externalManagers.size() == 0) {
+            externalManagers.add("");
+        }
+        if (extensionServices.size() == 1 && extensionManagers.size() == 0) {
+            extensionManagers.add("");
+        }
+        if (externalNodeTypes.size() == 0) {
+            for (int i = 0; i < externalServices.size(); i++) {
+                externalNodeTypes.add(ServiceNodeTypes.ALL);
             }
         }
-        
+        if (extensionNodeTypes.size() == 0) {
+            for (int i = 0; i < extensionServices.size(); i++) {
+                extensionNodeTypes.add(ServiceNodeTypes.ALL);
+            }
+        }
+
+        List<String> allServices = extensionServices;
+        allServices.addAll(externalServices);
+        List<String> allManagers = extensionManagers;
+        allManagers.addAll(externalManagers);
+        List<ServiceNodeTypes> allNodeTypes = extensionNodeTypes;
+        allNodeTypes.addAll(externalNodeTypes);
+
+        NodeType type =
+            NodeType.valueOf(
+                wrappedProperties.getProperty(StandardProperties.NODE_TYPE));
+
+        loadCoreServices(type, startupContext);
+        loadExternalServices(allServices, 
+                             allManagers,
+                             allNodeTypes,
+                             type,
+                             startupContext);
+    }
+
+    /** Private helper used to load all core services and managers. */
+    private void loadCoreServices(NodeType type,
+                                  StartupKernelContext startupContext)
+            throws Exception {
+        StandardService finalStandardService = null;
         switch (type) {
             case appNode:
+                finalStandardService = StandardService.LAST_APP_SERVICE;
+                break;
             case singleNode:
-            default:
-                finalStandardService = StandardService.LAST_SERVICE;
+                finalStandardService = StandardService.LAST_SINGLE_SERVICE;
                 break;
             case coreServerNode:
-                if ((externalServices != null) || (externalManagers != null)) {
-                    throw new IllegalArgumentException(
-                        "Cannot specify external services for the core server");
-                }
-
-                finalStandardService = StandardService.TaskService;
+                finalStandardService = StandardService.LAST_CORE_SERVICE;
                 break;
+            default:
+                throw new IllegalArgumentException("Invalid node type : " +
+                                                   type);
         }
-        
+
         final int finalServiceOrdinal = finalStandardService.ordinal();
 
         // load the data service
 
-        String dataServiceClass =
-            appProperties.getProperty(StandardProperties.DATA_SERVICE,
-                                      DEFAULT_DATA_SERVICE);
-        String dataManagerClass =
-            appProperties.getProperty(StandardProperties.DATA_MANAGER,
-                                      DEFAULT_DATA_MANAGER);
+        String dataServiceClass = wrappedProperties.getProperty(
+                StandardProperties.DATA_SERVICE, DEFAULT_DATA_SERVICE);
+        String dataManagerClass = wrappedProperties.getProperty(
+                StandardProperties.DATA_MANAGER, DEFAULT_DATA_MANAGER);
         setupService(dataServiceClass, dataManagerClass, startupContext);
         // provide the node id to the shutdown controller and profile collector
         long nodeId =
@@ -577,25 +593,24 @@ class Kernel {
             return;
         }
 
-        String watchdogServiceClass =
-            appProperties.getProperty(StandardProperties.WATCHDOG_SERVICE,
-                                      DEFAULT_WATCHDOG_SERVICE);
+        String watchdogServiceClass = wrappedProperties.getProperty(
+                StandardProperties.WATCHDOG_SERVICE, DEFAULT_WATCHDOG_SERVICE);
         setupServiceNoManager(watchdogServiceClass, startupContext);
-        
+
         // provide a handle to the watchdog service for the shutdown controller
         shutdownCtrl.setWatchdogHandle(
                 startupContext.getService(WatchdogService.class));
 
         // load the node mapping service, which has no associated manager
 
-        if (StandardService.NodeMappingService.ordinal() > finalServiceOrdinal) 
+        if (StandardService.NodeMappingService.ordinal() > finalServiceOrdinal)
         {
             return;
         }
 
-        String nodemapServiceClass =
-            appProperties.getProperty(StandardProperties.NODE_MAPPING_SERVICE,
-                                      DEFAULT_NODE_MAPPING_SERVICE);
+        String nodemapServiceClass = wrappedProperties.getProperty(
+                StandardProperties.NODE_MAPPING_SERVICE,
+                DEFAULT_NODE_MAPPING_SERVICE);
         setupServiceNoManager(nodemapServiceClass, startupContext);
 
         // load the task service
@@ -604,73 +619,71 @@ class Kernel {
             return;
         }
 
-        String taskServiceClass =
-            appProperties.getProperty(StandardProperties.TASK_SERVICE,
-                                      DEFAULT_TASK_SERVICE);
-        String taskManagerClass =
-            appProperties.getProperty(StandardProperties.TASK_MANAGER,
-                                      DEFAULT_TASK_MANAGER);
+        String taskServiceClass = wrappedProperties.getProperty(
+                StandardProperties.TASK_SERVICE, DEFAULT_TASK_SERVICE);
+        String taskManagerClass = wrappedProperties.getProperty(
+                StandardProperties.TASK_MANAGER, DEFAULT_TASK_MANAGER);
         setupService(taskServiceClass, taskManagerClass, startupContext);
 
         // load the client session service, which has no associated manager
 
-        if (StandardService.ClientSessionService.ordinal() > 
+        if (StandardService.ClientSessionService.ordinal() >
                 finalServiceOrdinal)
         {
             return;
         }
 
-        String clientSessionServiceClass =
-            appProperties.getProperty(StandardProperties.
-                                      CLIENT_SESSION_SERVICE,
-                                      DEFAULT_CLIENT_SESSION_SERVICE);
+        String clientSessionServiceClass = wrappedProperties.getProperty(
+                StandardProperties.CLIENT_SESSION_SERVICE,
+                DEFAULT_CLIENT_SESSION_SERVICE);
         setupServiceNoManager(clientSessionServiceClass, startupContext);
 
         // load the channel service
 
-        if (StandardService.ChannelService.ordinal() > finalServiceOrdinal) { 
+        if (StandardService.ChannelService.ordinal() > finalServiceOrdinal) {
             return;
         }
 
-        String channelServiceClass =
-            appProperties.getProperty(StandardProperties.CHANNEL_SERVICE,
-                                      DEFAULT_CHANNEL_SERVICE);
-        String channelManagerClass =
-            appProperties.getProperty(StandardProperties.CHANNEL_MANAGER,
-                                      DEFAULT_CHANNEL_MANAGER);
+        String channelServiceClass = wrappedProperties.getProperty(
+                StandardProperties.CHANNEL_SERVICE, DEFAULT_CHANNEL_SERVICE);
+        String channelManagerClass = wrappedProperties.getProperty(
+                StandardProperties.CHANNEL_MANAGER, DEFAULT_CHANNEL_MANAGER);
         setupService(channelServiceClass, channelManagerClass, startupContext);
-
-        // finally, load any external services and their associated managers
-        if ((externalServices != null) && (externalManagers != null)) {
-            loadExternalServices(externalServices, externalManagers,
-                                 startupContext);
-        }
     }
 
-    /** Private helper used to load all extenal services and managers. */
-    private void loadExternalServices(String externalServices,
-                                      String externalManagers,
+    /** Private helper used to load all external services and managers. */
+    private void loadExternalServices(List<String> externalServices,
+                                      List<String> externalManagers,
+                                      List<ServiceNodeTypes> externalNodeTypes,
+                                      NodeType type,
                                       StartupKernelContext startupContext)
         throws Exception
     {
-        String [] serviceClassNames = externalServices.split(":", -1);
-        String [] managerClassNames = externalManagers.split(":", -1);
-        if (serviceClassNames.length != managerClassNames.length) {
+        if (externalServices.size() != externalManagers.size() ||
+            externalServices.size() != externalNodeTypes.size()) {
             if (logger.isLoggable(Level.SEVERE)) {
                 logger.log(Level.SEVERE, "External service count " +
-                           "({0}) does not match manager count ({1}).",
-                           serviceClassNames.length, managerClassNames.length);
+                           "({0}), manager count ({1}), and node type count " +
+                           "({2}) do not match.",
+                           externalServices.size(),
+                           externalManagers.size(),
+                           externalNodeTypes.size());
             }
-            throw new IllegalArgumentException("Mis-matched service " +
-                                               "and manager count");
+            throw new IllegalArgumentException("Mis-matched service, manager " +
+                                               "and node type count");
         }
 
-        for (int i = 0; i < serviceClassNames.length; i++) {
-            if (!managerClassNames[i].equals("")) {
-                setupService(serviceClassNames[i], managerClassNames[i],
+        for (int i = 0; i < externalServices.size(); i++) {
+            // skip this service if it should not be started on this node type
+            if (!externalNodeTypes.get(i).shouldStart(type)) {
+                continue;
+            }
+
+            if (!externalManagers.get(i).equals("")) {
+                setupService(externalServices.get(i), externalManagers.get(i),
                              startupContext);
             } else {
-                setupServiceNoManager(serviceClassNames[i], startupContext);
+                setupServiceNoManager(externalServices.get(i), startupContext);
             }
         }
     }
@@ -739,8 +752,8 @@ class Kernel {
                     serviceClass.getConstructor(Properties.class,
                     ComponentRegistry.class, TransactionProxy.class);
             // return a new instance
-            return (Service) (serviceConstructor.newInstance(appProperties,
-                    systemRegistry, proxy));
+            return (Service) (serviceConstructor.newInstance(
+                    wrappedProperties.getProperties(), systemRegistry, proxy));
         } catch (NoSuchMethodException e) {
             // instead, look for a constructor with 4 parameters which is for 
             // services with shutdown privileges.
@@ -749,8 +762,9 @@ class Kernel {
                     ComponentRegistry.class, TransactionProxy.class,
                     KernelShutdownController.class);
             // return a new instance
-            return (Service) (serviceConstructor.newInstance(appProperties,
-                    systemRegistry, proxy, shutdownCtrl));
+            return (Service) (serviceConstructor.newInstance(
+                    wrappedProperties.getProperties(), systemRegistry,
+                    proxy, shutdownCtrl));
         }
     }
 
@@ -764,7 +778,7 @@ class Kernel {
         // running without an application
         NodeType type = 
             NodeType.valueOf(
-                appProperties.getProperty(StandardProperties.NODE_TYPE));
+                wrappedProperties.getProperty(StandardProperties.NODE_TYPE));
         if (!type.equals(NodeType.coreServerNode)) {
             try {
                 if (logger.isLoggable(Level.CONFIG)) {
@@ -773,8 +787,9 @@ class Kernel {
                 }
 
                 transactionScheduler.
-                    runUnboundedTask(new AppStartupRunner(appProperties),
-                                     owner);
+                    runUnboundedTask(
+                        new AppStartupRunner(wrappedProperties.getProperties()),
+                        owner);
 
                 logger.log(Level.INFO, 
                            "{0}: application is ready", application);
@@ -833,15 +848,51 @@ class Kernel {
         logger.log(Level.FINE, "Node is shut down.");
         isShutdown = true;
     }
+
+    /**
+     * Creates the {@code IdentityCoordinator} system component used to
+     * authenticate identities.  This method builds a collection of
+     * {@link IdentityAuthenticator}s specified in the application's properties
+     * with the {@link StandardProperties#AUTHENTICATORS} and
+     * {@link BootProperties#EXTENSION_AUTHENTICATORS_PROPERTY} properties.
+     * The returned {@code IdentityCoordinator} is then generated with this
+     * as a backing collection of authenticators.
+     */
+    private IdentityCoordinator createIdentityCoordinator()
+            throws Exception {
+        List<String> authClassNameList =
+                wrappedProperties.getListProperty(
+                StandardProperties.AUTHENTICATORS, String.class, "");
+        List<String> extAuthClassNameList =
+                wrappedProperties.getListProperty(
+                BootProperties.EXTENSION_AUTHENTICATORS_PROPERTY,
+                String.class, "");
+
+        List<String> allAuthClassNames = extAuthClassNameList;
+        allAuthClassNames.addAll(authClassNameList);
+        if (allAuthClassNames.isEmpty()) {
+            allAuthClassNames.add(DEFAULT_IDENTITY_AUTHENTICATOR);
+        }
+
+        ArrayList<IdentityAuthenticator> authenticators =
+                                         new ArrayList<IdentityAuthenticator>();
+        for (String authClassName : allAuthClassNames) {
+            authenticators.add(getAuthenticator(
+                    authClassName,
+                    wrappedProperties.getProperties()));
+        }
+
+        return new IdentityCoordinatorImpl(authenticators);
+    }
     
     /**
      * Creates a new identity authenticator.
      */
-    private IdentityAuthenticator getAuthenticator(String className,
+    private IdentityAuthenticator getAuthenticator(String authClassName,
                                                    Properties properties)
         throws Exception
     {
-        Class<?> authenticatorClass = Class.forName(className);
+        Class<?> authenticatorClass = Class.forName(authClassName);
         Constructor<?> authenticatorConstructor =
             authenticatorClass.getConstructor(Properties.class);
         return (IdentityAuthenticator) (authenticatorConstructor.
@@ -1204,7 +1255,7 @@ class Kernel {
      * {@link BootProperties#DEFAULT_APP_PROPERTIES}
      * This file is typically included as part of the application jar file.</li>
      * <li>Properties specified in the file named by the optional
-     * {@link BootProperties#EXTENSION_FILE_PROPERTY} property.</li>
+     * {@link BootProperties#EXTENSION_FILE_PROPERTY} system property.</li>
      * </ol>
      * 
      * If no value is specified for a given property in any of these places,
