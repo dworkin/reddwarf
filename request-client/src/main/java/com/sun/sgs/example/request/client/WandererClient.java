@@ -672,8 +672,10 @@ public class WandererClient
 		(failing > 0 ? " failing=" + failing : "") +
 		(disconnected > 0 ? " disconnected=" + disconnected : "") +
 		(logins > 0 ? " login=" + logins : "") +
-		(backlog > 0 ? " backlog=" + (backlog / active) : "") +
-		(throttled > 0 ? " throttle=" + (throttled /active) : "");
+		((backlog > 0 && active > 0)
+		 ? " backlog=" + (backlog / active) : "") +
+		((throttled > 0 && active > 0)
+		 ? " throttle=" + (throttled /active) : "");
 	}
 
 	/** Reset counts for the start of the next reporting period. */
