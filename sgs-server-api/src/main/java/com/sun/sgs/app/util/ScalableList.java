@@ -2382,13 +2382,9 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * {@inheritDoc}
 	 */
 	public E next() {
-	    try {
-                E result = super.next();
-                cannotRemoveOrSet = false;
-                return result;
-            } catch (NoSuchElementException e) {
-                throw e;
-            }
+            E result = super.next();
+            cannotRemoveOrSet = false;
+            return result;
 	}
 
 	/**
