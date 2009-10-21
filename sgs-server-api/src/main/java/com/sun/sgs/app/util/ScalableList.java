@@ -2275,8 +2275,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
 
-            boolean cacheCannotRemoveOrSet = cannotRemoveOrSet;
-	    cannotRemoveOrSet = false;
 	    List<ManagedReference<ManagedObject>> elements =
 		    currentNode.get().getSubList().getElements();
 
@@ -2288,11 +2286,11 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		    elements = currentNode.get().getSubList().getElements();
 		    index = currentNode.get().size() - 1;
 		} else {
-                    cannotRemoveOrSet = cacheCannotRemoveOrSet;
 		    throw new NoSuchElementException(
 			    "The previous element does not exist");
 		}
 	    }
+            cannotRemoveOrSet = false;
 	    cursor = index;
 	    wasNextCalled = false;
 
@@ -2384,12 +2382,11 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * {@inheritDoc}
 	 */
 	public E next() {
-            boolean cacheCannotRemoveOrSet = cannotRemoveOrSet;
-	    cannotRemoveOrSet = false;
 	    try {
-                return super.next();
+                E result = super.next();
+                cannotRemoveOrSet = false;
+                return result;
             } catch (NoSuchElementException e) {
-                cannotRemoveOrSet = cacheCannotRemoveOrSet;
                 throw e;
             }
 	}

@@ -3682,10 +3682,8 @@ public class TestScalableList extends Assert {
 
                 //attempt to set an item with the iterator
                 listIter.set("Test");
-                listIter.set("Test");
                 Assert.assertEquals("Test", list.get(list.size() - 1));
                 Assert.assertEquals(5, list.size());
-
             }
         }, taskOwner);
     }
