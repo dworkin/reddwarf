@@ -3606,6 +3606,89 @@ public class TestScalableList extends Assert {
     }
 
     /**
+     * Test setting an object with an iterator after a call to
+     * previous returns NoSuchElementException while a previous call to
+     * previous was valid.
+     *
+     * @throws java.lang.Exception
+     */
+    @Test
+    public void testSetAfterValidThenInvalidPrevious() throws Exception {
+        // create the list
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+
+                // Populate the list
+		for (int i = 0; i < 5; i++) {
+		    list.add(Integer.toString(i));
+		}
+
+                // place iterator one before the beginning
+		ListIterator<String> listIter =
+			list.listIterator(1);
+
+                //make a valid call to previous
+                listIter.previous();
+                //attempt to get previous item for the list
+                try {
+                    listIter.previous();
+                    fail("Expected NoSuchElementException");
+                } catch (NoSuchElementException e) {
+
+                }
+
+                //attempt to set an item with the iterator
+                listIter.set("Test");
+                Assert.assertEquals("Test", list.get(0));
+                Assert.assertEquals(5, list.size());
+
+            }
+        }, taskOwner);
+    }
+
+    /**
+     * Test setting an object with an iterator after a call to
+     * next returns NoSuchElementException while a previous call to next
+     * was valid.
+     *
+     * @throws java.lang.Exception
+     */
+    @Test
+    public void testSetAfterValidThenInvalidNext() throws Exception {
+        // create the list
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+
+                // Populate the list
+		for (int i = 0; i < 5; i++) {
+		    list.add(Integer.toString(i));
+		}
+
+                // place iterator one before the end
+		ListIterator<String> listIter =
+			list.listIterator(list.size() - 1);
+
+                //make a valid call to next
+                listIter.next();
+                //attempt to get next item for the list
+                try {
+                    listIter.next();
+                    fail("Expected NoSuchElementException");
+                } catch (NoSuchElementException e) {
+
+                }
+
+                //attempt to set an item with the iterator
+                listIter.set("Test");
+                Assert.assertEquals("Test", list.get(list.size() - 1));
+                Assert.assertEquals(5, list.size());
+            }
+        }, taskOwner);
+    }
+
+    /**
      * An object to return both the iterator and the result from the
      * {@code performOperation()} method.
      * 
