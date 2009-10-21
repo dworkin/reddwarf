@@ -285,7 +285,7 @@ class TxnContext {
     {
 	assert Thread.holdsLock(store.getCache().getObjectLock(oid));
 	ObjectCacheEntry entry =
-	    ObjectCacheEntry.createFetching(oid, forUpdate);
+	    ObjectCacheEntry.createFetching(oid, contextId, forUpdate);
 	store.getCache().addObjectEntry(entry, reserve);
 	return entry;
     }
@@ -304,7 +304,7 @@ class TxnContext {
     {
 	assert Thread.holdsLock(store.getCache().getObjectLock(oid));
 	ObjectCacheEntry entry =
-	    ObjectCacheEntry.createCached(oid, data, contextId);
+	    ObjectCacheEntry.createCached(oid, contextId, data);
 	store.getCache().addObjectEntry(entry, reserve);
 	return entry;
     }
@@ -325,7 +325,7 @@ class TxnContext {
 	if (cache.getBindingEntry(BindingKey.LAST) != null) {
 	    return null;
 	}
-	BindingCacheEntry entry = BindingCacheEntry.createLast();
+	BindingCacheEntry entry = BindingCacheEntry.createLast(contextId);
 	cache.addBindingEntry(entry, reserve);
 	return entry;
     }
@@ -344,7 +344,7 @@ class TxnContext {
     {
 	assert Thread.holdsLock(store.getCache().getBindingLock(key));
 	BindingCacheEntry entry =
-	    BindingCacheEntry.createCached(key, value, forUpdate, contextId);
+	    BindingCacheEntry.createCached(key, contextId, value, forUpdate);
 	store.getCache().addBindingEntry(entry, reserve);
 	return entry;
     }

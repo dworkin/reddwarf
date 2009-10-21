@@ -32,7 +32,19 @@ import java.util.logging.Logger;
  * accessed without holding the associated lock.  For all other fields and
  * methods, the lock should be held. <p>
  *
+ * In addition to the value associated with a name, binding cache entries store
+ * information about name bindings in the range between this name and an
+ * earlier name.  This information is used to cache information about ranges of
+ * names that are known to be unbound so that they can be bound without needing
+ * to communicate with the central server.  Entries also maintain information
+ * about whether there are operations underway for which the entry was the next
+ * entry found in the cache.  This facility is the way that the cache avoids
+ * performing multiple operations simultaneously that might add or modify the
+ * same cache entry. <p>
+ *
  * This class is part of the implementation of {@link CachingDataStore}.
+ *
+ * @see	Cache#getBindingLock Cache.getBindingLock
  */
 final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
@@ -44,9 +56,9 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     private static final long LAST_KEY_VALUE = -2;
 
     /**
-     * The lowest-valued previous key known such that names between that key
-     * and this entry's key are known to be unbound, else {@code null} if no
-     * information about previous keys is known.
+     * The lowest-valued previous key such that names between that key and this
+     * entry's key are known to be unbound, else {@code null} if no information
+     * about previous keys is known.
      */
     private BindingKey previousKey;
 
@@ -63,13 +75,15 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     private boolean pendingPrevious;
 
     /**
-     * Creates a binding cache entry with the specified key and state.
+     * Creates a binding cache entry.
      *
      * @param	key the key
+     * @param	contextId the context ID associated with the transaction on
+     *		whose behalf the entry was created
      * @param	state the state
      */
-    private BindingCacheEntry(BindingKey key, State state) {
-	super(key, state);
+    private BindingCacheEntry(BindingKey key, long contextId, State state) {
+	super(key, contextId, state);
     }
 
     /**
@@ -77,27 +91,29 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * on behalf of a transaction.
      *
      * @param	key the key
+     * @param	contextId the context ID associated with the transaction
      * @param	value the cached value
      * @param	forUpdate whether the value is cached for update
-     * @param	contextId the context ID associated with the transaction
      */
     static BindingCacheEntry createCached(
-	BindingKey key, long value, boolean forUpdate, long contextId)
+	BindingKey key, long contextId, long value, boolean forUpdate)
     {
 	BindingCacheEntry entry = new BindingCacheEntry(
-	    key, forUpdate ? State.CACHED_WRITE : State.CACHED_READ);
+	    key, contextId,
+	    forUpdate ? State.CACHED_WRITE : State.CACHED_READ);
 	entry.setValue(value);
-	entry.noteAccess(contextId);
 	return entry;
     }
 
     /**
      * Creates a binding cache entry to represent the last name binding that is
-     * being fetched from the server.
+     * being fetched from the server on behalf of a transaction.
+     *
+     * @param	contextId the context ID associated with the transaction
      */
-    static BindingCacheEntry createLast() {
-	BindingCacheEntry entry =
-	    new BindingCacheEntry(BindingKey.LAST, State.FETCHING_READ);
+    static BindingCacheEntry createLast(long contextId) {
+	BindingCacheEntry entry = new BindingCacheEntry(
+	    BindingKey.LAST, contextId, State.FETCHING_READ);
 	/* Give this last entry a numeric value, but an illegal one */
 	entry.setValue(LAST_KEY_VALUE);
 	return entry;
@@ -124,46 +140,39 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      *
      * @param	newPreviousKey the new previous key
      * @param	newPreviousKeyBound the binding state of the new previous key
-     * @return	whether this entry's previous key information was changed
+     * @throws	IllegalArgumentException if {@code newPreviousKey} is greater
+     *		than or equal to the key for this entry
      */
-    boolean updatePreviousKey(BindingKey newPreviousKey,
-			      BindingState newPreviousKeyBound)
+    void updatePreviousKey(BindingKey newPreviousKey,
+			   BindingState newPreviousKeyBound)
     {
-	if (previousKey == null) {
-	    if (newPreviousKey.compareTo(key) < 0) {
-		/*
-		 * No previous key was known, and the new previous key is
-		 * before this entry's key.
-		 */
-		previousKey = newPreviousKey;
-		previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
-		return true;
-	    }
-	} else {
-	    int compareTo = newPreviousKey.compareTo(previousKey);
-	    if (compareTo < 0) {
-		/* New previous key is earlier than previous one */
-		previousKey = newPreviousKey;
-		previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
-		return true;
-	    } else if (compareTo == 0 &&
-		       !previousKeyUnbound &&
-		       newPreviousKeyBound == UNBOUND)
-	    {
-		/*
-		 * Previous key is the same, but it was not previously known
-		 * that the previous key itself was unbound
-		 */
-		previousKeyUnbound = true;
-		return true;
-	    } else if (newPreviousKeyBound == BOUND) {
-		previousKey = newPreviousKey;
-		previousKeyUnbound = false;
-		return true;
-	    }
+	if (newPreviousKey.compareTo(key) >= 0) {
+	    throw new IllegalArgumentException(
+		"New previous key is too large");
+	} else if (previousKey == null) {
+	    /* No previous key was known */
+	    previousKey = newPreviousKey;
+	    previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
 	}
-	/* No change */
-	return false;
+	int compareTo = newPreviousKey.compareTo(previousKey);
+	if (compareTo < 0) {
+	    /* New previous key is earlier than previous one */
+	    previousKey = newPreviousKey;
+	    previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
+	} else if (compareTo == 0) {
+	    /* Same previous key */
+	    if (!previousKeyUnbound && newPreviousKeyBound == UNBOUND) {
+		/* Now know previous key is unbound */
+		previousKeyUnbound = true;
+	    } else if (previousKeyUnbound && newPreviousKeyBound == BOUND) {
+		/* No longer know that previous key is unbound */
+		previousKeyUnbound = false;
+	    }
+	} else if (newPreviousKeyBound == BOUND) {
+	    /* Move up to the new, higher previous key */
+	    previousKey = newPreviousKey;
+	    previousKeyUnbound = false;
+	}
     }
 
     /**
@@ -181,8 +190,8 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	}
 	int compare = previousKey.compareTo(forKey);
 	/*
-	 * Check if requested key is greater than the previous key, or equal
-	 * and we know that key is unbound
+	 * Check if previous key is less than the requested key, or equal and
+	 * we know that key is unbound
 	 */
 	return compare < 0 || (compare == 0 && previousKeyUnbound);
     }
@@ -199,20 +208,23 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	Object lock = cache.getEntryLock(this);
 	synchronized (lock) {
 	    if (getDecached()) {
+		if (cache.getBindingLock(key) != null) {
+		    throw new AssertionError(
+			"Decached binding entry found: " + this);
+		}
 		return;
 	    }
 	    if (key == BindingKey.FIRST) {
-		throw new AssertionError("Binding entry for first key:" +
-					 "\n  entry: " + this);
+		throw new AssertionError(
+		    "Binding entry for first key: " + this);
 	    } else if (key == BindingKey.LAST) {
 		if (getValue() != LAST_KEY_VALUE) {
 		    throw new AssertionError(
-			"Binding entry for last key has wrong value:" +
-			"\n  entry: " + this);
+			"Binding entry for last key has wrong value: " + this);
 		}
 	    } else if (getValue() == -1) {
-		throw new AssertionError("Binding entry for removed binding:" +
-					 "\n  entry: " + this);
+		throw new AssertionError(
+		    "Binding entry for removed binding: " + this);
 	    }
 	    /*
 	     * Check for permitting fetching, evicting, and pending previous
@@ -259,15 +271,9 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		if (logger.isLoggable(WARNING)) {
 		    logger.log(WARNING,
 			       "Unable to check entry's previous key due to" +
-			       " timeout on pending previous:" +
-			       "\n  entry: " + this);
+			       " timeout on pending previous:" + this);
 		}
 		return;
-	    }
-	    if (previousKey != null && previousKey.compareTo(key) >= 0) {
-		throw new AssertionError(
-		    "Binding entry key is not greater than its previous key:" +
-		    "\n  entry: " + this);
 	    }
 	    BindingCacheEntry previousEntry = cache.getLowerBindingEntry(key);
 	    if (previousEntry == null) {
@@ -279,31 +285,28 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		if (compareTo > 0) {
 		    throw new AssertionError(
 			"Binding entry previous key is lower than previous" +
-			" entry key:" +
-			"\n  previous entry key: " + previousEntryKey +
-			"\n  entry: " + this);
+			" entry key: " + this +
+			", previous entry key: " + previousEntryKey);
 		} else if (compareTo == 0 && previousKeyUnbound) {
 		    throw new AssertionError(
 			"Binding entry notes previous key entry is unbound," +
-			" but key is bound:" +
-			"\n  previous entry key: " + previousEntryKey +
-			"\n  entry: " + this);
+			" but key is bound: " + this +
+			", previous entry key: " + previousEntryKey);
 		}
 	    } else if (previousEntryKey.compareTo(key) >= 0) {
 		throw new AssertionError(
 		    "Binding entry key is not greater than the previous" +
-		    " entry's key:" +
-		    "\n  previous entry key: " + previousEntryKey +
-		    "\n  entry: " + this);
+		    " entry's key: " + this +
+		    ", previous entry key: " + previousEntryKey);
 	    }
 	}
     }
 
     /**
      * Returns whether this entry is known to be the next entry in the cache
-     * after the specified key.	 Note that this entry does not necessarily
-     * represent a bound name, in which case this entry would not represent the
-     * next bound name after the specified key.
+     * after the specified key.  Note that if this entry does not represent a
+     * bound name then this entry does not represent the next bound name after
+     * the specified key.
      *
      * @param	forKey the key to check
      * @return	whether this entry is known to be the next entry in the cache
@@ -344,9 +347,13 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * @param	previousKey the new previous key or {@code null}
      * @param	previousKeyUnbound whether the new previous key is known to be
      *		unbound
+     * @throws	IllegalArgumentException if {@code newPreviousKey} is greater
+     *		than or equal to the key for this entry
      */
     void setPreviousKey(BindingKey previousKey, boolean previousKeyUnbound) {
-	assert previousKey == null || previousKey.compareTo(key) < 0;
+	if (previousKey.compareTo(key) >= 0) {
+	    throw new IllegalArgumentException("Previous key is too large");
+	}
 	this.previousKey = previousKey;
 	this.previousKeyUnbound = previousKeyUnbound;
     }

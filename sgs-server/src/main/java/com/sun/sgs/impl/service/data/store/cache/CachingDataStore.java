@@ -202,7 +202,7 @@ public class CachingDataStore extends AbstractDataStore
     public static final String CALLBACK_PORT_PROPERTY = PKG + ".callback.port";
 
     /** The default callback port. */
-    public static final int DEFAULT_CALLBACK_PORT = 44541;
+    public static final int DEFAULT_CALLBACK_PORT = 0;
 
     /**
      * The property for specifying the eviction batch size, which specifies the
@@ -394,55 +394,55 @@ public class CachingDataStore extends AbstractDataStore
 	Executors.newCachedThreadPool(
 	    new NamedThreadFactory(CLASSNAME + ".fetch-"));
 
-    /** The possible shutdown states. */
-    enum ShutdownState {
+    /** The possible life cycle states. */
+    enum State {
 
-	/** Shutdown has not been requested. */
-	NOT_REQUESTED,
+	/** Not yet ready. */
+	NOT_READY,
+
+	/** The {@link #ready} method has completed. */
+	READY,
 
 	/** Shutdown has been requested. */
-	REQUESTED,
+	SHUTDOWN_REQUESTED,
 
 	/** All active transactions have been completed. */
-	TXNS_COMPLETED,
+	SHUTDOWN_TXNS_COMPLETED,
 
 	/** Shutdown has been completed. */
-	COMPLETED;
+	SHUTDOWN_COMPLETED;
     }
 
     /**
-     * The shutdown state.  Synchronize on {@link #shutdownSync} when accessing
-     * this field.
+     * The life cycle state.  Synchronize on stateSync when accessing this
+     * field.
      */
-    private ShutdownState shutdownState = ShutdownState.NOT_REQUESTED;
+    private State state = State.NOT_READY;
 
     /**
-     * The number of active transactions.  Synchronize on {@link #shutdownSync}
-     * when accessing this field.
+     * The number of active transactions.  Synchronize on stateSync when
+     * accessing this field.
      */
     private int txnCount = 0;
 
-    /** Synchronizer for {@code shutdownState}. */
-    private final Object shutdownSync = new Object();
-
     /**
-     * The watchdog service, or {@code null} if not initialized.  Synchronize
-     * on {@link #watchdogServiceSync} when accessing.
+     * The watchdog service, or null if not initialized.  Synchronize on
+     * stateSync when accessing.
      */
     private WatchdogService watchdogService;
 
     /**
      * An exception responsible for a failure before the watchdog service
-     * became available, or {@code null} if there was no failure.  Synchronize
-     * on {@link #watchdogServiceSync} when accessing.
+     * became available, or null if there was no failure.  Synchronize on
+     * stateSync when accessing.
      */
-    private Throwable failureBeforeWatchdog;
+    private Throwable failureBeforeReady;
 
     /**
-     * The synchronizer for {@link #watchdogService} and {@link
-     * #failureBeforeWatchdog}.
+     * Synchronizer for state, txnCount, watchdogService, and
+     * failureBeforeReady.
      */
-    private final Object watchdogServiceSync = new Object();
+    private final Object stateSync = new Object();
 
     /** A synchronized list of registered data conflict listeners. */
     private final List<DataConflictListener> dataConflictListeners =
@@ -643,18 +643,21 @@ public class CachingDataStore extends AbstractDataStore
      */
     @Override
     public void ready() throws Exception {
-	synchronized (watchdogServiceSync) {
-	    if (failureBeforeWatchdog != null) {
-		if (failureBeforeWatchdog instanceof Error) {
-		    throw (Error) failureBeforeWatchdog;
-		} else {
-		    throw (Exception) failureBeforeWatchdog;
-		}
-	    }
-	    watchdogService = txnProxy.getService(WatchdogService.class);
-	}
 	if (localServer != null) {
 	    localServer.ready();
+	}
+	synchronized (stateSync) {
+	    if (state != State.NOT_READY) {
+		throw new IllegalStateException(
+		    "Ready called when state is " + state);
+	    }
+	    if (failureBeforeReady instanceof Error) {
+		throw (Error) failureBeforeReady;
+	    } else if (failureBeforeReady instanceof Exception) {
+		throw (Exception) failureBeforeReady;
+	    }
+	    watchdogService = txnProxy.getService(WatchdogService.class);
+	    state = State.READY;
 	}
     }
 
@@ -1336,9 +1339,7 @@ public class CachingDataStore extends AbstractDataStore
 		     * there were no entries between the name and the cached
 		     * next entry
 		     */
-		    boolean updated =
-			entry.updatePreviousKey(nameKey, nameBound);
-		    assert updated;
+		    entry.updatePreviousKey(nameKey, nameBound);
 		    context.noteAccess(entry);
 		    if (entry.getReading()) {
 			/* Make a temporary last entry permanent */
@@ -1397,8 +1398,7 @@ public class CachingDataStore extends AbstractDataStore
 	    ReserveCache reserve, int numCacheEntries)
 	{
 	    super(CachingDataStore.this);
-	    this.reserve = new ReserveCache(cache, numCacheEntries);
-	    reserve.used(numCacheEntries);
+	    this.reserve = new ReserveCache(reserve, numCacheEntries);
 	}
 
 	/**
@@ -2298,21 +2298,22 @@ public class CachingDataStore extends AbstractDataStore
     /** {@inheritDoc} */
     @Override
     protected void shutdownInternal() {
-	synchronized (shutdownSync) {
-	    switch (shutdownState) {
-	    case NOT_REQUESTED:
-		shutdownState = ShutdownState.REQUESTED;
+	synchronized (stateSync) {
+	    switch (state) {
+	    case NOT_READY:
+	    case READY:
+		state = State.SHUTDOWN_REQUESTED;
 		break;
-	    case REQUESTED:
-	    case TXNS_COMPLETED:
+	    case SHUTDOWN_REQUESTED:
+	    case SHUTDOWN_TXNS_COMPLETED:
 		do {
 		    try {
-			shutdownSync.wait();
+			stateSync.wait();
 		    } catch (InterruptedException e) {
 		    }
-		} while (shutdownState != ShutdownState.COMPLETED);
+		} while (state != State.SHUTDOWN_COMPLETED);
 		return;
-	    case COMPLETED:
+	    case SHUTDOWN_COMPLETED:
 		return;
 	    default:
 		throw new AssertionError();
@@ -2352,9 +2353,9 @@ public class CachingDataStore extends AbstractDataStore
 	    localServer.shutdown();
 	}
 	/* Done */
-	synchronized (shutdownSync) {
-	    shutdownState = ShutdownState.COMPLETED;
-	    shutdownSync.notifyAll();
+	synchronized (stateSync) {
+	    state = State.SHUTDOWN_COMPLETED;
+	    stateSync.notifyAll();
 	}
     }
 
@@ -3014,10 +3015,10 @@ public class CachingDataStore extends AbstractDataStore
     @Override
     public void reportFailure(Throwable exception) {
 	logger.logThrow(WARNING, exception, "CachingDataStore failed");
-	synchronized (watchdogServiceSync) {
+	synchronized (stateSync) {
 	    if (watchdogService == null) {
-		if (failureBeforeWatchdog != null) {
-		    failureBeforeWatchdog = exception;
+		if (failureBeforeReady != null) {
+		    failureBeforeReady = exception;
 		}
 	    } else {
 		Thread thread = new Thread(CLASSNAME + ".reportFailure") {
@@ -3039,8 +3040,8 @@ public class CachingDataStore extends AbstractDataStore
      * @return	whether a shutdown has been requested
      */
     boolean getShutdownRequested() {
-	synchronized (shutdownSync) {
-	    return shutdownState != ShutdownState.NOT_REQUESTED;
+	synchronized (stateSync) {
+	    return state.compareTo(State.SHUTDOWN_REQUESTED) >= 0;
 	}
     }
 
@@ -3049,13 +3050,14 @@ public class CachingDataStore extends AbstractDataStore
      * have completed.
      */
     boolean getShutdownTxnsCompleted() {
-	synchronized (shutdownSync) {
-	    switch (shutdownState) {
-	    case NOT_REQUESTED:
-	    case REQUESTED:
+	synchronized (stateSync) {
+	    switch (state) {
+	    case NOT_READY:
+	    case READY:
+	    case SHUTDOWN_REQUESTED:
 		return false;
-	    case TXNS_COMPLETED:
-	    case COMPLETED:
+	    case SHUTDOWN_TXNS_COMPLETED:
+	    case SHUTDOWN_COMPLETED:
 		return true;
 	    default:
 		throw new AssertionError();
@@ -3069,10 +3071,9 @@ public class CachingDataStore extends AbstractDataStore
      * @throws	IllegalStateException if shutdown has been requested
      */
     void txnStarted() {
-	synchronized (shutdownSync) {
+	synchronized (stateSync) {
 	    if (getShutdownRequested()) {
-		throw new IllegalStateException(
-		    "Data store is shut down");
+		throw new IllegalStateException("Data store is shut down");
 	    }
 	    txnCount++;
 	}
@@ -3080,11 +3081,11 @@ public class CachingDataStore extends AbstractDataStore
 
     /** Notes that a transaction has finished. */
     void txnFinished() {
-	synchronized (shutdownSync) {
+	synchronized (stateSync) {
 	    txnCount--;
 	    assert txnCount >= 0;
-	    if (shutdownState == ShutdownState.REQUESTED && txnCount == 0) {
-		shutdownSync.notifyAll();
+	    if (state == State.SHUTDOWN_REQUESTED && txnCount == 0) {
+		stateSync.notifyAll();
 	    }
 	}
     }
@@ -3096,21 +3097,22 @@ public class CachingDataStore extends AbstractDataStore
      * @throws	IllegalStateException if shutdown has not been requested
      */
     void awaitTxnShutdown() {
-	synchronized (shutdownSync) {
-	    switch (shutdownState) {
-	    case NOT_REQUESTED:
+	synchronized (stateSync) {
+	    switch (state) {
+	    case NOT_READY:
+	    case READY:
 		throw new IllegalStateException("Shutdown not requested");
-	    case REQUESTED:
+	    case SHUTDOWN_REQUESTED:
 		while (txnCount > 0) {
 		    try {
-			shutdownSync.wait();
+			stateSync.wait();
 		    } catch (InterruptedException e) {
 		    }
 		}
-		shutdownState = ShutdownState.TXNS_COMPLETED;
+		state = State.SHUTDOWN_TXNS_COMPLETED;
 		break;
-	    case TXNS_COMPLETED:
-	    case COMPLETED:
+	    case SHUTDOWN_TXNS_COMPLETED:
+	    case SHUTDOWN_COMPLETED:
 		return;
 	    default:
 		throw new AssertionError();
@@ -3308,6 +3310,15 @@ public class CachingDataStore extends AbstractDataStore
 	@Override
 	public void run() {
 	    logger.log(FINEST, "Start eviction thread");
+	    try {
+		runInternal();
+	    } catch (Throwable t) {
+		reportFailure(t);
+	    }
+	}
+
+	/** Perform eviction as needed. */
+	private void runInternal() {
 	    /* Set up the initial reserve */
 	    if (cache.tryReserve(evictionReserveSize)) {
 		reserved = true;
@@ -3318,7 +3329,13 @@ public class CachingDataStore extends AbstractDataStore
 		    synchronized (this) {
 			if (!cacheIsFull) {
 			    /* Enough space -- wait to get full */
-			    logger.log(FINE, "Waiting for cache full");
+			    if (logger.isLoggable(FINE)) {
+				logger.log(
+				    FINE,
+				    "Waiting for cache full, available:" +
+				    cache.available() +
+				    ", reserve:" + evictionReserveSize);
+			    }
 			    try {
 				wait();
 			    } catch (InterruptedException e) {
@@ -3335,9 +3352,7 @@ public class CachingDataStore extends AbstractDataStore
 		    logger.log(FINE, "Cache full, starting eviction");
 		    cache.release(evictionReserveSize);
 		    reserved = false;
-		} else if (cache.available() + pendingEvictions.get() >=
-			   2 * evictionReserveSize)
-		{
+		} else if (cache.available() >= 2 * evictionReserveSize) {
 		    /*
 		     * The cache has plenty of space -- try to set up the
 		     * reserve

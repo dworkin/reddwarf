@@ -183,9 +183,9 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * The context ID of the transaction with the highest context ID that has
-     * accessed this entry, or Integer.MIN_VALUE if not accessed.
+     * accessed this entry.
      */
-    private long contextId = Integer.MIN_VALUE;
+    private long contextId;
 
     /**
      * The state of this entry.  Make sure to notify the associated lock
@@ -194,13 +194,16 @@ abstract class BasicCacheEntry<K, V> {
     private State state;
 
     /**
-     * Creates a cache entry with the specified key and state.
+     * Creates a cache entry with the specified key, context ID, and state.
      *
      * @param	key the key
+     * @param	contextId the context ID associated with the transaction on
+     *		whose behalf the entry was created
      * @param	state the state
      */
-    BasicCacheEntry(K key, State state) {
+    BasicCacheEntry(K key, long contextId, State state) {
 	this.key = key;
+	this.contextId = contextId;
 	this.state = state;
     }
 

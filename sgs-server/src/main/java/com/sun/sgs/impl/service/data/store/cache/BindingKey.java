@@ -22,28 +22,36 @@ package com.sun.sgs.impl.service.data.store.cache;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 
 /**
- * A key to represent binding names that is {@link Comparable} and provides a
- * non-{@code null} value to represent the a value beyond any possible
+ * A key to represent binding names that is {@link Comparable} and provides
+ * non-{@code null} values to represent keys before and after any possible
  * name. <p>
  *
  * This class is part of the implementation of {@link CachingDataStore}.
  */
 abstract class BindingKey implements Comparable<BindingKey> {
 
-    /** A key before all possible names. */
+    /**
+     * A key before all possible names.  This value is only used for previous
+     * key information.
+     */
     static final BindingKey FIRST = new BindingKey() {
+	@Override
 	String getNameAllowFirst() {
 	    return null;
 	}
+	@Override
 	public int compareTo(BindingKey other) {
 	    return other == FIRST ? 0 : -1;
 	}
+	@Override
 	public boolean equals(Object other) {
 	    return this == other;
 	}
+	@Override
 	public int hashCode() {
 	    return 0x1234567;
 	}
+	@Override
 	public String toString() {
 	    return "BindingKey[FIRST]";
 	}
@@ -51,18 +59,23 @@ abstract class BindingKey implements Comparable<BindingKey> {
 
     /** A key after all possible names. */
     static final BindingKey LAST = new BindingKey() {
+	@Override
 	String getNameAllowLast() {
 	    return null;
 	}
+	@Override
 	public int compareTo(BindingKey other) {
 	    return other == LAST ? 0 : 1;
 	}
+	@Override
 	public boolean equals(Object other) {
 	    return this == other;
 	}
+	@Override
 	public int hashCode() {
 	    return 0x7654321;
 	}
+	@Override
 	public String toString() {
 	    return "BindingKey[LAST]";
 	}
@@ -145,15 +158,19 @@ abstract class BindingKey implements Comparable<BindingKey> {
 	    checkNull("name", name);
 	    this.name = name;
 	}
+	@Override
 	String getName() {
 	    return name;
 	}
+	@Override
 	String getNameAllowFirst() {
 	    return name;
 	}
+	@Override
 	String getNameAllowLast() {
 	    return name;
 	}
+	@Override
 	public int compareTo(BindingKey bindingKey) {
 	    if (bindingKey == FIRST) {
 		return 1;
@@ -169,6 +186,7 @@ abstract class BindingKey implements Comparable<BindingKey> {
 		return name.compareTo(((BindingKeyName) bindingKey).name);
 	    }
 	}
+	@Override
 	public boolean equals(Object object) {
 	    if (this == object) {
 		return true;
@@ -178,9 +196,11 @@ abstract class BindingKey implements Comparable<BindingKey> {
 		return false;
 	    }
 	}
+	@Override
 	public int hashCode() {
 	    return name.hashCode();
 	}
+	@Override
 	public String toString() {
 	    return "BindingKey[name:" + name + "]";
 	}

@@ -89,7 +89,7 @@ public class TestDataStoreImpl extends Assert {
     protected final ComponentRegistry systemRegistry;
 
     /** An instance of the data store, to test. */
-    protected static DataStore store;
+    protected static volatile DataStore store;
 
     /** Default properties for creating the DataStore. */
     protected Properties props;

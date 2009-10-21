@@ -22,6 +22,8 @@ package com.sun.sgs.impl.service.data.store.cache;
 /**
  * Represents the information available about whether a name is bound.  This
  * class is part of the implementation of {@link CachingDataStore}.
+ *
+ * @see	BindingCacheEntry
  */
 enum BindingState {
 

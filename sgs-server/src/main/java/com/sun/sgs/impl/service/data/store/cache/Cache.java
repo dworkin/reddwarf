@@ -23,24 +23,36 @@ import static com.sun.sgs.impl.service.data.store.AbstractDataStore.checkOid;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * The cache of objects and bindings.  This class is part of the implementation
- * of {@link CachingDataStore}.
+ * The cache of objects and bindings. <p>
+ *
+ * The implementation uses concurrent skip lists so that cache eviction can
+ * walk over cache entries concurrently with other operations.  The weak
+ * consistency of the skip list's iterator is well suited to this purpose
+ * because it is OK for cache eviction miss entries during eviction -- they can
+ * always be evicted the next time. <p>
+ *
+ * The implementation also uses a set of locks that should be held when
+ * manipulating the entry for an associated key.  Since the lock to use is
+ * determined by the key, it can be used to lock access to the entry for a
+ * particular key even if the entry is not currently present in the cache. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 class Cache {
 
     /** The data store. */
     private final CachingDataStore store;
 
-    /** The cache size. */
+    /** The maximum number of entries that can be stored in the cache. */
     private final int cacheSize;
 
     /** The number of open slots available in the cache. */
@@ -53,15 +65,16 @@ class Cache {
     private final FullNotifier cacheFullNotify;
 
     /** Maps object IDs to object cache entries. */
-    private final Map<Long, ObjectCacheEntry> objectMap =
+    private final ConcurrentMap<Long, ObjectCacheEntry> objectMap =
 	new ConcurrentSkipListMap<Long, ObjectCacheEntry>();
 
     /** The number of objects in the cache. */
     private final AtomicInteger objectCount = new AtomicInteger(0);
 
     /** Maps binding keys to binding cache entries. */
-    private final NavigableMap<BindingKey, BindingCacheEntry> bindingMap =
-	new ConcurrentSkipListMap<BindingKey, BindingCacheEntry>();
+    private final ConcurrentNavigableMap<BindingKey, BindingCacheEntry>
+	bindingMap =
+	    new ConcurrentSkipListMap<BindingKey, BindingCacheEntry>();
 
     /** The number of bindings in the cache. */
     private final AtomicInteger bindingCount = new AtomicInteger(0);
@@ -70,8 +83,8 @@ class Cache {
      * Creates an instance of this class.
      *
      * @param	store the data store, for detecting shutdown
-     * @param	cacheSize the maximum number of items permitted in the cache
-     * @param	numLocks the number of locks to use for items in the cache
+     * @param	cacheSize the maximum number of entries permitted in the cache
+     * @param	numLocks the number of locks to use for entries in the cache
      * @param	cacheFullNotify the object to notify when the cache becomes
      *		full
      */
@@ -105,19 +118,8 @@ class Cache {
      * @param	oid the object ID
      * @return	the associated lock
      */
-    Object getObjectLock(Long oid) {
-	return getEntryLock(oid.hashCode());
-    }
-
-    /**
-     * Returns the object to use for locking the cache entry of the object with
-     * the specified ID.
-     *
-     * @param	oid the object ID
-     * @return	the associated lock
-     */
     Object getObjectLock(long oid) {
-	/* Use the same value as new Long(oid).hashCode */
+	/* Use the same value as new Long(oid).hashCode() */
 	return getEntryLock(ObjectCacheEntry.keyHashCode(oid));
     }
 
@@ -132,6 +134,12 @@ class Cache {
 	return getEntryLock(key.hashCode());
     }
 
+    /**
+     * Returns the object to use for locking the specified cache entry.
+     *
+     * @param	entry the cache entry
+     * @return	the associated lock
+     */
     Object getEntryLock(BasicCacheEntry<?, ?> entry) {
 	return getEntryLock(entry.key.hashCode());
     }
@@ -153,8 +161,7 @@ class Cache {
      */
     ObjectCacheEntry getObjectEntry(long oid) {
 	checkOid(oid);
-	ObjectCacheEntry entry = objectMap.get(oid);
-	return entry;
+	return objectMap.get(oid);
     }
 
     /**
@@ -166,12 +173,11 @@ class Cache {
      */
     BindingCacheEntry getBindingEntry(BindingKey key) {
 	checkNull("key", key);
-	BindingCacheEntry entry = bindingMap.get(key);
-	return entry;
+	return bindingMap.get(key);
     }
 
     /**
-     * Returns the cache entry for the binding with a key that is equal or
+     * Returns the cache entry for the binding with a key that is equal to or
      * higher than the one specified, or {@code null} if none is found.
      *
      * @param	key the binding key
@@ -218,11 +224,16 @@ class Cache {
      *
      * @param	entry the new cache entry
      * @param	reserve for tracking cache reservations
+     * @throws	IllegalArgumentException if an entry with the same key is
+     *		already present
      */
     void addObjectEntry(ObjectCacheEntry entry, ReserveCache reserve) {
-	assert !objectMap.containsKey(entry.key);
+	ObjectCacheEntry existing = objectMap.putIfAbsent(entry.key, entry);
+	if (existing != null) {
+	    throw new IllegalArgumentException(
+		"Entry is already present: " + existing);
+	}
 	objectCount.incrementAndGet();
-	objectMap.put(entry.key, entry);
 	reserve.used();
     }
 
@@ -232,12 +243,16 @@ class Cache {
      *
      * @param	entry the new cache entry
      * @param	reserve for tracking cache reservations
+     * @throws	IllegalArgumentException if an entry with the same key is
+     *		already present
      */
     void addBindingEntry(BindingCacheEntry entry, ReserveCache reserve) {
-	assert !bindingMap.containsKey(entry.key)
-	    : "Attempt to add new binding that is already present: " + entry;
+	BindingCacheEntry existing = bindingMap.putIfAbsent(entry.key, entry);
+	if (existing != null) {
+	    throw new IllegalArgumentException(
+		"Entry is already present: " + existing);
+	}
 	bindingCount.incrementAndGet();
-	bindingMap.put(entry.key, entry);
 	reserve.used();
     }
 
@@ -267,7 +282,7 @@ class Cache {
      * @return	whether the entries were reserved
      */
     boolean tryReserve(int count) {
-	return available.tryAcquire();
+	return available.tryAcquire(count);
     }
 
     /**
@@ -290,16 +305,23 @@ class Cache {
     }
 
     /**
-     * Removes the cache entry for the object with the specified object ID.
+     * Removes the cache entry for the object with the specified object ID,
+     * which should already have been marked as decached.
      *
      * @param	oid the object ID
-     * @throws	IllegalArgumentException if {@code oid} is negative
+     * @throws	IllegalArgumentException if {@code oid} is negative, if the
+     *		entry is not found, or if the entry is not marked decached
      */
     void removeObjectEntry(long oid) {
 	checkOid(oid);
 	ObjectCacheEntry entry = objectMap.remove(oid);
-	assert entry != null;
-	assert entry.getDecached();
+	if (entry == null) {
+	    throw new IllegalArgumentException(
+		"Object entry was not found: " + oid);
+	} else if (!entry.getDecached()) {
+	    throw new IllegalArgumentException(
+		"Entry was not decached: " + entry);
+	}
 	available.release();
 	objectCount.decrementAndGet();
     }
@@ -308,12 +330,19 @@ class Cache {
      * Removes the cache entry for the binding with the specified binding key.
      *
      * @param	key the binding key
+     * @throws	IllegalArgumentException if the entry is not found or if the
+     *		entry is not marked decached
      */
     void removeBindingEntry(BindingKey key) {
 	checkNull("key", key);
 	BindingCacheEntry entry = bindingMap.remove(key);
-	assert entry != null;
-	assert entry.getDecached();
+	if (entry == null) {
+	    throw new IllegalArgumentException(
+		"Binding entry was not found: " + key);
+	} else if (!entry.getDecached()) {
+	    throw new IllegalArgumentException(
+		"Entry was not decached: " + entry);
+	}
 	available.release();
 	bindingCount.decrementAndGet();
     }
@@ -326,7 +355,7 @@ class Cache {
      * with other operations.  The iterator iterates over batches of entries of
      * the specified size where the proportion of object and binding entries in
      * the batch roughly approximates the ratio of those types of entries in
-     * the cache.  The iterator does not support the {@link Iterator#remove}
+     * the cache.  This iterator does not support the {@link Iterator#remove}
      * method.
      *
      * @param	batchSize the batch size
@@ -363,41 +392,42 @@ class Cache {
 	    this.batchSize = batchSize;
 	    objectIterator = objectMap.values().iterator();
 	    bindingIterator = bindingMap.values().iterator();
-	    resetBatch();
+	    computeBatch();
 	}
 	
-	/** Resets remainingObjects and remainingBindings. */
-	private void resetBatch() {
+	/** Sets remainingObjects and remainingBindings. */
+	private void computeBatch() {
 	    double total = (double) (cacheSize - available());
 	    remainingObjects = (int) (batchSize * (objectCount.get() / total));
 	    remainingBindings =
 		(int) (batchSize * (bindingCount.get() / total));
 	}
 
+	@Override
 	public boolean hasNext() {
 	    return objectIterator.hasNext() || bindingIterator.hasNext();
 	}
 
+	@Override
 	public BasicCacheEntry<?, ?> next() {
-	    boolean repeated = false;
 	    while (true) {
-		boolean moreObjects = objectIterator.hasNext();
-		if (moreObjects && remainingObjects > 0) {
+		if (objectIterator.hasNext() && remainingObjects > 0) {
 		    remainingObjects--;
 		    return objectIterator.next();
 		} else if (bindingIterator.hasNext() &&
-			   (!moreObjects || remainingBindings > 0))
+			   remainingBindings > 0)
 		{
 		    remainingBindings--;
 		    return bindingIterator.next();
-		} else if (repeated) {
+		} else if (hasNext()) {
+		    computeBatch();
+		} else {
 		    throw new NoSuchElementException();
 		}
-		resetBatch();
-		repeated = true;
 	    }
 	}
 
+	@Override
 	public void remove() {
 	    throw new UnsupportedOperationException(
 		"This iterator does not support the remove method");
@@ -426,7 +456,10 @@ class Cache {
 	}
     }
 
-    /** Checks the consistency of fields in bindings. */
+    /**
+     * Checks the consistency of fields in bindings, throwing an assertion
+     * error if an inconsistency is found.
+     */
     void checkBindings() {
 	long lockTimeout = store.getLockTimeout();
 	for (BindingCacheEntry entry : bindingMap.values()) {

@@ -26,13 +26,15 @@ package com.sun.sgs.impl.service.data.store.cache;
 final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     /**
-     * Creates an object cache entry with the specified object ID and state.
+     * Creates an object cache entry.
      *
      * @param	oid the object ID
+     * @param	contextId the context ID associated with the transaction on
+     *		whose behalf the entry was created
      * @param	state the state
      */
-    private ObjectCacheEntry(long oid, State state) {
-	super(oid, state);
+    private ObjectCacheEntry(long oid, long contextId, State state) {
+	super(oid, contextId, state);
     }
 
     /**
@@ -44,22 +46,24 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      * @return	the cache entry
      */
     static ObjectCacheEntry createNew(long oid, long contextId) {
-	ObjectCacheEntry entry = new ObjectCacheEntry(oid, State.CACHED_WRITE);
-	entry.noteAccess(contextId);
-	return entry;
+	return new ObjectCacheEntry(oid, contextId, State.CACHED_WRITE);
     }
 
     /**
      * Creates a cache entry for an object that is being fetched from the
-     * server.
+     * server on behalf of a transaction.
      *
      * @param	oid the object ID
+     * @param	contextId the context ID associated with the transaction
      * @param	forUpdate whether the object is being fetched for update
      * @return	the cache entry
      */
-    static ObjectCacheEntry createFetching(long oid, boolean forUpdate) {
+    static ObjectCacheEntry createFetching(
+	long oid, long contextId, boolean forUpdate)
+    {
 	return new ObjectCacheEntry(
-	    oid, forUpdate ? State.FETCHING_WRITE : State.FETCHING_READ);
+	    oid, contextId,
+	    forUpdate ? State.FETCHING_WRITE : State.FETCHING_READ);
     }
 
     /**
@@ -67,16 +71,16 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      * the server on behalf of a transaction.
      *
      * @param	oid the object ID
-     * @param	data the object data
      * @param	contextId the context ID associated with the transaction
+     * @param	data the object data
      * @return	the cache entry     
      */
     static ObjectCacheEntry createCached(
-	long oid, byte[] data, long contextId)
+	long oid, long contextId, byte[] data)
     {
-	ObjectCacheEntry entry = new ObjectCacheEntry(oid, State.CACHED_READ);
+	ObjectCacheEntry entry =
+	    new ObjectCacheEntry(oid, contextId, State.CACHED_READ);
 	entry.setValue(data);
-	entry.noteAccess(contextId);
 	return entry;
     }
 

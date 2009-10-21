@@ -19,9 +19,13 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import static com.sun.sgs.impl.kernel.StandardProperties.NODE_TYPE;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import static com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStore.CACHE_SIZE_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.CALLBACK_PORT_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
@@ -30,6 +34,8 @@ import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.DEFAULT_CALLBACK_PORT;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.DEFAULT_SERVER_PORT;
+import static com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStore.EVICTION_RESERVE_SIZE_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_HOST_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
@@ -42,11 +48,20 @@ import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.UPDATE_QUEUE_PORT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.NodeType;
+import com.sun.sgs.service.DataConflictListener;
+import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeListener;
+import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
+import java.math.BigInteger;
+import java.util.Iterator;
 import java.util.Properties;
+import org.junit.Test;
 
 /** Test the {@link CachingDataStore} class. */
 public class TestCachingDataStore extends TestDataStoreImpl {
@@ -76,11 +91,18 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 
     /** Creates an instance of this class. */
     public TestCachingDataStore() {
-	super(staticEnv == null
-	      ? staticEnv = new BasicDataStoreTestEnv(
-		  System.getProperties(),
-		  LockingAccessCoordinator.class.getName())
-	      : staticEnv);
+	super(staticEnv == null ? staticEnv = createTestEnv() : staticEnv);
+    }
+
+    private static BasicDataStoreTestEnv createTestEnv() {
+	BasicDataStoreTestEnv env = new BasicDataStoreTestEnv(
+	    System.getProperties(),
+	    LockingAccessCoordinator.class.getName());
+	env.txnProxy.setComponent(
+	    DataService.class, new DummyDataService());
+	env.txnProxy.setComponent(
+	    WatchdogService.class, new DummyWatchdogService());
+	return env;
     }
 
     /** Add client and server properties. */
@@ -120,6 +142,7 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	    new CachingDataStore(props, systemRegistry, txnProxy),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
+	store.ready();
 	return store;
     }
 
@@ -143,5 +166,113 @@ public class TestCachingDataStore extends TestDataStoreImpl {
     @Override
     public void testConstructorDirectoryNotWritable() throws Exception {
 	System.err.println("Skipping");
+    }
+
+    /* -- Other tests -- */
+
+    @Test
+    public void testCacheReplacement() throws Exception {
+	txn.commit();
+	txn = null;
+	store.shutdown();
+	store = null;
+	/* Use a smaller cache size to get more replacement */
+	props.setProperty(CACHE_SIZE_PROPERTY, "1000");
+	store = createDataStore();
+	try {
+	    /* Create objects and bindings */
+	    for (int i = 0; i < 2000; i++) {
+		txn = createTransaction();
+		id = store.createObject(txn);
+		store.setObject(txn, id, new byte[] { 0 });
+		store.setBinding(txn, String.valueOf(i), id);
+		txn.commit();
+		txn = null;
+	    }
+	    /* Access objects and bindings */
+	    for (int repeat = 0; repeat < 3; repeat++) {
+		for (int i = 0; i < 2000; i++) {
+		    txn = createTransaction();
+		    id = store.getBinding(txn, String.valueOf(i));
+		    boolean forUpdate = (i % 2 == 0);
+		    store.getObject(txn, id, forUpdate);
+		    if (forUpdate) {
+			store.setObject(txn, id, new byte[] { (byte) i });
+		    }
+		    txn.commit();
+		    txn = null;
+		}
+	    }
+	} finally {
+	    if (txn != null) {
+		txn.abort(new RuntimeException("abort"));
+	    }
+	    store.shutdown();
+	    store = null;
+	}
+    }
+
+    /* -- Other classes -- */
+
+    /** A dummy data service that just supplies the local node ID. */
+    private static class DummyDataService implements DataService {
+	/* -- Stubs for DataManager -- */
+	public ManagedObject getBinding(String name) { return null; }
+	public ManagedObject getBindingForUpdate(String name) { return null; }
+	public void setBinding(String name, Object object) { }
+	public void removeBinding(String name) { }
+	public String nextBoundName(String name) { return null; }
+	public void removeObject(Object object) { }
+	public void markForUpdate(Object object) { }
+	public <T> ManagedReference<T> createReference(T object) {
+	    return null;
+	}
+	public BigInteger getObjectId(Object object) { return null; }
+	/* -- Stubs for DataService -- */
+	public long getLocalNodeId() { return 1; }
+	public ManagedObject getServiceBinding(String name) { return null; }
+	public ManagedObject getServiceBindingForUpdate(String name) {
+	    return null;
+	}
+	public void setServiceBinding(String name, Object object) { }
+	public void removeServiceBinding(String name) { }
+	public String nextServiceBoundName(String name) { return null; }
+	public ManagedReference<?> createReferenceForId(BigInteger id) {
+	    return null;
+	}
+	public BigInteger nextObjectId(BigInteger objectId) { return null; }
+	public void addDataConflictListener(DataConflictListener listener) { }
+	/* -- Stubs for Service -- */
+	public String getName() { return null; }
+	public void ready() { }
+	public void shutdown() { }
+    }
+
+    /**
+     * A dummy watchdog service that shuts down the data service on failure.
+     */
+    private static class DummyWatchdogService implements WatchdogService {
+	DummyWatchdogService() { }
+	/* Service */
+	public String getName() { return "DummyWatchdogService"; }
+	public void ready() { }
+	public void shutdown() { }
+	/* WatchdogService */
+	public boolean isLocalNodeAlive() { return true; }
+	public boolean isLocalNodeAliveNonTransactional() { return true; }
+	public Iterator<Node> getNodes() { return null; }
+	public Node getNode(long nodeId) { return null; }
+	public Node getBackup(long nodeId) { return null; }
+	public void addNodeListener(NodeListener listener) { }
+	public void addRecoveryListener(RecoveryListener listener) { }
+	public void reportFailure(long nodeId, String className) {
+	    DataStore s = store;
+	    if (s != null) {
+		s.shutdown();
+	    }
+	}
+	public long currentAppTimeMillis() { return 0; }
+	public long getAppTimeMillis(long systemTimeMillis) { return 0; }
+	public long getSystemTimeMillis(long appTimeMillis) { return 0; }
     }
 }

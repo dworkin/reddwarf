@@ -62,6 +62,29 @@ class ReserveCache {
     }
 
     /**
+     * Creates an instance that transfers its reservations from another
+     * instance.
+     *
+     * @param	otherReserve the existing reserve
+     * @param	numCacheEntries the number of cache entries to transfer
+     * @throws	IllegalArgumentException if the argument is less than {@code 1}
+     *		or if it is larger than the number of entries reserved by
+     *		{@code otherReserve}
+     */
+    ReserveCache(ReserveCache otherReserve, int numCacheEntries) {
+	this.cache = otherReserve.cache;
+	if (numCacheEntries < 1) {
+	    throw new IllegalArgumentException(
+		"The number of cache entries must be greater than 0");
+	} else if (numCacheEntries > otherReserve.unusedCacheEntries) {
+	    throw new IllegalArgumentException(
+		"Other reserve doesn't have enough entries");
+	}
+	unusedCacheEntries = numCacheEntries;
+	otherReserve.unusedCacheEntries -= numCacheEntries;
+    }
+
+    /**
      * Notes that a cache entry has been used.
      *
      * @throws	IllegalStateException if there are no unused entries
