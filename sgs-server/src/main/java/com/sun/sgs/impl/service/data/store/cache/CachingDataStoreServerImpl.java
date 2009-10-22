@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import static com.sun.sgs.impl.kernel.StandardProperties.APP_ROOT;
@@ -981,64 +982,91 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		throw new IllegalArgumentException(
 		    "Illegal newNames: " + newNames);
 	    }
-	    boolean txnDone = false;
-	    DbTransaction txn = env.beginTransaction(txnTimeout);
-	    try {
-		for (int i = 0; i < oids.length; i++) {
-		    long oid = oids[i];
-		    if (oid < 0) {
-			throw new IllegalArgumentException(
-			    "The object IDs must not be negative");
+	    for (int i = 0; true; i++) {
+		assert i < 1000 : "Too many retries";		
+		try {
+		    commitInternal(nodeInfo, oids, oidValues, newOids, names,
+				   nameValues, newNames);
+		    break;
+		} catch (RuntimeException e) {
+		    if (e instanceof ExceptionRetryStatus &&
+			((ExceptionRetryStatus) e).shouldRetry())
+		    {
+			continue;
 		    }
-		    if (i < newOids) {
-			lock(nodeInfo, oid, true);
-		    } else {
-			checkLocked(nodeInfo, oid, true);
-		    }
-		    byte[] value = oidValues[i];
-		    if (value == null) {
-			oidsDb.delete(txn, encodeLong(oid));
-		    } else {
-			oidsDb.put(txn, encodeLong(oid), oidValues[i]);
-		    }
-		}
-		for (int i = 0; i < names.length; i++) {
-		    String name = names[i];
-		    if (name == null) {
-			throw new IllegalArgumentException(
-			    "The names must not be null");
-		    }
-		    BindingKey key = BindingKey.get(name);
-		    if (i < newNames) {
-			lock(nodeInfo, key, true);
-		    } else {
-			checkLocked(nodeInfo, key, true);
-		    }
-		    long value = nameValues[i];
-		    if (value < -1) {
-			throw new IllegalArgumentException(
-			    "The name values must not be less than -1");
-		    } else if (value == -1) {
-			namesDb.delete(txn, encodeString(name));
-			/*
-			 * Release the lock on the removed name since the node
-			 * does not maintain an entry for an unbound name.
-			 */
-			releaseLock(nodeInfo, key);
-		    } else {
-			namesDb.put(
-			    txn, encodeString(name), encodeLong(value));
-		    }
-		}
-		txnDone = true;
-		txn.commit();
-	    } finally {
-		if (!txnDone) {
-		    txn.abort();
+		    throw e;
 		}
 	    }
 	} finally {
 	    nodeCallFinished(nodeInfo);
+	}
+    }
+
+    /** Makes a single attempt to perform the commit. */
+    private void commitInternal(NodeInfo nodeInfo,
+				long[] oids,
+				byte[][] oidValues,
+				int newOids,
+				String[] names,
+				long[] nameValues,
+				int newNames)
+	throws CacheConsistencyException
+    {
+	boolean txnDone = false;
+	DbTransaction txn = env.beginTransaction(txnTimeout);
+	try {
+	    for (int i = 0; i < oids.length; i++) {
+		long oid = oids[i];
+		if (oid < 0) {
+		    throw new IllegalArgumentException(
+			"The object IDs must not be negative");
+		}
+		if (i < newOids) {
+		    lock(nodeInfo, oid, true);
+		} else {
+		    checkLocked(nodeInfo, oid, true);
+		}
+		byte[] value = oidValues[i];
+		if (value == null) {
+		    oidsDb.delete(txn, encodeLong(oid));
+		} else {
+		    oidsDb.put(txn, encodeLong(oid), oidValues[i]);
+		}
+	    }
+	    for (int i = 0; i < names.length; i++) {
+		String name = names[i];
+		if (name == null) {
+		    throw new IllegalArgumentException(
+			"The names must not be null");
+		}
+		BindingKey key = BindingKey.get(name);
+		if (i < newNames) {
+		    lock(nodeInfo, key, true);
+		} else {
+		    checkLocked(nodeInfo, key, true);
+		}
+		long value = nameValues[i];
+		if (value < -1) {
+		    throw new IllegalArgumentException(
+			"The name values must not be less than -1");
+		} else if (value == -1) {
+		    namesDb.delete(txn, encodeString(name));
+		    /*
+		     * Release the lock on the removed name since the node
+		     * does not maintain an entry for an unbound name.
+		     */
+		    releaseLock(nodeInfo, key);
+		} else {
+		    namesDb.put(
+			txn, encodeString(name), encodeLong(value));
+		}
+	    }
+	    txnDone = true;
+	    txn.commit();
+	} finally {
+	    if (!txnDone) {
+		txn.abort();
+	    }
 	}
     }
 

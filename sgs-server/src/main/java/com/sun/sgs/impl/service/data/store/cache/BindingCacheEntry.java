@@ -351,7 +351,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      *		than or equal to the key for this entry
      */
     void setPreviousKey(BindingKey previousKey, boolean previousKeyUnbound) {
-	if (previousKey.compareTo(key) >= 0) {
+	if (previousKey != null && previousKey.compareTo(key) >= 0) {
 	    throw new IllegalArgumentException("Previous key is too large");
 	}
 	this.previousKey = previousKey;
