@@ -143,7 +143,7 @@ public class SimpleSgsProtocolAcceptor
     public static final int PROTOCOL4 = 4;
 
     /** The default protocol version: {@value #DEFAULT_PROTOCOL_VERSION}. */
-    public static final int DEFAULT_PROTOCOL_VERSION = /* PROTOCOL4 */ 5;
+    public static final int DEFAULT_PROTOCOL_VERSION = PROTOCOL4;
             
     /** The name of the disconnect delay property. */
     public static final String DISCONNECT_DELAY_PROPERTY =

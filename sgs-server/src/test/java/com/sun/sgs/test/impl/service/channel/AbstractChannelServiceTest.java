@@ -82,6 +82,8 @@ public abstract class AbstractChannelServiceTest extends Assert {
     
     private static final String APP_NAME = "TestChannelServiceImpl";
     
+    protected static final byte PROTOCOL_v4 = 0x04;
+
     protected static final int WAIT_TIME = 2000;
     
     /** A list of users for test purposes. */
@@ -138,6 +140,8 @@ public abstract class AbstractChannelServiceTest extends Assert {
     /** The listen port for the client session service. */
     protected int port;
 
+    /** The SimpleSgsProtocol version for clients. */
+    private byte protocolVersion;
 
     protected boolean isPerformanceTest = false;
 
@@ -166,10 +170,14 @@ public abstract class AbstractChannelServiceTest extends Assert {
         Properties props = 
             SgsTestNode.getDefaultProperties(APP_NAME, null, 
                                              DummyAppListener.class);
+	this.protocolVersion = SimpleSgsProtocol.VERSION;
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
 			  DirectiveNodeAssignmentPolicy.class.getName());
+	props.setProperty(
+ 	   "com.sun.sgs.impl.protocol.simple.protocol.version",
+	   Byte.toString(protocolVersion));
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 	port = serverNode.getAppPort();
@@ -211,6 +219,9 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	props.setProperty(StandardProperties.AUTHENTICATORS, 
 	    "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+	props.setProperty(
+ 	   "com.sun.sgs.impl.protocol.simple.protocol.version",
+	   Byte.toString(protocolVersion));
 	SgsTestNode node = 
 	    new SgsTestNode(serverNode, DummyAppListener.class, props);
 	wrapChannelServerProxy(node);
@@ -621,9 +632,9 @@ public abstract class AbstractChannelServiceTest extends Assert {
 
 	/** Constructs an instance with the given {@code name}. */
 	DummyClient(String name) {
-	    super(name);
+	    super(name, SimpleSgsProtocol.VERSION);
 	}
-
+	
 	ClientSession getSession() throws Exception {
 	    GetSessionTask task = new GetSessionTask(name);
 	    txnScheduler.runTask(task, taskOwner);

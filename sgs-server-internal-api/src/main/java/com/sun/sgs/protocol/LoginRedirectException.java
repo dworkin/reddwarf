@@ -42,7 +42,7 @@ public class LoginRedirectException extends Exception {
     private final Set<ProtocolDescriptor> descriptors;
 
     /**
-     * Constructs and instance with the specified {@code node} and
+     * Constructs an instance with the specified {@code node} and
      * protocol {@code descriptors}.
      *
      * @param	node a node
@@ -56,7 +56,7 @@ public class LoginRedirectException extends Exception {
     }
     
     /**
-     * Constructs and instance with the specified {@code node}, {@code
+     * Constructs an instance with the specified {@code node}, {@code
      * descriptors} and detail {@code message}.
      *
      * @param	node a node
@@ -72,7 +72,7 @@ public class LoginRedirectException extends Exception {
     }
     
     /**
-     * Constructs and instance with the specified {@code node}, detail
+     * Constructs an instance with the specified {@code node}, detail
      * {@code message}, and {@code cause}.
      *
      * @param	node a node

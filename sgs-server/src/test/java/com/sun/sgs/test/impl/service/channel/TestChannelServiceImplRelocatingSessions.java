@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.channel;
 
 import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -48,7 +49,7 @@ public class TestChannelServiceImplRelocatingSessions
     extends AbstractChannelServiceTest
 {
     private final static String REX = "rex";
-    
+
     private final String[] oneUser = new String[] { REX };
 
     /** Constructs a test instance. */

@@ -72,7 +72,7 @@ public class RequestFailureException extends Exception {
     }
     
     /**
-     * Constructs and instance with the specified detail {@code message}
+     * Constructs an instance with the specified detail {@code message}
      * and {@code cause}.
      *
      * @param	message a detail message, or {@code null}
