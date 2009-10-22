@@ -2120,7 +2120,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * A flag which records whether a removal or set is an invalid
 	 * operation. {@code True} if invalid, and {@code false} otherwise.
 	 */
-	private boolean cannotRemoveOrSet;
+	private boolean cannotRemoveOrSet = true;
 
 	/**
 	 * Constructor which starts the iterations at the specified
@@ -2130,7 +2130,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 */
 	ScalableListIterator(ScalableList<E> list) {
 	    super(list);
-	    cannotRemoveOrSet = true;
 	}
 
 	/**
@@ -2162,7 +2161,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		SearchResult<E> searchResult) {
 	    super(list, searchResult.node);
 	    cursor = searchResult.offset;
-	    cannotRemoveOrSet = true;
 	}
 
 	/**
@@ -2277,7 +2275,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
 
-	    cannotRemoveOrSet = false;
 	    List<ManagedReference<ManagedObject>> elements =
 		    currentNode.get().getSubList().getElements();
 
@@ -2289,11 +2286,11 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		    elements = currentNode.get().getSubList().getElements();
 		    index = currentNode.get().size() - 1;
 		} else {
-                    cannotRemoveOrSet = true;
 		    throw new NoSuchElementException(
 			    "The previous element does not exist");
 		}
 	    }
+            cannotRemoveOrSet = false;
 	    cursor = index;
 	    wasNextCalled = false;
 
@@ -2385,13 +2382,9 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * {@inheritDoc}
 	 */
 	public E next() {
-	    cannotRemoveOrSet = false;
-	    try {
-                return super.next();
-            } catch (NoSuchElementException e) {
-                cannotRemoveOrSet = true;
-                throw e;
-            }
+            E result = super.next();
+            cannotRemoveOrSet = false;
+            return result;
 	}
 
 	/**

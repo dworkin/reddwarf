@@ -26,6 +26,7 @@ import java.beans.PropertyChangeEvent;
 /** A simple profile listener that notes calls to the public APIs */
 class SimpleTestListener implements ProfileListener {
     int propertyChangeCalls = 0;
+    long reportedNodeId = -1L;
     int reportCalls = 0;
     int shutdownCalls = 0;
     final Runnable doReport;
@@ -42,6 +43,9 @@ class SimpleTestListener implements ProfileListener {
     @Override
     public void propertyChange(PropertyChangeEvent event) {
         propertyChangeCalls++;
+        if (event.getPropertyName().equals("com.sun.sgs.profile.nodeid")) {
+            reportedNodeId = (Long) event.getNewValue();
+        }
     }
 
     @Override
