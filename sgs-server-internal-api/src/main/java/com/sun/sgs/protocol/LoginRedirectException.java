@@ -105,7 +105,7 @@ public class LoginRedirectException extends Exception {
     
     /**
      * Returns a collection of protocol descriptors supported by
-     * the node who's ID is returned by {@link #getNodeId getNodeId}.
+     * the node whose ID is returned by {@link #getNodeId getNodeId}.
      *
      * @return	a {@code Set} of protocol descriptors
      */

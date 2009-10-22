@@ -52,7 +52,7 @@ public interface ProtocolListener {
      * getCause} method will return one of the following exceptions: <ul>
      *
      * <li>{@code LoginRedirectException}: indicates that the login should
-     * be redirected to the node who's ID is returned by the exception's {@link
+     * be redirected to the node whose ID is returned by the exception's {@link
      * LoginRedirectException#getNodeId getNodeId} method. </li>
      *
      * <li>{@code LoginFailureException}: indicates that the login failed.

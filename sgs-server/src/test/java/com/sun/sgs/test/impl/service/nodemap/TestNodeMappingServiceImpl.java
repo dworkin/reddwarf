@@ -31,6 +31,7 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -362,8 +363,12 @@ public class TestNodeMappingServiceImpl {
     public void testAssignNode() throws Exception {   
         // Assign outside a transaction
         final Identity id = new IdentityImpl("first");
-        nodeMappingService.assignNode(NodeMappingService.class, id);
-                
+        long nodeId =
+                nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        if (nodeId < 0) {
+            fail("Unexpected assignNode failure");
+        }
         verifyMapCorrect(id);
 	TestListener l = nodeListenerMap.get(serverNode.getNodeId());
         l.waitForNotification();
@@ -437,7 +442,26 @@ public class TestNodeMappingServiceImpl {
             }, taskOwner);
         }
     }
-    
+
+    @Test
+    public void testAssignNodeNoNodes() throws Exception {
+        WatchdogService watchdogService =
+                    (WatchdogService)serverNode.getWatchdogService();
+
+        // By reporting health as YELLOW there should not be any nodes available
+        // for assignment
+        watchdogService.reportHealth(
+                                serverNode.getDataService().getLocalNodeId(),
+                                Health.YELLOW, "A");
+
+        long nodeId = nodeMappingService.assignNode(NodeMappingService.class,
+                                                    new IdentityImpl("first"));
+
+        if (nodeId >= 0) {
+            fail("Expected assignNode to fail (-1), got: " + nodeId);
+        }
+    }
+
     @Test
     public void testLocalNodePolicy() throws Exception {
         // Remove what happened at setup().  I know, I know...
