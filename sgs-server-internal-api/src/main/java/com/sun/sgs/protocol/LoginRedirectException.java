@@ -41,7 +41,7 @@ public class LoginRedirectException extends Exception {
     private final Set<ProtocolDescriptor> descriptors;
 
     /**
-     * Constructs and instance with the specified {@code nodeId} and
+     * Constructs an instance with the specified {@code nodeId} and
      * protocol {@code descriptors}.
      *
      * @param	nodeId a node ID
@@ -55,7 +55,7 @@ public class LoginRedirectException extends Exception {
     }
 
     /**
-     * Constructs and instance with the specified {@code nodeId}, {@code
+     * Constructs an instance with the specified {@code nodeId}, {@code
      * descriptors} and detail {@code message}.
      *
      * @param	nodeId a node ID
@@ -71,7 +71,7 @@ public class LoginRedirectException extends Exception {
     }
 
     /**
-     * Constructs and instance with the specified {@code nodeId}, detail
+     * Constructs an instance with the specified {@code nodeId}, detail
      * {@code message}, and {@code cause}.
      *
      * @param	nodeId a node ID
@@ -95,9 +95,9 @@ public class LoginRedirectException extends Exception {
     }
 
     /**
-     * Returns the node id to which the login should be redirected.
+     * Returns the ID of the node to which the login should be redirected.
      *
-     * @return	the node id to which the login should be redirected
+     * @return	the ID of the node to which the login should be redirected
      */
     public long getNodeId() {
 	return nodeId;
@@ -105,7 +105,7 @@ public class LoginRedirectException extends Exception {
     
     /**
      * Returns a collection of protocol descriptors supported by
-     * the node returned by {@link #getNode getNode}.
+     * the node who's ID is returned by {@link #getNodeId getNodeId}.
      *
      * @return	a {@code Set} of protocol descriptors
      */

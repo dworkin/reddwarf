@@ -299,7 +299,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      * the specified {@code node} with the specified protocol {@code
      * descriptors}.
      *
-     * @param	node a node to redirect the login
+     * @param	nodeId the ID of the node to redirect the login
      * @param	descriptors a set of protocol descriptors supported
      *		by {@code node}
      */

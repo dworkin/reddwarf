@@ -414,8 +414,6 @@ public final class NodeMappingServerImpl
                 // This should only occur if no nodes are available, which
                 // can only happen if our client shutdown and unregistered
                 // while we were in this call.
-                // Ignore the error.
-                logger.logThrow(Level.FINEST, ex, "Exception ignored");
             }
             
         } finally {
@@ -757,10 +755,10 @@ public final class NodeMappingServerImpl
      *        was no prior mapping
      * @param requestingNode the node making the mapping request
      *
-     * @throws NoNodesAvailableException if there are no live nodes to map to
+     * @throws NoNodesAvailableException if there are no nodes to map to
      */
-    long mapToNewNode(final Identity id, String serviceName, Node oldNode,
-                      long requestingNode) 
+    private long mapToNewNode(final Identity id, String serviceName,
+                              Node oldNode, long requestingNode)
         throws NoNodesAvailableException
     {
         assert (id != null);
