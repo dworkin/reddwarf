@@ -38,7 +38,6 @@ import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
