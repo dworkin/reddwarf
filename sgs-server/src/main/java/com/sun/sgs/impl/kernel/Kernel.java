@@ -224,7 +224,7 @@ class Kernel {
         throws Exception 
     {
         // output the entire set of configuration properties to the logger
-        if(logger.isLoggable(Level.CONFIG)) {
+        if (logger.isLoggable(Level.CONFIG)) {
             StringBuffer propOutput = new StringBuffer(
                     "Booting the Kernel with raw properties:");
             for (String key : new TreeSet<String>(
