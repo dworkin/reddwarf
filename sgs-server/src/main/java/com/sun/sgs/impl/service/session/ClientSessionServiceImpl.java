@@ -301,9 +301,6 @@ public final class ClientSessionServiceImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);	
-	logger.log(Level.CONFIG,
-		   "Creating ClientSessionServiceImpl properties:{0}",
-		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);	
 	try {
 	    /*
@@ -405,6 +402,16 @@ public final class ClientSessionServiceImpl
                 config.setProtocolDescriptor(
 		    protocolAcceptor.getDescriptor().toString());
             }
+
+            logger.log(Level.CONFIG,
+                       "Created ClientSessionServiceImpl with properties:" +
+                       "\n  " + ALLOW_NEW_LOGIN_PROPERTY + "=" + allowNewLogin +
+                       "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" +
+                       writeBufferSize +
+                       "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
+                       "\n  " + PROTOCOL_ACCEPTOR_PROPERTY + "=" +
+                       protocolAcceptor.getClass().getName() +
+                       "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort);
 	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

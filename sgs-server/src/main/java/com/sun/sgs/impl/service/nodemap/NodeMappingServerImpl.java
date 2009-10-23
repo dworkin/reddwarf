@@ -258,10 +258,6 @@ public final class NodeMappingServerImpl
     {     
         super(properties, systemRegistry, txnProxy, logger);
 
-        logger.log(Level.CONFIG, 
-                   "Creating NodeMappingServerImpl properties:{0}", 
-                   properties); 
-        
         watchdogService = txnProxy.getService(WatchdogService.class);
        
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -320,6 +316,16 @@ public final class NodeMappingServerImpl
         fullName = "NodeMappingServiceImpl[host:" + 
                    InetAddress.getLocalHost().getHostName() + 
                    ", port:" + port + "]";
+
+        logger.log(Level.CONFIG,
+                   "Created NodeMappingServerImpl with properties:" +
+                   "\n  " + ASSIGN_POLICY_CLASS_PROPERTY + "=" +
+                   assignPolicy.getClass().getName() +
+                   "\n  " + RELOCATION_EXPIRE_PROPERTY + "=" +
+                   relocationExpireTime +
+                   "\n  " + REMOVE_EXPIRE_PROPERTY + "=" + removeExpireTime +
+                   "\n  " + SERVER_PORT_PROPERTY + "=" + requestedPort);
+        
     }
     
     /* -- Implement AbstractService -- */

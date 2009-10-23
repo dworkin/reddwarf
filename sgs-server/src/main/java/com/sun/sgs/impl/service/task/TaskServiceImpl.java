@@ -322,8 +322,6 @@ public class TaskServiceImpl
         throws Exception
     {
         super(properties, systemRegistry, transactionProxy, logger);
-        
-        logger.log(Level.CONFIG, "creating TaskServiceImpl");
 
         // create the transient local collections
         activeIdentityMap = new HashMap<Identity, Integer>();
@@ -410,6 +408,14 @@ public class TaskServiceImpl
             throw new IllegalStateException("Vote Delay property must " +
                                             "be non-negative");
         }
+
+        logger.log(Level.CONFIG,
+                   "Created TaskServiceImpl with properties:" +
+                   "\n  " + CONTINUE_POLICY_PROPERTY + "=" +
+                   continuePolicy.getClass().getName() +
+                   "\n  " + HANDOFF_PERIOD_PROPERTY + "=" + handoffPeriod +
+                   "\n  " + HANDOFF_START_PROPERTY + "=" + handoffStart +
+                   "\n  " + VOTE_DELAY_PROPERTY + "=" + voteDelay);
     }
 
     /**

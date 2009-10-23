@@ -197,9 +197,6 @@ public class SimpleSgsProtocolAcceptor
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	logger.log(Level.CONFIG,
-		   "Creating SimpleSgsProtocolAcceptor properties:{0}",
-		   properties);
 
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {
@@ -241,6 +238,15 @@ public class SimpleSgsProtocolAcceptor
 			checkServiceVersion(
 			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
 		    } },  taskOwner);
+
+            logger.log(Level.CONFIG,
+                       "Created SimpleSgsProtocolAcceptor with properties:" +
+                       "\n  " + DISCONNECT_DELAY_PROPERTY + "=" +
+                       disconnectDelay +
+                       "\n  " + READ_BUFFER_SIZE_PROPERTY + "=" +
+                       readBufferSize +
+                       "\n  " + TRANSPORT_PROPERTY + "=" +
+                       transport.getClass().getName());
 	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

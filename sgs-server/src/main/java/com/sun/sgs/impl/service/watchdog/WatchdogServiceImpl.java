@@ -291,8 +291,6 @@ public final class WatchdogServiceImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	logger.log(Level.CONFIG, "Creating WatchdogServiceImpl properties:{0}",
-		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	// Setup the KernelShutdownController object
@@ -396,6 +394,15 @@ public final class WatchdogServiceImpl
 			   "node registered, host:{0}, localNodeId:{1}",
 			   clientHost, localNodeId);
 	    }
+
+            logger.log(Level.CONFIG,
+                       "Created WatchdogServiceImpl with properties:" +
+                       "\n  " + CLIENT_HOST_PROPERTY + "=" + clientHost +
+                       "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
+                       "\n  " + HOST_PROPERTY + "=" + host +
+                       "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort +
+                       "\n  " + TIMESYNC_INTERVAL_PROPERTY + "=" +
+                       timesyncInterval);
 	    
 	} catch (Exception e) {
 	    logger.logThrow(

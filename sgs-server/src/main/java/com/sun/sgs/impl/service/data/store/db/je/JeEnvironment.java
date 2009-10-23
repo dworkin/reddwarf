@@ -314,12 +314,6 @@ public class JeEnvironment implements DbEnvironment {
 			 ComponentRegistry systemRegistry,
 			 TransactionProxy txnProxy)
     {
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG,
-		       "JeEnvironment directory:{0}, properties:{1}, " +
-		       "systemRegistry:{2}, txnProxy:{3}",
-		       directory, properties, systemRegistry, txnProxy);
-	}
 	Properties propertiesWithDefaults = new Properties(properties);
 	for (Enumeration<?> names = defaultProperties.propertyNames();
 	     names.hasMoreElements(); )
@@ -416,6 +410,13 @@ public class JeEnvironment implements DbEnvironment {
 		statsTask, txnProxy.getCurrentOwner(),
 		System.currentTimeMillis() + stats, stats);
 	}
+
+        logger.log(Level.CONFIG,
+                   "Created JeEnvironment with properties:" +
+                   "\n  " + FLUSH_TO_DISK_PROPERTY + "=" + flushToDisk +
+                   "\n  " + LOCK_TIMEOUT_PROPERTY + "=" + lockTimeout +
+                   "\n  " + TXN_ISOLATION_PROPERTY + "=" + txnIsolation +
+                   "\n  " + STATS_PROPERTY + "=" + stats);
     }
 
     /**
