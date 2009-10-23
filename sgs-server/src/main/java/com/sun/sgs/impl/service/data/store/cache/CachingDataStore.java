@@ -1281,6 +1281,23 @@ public class CachingDataStore extends AbstractDataStore
 		? serverNextNameKey.compareTo(cachedNextNameKey) : 0;
 	    if (compareServer != 0) {
 		/*
+		 * Check if we have cached information about the server's next
+		 * name being unbound
+		 */
+		Object lock = cache.getBindingLock(cachedNextNameKey);
+		synchronized (lock) {
+		    BindingCacheEntry entry =
+			cache.getBindingEntry(cachedNextNameKey);
+		    assert entry != null;
+		    if (entry.getKnownUnbound(serverNextNameKey)) {
+			/*
+			 * We know the server's next name was made unbound
+			 * locally, so don't create an entry for it.
+			 */
+			return;
+		    }
+		}
+		/*
 		 * Update the entry for the next name from server if it is
 		 * different from the cached next name.	 Only need to do
 		 * something if the server entry is lower than the cached next
@@ -1288,7 +1305,7 @@ public class CachingDataStore extends AbstractDataStore
 		 * If the server entry is higher, then it should already be
 		 * present in the cache.
 		 */
-		Object lock = cache.getBindingLock(serverNextNameKey);
+		lock = cache.getBindingLock(serverNextNameKey);
 		synchronized (lock) {
 		    BindingCacheEntry entry =
 			cache.getBindingEntry(serverNextNameKey);
@@ -1332,23 +1349,29 @@ public class CachingDataStore extends AbstractDataStore
 		    cache.getBindingEntry(cachedNextNameKey);
 		assert entry != null : "No entry for " + cachedNextNameKey;
 		if (serverNextNameKey != null &&
-		    serverNextNameKey.compareTo(cachedNextNameKey) >= 0)
+		    (serverNextNameKey.compareTo(cachedNextNameKey) >= 0 ||
+		     entry.getKnownUnbound(serverNextNameKey)))
 		{
 		    /*
 		     * The server returned information about the next key, and
-		     * there were no entries between the name and the cached
-		     * next entry
+		     * and either that key is greater than or equal to the
+		     * cached next key or the cached next key records that the
+		     * server's key is unbound.  Update the  cached entry to
+		     * record that there are no entries between it and the
+		     * requested name.
 		     */
 		    entry.updatePreviousKey(nameKey, nameBound);
-		    context.noteAccess(entry);
-		    if (entry.getReading()) {
-			/* Make a temporary last entry permanent */
-			assert cachedNextNameKey == LAST;
-			entry.setCachedRead(lock);
-		    }
-		    if (serverNextNameForWrite && !entry.getWritable()) {
-			/* Upgraded to write access for the next key */
-			entry.setUpgradedImmediate(lock);
+		    if (serverNextNameKey.compareTo(cachedNextNameKey) >= 0) {
+			context.noteAccess(entry);
+			if (entry.getReading()) {
+			    /* Make a temporary last entry permanent */
+			    assert cachedNextNameKey == LAST;
+			    entry.setCachedRead(lock);
+			}
+			if (serverNextNameForWrite && !entry.getWritable()) {
+			    /* Upgraded to write access for the next key */
+			    entry.setUpgradedImmediate(lock);
+			}
 		    }
 		} else if (entry.getReading()) {
 		    /*

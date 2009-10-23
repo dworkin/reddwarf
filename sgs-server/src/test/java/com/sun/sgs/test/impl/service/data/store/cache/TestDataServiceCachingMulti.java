@@ -420,6 +420,45 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	}
     }
 
+    /**
+     * Test that the cache correctly handles a case where a removed binding is
+     * the next entry in the cache but is not known to be removed by the
+     * server.
+     */
+    @Test
+    public void testRemoveBindingProblems() throws Exception {
+	RunTask init = new RunTask(serverNode) { public void run() {
+	    DummyManagedObject dummy = new DummyManagedObject();
+	    dataService.setBinding("a", dummy);
+	    dataService.setBinding("b", dummy);	    
+	    dataService.setBinding("c", dummy);
+	} };
+	init.runTask();
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.getBinding("a");
+	    dataService.removeBinding("b");
+	    assertEquals("c", dataService.nextBoundName("a"));
+	} }.runTask();
+	init.runTask();
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.getBinding("a");
+	    dataService.removeBinding("b");
+	    dataService.removeBinding("a");
+	} }.runTask();
+	init.runTask();
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.getBinding("a");
+	    dataService.removeBinding("b");
+	    dataService.getBinding("a");
+	} }.runTask();
+	init.runTask();
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.getBinding("a");
+	    dataService.removeBinding("b");
+	    dataService.setBinding("a", new DummyManagedObject());
+	} }.runTask();
+    }
+
     /* -- Other classes and methods -- */
 
     /** Define a convenience class for scheduling tasks. */

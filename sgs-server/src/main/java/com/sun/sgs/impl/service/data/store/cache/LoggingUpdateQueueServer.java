@@ -209,7 +209,7 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		       "downgradeBinding nodeId:" + nodeId + ", name:" + name);
 	}
 	try {
-	    server.evictBinding(nodeId, name);
+	    server.downgradeBinding(nodeId, name);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "downgradeBinding nodeId:" + nodeId +
