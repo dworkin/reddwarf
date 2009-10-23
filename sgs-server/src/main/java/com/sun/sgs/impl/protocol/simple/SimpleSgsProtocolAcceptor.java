@@ -69,8 +69,8 @@ import javax.security.auth.login.LoginException;
  *
  * <dd style="padding-top: .5em">Specifies the <code>SimpleSgsProtocol</code>
  *	version for this acceptor's connections. Valid values for the protocol
- *	version are <b><code>5</code></b> which supports client session
- *	relocation, and <b><code>4</code></b> (the default), which does not
+ *	version are <b><code>0x05</code></b> which supports client session
+ *	relocation, and <b><code>0x04</code></b> (the default), which does not
  *	support client session relocation but is compatible with clients
  *	using the older protocol version. <p>
  *
