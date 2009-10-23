@@ -257,6 +257,7 @@ public final class NodeMappingServerImpl
          throws Exception 
     {     
         super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating NodeMappingServerImpl");
 
         watchdogService = txnProxy.getService(WatchdogService.class);
        

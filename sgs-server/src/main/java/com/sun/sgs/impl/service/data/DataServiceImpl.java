@@ -334,6 +334,7 @@ public final class DataServiceImpl implements DataService {
 			   TransactionProxy txnProxy)
 	throws Exception
     {
+        logger.log(Level.CONFIG, "Creating DataServiceImpl");
 	DataStore storeToShutdown = null;
 	try {
 	    PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);

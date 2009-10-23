@@ -266,6 +266,7 @@ public final class WatchdogServerImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating WatchdogServerImpl");
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	isFullStack = fullStack;

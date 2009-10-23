@@ -300,7 +300,8 @@ public final class ClientSessionServiceImpl
 				    TransactionProxy txnProxy)
 	throws Exception
     {
-	super(properties, systemRegistry, txnProxy, logger);	
+	super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating ClientSessionServiceImpl");
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);	
 	try {
 	    /*

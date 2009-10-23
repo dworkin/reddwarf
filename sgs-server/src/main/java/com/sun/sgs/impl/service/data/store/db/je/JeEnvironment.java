@@ -314,6 +314,9 @@ public class JeEnvironment implements DbEnvironment {
 			 ComponentRegistry systemRegistry,
 			 TransactionProxy txnProxy)
     {
+        logger.log(Level.CONFIG, "Creating JeEnvironment with directory: {0}",
+                   directory);
+
 	Properties propertiesWithDefaults = new Properties(properties);
 	for (Enumeration<?> names = defaultProperties.propertyNames();
 	     names.hasMoreElements(); )

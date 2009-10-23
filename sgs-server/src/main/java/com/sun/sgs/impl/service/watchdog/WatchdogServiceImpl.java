@@ -291,6 +291,7 @@ public final class WatchdogServiceImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating WatchdogServiceImpl");
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	// Setup the KernelShutdownController object

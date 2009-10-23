@@ -306,6 +306,9 @@ public class BdbEnvironment implements DbEnvironment {
 			  ComponentRegistry systemRegistry,
 			  TransactionProxy txnProxy)
     {
+        logger.log(Level.CONFIG, "Creating BdbEnvironment with directory: {0}",
+                   directory);
+
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	long cacheSize = wrappedProps.getLongProperty(
 	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE, MIN_CACHE_SIZE,

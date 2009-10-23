@@ -134,7 +134,8 @@ public class TcpTransport implements Transport {
      * @param properties transport properties
      */
     public TcpTransport(Properties properties) {
-        
+
+        logger.log(Level.CONFIG, "Creating TcpTransport");
         if (properties == null) {
             throw new NullPointerException("properties is null");
         }

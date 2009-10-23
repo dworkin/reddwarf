@@ -322,6 +322,7 @@ public class TaskServiceImpl
         throws Exception
     {
         super(properties, systemRegistry, transactionProxy, logger);
+        logger.log(Level.CONFIG, "Creating TaskServiceImpl");
 
         // create the transient local collections
         activeIdentityMap = new HashMap<Identity, Integer>();

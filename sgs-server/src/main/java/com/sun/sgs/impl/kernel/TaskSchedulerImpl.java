@@ -117,6 +117,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
                       ProfileCollectorHandle profileCollectorHandle) 
         throws Exception 
     {
+        logger.log(Level.CONFIG, "Creating TaskSchedulerImpl");
         if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
         }

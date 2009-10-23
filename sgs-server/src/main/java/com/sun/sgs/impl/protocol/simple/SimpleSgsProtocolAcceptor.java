@@ -197,6 +197,7 @@ public class SimpleSgsProtocolAcceptor
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating SimpleSgsProtocolAcceptor");
 
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {

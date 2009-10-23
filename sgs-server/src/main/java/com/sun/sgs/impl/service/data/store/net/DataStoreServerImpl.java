@@ -812,6 +812,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 			       TransactionProxy txnProxy)
 	throws IOException
     {
+        logger.log(Level.CONFIG, "Creating DataStoreServerImpl");
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	store = new CustomDataStoreImpl(properties, systemRegistry, txnProxy);
 	maxTxnTimeout = wrappedProps.getLongProperty(

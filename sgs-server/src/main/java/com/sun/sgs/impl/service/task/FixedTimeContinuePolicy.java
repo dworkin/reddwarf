@@ -87,6 +87,7 @@ public class FixedTimeContinuePolicy implements ContinuePolicy {
     public FixedTimeContinuePolicy(Properties properties,
                                    ComponentRegistry systemRegistry,
                                    TransactionProxy txnProxy) {
+        logger.log(Level.CONFIG, "Creating FixedTimeContinuePolicy");
         this.txnProxy = txnProxy;
         
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);

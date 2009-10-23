@@ -207,6 +207,7 @@ final class TransactionSchedulerImpl
                              AccessCoordinatorHandle accessCoordinator)
         throws Exception
     {
+        logger.log(Level.CONFIG, "Creating TransactionSchedulerImpl");
         if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
         }

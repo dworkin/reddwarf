@@ -254,6 +254,7 @@ public final class ChannelServiceImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating ChannelServiceImpl");
 	
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 

@@ -736,6 +736,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	super(systemRegistry,
 	      new LoggerWrapper(Logger.getLogger(CLASSNAME)),
 	      new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort")));
+        logger.log(Level.CONFIG, "Creating DataStoreImpl");
 
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	String specifiedDirectory =

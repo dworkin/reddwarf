@@ -369,6 +369,7 @@ public class NodeMappingServiceImpl
     {
         super(properties, systemRegistry, txnProxy, 
               new LoggerWrapper(Logger.getLogger(PKG_NAME)));
+        logger.log(Level.CONFIG, "Creating NodeMappingServiceImpl");
         
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         
