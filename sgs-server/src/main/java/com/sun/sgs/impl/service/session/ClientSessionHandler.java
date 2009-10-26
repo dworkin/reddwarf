@@ -544,8 +544,19 @@ class ClientSessionHandler implements SessionProtocolHandler {
         /*
          * Get node assignment.
          */
-        final long assignedNodeId = sessionService.nodeMapService.assignNode(
+        final long assignedNodeId;
+        try{
+            assignedNodeId = sessionService.nodeMapService.assignNode(
                                     ClientSessionHandler.class, identity);
+	} catch (Exception e) {
+	    logger.logThrow(
+	        Level.WARNING, e,
+		"getting node assignment for identity:{0} throws", identity);
+	    sendLoginFailureAndDisconnect(
+		new LoginFailureException(LOGIN_REFUSED_REASON, e));
+	    return;
+	}
+
 	    
 	if (assignedNodeId < 0) {
 	    logger.log(Level.WARNING,
