@@ -218,7 +218,9 @@ public class SimpleSgsProtocol {
      * sends a {@code SUSPEND_MESSAGES} notification to the client, the
      * server may decide to drop messages from the client if it does not
      * receive the {@link #SUSPEND_MESSAGES_COMPLETE} acknowledgment in a
-     * timely fashion.
+     * timely fashion. <p>
+     *
+     * This opcode was introduced in protocol version {@code 0x05}.
      */
     public static final byte SUSPEND_MESSAGES = 0x14;
 
@@ -233,7 +235,9 @@ public class SimpleSgsProtocol {
      * {@link #SUSPEND_MESSAGES} notification.  Any messages received by the
      * server after this notification will be dropped, unless the server
      * has instructed the client to either resume messages or relocate its
-     * client session to another node.
+     * client session to another node. <p>
+     *
+     * This opcode was introduced in protocol version {@code 0x05}.
      */
     public static final byte SUSPEND_MESSAGES_COMPLETE = 0x15;
 
@@ -244,7 +248,9 @@ public class SimpleSgsProtocol {
      * Payload: (none)
      *
      * This message notifies the client that it can resume sending messages
-     * to the server.
+     * to the server. <p>
+     *
+     * This opcode was introduced in protocol version {@code 0x05}.
      */
     public static final byte RESUME_MESSAGES = 0x16;
 
@@ -265,7 +271,9 @@ public class SimpleSgsProtocol {
      * connection to the node indicated by the {@code hostname} and {@code
      * port} in the payload. The client should then attempt to reestablish
      * the client session with the server (without logging in) using the
-     * {@code relocationKey} specified in the payload.
+     * {@code relocationKey} specified in the payload. <p>
+     *
+     * This opcode was introduced in protocol version {@code 0x05}.
      */
     public static final byte RELOCATE_NOTIFICATION = 0x17;
 
@@ -287,7 +295,9 @@ public class SimpleSgsProtocol {
      * reconnecting to the server. If relocation is not successful, a
      * {@link #RELOCATE_FAILURE} message is sent to the client.  If the
      * client receives a {@code RELOCATE_FAILURE} message, the client
-     * should disconnect from the server.
+     * should disconnect from the server. <p>
+     *
+     * This opcode was introduced in protocol version {@code 0x05}.
      */
     public static final byte RELOCATE_REQUEST = 0x18;
 
@@ -303,7 +313,9 @@ public class SimpleSgsProtocol {
      * The {@code reconnectionKey} is an opaque reference that can be held by
      * the client for use in case the client is disconnected and wishes to
      * reconnect to the server with the same identity using a
-     * {@link #RECONNECT_REQUEST}.
+     * {@link #RECONNECT_REQUEST}. <p>
+     *
+     * This opcode was introduced in protocol version {@code 0x05}.
      */
     public static final byte RELOCATE_SUCCESS = 0x19;
 
@@ -322,7 +334,9 @@ public class SimpleSgsProtocol {
      * <li> session not relocating to the server
      * <li> relocation key mismatch
      * <li> a user with the same identity is already logged in
-     * </ul>
+     * </ul> <p>
+     *
+     * This opcode was introduced in protocol version {@code 0x05}.
      */
     public static final byte RELOCATE_FAILURE = 0x1a;
 
