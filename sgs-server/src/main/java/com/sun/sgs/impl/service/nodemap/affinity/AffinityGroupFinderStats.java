@@ -41,9 +41,13 @@ import javax.management.StandardMBean;
 public class AffinityGroupFinderStats extends StandardMBean
         implements AffinityGroupFinderMXBean
 {
-    /** Our consumer name. */
+    /** 
+     * Our consumer name, created with at {@code ProfileLevel.MEDIUM}.
+     */
     public static final String CONS_NAME = "com.sun.sgs.AffinityGroupFinder";
-    /** Configuration info -- what if we allow this be modified? */
+    /** Configuration info.
+     * TBD: what if we allow this be modified?
+     */
     private final int stopIteration;
 
     /** The affinity group finder. */
@@ -86,7 +90,7 @@ public class AffinityGroupFinderStats extends StandardMBean
         this.finder = finder;
 
         ProfileConsumer consumer = collector.getConsumer(CONS_NAME);
-        ProfileLevel level = ProfileLevel.MIN;
+        ProfileLevel level = ProfileLevel.MEDIUM;
         ProfileDataType type = ProfileDataType.AGGREGATE;
 
         iterations = (AggregateProfileSample)

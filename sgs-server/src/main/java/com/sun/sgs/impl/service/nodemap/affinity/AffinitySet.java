@@ -17,10 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
+package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashSet;
@@ -38,13 +37,17 @@ public class AffinitySet implements AffinityGroup, Serializable {
     private final long id;
     /** The set of identities comprising the group. */
     private final HashSet<Identity> identities = new HashSet<Identity>();
+    /** The generation of this affinity set. */
+    private final long generation;
 
     /**
-     * Constructs a new affinity group with the given identity.
+     * Constructs a new affinity group with the given ID.
      * @param id the affinity group identity
+     * @param generation the generation number of this group
      */
-    public AffinitySet(long id) {
+    public AffinitySet(long id, long generation) {
         this.id = id;
+        this.generation = generation;
     }
 
     /** {@inheritDoc} */
@@ -57,6 +60,11 @@ public class AffinitySet implements AffinityGroup, Serializable {
         return Collections.unmodifiableSet(identities);
     }
 
+    /** {@inheritDoc} */
+    public long getGeneration() {
+        return generation;
+    }
+    
     /** {@inheritDoc} */
     public String toString() {
         return getClass().getName() + "[" + id +

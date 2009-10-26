@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import java.util.Collection;
+import java.util.Set;
 
 /**
  *  The affinity group finder finds affinity groups within a
@@ -33,13 +33,7 @@ public interface AffinityGroupFinder {
      *
      * @return the affinity groups
      */
-    Collection<AffinityGroup> findAffinityGroups();
-
-    /**
-     * Removes any cached information about a failed node.
-     * @param nodeId the id of a failed node
-     */
-    void removeNode(long nodeId);
+    Set<AffinityGroup> findAffinityGroups();
 
     /**
      * Shuts down the affinity group finder.

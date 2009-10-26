@@ -46,11 +46,12 @@ import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
@@ -111,6 +112,9 @@ public class DistGraphBuilderServerImpl
      */
     private final AffinityGraphBuilderStats builderStats;
 
+    /** Generation number for our returned groups. */
+    private final AtomicLong generation = new AtomicLong();
+
     /**
      * Creates a distributed graph builder server.
      * @param systemRegistry the registry of available system components
@@ -135,7 +139,8 @@ public class DistGraphBuilderServerImpl
                 systemRegistry.getComponent(ProfileCollector.class);
         // Create our backing graph builder.  We wrap this object so we
         // can return a different type from findAffinityGroups.
-        builder = new SingleGraphBuilder(col, properties, nodeId, false);
+        builder = new SingleGraphBuilder(properties, systemRegistry,
+                                         txnProxy, false);
  
         // Create our group finder and graph builder JMX MBeans
         AffinityGroupFinderStats stats =
@@ -211,7 +216,7 @@ public class DistGraphBuilderServerImpl
 
     /**
      * {@inheritDoc}
-     * 
+     * <p>
      * The returned groups contain node assignment information for the
      * identities.  This information is looked up from the node mapping service.
      * Alternatively, we could create a new graph node type and track this
@@ -219,11 +224,12 @@ public class DistGraphBuilderServerImpl
      * this would be some work, it might be worthwhile to implement if we
      * find this LPA implementation is useful in deployed systems.
      */
-    public Collection<AffinityGroup> findAffinityGroups() {
-        Collection<AffinityGroup> groups = lpa.findAffinityGroups();
+    public Set<AffinityGroup> findAffinityGroups() {
+        long gen = generation.incrementAndGet();
+        Set<AffinityGroup> groups = lpa.findAffinityGroups();
         // Need to translate each group into a relocating affinity group
         // Create our final return values
-        Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
+        Set<AffinityGroup> retVal = new HashSet<AffinityGroup>();
         for (AffinityGroup ag : groups) {
             Map<Identity, Long> idMap = new HashMap<Identity, Long>();
             for (Identity id : ag.getIdentities()) {
@@ -240,15 +246,10 @@ public class DistGraphBuilderServerImpl
                     idMap.put(id, Long.valueOf(-1));
                 }
             }
-            retVal.add(new RelocatingAffinityGroup(ag.getId(), idMap));
+            retVal.add(new RelocatingAffinityGroup(ag.getId(), idMap, gen));
         }
 
         return retVal;
-    }
-
-    /** {@inheritDoc} */
-    public void removeNode(long nodeId) {
-        // do nothing, the server never contacts clients
     }
 
     /**

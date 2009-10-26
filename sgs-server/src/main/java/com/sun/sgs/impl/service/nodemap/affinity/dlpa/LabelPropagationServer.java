@@ -30,9 +30,10 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -92,7 +93,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      */
     private static final int MAX_ITERATIONS = 10;
 
-        /** Prefix for io task related properties. */
+    /** Prefix for io task related properties. */
     public static final String IO_TASK_PROPERTY_PREFIX =
             "com.sun.sgs.impl.util.io.task";
 
@@ -138,27 +139,33 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     /** A barrier that consists of the set of nodes we expect to hear back
      * from asynchronous calls.  Once this set is empty, we can move on to the
-     * next step of the algorithm.  This is required, rather than a simple
-     * Barrier, because our calls must be idempotent.
+     * next step of the algorithm.  This data structure is required, rather
+     * than a simple Barrier, because our calls must be idempotent.
      */
-    private Set<Long> nodeBarrier = new HashSet<Long>();
+    private final Set<Long> nodeBarrier =
+            Collections.synchronizedSet(new HashSet<Long>());
 
-    /** A latch to ensure our main thread waits for all nodes to complete
+    /**
+     * A latch to ensure our main thread waits for all nodes to complete
      * each step of the algorithm before proceeding.
      * This is replaced on each iteration.
+     * No synchronization is required on this latch.
      */
     private CountDownLatch latch;
 
     // Algorithm iteration information
-    /** The current iteration of the algorithm, used for sanity checking. */
+    /**
+     * The current iteration of the algorithm, used for sanity checking;
+     * and set in a single thread.
+     */
     private int currentIteration;
     /** True if we believe all nodes have converged. */
-    private boolean nodesConverged;
+    private volatile boolean nodesConverged;
 
     /** Set to true if something has gone wrong and the results from
      * this algorithm run should be ignored.
      */
-    private boolean runFailed;
+    private volatile boolean runFailed;
 
     /** A thread pool.  Will create as many threads as needed, with a timeout
      * of 60 sec before unused threads are reaped.
@@ -174,8 +181,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     /** True if we're in the midst of an algorithm run. */
     private boolean running = false;
 
-    /**  The iteration number, used to ensure that LPAClients are reporting
-     * results from the expected iteration.
+    /**  The algorithm run number, used to ensure that LPAClients are reporting
+     * results from the expected run.
      */
     private final AtomicLong runNumber = new AtomicLong();
 
@@ -204,6 +211,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 IO_TASK_RETRIES_PROPERTY, DEFAULT_MAX_IO_ATTEMPTS, 0,
                 Integer.MAX_VALUE);
 
+        // Register our node listener with the watchdog service.
+        wdog.addNodeListener(new NodeFailListener());
+        
         int requestedPort = wrappedProps.getIntProperty(
                 SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
         // Export ourself.
@@ -224,9 +234,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     // ---- Implement AffinityGroupFinder --- //
 
     /** {@inheritDoc} */
-    public Collection<AffinityGroup> findAffinityGroups() {
-        // Our return value, initally empty
-        Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
+    public Set<AffinityGroup> findAffinityGroups() {
+        // Our return value, initially empty
+        Set<AffinityGroup> retVal = new HashSet<AffinityGroup>();
         synchronized (runningLock) {
             while (running) {
                 try {
@@ -242,7 +252,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // interfaces.  The protocol is:
         // Server calls each LPAClient.prepareAlgorithm().
         //     Nodes contact other nodes which their graphs might be
-        //     connected to, using LPAClient.crossNodeEdges.
+        //     connected to, using LPAClient.notifyCrossNodeEdges.
         //     Nodes can find the appropriate LPAClient by calling
         //     LPAServer.getLPAClientProxy.
         //     When finished exchanging information, each node calls
@@ -310,7 +320,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Algorithm took {0} milliseconds and {1} " +
                     "iterations", runTime, currentIteration);
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
             sb.append(" LPA found " +  retVal.size() + " groups ");
 
             for (AffinityGroup group : retVal) {
@@ -327,13 +337,6 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             runningLock.notifyAll();
         }
         return retVal;
-    }
-
-    /** {@inheritDoc} */
-    public void removeNode(long nodeId) {
-        synchronized (clientProxyMap) {
-            clientProxyMap.remove(nodeId);
-        }
     }
 
     /** {@inheritDoc} */
@@ -358,9 +361,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             logger.log(Level.INFO, "node {0} reports failure", nodeId);
         }
         runFailed = runFailed || failed;
-        if (nodeBarrier.remove(nodeId)) {
-            latch.countDown();
-        }
+        maybeCountDown(nodeId);
     }
 
     /** {@inheritDoc} */
@@ -380,9 +381,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
         nodesConverged = converged && nodesConverged;
 
-        if (nodeBarrier.remove(nodeId)) {
-            latch.countDown();
-        }
+        maybeCountDown(nodeId);
     }
 
     /** {@inheritDoc} */
@@ -393,8 +392,36 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     /** {@inheritDoc} */
     public void register(long nodeId, LPAClient client) throws IOException {
+        clientProxyMap.put(nodeId, client);
+    }
+
+    /**
+     * The listener registered with the watchdog service.  These methods
+     * will be notified if a node starts or stops.
+     */
+    private class NodeFailListener implements NodeListener {
+        NodeFailListener() {
+            // nothing special
+        }
+
+        /** {@inheritDoc} */
+        public void nodeStarted(Node node) {
+            // Do nothing. We will ask for a proxy for the node lazily.
+        }
+
+        /** {@inheritDoc} */
+        public void nodeFailed(Node node) {
+            removeNode(node.getId());
+        }
+    }
+
+    /**
+     * Removes cached information about a failed node.
+     * @param nodeId the Id of the failed node
+     */
+    private void removeNode(long nodeId) {
         synchronized (clientProxyMap) {
-            clientProxyMap.put(nodeId, client);
+            clientProxyMap.remove(nodeId);
         }
     }
 
@@ -407,7 +434,8 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // Tell each node to prepare for an algorithm run.
         final Set<Long> clean =
                 Collections.unmodifiableSet(clientProxies.keySet());
-        nodeBarrier = Collections.synchronizedSet(new HashSet<Long>(clean));
+        nodeBarrier.clear();
+        nodeBarrier.addAll(clean);
         latch = new CountDownLatch(clean.size());
 
         final long runNum = runNumber.incrementAndGet();
@@ -421,7 +449,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                          CLASS_NAME);
                 if (!ok) {
                     runFailed = true;
-                    latch.countDown();
+                    maybeCountDown(nodeId);
                     // If we cannot reach the proxy after retries, we need
                     // to remove it from the
                     // clientProxyMap.
@@ -432,7 +460,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                     "exception from node {0} while preparing",
                     nodeId);
                 runFailed = true;
-                latch.countDown();
+                maybeCountDown(nodeId);
             }
         }
 
@@ -468,7 +496,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                          CLASS_NAME);
                     if (!ok) {
                         runFailed = true;
-                        latch.countDown();
+                        maybeCountDown(nodeId);
                         // If we cannot reach the proxy after retries, we need
                         // to remove it from the
                         // clientProxyMap.
@@ -480,7 +508,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                         "iteration {1}",
                         nodeId, currentIteration);
                     runFailed = true;
-                    latch.countDown();
+                    maybeCountDown(nodeId);
                 }
             }
             // Wait for all nodes to complete this iteration
@@ -503,20 +531,25 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      * @param clientProxies a map of node ids to LPAClient proxies
      * @return the merged affinity groups found on each LPAClient
      */
-    private Collection<AffinityGroup> gatherFinalGroups(
-            Map<Long, LPAClient> clientProxies)
+    private Set<AffinityGroup> gatherFinalGroups(
+                    Map<Long, LPAClient> clientProxies)
     {
         // If, after this point, we cannot contact a node, simply
         // return the information that we have.
         // Assuming a node has failed, we won't report the identities
         // on the failed node as being part of any group.
-        final Map<Long, Collection<AffinityGroup>> returnedGroups =
-            new ConcurrentHashMap<Long, Collection<AffinityGroup>>();
-        latch = new CountDownLatch(clientProxies.keySet().size());
+        final Map<Long, Set<AffinityGroup>> returnedGroups =
+            new ConcurrentHashMap<Long, Set<AffinityGroup>>();
+        final Set<Long> clean =
+                Collections.unmodifiableSet(clientProxies.keySet());
+        nodeBarrier.clear();
+        nodeBarrier.addAll(clean);
+        latch = new CountDownLatch(clean.size());
         final long runNum = runNumber.get();
         for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
             final Long nodeId = ce.getKey();
             final LPAClient proxy = ce.getValue();
+            // TODO:  use executor to make parallel requests
             executor.execute(new Runnable() {
                 public void run() {
                     try {
@@ -526,21 +559,15 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                                       proxy.getAffinityGroups(runNum, true));
                             } }, wdog, nodeId, maxIoAttempts, retryWaitTime,
                                  CLASS_NAME);
-                        if (ok) {
-                            latch.countDown();
-                        } else {
-                            if (nodeBarrier.remove(nodeId)) {
-                                latch.countDown();
-                            }
+                        maybeCountDown(nodeId);
+                        if (!ok) {
                             removeNode(ce.getKey());
                         }
                     } catch (Exception e) {
                         logger.logThrow(Level.INFO, e,
                             "exception from node {0} while returning groups",
                             ce.getKey());
-                        if (nodeBarrier.remove(nodeId)) {
-                            latch.countDown();
-                        }
+                        maybeCountDown(nodeId);
                     }
                 }
             });
@@ -554,7 +581,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
                 new HashMap<Long, Map<Identity, Long>>();
         // Ensure that each identity is only assigned to a single group
         Set<Identity> idSet = new HashSet<Identity>();
-        for (Map.Entry<Long, Collection<AffinityGroup>> e :
+        for (Map.Entry<Long, Set<AffinityGroup>> e :
             returnedGroups.entrySet())
         {
             Long nodeId = e.getKey();
@@ -578,11 +605,13 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
 
         // Create our final return values
-        Collection<AffinityGroup> retVal = new HashSet<AffinityGroup>();
+        Set<AffinityGroup> retVal = new HashSet<AffinityGroup>();
         for (Map.Entry<Long, Map<Identity, Long>> e :
             groupMap.entrySet())
         {
-            retVal.add(new RelocatingAffinityGroup(e.getKey(), e.getValue()));
+            retVal.add(new RelocatingAffinityGroup(e.getKey(), 
+                                                   e.getValue(),
+                                                   runNum));
         }
 
         return retVal;
@@ -603,6 +632,17 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
     }
 
+    /**
+     * Calls countDown on {@code latch} if the given node ID is in
+     * the {@code nodeBarrier}.
+     * 
+     * @param nodeId the ID of the node we're accounting for
+     */
+    private void maybeCountDown(long nodeId) {
+        if (nodeBarrier.remove(nodeId)) {
+            latch.countDown();
+        }
+    }
     /**
      * Executes the specified {@code ioTask} by invoking its {@link
      * IoRunnable#run run} method. If the specified task throws an

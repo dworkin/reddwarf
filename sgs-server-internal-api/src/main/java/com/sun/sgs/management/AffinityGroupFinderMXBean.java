@@ -106,7 +106,7 @@ public interface AffinityGroupFinderMXBean {
 
     /**
      * Returns the time of the last call to {@link #clear}, or the time
-     * this MBean was created {@code clear} has never been called.  The
+     * this MBean was created if {@code clear} has never been called.  The
      * time is the difference, measured in milliseconds, between the time at
      * which this was last cleared and midnight, January 1, 1970 UTC.
      *
@@ -115,7 +115,11 @@ public interface AffinityGroupFinderMXBean {
     long getLastClearTime();
 
     /**
-     * Finds affinity groups.
+     * Finds affinity groups based on the current graph information.  This
+     * will start a new run of the affinity group finder, or wait for the
+     * current run to complete.
+     * <p>
+     * NOTE:  This method is useful for testing but may be removed.
      */
     void findAffinityGroups();
 }

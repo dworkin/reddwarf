@@ -33,7 +33,7 @@ import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
@@ -89,16 +89,14 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
 
     /**
      * Creates the client side of a distributed graph builder.
+     * @param properties the properties for configuring this builder
      * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
-     * @param properties  application properties
-     * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public DistGraphBuilder(ComponentRegistry systemRegistry,
-                            TransactionProxy txnProxy,
-                            Properties properties,
-                            long nodeId)
+    public DistGraphBuilder(Properties properties,
+                            ComponentRegistry systemRegistry,
+                            TransactionProxy txnProxy)
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -112,7 +110,8 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
                 AbstractService.IO_TASK_RETRIES_PROPERTY,
                 DEFAULT_MAX_IO_ATTEMPTS, 0, Integer.MAX_VALUE);
 
-        localNodeId = nodeId;
+        DataService dataService = txnProxy.getService(DataService.class);
+        localNodeId = dataService.getLocalNodeId();
 
         NodeType nodeType =
                 wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE,
@@ -121,7 +120,7 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
         if (nodeType == NodeType.coreServerNode) {
             serverImpl = 
                 new DistGraphBuilderServerImpl(systemRegistry, txnProxy,
-                                               properties, nodeId);
+                                               properties, localNodeId);
             server = null;
         } else {
             String host = wrappedProps.getProperty(SERVER_HOST_PROPERTY,

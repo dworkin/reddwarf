@@ -51,6 +51,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import junit.framework.Assert;
 import org.junit.After;
 import org.junit.Before;
@@ -133,7 +134,7 @@ public class TestLPADistGraphPerf {
         for (int i = 0; i < WARMUP_RUNS; i++) {
             GraphListener serverListener = (GraphListener)
                 graphListenerField.get(serverNode.getNodeMappingService());
-            Collection<AffinityGroup> groups =
+            Set<AffinityGroup> groups =
                 serverListener.getGraphBuilder().
                     getAffinityGroupFinder().findAffinityGroups();
         }
@@ -405,7 +406,7 @@ public class TestLPADistGraphPerf {
             double maxMod = 0.0;
             double minMod = 1.0;
             for (int i = 0; i < RUNS; i++) {                
-                Collection<AffinityGroup> groups =
+                Set<AffinityGroup> groups =
                     builder.getAffinityGroupFinder().findAffinityGroups();
                 double mod =
                     AffinityGroupGoodness.calcModularity(graphModel, groups);

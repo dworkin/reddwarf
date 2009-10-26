@@ -29,7 +29,7 @@
  * Each node constructs a 
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener} which
  * consumes task information about which identities are using which objects.
- * The graph listener creates a
+ * The graph listener creates an
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder}
  * based on the property value {@value
  * com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener#GRAPH_CLASS_PROPERTY}.

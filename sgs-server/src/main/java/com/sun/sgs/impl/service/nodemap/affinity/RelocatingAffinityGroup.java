@@ -27,7 +27,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 /**
- * An ffinity group which can relocate its member identities to other nodes.
+ * An affinity group which can relocate its member identities to other nodes.
  * Key ideas swiped from Keith's branch to help us with merging.
  * <p>
  * These affinity groups can span multiple nodes and will eventually
@@ -42,16 +42,25 @@ public class RelocatingAffinityGroup implements AffinityGroup {
     private final Map<Identity, Long> identities;
     // The node id that most Identities seem to be on
     private final long targetNodeId;
-
+    // Generation number
+    private final long generation;
     /**
      * Creates a new affinity group containing node information.
      * @param agid the group id
      * @param identities the identities and their nodes in the group
+     * @param generation the generation number of this group
+     * @throws IllegalArgumentException if {@code identities} is empty
      */
-    public RelocatingAffinityGroup(long agid, Map<Identity, Long> identities) {
-        assert identities.size() > 0;
+    public RelocatingAffinityGroup(long agid,
+                                   Map<Identity, Long> identities,
+                                   long generation)
+    {
+        if (identities.size() == 0) {
+            throw new IllegalArgumentException("Identities must not be empty");
+        }
         this.agid = agid;
         this.identities = identities;
+        this.generation = generation;
         targetNodeId = calcMostUsedNode();
     }
 
@@ -96,4 +105,8 @@ public class RelocatingAffinityGroup implements AffinityGroup {
         return Collections.unmodifiableSet(identities.keySet());
     }
 
+    /** {@inheritDoc} */
+    public long getGeneration() {
+        return generation;
+    }
 }

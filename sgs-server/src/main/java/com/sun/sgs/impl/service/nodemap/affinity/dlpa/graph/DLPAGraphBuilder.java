@@ -42,10 +42,13 @@ public interface DLPAGraphBuilder extends AffinityGraphBuilder {
             getObjectUseMap();
 
     /**
-     * Returns a map of detected cross node data conflicts.  This is a map 
-     * of node IDs to object IDs, and a count of the number of conflicts on the
-     * object with that node.  An emtpy map will be returned if there are no
-     * conflicts.
+     * Returns a map of detected cross node data conflicts.  Conflicts
+     * occur when an object is in use by the current node but is needed by
+     * another node. This is a map of node IDs (the nodes requesting the
+     * object) to object IDs, and a count of the number of conflicts on the
+     * object with that node.  An empty map will be returned if there are no
+     * conflicts.  If more than one node needs an object at about the same
+     * time, it is only required that one node be recorded as a conflict.
      * 
      * @return the map of detected cross node data conflicts
      */

@@ -106,8 +106,7 @@ public class GraphListener implements ProfileListener {
         }
         if (builderName != null) {
             builder = createBuilder(Class.forName(builderName),
-                                    systemRegistry, txnProxy,
-                                    col, properties, nodeId);
+                                    properties, systemRegistry, txnProxy);
 //        } else if (type != NodeType.singleNode) {
 //            // Default is currently NONE, might become the distributed LPA/
 //            // weighted graph listener in the future.
@@ -134,32 +133,20 @@ public class GraphListener implements ProfileListener {
      * two different ctor signatures.
      */
     private AffinityGraphBuilder createBuilder(Class<?> bClass,
-            ComponentRegistry systemRegistry, TransactionProxy txnProxy,
-            ProfileCollector col,
-            Properties props, long nodeId)
+                                               Properties props,
+                                               ComponentRegistry systemRegistry,
+                                               TransactionProxy txnProxy)
         throws Exception
     {
         Constructor<?> ctor;
         try {
-            try {
-                // find the appropriate constructor
-                ctor = bClass.getConstructor(ProfileCollector.class,
-                        TransactionProxy.class,
-                        Properties.class, long.class);
-                // return a new instance
-                return (AffinityGraphBuilder)
-                        (ctor.newInstance(col, txnProxy, props, nodeId));
-
-            } catch (NoSuchMethodException e) {
-                // Look for a version that takes additional args because
-                // transactions must be used
-                ctor = bClass.getConstructor(ComponentRegistry.class,
-                        TransactionProxy.class,
-                        Properties.class, long.class);
-                // return a new instance
-                return (AffinityGraphBuilder)
-                    (ctor.newInstance(systemRegistry, txnProxy, props, nodeId));
-            }
+            // find the constructor
+            ctor = bClass.getConstructor(Properties.class,
+                                         ComponentRegistry.class,
+                                         TransactionProxy.class);
+            // return a new instance
+            return (AffinityGraphBuilder)
+                    (ctor.newInstance(props, systemRegistry, txnProxy));
         } catch (InvocationTargetException e) {
             // Try to unwrap any nested exceptions - they will be wrapped
             // because we are instantiating via reflection
@@ -187,7 +174,10 @@ public class GraphListener implements ProfileListener {
     /** {@inheritDoc} */
     public void report(ProfileReport profileReport) {
         Identity owner = profileReport.getTaskOwner(); 
-        // We don't care about accesses by the system identity
+        // We don't care about accesses by the system identity, since
+        // these identities cannot move to other nodes. The affinity graphs
+        // consist of application information only to help reduce their
+        // size.  The system identity is pinned to a node.
         if (owner instanceof SystemIdentity) {
             return;
         }
@@ -201,8 +191,9 @@ public class GraphListener implements ProfileListener {
     }
 
     /**
-     * Returns the graph builder used by this listener.
-     * @return the graph builder
+     * Returns the graph builder used by this listener, or {@code null} if
+     * we are not building graphs.
+     * @return the graph builder or {@code null} if there is none
      */
     public AffinityGraphBuilder getGraphBuilder() {
         return builder;

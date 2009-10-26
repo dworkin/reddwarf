@@ -29,6 +29,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
@@ -90,17 +91,17 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     
     /**
      * Creates a weighted graph builder and its JMX MBean.
-     * @param col the profile collector
-     * @param txnProxy the transaction proxy (unused)
-     * @param properties application properties
-     * @param nodeId the local node id
+     * @param properties the properties for configuring this builder
+     * @param systemRegistry the registry of available system components
+     * @param txnProxy the transaction proxy
      * @throws Exception if an error occurs
      */
-    public SingleGraphBuilder(ProfileCollector col, TransactionProxy txnProxy,
-                              Properties properties, long nodeId)
+    public SingleGraphBuilder(Properties properties,
+                              ComponentRegistry systemRegistry,
+                              TransactionProxy txnProxy)
         throws Exception
     {
-        this(col, properties, nodeId, true);
+        this (properties, systemRegistry, txnProxy, true);
     }
 
     /**
@@ -110,14 +111,15 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
      * with a call to {@code setStats} or a {@code NullPointerException} will
      * be thrown on the first call to {@code updateGraph}.
      * 
-     * @param col the profile collector
-     * @param properties application properties
-     * @param nodeId the local node id
+     * @param properties the properties for configuring this builder
+     * @param systemRegistry the registry of available system components
+     * @param txnProxy the transaction proxy
      * @param needStats {@code true} if stats should be constructed
      * @throws Exception if an error occurs
      */
-    public SingleGraphBuilder(ProfileCollector col,
-                              Properties properties, long nodeId,
+    public SingleGraphBuilder(Properties properties,
+                              ComponentRegistry systemRegistry,
+                              TransactionProxy txnProxy,
                               boolean needStats)
         throws Exception
     {
@@ -128,6 +130,8 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
                 1, Integer.MAX_VALUE);
 
+        ProfileCollector col =
+                systemRegistry.getComponent(ProfileCollector.class);
         // Create the LPA algorithm
         lpa = new SingleLabelPropagation(this, col, properties);
 
@@ -150,12 +154,9 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         pruneTimer.schedule(pruneTask, snapshot, snapshot);
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * We don't currently use read/write access info.
-     */
+    /** {@inheritDoc} */
     public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+        // TBD:  We don't currently use read/write access info.
         final Object[] ids = new Object[detail.getAccessedObjects().size()];
         int index = 0;
         for (AccessedObject access : detail.getAccessedObjects()) {
@@ -167,7 +168,7 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     /**
      * Updates the graph with the given identity and object ids.
      * <p>
-     * This method is may be called by multiple threads and must protect itself
+     * This method may be called by multiple threads and must protect itself
      * from changes to data structures made by the pruner.
      * @param owner the identity which accessed the objects
      * @param objIds the object ids of objects accessed by the identity
@@ -198,11 +199,17 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
                 if (value == null) {
                     value = newVal;
                 }
+                // Make sure the idMap is still in the objectMap, in case
+                // of interference with the pruner.
+                objectMap.putIfAbsent(objId, idMap);
             }
             long currentVal = value.incrementAndGet();
 
             synchronized (affinityGraph) {
+                // Add the vertex while synchronized to ensure no interference
+                // from the graph pruner.
                 affinityGraph.addVertex(vowner);
+
                 // add or update edges between task owner and identities
                 for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
@@ -271,6 +278,9 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
      * @param stats our JMX information
      */
     public void setStats(AffinityGraphBuilderStats stats) {
+        if (stats == null) {
+            throw new NullPointerException("null stats");
+        }
         this.stats = stats;
     }
 
@@ -286,6 +296,8 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         // length of the window.
         private final int count;
         // The current snapshot count, used to initially fill up our window.
+        // We run long enough to fill at least one window before the pruner
+        // can begin.
         private int current = 1;
 
         // The change information we keep for each snapshot.  A new change info
@@ -295,11 +307,6 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         private Map<Object, Map<Identity, Integer>> currentPeriodObject;
         // Edge -> count of times incremented
         private Map<WeightedEdge, Integer> currentPeriodEdgeIncrements;
-
-        // A lock to guard all uses of the current period information above.
-        // Specifically, we want to ensure that updates to these structures
-        // aren't ones currently being pruned.
-        private final Object currentPeriodLock = new Object();
 
         // Queues of snapshot information.  As a snapshot time period ends,
         // we add its change info to the back of the appropriate queue.  If
@@ -312,6 +319,12 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         private final Deque<Map<WeightedEdge, Integer>>
             periodEdgeIncrementsQueue =
                 new ArrayDeque<Map<WeightedEdge, Integer>>();
+
+        // A lock to guard all uses of the current period information above
+        // and the queues.
+        // Specifically, we want to ensure that updates to these structures
+        // aren't ones currently being pruned.
+        private final Object currentPeriodLock = new Object();
 
         /**
          * Creates a PruneTask.
@@ -330,6 +343,9 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
          */
         public void run() {
             stats.pruneCountInc();
+
+            Map<Object, Map<Identity, Integer>> periodObject;
+            Map<WeightedEdge, Integer> periodEdgeIncrements;
             // Note: We want to make sure we don't have snapshots that are so
             // short that we cannot do all our pruning within one.
             synchronized (currentPeriodLock) {
@@ -342,15 +358,12 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
                     current++;
                     return;
                 }
+                // Remove the earliest snasphot.
+                periodObject = periodObjectQueue.removeFirst();
+                periodEdgeIncrements = periodEdgeIncrementsQueue.removeFirst();
             }
 
             long startTime = System.currentTimeMillis();
-
-            // Remove the earliest snasphot.
-            Map<Object, Map<Identity, Integer>>
-                periodObject = periodObjectQueue.remove();
-            Map<WeightedEdge, Integer>
-                periodEdgeIncrements = periodEdgeIncrementsQueue.remove();
 
             // For each object, remove the added access counts
             for (Map.Entry<Object, Map<Identity, Integer>> entry :
@@ -364,14 +377,13 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
                     Identity updateId = updateEntry.getKey();
                     long updateValue = updateEntry.getValue();
                     AtomicLong val = idMap.get(updateId);
-                    // correct? should be using compareAndSet?
                     val.addAndGet(-updateValue);
                     if (val.get() <= 0) {
                         idMap.remove(updateId);
                     }
                 }
                 if (idMap.isEmpty()) {
-                    objectMap.remove(entry.getKey());
+                    objectMap.remove(entry.getKey(), idMap);
                 }
             }
 
@@ -439,10 +451,10 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         private void addPeriodStructures() {
             currentPeriodObject =
                     new HashMap<Object, Map<Identity, Integer>>();
-            periodObjectQueue.add(currentPeriodObject);
+            periodObjectQueue.addLast(currentPeriodObject);
             currentPeriodEdgeIncrements =
                     new HashMap<WeightedEdge, Integer>();
-            periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
+            periodEdgeIncrementsQueue.addLast(currentPeriodEdgeIncrements);
         }
     }
 }

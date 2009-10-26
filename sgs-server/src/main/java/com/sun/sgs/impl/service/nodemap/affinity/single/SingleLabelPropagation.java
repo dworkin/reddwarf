@@ -30,13 +30,14 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import javax.management.JMException;
 
@@ -53,6 +54,17 @@ public class SingleLabelPropagation extends AbstractLPA
 
     /** Our JMX info. */
     private final AffinityGroupFinderStats stats;
+
+    /** Our generation number. */
+    private final AtomicLong generation = new AtomicLong();
+
+    /** The maximum number of iterations we will run.  Interesting to set high
+     * for testing, but 5 has been shown to be adequate in most papers.
+     * For distributed case, seem to always converge within 10, and setting
+     * to 5 cuts off some of the highest modularity solutions (running
+     * distributed Zachary test network).
+     */
+    private static final int MAX_ITERATIONS = 10;
 
     /**
      * Constructs a new instance of the label propagation algorithm.
@@ -76,10 +88,9 @@ public class SingleLabelPropagation extends AbstractLPA
      * Constructs a new instance of the label propagation algorithm.
      * @param builder the graph producer
      * @param col the profile collector
+     * @param properties the properties for configuring this service
      * @param stats pre-constructed JMX Mbean or {@code null} if one should be
      *              constructed
-     * @param properties the properties for configuring this service
-     *
      * @throws IllegalArgumentException if {@code numThreads} is
      *       less than {@code 1}
      * @throws Exception if any other error occurs
@@ -91,10 +102,13 @@ public class SingleLabelPropagation extends AbstractLPA
         throws Exception
     {
         super(1, properties);
+        if (builder == null) {
+	    throw new NullPointerException("null builder");
+	}
         this.builder = builder;
         if (stats == null) {
             // Create our JMX MBean
-            stats = new AffinityGroupFinderStats(this, col, -1);
+            stats = new AffinityGroupFinderStats(this, col, MAX_ITERATIONS);
             try {
                 col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
             } catch (JMException e) {
@@ -112,11 +126,13 @@ public class SingleLabelPropagation extends AbstractLPA
     }
 
     /** {@inheritDoc} */
-    protected void doOtherNeighbors(LabelVertex vertex,
+    protected long doOtherNeighbors(LabelVertex vertex,
                                     Map<Integer, Long> labelMap,
-                                    StringBuffer logSB)
+                                    long maxCount,
+                                    StringBuilder logSB)
     {
-        //do nothing
+        // do nothing, no changes
+        return maxCount;
     }
 
     /**
@@ -145,9 +161,10 @@ public class SingleLabelPropagation extends AbstractLPA
      *
      * @return the affinity groups
      */
-    public Collection<AffinityGroup> findAffinityGroups() {
+    public Set<AffinityGroup> findAffinityGroups() {
         long startTime = System.currentTimeMillis();
         stats.runsCountInc();
+        long gen = generation.incrementAndGet();
 
         // Step 1.  Initialize all nodes in the network.
         //          Their labels are their Identities.
@@ -163,15 +180,15 @@ public class SingleLabelPropagation extends AbstractLPA
                                           localNodeId, t, graph);
             }
             // Step 3.  Arrange the nodes in a random order and set it to X.
-            // Step 4.  For each vertices in X chosen in that specific order,
-            //          let the label of vertices be the label of the highest
-            //          frequency of its neighbors.
-            boolean changed = false;
-
             // Choose a different ordering for each iteration
             if (t > 1) {
                 Collections.shuffle(vertices);
             }
+
+            // Step 4.  For each vertices in X chosen in that specific order,
+            //          let the label of vertices be the label of the highest
+            //          frequency of its neighbors.
+            boolean changed = false;    
 
             if (numThreads > 1) {
                 final AtomicBoolean abool = new AtomicBoolean(false);
@@ -179,8 +196,9 @@ public class SingleLabelPropagation extends AbstractLPA
                 for (final LabelVertex vertex : vertices) {
                     tasks.add(new Callable<Void>() {
                         public Void call() {
-                            abool.set(setMostFrequentLabel(vertex, true) ||
-                                      abool.get());
+                            if (setMostFrequentLabel(vertex, true)) {
+                                abool.set(true);
+                            }
                             return null;
                         }
                     });
@@ -190,35 +208,34 @@ public class SingleLabelPropagation extends AbstractLPA
                 // We don't look at the returned futures.
                 try {
                     executor.invokeAll(tasks);
+                    changed = abool.get();
                 } catch (InterruptedException ie) {
                     changed = true;
                     logger.logThrow(Level.INFO, ie,
                                     " during iteration " + t);
                 }
-                changed = abool.get();
 
             } else {
                 for (LabelVertex vertex : vertices) {
-                    changed = setMostFrequentLabel(vertex, true) || changed;
+                    if (setMostFrequentLabel(vertex, true)) {
+                        changed = true;
+                    }
                 }
             }
 
             // Step 5. If every vertex has a label that the maximum number of
             //         their neighbors have, then stop.   Otherwise, set
             //         t++ and loop.
-            // Note that Leung's paper suggests we don't need the extra stopping
-            // condition if we include each vertex in the neighbor freq calc.
             if (!changed) {
                 break;
             }
-            t++;
 
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
-                Collection<AffinityGroup> intermediateGroups =
-                        gatherGroups(vertices, false);
+                Set<AffinityGroup> intermediateGroups =
+                        gatherGroups(vertices, false, gen);
                 for (AffinityGroup group : intermediateGroups) {
-                    StringBuffer logSB = new StringBuffer();
+                    StringBuilder logSB = new StringBuilder();
                     for (Identity id : group.getIdentities()) {
                         logSB.append(id + " ");
                     }
@@ -228,6 +245,14 @@ public class SingleLabelPropagation extends AbstractLPA
                 }
 
             }
+
+            // Papers show most work is done after 5 iterations
+            if (++t >= MAX_ITERATIONS) {
+                stats.stoppedCountInc();
+                logger.log(Level.FINE, "exceeded {0} iterations, stopping",
+                        MAX_ITERATIONS);
+                break;
+            }
         }
 
         if (logger.isLoggable(Level.FINER)) {
@@ -235,7 +260,7 @@ public class SingleLabelPropagation extends AbstractLPA
                                     localNodeId, graph);
         }
         // The groups collected in the last run
-        Collection<AffinityGroup> groups = gatherGroups(vertices, true);
+        Set<AffinityGroup> groups = gatherGroups(vertices, true, gen);
         long runTime = System.currentTimeMillis() - startTime;
         stats.runtimeSample(runTime);
         stats.iterationsSample(t);
@@ -244,7 +269,7 @@ public class SingleLabelPropagation extends AbstractLPA
         if (logger.isLoggable(Level.FINE)) {
             double modularity =
                     AffinityGroupGoodness.calcModularity(graph, groups);
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
             sb.append(" LPA (" + numThreads + ") took " +
                       runTime + " milliseconds, " +
                       t + " iterations, and found " +
@@ -259,10 +284,5 @@ public class SingleLabelPropagation extends AbstractLPA
             logger.log(Level.FINE, sb.toString());
         }
         return groups;
-    }
-
-    /** {@inheritDoc} */
-    public void removeNode(long nodeId) {
-        // do nothing
     }
 }

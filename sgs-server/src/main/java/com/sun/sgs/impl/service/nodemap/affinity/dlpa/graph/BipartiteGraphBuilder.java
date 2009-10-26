@@ -31,10 +31,12 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.Graph;
@@ -108,18 +110,17 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     private final LabelPropagation lpa;
     /**
      * Constructs a new bipartite graph builder.
-     * @param col the profile collector
+     * @param properties the properties for configuring this builder
+     * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
-     * @param props application properties
-     * @param nodeId the local node id
      * @throws Exception if an error occurs
      */
-    public BipartiteGraphBuilder(ProfileCollector col, 
-                                 TransactionProxy txnProxy,
-                                 Properties props, long nodeId)
+    public BipartiteGraphBuilder(Properties properties,
+                                 ComponentRegistry systemRegistry,
+                                 TransactionProxy txnProxy)
         throws Exception
     {
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         long snapshot =
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         int periodCount = wrappedProps.getIntProperty(
@@ -129,14 +130,18 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
         // Create the LPA algorithm pieces
         NodeType type =
             NodeType.valueOf(
-                props.getProperty(StandardProperties.NODE_TYPE));
+                wrappedProps.getProperty(StandardProperties.NODE_TYPE));
+        ProfileCollector col =
+            systemRegistry.getComponent(ProfileCollector.class);
         WatchdogService wdog = txnProxy.getService(WatchdogService.class);
         if (type == NodeType.coreServerNode) {
-            lpaServer = new LabelPropagationServer(col, wdog, props);
+            lpaServer = new LabelPropagationServer(col, wdog, properties);
             lpa = null;
         } else if (type == NodeType.appNode) {
             lpaServer = null;
-            lpa = new LabelPropagation(this, wdog, nodeId, props);
+            DataService dataService = txnProxy.getService(DataService.class);
+            long nodeId = dataService.getLocalNodeId();       
+            lpa = new LabelPropagation(this, wdog, nodeId, properties);
         } else {
             lpaServer = null;
             lpa = null;

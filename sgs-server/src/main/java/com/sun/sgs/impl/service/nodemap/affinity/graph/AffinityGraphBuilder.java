@@ -30,12 +30,17 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * responsible for instantiating the objects which will consume the graph.
  * <p>
  * The returned graph vertices are identities, and the edges are the
- * object references the vertices have in common.  The edges can be either
- * weighted or parallel (both are being used for experiments).
+ * object references the vertices have in common.  Edge weights refer to the
+ * number of common references of all objects (e.g. if obj1 is used
+ * twice by both objects, the weight is 2.  If both objects then use obj2,
+ * the weight becomes 3).  Parallel edges are not supported.
  * <p>
  * Graphs are pruned as time goes by, both to ensure that endless resources
- * are consumed, and to ensure that while the graph contains enough history
+ * are not consumed, and to ensure that while the graph contains enough history
  * to be useful, it doesn't contain too much very old history.
+ * <p>
+ * The graphs contain only application information (no system service
+ * information) to limit the size of the graphs.
  * <p>
  * Graph builders support the following properties:
  * <p>
@@ -67,9 +72,9 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * Graph builders are typically instantiated by the node {@link GraphListener}.
  * In order to be instantiated by the {@code GraphListener}, they should
  * implement a constructor taking the arguments
- * {@code (ProfileCollector, TransactionProxy, Properties, long)},
- * where the final argument is the local node id.  The transaction proxy
- * can be {@code null} for testing outside of the Darkstar service framework.
+ * {@code (Properties, ComponentRegistry, TransactionProxy)}.
+ * The transaction proxy can be {@code null} for testing outside of the
+ * Darkstar service framework.
  */
 public interface AffinityGraphBuilder {
     /** The base name for graph builder properties. */
@@ -119,7 +124,7 @@ public interface AffinityGraphBuilder {
 
     /**
      * Returns the affinity group finder created by this builder,
-     * or null if none was created.  Some algorithms only create
+     * or {@code null} if none was created.  Some algorithms only create
      * the finder on the server node.
      *
      * @return the affinity group finder or {@code null}

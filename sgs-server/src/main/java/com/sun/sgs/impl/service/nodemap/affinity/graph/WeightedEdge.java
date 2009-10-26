@@ -44,8 +44,11 @@ public class WeightedEdge {
     }
 
     /**
-     * Returns the weight of this edge, which is the number of times both
-     * vertices accessed the object since this edge was created.
+     * Returns the weight of this edge.  Edge weights represent the number
+     * of times both vertices that this edge connects have accessed the
+     * same object.  For example, if both vertices access object1 two times,
+     * the returned weight is {@code 2}.  If they both access a different
+     * object, object2, once, the weight will now be {@code 3}.
      *
      * @return the weight of this edge
      */

@@ -37,8 +37,7 @@
  * {@link com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet}.
  * <p>
  * Affinity groups returned by this implementation are of type
- * {@link com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup
- * RelocatingAffintyGroup}.
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup}.
  * <p>
  * If a node fails or becomes unreachable during a run of the algorithm, the
  * run is deemed failed and invalid.  No attempt is made to mark unreachable

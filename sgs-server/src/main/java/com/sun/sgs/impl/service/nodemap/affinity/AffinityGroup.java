@@ -26,15 +26,15 @@ import java.util.Set;
  * An affinity group in the system.  Affinity groups are sets of
  * identities that have formed a community.
  * <p>
- * Affinity groups have an identity.  Affinity groups cannot be compared
- * between algorithm runs.  In particular, two groups found in separate runs
- * which have the same affinity group identity cannot be assumed to be
- * related in any way.
+ * Affinity groups have an identifier and a generation number. Affinity groups
+ * with different generation numbrers cannot be compared.  In particular, two
+ * groups which have the same affinity group identifier but different
+ * generation numbers cannot be assumed to be related in any way.
  */
 public interface AffinityGroup {
     /**
-     * Returns the affinity group identity.
-     * @return the affinity group identity
+     * Returns the affinity group identifier.
+     * @return the affinity group identifier
      */
     long getId();
 
@@ -43,4 +43,12 @@ public interface AffinityGroup {
      * @return the set of {@code Identities} which are members of this group
      */
     Set<Identity> getIdentities();
+
+    /**
+     * Returns a generation number for this affinity group. Affinity groups
+     * with the same identifier but different generations cannot be compared;
+     * they are independent.
+     * @return the generation number for this affinity group
+     */
+    long getGeneration();
 }

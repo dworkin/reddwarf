@@ -40,7 +40,9 @@ import javax.management.StandardMBean;
 public class AffinityGraphBuilderStats extends StandardMBean
         implements AffinityGraphBuilderMXBean
 {
-    /** Our consumer name. */
+    /**
+     * Our consumer name, created with at {@code ProfileLevel.MEDIUM}.
+     */
     public static final String CONS_NAME = "com.sun.sgs.AffinityGraphBuilder";
     /** The graph we are building. */
     private final Graph<?, ?> graph;
@@ -62,7 +64,7 @@ public class AffinityGraphBuilderStats extends StandardMBean
     /**
      * Constructs a stats instance.
      * @param collector the profile collector
-     * @param graph the graphs
+     * @param graph the graph
      * @param snapCount the configured snapshot count
      * @param snapPeriod the configured snapshot period
      */
@@ -70,6 +72,9 @@ public class AffinityGraphBuilderStats extends StandardMBean
             Graph<?, ?> graph, int snapCount, long snapPeriod)
     {
         super(AffinityGraphBuilderMXBean.class, true);
+        if (graph == null) {
+	    throw new NullPointerException("null graph");
+	}
         this.graph = graph;
         this.snapCount = snapCount;
         this.snapPeriod = snapPeriod;
@@ -142,7 +147,7 @@ public class AffinityGraphBuilderStats extends StandardMBean
             description = "The number of updates (additions) to the graph.";
         } else if (info.getName().equals("PruneCount")) {
             description = "The number of times the graph was pruned (had dead"
-                   +  " information removed";
+                   +  " information removed)";
         } else if (info.getName().equals("SnapshotCount")) {
             description = "The configured number of live snapshots of the"
                    + " graph to keep.";

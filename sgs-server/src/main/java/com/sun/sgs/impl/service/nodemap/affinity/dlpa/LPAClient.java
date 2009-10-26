@@ -25,6 +25,7 @@ import java.rmi.Remote;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The label propagation algorithm clients, which can be called by
@@ -34,7 +35,7 @@ public interface LPAClient extends Remote {
     /**
      * A new run of the algorithm is about to start, so the client nodes
      * should do whatever is necessary to set up for that run.  When
-     * finished, {@link LPAServer#readyToBegin} should be called.
+     * prepared, {@link LPAServer#readyToBegin} should be called.
      * Called by the LPAServer.
      *
      * @param runNumber the number of this algorithm run
@@ -66,17 +67,8 @@ public interface LPAClient extends Remote {
      *         call to {@code prepareAlgorithm}
      * @throws IOException if there is a communication problem
      */
-    Collection<AffinityGroup> getAffinityGroups(long runNumber, boolean done)
+    Set<AffinityGroup> getAffinityGroups(long runNumber, boolean done)
             throws IOException;
-
-    /**
-     * Remove any cached information about a node.
-     * Called by the LPAServer.
-     *
-     * @param nodeId the node to be removed
-     * @throws IOException if there is a communication problem
-     */
-    void removeNode(long nodeId) throws IOException;
 
     /**
      * Indicates that the given node probably contains edges to the graph on
@@ -90,7 +82,7 @@ public interface LPAClient extends Remote {
      * @param nodeId the node with vertices attached to the edges
      * @throws IOException if there is a communication problem
      */
-    void crossNodeEdges(Collection<Object> objIds, long nodeId)
+    void notifyCrossNodeEdges(Collection<Object> objIds, long nodeId)
             throws IOException;
 
     /**

@@ -28,6 +28,8 @@ import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -41,6 +43,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -63,6 +66,12 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     /** The property name for the server host. */
     static final String SERVER_HOST_PROPERTY = PROP_NAME + ".server.host";
 
+    /** The property name for the client port. */
+    private static final String CLIENT_PORT_PROPERTY =
+            PROP_NAME + ".client.port";
+
+    /** The default value of the server port. */
+    private static final int DEFAULT_CLIENT_PORT = 0;
     /**
      * Our local watchdog service, used in case of IO failures.
      * Can be null for testing.
@@ -89,8 +98,10 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      */
     private final Object verticesLock = new Object();
 
-    /** The map of conflicts in the system, nodeId->objId, count.
-     * Updates are multi-threaded.
+    /**
+     * The map of conflicts in the system, nodeId->objId, count.
+     * Updates are multi-threaded.  This includes both conflicts detected
+     * locally, and conflicts that other nodes tell us about.
      */
     private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
         nodeConflictMap =
@@ -116,30 +127,32 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         IN_ITERATION,
         // Gathering up the final groups
         GATHERING_GROUPS,
-        // Completed gathering groups
-        GATHERED_GROUPS,
-        // Idle (none of the above)
-        IDLE
+        // Completed algorithm run
+        FINISHED,
+        // In the midst of a run, but waiting for the server to start the
+        // next step.
+        WAITING_FOR_SERVER
     }
 
     /** The current state of this instance. */
-    private State state = State.IDLE;
+    private State state = State.FINISHED;
 
-    /** The current algorithm run number, used to ensure we're returning
+    /**
+     * The current algorithm run number, used to ensure we're returning
      * values for the correct algorithm run.
      */
-    private volatile long runNumber = -1;
+    private long runNumber = -1;
 
     /** The current iteration being run, used to detect multiple calls
      * for an iteration.
      */
-    private volatile int iteration = -1;
+    private int iteration = -1;
 
     /** Synchronization for state, runNumber, and iteration. */
     private final Object stateLock = new Object();
 
     /** The groups collected in the last run. */
-    private Collection<AffinityGroup> groups;
+    private Set<AffinityGroup> groups;
 
     /** The time (in milliseconds) to wait between retries for IO
      * operations. */
@@ -191,13 +204,23 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         Registry registry = LocateRegistry.getRegistry(host, port);
         server = (LPAServer) registry.lookup(
                          LabelPropagationServer.SERVER_EXPORT_NAME);
-        // Export ourselves using an anonymous port, and register with server
-        // Another option is to have the LPAServer collect and exchange
+
+        // Register our node listener with the watchdog service.
+        wdog.addNodeListener(new NodeFailListener());
+
+        // Export ourselves (using an anonymous port by default), and
+        // register with server.
+        //
+        //  TBD: Another option is to have the LPAServer collect and exchange
         // all cross node edge info, and the remote labels at the start
         // of each iteration.  That would be helpful, because then the
         // server knows when all preliminary information has been exchanged.
+        // Export our client object for server callbacks.
+        int clientPort = wrappedProps.getIntProperty(
+                                        CLIENT_PORT_PROPERTY,
+                                        DEFAULT_CLIENT_PORT, 0, 65535);
         clientExporter = new Exporter<LPAClient>(LPAClient.class);
-        int exportPort = clientExporter.export(this, 0);
+        int exportPort = clientExporter.export(this, clientPort);
         server.register(nodeId, clientExporter.getProxy());
         if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "Created label propagation node on {0} " +
@@ -209,8 +232,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     // --- implement LPAClient -- //
     
     /** {@inheritDoc} */
-    public Collection<AffinityGroup> getAffinityGroups(long runNumber,
-                                                       boolean done)
+    public Set<AffinityGroup> getAffinityGroups(long runNumber, boolean done)
         throws IOException
     {
         synchronized (stateLock) {
@@ -230,13 +252,13 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                         // Do nothing - ignore until state changes
                     }
                 }
-                if (state == State.GATHERED_GROUPS) {
+                if (state == State.FINISHED) {
                     // We have collected data for this run already, just return
                     // them.
                     logger.log(Level.FINE,
                             "{0}: returning {1} precalculated groups",
                             localNodeId, groups.size());
-                    new HashSet<AffinityGroup>(groups);
+                    return new HashSet<AffinityGroup>(groups);
                 }
                 state = State.GATHERING_GROUPS;
             }
@@ -249,7 +271,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             logger.log(Level.FINER, "{0}: FINAL GRAPH IS {1}",
                                      localNodeId, graph);
         }
-        groups = gatherGroups(vertices, done);
+        groups = gatherGroups(vertices, done, runNumber);
 
         if (done) {
             // Clear our maps that are set up as the first step of an
@@ -260,7 +282,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             vertices = null;
 
             synchronized (stateLock) {
-                state = State.GATHERED_GROUPS;
+                state = State.FINISHED;
                 stateLock.notifyAll();
             }
         }
@@ -305,7 +327,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * It might be better to just let the server ask each vertex for its
      * information and merge it there.
      *
-     * @param runNumber
+     * @param runNumber the algorithm run count, used to detect problems
+     *           between the server and clients
      */
     private void prepareAlgorithmInternal(long runNumber) {
         synchronized (stateLock) {
@@ -315,6 +338,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 return;
             }
             while (state == State.PREPARING) {
+                // We don't worry about it if we're busy preparing for
+                // a previous run that the server gave up on.  We will
+                // go through the prepare actions again below.
                 try {
                     stateLock.wait();
                 } catch (InterruptedException e) {
@@ -339,9 +365,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
 
         // If we cannot reach a proxy, we invalidate the run.
         boolean failed = false;
-        // Now, go through the new map, and tell each vertex about the
+        // Now, go through the new map, and tell each node about the
         // edges we might have in common.
-        assert (nodeConflictMap != null);
         for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
              nodeConflictMap.entrySet())
         {
@@ -356,12 +381,13 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
 
                 boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
                     public void run() throws IOException {
-                        proxy.crossNodeEdges(new HashSet<Object>(map.keySet()),
-                                         localNodeId);
+                        proxy.notifyCrossNodeEdges(
+                            new HashSet<Object>(map.keySet()), localNodeId);
                     } }, 
                     wdog, nodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
                 if (!ok) {
                     failed = true;
+                    break;
                 }
             } else {
                 logger.log(Level.FINE, "{0}: could not exchange edges with {1}",
@@ -378,18 +404,19 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 server.readyToBegin(localNodeId, runFailed);
             } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
         if (!ok) {
-            failed = true;
+            // The run has failed, and the server should detect this when
+            // it times out waiting for responses.
             logger.log(Level.WARNING, "{0}: could not contact server",
                                       localNodeId);
         }
         synchronized (stateLock) {
-            state = State.IDLE;
+            state = State.WAITING_FOR_SERVER;
             stateLock.notifyAll();
         }
     }
 
     /** {@inheritDoc} */
-    public void crossNodeEdges(Collection<Object> objIds, long nodeId)
+    public void notifyCrossNodeEdges(Collection<Object> objIds, long nodeId)
         throws IOException
     {
         if (objIds == null) {
@@ -416,9 +443,24 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         }
     }
 
-    /** {@inheritDoc} */
-    public void removeNode(long nodeId) throws IOException {
-        removeNodeInternal(nodeId);
+    /**
+     * The listener registered with the watchdog service.  These methods
+     * will be notified if a node starts or stops.
+     */
+    private class NodeFailListener implements NodeListener {
+        NodeFailListener() {
+            // nothing special
+        }
+
+        /** {@inheritDoc} */
+        public void nodeStarted(Node node) {
+            // Do nothing. We will ask for a proxy for the node lazily.
+        }
+
+        /** {@inheritDoc} */
+        public void nodeFailed(Node node) {
+            removeNodeInternal(node.getId());
+        }
     }
 
     /**
@@ -527,8 +569,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 for (final LabelVertex vertex : vertices) {
                     tasks.add(new Callable<Void>() {
                         public Void call() {
-                            abool.set(setMostFrequentLabel(vertex, true) ||
-                                      abool.get());
+                            if (setMostFrequentLabel(vertex, true)) {
+                                abool.set(true);
+                            }
                             return null;
                         }
                     });
@@ -547,16 +590,18 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
 
             } else {
                 for (LabelVertex vertex : vertices) {
-                    changed = setMostFrequentLabel(vertex, true) || changed;
+                    if (setMostFrequentLabel(vertex, true)) {
+                        changed = true;
+                    }
                 }
             }
 
             if (logger.isLoggable(Level.FINEST)) {
                 // Log the affinity groups so far:
-                Collection<AffinityGroup> intermediateGroups =
-                        gatherGroups(vertices, false);
+                Set<AffinityGroup> intermediateGroups =
+                        gatherGroups(vertices, false, runNumber);
                 for (AffinityGroup group : intermediateGroups) {
-                    StringBuffer logSB = new StringBuffer();
+                    StringBuilder logSB = new StringBuilder();
                     for (Identity id : group.getIdentities()) {
                         logSB.append(id + " ");
                     }
@@ -575,13 +620,12 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                                          runFailed, iteration);
             } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
         if (!ok) {
-            failed = true;
             logger.log(Level.WARNING, "{0}: could not contact server",
                                       localNodeId);
         }
 
         synchronized (stateLock) {
-            state = State.IDLE;
+            state = State.WAITING_FOR_SERVER;
             stateLock.notifyAll();
         }
     }
@@ -619,20 +663,15 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                     {
                         // Find the label associated with the identity in
                         // the graph.
-                        // We do this by creating vid, a template of the
-                        // LabelVertex, and then finding the actual graph
-                        // vertex with that identity.  The current label can
-                        // be found in the actual graph vertex.
-                        LabelVertex vid = new LabelVertex(entry.getKey());
-                        int index = vertices.indexOf(vid);
-                        if (index != -1) {
-                            // If the vid wasn't found in the vertices list,
+                        LabelVertex vert = verticesMap.get(entry.getKey());
+                        if (vert != null) {
+                            // If the vertex wasn't found in the vertices list,
                             // it is a new identity since the vertices were
                             // captured at the start of this algorithm run,
                             // and we just ignore the label.
                             // Otherwise, add the label to set of labels for
                             // this identity.
-                            Integer label = vertices.get(index).getLabel();
+                            Integer label = vert.getLabel();
 
                             List<Long> weightList = labelWeightMap.get(label);
                             if (weightList == null) {
@@ -663,28 +702,26 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * Initialize our vertex conflicts.  This needs to happen before
      * we send our vertex conflict information to other nodes in
      * response to an prepareAlgorithm call from the server, and before
-     * any crossNodeEdges calls.
+     * any notifyCrossNodeEdges calls.
      */
     protected void doOtherInitialization() {
         // Get conflict information from the graph builder.
         nodeConflictMap.putAll(builder.getConflictMap());
         logger.log(Level.FINEST,
                 "{0}: initialized node conflict map", localNodeId);
-        printNodeConflictMap();
     }
 
     /** {@inheritDoc} */
-    protected void doOtherNeighbors(LabelVertex vertex,
+    protected long doOtherNeighbors(LabelVertex vertex,
                                     Map<Integer, Long> labelMap,
-                                    StringBuffer logSB)
+                                    long maxCount,
+                                    StringBuilder logSB)
     {
         // Account for the remote neighbors:  look up this LabelVertex in
-        // the remoteNeighborMap
-        Map<Integer, Long> remoteMap =
-                remoteLabelMap.get(vertex.getIdentity());
+        // the remoteLabelMap
+        Map<Integer, Long> remoteMap = remoteLabelMap.get(vertex.getIdentity());
+
         if (remoteMap != null) {
-            // The check above is just so I can continue to test in single
-            // node mode
             for (Map.Entry<Integer, Long> entry : remoteMap.entrySet()) {
                 Integer label = entry.getKey();
                 if (logger.isLoggable(Level.FINEST)) {
@@ -695,8 +732,12 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                                 labelMap.get(label) : 0;
                 value += entry.getValue();
                 labelMap.put(label, value);
+                if (value > maxCount) {
+                    maxCount = value;
+                }
             }
         }
+        return maxCount;
     }
     
     /**
@@ -714,7 +755,6 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         boolean failed = false;
 
         // Now, go through the new map, asking for its labels
-        assert (nodeConflictMap != null);
         for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
              nodeConflictMap.entrySet())
         {
@@ -830,7 +870,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         public void run() throws IOException {
             labels = proxy.getRemoteLabels(objects);
         }
-        public Map<Object, Map<Integer, List<Long>>> getLabels() {
+        Map<Object, Map<Integer, List<Long>>> getLabels() {
             return labels;
         }
     }
@@ -876,31 +916,32 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         public void run() throws IOException {
             proxy = server.getLPAClientProxy(nodeId);
         }
-        public LPAClient getProxy() {
+        LPAClient getProxy() {
             return proxy;
         }
     }
 
     // For debugging.
-    private void printNodeConflictMap() {
-        if (!logger.isLoggable(Level.FINEST)) {
-            return;
-        }
-        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
-             nodeConflictMap.entrySet())
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.append(entry.getKey());
-            sb.append(":  ");
-            for (Map.Entry<Object, AtomicLong> subEntry :
-                 entry.getValue().entrySet())
-            {
-                sb.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
-            }
-            logger.log(Level.FINEST, "{0}: nodeConflictMap: {1}",
-                    localNodeId, sb.toString());
-        }
-    }
+//    private void printNodeConflictMap() {
+//        if (!logger.isLoggable(Level.FINEST)) {
+//            return;
+//        }
+//        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
+//             nodeConflictMap.entrySet())
+//        {
+//            StringBuilder sb = new StringBuilder();
+//            sb.append(entry.getKey());
+//            sb.append(":  ");
+//            for (Map.Entry<Object, AtomicLong> subEntry :
+//                 entry.getValue().entrySet())
+//            {
+//                sb.append(subEntry.getKey() + "," +
+//                          subEntry.getValue() + " ");
+//            }
+//            logger.log(Level.FINEST, "{0}: nodeConflictMap: {1}",
+//                    localNodeId, sb.toString());
+//        }
+//    }
 
     // For testing
     /**

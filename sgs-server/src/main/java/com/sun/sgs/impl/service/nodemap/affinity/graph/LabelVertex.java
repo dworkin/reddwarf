@@ -23,9 +23,9 @@ import com.sun.sgs.auth.Identity;
 
 /**
  * Vertices for a Label Propagation Algorithm graph.
- * Labels change as we iterate through the algorithm, and once it has
- * the algorithm has converged after several iterations, vertices
- * with the same label are in the same cluster.
+ * Labels change as we iterate through the algorithm, and once the
+ * algorithm has converged after several iterations, vertices with
+ * the same label are in the same cluster.
  * <p>
  * We are using the identity's hash code for the label for faster
  * comparisions.  This has some risk of us clustering identities

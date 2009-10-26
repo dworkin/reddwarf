@@ -20,10 +20,9 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAServer;
@@ -35,7 +34,9 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyIdentity;
+import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
@@ -88,65 +89,72 @@ public class TestLPA {
     }
 
     private TestLPAServer server;
+    private SgsTestNode serverNode;
     private ProfileCollector collector;
     private Properties props;
+    private WatchdogService wdog;
 
     @Before
     public void setup() throws Exception {
-        props = new Properties();
-        int serverPort = getNextUniquePort();
+        props = SgsTestNode.getDefaultProperties("TestLPA", null, null);
+        props.put("com.sun.sgs.impl.kernel.profile.level", 
+                   ProfileLevel.MAX.name());
+        // We are creating this SgsTestNode so we can get at its watchdog
+        // and profile collector only - the LPAServer we are testing is
+        // created outside this framework so we could easily extend the type.
+        serverNode = new SgsTestNode("TestLPA", null, props);
+        int serverPort = SgsTestNode.getNextUniquePort();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads", "1");
-        collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
-        server = new TestLPAServer(collector, props);
+        collector =
+            serverNode.getSystemRegistry().getComponent(ProfileCollector.class);
+        wdog = serverNode.getWatchdogService();
+        server = new TestLPAServer(collector, wdog, props);
     }
 
     @After
     public void shutdown() throws Exception {
+        if (serverNode != null) {
+            serverNode.shutdown(true);
+            serverNode = null;
+        }
         if (server != null) {
             server.shutdown();
             server = null;
-            collector.shutdown();
         }
-    }
-    /**
-     * Returns a unique port number.  Note that the ports are only unique
-     * within the current process.
-     */
-    public static int getNextUniquePort() {
-        return nextUniquePort.incrementAndGet();
     }
 
     /* -- Server tests -- */
     @Test
     public void testDistributedFramework() throws Exception {
-        Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
+        final long generation = 1;
+        Set<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         {
-            AffinitySet a = new AffinitySet(1);
+            AffinitySet a = new AffinitySet(1, generation);
             a.addIdentity(new DummyIdentity("1"));
             a.addIdentity(new DummyIdentity("2"));
             a.addIdentity(new DummyIdentity("3"));
             group1.add(a);
-            AffinitySet b = new AffinitySet(2);
+            AffinitySet b = new AffinitySet(2, generation);
             b.addIdentity(new DummyIdentity("4"));
             b.addIdentity(new DummyIdentity("5"));
             group1.add(b);
         }
-        Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
+        Set<AffinityGroup> group2 = new HashSet<AffinityGroup>();
         {
-            AffinitySet a = new AffinitySet(1);
+            AffinitySet a = new AffinitySet(1, generation);
             a.addIdentity(new DummyIdentity("6"));
             a.addIdentity(new DummyIdentity("7"));
             group2.add(a);
-            AffinitySet b = new AffinitySet(3);
+            AffinitySet b = new AffinitySet(3, generation);
             b.addIdentity(new DummyIdentity("8"));
             b.addIdentity(new DummyIdentity("9"));
             group2.add(b);
         }
-        Collection<AffinityGroup> group3 = new HashSet<AffinityGroup>();
+        Set<AffinityGroup> group3 = new HashSet<AffinityGroup>();
         {
-            AffinitySet a = new AffinitySet(4);
+            AffinitySet a = new AffinitySet(4, generation);
             a.addIdentity(new DummyIdentity("10"));
             a.addIdentity(new DummyIdentity("11"));
             group3.add(a);
@@ -164,7 +172,7 @@ public class TestLPA {
         server.register(30, client3);
 
         long now = System.currentTimeMillis();
-        Collection<AffinityGroup> groups = server.findAffinityGroups();
+        Set<AffinityGroup> groups = server.findAffinityGroups();
         System.out.printf("finished in %d milliseconds %n",
                           System.currentTimeMillis() - now);
         for (TestLPAClient client : clients) {
@@ -201,32 +209,36 @@ public class TestLPA {
     @Test
     public void testLPAAlgorithm() throws Exception {
         // Create three clients.
+        // We'll just use the server's watchdog - safe because we aren't
+        // testing node failures here.
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    null, PartialToyBuilder.NODE2, props);
+                    wdog, PartialToyBuilder.NODE2, props);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    null, PartialToyBuilder.NODE3, props);
-        Collection<AffinityGroup> groups = server.findAffinityGroups();
+                    wdog, PartialToyBuilder.NODE3, props);
+        Set<AffinityGroup> groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
     }
 
     @Test
     public void testLPAAlgorithmTwice() throws Exception {
         // Create three clients.
+        // We'll just use the server's watchdog - safe because we aren't
+        // testing node failures here.
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    null, PartialToyBuilder.NODE2, props);
+                    wdog, PartialToyBuilder.NODE2, props);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    null, PartialToyBuilder.NODE3, props);
-        Collection<AffinityGroup> groups = server.findAffinityGroups();
+                    wdog, PartialToyBuilder.NODE3, props);
+        Set<AffinityGroup> groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
         groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
@@ -234,19 +246,22 @@ public class TestLPA {
 
     @Test
     public void testLPAAlgorithmOneClient() throws Exception {
+        // We'll just use the server's watchdog - safe because we aren't
+        // testing node failures here.
+        //
         // We choose node 3 here because it has no reported conflicts with
         // other nodes, so it doesn't fail immediately because the other nodes
         // are down.
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    null, PartialToyBuilder.NODE3, props);
-        Collection<AffinityGroup> groups = server.findAffinityGroups();
+                    wdog, PartialToyBuilder.NODE3, props);
+        Set<AffinityGroup> groups = server.findAffinityGroups();
         assertTrue(groups.size() != 0);
     }
 
     @Test
     public void testLPAAlgorithmNoClient() throws Exception {
-        Collection<AffinityGroup> groups = server.findAffinityGroups();
+        Set<AffinityGroup> groups = server.findAffinityGroups();
         assertEquals(0, groups.size());
     }
 
@@ -255,9 +270,11 @@ public class TestLPA {
     @Ignore
     @Test(expected = IOException.class)
     public void testServerShutdown() throws Throwable {
+        // We'll just use the server's watchdog - safe because we aren't
+        // testing node failures here.
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         server.shutdown();
         lp1.prepareAlgorithm(1);
     }
@@ -329,7 +346,7 @@ public class TestLPA {
     public void testAffinityGroupsTwice() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -338,8 +355,8 @@ public class TestLPA {
                 fail("Too much time sleeping");
             }
         }
-        Collection<AffinityGroup> groups1 = lp1.getAffinityGroups(1, false);
-        Collection<AffinityGroup> groups2 = lp1.getAffinityGroups(1, false);
+        Set<AffinityGroup> groups1 = lp1.getAffinityGroups(1, false);
+        Set<AffinityGroup> groups2 = lp1.getAffinityGroups(1, false);
         assertEquals(groups1.size(), groups2.size());
         // Because we haven't actually run the algorithm, I know the groups
         // correspond to the vertices on the node
@@ -355,7 +372,7 @@ public class TestLPA {
     public void testPrepareTwice() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         lp1.prepareAlgorithm(1);
         lp1.prepareAlgorithm(1);
         int count = 0;
@@ -373,7 +390,7 @@ public class TestLPA {
     public void testIterationTwice() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -400,7 +417,7 @@ public class TestLPA {
     public void testAffinityGroupsRunMismatch() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -409,7 +426,7 @@ public class TestLPA {
                 fail("Too much time sleeping");
             }
         }
-        Collection<AffinityGroup> groups1 = lp1.getAffinityGroups(2, false);
+        Set<AffinityGroup> groups1 = lp1.getAffinityGroups(2, false);
     }
 
     // Client test: iteration mismatch
@@ -417,7 +434,7 @@ public class TestLPA {
     public void testIterationMismatch() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         lp1.prepareAlgorithm(1);
         int count = 0;
         while (server.readyToBeginCount() < 1) {
@@ -452,13 +469,13 @@ public class TestLPA {
     public void testCrossNodeData() throws Exception {
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    null, PartialToyBuilder.NODE2, props);
+                    wdog, PartialToyBuilder.NODE2, props);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    null, PartialToyBuilder.NODE3, props);
+                    wdog, PartialToyBuilder.NODE3, props);
 
         long run = 1;
         lp1.prepareAlgorithm(run);
@@ -583,13 +600,13 @@ public class TestLPA {
         Identity id4 = new DummyIdentity("4");
         LabelPropagation lp1 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
-                    null, PartialToyBuilder.NODE1, props);
+                    wdog, PartialToyBuilder.NODE1, props);
         LabelPropagation lp2 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE2),
-                    null, PartialToyBuilder.NODE2, props);
+                    wdog, PartialToyBuilder.NODE2, props);
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
-                    null, PartialToyBuilder.NODE3, props);
+                    wdog, PartialToyBuilder.NODE3, props);
         lp1.prepareAlgorithm(1);
         lp2.prepareAlgorithm(1);
         lp3.prepareAlgorithm(1);
@@ -700,11 +717,12 @@ public class TestLPA {
     public interface TestLPAClientIface extends LPAClient {
         boolean finishedExchangeInfo() throws IOException;
     }
+    
     private class TestLPAClient implements TestLPAClientIface {
         private final long sleepTime;
         private final long nodeId;
         private final int convergeCount;
-        private final Collection<AffinityGroup> result;
+        private final Set<AffinityGroup> result;
         private final LPAServer server;
 
         boolean failed = false;
@@ -715,7 +733,7 @@ public class TestLPA {
         int currentIter = -1;
 
         public TestLPAClient(LPAServer server, long nodeId, long sleepTime, 
-                int convergeCount, Collection<AffinityGroup> result)
+                int convergeCount, Set<AffinityGroup> result)
         {
             this.server = server;
             this.nodeId = nodeId;
@@ -728,8 +746,8 @@ public class TestLPA {
             return finishedExchangeInfo;
         }
         /** {@inheritDoc} */
-        public Collection<AffinityGroup> getAffinityGroups(long runNumber,
-                                                           boolean done)
+        public Set<AffinityGroup> getAffinityGroups(long runNumber,
+                                                    boolean done)
                 throws IOException
         {
             return result;
@@ -770,12 +788,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public void removeNode(long nodeId) throws IOException {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        /** {@inheritDoc} */
-        public void crossNodeEdges(Collection<Object> objIds, long nodeId)
+        public void notifyCrossNodeEdges(Collection<Object> objIds, long nodeId)
                 throws IOException
         {
             throw new UnsupportedOperationException("Not supported yet.");
@@ -802,10 +815,12 @@ public class TestLPA {
         private AtomicInteger finishedIterationCount = new AtomicInteger(0);
         private AtomicInteger readyToBeginCount = new AtomicInteger(0);
 
-        public TestLPAServer(ProfileCollector col, Properties properties)
+        public TestLPAServer(ProfileCollector col, 
+                             WatchdogService wdog,
+                             Properties properties)
                 throws IOException
         {
-            super(col, null, properties);
+            super(col, wdog, properties);
         }
 
         /** {@inheritDoc} */

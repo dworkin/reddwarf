@@ -20,7 +20,6 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -36,13 +35,16 @@ import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyIdentity;
+import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.tools.test.IntegrationTest;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -73,6 +75,12 @@ public class TestLPAPerf {
     // server used for single node tests
     private static LabelPropagationServer lpaServer;
 
+    // sgs test node used to start a watchdog, needed for lpaServer
+    private static SgsTestNode serverNode;
+
+    // watchdog
+    private static WatchdogService wdog;
+
     // profile collector
     private static ProfileCollector collector;
 
@@ -82,15 +90,6 @@ public class TestLPAPerf {
     /** The property that can be used to select an initial port. */
     private final static String PORT_PROPERTY = "test.sgs.port";
 
-    /** The next unique port to use for this test suite. */
-    private static AtomicInteger nextUniquePort;
-
-    static {
-        Integer systemPort = Integer.getInteger(PORT_PROPERTY);
-        int port = systemPort == null ? DEFAULT_PORT
-                                      : systemPort.intValue();
-        nextUniquePort = new AtomicInteger(port);
-    }
     
     @Parameterized.Parameters
     public static Collection data() {
@@ -104,15 +103,23 @@ public class TestLPAPerf {
 
     @BeforeClass
     public static void before() throws Exception {
-        Properties props = new Properties();
-        collector = new ProfileCollectorImpl(ProfileLevel.MAX, props, null);
-        lpaServer = new LabelPropagationServer(collector, null, props);
+        Properties props = SgsTestNode.getDefaultProperties("TestLPA", null, null);
+        props.put("com.sun.sgs.impl.kernel.profile.level",
+                   ProfileLevel.MAX.name());
+        // We are creating this SgsTestNode so we can get at its watchdog
+        // and profile collector only - the LPAServer we are testing is
+        // created outside this framework so we could easily extend the type.
+        serverNode = new SgsTestNode("TestLPA", null, props);
+        collector =
+            serverNode.getSystemRegistry().getComponent(ProfileCollector.class);
+        wdog = serverNode.getWatchdogService();
+        lpaServer = new LabelPropagationServer(collector, wdog, props);
     }
 
     @AfterClass
     public static void after() throws Exception {
         lpaServer.shutdown();
-        collector.shutdown();
+        serverNode.shutdown(true);
     }
 
     @Test
@@ -152,7 +159,7 @@ public class TestLPAPerf {
         double maxMod = 0.0;
         double minMod = 1.0;
         for (int i = 0; i < RUNS; i++) {
-            Collection<AffinityGroup> groups = lpa.findAffinityGroups();
+            Set<AffinityGroup> groups = lpa.findAffinityGroups();
             double mod =
                 AffinityGroupGoodness.calcModularity(
                                 new ZachBuilder().getAffinityGraph(), groups);
@@ -182,29 +189,29 @@ public class TestLPAPerf {
         LabelPropagationServer server = null;
         if (WARMUP_RUNS > 0) {
             Properties props = new Properties();
-            int serverPort = nextUniquePort.incrementAndGet();
+            int serverPort = SgsTestNode.getNextUniquePort();
             props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                        String.valueOf(serverPort));
             props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
-            server = new LabelPropagationServer(collector, null, props);
+            server = new LabelPropagationServer(collector, wdog, props);
 
             LabelPropagation lp1 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                        null, DistributedZachBuilder.NODE1, props);
+                        wdog, DistributedZachBuilder.NODE1, props);
             LabelPropagation lp2 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                        null, DistributedZachBuilder.NODE2, props);
+                        wdog, DistributedZachBuilder.NODE2, props);
             LabelPropagation lp3 =
                 new LabelPropagation(
                     new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                        null, DistributedZachBuilder.NODE3, props);
+                        wdog, DistributedZachBuilder.NODE3, props);
         }
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            Collection<AffinityGroup> groups = server.findAffinityGroups();
+            Set<AffinityGroup> groups = server.findAffinityGroups();
         }
         if (server != null) {
             server.shutdown();
@@ -215,26 +222,26 @@ public class TestLPAPerf {
     public void testDistZach() throws Exception {
         // setup
         Properties props = new Properties();
-        int serverPort = nextUniquePort.incrementAndGet();
+        int serverPort = SgsTestNode.getNextUniquePort();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
         LabelPropagationServer server = 
-                new LabelPropagationServer(collector, null, props);
+                new LabelPropagationServer(collector, wdog, props);
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
 
         LabelPropagation lp1 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE1),
-                    null, DistributedZachBuilder.NODE1, props);
+                    wdog, DistributedZachBuilder.NODE1, props);
         LabelPropagation lp2 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE2),
-                    null, DistributedZachBuilder.NODE2, props);
+                    wdog, DistributedZachBuilder.NODE2, props);
         LabelPropagation lp3 =
             new LabelPropagation(
                 new DistributedZachBuilder(DistributedZachBuilder.NODE3),
-                    null, DistributedZachBuilder.NODE3, props);
+                    wdog, DistributedZachBuilder.NODE3, props);
 
         AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
             collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
@@ -248,7 +255,7 @@ public class TestLPAPerf {
         double maxMod = 0.0;
         double minMod = 1.0;
         for (int i = 0; i < RUNS; i++) {
-            Collection<AffinityGroup> groups = server.findAffinityGroups();
+            Set<AffinityGroup> groups = server.findAffinityGroups();
             double mod =
                 AffinityGroupGoodness.calcModularity(
                                 new ZachBuilder().getAffinityGraph(), groups);

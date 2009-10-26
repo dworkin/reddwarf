@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
@@ -29,10 +29,12 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -91,10 +93,7 @@ public abstract class AbstractLPA {
     /** The number of threads this algorithm should use. */
     protected final int numThreads;
 
-    /**
-     * The number of iterations required for the last run,
-     * only valid if gatherStats is true.
-     */
+    /**  The number of iterations required for the last run. */
     protected int iterations;
 
     /** The graph in which we're finding communities.  This is a live
@@ -107,6 +106,13 @@ public abstract class AbstractLPA {
      * but for now it's easiest to leave this list fixed.
      */
     protected volatile List<LabelVertex> vertices;
+
+    /**
+     * A map view of identity to label vertex in {@code vertices}, useful
+     * for looking up a particular vertex.  The map is empty if vertices is
+     * empty.
+     */
+    protected volatile Map<Identity, LabelVertex> verticesMap;
 
     /**
      * Constructs a new instance of the label propagation algorithm.
@@ -151,10 +157,14 @@ public abstract class AbstractLPA {
         // takes a long time, or if we use a more dynamic work queue, we'll
         // want to revisit this.
         Collection<LabelVertex> graphVertices = graph.getVertices();
+        verticesMap = new HashMap<Identity, LabelVertex>();
         if (graphVertices == null) {
             vertices = new ArrayList<LabelVertex>();
         } else {
             vertices = new ArrayList<LabelVertex>(graphVertices);
+            for (LabelVertex vert : graphVertices) {
+                verticesMap.put(vert.getIdentity(), vert);
+            }
         }
 
         // Initialize algorithm-specific info
@@ -180,7 +190,7 @@ public abstract class AbstractLPA {
      *        if it is not changed
      */
     protected boolean setMostFrequentLabel(LabelVertex vertex, boolean self) {
-        List<Integer> highestSet = getNeighborCounts(vertex);
+        List<Integer> highestSet = getMaxCountLabels(vertex);
 
         // If we got back an empty set, no neighbors were found and we're done.
         if (highestSet.isEmpty()) {
@@ -206,38 +216,42 @@ public abstract class AbstractLPA {
      * @param vertex the vertex whose neighbors labels will be examined
      * @return a list of labels with the higest counts
      */
-    protected List<Integer> getNeighborCounts(LabelVertex vertex) {
+    protected List<Integer> getMaxCountLabels(LabelVertex vertex) {
         // A map of labels -> counts, counting how many
         // of our neighbors use a particular label.
         Map<Integer, Long> labelMap = new HashMap<Integer, Long>();
 
         // Put our neighbors labels into the label map.  We assume there
         // are no parallel edges, but edges will have weights.
-        Collection<LabelVertex> neighbors = graph.getNeighbors(vertex);
-        if (neighbors == null) {
-            // JUNG returns null if vertex is not present
+        Collection<WeightedEdge> edges = graph.getIncidentEdges(vertex);
+        if (edges == null) {
+            // JUNG returns null if vertex is not present; this can occur
+            // if our graph was pruned while the algorithm is running
             return new ArrayList<Integer>();
         }
 
-        StringBuffer logSB = new StringBuffer();     // for logging
-        for (LabelVertex neighbor : neighbors) {
+        // As we iterate, calculate the maximum count of any particular label
+        // for use later
+        long maxCount = -1L;
+        StringBuilder logSB = new StringBuilder();     // for logging
+        for (WeightedEdge edge : edges) {
+            LabelVertex neighbor = graph.getOpposite(vertex, edge);
             Integer label = neighbor.getLabel();
-            Long value = labelMap.containsKey(label) ?
-                            labelMap.get(label) : 0;
-            WeightedEdge edge = graph.findEdge(vertex, neighbor);
-            if (edge != null) {
-                if (logger.isLoggable(Level.FINEST)) {
-                    logSB.append(neighbor + "(" + edge.getWeight() + ") ");
-                }
-                value += edge.getWeight();
-                labelMap.put(label, value);
+            Long value = labelMap.containsKey(label) ? labelMap.get(label) : 0;
+            if (logger.isLoggable(Level.FINEST)) {
+                logSB.append(neighbor + "(" + edge.getWeight() + ") ");
+            }
+            value += edge.getWeight();
+            labelMap.put(label, value);
+            if (value > maxCount) {
+                maxCount = value;
             }
         }
 
         // Allow algorithms a shot at updating the labelMap.  In particular,
         // the distributed algorithm needs to update information based on
         // cache eviction data.
-        doOtherNeighbors(vertex, labelMap, logSB);
+        maxCount = doOtherNeighbors(vertex, labelMap, maxCount, logSB);
 
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "{0}: Neighbors of {1} : {2}",
@@ -245,19 +259,13 @@ public abstract class AbstractLPA {
         }
 
         // Find the set of labels used the max number of times
-        long maxValue = -1L;
-        List<Integer> maxLabelSet = new ArrayList<Integer>();
+        List<Integer> maxLabelList = new ArrayList<Integer>();
         for (Map.Entry<Integer, Long> entry : labelMap.entrySet()) {
-            long val = entry.getValue();
-            if (val > maxValue) {
-                maxValue = val;
-                maxLabelSet.clear();
-                maxLabelSet.add(entry.getKey());
-            } else if (val == maxValue) {
-                maxLabelSet.add(entry.getKey());
+            if (entry.getValue() == maxCount) {
+                maxLabelList.add(entry.getKey());
             }
         }
-        return maxLabelSet;
+        return maxLabelList;
     }
 
     /**
@@ -265,35 +273,38 @@ public abstract class AbstractLPA {
      * particular algorithm.
      * @param vertex the vertex whose neighbors labels will be examined
      * @param labelMap a map of labels to counts of neighbors using that label
-     * @param logSB a StringBuffer for gathering log info about neighbors
+     * @param maxCount the maximum count of neighbor labels seen so far
+     * @param logSB a StringBuilder for gathering log info about neighbors
+     * @return the updated {@code maxCount}
      */
-    protected abstract void doOtherNeighbors(LabelVertex vertex,
+    protected abstract long doOtherNeighbors(LabelVertex vertex,
                                              Map<Integer, Long> labelMap,
-                                             StringBuffer logSB);
+                                             long maxCount,
+                                             StringBuilder logSB);
 
     /**
      * Return the affinity groups found within the given vertices, putting all
-     * nodes with the same label in a group.  The affinity group's id
+     * vertices with the same label in a group.  The affinity group's id
      * will be the common label of the group.  Also, as an optimization,
      * can reinitialize the labels in the graph to their initial setting.
      *
      * @param vertices the vertices that we gather groups from
      * @param reinitialize if {@code true}, reinitialize the labels
+     * @param gen the generation number
      * @return the affinity groups
      */
-    protected static Collection<AffinityGroup> gatherGroups(
-            List<LabelVertex> vertices, boolean reinitialize)
+    protected static Set<AffinityGroup> gatherGroups(
+            List<LabelVertex> vertices, boolean reinitialize, long gen)
     {
         assert (vertices != null);
         // All nodes with the same label are in the same community.
-        Map<Integer, AffinityGroup> groupMap =
-                new HashMap<Integer, AffinityGroup>();
+        Map<Integer, AffinitySet> groupMap =
+                new HashMap<Integer, AffinitySet>();
         for (LabelVertex vertex : vertices) {
             int label = vertex.getLabel();
-            AffinitySet ag =
-                    (AffinitySet) groupMap.get(label);
+            AffinitySet ag = groupMap.get(label);
             if (ag == null) {
-                ag = new AffinitySet(label);
+                ag = new AffinitySet(label, gen);
                 groupMap.put(label, ag);
             }
             ag.addIdentity(vertex.getIdentity());
@@ -304,6 +315,6 @@ public abstract class AbstractLPA {
                 vertex.initializeLabel();
             }
         }
-        return groupMap.values();
+        return new HashSet<AffinityGroup>(groupMap.values());
     }
 }
