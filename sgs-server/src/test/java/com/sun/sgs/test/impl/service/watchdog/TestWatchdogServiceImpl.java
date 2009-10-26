@@ -37,6 +37,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
@@ -426,7 +427,58 @@ public class TestWatchdogServiceImpl extends Assert {
 	new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy,
 				dummyShutdownCtrl);  
     }
-    
+
+    /* -- Test getLocalNodeHealth -- */
+
+    @Test public void testGetLocalNodeHealth() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                checkHealth(watchdogService, Health.GREEN);
+            }
+        }, taskOwner);
+
+	DataService dataService = createDataService(serviceProps);
+	final WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy,
+				    dummyShutdownCtrl);
+	try {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() throws Exception {
+                    checkHealth(watchdogService, Health.GREEN);
+                }
+            }, taskOwner);
+
+	    watchdogService.shutdown();
+	    // wait for watchdog's renew to fail...
+	    Thread.sleep(renewTime * 4);
+
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() throws Exception {
+                    checkHealth(watchdog, Health.RED);
+                }
+            }, taskOwner);
+
+	} finally {
+	    watchdog.shutdown();
+	    dataService.shutdown();
+	}
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testGetLocalNodeHealthServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy, dummyShutdownCtrl);
+	watchdog.shutdown();
+	watchdog.getLocalNodeHealth();
+    }
+
+    @Test(expected = TransactionNotActiveException.class)
+    public void testGetLocalNodeHealthNoTransaction() throws Exception {
+	watchdogService.getLocalNodeHealth();
+    }
+
     /* -- Test isLocalNodeAlive -- */
 
     @Test public void testIsLocalNodeAlive() throws Exception {
@@ -448,7 +500,7 @@ public class TestWatchdogServiceImpl extends Assert {
                 public void run() throws Exception {
                     if (! watchdogService.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
-                          "to return true");
+                             "to return true");
                     }
                 }
             }, taskOwner);
@@ -461,7 +513,7 @@ public class TestWatchdogServiceImpl extends Assert {
                 public void run() throws Exception {
                     if (watchdog.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
-                          "to return false");
+                             "to return false");
                     }
                 }
             }, taskOwner);
@@ -542,6 +594,61 @@ public class TestWatchdogServiceImpl extends Assert {
 	    public void run() {
 		watchdogService.isLocalNodeAliveNonTransactional();
 	    }}, taskOwner);
+    }
+
+    /* -- Test reportHealth -- */
+
+    @Test public void testReportHealth() throws Exception {
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+        
+        checkHealth(watchdogService, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "A");
+        checkHealth(watchdogService, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.ORANGE, "B");
+        checkHealth(watchdogService, Health.ORANGE);
+        watchdogService.reportHealth(nodeId, Health.ORANGE, "C");
+        checkHealth(watchdogService, Health.ORANGE);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "B");
+        checkHealth(watchdogService, Health.ORANGE);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "C");
+        checkHealth(watchdogService, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkHealth(watchdogService, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "C");
+        checkHealth(watchdogService, Health.GREEN);
+    }
+
+    @Test public void testReportFailedHealth() throws Exception {
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+
+        checkHealth(watchdogService, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.RED, "A");
+        checkHealth(watchdogService, Health.RED);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkHealth(watchdogService, Health.RED);
+    }
+
+    // Utility method to check that that the reported health matches the
+    // expected health value
+    private void checkHealth(final WatchdogService watchdog,
+                             final Health expected)
+        throws Exception
+    {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                Health health = watchdog.getLocalNodeHealth();
+
+                if (health == null) {
+                    fail("Expected WatchdogService.getLocalNodeHealth() " +
+                          "to return non-null health");
+                }
+                if (!health.equals(expected)) {
+                    fail("Expected WatchdogService.getLocalNodeHealth() " +
+                          "to return: " + expected +
+                          ", instead received: " + health);
+                }
+            }
+        }, taskOwner);
     }
 
     /* -- Test getNodes -- */
@@ -753,6 +860,70 @@ public class TestWatchdogServiceImpl extends Assert {
 		fail("Node " + node.getId() + " is alive!");
 	    }
 	}
+    }
+
+    @Test public void testNodeHealthNotification() throws Exception {
+        DummyNodeListener listener = new DummyNodeListener();
+	watchdogService.addNodeListener(listener);
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkNotification(listener, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "B");
+        checkNotification(listener, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "A");
+        checkNotification(listener, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.YELLOW, "C");
+        checkNotification(listener, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkNotification(listener, Health.YELLOW);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "C");
+        checkNotification(listener, Health.GREEN);
+
+        if (listener.getNumNotifications() != 6) {
+            fail("Expected 6 notifications, got " +
+                 listener.getNumNotifications());
+        }
+        Set<Node> nodes = listener.getStartedNodes();
+
+        if (nodes.size() != 1) {
+            fail("Expected 1 started node, got " + nodes.size());
+        }
+    }
+
+    @Test public void testNodeHealthFailNotification() throws Exception {
+        DummyNodeListener listener = new DummyNodeListener();
+	watchdogService.addNodeListener(listener);
+        final long nodeId = serverNode.getDataService().getLocalNodeId();
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        checkNotification(listener, Health.GREEN);
+        watchdogService.reportHealth(nodeId, Health.RED, "A");
+        Thread.sleep(2000);
+        watchdogService.reportHealth(nodeId, Health.GREEN, "A");
+        Thread.sleep(2000);
+
+        if (listener.getNumNotifications() != 1) {
+            fail("Expected 1 notifications, got " +
+                 listener.getNumNotifications());
+        }
+        Set<Node> nodes = listener.getStartedNodes();
+
+        if (nodes.size() != 1) {
+            fail("Expected 1 started node, got " + nodes.size());
+        }
+    }
+
+    private void checkNotification(DummyNodeListener listener, Health expected)
+        throws InterruptedException
+    {
+        // Wait for notification to work its way through
+        Thread.sleep(2000);
+        Node node = listener.getLastNotification();
+        if (node == null) {
+            fail("Expected a notification, did not get any");
+        }
+        if (node.getHealth() != expected) {
+            fail("Expected " + expected + ", got " + node.getHealth());
+        }
     }
 
     /* -- test shutdown -- */
@@ -1307,7 +1478,7 @@ public class TestWatchdogServiceImpl extends Assert {
         } catch (IllegalStateException ise) {
             // May happen if service is shutting down.
         } catch (Exception e) {
-            fail ("Not expecting an Exception");
+            fail ("Not expecting an Exception: " + e.getLocalizedMessage());
         }
     }
 
@@ -1772,16 +1943,19 @@ public class TestWatchdogServiceImpl extends Assert {
 
     private static class DummyNodeListener implements NodeListener {
 
+        private int notifications = 0;
+        private Node lastNode = null;
 	private final Set<Node> failedNodes = new HashSet<Node>();
 	private final Set<Node> startedNodes = new HashSet<Node>();
-	
 
-	public void nodeStarted(Node node) {
-	    startedNodes.add(node);
-	}
-
-	public void nodeFailed(Node node) {
-	    failedNodes.add(node);
+	public void nodeHealthUpdate(Node node) {
+            notifications++;
+            lastNode = node;
+	    if (node.isAlive()) {
+                startedNodes.add(node);
+            } else {
+                failedNodes.add(node);
+            }
 	}
 
 	Set<Node> getFailedNodes() {
@@ -1791,6 +1965,16 @@ public class TestWatchdogServiceImpl extends Assert {
 	Set<Node> getStartedNodes() {
 	    return startedNodes;
 	}
+
+        int getNumNotifications() {
+            return notifications;
+        }
+
+        Node getLastNotification() {
+            Node node = lastNode;
+            lastNode = null;
+            return node;
+        }
     }
 
     /** Define a {@code ComponentRegistry} that holds a single component. */

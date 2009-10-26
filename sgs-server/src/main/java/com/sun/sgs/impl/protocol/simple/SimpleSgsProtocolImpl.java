@@ -38,7 +38,6 @@ import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -299,12 +298,12 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      * the specified {@code node} with the specified protocol {@code
      * descriptors}.
      *
-     * @param	node a node to redirect the login
+     * @param	nodeId the ID of the node to redirect the login
      * @param	descriptors a set of protocol descriptors supported
      *		by {@code node}
      */
     private void loginRedirect(
-	Node node, Set<ProtocolDescriptor> descriptors)
+	long nodeId, Set<ProtocolDescriptor> descriptors)
     {
         for (ProtocolDescriptor descriptor : descriptors) {
             if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
@@ -324,7 +323,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
         loginFailure("redirect failed", null);
         logger.log(Level.SEVERE,
                    "redirect node {0} does not support a compatable protocol",
-                   node);
+                   nodeId);
     }
 
     /**
@@ -865,7 +864,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    LoginRedirectException redirectException =
 			(LoginRedirectException) cause;
 		    
-                    loginRedirect(redirectException.getNode(),
+                    loginRedirect(redirectException.getNodeId(),
                                   redirectException.getProtocolDescriptors());
 		    
 		} else if (cause instanceof LoginFailureException) {

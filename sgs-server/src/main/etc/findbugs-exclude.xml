@@ -389,11 +389,12 @@
     <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
   </Match>
 
-  <!-- Synchronization in setFailed method is ok, nodeImpl is retrieved from
-       the DataService -->
+  <!-- Synchronization in setFailed and setHealth method is ok, nodeImpl
+       is retrieved from the DataService -->
   <Match>
     <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
     <Or>
+      <Field name="health"/>
       <Field name="backupId"/>
       <Field name="isAlive"/>
     </Or>

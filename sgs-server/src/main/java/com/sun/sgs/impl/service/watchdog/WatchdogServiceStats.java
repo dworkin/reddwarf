@@ -28,6 +28,7 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.service.Node.Health;
 
 /**
  *
@@ -43,6 +44,8 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     final ProfileOperation getBackupOp;
     final ProfileOperation getNodeOp;
     final ProfileOperation getNodesOp;
+    final ProfileOperation getLocalNodeHealthOp;
+    final ProfileOperation getLocalNodeHealthNonTransOp;
     final ProfileOperation isLocalNodeAliveOp;
     final ProfileOperation isLocalNodeAliveNonTransOp;
     
@@ -65,6 +68,11 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
             consumer.createOperation("getNode", type, level);
         getNodesOp =
             consumer.createOperation("getNodes", type, level);
+        getLocalNodeHealthOp =
+            consumer.createOperation("getLocalNodeHealth", type, level);
+        getLocalNodeHealthNonTransOp =
+            consumer.createOperation("getLocalNodeHealthNonTransactional",
+                                     type, level);
         isLocalNodeAliveOp =
             consumer.createOperation("isLocalNodeAlive", type, level);
         isLocalNodeAliveNonTransOp =
@@ -72,6 +80,17 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
                                      type, level);
     }
     
+    /** {@inheritDoc} */
+    public Health getNodeHealth() {
+        return watchdog.getLocalNodeHealthNonTransactional();
+    }
+
+    /** {@inheritDoc} */
+    public void setNodeHealth(Health health) {
+        watchdog.reportHealth(watchdog.localNodeId, health,
+                              WatchdogServiceStats.class.getName());
+    }
+
     /** {@inheritDoc} */
     public long getAddNodeListenerCalls() {
         return ((AggregateProfileOperation) addNodeListenerOp).getCount();
@@ -96,7 +115,18 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     public long getGetNodesCalls() {
         return ((AggregateProfileOperation) getNodesOp).getCount();
     }
-        
+
+    /** {@inheritDoc} */
+    public long getGetLocalNodeHealthCalls() {
+        return ((AggregateProfileOperation) getLocalNodeHealthOp).getCount();
+    }
+
+    /** {@inheritDoc} */
+    public long getGetLocalNodeHealthNonTransactionalCalls() {
+        return ((AggregateProfileOperation) getLocalNodeHealthNonTransOp).
+                getCount();
+    }
+
     /** {@inheritDoc} */
     public long getIsLocalNodeAliveCalls() {
         return ((AggregateProfileOperation) isLocalNodeAliveOp).getCount();
