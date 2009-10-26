@@ -303,7 +303,8 @@ public final class WatchdogServiceImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	logger.log(Level.CONFIG, "Creating WatchdogServiceImpl");
+        logger.log(Level.CONFIG, "Creating WatchdogServiceImpl");
+
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	// Setup the KernelShutdownController object
@@ -363,11 +364,6 @@ public final class WatchdogServiceImpl
 		serverPort = wrappedProps.getIntProperty(
 		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
-            if (logger.isLoggable(Level.CONFIG)) {
-		logger.log(Level.CONFIG,
-			   "watchdog server at: {0}:{1}",
-			   host, serverPort);
-	    }
 
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy = (WatchdogServer)
@@ -388,14 +384,6 @@ public final class WatchdogServiceImpl
                     TIMESYNC_INTERVAL_PROPERTY, DEFAULT_TIMESYNC_INTERVAL,
                     1000, Long.MAX_VALUE);
 
-            if (logger.isLoggable(Level.CONFIG)) {
-		logger.log(Level.CONFIG,
-			   "node {0} registered at: {1}:{2}, jmx port: {3}, " +
-                           "renew interval: {4}, time sync interval: {5}",
-			   localNodeId, clientHost, clientPort, jmxPort,
-                           renewInterval, timesyncInterval);
-	    }
-
             // create our profiling info and register our MBean
             ProfileCollector collector = 
                 systemRegistry.getComponent(ProfileCollector.class);
@@ -414,6 +402,22 @@ public final class WatchdogServiceImpl
             } else {
                 config.setJmxPort(jmxPort);
             }
+            
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG,
+			   "node registered, host:{0}, localNodeId:{1}",
+			   clientHost, localNodeId);
+	    }
+
+            logger.log(Level.CONFIG,
+                       "Created WatchdogServiceImpl with properties:" +
+                       "\n  " + CLIENT_HOST_PROPERTY + "=" + clientHost +
+                       "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
+                       "\n  " + HOST_PROPERTY + "=" + host +
+                       "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort +
+                       "\n  " + TIMESYNC_INTERVAL_PROPERTY + "=" +
+                       timesyncInterval);
+	    
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.CONFIG, e,

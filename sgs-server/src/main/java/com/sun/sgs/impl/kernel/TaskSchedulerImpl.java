@@ -117,8 +117,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
                       ProfileCollectorHandle profileCollectorHandle) 
         throws Exception 
     {
-        logger.log(Level.CONFIG, "Creating a Task Scheduler");
-
+        logger.log(Level.CONFIG, "Creating TaskSchedulerImpl");
         if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
         }
@@ -131,15 +130,16 @@ final class TaskSchedulerImpl implements TaskScheduler {
         int requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
-        if (logger.isLoggable(Level.CONFIG)) {
-            logger.log(Level.CONFIG, "Using {0} task consumer threads",
-                       requestedThreads);
-        }
+
         // NOTE: this is replicating previous behavior where there is a
         // fixed-size pool for running tasks, but in practice we may
         // want a flexible pool that allows (e.g.) for tasks that run
         // for the lifetime of a stack
         this.executor = Executors.newScheduledThreadPool(requestedThreads);
+
+        logger.log(Level.CONFIG,
+                   "Created TaskSchedulerImpl with properties:" +
+                   "\n  " + CONSUMER_THREADS_PROPERTY + "=" + requestedThreads);
     }
 
     /**

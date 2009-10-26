@@ -110,18 +110,6 @@ import javax.management.JMException;
  *      and no greater than {@code 65535}.   <p>
  * </dl> 
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.server.class
- *	</b></code> <br>
- *	<i>Default:</i>
- *	<code>com.sun.sgs.impl.service.nodemap.NodemappingServerImpl</code>
- *
- * <dd style="padding-top: .5em">
- *      The name of the class that implements {@link
- *	NodeMappingServer}, the global server for this service. The class 
- *      should be public, not abstract, and should provide a public constructor
- *      with parameters {@link Properties} and {@link ComponentRegistry}. 
- *      Being able to specify this class is useful for testing.  <p>
  * <p>
  *
  * This class uses the {@link Logger} named
@@ -382,9 +370,8 @@ public class NodeMappingServiceImpl
     {
         super(properties, systemRegistry, txnProxy, 
               new LoggerWrapper(Logger.getLogger(PKG_NAME)));
+        logger.log(Level.CONFIG, "Creating NodeMappingServiceImpl");
         
-        logger.log(Level.CONFIG, 
-                 "Creating NodeMappingServiceImpl properties:{0}", properties);
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         
 	try {
@@ -486,6 +473,14 @@ public class NodeMappingServiceImpl
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
+
+            logger.log(Level.CONFIG,
+                       "Created NodeMappingServiceImpl with properties:" +
+                       "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
+                       "\n  " + SERVER_HOST_PROPERTY + "=" + host +
+                       "\n  " + NodeMappingServerImpl.SERVER_PORT_PROPERTY +
+                       "=" + port);
+            
 
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 

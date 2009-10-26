@@ -11,7 +11,7 @@ Version 0.9.11:
 - Added support for including extension libraries on startup (issue #194)
 - Added multivalued health to node state
 - Fix issues #168, #169, #171, #173, #174, #178, #183, #187, #190, #191,
-  #195, #199
+  #195, #198, #199
 
 Version 0.9.10:
 - Add DataManager.getObjectId (issue #99) and

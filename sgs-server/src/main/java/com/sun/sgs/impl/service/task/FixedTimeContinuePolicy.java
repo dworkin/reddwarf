@@ -19,12 +19,15 @@
 
 package com.sun.sgs.impl.service.task;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.task.ContinuePolicy;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * An implementation of {@code ContinuePolicy} that always provides
@@ -49,6 +52,11 @@ import java.util.Properties;
  * </dl> <p>
  */
 public class FixedTimeContinuePolicy implements ContinuePolicy {
+
+    // logger for this class
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(FixedTimeContinuePolicy.
+                                           class.getName()));
 
     // the name of the current package
     private static final String PKG_NAME = "com.sun.sgs.impl.service.task";
@@ -79,6 +87,7 @@ public class FixedTimeContinuePolicy implements ContinuePolicy {
     public FixedTimeContinuePolicy(Properties properties,
                                    ComponentRegistry systemRegistry,
                                    TransactionProxy txnProxy) {
+        logger.log(Level.CONFIG, "Creating FixedTimeContinuePolicy");
         this.txnProxy = txnProxy;
         
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -88,6 +97,11 @@ public class FixedTimeContinuePolicy implements ContinuePolicy {
             throw new IllegalStateException("Continue threshold property " +
                                             "must be positive");
         }
+
+        logger.log(Level.CONFIG,
+                   "Created FixedTimeContinuePolicy with properties:" +
+                   "\n  " + CONTINUE_THRESHOLD_PROPERTY + "=" +
+                   continueThreshold);
     }
 
     /**

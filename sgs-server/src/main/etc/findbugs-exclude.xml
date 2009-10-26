@@ -410,6 +410,13 @@
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
   </Match>
 
+  <!-- DataStreamUtil method ok to return null -->
+  <Match>
+    <Class name="com.sun.sgs.impl.util.DataStreamUtil"/>
+    <Method name="readBytes"/>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.util.lock -->
 
   <!-- LockManager.releaseLockInternal notifies the new owners, but 
