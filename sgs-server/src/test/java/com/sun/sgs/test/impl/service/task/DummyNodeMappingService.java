@@ -104,8 +104,8 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** {@inheritDoc} */
-    public void assignNode(Class service, Identity identity) {
-        assignIdentity(service, identity, chooseNode(identity).getId());
+    public long assignNode(Class service, Identity identity) {
+        return assignIdentity(service, identity, chooseNode(identity).getId());
     }
 
     /** {@inheritDoc} */
@@ -160,13 +160,12 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** {@inheritDoc} */
-    public void nodeStarted(Node node) {
-        availableNodes.add(node);
-    }
-
-    /** {@inheritDoc} */
-    public void nodeFailed(Node node) {
-        
+    public void nodeHealthUpdate(Node node) {
+        if (node.isAlive()) {
+            availableNodes.add(node);
+        } else {
+            availableNodes.remove(node);
+        }
     }
 
     /** {@inheritDoc} */
@@ -216,7 +215,7 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** Assigns the given identity to the given node. */
-    public static void assignIdentity(Class<?> service, Identity identity,
+    public static long assignIdentity(Class<?> service, Identity identity,
                                       long nodeId) {
         DummyNodeMappingService newService = serviceMap.get(nodeId);
         Node node = newService.watchdogService.getNode(nodeId);
@@ -229,6 +228,7 @@ public class DummyNodeMappingService implements NodeMappingService,
         try {
             newService.setStatus(service, identity, true);
         } catch (UnknownIdentityException uie) {}
+        return nodeId;
     }
 
     /**

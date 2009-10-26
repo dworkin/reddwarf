@@ -541,21 +541,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    Level.FINEST, 
 	    "handling login request for identity:{0}", identity);
 	
-	final Node node;
-	try {
-	    /*
-	     * Get node assignment.
-	     */
-	    sessionService.nodeMapService.assignNode(
-		ClientSessionHandler.class, identity);
-	    GetNodeTask getNodeTask = new GetNodeTask(identity);		
-	    sessionService.runTransactionalTask(getNodeTask, identity);
-	    node = getNodeTask.getNode();
-	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
-			   identity, node);
-	    }
-	    
+        /*
+         * Get node assignment.
+         */
+        final long assignedNodeId;
+        try{
+            assignedNodeId = sessionService.nodeMapService.assignNode(
+                                    ClientSessionHandler.class, identity);
 	} catch (Exception e) {
 	    logger.logThrow(
 	        Level.WARNING, e,
@@ -565,7 +557,22 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    return;
 	}
 
-	long assignedNodeId = node.getId();
+	    
+	if (assignedNodeId < 0) {
+	    logger.log(Level.WARNING,
+		       "getting node assignment for identity:{0} failed",
+                       identity);
+	    sendLoginFailureAndDisconnect(
+                new LoginFailureException(LOGIN_REFUSED_REASON,
+                                          FailureReason.SERVER_UNAVAILABLE));
+	    return;
+        }
+
+	if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
+		       identity, assignedNodeId);
+	}
+
 	if (assignedNodeId == sessionService.getLocalNodeId()) {
 	    /*
 	     * Handle this login request locally: Validate that the
@@ -611,7 +618,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    Level.FINE,
 		    "redirecting login for identity:{0} " +
 		    "from nodeId:{1} to node:{2}",
-		    identity, sessionService.getLocalNodeId(), node);
+		    identity, sessionService.getLocalNodeId(), assignedNodeId);
 	    }
 	    
 	    scheduleNonTransactionalTask(
@@ -619,7 +626,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    public void run() {
 			try {
                             try {
-                                loginRedirect(node);
+                                loginRedirect(assignedNodeId);
                             } catch (Exception ex) {
                                 loginFailure(
                                     new LoginFailureException("Redirect failed",
@@ -639,14 +646,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @param	node a node
      */
-    private void loginRedirect(Node node) {
+    private void loginRedirect(long nodeId) {
 	synchronized (lock) {
 	    checkConnectedState();
 	    Set<ProtocolDescriptor> descriptors =
 		ClientSessionServiceImpl.getInstance().
-		    getProtocolDescriptors(node.getId());
+		    getProtocolDescriptors(nodeId);
 	    loginCompletionFuture.setException(
- 		new LoginRedirectException(node, descriptors));
+ 		new LoginRedirectException(nodeId, descriptors));
 	    state = State.LOGIN_HANDLED;
 	}
     }

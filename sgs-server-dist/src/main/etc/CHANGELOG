@@ -9,6 +9,7 @@ Version 0.9.11:
   the core node (issue #189)
 - Added support for JMX-based shutdown (issue #193)
 - Added support for including extension libraries on startup (issue #194)
+- Added multivalued health to node state
 - Fix issues #168, #169, #171, #173, #174, #178, #183, #187, #190, #191,
   #195, #199
 

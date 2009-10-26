@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -562,7 +563,7 @@ public class NodeMappingServiceImpl
      *  an AI object), it will be assigned to the local node.  Otherwise,
      *  a remote call will be made to determine a node assignment.
      */
-    public void assignNode(final Class service, final Identity identity) {
+    public long assignNode(final Class service, final Identity identity) {
         checkState();
         if (service == null) {
             throw new NullPointerException("null service");
@@ -581,23 +582,75 @@ public class NodeMappingServiceImpl
         // more complicated, and it means we duplicate some of the
         // server's work.  Best to always ask the server to handle it.
         //
-        // Note for all uses of runIoTask in this class:  if we cannot
-        // contact the server, we ask that the local node be shut down.
-        // This is because "server" is the core server, which contains
-        // the data store.  If it is shutdown, the entire cluster is
-        // shut down.  If we have a loss of connectivity with the server,
-        // we assume the problem is with the local node.  If the core server
-        // is disconnected from all nodes, the watchdog server will eventually
-        // detect that and declare all nodes dead.
-        runIoTask(
-            new IoRunnable() {
-                public void run() throws IOException {
-                    server.assignNode(service, identity, localNodeId);       
+        return callServer(
+            new Callable<Long>() {
+                public Long call() throws Exception {
+                    return server.assignNode(service, identity, localNodeId);
                 }
-            }, localNodeId);
-        logger.log(Level.FINEST, "assign identity {0}", identity);
+            });
     }
-    
+
+    /**
+     * Executes the specified {@code serverCall} by invoking its {@link
+     * Callable#call call} method. If the specified call throws an
+     * {@code IOException}, this method will retry the task for a fixed
+     * number of times. The method will stop retrying if this service is
+     * shutting down. The number of retries and the wait time between retries
+     * are configurable properties. <p>
+     *
+     * Note that like {@link #runIoTask runIoTask}, if we cannot contact the
+     * server, we ask that the local node be shut down. This is because
+     * "server" is the core server, which contains the data store.  If it is
+     * shutdown, the entire cluster is shut down.  If we have a loss of
+     * connectivity with the server, we assume the problem is with the local
+     * node.  If the core server is disconnected from all nodes, the watchdog
+     * server will eventually detect that and declare all nodes dead.
+     *
+     * This method must be called from outside a transaction or {@code
+     * IllegalStateException} will be thrown. <p>
+     *
+     * @param <T> return type of the value returned by the server call
+     * @param serverCall a callable with the server call
+     *
+     * @return the value returned by the server call
+     *
+     * @throws IllegalStateException if this method is invoked within a
+     *         transactional context
+     */
+    private <T> T callServer(Callable<T> serverCall) {
+        int maxAttempts = maxIoAttempts;
+        checkNonTransactionalContext();
+        while (!shuttingDown()) {
+            try {
+                return serverCall.call();
+            } catch (IOException ioe) {
+
+                if (maxAttempts-- == 0) {
+                    logger.logThrow(Level.SEVERE, ioe,
+                            "A communication error occured while calling the " +
+                            "server. Reporting this node - {0} as failed.",
+                            localNodeId);
+
+                    watchdogService.reportFailure(localNodeId,
+                                                  this.getClass().toString());
+                    break;
+                } else if (logger.isLoggable(Level.FINEST)) {
+                    logger.logThrow(Level.FINEST, ioe,
+                                    "Server call: {0} throws", serverCall);
+                }
+                try {
+                    // TBD: what back-off policy do we want here?
+                    Thread.sleep(retryWaitTime);
+                } catch (InterruptedException ignore) { }
+            } catch (Exception e) {
+                throw new AssertionError("unexpected exception from server: " +
+                                         e.getMessage());
+            }
+        }
+        throw new IllegalStateException("service shutting down");
+    }
+
+
     /** 
      * {@inheritDoc} 
      * <p>
@@ -634,12 +687,13 @@ public class NodeMappingServiceImpl
         }
 
         if (stask.canRemove()) {
-            runIoTask(
-                new IoRunnable() {
-                    public void run() throws IOException {
+            callServer(
+                new Callable<Void>() {
+                    public Void call() throws Exception {
                         server.canRemove(identity);
+                        return null;
                     }
-                }, localNodeId);
+                });
         }
         logger.log(Level.FINEST, "setStatus key: {0} , active: {1}", 
                 stask.statusKey(), active);
@@ -1109,12 +1163,13 @@ public class NodeMappingServiceImpl
      * @param id the id to move
      */
     private void tellServerCanMove(final Identity id) {
-        runIoTask(
-            new IoRunnable() {
-                public void run() throws IOException {
-                    server.canMove(id);   
-                }
-            }, localNodeId);
+        callServer(
+                new Callable<Void>() {
+                    public Void call() throws Exception {
+                        server.canMove(id);
+                        return null;
+                    }
+                });
         logger.log(Level.FINEST, "can move identity {0}", id);
     }
     

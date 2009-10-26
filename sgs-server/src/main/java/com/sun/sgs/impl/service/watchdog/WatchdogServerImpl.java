@@ -36,6 +36,7 @@ import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.NodesMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -584,23 +585,53 @@ public final class WatchdogServerImpl
     /**
      * {@inheritDoc}
      */
-    public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
-            int maxNumberOfAttempts)
+    public void setNodeHealth(long nodeId, boolean isLocal,
+                              final Health health, String component,
+                              int maxNumberOfAttempts)
     {
-        NodeImpl remoteNode = aliveNodes.get(nodeId);
-        if (remoteNode == null) {
-            logger.log(Level.FINEST, "Node with ID '" + nodeId +
-                    "' is already reported as failed");
+        final NodeImpl node = aliveNodes.get(nodeId);
+        if (node == null) {
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST,
+                           "Node with ID {0} is already reported as failed",
+                           nodeId);
+            }
             return;
         }
+        if (!health.isAlive()) {
+            setNodeAsFailed(node, isLocal, component, maxNumberOfAttempts);
+        } else {
 
+            // persist the change
+            try {
+                transactionScheduler.runTask(
+                    new AbstractKernelRunnable("SetNodeHealth") {
+                        public void run() {
+                            node.setHealth(dataService, health);
+                        } }, taskOwner);
+            } catch (Exception e) {
+                logger.logThrow(Level.SEVERE, e,
+                                "Setting node: {0} health throws", node);
+            }
+
+            // Notify clients of a status change.
+            statusChangedNodes.add(node);
+            synchronized (notifyClientsLock) {
+                notifyClientsLock.notifyAll();
+            }
+        }
+    }
+
+    private void setNodeAsFailed(NodeImpl node, boolean isLocal,
+                                 String component, int maxNumberOfAttempts)
+    {
         if (!isLocal) {
             // Try to report the failure to the watchdog so that the node can 
             // be shutdown. Try a few times if we run into an IOException.
             int retries = maxNumberOfAttempts;
             while (retries-- > 0) {
                 try {
-                    remoteNode.getWatchdogClient().reportFailure(className);
+                    node.getWatchdogClient().reportFailure(component);
                     break;
                 } catch (IOException ioe) {
                     if (retries == 0) {
@@ -611,7 +642,7 @@ public final class WatchdogServerImpl
                 }
             }
         }
-        processNodeFailures(Arrays.asList(remoteNode));
+        processNodeFailures(Arrays.asList(node));
     }
 
     /**
@@ -989,7 +1020,7 @@ public final class WatchdogServerImpl
 	int size = changedNodes.size();
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
-	boolean[] status = new boolean[size];
+	Health[] health = new Health[size];
 	long[] backups = new long[size];
 
 	int i = 0;
@@ -997,7 +1028,7 @@ public final class WatchdogServerImpl
 	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
-	    status[i] = changedNode.isAlive();
+	    health[i] = changedNode.getHealth();
 	    backups[i] = changedNode.getBackupId();
 	    i++;
 	}
@@ -1011,7 +1042,7 @@ public final class WatchdogServerImpl
 			Level.FINEST,
 			"notifying client:{0} of status change", notifyNode);
 		}
-		client.nodeStatusChanges(ids, hosts, status, backups);
+		client.nodeStatusChanges(ids, hosts, health, backups);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the

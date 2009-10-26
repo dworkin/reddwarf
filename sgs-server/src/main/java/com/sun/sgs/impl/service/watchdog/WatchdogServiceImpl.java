@@ -35,6 +35,7 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -44,7 +45,9 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -253,13 +256,21 @@ public final class WatchdogServiceImpl
 	recoveryQueues =
 	    new ConcurrentHashMap<Node, Queue<SimpleCompletionHandler>>();
 
-    /** The lock for {@code isAlive} field. */
-    private final Object lock = new Object();
-    
-    /** If {@code true}, this node is alive; initially, the field is {@code
-     * true}. Accesses to this field should be protected by {@code lock}.
+    /**
+     * The set of health reports for this node by component. Should only contain
+     * non-GREEN health reports. Accesses to this map and the {@code health}
+     * field must be synchronized.
      */
-    private boolean isAlive = true;
+    private final Map<String, Health> healthReports =
+            new HashMap<String, Health>();
+
+    /**
+     * Overall health of this node, initially, the field is {@code
+     * GREEN}.  The health of this node is the most severe condition reported,
+     * or {@code Health.GREEN} if no reports exits. Accesses to this field
+     * and the {@code healthReports} map must be synchronized.
+     */
+    private Health health = Health.GREEN;
     
     /** Our profiled data */
     private final WatchdogServiceStats serviceStats;
@@ -286,13 +297,13 @@ public final class WatchdogServiceImpl
      * @throws	Exception if a problem occurs constructing the service/server
      */
     public WatchdogServiceImpl(Properties properties,
-	    ComponentRegistry systemRegistry, TransactionProxy txnProxy,
-	    KernelShutdownController ctrl) 
+                               ComponentRegistry systemRegistry,
+                               TransactionProxy txnProxy,
+                               KernelShutdownController ctrl)
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	logger.log(Level.CONFIG, "Creating WatchdogServiceImpl properties:{0}",
-		   properties);
+	logger.log(Level.CONFIG, "Creating WatchdogServiceImpl");
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	// Setup the KernelShutdownController object
@@ -352,6 +363,11 @@ public final class WatchdogServiceImpl
 		serverPort = wrappedProps.getIntProperty(
 		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
+            if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG,
+			   "watchdog server at: {0}:{1}",
+			   host, serverPort);
+	    }
 
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy = (WatchdogServer)
@@ -371,7 +387,15 @@ public final class WatchdogServiceImpl
             timesyncInterval = wrappedProps.getLongProperty(
                     TIMESYNC_INTERVAL_PROPERTY, DEFAULT_TIMESYNC_INTERVAL,
                     1000, Long.MAX_VALUE);
-            
+
+            if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG,
+			   "node {0} registered at: {1}:{2}, jmx port: {3}, " +
+                           "renew interval: {4}, time sync interval: {5}",
+			   localNodeId, clientHost, clientPort, jmxPort,
+                           renewInterval, timesyncInterval);
+	    }
+
             // create our profiling info and register our MBean
             ProfileCollector collector = 
                 systemRegistry.getComponent(ProfileCollector.class);
@@ -390,13 +414,6 @@ public final class WatchdogServiceImpl
             } else {
                 config.setJmxPort(jmxPort);
             }
-            
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.log(Level.CONFIG,
-			   "node registered, host:{0}, localNodeId:{1}",
-			   clientHost, localNodeId);
-	    }
-	    
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.CONFIG, e,
@@ -417,7 +434,11 @@ public final class WatchdogServiceImpl
 	    " to current version:" + currentVersion);
     }
     
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * 
+     * A health update will be sent to listeners.
+     */
     protected void doReady() throws Exception {
 	// TBD: the client shouldn't accept incoming calls until this
 	// service is ready which would give all RecoveryListeners a
@@ -434,6 +455,9 @@ public final class WatchdogServiceImpl
                     timesyncInterval);
             timesyncTaskHandle.start();
         }
+
+        // Report this component is healthy and ready for work
+        reportHealth(localNodeId, Health.GREEN, CLASSNAME);
     }
 
     /** {@inheritDoc} */
@@ -463,28 +487,45 @@ public final class WatchdogServiceImpl
     /* -- Implement WatchdogService -- */
 
     /** {@inheritDoc} */
+    public Health getLocalNodeHealth() {
+	checkState();
+        serviceStats.getLocalNodeHealthOp.report();
+        return getNodeHealthTransactional();
+    }
+
+    private Health getNodeHealthTransactional() {
+	if (!isLocalAlive()) {
+	    return Health.RED;
+	} else {
+	    Node node = NodeImpl.getNode(dataService, localNodeId);
+            if (node == null || !node.isAlive()) {
+                reportFailure(localNodeId, CLASSNAME);
+                return Health.RED;
+            } else {
+                return node.getHealth();
+            }
+	}
+    }
+
+    /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
 	checkState();
         serviceStats.isLocalNodeAliveOp.report();
-	if (!getIsAlive()) {
-	    return false;
-	} else {
-	    Node node = NodeImpl.getNode(dataService, localNodeId);
-	    if (node == null || !node.isAlive()) {
-		// this will call setFailedThenNotify(true)
-                reportFailure(localNodeId, CLASSNAME);
-		return false;
-	    } else {
-		return true;
-	    }
-	}
+	return getNodeHealthTransactional().isAlive();
+    }
+
+    /** {@inheritDoc} */
+    public synchronized Health getLocalNodeHealthNonTransactional() {
+	checkState();
+        serviceStats.getLocalNodeHealthNonTransOp.report();
+	return health;
     }
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAliveNonTransactional() {
 	checkState();
         serviceStats.isLocalNodeAliveNonTransOp.report();
-	return getIsAlive();
+	return isLocalAlive();
     }
     
     /** {@inheritDoc} */
@@ -534,48 +575,135 @@ public final class WatchdogServiceImpl
 	recoveryListeners.putIfAbsent(listener, listener);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public synchronized void reportFailure(long nodeId, String className)
+    /** {@inheritDoc} */
+    public void reportFailure(long nodeId, String component) {
+        reportHealth(nodeId, Health.RED, component);
+    }
+
+    /** {@inheritDoc} */
+    public synchronized void reportHealth(long nodeId,
+                                          Health nodeHealth,
+                                          String component)
     {
-	checkNull("className", className);
+	checkNull("nodeHealth", nodeHealth);
+        checkNull("component", component);
 	checkNonTransactionalContext();
-        if (shuttingDown() || !getIsAlive()) {
+
+        if (shuttingDown() || !isLocalAlive()) {
             return;
         }
 
         boolean isLocal = (nodeId == localNodeId);
-        if (isLocal) {
-            logger.log(Level.WARNING, "{1} reported failure in local " +
-                    "node with id: {0}", nodeId, className);
-        } else {
-            logger.log(Level.WARNING, "{1} reported failure in remote" +
-                    " node with id {0}", nodeId, className);
+
+        if (logger.isLoggable(Level.FINER) || !nodeHealth.isAlive()) {
+            logger.log((nodeHealth.isAlive() ? Level.WARNING : Level.FINER),
+                       "{1} reported {2} health in {3} node with id: {0}",
+                       nodeId, component, nodeHealth,
+                       isLocal ? "local" : "remote");
         }
 
-        /*
-         * Try to report the failure to the watchdog server. If we cannot 
-         * contact the Watchdog server while reporting a remote failure, then
-         * set the failure as local.
-         */
-        int retries = maxIoAttempts;
-        while (retries-- > 0) {
-            try {
-                serverProxy.setNodeAsFailed(nodeId, isLocal, className,
-                        maxIoAttempts);
-                break;
-            } catch (IOException ioe) {
-                if (retries == 0) {
-                    logger.log(Level.SEVERE, "Cannot report failure to " +
-                            "Watchdog server");
-                    isLocal = true;
+        // If the report is for this node, determine the actual (overall) health
+        // which is the more severe health reported to date
+        if (isLocal) {
+
+            // If reported health is GREEN then just remove the entry (since
+            // empty reports == GREEN) otherwise add this report, possibly
+            // replacing a previous report from the component
+            if (nodeHealth == Health.GREEN) {
+                healthReports.remove(component);
+            } else {
+                healthReports.put(component, nodeHealth);
+            }
+
+            // If the report is an improvement over the current
+            // health, see if it improves the overall health
+            if (health.worseThan(nodeHealth)) {
+                // Look at all the reports for this node, recording the most
+                // severe
+                for (Map.Entry<String,
+                        Health> report : healthReports.entrySet()) {
+                    if (report.getValue().worseThan(nodeHealth)) {
+                        nodeHealth = report.getValue();
+                        component = report.getKey();
+                    }
                 }
             }
         }
-        
+
+        // Try to report the health to the watchdog server. If we cannot
+        // contact the Watchdog server while reporting, then set a local
+        // failure.
+        int retries = maxIoAttempts;
+        while (retries-- > 0) {
+            try {
+                serverProxy.setNodeHealth(nodeId, isLocal,
+                                          nodeHealth, component,
+                                          maxIoAttempts);
+                break;
+            } catch (IOException ioe) {
+                if (retries == 0) {
+                    logger.logThrow(Level.SEVERE, ioe,
+                                    "Cannot report failure to Watchdog server");
+                    setFailedThenNotify();
+                    return;
+                }
+            }
+        }
+
         if (isLocal) {
-            setFailedThenNotify(true);
+            setHealthThenNotify(nodeHealth, component);
+        }
+    }
+
+    /**
+     * Sets the local health of this node to {@code RED} and notifies
+     * appropriate registered node listeners of this node's failure. This method
+     * should only be called by this service when this node is no longer
+     * considered alive by the Watchdog server or the server can no longer
+     * be contacted. If the Watchdog server needs to be made aware of this
+     * node's failure, use {@code reportFailure()}. <p>
+     *
+     * If this node's local health status was already set to {@code RED},
+     * then this method does nothing.
+     */
+    private void setFailedThenNotify() {
+	setHealthThenNotify(Health.RED, CLASSNAME);
+    }
+
+    /**
+     * Sets the local health of this node and notifies appropriate
+     * registered node listeners of the possible change. If this node's local
+     * health status was already set to {@code RED}, then this method does
+     * nothing. It is assumed that the Watchdog server has been informed of the
+     * possible health change. If the Watchdog server needs to be notified
+     * use {@code reportHealth()}, which will eventually invoke this method.
+     *
+     * @param newHealth the new health for the local node
+     * @param component the component reporting the health
+     */
+    private synchronized void setHealthThenNotify(Health newHealth,
+                                                  String component)
+    {
+	if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER,
+                       "Set local health to {0}, reported by {1}, " +
+                       "previous health was: {2}",
+                       newHealth, component, health);
+        }
+
+        if (!health.isAlive()) {
+            return;
+        }
+        health = newHealth;
+
+        notifyNodeListeners(new NodeImpl(localNodeId, localHost, health));
+
+        if (!health.isAlive()) {
+            logger.log(Level.SEVERE,
+                       "Node:{0} forced to shutdown due to service failure",
+                       localNodeId);
+
+            shutdownController.shutdownNode(this);
         }
     }
 
@@ -629,7 +757,7 @@ public final class WatchdogServiceImpl
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
-	    while (getIsAlive()) {
+	    while (isLocalAlive()) {
 
 		synchronized (this) {
 		    if (shuttingDown()) {
@@ -651,7 +779,7 @@ public final class WatchdogServiceImpl
     		    if (!serverProxy.renewNode(localNodeId)) {
                         // server has already marked node as failed, so we can
                         // go directly to removing this node
-                        setFailedThenNotify(true);
+                        setFailedThenNotify();
 			return;
 		    }
 		    renewed = true;
@@ -672,7 +800,7 @@ public final class WatchdogServiceImpl
 		if (now - lastRenewTime > renewInterval) {
                     // server has already marked node as failed, so we can
                     // go directly to removing this node
-                    setFailedThenNotify(true);
+                    setFailedThenNotify();
                     return;
 		}
 		if (renewed) {
@@ -703,55 +831,15 @@ public final class WatchdogServiceImpl
     }
 
     /**
-     * Returns the local alive status: {@code true} if this node is
-     * considered alive.
+     * Returns {@code true} if this node is considered alive.
      */
-    private boolean getIsAlive() {
-	synchronized (lock) {
-	    return isAlive;
-	}
-    }
-
-    /**
-     * Sets the local alive status of this node to {@code false}, and
-     * if {@code notify} is {@code true}, notifies appropriate
-     * registered node listeners of this node's failure.  This method
-     * is called when this node is no longer considered alive.
-     * Subsequent calls to {@link #isAlive isAlive} will return {@code
-     * false}.  If this node's local alive status was already set to
-     * {@code false}, then this method does nothing.
-     *
-     * @param	notify	if {@code true}, notifies appropriate registered
-     *		node listeners of this node's failure
-     */
-    private void setFailedThenNotify(boolean notify) {
-	synchronized (lock) {
-	    if (!isAlive) {
-		return;
-	    }
-	    isAlive = false;
-	}
-
-	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, false);
-	    notifyNodeListeners(node);
-	}
-
-        logger.log(
-	    Level.SEVERE,
-	    "Node:{0} forced to shutdown due to service failure", localNodeId);
-
-        shutdownController.shutdownNode(this);
+    private synchronized boolean isLocalAlive() {
+	return health.isAlive();
     }
 
     /**
      * Notifies the appropriate registered node listeners of the
-     * status change of the specified {@code node}.  If invoking
-     * {@link Node#isAlive isAlive} on the {@code node} returns
-     * {@code false}, the {@code NodeListener#nodeFailed nodeFailed}
-     * method is invoked on each node listener, otherwise the {@code
-     * NodeListener#nodeStarted nodeStarted} method is invoked on each
-     * node listener.
+     * status change of the specified {@code node}.
      *
      * @param	node a node
      * @throws  IllegalStateException if this service is shutting down
@@ -766,11 +854,7 @@ public final class WatchdogServiceImpl
 			if (!shuttingDown() &&
                             isLocalNodeAliveNonTransactional()) 
 			{
-			    if (node.isAlive()) {
-				nodeListener.nodeStarted(node);
-			    } else {
-				nodeListener.nodeFailed(node);
-			    }
+                            nodeListener.nodeHealthUpdate(node);
 			}
 		    }
 		}, taskOwner);
@@ -856,23 +940,23 @@ public final class WatchdogServiceImpl
         @Override
 	public void nodeStatusChanges(long[] ids,
                                       String[] hosts,
-                                      boolean[] status,
+                                      Health[] health,
                                       long[] backups)
 	{
-	    if (ids.length != hosts.length || hosts.length != status.length ||
-		status.length != backups.length)
+	    if (ids.length != hosts.length || hosts.length != health.length ||
+		health.length != backups.length)
 	    {
 		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
-		if (ids[i] == localNodeId && status[i]) {
+		if (ids[i] == localNodeId && health[i].isAlive()) {
 		    /* Don't notify the local node that it is alive. */
 		    continue;
 		}
 		Node node =
-                        new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
+                        new NodeImpl(ids[i], hosts[i], health[i], backups[i]);
 		notifyNodeListeners(node);
-		if (!status[i] && backups[i] == localNodeId) {
+		if (!health[i].isAlive() && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
 		}
 	    }
@@ -882,7 +966,7 @@ public final class WatchdogServiceImpl
 	 * {@inheritDoc}
 	 */
 	public void reportFailure(String className) {
-	    setFailedThenNotify(true);
+	    setFailedThenNotify();
 	}
     }
 

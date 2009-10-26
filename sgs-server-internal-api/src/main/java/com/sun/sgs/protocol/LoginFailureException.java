@@ -41,6 +41,8 @@ public class LoginFailureException extends Exception {
 	DUPLICATE_LOGIN,
 	/** The application rejects the login. */
 	REJECTED_LOGIN,
+        /** The server is temporarily unavailable. */
+        SERVER_UNAVAILABLE,
 	/** Other operational failure (see exception {@link
 	 * Throwable#getCause cause} for detail). */ 
 	OTHER
@@ -68,7 +70,7 @@ public class LoginFailureException extends Exception {
     }
     
     /**
-     * Constructs and instance with the specified detail {@code message}
+     * Constructs an instance with the specified detail {@code message}
      * and {@code cause}.
      *
      * @param	message a detail message, or {@code null}
