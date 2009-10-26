@@ -66,6 +66,13 @@ final class BootProperties {
     static final String EXTENSION_MANAGERS_PROPERTY =
         "com.sun.sgs.ext.managers";
 
+    /**
+     * The property used to specify service node types from extension
+     * libraries.
+     */
+    static final String EXTENSION_SERVICE_NODE_TYPES_PROPERTY =
+        "com.sun.sgs.ext.services.node.types";
+
     /** The property used to specify authenticators from extension libraries. */
     static final String EXTENSION_AUTHENTICATORS_PROPERTY =
         "com.sun.sgs.ext.authenticators";

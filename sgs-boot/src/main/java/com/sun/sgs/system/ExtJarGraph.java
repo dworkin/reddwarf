@@ -144,9 +144,10 @@ class ExtJarGraph {
         Properties p = new Properties();
         StringBuilder servicesLine = new StringBuilder();
         StringBuilder managersLine = new StringBuilder();
+        StringBuilder nodeTypesLine = new StringBuilder();
         StringBuilder authenticatorsLine = new StringBuilder();
         for (JarNode node : dependencyRoots) {
-            buildProperties(node, p, servicesLine, managersLine,
+            buildProperties(node, p, servicesLine, managersLine, nodeTypesLine,
                             authenticatorsLine);
         }
         if (servicesLine.length() != 0) {
@@ -154,6 +155,10 @@ class ExtJarGraph {
         }
         if (managersLine.length() != 0) {
             p.setProperty("com.sun.sgs.ext.managers", managersLine.toString());
+        }
+        if (nodeTypesLine.length() != 0) {
+            p.setProperty("com.sun.sgs.ext.services.node.types",
+                          nodeTypesLine.toString());
         }
         if (authenticatorsLine.length() != 0) {
             p.setProperty("com.sun.sgs.ext.authenticators",
@@ -220,11 +225,12 @@ class ExtJarGraph {
     private void buildProperties(JarNode node, Properties p,
                                  StringBuilder servicesLine,
                                  StringBuilder managersLine,
+                                 StringBuilder nodeTypesLine,
                                  StringBuilder authenticatorsLine)
     {
         // gather properties from depdencies first
         for (JarNode dNode : node.dNodes) {
-            buildProperties(dNode, p, servicesLine, managersLine,
+            buildProperties(dNode, p, servicesLine, managersLine, nodeTypesLine,
                             authenticatorsLine);
         }
 
@@ -237,6 +243,9 @@ class ExtJarGraph {
             int managerCount = getElementCount(managers);
             String services = (String) nodeProps.remove("com.sun.sgs.services");
             int serviceCount = getElementCount(services);
+            String nodeTypes = (String) nodeProps.remove(
+                    "com.sun.sgs.services.node.types");
+            int nodeTypeCount = getElementCount(nodeTypes);
 
             // verify that the manager and service counts line up, or if
             // there are no managers then there is at most only one service
@@ -253,8 +262,16 @@ class ExtJarGraph {
                 }
             }
 
+            // verify that there are either no node types, or exactly the same
+            // number as there are services
+            if (nodeTypeCount != 0 && nodeTypeCount != serviceCount) {
+                throw new IllegalStateException("Mis-matched Node Type " +
+                                                "and Service count for " +
+                                                node.name);
+            }
+
             // if there are services then add them after figuring out how to
-            // modify the manager line correctly
+            // modify the manager and node types lines correctly
             if (serviceCount != 0) {
                 if (managerCount == 0) {
                     if (servicesLine.length() != 0) {
@@ -274,6 +291,15 @@ class ExtJarGraph {
                         addToLine(managersLine, managers);
                     }
                 }
+
+                if (nodeTypeCount == 0) {
+                    for (int i = 0; i < serviceCount; i++) {
+                        addToLine(nodeTypesLine, "ALL");
+                    }
+                } else {
+                    addToLine(nodeTypesLine, nodeTypes);
+                }
+
                 addToLine(servicesLine, services);
             }
 
