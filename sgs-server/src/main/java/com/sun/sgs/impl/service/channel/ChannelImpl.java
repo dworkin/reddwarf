@@ -1363,7 +1363,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Notifies this event queue that its coordinator has been
+	 * Notifies this event queue that its channel's coordinator has
+	 * been reassigned and is considered to be recovering.  This event
+	 * queue notes the "next timestamp" (to be assigned to an event) so
+	 * that the event queue can perform specific recovery actions for
+	 * events until it processes all events (if any) with timestamps
+	 * less than the timestamp at the moment the coordinator was
 	 * reassigned.
 	 */
 	void coordinatorReassigned() {
@@ -1372,6 +1377,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		isEmpty() ? 0 : nextTimestamp;
 	}
 
+	/**
+	 * Returns {@code true} if the coordinator is considered recovering
+	 * for the specified {@code timestamp}, and returns {@code false}
+	 * otherwise.
+	 *
+	 * @param timestamp an event timestamp
+	 * @return {@code true} if the coordinator is considered recovering
+	 * for the specified {@code timestamp}
+	 */
 	boolean isCoordinatorRecovering(long timestamp) {
 	    return timestamp < coordinatorAssignmentTimestamp;
 	}
@@ -1942,7 +1956,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		    // Wait for transient situation to resolve.
 		    try {
-			// TBD: make sleep time configurable.
+			// TBD: make sleep time configurable?
 			Thread.sleep(200);
 		    } catch (InterruptedException ie) {
 		    }
@@ -2075,7 +2089,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	protected boolean sendNotification(ChannelServer server)
 	    throws IOException
 	{
-	    // TBD: why is it timestamp - 1 here?????
+	    /*
+	     * Send "join" notification to session's server with a
+	     * timestamp of the last message sent on the channel (which may
+	     * be zero if no messages have been sent on the channel).  The
+	     * timestamp of the last message sent on the channel is one
+	     * less than the event's timestamp.
+	     */
 	    boolean success =
 		server.join(name, channelRefId, (byte) delivery.ordinal(),
 			    timestamp - 1, sessionRefId);
@@ -2242,15 +2262,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    this.isChannelMember = isChannelMember;
 	}
 
-	/** {@inheritDoc}
-	 *
-	 * TBD: (optimization) this should handle sending
-	 * multiple messages to a given channel.  Here, we
-	 * could peek at the next event in the queue, and if
-	 * it is a send, that event could be batched with this
-	 * send event.  This could be repeated for multiple
-	 * send events appearing in the queue.
-	 */
+	/** {@inheritDoc} */
 	public boolean serviceEvent(ChannelImpl channel) {
 	    assert isProcessing() && !isCompleted();
 	    ChannelServiceImpl channelService =
