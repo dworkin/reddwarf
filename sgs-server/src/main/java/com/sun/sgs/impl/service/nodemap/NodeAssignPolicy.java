@@ -22,52 +22,64 @@ package com.sun.sgs.impl.service.nodemap;
 import com.sun.sgs.auth.Identity;
 
 /**
+ * Interface for node assignment. The actual policy to be used is configurable
+ * in the node mapping server. A class implementing the {@code NodeAssignPolicy}
+ * interface must have a public constructor that takes the following argument:
  *
- * Interface for node assignment.  I expect that we'll replace
- * these every so often, so the actual policy to be used is configurable
- * in the node mapping server.
- * <p>
- * This will probably morph into node assignment plus node balancing policy.
+ * <ul>
+ * <li>{@link java.util.Properties}</li>
+ * </ul>
  * 
  */
-interface NodeAssignPolicy {
+public interface NodeAssignPolicy {
     
     /**
      *  An id representing the server node.
      */
     long SERVER_NODE = -1L;
-    
+   
     /**
-     * Choose a node to assign the identity to.  It is assumed that
-     * we've already checked to see if the identity is in the map
-     * before calling this method.
+     * Choose a node to assign an identity, or set of identities to.
      *
-     * @param id the identity which needs an assignment.
      * @param requestingNode the id of the node making the request, or 
      *         {@code SERVER_NODE} if the system is making the request
+     *
      * @return the chosen node's id
      *
      * @throws NoNodesAvailableException if there are no live nodes to assign to
      */
-    long chooseNode(Identity id, long requestingNode) 
+    long chooseNode(long requestingNode) throws NoNodesAvailableException;
+
+    /**
+     * Choose a node to assign an identity to.
+     *
+     * @param requestingNode the id of the node making the request, or
+     *         {@code SERVER_NODE} if the system is making the request
+     * @param id the identity which needs an assignment.
+     *
+     * @return the chosen node's id
+     *
+     * @throws NoNodesAvailableException if there are no live nodes to assign to
+     */
+    long chooseNode(long requestingNode, Identity id)
             throws NoNodesAvailableException;
     
     /**
      * Inform the policy that a node is now available.
      *
-     * @param nodeId the started node
+     * @param nodeId the node ID
      */
-    void nodeStarted(long nodeId);
+    void nodeAvailable(long nodeId);
     
     /**
-     * Inform the policy that a node has stopped.
-     * @param nodeId  the stopped node
+     * Inform the policy that a node is no longer available.
+     *
+     * @param nodeId  the node ID
      */
-    void nodeStopped(long nodeId);
+    void nodeUnavailable(long nodeId);
     
     /**
-     * Reset the policy, in particular its idea of what nodes have
-     * started and stopped.
+     * Reset the policy, informing it that no nodes are available.
      */
     void reset();
 }

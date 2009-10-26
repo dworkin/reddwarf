@@ -26,6 +26,7 @@ package com.sun.sgs.service;
 import java.util.Iterator;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.service.Node.Health;
 
 /**
  * The {@code WatchdogService} monitors the health of server nodes and
@@ -34,6 +35,30 @@ import com.sun.sgs.app.TransactionException;
  * backup and recovery.
  */
 public interface WatchdogService extends Service {
+
+    /**
+     * Returns the health of the local node.  This method should only be
+     * called from within a transaction.
+     *
+     * @return	the health of the local node
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    Health getLocalNodeHealth();
+
+    /**
+     * Returns the health of the local node.  This method returns the most
+     * recent information known to this service and may not be
+     * definitive.  For definitive information, use the {@link
+     * #getLocalNodeHealth getLocalNodeHealth} method. <p>
+     *
+     * This method may be invoked any time after this service is
+     * initialized, whether or not the calling context is inside or outside
+     * of a transaction.
+     *
+     * @return	the health of the local node
+     */
+    Health getLocalNodeHealthNonTransactional();
 
     /**
      * Returns {@code true} if the local node is considered alive,
@@ -55,7 +80,7 @@ public interface WatchdogService extends Service {
      * #isLocalNodeAlive isLocalNodeAlive} method. <p>
      *
      * This method may be invoked any time after this service is
-     * intialized, whether or not the calling context is inside or outside
+     * initialized, whether or not the calling context is inside or outside
      * of a transaction.
      *
      * @return	{@code true} if the local node is considered alive, and
@@ -145,19 +170,46 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
 
     /**
-     * Informs the watchdog that a problem has occured in a service or
-     * component. The watchdog will notify the server of the failure and
-     * then proceeed to shutting down the node. The node specified as the
-     * {@code nodeId} can be a local node or a remote node. <p>
+     * Informs the watchdog of a node's health. Multiple components may report
+     * on a node's health. The watchdog will use these reports to determine the
+     * overall node's health. The node specified as the {@code nodeId} can be
+     * the local node or a remote node. The {@code component} parameter may be
+     * any identifying string, but is typically the class name of the component.
+     * <p>
+     * Once {@code reportHealth} has been called with a health that returns
+     * {@code false} from its {@code Health.isAlive} method, the health
+     * of the specified node can not be changed. <p>
      *
      * This method must be invoked outside of a transaction.
-     * 
-     * @param nodeId the id of the node to shutdown
-     * @param className the class name of the service that failed
+     *
+     * @param nodeId the id of the node
+     * @param health the health
+     * @param component the name of the component reporting health
+     *
      * @throws	IllegalStateException if this method is invoked from a
      *		transactional context
      */
-    void reportFailure(long nodeId, String className);
+    void reportHealth(long nodeId, Health health, String component);
+
+    /**
+     * Informs the watchdog that a problem has occurred in a service or
+     * component. The watchdog will notify the server of the failure and
+     * then proceed to shutting down the node. The node specified as the
+     * {@code nodeId} can be the local node or a remote node. The
+     * {@code component} parameter may be any identifying string, but is
+     * typically the class name of the component.<p>
+     *
+     * Once {@code reportFailure} has been called, the health of the
+     * specified node can not be changed. <p>
+     *
+     * This method must be invoked outside of a transaction.
+     *
+     * @param nodeId the id of the node to shutdown
+     * @param component the name of the component that failed
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
+     */
+    void reportFailure(long nodeId, String component);
 
     /**
      * Returns the current global application time in milliseconds. This

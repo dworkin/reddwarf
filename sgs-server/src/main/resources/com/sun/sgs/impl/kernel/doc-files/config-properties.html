@@ -418,6 +418,52 @@ system including identity management, profiling, and task scheduling.
 
 </dl>
 
+<a name="Services"></a>
+<h3>Additional Service Properties</h3>
+
+These properties provide support for enabling additional services and
+managers in the system.
+
+<dl>
+<dt>com.sun.sgs.services
+<span class="nodefault"/>
+<dd>A colon separated list of additional
+  <a href="../../../service/Service.html"><code>Service</code>s</a> to start
+  after all of the core <code>Service</code>s have started. Each
+  <code>Service</code> should be specified as a fully qualified class name.
+  <code>Service</code>s will be started in the order that they are specified
+  in this list.
+    
+<dt>com.sun.sgs.managers
+<span class="nodefault"/>
+<dd>A colon separated list of additional <code>Manager</code>s to use. Each
+  <code>Manager</code> should be specified as a fully qualified class name.
+  This list must contain the same number of classes as the
+  <code>com.sun.sgs.services</code> list described above.  Each Manager in the
+  list is paired with the corresponding <code>Service</code> in the
+  <code>Service</code>s list at the same index.  To specify a
+  <code>Service</code> with no <code>Manager</code>, leave the appropriate
+  element in the list empty.
+
+<dt>com.sun.sgs.services.node.types
+<span class="nodefault"/>
+<dd>A colon separated list of node type identifiers that indicate which node
+  types each respective <code>Service</code>/<code>Manager</code> pair in the
+  lists described above should be started on. This list must contain the same
+  number of items as the <code>Service</code> and <code>Manager</code>s lists.
+  Valid values for a node type are:
+<ul>
+  <li><code>SINGLE</code></li>
+  <li><code>CORE</code></li>
+  <li><code>APP</code></li>
+  <li><code>SINGLE_OR_CORE</code></li>
+  <li><code>SINGLE_OR_APP</code></li>
+  <li><code>CORE_OR_APP</code></li>
+  <li><code>ALL</code></li>
+</ul>
+
+</dl>
+
 <a name="DebugProperties"></a>
 <h2>Debug and Test Properties</h2>
 
@@ -599,6 +645,11 @@ class:
       <b>
 	<code>com.sun.sgs.impl.service.session.ClientSessionServiceImpl</code>
       </b>
+    </a>
+  </li>
+  <li>
+    <a href="../../../impl/service/task/FixedTimeContinuePolicy.html">
+      <b><code>com.sun.sgs.impl.service.task.FixedTimeContinuePolicy</code></b>
     </a>
   </li>
   <li>

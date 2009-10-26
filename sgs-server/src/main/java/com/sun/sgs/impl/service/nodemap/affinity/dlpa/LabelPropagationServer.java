@@ -405,13 +405,15 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
 
         /** {@inheritDoc} */
-        public void nodeStarted(Node node) {
-            // Do nothing. We will ask for a proxy for the node lazily.
-        }
-
-        /** {@inheritDoc} */
-        public void nodeFailed(Node node) {
-            removeNode(node.getId());
+        public void nodeHealthUpdate(Node node) {
+            switch (node.getHealth()) {
+                case RED :
+                    removeNode(node.getId());
+                    break;
+                default :
+                    // do nothing
+                    break;
+            }
         }
     }
 

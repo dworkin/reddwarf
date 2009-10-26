@@ -80,6 +80,7 @@ import java.util.Properties;
 
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.LogManager;
@@ -222,7 +223,17 @@ class Kernel {
     protected Kernel(Properties appProperties)
         throws Exception 
     {
-        logger.log(Level.CONFIG, "Booting the Kernel");
+        // output the entire set of configuration properties to the logger
+        if (logger.isLoggable(Level.CONFIG)) {
+            StringBuffer propOutput = new StringBuffer(
+                    "Booting the Kernel with raw properties:");
+            for (String key : new TreeSet<String>(
+                    appProperties.stringPropertyNames())) {
+                propOutput.append("\n  " + key + "=" +
+                                  appProperties.getProperty(key));
+            }
+            logger.log(Level.CONFIG, propOutput.toString());
+        }
                 
         // filter the properties with appropriate defaults
         filterProperties(appProperties);

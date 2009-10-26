@@ -23,6 +23,7 @@
 
 package com.sun.sgs.management;
 
+import com.sun.sgs.service.Node.Health;
 import java.beans.ConstructorProperties;
 import java.io.Serializable;
 
@@ -35,7 +36,7 @@ public class NodeInfo implements Serializable {
     
     private String host;
     private long id;
-    private boolean live;
+    private Health health;
     private long backup;
     private int jmxPort;
     
@@ -57,17 +58,17 @@ public class NodeInfo implements Serializable {
      * 
      * @param host the host name of the machine
      * @param id   the unique identifier for this node
-     * @param live {@code true} if the node is live
+     * @param health the node's health
      * @param backup the backup node for this node
      * @param jmxPort the port for JMX remote connections
      */
-    @ConstructorProperties({"host", "id", "live", "backup", "jmxPort" })
-    public NodeInfo(String host, long id, boolean live, long backup, 
+    @ConstructorProperties({"host", "id", "health", "backup", "jmxPort" })
+    public NodeInfo(String host, long id, Health health, long backup,
                     int jmxPort) 
     {
         this.host = host;
         this.id = id;
-        this.live = live;
+        this.health = health;
         this.backup = backup;
         this.jmxPort = jmxPort;
     }
@@ -88,18 +89,27 @@ public class NodeInfo implements Serializable {
     public long getId() {
         return id;
     }
-    
+
+    /**
+     * Returns the node health.
+     *
+     * @return the node health
+     */
+    public Health getHealth() {
+        return health;
+    }
+
     /**
      * Returns whether the node is alive or failed.  Once a node has
      * failed, it is never considered alive again and is removed from
      * the system when any required fail-over procedures have completed.
-     * 
+     *
      * @return {@code true} if the node is alive
      */
     public boolean isLive() {
-        return live;
+        return health.isAlive();
     }
-    
+
     /**
      * Returns the node id of the backup node for this node, or {@code -1} if
      * no backup is assigned.

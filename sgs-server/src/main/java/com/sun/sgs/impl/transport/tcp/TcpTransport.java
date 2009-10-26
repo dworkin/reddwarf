@@ -134,14 +134,11 @@ public class TcpTransport implements Transport {
      * @param properties transport properties
      */
     public TcpTransport(Properties properties) {
-        
+
+        logger.log(Level.CONFIG, "Creating TcpTransport");
         if (properties == null) {
             throw new NullPointerException("properties is null");
         }
-	logger.log(Level.CONFIG,
-	           "Creating TCP transport with properties:{0}",
-	           properties);
-        
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         acceptorBacklog = wrappedProps.getIntProperty(ACCEPTOR_BACKLOG_PROPERTY,
@@ -192,6 +189,14 @@ public class TcpTransport implements Transport {
                 }
 		throw e;
 	    }
+
+            logger.log(Level.CONFIG,
+                       "Created TcpTransport with properties:" +
+                       "\n  " + ACCEPTOR_BACKLOG_PROPERTY + "=" +
+                       acceptorBacklog +
+                       "\n  " + LISTEN_HOST_PROPERTY + "=" + host +
+                       "\n  " + LISTEN_PORT_PROPERTY + "=" + port);
+
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(Level.CONFIG, e,

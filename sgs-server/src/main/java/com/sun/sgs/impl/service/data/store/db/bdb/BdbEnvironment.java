@@ -306,12 +306,9 @@ public class BdbEnvironment implements DbEnvironment {
 			  ComponentRegistry systemRegistry,
 			  TransactionProxy txnProxy)
     {
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG,
-		       "BdbEnvironment directory:{0}, properties:{1}, " +
-		       "systemRegistry:{2}, txnProxy:{3}",
-		       directory, properties, systemRegistry, txnProxy);
-	}
+        logger.log(Level.CONFIG, "Creating BdbEnvironment with directory: {0}",
+                   directory);
+
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	long cacheSize = wrappedProps.getLongProperty(
 	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE, MIN_CACHE_SIZE,
@@ -381,6 +378,18 @@ public class BdbEnvironment implements DbEnvironment {
 	    checkpointTask, txnProxy.getCurrentOwner(),
 	    System.currentTimeMillis() + checkpointInterval,
 	    checkpointInterval);
+
+        logger.log(Level.CONFIG,
+                   "Created BdbEnvironment with properties:" +
+                   "\n  " + CACHE_SIZE_PROPERTY + "=" + cacheSize +
+                   "\n  " + CHECKPOINT_INTERVAL_PROPERTY + "=" +
+                   checkpointInterval +
+                   "\n  " + CHECKPOINT_SIZE_PROPERTY + "=" + checkpointSize +
+                   "\n  " + FLUSH_TO_DISK_PROPERTY + "=" + flushToDisk +
+                   "\n  " + LOCK_TIMEOUT_PROPERTY + "=" + lockTimeout +
+                   "\n  " + REMOVE_LOGS_PROPERTY + "=" + removeLogs +
+                   "\n  " + TXN_ISOLATION_PROPERTY + "=" + txnIsolation);
+        
     }
 
     /**
