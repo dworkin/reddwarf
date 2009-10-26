@@ -545,7 +545,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
          * Get node assignment.
          */
         final long assignedNodeId;
-        try{
+        try {
             assignedNodeId = sessionService.nodeMapService.assignNode(
                                     ClientSessionHandler.class, identity);
 	} catch (Exception e) {
