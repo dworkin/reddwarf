@@ -43,6 +43,7 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -852,6 +853,8 @@ public class TestLPA {
     // Simple builder spread across 3 nodes
     private class PartialToyBuilder implements DLPAGraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
+        private final Map<Identity, LabelVertex> identMap =
+                new HashMap<Identity, LabelVertex>();
         private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
                 conflictMap;
         private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
@@ -943,6 +946,9 @@ public class TestLPA {
                 // conflicts - data cache evictions due to conflict
                 // none on this node
             }
+            for (LabelVertex v : graph.getVertices()) {
+                identMap.put(v.getIdentity(), v);
+            }
         }
 
         /** {@inheritDoc} */
@@ -950,6 +956,11 @@ public class TestLPA {
                 getAffinityGraph()
         {
             return graph;
+        }
+        
+        /** {@inheritDoc} */
+        public LabelVertex getVertex(Identity id) {
+            return identMap.get(id);
         }
 
         /** {@inheritDoc} */

@@ -81,6 +81,15 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
         bipartiteGraph = 
             new CopyableGraph<Object, WeightedEdge>();
 
+    /**
+     * A map of identity->graph vertex, allowing fast lookups of particular
+     * vertices. This graph is updated when each call to getAffinityGraph
+     * is made, so results may be a little stale compared to the
+     * bipartite graph.
+     */
+    private final Map<Identity, LabelVertex> identMap =
+            new HashMap<Identity, LabelVertex>();
+
     /** Our recorded cross-node accesses.  We keep track of this through
      * conflicts detected in data cache kept across nodes;  when a
      * local node is evicted from the cache because of a request from another
@@ -197,6 +206,11 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     }
 
     /** {@inheritDoc} */
+    public LabelVertex getVertex(Identity id) {
+        return identMap.get(id);
+    }
+
+    /** {@inheritDoc} */
     public Runnable getPruneTask() {
         return pruneTask;
     }
@@ -225,6 +239,9 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
         // collapsed into a single weighted edge.
         UndirectedSparseGraph<LabelVertex, WeightedEdge> foldedGraph =
             new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
+
+        // Clear out our identity->vertex map to prepare for new data.
+        identMap.clear();
         
         // Separate out the vertex set for our new folded graph.
         for (Object vert : graphCopy.getVertices()) {
@@ -236,7 +253,9 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
                 Identity ivert = (Identity) vert;
                 vertices.add(ivert);
                 affinityGraph.addVertex(ivert);
-                foldedGraph.addVertex(new LabelVertex(ivert));
+                LabelVertex v = new LabelVertex(ivert);
+                foldedGraph.addVertex(v);
+                identMap.put(ivert, v);
             }
         }
         
@@ -274,8 +293,8 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
         // Now collapse the parallel edges in the affinity graph
         for (AffinityEdge e : affinityGraph.getEdges()) {
             Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
-            LabelVertex v1 = new LabelVertex(endpoints.getFirst());
-            LabelVertex v2 = new LabelVertex(endpoints.getSecond());
+            LabelVertex v1 = getVertex(endpoints.getFirst());
+            LabelVertex v2 = getVertex(endpoints.getSecond());
             WeightedEdge edge = foldedGraph.findEdge(v1, v2);
             if (edge == null) {
                 foldedGraph.addEdge(new WeightedEdge(e.getWeight()), v1, v2);

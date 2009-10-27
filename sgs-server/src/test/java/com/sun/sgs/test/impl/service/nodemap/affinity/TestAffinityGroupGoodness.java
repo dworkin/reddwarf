@@ -227,6 +227,12 @@ public class TestAffinityGroupGoodness {
         {
             return graph;
         }
+
+        /** {@inheritDoc} */
+        public LabelVertex getVertex(Identity id) {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
         /** {@inheritDoc} */
         public Runnable getPruneTask() {
             throw new UnsupportedOperationException("Not supported yet.");

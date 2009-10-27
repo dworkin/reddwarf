@@ -26,6 +26,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -39,6 +40,8 @@ class ZachBuilder implements AffinityGraphBuilder {
 
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
 
+    private final HashMap<Identity, LabelVertex> identMap =
+                new HashMap<Identity, LabelVertex>();
     public ZachBuilder() {
         graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
         // Create a graph for the Zachary network:
@@ -131,11 +134,20 @@ class ZachBuilder implements AffinityGraphBuilder {
         graph.addEdge(new WeightedEdge(), nodes[34], nodes[33]);
         Assert.assertEquals(34, graph.getVertexCount());
         Assert.assertEquals(78, graph.getEdgeCount());
+
+        for (LabelVertex v : graph.getVertices()) {
+            identMap.put(v.getIdentity(), v);
+        }
     }
 
     /** {@inheritDoc} */
     public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         return graph;
+    }
+
+    /** {@inheritDoc} */
+    public LabelVertex getVertex(Identity id) {
+        return identMap.get(id);
     }
 
     /** {@inheritDoc} */

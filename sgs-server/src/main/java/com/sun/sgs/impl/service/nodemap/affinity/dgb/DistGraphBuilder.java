@@ -167,6 +167,20 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
                 "Cannot obtain the affinity graph from a local node");
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation will always throw an
+     * {@code UnsupportedOperationException}, because the graph is not
+     * held on the local node.
+     */
+    public LabelVertex getVertex(Identity id) {
+        throw new UnsupportedOperationException(
+                "Cannot obtain the affinity graph from a local node");
+    }
+
+
+
     /** {@inheritDoc} */
     public void shutdown() {
         if (serverImpl != null) {

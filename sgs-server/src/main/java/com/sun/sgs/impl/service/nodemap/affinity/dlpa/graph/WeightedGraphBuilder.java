@@ -92,6 +92,14 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
         affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
+    /**
+     * A map of identity->graph vertex, allowing fast lookups of particular
+     * vertices. Changes to this graph should occur atomically with vertex
+     * changes to the affinity graph.
+     */
+    private final Map<Identity, LabelVertex> identMap =
+            new HashMap<Identity, LabelVertex>();
+
     /** Our recorded cross-node accesses.  We keep track of this through
      * conflicts detected in data cache kept across nodes;  when a
      * local node is evicted from the cache because of a request from another
@@ -188,8 +196,6 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         long startTime = System.currentTimeMillis();
         stats.updateCountInc();
 
-        LabelVertex vowner = new LabelVertex(owner);
-
         // For each object accessed in this task...
         for (AccessedObject obj : detail.getAccessedObjects()) {
             Object objId = obj.getObjectId();
@@ -216,7 +222,7 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
             long currentVal = value.incrementAndGet();
 
             synchronized (affinityGraph) {
-                affinityGraph.addVertex(vowner);
+                LabelVertex vowner = addOrGetVertex(owner);
                 // add or update edges between task owner and identities
                 for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
@@ -224,7 +230,7 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
                     // Our folded graph has no self-loops:  only add an
                     // edge if the identity isn't the owner
                     if (!ident.equals(owner)) {
-                        LabelVertex vident = new LabelVertex(ident);
+                        LabelVertex vident = addOrGetVertex(ident);
                         // Check to see if we already have an edge between
                         // the two vertices.  If so, update its weight.
                         WeightedEdge edge =
@@ -290,6 +296,11 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     }
 
     /** {@inheritDoc} */
+    public LabelVertex getVertex(Identity id) {
+        return identMap.get(id);
+    }
+    
+    /** {@inheritDoc} */
     public AffinityGroupFinder getAffinityGroupFinder() {
         return lpaServer;
     }
@@ -336,6 +347,22 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         conflictMap.remove(nodeId);
     }
 
+    /**
+     * Adds a vertex for the given identity to the graph, or retrieve the
+     * existing one.
+     * @param id the identity
+     * @return the graph vertex representing the identity
+     */
+    private LabelVertex addOrGetVertex(Identity id) {
+        LabelVertex v = getVertex(id);
+        if (v == null) {
+            v = new LabelVertex(id);
+            affinityGraph.addVertex(v);
+            identMap.put(id, v);
+        }
+        return v;
+    }
+    
     /**
      * The graph pruner.  It runs periodically, and is the only code
      * that removes edges and vertices from the graph.
@@ -459,6 +486,7 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
                         for (LabelVertex end : endpts) {
                             if (affinityGraph.degree(end) == 0) {
                                 affinityGraph.removeVertex(end);
+                                identMap.remove(end.getIdentity());
                             }
                         }
                     } else {

@@ -123,6 +123,14 @@ public interface AffinityGraphBuilder {
     void shutdown();
 
     /**
+     * Gets the graph vertex for the given {@code Identity}.
+     * @param id an identity
+     * @return the graph vertex for the identity, or {@code null} if
+     *          there is no such vertex
+     */
+    LabelVertex getVertex(Identity id);
+
+    /**
      * Returns the affinity group finder created by this builder,
      * or {@code null} if none was created.  Some algorithms only create
      * the finder on the server node.

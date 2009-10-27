@@ -75,6 +75,14 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
         affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
+    /**
+     * A map of identity->graph vertex, allowing fast lookups of particular
+     * vertices. Changes to this graph should occur atomically with vertex
+     * changes to the affinity graph.
+     */
+    private final Map<Identity, LabelVertex> identMap =
+            new HashMap<Identity, LabelVertex>();
+
     /** The TimerTask which prunes our data structures over time.  As the data
      * structures above are modified, the pruneTask notes the ways they have
      * changed.  Groups of changes are chunked into periods, each the length
@@ -177,8 +185,6 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         long startTime = System.currentTimeMillis();
         stats.updateCountInc();
 
-        LabelVertex vowner = new LabelVertex(owner);
-
         // For each object accessed in this task...
         for (Object objId : objIds) {
             // find the identities that have already used this object
@@ -208,8 +214,7 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
             synchronized (affinityGraph) {
                 // Add the vertex while synchronized to ensure no interference
                 // from the graph pruner.
-                affinityGraph.addVertex(vowner);
-
+                LabelVertex vowner = addOrGetVertex(owner);
                 // add or update edges between task owner and identities
                 for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
@@ -217,7 +222,7 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
                     // Our folded graph has no self-loops:  only add an
                     // edge if the identity isn't the owner
                     if (!ident.equals(owner)) {
-                        LabelVertex vident = new LabelVertex(ident);
+                        LabelVertex vident = addOrGetVertex(ident);
                         // Check to see if we already have an edge between
                         // the two vertices.  If so, update its weight.
                         WeightedEdge edge =
@@ -265,6 +270,11 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
     }
 
     /** {@inheritDoc} */
+    public LabelVertex getVertex(Identity id) {
+        return identMap.get(id);
+    }
+
+    /** {@inheritDoc} */
     public AffinityGroupFinder getAffinityGroupFinder() {
         return lpa;
     }
@@ -282,6 +292,22 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
             throw new NullPointerException("null stats");
         }
         this.stats = stats;
+    }
+
+    /**
+     * Adds a vertex for the given identity to the graph, or retrieve the
+     * existing one.
+     * @param id the identity
+     * @return the graph vertex representing the identity
+     */
+    private LabelVertex addOrGetVertex(Identity id) {
+        LabelVertex v = getVertex(id);
+        if (v == null) {
+            v = new LabelVertex(id);
+            affinityGraph.addVertex(v);
+            identMap.put(id, v);
+        }
+        return v;
     }
 
     /**
@@ -401,6 +427,7 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
                         for (LabelVertex end : endpts) {
                             if (affinityGraph.degree(end) == 0) {
                                 affinityGraph.removeVertex(end);
+                                identMap.remove(end.getIdentity());
                             }
                         }
                     } else {

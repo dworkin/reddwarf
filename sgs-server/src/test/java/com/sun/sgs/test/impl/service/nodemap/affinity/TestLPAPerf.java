@@ -43,11 +43,11 @@ import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -282,6 +282,8 @@ public class TestLPAPerf {
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
     private class DistributedZachBuilder implements DLPAGraphBuilder {
         private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
+        private final HashMap<Identity, LabelVertex> identMap =
+                new HashMap<Identity, LabelVertex>();
         private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
             conflictMap;
         private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
@@ -741,6 +743,9 @@ public class TestLPAPerf {
                 conflict.put("o39", new AtomicLong(1));
                 conflictMap.put(NODE2, conflict);
             }
+            for (LabelVertex v : graph.getVertices()) {
+                identMap.put(v.getIdentity(), v);
+            }
         }
 
         /** {@inheritDoc} */
@@ -750,6 +755,11 @@ public class TestLPAPerf {
             return graph;
         }
 
+        /** {@inheritDoc} */
+        public LabelVertex getVertex(Identity id) {
+            return identMap.get(id);
+        }
+        
         /** {@inheritDoc} */
         public Runnable getPruneTask() {
             throw new UnsupportedOperationException("Not supported yet.");

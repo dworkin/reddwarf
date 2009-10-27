@@ -108,13 +108,6 @@ public abstract class AbstractLPA {
     protected volatile List<LabelVertex> vertices;
 
     /**
-     * A map view of identity to label vertex in {@code vertices}, useful
-     * for looking up a particular vertex.  The map is empty if vertices is
-     * empty.
-     */
-    protected volatile Map<Identity, LabelVertex> verticesMap;
-
-    /**
      * Constructs a new instance of the label propagation algorithm.
      * @param nodeId the local node ID
      * @param properties the properties for configuring this service
@@ -157,14 +150,10 @@ public abstract class AbstractLPA {
         // takes a long time, or if we use a more dynamic work queue, we'll
         // want to revisit this.
         Collection<LabelVertex> graphVertices = graph.getVertices();
-        verticesMap = new HashMap<Identity, LabelVertex>();
         if (graphVertices == null) {
             vertices = new ArrayList<LabelVertex>();
         } else {
             vertices = new ArrayList<LabelVertex>(graphVertices);
-            for (LabelVertex vert : graphVertices) {
-                verticesMap.put(vert.getIdentity(), vert);
-            }
         }
 
         // Initialize algorithm-specific info

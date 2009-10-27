@@ -665,7 +665,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                     {
                         // Find the label associated with the identity in
                         // the graph.
-                        LabelVertex vert = verticesMap.get(entry.getKey());
+                        LabelVertex vert = builder.getVertex(entry.getKey());
                         if (vert != null) {
                             // If the vertex wasn't found in the vertices list,
                             // it is a new identity since the vertices were

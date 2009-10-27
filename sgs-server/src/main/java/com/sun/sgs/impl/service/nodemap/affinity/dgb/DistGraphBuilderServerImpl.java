@@ -208,6 +208,11 @@ public class DistGraphBuilderServerImpl
     }
 
     /** {@inheritDoc} */
+    public LabelVertex getVertex(Identity id) {
+        return builder.getVertex(id);
+    }
+
+    /** {@inheritDoc} */
     public Runnable getPruneTask() {
         return builder.getPruneTask();
     }

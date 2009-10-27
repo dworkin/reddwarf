@@ -44,6 +44,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -236,7 +237,38 @@ public class GraphBuilderTests {
 
         for (WeightedEdge e : graph.getEdges()) {
             Assert.assertEquals(1, e.getWeight());
+            validateEdgeEndpoints(e);
         }
+    }
+
+    /**
+     * Checks that the endpoints of a graph edge are also the same
+     * as some vertex in the graph vertices.  This is a helpful graph
+     * consistency check because our LabelVertices implement equal, and
+     * we want the graph vertices and edges to be the same (==).
+     * @param edge
+     */
+    private void validateEdgeEndpoints(WeightedEdge edge) {
+        Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
+        Collection<LabelVertex> allvertices = graph.getVertices();
+        LabelVertex end1 = graph.getEndpoints(edge).getFirst();
+        LabelVertex end2 = graph.getEndpoints(edge).getSecond();
+        boolean ok = false;
+        for (LabelVertex v : allvertices) {
+            if (v == end1) {
+                ok = true;
+                break;
+            }
+        }
+        Assert.assertTrue("end1 check", ok);
+        ok = false;
+        for (LabelVertex v : allvertices) {
+            if (v == end2) {
+                ok = true;
+                break;
+            }
+        }
+        Assert.assertTrue("end2 check", ok);
     }
 
     @Test
@@ -420,6 +452,51 @@ public class GraphBuilderTests {
             // don't expect edge weight to have been updated
             Assert.assertEquals(2, e.getWeight());
         }
+    }
+
+    @Test
+    public void testGetVertexNotThere() {
+        // Needed for the bipartite version
+        builder.getAffinityGraph();
+        LabelVertex v = builder.getVertex(new IdentityImpl("None"));
+        Assert.assertNull(v);
+    }
+
+    @Test
+    public void testGetVertex() throws Exception {
+        Identity identA = new IdentityImpl("A");
+        Identity identB = new IdentityImpl("B");
+        ProfileReport report = makeReport(identA);
+        AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+        report = makeReport(identA);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        // Needed for the bipartite version
+        builder.getAffinityGraph();
+        LabelVertex v = builder.getVertex(identA);
+        Assert.assertEquals(identA, v.getIdentity());
+        LabelVertex v1 = builder.getVertex(identB);
+        Assert.assertNull(v1);
+
+        report = makeReport(identB);
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        // Needed for the bipartite version
+        builder.getAffinityGraph();
+        v1 = builder.getVertex(identB);
+        Assert.assertEquals(identB, v1.getIdentity());
+        // can still find a as well
+        v = builder.getVertex(identA);
+        Assert.assertEquals(identA, v.getIdentity());
     }
 
     @Test
