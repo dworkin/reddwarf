@@ -1,3 +1,6 @@
+Version 0.9.11
+ - Changed the channel name from a wchar_t* to a char*
+
 Version 0.9.10
  - Fixed a number of bugs in the handling of throttling and in logout,
     these deal with the root causes of issue 13.

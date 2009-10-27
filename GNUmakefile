@@ -16,7 +16,7 @@ SRCS = \
 
 LIB = libsgsclient.a
 
-VERSION = 0.9.10
+VERSION = 0.9.11
 
 DIST_FILE = sgs-c-client-dist-$(VERSION).zip
 
