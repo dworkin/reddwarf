@@ -105,8 +105,8 @@
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
 	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
-	      <windowtitle>Project Darkstar Client ${project.version} API</windowtitle>
-	      <doctitle>Project Darkstar Client ${project.version} API</doctitle>
+	      <windowtitle>Project Darkstar Java Client ${project.version} API</windowtitle>
+	      <doctitle>Project Darkstar Java Client ${project.version} API</doctitle>
 	      <footer>
 		<![CDATA[<font size="-1">Project Darkstar, Version
                 ${project.version}<br/>${buildNumber}</font>]]>
@@ -138,8 +138,8 @@
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
 	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
-	      <windowtitle>Project Darkstar Client ${project.version} External API</windowtitle>
-	      <doctitle>Project Darkstar Client ${project.version} External API</doctitle>
+	      <windowtitle>Project Darkstar Java Client ${project.version} External API</windowtitle>
+	      <doctitle>Project Darkstar Java Client ${project.version} External API</doctitle>
 	      <footer>
 		<![CDATA[<font size="-1">Project Darkstar, Version
                 ${project.version}<br/>${buildNumber}</font>]]>
