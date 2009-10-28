@@ -19,7 +19,6 @@
 
 package com.sun.sgs.test.impl.service.channel;
 
-import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -58,7 +57,6 @@ public class TestChannelServiceImplRelocatingSessions
 
     protected void setUp(boolean clean) throws Exception {
 	super.setUp(clean);
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
     }
     
     // -- Relocation test cases --
@@ -903,7 +901,7 @@ public class TestChannelServiceImplRelocatingSessions
 	DummyClient client, SgsTestNode oldNode, SgsTestNode newNode)
 	throws Exception
     {
-	DirectiveNodeAssignmentPolicy.instance.
+	identityAssigner.
 	    moveIdentity(client.name, oldNode.getNodeId(), newNode.getNodeId());
     }
     

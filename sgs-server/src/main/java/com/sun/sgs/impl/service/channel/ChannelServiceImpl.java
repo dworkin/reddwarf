@@ -1981,11 +1981,12 @@ public final class ChannelServiceImpl
 	implements NodeListener
     {
 	/** {@inheritDoc} */
-	public void nodeStarted(Node node) {
-	}
+	public void nodeHealthUpdate(Node node) {
+            // Only worry about node failures
+            if (node.isAlive()) {
+                return;
+            }
 
-	/** {@inheritDoc} */
-	public void nodeFailed(Node node) {
 	    final long nodeId = node.getId();
 	    channelServerCache.remove(nodeId);
 	    final TaskService taskService = getTaskService();

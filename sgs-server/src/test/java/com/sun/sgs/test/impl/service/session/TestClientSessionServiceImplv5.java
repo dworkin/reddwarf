@@ -19,10 +19,10 @@
 
 package com.sun.sgs.test.impl.service.session;
 
-import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.test.impl.service.session.TestClientSessionServiceImplv4.
     DummyClient;
+import com.sun.sgs.test.util.IdentityAssigner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
@@ -42,6 +42,8 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
     private static final String APP_NAME = "TestClientSessionServiceImplv5";
     
     private static final byte PROTOCOL_v5 = 0x05;
+
+    private IdentityAssigner identityAssigner;
     
     /** Number of managed objects per client session: 4 (ClientSessionImpl,
      * ClientSessionWrapper, EventQueue, ManagedQueue).
@@ -55,6 +57,7 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
     @Before
     public void setUp() throws Exception {
         super.setUp(null, true, APP_NAME, PROTOCOL_v5);
+	identityAssigner = new IdentityAssigner(serverNode);
     }
 
     @Test
@@ -187,8 +190,7 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
 	addNodes(host3);
 	SgsTestNode node2 = additionalNodes.get(host2);
 	SgsTestNode node3 = additionalNodes.get(host3);
-	DirectiveNodeAssignmentPolicy.instance.
-	    moveIdentity("foo", node2.getNodeId(),
+	identityAssigner.moveIdentity("foo", node2.getNodeId(),
 			 node3.getNodeId());
 	int objectCount = getObjectCount();
 	client.relocate(node2.getAppPort(), true, false);
@@ -310,7 +312,6 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
 	throws Exception
     {
 	final String name = "foo";
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	addNodes(newNodeHost);
 	DummyClient client = createDummyClient(name);
 	if (setWaitForSuspendMessages) {
@@ -321,7 +322,7 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
 	System.err.println("reassigning identity:" + name +
 			   " from server node to host: " +
 			   newNodeHost);
-	DirectiveNodeAssignmentPolicy.instance.
+	identityAssigner.
 	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
 	System.err.println("(done) reassigning identity");
 	return client;

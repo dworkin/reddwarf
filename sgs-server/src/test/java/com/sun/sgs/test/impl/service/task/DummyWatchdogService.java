@@ -24,6 +24,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
@@ -49,8 +50,8 @@ public class DummyWatchdogService implements WatchdogService {
 
     // a node-local copy of the node's identifier
     private final long localId;
-    // a node-local indicator of whether the node is alive
-    private boolean isAlive = true;
+    // a node-local indicator of the node's health
+    private Health health = Health.GREEN;
 
     /** Creates an instance of the service. */
     public DummyWatchdogService(Properties p, ComponentRegistry cr,
@@ -72,21 +73,31 @@ public class DummyWatchdogService implements WatchdogService {
     public void ready() {
         Node node = nodeMap.get(localId);
         for (NodeListener listener : listeners)
-            listener.nodeStarted(node);
+            listener.nodeHealthUpdate(node);
     }
 
     /** {@inheritDoc} */
     public void shutdown() {
-        isAlive = false;
+        health = Health.RED;
         nodeMap.remove(localId);
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
-            listener.nodeFailed(localNode);
+            listener.nodeHealthUpdate(localNode);
+    }
+
+    /** {@inheritDoc} */
+    public Health getLocalNodeHealth() {
+        return health;
+    }
+
+    /** {@inheritDoc} */
+    public Health getLocalNodeHealthNonTransactional() {
+        return health;
     }
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
-        return isAlive;
+        return health.isAlive();
     }
 
     /** {@inheritDoc} */
@@ -169,8 +180,14 @@ public class DummyWatchdogService implements WatchdogService {
         public boolean isAlive() {
             return isLocalNodeAlive();
         }
+        public Health getHealth() {
+            return getLocalNodeHealth();
+        }
     }
-    public void reportFailure(long nodeId, String className) {
+    public void reportHealth(long nodeId, Health health, String component) {
+        // Don't do anything for now
+    }
+    public void reportFailure(long nodeId, String component) {
         // Don't do anything for now
     }
 }

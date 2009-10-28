@@ -361,6 +361,18 @@ public class SgsTestNode {
     }
 
     /**
+     * Returns the node mapping server.
+     */
+    NodeMappingServerImpl getNodeMappingServer()
+	throws Exception
+    {
+        Field serverImplField = 
+            NodeMappingServiceImpl.class.getDeclaredField("serverImpl");
+        serverImplField.setAccessible(true);
+	return (NodeMappingServerImpl) serverImplField.get(nodeMappingService);
+    }
+    
+    /**
      * Returns the task service.
      */
     public TaskService getTaskService() {
@@ -426,8 +438,7 @@ public class SgsTestNode {
         int requestedNodeMapPort =
             isServerNode ?
             getNextUniquePort() :
-            getNodeMapServerPort((NodeMappingServiceImpl)
-				 serverNode.getNodeMappingService());
+            getNodeMapServerPort(serverNode.getNodeMappingServer());
 
         String dir = System.getProperty("java.io.tmpdir") +
                                 File.separator + appName;
@@ -545,18 +556,12 @@ public class SgsTestNode {
     /**
      * Returns the bound port for the node mapping server.
      */
-    private static int getNodeMapServerPort(
-        NodeMappingServiceImpl nodemapService)
+    private static int getNodeMapServerPort(NodeMappingServerImpl nodemapServer)
 	throws Exception
     {
-        Field serverImplField = 
-            NodeMappingServiceImpl.class.getDeclaredField("serverImpl");
-        serverImplField.setAccessible(true);
         Method getPortMethod = 
                 NodeMappingServerImpl.class.getDeclaredMethod("getPort");
         getPortMethod.setAccessible(true);
-	NodeMappingServerImpl server =
-	    (NodeMappingServerImpl) serverImplField.get(nodemapService);
-	return (Integer) getPortMethod.invoke(server);
+	return (Integer) getPortMethod.invoke(nodemapServer);
     }
 }

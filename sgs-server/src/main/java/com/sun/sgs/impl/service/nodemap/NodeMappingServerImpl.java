@@ -157,7 +157,11 @@ public final class NodeMappingServerImpl
      */
     private static final String ASSIGN_POLICY_CLASS_PROPERTY =
             PKG_NAME + ".policy.class";
-    
+
+    /** The default node assign policy */
+    private static final String DEFAULT_ASSIGN_POLICY_CLASS =
+            "com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy";
+
     /** The property name for the amount of time to wait before removing an
      * identity from the node map.
      */
@@ -258,27 +262,23 @@ public final class NodeMappingServerImpl
     {     
         super(properties, systemRegistry, txnProxy, logger);
 
-        logger.log(Level.CONFIG, 
-                   "Creating NodeMappingServerImpl properties:{0}", 
-                   properties); 
+        logger.log(Level.CONFIG, "Creating NodeMappingServerImpl"); 
         
         watchdogService = txnProxy.getService(WatchdogService.class);
        
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
                 SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
-        
-        String policyClassName = wrappedProps.getProperty(
-		ASSIGN_POLICY_CLASS_PROPERTY);	    
-        if (policyClassName == null) {
-            assignPolicy = new RoundRobinPolicy(properties, this);
-        } else {
-            assignPolicy = wrappedProps.getClassInstanceProperty(
-                ASSIGN_POLICY_CLASS_PROPERTY, NodeAssignPolicy.class,
-                new Class[] { Properties.class, NodeMappingServerImpl.class }, 
-                properties, this);
-        }
-        
+
+        assignPolicy = wrappedProps.getClassInstanceProperty(
+                                            ASSIGN_POLICY_CLASS_PROPERTY,
+                                            DEFAULT_ASSIGN_POLICY_CLASS,
+                                            NodeAssignPolicy.class,
+                                            new Class[] { Properties.class },
+                                            properties);
+
+        logger.log(Level.CONFIG, "Node assign policy: {0}",
+                   assignPolicy.getClass().getName());
         /*
          * Check service version.
          */
@@ -305,6 +305,10 @@ public final class NodeMappingServerImpl
         relocationExpireTime = wrappedProps.getLongProperty(
                 RELOCATION_EXPIRE_PROPERTY, DEFAULT_RELOCATION_EXPIRE_TIME,
                 1, Long.MAX_VALUE);
+
+        logger.log(Level.CONFIG,
+                   "Remove expire time: {0}, relocate expire time {1}",
+                   removeExpireTime, relocationExpireTime);
 
         // Register our node listener with the watchdog service.
         watchdogNodeListener = new Listener();
@@ -368,8 +372,8 @@ public final class NodeMappingServerImpl
     /* -- Implement NodeMappingServer -- */
 
     /** {@inheritDoc} */
-    public void assignNode(Class service, Identity identity, 
-                           long requestingNode)
+    public long assignNode(Class service, Identity identity,
+                              long requestingNode)
         throws IOException 
     {
         callStarted();    
@@ -388,7 +392,7 @@ public final class NodeMappingServerImpl
                 runTransactionally(checkTask);
 
                 if (checkTask.idFound() && checkTask.isAssignedToLiveNode()) {
-                    return;
+                    return checkTask.getNode().getId();
                 } else {
                     // The node is dead.  We need to map to a new node.
                     node = checkTask.getNode();
@@ -405,17 +409,17 @@ public final class NodeMappingServerImpl
                     mapToNewNode(identity, serviceName, node, requestingNode);
                 logger.log(Level.FINEST, 
                            "assignNode id:{0} to {1}", identity, newNodeId);
+                return newNodeId;
             } catch (NoNodesAvailableException ex) {
                 // This should only occur if no nodes are available, which
                 // can only happen if our client shutdown and unregistered
                 // while we were in this call.
-                // Ignore the error.
-                logger.logThrow(Level.FINEST, ex, "Exception ignored");
             }
             
         } finally {
             callFinished();
         }
+        return -1;
     }
     
     /**
@@ -633,7 +637,13 @@ public final class NodeMappingServerImpl
         } 
     }
     
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     *
+     * Only nodes that have registered can be assigned identities. Nodes will
+     * not be added to the server's {@code NodeAssignPolicy} unless they have
+     * registered a listener with this method.
+     */
     public void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException
     {
@@ -641,7 +651,6 @@ public final class NodeMappingServerImpl
         
         try {
             notifyMap.put(nodeId, client);
-            assignPolicy.nodeStarted(nodeId);
             logger.log(Level.FINEST, 
                        "Registered node listener for {0} ", nodeId);
         } finally {
@@ -658,7 +667,7 @@ public final class NodeMappingServerImpl
         
         try {
             // Tell the assign policy to stop assigning to the node
-            assignPolicy.nodeStopped(nodeId);
+            assignPolicy.nodeUnavailable(nodeId);
             notifyMap.remove(nodeId);
             logger.log(Level.FINEST, 
                        "Unregistered node listener for {0} ", nodeId);
@@ -746,10 +755,10 @@ public final class NodeMappingServerImpl
      *        was no prior mapping
      * @param requestingNode the node making the mapping request
      *
-     * @throws NoNodesAvailableException if there are no live nodes to map to
+     * @throws NoNodesAvailableException if there are no nodes to map to
      */
-    long mapToNewNode(final Identity id, String serviceName, Node oldNode,
-                      long requestingNode) 
+    private long mapToNewNode(final Identity id, String serviceName,
+                              Node oldNode, long requestingNode)
         throws NoNodesAvailableException
     {
         assert (id != null);
@@ -773,7 +782,7 @@ public final class NodeMappingServerImpl
         // as it could take a while.  
         final long newNodeId;
         try {
-            newNodeId = assignPolicy.chooseNode(id, requestingNode);
+            newNodeId = assignPolicy.chooseNode(requestingNode, id);
         } catch (NoNodesAvailableException ex) {
             logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}" +
                     " failed because no live nodes are available", 
@@ -970,29 +979,50 @@ public final class NodeMappingServerImpl
         
     /** 
      * The listener registered with the watchdog service.  These methods
-     * will be notified if a node starts or stops.
+     * will be notified of node health updates.
      */
-    private class Listener implements NodeListener {    
-        Listener() {
-            
-        }
+    private class Listener implements NodeListener {
         
         /** {@inheritDoc} */
-        public void nodeStarted(Node node) {
-            // Do nothing.  We find out about nodes being available when
-            // our client services register with us.     
-        }
-        
-        /** {@inheritDoc} */
-        public void nodeFailed(Node node) {
-            long nodeId = node.getId();          
-            try {
-                // Remove the service node listener for the node and tell
-                // the assign policy.
-                unregisterNodeListener(nodeId);
-            } catch (IOException ex) {
-                // won't happen, this is a local call
+        public void nodeHealthUpdate(Node node) {
+            long nodeId = node.getId();
+
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "Node {0} health update, health is: {1}",
+                           nodeId, node.getHealth());
             }
+            switch (node.getHealth()) {
+                case GREEN :
+                    // only registered nodes can be assigned identities
+                    if (notifyMap.containsKey(nodeId)) {
+                        assignPolicy.nodeAvailable(nodeId);
+                    }
+                    break;
+
+                case YELLOW :
+                    // fall through
+                case ORANGE :
+                    assignPolicy.nodeUnavailable(nodeId);
+                    break;
+
+                case RED :
+                    try {
+                        // Remove the service node listener for the node and
+                        // tell the assign policy.
+                        unregisterNodeListener(nodeId);
+                    } catch (IOException ex) {
+                        // won't happen, this is a local call
+                    }
+                    moveIdentities(node);
+                    break;
+
+                default :
+                    throw new AssertionError("Bad node health");
+            }
+        }
+
+        private void moveIdentities(Node node) {
+            long nodeId = node.getId();
             
             // Look up each identity on the failed node and move it
             String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);

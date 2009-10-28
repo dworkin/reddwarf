@@ -35,7 +35,6 @@ import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
-import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -49,6 +48,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.test.util.AbstractDummyClient;
+import com.sun.sgs.test.util.ConfigurableNodePolicy;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
@@ -170,7 +170,7 @@ public class TestClientSessionServiceImplv4 extends Assert {
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
-			  DirectiveNodeAssignmentPolicy.class.getName());
+			  ConfigurableNodePolicy.class.getName());
 	props.setProperty(
 	    "com.sun.sgs.impl.service.watchdog.server.renew.interval", "1000");
 	props.setProperty(
@@ -273,12 +273,12 @@ public class TestClientSessionServiceImplv4 extends Assert {
     @IntegrationTest
     public void testLoginRedirect() throws Exception {
 	int serverAppPort = serverNode.getAppPort();
-	String[] hosts = new String[] { "one", "two", "three", "four"};
 	String[] users = new String[] { "sleepy", "bashful", "dopey", "doc" };
 	Set<DummyClient> clients = new HashSet<DummyClient>();
-	addNodes(hosts);
+	addNodes(users);
 	boolean failed = false;
 	int redirectCount = 0;
+	ConfigurableNodePolicy.setRoundRobinPolicy();
 	try {
 	    for (String user : users) {
 		DummyClient client = createDummyClient(user);
@@ -295,7 +295,7 @@ public class TestClientSessionServiceImplv4 extends Assert {
 		clients.add(client);
 	    }
 	    
-	    int expectedRedirects = users.length;
+	    int expectedRedirects = users.length - 1;
 	    if (redirectCount != expectedRedirects) {
 		failed = true;
 		System.err.println("Expected " + expectedRedirects +

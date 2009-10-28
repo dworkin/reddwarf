@@ -62,15 +62,15 @@ class NodeImpl
     
     /** The host name, or {@code null}. */
     private final String host;
+
+    /** The node's health. */
+    private Health health;
     
     /** The port JMX can listen on, or {@code -1}. */
     private final int jmxPort;
     
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
-    
-    /** If true, this node is considered alive. */
-    private boolean isAlive;
 
     /** The ID of the backup for this node. */
     private long backupId = INVALID_ID;
@@ -98,21 +98,21 @@ class NodeImpl
      * @param	client a watchdog client
      */
     NodeImpl(long nodeId, String hostName, int jmxPort, WatchdogClient client) {
-        this (nodeId, hostName, jmxPort, client, true, INVALID_ID);
+        this (nodeId, hostName, jmxPort, client, Health.GREEN, INVALID_ID);
     }
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, and {@code isAlive} status.  This
+     * nodeId}, {@code hostName}, and {@code health}.  This
      * instance's watchdog client is set to {@code null} and its
      * backup is unassigned (backup ID is -1).
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
-     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	health   the node's health
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive) {
-	this(nodeId, hostName, -1, null, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, Health health) {
+	this(nodeId, hostName, -1, null, health, INVALID_ID);
     }
 	
     /**
@@ -123,34 +123,34 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	health   the node's health
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
-        this(nodeId, hostName, -1, null, isAlive, backupId);
+    NodeImpl(long nodeId, String hostName, Health health, long backupId) {
+        this(nodeId, hostName, -1, null, health, backupId);
     }
-    
+
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code jmxPort}, {@code client}, 
-     * {@code isAlive} status, and {@code backupId}.
+     * nodeId}, {@code hostName}, {@code jmxPort}, {@code client},
+     * {@code health}, and {@code backupId}.
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
      * @param   jmxPort  the port JMX is listening on, or {@code -1}
      * @param	client   a watchdog client
-     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	health   the node's health
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
     private NodeImpl(long nodeId, String hostName, int jmxPort,
-                     WatchdogClient client, boolean isAlive, long backupId) 
+                     WatchdogClient client, Health health, long backupId)
     {
         this.id = nodeId;
 	this.host = hostName;
         this.client = client;
-        this.isAlive = isAlive;
+        this.health = health;
         this.backupId = backupId;
         this.jmxPort = jmxPort;
     }
@@ -168,8 +168,13 @@ class NodeImpl
     }
     
     /** {@inheritDoc} */
-    public synchronized boolean isAlive() {
-	return isAlive;
+    public boolean isAlive() {
+	return getHealth().isAlive();
+    }
+
+    /** {@inheritDoc} */
+    public synchronized Health getHealth() {
+        return health;
     }
 
     /* -- Implement Comparable -- */
@@ -216,8 +221,8 @@ class NodeImpl
 
     /** {@inheritDoc} */
     public synchronized String toString() {
-	return getClass().getName() + "[" + id + "," +
-	    (isAlive() ? "alive" : "failed") + ",backup:" +
+	return getClass().getName() + "[" + id + ",health:" +
+	    health.toString() + ",backup:" +
 	    (backupId == INVALID_ID ? "(none)" : backupId) + 
             "]@" + host;
     }
@@ -263,7 +268,7 @@ class NodeImpl
     }
     
     /**
-     * Sets the alive status of this node instance to {@code false},
+     * Sets the health of this node instance to {@code RED},
      * sets this node's backup to the specified {@code backup},
      * empties the set of primaries for which this node is recovering,
      * and updates the node's state in the specified {@code
@@ -278,8 +283,8 @@ class NodeImpl
      */
     synchronized void setFailed(DataService dataService, NodeImpl backup) {
 	NodeImpl nodeImpl = getForUpdate(dataService);
-	this.isAlive = false;
-	nodeImpl.isAlive = false;
+	this.health = Health.RED;
+	nodeImpl.health = Health.RED;
 	this.backupId = 
 	    (backup != null) ?
 	    backup.getId() :
@@ -287,6 +292,25 @@ class NodeImpl
 	nodeImpl.backupId = this.backupId;
 	this.primaryIds.clear();
 	nodeImpl.primaryIds.clear();
+    }
+
+    /**
+     * Sets the health of this node instance to a non-RED value. If the node
+     * health is to be set to RED use {@code setFailed}.
+     *
+     * @param dataService a data service
+     * @param newHealth the new health of this node
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    synchronized void setHealth(DataService dataService, Health newHealth) {
+        if (!newHealth.isAlive()) {
+            throw new AssertionError("Call to setHealth with RED health");
+        }
+	NodeImpl nodeImpl = getForUpdate(dataService);
+	this.health = newHealth;
+	nodeImpl.health = newHealth;
     }
 
     /**
@@ -372,7 +396,7 @@ class NodeImpl
     NodeInfo getNodeInfo() {
         return new NodeInfo(getHostName(),
                             getId(),
-                            isAlive(),
+                            getHealth(),
                             getBackupId(),
                             getJmxPort());
     }
@@ -518,7 +542,7 @@ class NodeImpl
     private static String getNodeKey(long nodeId) {
 	return NODE_PREFIX + "." + nodeId;
     }
-    
+
     /**
      * An iterator for node state.
      */

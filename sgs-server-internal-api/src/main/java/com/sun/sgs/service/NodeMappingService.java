@@ -81,26 +81,23 @@ public interface NodeMappingService extends Service {
      * {@link #setStatus setStatus(service, identity, true)} had
      * been called on the assigned node.
      * <p>
-     * <b> TBD:  Perhaps this atomic setService doesn't help.  It seems as
-     *  though each service instance on a node needs to call setStatus 
-     *  anyway, and it complicates the implementation of this service. </b>
-     * <p>
-     * <b> TBD:  Maybe the first parameter should be Class<? extends Service>.
-     *  The actual service who cares might be very interesting to the 
-     *  load balancer. </b>
-     * <p>
      * This method should not be called while in a transaction, as this
      * method call could entail remote communication.
      * <p>
+     * The returned node ID might not match the ID of the node returned from an
+     * immediate call to {@link #getNode getNode} in a transaction because an
+     * identity's node assignment may change at any time.
      *
      * @param service the class of the caller
      * @param identity the identity to assign to a node
-     * 
-     *@throws IllegalStateException if this method is called while in a
-     *        transaction
+     *
+     * @return the ID of the node that the identity was assigned to,
+     *         or -1 if the assignment failed
+     * @throws IllegalStateException if this method is called while in a
+     *         transaction
      *
      */
-    void assignNode(Class service, Identity identity);
+    long assignNode(Class service, Identity identity);
     
     /**
      * Inform the {@code NodeMappingService} that a service instance has 
@@ -110,10 +107,6 @@ public interface NodeMappingService extends Service {
      * fails or the node mapping service initiates a mapping change (for 
      * load balancing), all status votes for the failing or old node are 
      * implicitly set to inactive.  
-     * <p>
-     * <b> TBD:  Maybe the first parameter should be Class<? extends Service>.
-     *  The actual service who cares might be very interesting to the 
-     *  load balancer. </b>
      * <p>
      * This method should not be called while in a transaction, as this
      * method call could entail remote communication.

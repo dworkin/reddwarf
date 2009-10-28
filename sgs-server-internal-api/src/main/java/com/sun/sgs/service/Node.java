@@ -30,6 +30,58 @@ package com.sun.sgs.service;
 public interface Node {
 
     /**
+     * Health of a node.
+     */
+    public enum Health {
+
+
+        /**
+         * The node is operating normally and is available for additional
+         * work.
+         */
+        GREEN,
+
+        /**
+         * The node is operating normally but is not available for
+         * additional work.
+         */
+        YELLOW,
+
+        /**
+         * The node is operational, but is in need of attention such as
+         * offloading some of its work.
+         */
+        ORANGE,
+
+        /**
+         * The component has failed, been shutdown, or its state is unknown.
+         */
+        RED;
+
+        /**
+         * Returns {@code true} if this health is worse than the specified
+         * health.
+         *
+         * @param health a health object to compare
+         *
+         * @return {@code true} if this health is worse than the specified
+         * health
+         */
+        public boolean worseThan(Health health) {
+            return compareTo(health) > 0;
+        }
+
+        /**
+         * Returns {@code true} if this health represents an operational state.
+         *
+         * @return {@code true} if this health represents an operational state
+         */
+        public boolean isAlive() {
+            return !equals(Health.RED);
+        }
+    }
+
+    /**
      * Returns the node ID, which is always non-negative.
      *
      * @return the node ID
@@ -52,4 +104,11 @@ public interface Node {
      * 		otherwise
      */
     boolean isAlive();
+
+    /**
+     * Returns the health of the node.
+     *
+     * @return	the node's health
+     */
+    Health getHealth();
 }

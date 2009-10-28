@@ -30,9 +30,9 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
-import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.util.AbstractService.Version;
+import com.sun.sgs.test.util.ConfigurableNodePolicy;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -572,6 +572,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     @Test
     public void testChannelGetSessionsMultipleNodes() throws Exception {
 	addNodes(2);
+	ConfigurableNodePolicy.setRoundRobinPolicy();
 	testChannelGetSessionsWithSessionsJoined();
     }
 
@@ -1001,7 +1002,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	SgsTestNode coordinatorNode = addNode();
 	createChannel(channelName, null, coordinatorNode);
 	// Clients will log into server node.
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	ClientGroup group = new ClientGroup(serverNode.getAppPort(), someUsers);
 	
 	try {
@@ -1090,6 +1090,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     @Test
     public void testChannelSendMultipleNodes() throws Exception {
 	addNodes(3);
+	ConfigurableNodePolicy.setRoundRobinPolicy();
 	testChannelSend();
     }
 
@@ -1099,6 +1100,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	throws Exception
     {
 	addNodes(3);
+	ConfigurableNodePolicy.setRoundRobinPolicy();
 	String channelName = "test";
 	createChannel(channelName);
 	Thread.sleep(1000);
@@ -1114,6 +1116,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	setUp(false);
         Thread.sleep(1000);
 	addNodes(3);
+	ConfigurableNodePolicy.setRoundRobinPolicy();
 	Thread.sleep(2000);
 	int afterCount = getObjectCount();
 	for (int i = 0; i < 2; i++) {
@@ -1147,6 +1150,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     {
 	SgsTestNode coordinatorNode = addNode();
 	SgsTestNode otherNode = addNode();
+	ConfigurableNodePolicy.setRoundRobinPolicy();
 	
 	// create channels on specific node which will be the coordinator node
 	String[] channelNames = new String[] {"channel1", "channel2"};
@@ -1198,6 +1202,7 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     {
 	SgsTestNode coordinatorNode = addNode();
 	SgsTestNode otherNode = addNode();
+	ConfigurableNodePolicy.setRoundRobinPolicy();
 	
 	// create channels on specific node which will be the coordinator node
 	String[] channelNames = new String[] {"channel1", "channel2"};
@@ -1646,7 +1651,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on server node.
 	createChannel(channelName);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1672,7 +1676,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on server node.
 	createChannel(channelName);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1703,7 +1706,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on server node.
 	createChannel(channelName);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1731,7 +1733,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on server node.
 	createChannel(channelName);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1766,7 +1767,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on coordinator node.
 	createChannel(channelName, null, coordinatorNode);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1798,7 +1798,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on server node.
 	createChannel(channelName, null, coordinatorNode);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1832,7 +1831,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on coordinator node.
 	createChannel(channelName, null, coordinatorNode);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1863,7 +1861,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on server node.
 	createChannel(channelName, null, coordinatorNode);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {
@@ -1898,7 +1895,6 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	// Create channel with coordinator on coordinator node.
 	createChannel(channelName, null, coordinatorNode);
 	SgsTestNode userNode = addNode();
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(user);
 	client.connect(userNode.getAppPort()).login();
 	try {

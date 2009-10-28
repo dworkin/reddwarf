@@ -691,25 +691,23 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    "setting up client session for identity:{0} loggingIn:{1}",
 	    identity, loggingIn);
 	
-	final Node node;
-	try {
-	    /*
-	     * Get node assignment.
-	     */
-	    sessionService.nodeMapService.assignNode(
-		ClientSessionHandler.class, identity);
-	    GetNodeTask getNodeTask = new GetNodeTask(identity);		
-	    sessionService.runTransactionalTask(getNodeTask, identity);
-	    node = getNodeTask.getNode();
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "identity:{0} assigned to node:{1}",
-			   identity, node);
-	    }
-	    
+        /*
+         * Get node assignment.
+         */
+        long assignedNodeId = -1L;
+        try {
+            assignedNodeId = sessionService.nodeMapService.assignNode(
+                                    ClientSessionHandler.class, identity);
 	} catch (Exception e) {
 	    logger.logThrow(
 	        Level.WARNING, e,
 		"getting node assignment for identity:{0} throws", identity);
+	}
+	    
+	if (assignedNodeId < 0) {
+	    logger.log(Level.WARNING,
+		       "getting node assignment for identity:{0} failed",
+                       identity);
 	    notifySetupFailureAndDisconnect(
 		loggingIn ?
 		new LoginFailureException(
@@ -719,9 +717,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    RELOCATE_REFUSED_REASON,
 		    RelocateFailureException.FailureReason.SERVER_UNAVAILABLE));
 	    return;
+        }
+
+	if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
+		       identity, assignedNodeId);
 	}
 
-	long assignedNodeId = node.getId();
 	if (assignedNodeId == sessionService.getLocalNodeId()) {
 	    /*
 	     * Handle this login (or relocation) request locally.  First,
@@ -815,15 +817,16 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    Level.FINE,
 		    "redirecting login for identity:{0} " +
 		    "from nodeId:{1} to node:{2}",
-		    identity, sessionService.getLocalNodeId(), node);
+		    identity, sessionService.getLocalNodeId(), assignedNodeId);
 	    }
-	    
+
+	    final long nodeId = assignedNodeId;
 	    scheduleNonTransactionalTask(
 	        new AbstractKernelRunnable("SendLoginRedirectMessage") {
 		    public void run() {
 			try {
                             try {
-                                loginRedirect(node);
+                                loginRedirect(nodeId);
                             } catch (Exception ex) {
                                 setupFailure(
                                     new LoginFailureException("Redirect failed",
@@ -838,18 +841,18 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /**
      * Notifies the "setup" future that login has been redirected to the
-     * specified {@code node}, and sets local state indicating that the
+     * specified {@code nodeId}, and sets local state indicating that the
      * login request has been handled.
      *
-     * @param	node a node
+     * @param	node a nodeId
      */
-    private void loginRedirect(Node node) {
+    private void loginRedirect(long nodeId) {
 	synchronized (lock) {
 	    checkConnectedState();
 	    Set<ProtocolDescriptor> descriptors =
-		sessionService.getProtocolDescriptors(node.getId());
+		sessionService.getProtocolDescriptors(nodeId);
 	    setupCompletionFuture.setException(
- 		new LoginRedirectException(node, descriptors));
+ 		new LoginRedirectException(nodeId, descriptors));
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -877,7 +880,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * Schedules a task to notify the "setup" future of failure and then
      * disconnect the client session.
      *
-     * @param	throwable an exception that occurred while setting up the
+     * @param	exception an exception that occurred while setting up the
      *		client session, or {@code null}
      */
     private void notifySetupFailureAndDisconnect(final Exception exception) {
@@ -904,30 +907,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
      */
     private void scheduleNonTransactionalTask(KernelRunnable task) {
 	sessionService.getTaskScheduler().scheduleTask(task, identity);
-    }
-
-    /**
-     * This is a transactional task to obtain the node assignment for
-     * a given identity.
-     */
-    private class GetNodeTask extends AbstractKernelRunnable {
-
-	private final Identity authenticatedIdentity;
-	private volatile Node node = null;
-
-	GetNodeTask(Identity authenticatedIdentity) {
-	    super(null);
-	    this.authenticatedIdentity = authenticatedIdentity;
-	}
-
-	public void run() throws Exception {
-	    node = sessionService.
-		nodeMapService.getNode(authenticatedIdentity);
-	}
-
-	Node getNode() {
-	    return node;
-	}
     }
 
     /**

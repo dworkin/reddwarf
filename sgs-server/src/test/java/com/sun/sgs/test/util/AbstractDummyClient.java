@@ -23,7 +23,6 @@ import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import static com.sun.sgs.impl.util.AbstractService.getStackTrace;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
@@ -449,8 +448,7 @@ public abstract class AbstractDummyClient extends Assert {
      * is closed or the timeout expires, which ever comes first.
      */
     public void disconnect() {
-	System.err.println(toString() + " disconnecting, stacktrace:\n" +
-			   getStackTrace());
+	System.err.println(toString() + " disconnecting");
 
 	synchronized (lock) {
 	    if (! connected) {

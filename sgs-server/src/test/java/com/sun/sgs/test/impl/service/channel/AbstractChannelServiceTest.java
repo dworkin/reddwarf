@@ -36,7 +36,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServer;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
-import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -46,6 +45,8 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.AbstractDummyClient;
+import com.sun.sgs.test.util.ConfigurableNodePolicy;
+import com.sun.sgs.test.util.IdentityAssigner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -137,6 +138,9 @@ public abstract class AbstractChannelServiceTest extends Assert {
     /** The channel service on the server node. */
     protected ChannelManager channelService;
 
+    /** The identity assigner, for moving identities. */
+    protected IdentityAssigner identityAssigner;
+
     /** The listen port for the client session service. */
     protected int port;
 
@@ -174,7 +178,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
-			  DirectiveNodeAssignmentPolicy.class.getName());
+			  ConfigurableNodePolicy.class.getName());
 	props.setProperty(
  	   "com.sun.sgs.impl.protocol.simple.protocol.version",
 	   Byte.toString(protocolVersion));
@@ -187,6 +191,7 @@ public abstract class AbstractChannelServiceTest extends Assert {
             getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
+	identityAssigner = new IdentityAssigner(serverNode);
         dataService = serverNode.getDataService();
 	channelService = serverNode.getChannelService();
 	wrapChannelServerProxy(serverNode);
@@ -605,12 +610,9 @@ public abstract class AbstractChannelServiceTest extends Assert {
 
     /**
      * Creates a dummy client with the specified {@code name} and logs it
-     * into the specified {@code node}.  Note: this uses the
-     * {@code DirectiveNodeAssignment} policy to turn off round-robin node
-     * assignment. 
+     * into the specified {@code node}.
      */
     protected DummyClient createDummyClient(String name, SgsTestNode node) {
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
 	DummyClient client = new DummyClient(name);
 	client.connect(node.getAppPort());
 	assertTrue(client.login());
