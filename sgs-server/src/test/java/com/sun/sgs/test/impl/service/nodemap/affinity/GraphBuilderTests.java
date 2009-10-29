@@ -39,6 +39,7 @@ import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.util.Pair;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -237,7 +238,7 @@ public class GraphBuilderTests {
 
         for (WeightedEdge e : graph.getEdges()) {
             Assert.assertEquals(1, e.getWeight());
-            validateEdgeEndpoints(e);
+            validateEdgeEndpoints(e, graph);
         }
     }
 
@@ -248,11 +249,16 @@ public class GraphBuilderTests {
      * we want the graph vertices and edges to be the same (==).
      * @param edge
      */
-    private void validateEdgeEndpoints(WeightedEdge edge) {
-        Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
+    private void validateEdgeEndpoints(WeightedEdge edge, 
+                                       Graph<LabelVertex, WeightedEdge> graph)
+    {
+        Assert.assertNotNull(edge);
+        Assert.assertNotNull(graph);
         Collection<LabelVertex> allvertices = graph.getVertices();
-        LabelVertex end1 = graph.getEndpoints(edge).getFirst();
-        LabelVertex end2 = graph.getEndpoints(edge).getSecond();
+        Pair<LabelVertex> endpoints = graph.getEndpoints(edge);
+        Assert.assertNotNull(endpoints);
+        LabelVertex end1 = endpoints.getFirst();
+        LabelVertex end2 = endpoints.getSecond();
         boolean ok = false;
         for (LabelVertex v : allvertices) {
             if (v == end1) {

@@ -213,12 +213,6 @@ public final class AffinityGroupGoodness {
         // Note:  this method doesn't assume that affinity groups will
         // contain disjoint members - it is legal for an Identity to
         // be found in two groups.
-        // While this is a good general case, that's probably not what
-        // we will require from our affinity group finder.  If this code
-        // is ever used for more than testing and verification, we might
-        // want to assume that the groups are partitions, and simply return
-        // false immediately if a group contains one identity and not
-        // the other.
         for (AffinityGroup g : sample) {
             Set<Identity> idents = g.getIdentities();
             if (idents.contains(id1) && idents.contains(id2)) {

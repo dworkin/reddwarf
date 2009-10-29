@@ -19,21 +19,18 @@
 
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Collection;
 import java.util.HashSet;
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -80,7 +77,47 @@ public class TestAffinityGroupGoodness {
                                                  group2);
         Assert.assertEquals(0.08, modularity, .001);
 
-        // Currently no tests with weighted edges.
+        double jaccard = AffinityGroupGoodness.calcJaccard(group1, group2);
+        System.out.println("Jaccard index is " + jaccard);
+        Assert.assertEquals(0.333, jaccard, .001);
+    }
+
+    @Test
+    public void testToyModularityAndJaccardWithWeights() {
+        AffinityGraphBuilder builder = new TestToyWeightBuilder();
+
+        final long gen = 1;
+        Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
+        AffinitySet a = new AffinitySet(1, gen);
+        a.addIdentity(new DummyIdentity("1"));
+        a.addIdentity(new DummyIdentity("2"));
+        a.addIdentity(new DummyIdentity("3"));
+        group1.add(a);
+        AffinitySet b = new AffinitySet(2, gen);
+        b.addIdentity(new DummyIdentity("4"));
+        b.addIdentity(new DummyIdentity("5"));
+        group1.add(b);
+
+        double modularity =
+            AffinityGroupGoodness.calcModularity(builder.getAffinityGraph(),
+                                                 group1);
+        Assert.assertEquals(0.22, modularity, .001);
+
+        Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
+        a = new AffinitySet(3, gen);
+        a.addIdentity(new DummyIdentity("1"));
+        a.addIdentity(new DummyIdentity("3"));
+        group2.add(a);
+        b = new AffinitySet(4, gen);
+        b.addIdentity(new DummyIdentity("2"));
+        b.addIdentity(new DummyIdentity("4"));
+        b.addIdentity(new DummyIdentity("5"));
+        group2.add(b);
+
+        modularity =
+            AffinityGroupGoodness.calcModularity(builder.getAffinityGraph(),
+                                                 group2);
+        Assert.assertEquals(0.08, modularity, .001);
 
         double jaccard = AffinityGroupGoodness.calcJaccard(group1, group2);
         System.out.println("Jaccard index is " + jaccard);
@@ -197,11 +234,16 @@ public class TestAffinityGroupGoodness {
      * A graph builder that returns a pre-made graph for a very simple toy
      * graph.
      */
-    private static class TestToyBuilder implements AffinityGraphBuilder {
-        private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
+    private static class TestToyBuilder extends AbstractTestGraphBuilder {
 
         public TestToyBuilder() {
-            graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
+            super(createGraph());
+        }
+        static private UndirectedSparseGraph<LabelVertex, WeightedEdge>
+                createGraph()
+        {
+            UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+                    new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
             LabelVertex[] nodes = new LabelVertex[6];
             for (int i = 1; i < nodes.length; i++) {
@@ -219,38 +261,42 @@ public class TestAffinityGroupGoodness {
 
             Assert.assertEquals(5, graph.getVertexCount());
             Assert.assertEquals(5, graph.getEdgeCount());
-        }
-
-        /** {@inheritDoc} */
-        public UndirectedSparseGraph<LabelVertex, WeightedEdge>
-                getAffinityGraph()
-        {
             return graph;
         }
+    }
 
-        /** {@inheritDoc} */
-        public LabelVertex getVertex(Identity id) {
-            throw new UnsupportedOperationException("Not supported yet.");
+    /**
+     * A graph builder that returns a pre-made graph for a very simple toy
+     * graph.
+     */
+    private static class TestToyWeightBuilder extends AbstractTestGraphBuilder {
+
+        public TestToyWeightBuilder() {
+            super(createGraph());
         }
+        static private UndirectedSparseGraph<LabelVertex, WeightedEdge>
+                createGraph()
+        {
+            UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+                    new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
-        /** {@inheritDoc} */
-        public Runnable getPruneTask() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
+            LabelVertex[] nodes = new LabelVertex[6];
+            for (int i = 1; i < nodes.length; i++) {
+                // Add identities 1-5
+                nodes[i] =
+                        new LabelVertex(new DummyIdentity(String.valueOf(i)));
+                graph.addVertex(nodes[i]);
+            }
 
-        /** {@inheritDoc} */
-        public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
-            return;
-        }
+            graph.addEdge(new WeightedEdge(2), nodes[1], nodes[2]);
+            graph.addEdge(new WeightedEdge(2), nodes[1], nodes[3]);
+            graph.addEdge(new WeightedEdge(2), nodes[2], nodes[3]);
+            graph.addEdge(new WeightedEdge(2), nodes[2], nodes[4]);
+            graph.addEdge(new WeightedEdge(2), nodes[4], nodes[5]);
 
-        /** {@inheritDoc} */
-        public void shutdown() {
-            // do nothing
-        }
-
-        /** {@inheritDoc} */
-        public AffinityGroupFinder getAffinityGroupFinder() {
-            return null;
+            Assert.assertEquals(5, graph.getVertexCount());
+            Assert.assertEquals(5, graph.getEdgeCount());
+            return graph;
         }
     }
 }

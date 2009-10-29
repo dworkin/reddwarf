@@ -34,9 +34,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -147,12 +147,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
     @Test
     public void testConstructor1() {
         // empty obj use
-        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> objUse =
+        ConcurrentMap<Object, Map<Identity, Long>> objUse =
                 graphBuilder.getObjectUseMap();
         Assert.assertNotNull(objUse);
         Assert.assertEquals(0, objUse.size());
         // empty conflicts
-        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflicts =
+        ConcurrentMap<Long, Map<Object, Long>> conflicts =
                 graphBuilder.getConflictMap();
         Assert.assertNotNull(conflicts);
         Assert.assertEquals(0, conflicts.size());
@@ -193,14 +193,14 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Object obj = new String("obj");
         long nodeId = 99L;
         meth.invoke(builder, obj, nodeId, false);
-        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflictMap =
+        ConcurrentMap<Long, Map<Object, Long>> conflictMap =
                 graphBuilder.getConflictMap();
         Assert.assertEquals(1, conflictMap.size());
-        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
+        Map<Object, Long> objMap = conflictMap.get(nodeId);
         Assert.assertNotNull(objMap);
-        AtomicLong val = objMap.get(obj);
+        Long val = objMap.get(obj);
         Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
+        Assert.assertEquals(1, val.intValue());
 
         meth.invoke(builder, obj, nodeId, false);
         Assert.assertEquals(1, conflictMap.size());
@@ -208,7 +208,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Assert.assertNotNull(objMap);
         val = objMap.get(obj);
         Assert.assertNotNull(val);
-        Assert.assertEquals(2, val.get());
+        Assert.assertEquals(2, val.intValue());
 
         // Add a different object to the same node
         Object obj1 = new String("obj1");
@@ -218,10 +218,10 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Assert.assertNotNull(objMap);
         val = objMap.get(obj);
         Assert.assertNotNull(val);
-        Assert.assertEquals(2, val.get());
+        Assert.assertEquals(2, val.intValue());
         val = objMap.get(obj1);
         Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
+        Assert.assertEquals(1, val.intValue());
     }
 
     @Test
@@ -243,22 +243,22 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         meth.invoke(builder, obj, badNodeId, false);
         meth.invoke(builder, obj1, badNodeId, false);
         meth.invoke(builder, obj1, badNodeId, true);
-        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> conflictMap =
+        ConcurrentMap<Long, Map<Object, Long>> conflictMap =
                 graphBuilder.getConflictMap();
         Assert.assertEquals(2, conflictMap.size());
-        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
+        Map<Object, Long> objMap = conflictMap.get(nodeId);
         Assert.assertNotNull(objMap);
-        AtomicLong val = objMap.get(obj);
+        Long val = objMap.get(obj);
         Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
+        Assert.assertEquals(1, val.intValue());
         objMap = conflictMap.get(badNodeId);
         Assert.assertNotNull(objMap);
         val = objMap.get(obj);
         Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
+        Assert.assertEquals(1, val.intValue());
         val = objMap.get(obj1);
         Assert.assertNotNull(val);
-        Assert.assertEquals(2, val.get());
+        Assert.assertEquals(2, val.intValue());
 
         // Now invalidate badNodeId
         graphBuilder.removeNode(badNodeId);
@@ -267,7 +267,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Assert.assertNotNull(objMap);
         val = objMap.get(obj);
         Assert.assertNotNull(val);
-        Assert.assertEquals(1, val.get());
+        Assert.assertEquals(1, val.intValue());
         objMap = conflictMap.get(badNodeId);
         Assert.assertNull(objMap);
     }

@@ -54,7 +54,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
@@ -97,9 +96,8 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
      * Map of object to map of remote nodes it was accessed on, with a weight
      * for each node.
      */
-    private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-        conflictMap =
-            new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
+    private final ConcurrentMap<Long, Map<Object, Long>>
+        conflictMap = new ConcurrentHashMap<Long, Map<Object, Long>>();
 
     /** The TimerTask which prunes our data structures over time.  As the data
      * structures above are modified, the pruneTask notes the ways they have
@@ -260,8 +258,8 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
         }
         
         for (Identity v1 : vertices) {
-            for (Object intermediate : graphCopy.getSuccessors(v1)) {
-                for (Object v2 : graphCopy.getSuccessors(intermediate)) {
+            for (Object intermediate : graphCopy.getNeighbors(v1)) {
+                for (Object v2 : graphCopy.getNeighbors(intermediate)) {
                     if (v2.equals(v1)) {
                         continue;
                     }
@@ -309,32 +307,25 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-            getConflictMap()
-    {
+    public ConcurrentMap<Long, Map<Object, Long>> getConflictMap() {
         return conflictMap;
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-            getObjectUseMap()
-    {
-        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> retMap =
-            new ConcurrentHashMap<Object,
-                                  ConcurrentMap<Identity, AtomicLong>>();
+    public ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap() {
+        ConcurrentMap<Object, Map<Identity, Long>> retMap =
+            new ConcurrentHashMap<Object, Map<Identity, Long>>();
         // Copy our input graph
         CopyableGraph<Object, WeightedEdge> graphCopy =
             new CopyableGraph<Object, WeightedEdge>(bipartiteGraph);
 
         for (Object vert : graphCopy.getVertices()) {
             if (!(vert instanceof Identity)) {
-                ConcurrentMap<Identity, AtomicLong> idMap =
-                        new ConcurrentHashMap<Identity, AtomicLong>();
+                Map<Identity, Long> idMap = new HashMap<Identity, Long>();
                 for (WeightedEdge edge : graphCopy.getIncidentEdges(vert)) {
                     Object v1 = graphCopy.getOpposite(vert, edge);
                     if (v1 instanceof Identity) {
-                        idMap.put((Identity) v1, 
-                                  new AtomicLong(edge.getWeight()));
+                        idMap.put((Identity) v1, edge.getWeight());
                     } else {
                         // our graph is messed up
                         System.out.println("unexpected vertex type " + v1);
@@ -357,24 +348,22 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     public void noteConflictDetected(Object objId, long nodeId,
                                      boolean forUpdate)
     {
-        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
+        if (objId == null) {
+            throw new NullPointerException("objId must not be null");
+        }
+        Map<Object, Long> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
-            ConcurrentMap<Object, AtomicLong> newMap =
-                    new ConcurrentHashMap<Object, AtomicLong>();
+            Map<Object, Long> newMap = new HashMap<Object, Long>();
             objMap = conflictMap.putIfAbsent(nodeId, newMap);
             if (objMap == null) {
                 objMap = newMap;
             }
         }
-        AtomicLong count = objMap.get(objId);
-        if (count == null) {
-            AtomicLong newCount = new AtomicLong();
-            count = objMap.putIfAbsent(objId, newCount);
-            if (count == null) {
-                count = newCount;
-            }
+        synchronized (objMap) {
+            Long count = objMap.get(objId);
+            long currentVal = (count == null) ? 1 : count + 1;
+            objMap.put(objId, currentVal);
         }
-        count.incrementAndGet();
         pruneTask.updateConflict(objId, nodeId);
     }
 
@@ -500,31 +489,27 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
                  periodConflicts.entrySet())
             {
                 Long nodeId = entry.getKey();
-                ConcurrentMap<Object, AtomicLong> objMap =
-                        conflictMap.get(nodeId);
+                Map<Object, Long> objMap = conflictMap.get(nodeId);
                 // If the node went down, we might have removed the entry
                 if (objMap != null) {
-                    for (Map.Entry<Object, Integer> updateEntry :
-                          entry.getValue().entrySet())
-                    {
-                        Object objId = updateEntry.getKey();
-                        Integer periodVal = updateEntry.getValue();
-                        AtomicLong conflictVal = objMap.get(objId);
-                        long oldVal;
-                        long newVal;
-                        do {
-                            oldVal = conflictVal.get();
-                            newVal = oldVal - periodVal;
-                        } while (!conflictVal.compareAndSet(oldVal, newVal));
-
-                        if (newVal <= 0) {
-                            // All conflictMap uses are synchrononized so
-                            // should be no problem.
-                            objMap.remove(objId);
+                    synchronized (objMap) {
+                        for (Map.Entry<Object, Integer> updateEntry :
+                              entry.getValue().entrySet())
+                        {
+                            Object objId = updateEntry.getKey();
+                            Integer periodVal = updateEntry.getValue();
+                            Long objMapVal = objMap.get(objId);
+                            long newVal =
+                                (objMapVal == null) ? 0 : objMapVal - periodVal;
+                            if (newVal <= 0) {
+                                objMap.remove(objId);
+                            } else {
+                                objMap.put(objId, newVal);
+                            }
                         }
-                    }
-                    if (objMap.isEmpty()) {
-                        conflictMap.remove(nodeId);
+                        if (objMap.isEmpty()) {
+                            conflictMap.remove(nodeId);
+                        }
                     }
                 }
             }

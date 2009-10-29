@@ -149,6 +149,11 @@ public abstract class AbstractLPA {
         // consider new vertices as we process this graph).  If processing
         // takes a long time, or if we use a more dynamic work queue, we'll
         // want to revisit this.
+        // Note that there is no guarantee that the set of vertices represents
+        // different identities on each node (we could be unlucky and have
+        // an identity move to a new node while each node takes this snapshot).
+        // There is no guarantee that, in a given set of affinity groups, each
+        // identity exists in only one group.
         Collection<LabelVertex> graphVertices = graph.getVertices();
         if (graphVertices == null) {
             vertices = new ArrayList<LabelVertex>();

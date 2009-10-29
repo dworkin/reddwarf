@@ -103,9 +103,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * Updates are multi-threaded.  This includes both conflicts detected
      * locally, and conflicts that other nodes tell us about.
      */
-    private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-        nodeConflictMap =
-            new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
+    private final ConcurrentMap<Long, Map<Object, Long>>
+        nodeConflictMap = new ConcurrentHashMap<Long, Map<Object, Long>>();
 
     /** Map of identity -> label and count
      * This sums all uses of that identity on other nodes. The count takes
@@ -367,8 +366,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         boolean failed = false;
         // Now, go through the new map, and tell each node about the
         // edges we might have in common.
-        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
-             nodeConflictMap.entrySet())
+        for (Map.Entry<Long, Map<Object, Long>> entry :
+            nodeConflictMap.entrySet())
         {
             Long nodeId = entry.getKey();
             final LPAClient proxy = getProxy(nodeId);
@@ -376,7 +375,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             if (proxy != null) {
                 logger.log(Level.FINEST, "{0}: exchanging edges with {1}",
                            localNodeId, nodeId);
-                final Map<Object, AtomicLong> map = entry.getValue();
+                final Map<Object, Long> map = entry.getValue();
                 assert (map != null);
 
                 boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
@@ -425,21 +424,24 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             logger.log(Level.FINE, "unexpected null objIds");
             return;
         }
-        ConcurrentMap<Object, AtomicLong> conflicts =
-                nodeConflictMap.get(nodeId);
+        Map<Object, Long> conflicts = nodeConflictMap.get(nodeId);
+
         if (conflicts == null) {
-            ConcurrentMap<Object, AtomicLong> newConf =
-                    new ConcurrentHashMap<Object, AtomicLong>();
+            Map<Object, Long> newConf = new HashMap<Object, Long>();
             conflicts = nodeConflictMap.putIfAbsent(nodeId, newConf);
             if (conflicts == null) {
                 conflicts = newConf;
             }
         }
 
-        for (Object objId : objIds) {
-            // Just the original value or 1
-            // If we start using the number of conflicts, this might change.
-            conflicts.putIfAbsent(objId, new AtomicLong(1));
+        // We don't expect contention on this lock:  we expect each node
+        // to make a call to other nodes once.
+        synchronized (conflicts) {
+            for (Object objId : objIds) {
+                // Just the original value or 1
+                // If we start using the number of conflicts, this might change.
+                conflicts.put(objId, Long.valueOf(1));
+            }
         }
     }
 
@@ -646,22 +648,21 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             return retMap;
         }
         
-        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> objectMap =
+        ConcurrentMap<Object, Map<Identity, Long>> objectMap =
                 builder.getObjectUseMap();
         assert (objectMap != null);
 
         synchronized (verticesLock) {
             for (Object obj : objIds) {
                 // look up the set of identities
-                ConcurrentMap<Identity, AtomicLong> idents = objectMap.get(obj);
+                Map<Identity, Long> idents = objectMap.get(obj);
                 Map<Integer, List<Long>> labelWeightMap =
                         new HashMap<Integer, List<Long>>();
                 // If idents is null, the identity is no longer used, probably
                 // because the graph was pruned (we are using a live object
                 // use map).
                 if (idents != null) {
-                    for (Map.Entry<Identity, AtomicLong> entry :
-                        idents.entrySet())
+                    for (Map.Entry<Identity, Long> entry : idents.entrySet())
                     {
                         // Find the label associated with the identity in
                         // the graph.
@@ -680,7 +681,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                                 weightList = new ArrayList<Long>();
                                 labelWeightMap.put(label, weightList);
                             }
-                            weightList.add(entry.getValue().get());
+                            weightList.add(entry.getValue());
                         }
                     }
                 }
@@ -750,15 +751,15 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     private boolean updateRemoteLabels() {
         // reinitialize the remote label map
         remoteLabelMap.clear();
-        ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>> objectMap =
+        ConcurrentMap<Object, Map<Identity, Long>> objectMap =
                 builder.getObjectUseMap();
         assert (objectMap != null);
         
         boolean failed = false;
 
         // Now, go through the new map, asking for its labels
-        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
-             nodeConflictMap.entrySet())
+        for (Map.Entry<Long, Map<Object, Long>> entry :
+            nodeConflictMap.entrySet())
         {
             Long nodeId = entry.getKey();
             LPAClient proxy = getProxy(nodeId);
@@ -771,7 +772,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             }
 
             // Tell the other vertex about the conflicts we know of.
-            Map<Object, AtomicLong> map = entry.getValue();
+            Map<Object, Long> map = entry.getValue();
             assert (map != null);
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
                        localNodeId, nodeId);
@@ -806,8 +807,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             {
                 Object remoteObject = remoteEntry.getKey();
                 // ... look up the local node use of the object.
-                ConcurrentMap<Identity, AtomicLong> objUse =
-                        objectMap.get(remoteObject);
+                Map<Identity, Long> objUse = objectMap.get(remoteObject);
                 if (objUse == null) {
                     // no local uses of this object
                     continue;
@@ -815,11 +815,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 Map<Integer, List<Long>> remoteLabels = remoteEntry.getValue();
                 // Compare each local use's weight with each remote use of
                 // the weight, and fill in our remoteLabelMap.
-                for (Map.Entry<Identity, AtomicLong> objUseId :
-                    objUse.entrySet())
-                {
+                for (Map.Entry<Identity, Long> objUseId : objUse.entrySet()) {
                     Identity ident = objUseId.getKey();
-                    long localCount = objUseId.getValue().get();
+                    long localCount = objUseId.getValue();
                     Map<Integer, Long> labelCount = remoteLabelMap.get(ident);
                     if (labelCount == null) {
                         // Effective Java item 69, faster to use get before
@@ -950,12 +948,11 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * Returns a copy of the node conflict map.
      * @return a copy of the node conflict map.
      */
-    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
+    public ConcurrentMap<Long, Map<Object, Long>>
             getNodeConflictMap()
     {
-        ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> copy =
-            new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>(
-                                                            nodeConflictMap);
+        ConcurrentMap<Long, Map<Object, Long>> copy =
+            new ConcurrentHashMap<Long, Map<Object, Long>>(nodeConflictMap);
         return copy;
     }
 

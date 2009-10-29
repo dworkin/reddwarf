@@ -45,7 +45,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
@@ -64,12 +63,10 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
 
     /** Map for tracking object-> map of identity-> number accesses
      * (thus we keep track of the number of accesses each identity has made
-     * for an object, to aid maintaining weighted edges)
-     * Concurrent modifications are protected by locking the affinity graph.
+     * for an object, to aid maintaining weighted edges).
      */
-    private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-        objectMap =
-           new ConcurrentHashMap<Object, ConcurrentMap<Identity, AtomicLong>>();
+    private final ConcurrentMap<Object, Map<Identity, Long>>
+        objectMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
 
     /** Our graph of object accesses. */
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
@@ -188,35 +185,29 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
         // For each object accessed in this task...
         for (Object objId : objIds) {
             // find the identities that have already used this object
-            ConcurrentMap<Identity, AtomicLong> idMap = objectMap.get(objId);
+            Map<Identity, Long> idMap = objectMap.get(objId);
             if (idMap == null) {
                 // first time we've seen this object
-                ConcurrentMap<Identity, AtomicLong> newMap =
-                        new ConcurrentHashMap<Identity, AtomicLong>();
+                Map<Identity, Long> newMap = new HashMap<Identity, Long>();
                 idMap = objectMap.putIfAbsent(objId, newMap);
                 if (idMap == null) {
                     idMap = newMap;
                 }
             }
-            AtomicLong value = idMap.get(owner);
-            if (value == null) {
-                AtomicLong newVal = new AtomicLong();
-                value = idMap.putIfAbsent(owner, newVal);
-                if (value == null) {
-                    value = newVal;
-                }
-                // Make sure the idMap is still in the objectMap, in case
-                // of interference with the pruner.
-                objectMap.putIfAbsent(objId, idMap);
+
+            long currentVal;
+            synchronized (idMap) {
+                Long val = idMap.get(owner);
+                currentVal = (val == null) ? 1 : val + 1;
+                idMap.put(owner, currentVal);
             }
-            long currentVal = value.incrementAndGet();
 
             synchronized (affinityGraph) {
                 // Add the vertex while synchronized to ensure no interference
                 // from the graph pruner.
                 LabelVertex vowner = addOrGetVertex(owner);
                 // add or update edges between task owner and identities
-                for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
+                for (Map.Entry<Identity, Long> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
 
                     // Our folded graph has no self-loops:  only add an
@@ -233,8 +224,7 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
                             // period info
                             pruneTask.incrementEdge(newEdge);
                         } else {
-                            AtomicLong otherValue = entry.getValue();
-                            if (currentVal <= otherValue.get()) {
+                            if (currentVal <= entry.getValue()) {
                                 edge.incrementWeight();
                                 // period info
                                 pruneTask.incrementEdge(edge);
@@ -395,21 +385,23 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
             for (Map.Entry<Object, Map<Identity, Integer>> entry :
                 periodObject.entrySet())
             {
-                ConcurrentMap<Identity, AtomicLong> idMap =
-                        objectMap.get(entry.getKey());
-                for (Map.Entry<Identity, Integer> updateEntry :
-                     entry.getValue().entrySet())
-                {
-                    Identity updateId = updateEntry.getKey();
-                    long updateValue = updateEntry.getValue();
-                    AtomicLong val = idMap.get(updateId);
-                    val.addAndGet(-updateValue);
-                    if (val.get() <= 0) {
-                        idMap.remove(updateId);
+                Map<Identity, Long> idMap = objectMap.get(entry.getKey());
+                synchronized (idMap) {
+                    for (Map.Entry<Identity, Integer> updateEntry :
+                         entry.getValue().entrySet())
+                    {
+                        Identity updateId = updateEntry.getKey();
+                        long updateValue = updateEntry.getValue();
+                        long newVal = idMap.get(updateId) - updateValue;
+                        if (newVal <= 0) {
+                            idMap.remove(updateId);
+                        } else {
+                            idMap.put(updateId, newVal);
+                        }
                     }
-                }
-                if (idMap.isEmpty()) {
-                    objectMap.remove(entry.getKey(), idMap);
+                    if (idMap.isEmpty()) {
+                        objectMap.remove(entry.getKey(), idMap);
+                    }
                 }
             }
 

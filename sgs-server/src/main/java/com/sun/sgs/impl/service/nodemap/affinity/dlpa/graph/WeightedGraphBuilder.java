@@ -50,7 +50,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
@@ -61,7 +60,7 @@ import javax.management.JMException;
  * identities. 
  * <p>
  * The data access information naturally forms a bipartite graph, with
- * verticies being either identities or objects, and an edge connecting each
+ * vertices being either identities or objects, and an edge connecting each
  * identity which has accessed an object.
  * However, we want a graph with vertices for identities, and edges 
  * representing object accesses between identities, so we need the bipartite
@@ -82,11 +81,9 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     /** Map for tracking object-> map of identity-> number accesses
      * (thus we keep track of the number of accesses each identity has made
      * for an object, to aid maintaining weighted edges)
-     * Concurrent modifications are protected by locking the affinity graph
      */
-    private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-        objectMap =
-           new ConcurrentHashMap<Object, ConcurrentMap<Identity, AtomicLong>>();
+    private final ConcurrentMap<Object, Map<Identity, Long>>
+        objectMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
     
     /** Our graph of object accesses. */
     private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
@@ -107,9 +104,8 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
      * Map of nodes to objects that were evicted to go to that node, with a
      * count.
      */
-    private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-        conflictMap =
-            new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
+    private final ConcurrentMap<Long, Map<Object, Long>> conflictMap =
+        new ConcurrentHashMap<Long, Map<Object, Long>>();
 
     /** The TimerTask which prunes our data structures over time.  As the data
      * structures above are modified, the pruneTask notes the ways they have
@@ -123,9 +119,9 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     private final AffinityGraphBuilderStats stats;
 
     // Our label propagation algorithm parts
-    /** The core server node portion or null if not valid. */
+    /** The core server node portion or null if this is an app node. */
     private final LabelPropagationServer lpaServer;
-    /** The app node portion or null if not valid. */
+    /** The app node portion or null if this is an app node. */
     private final LabelPropagation lpa;
 
     /**
@@ -201,30 +197,28 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
             Object objId = obj.getObjectId();
 
             // find the identities that have already used this object
-            ConcurrentMap<Identity, AtomicLong> idMap = objectMap.get(objId);
+            Map<Identity, Long> idMap = objectMap.get(objId);
             if (idMap == null) {
                 // first time we've seen this object
-                ConcurrentMap<Identity, AtomicLong> newMap =
-                        new ConcurrentHashMap<Identity, AtomicLong>();
+                Map<Identity, Long> newMap = new HashMap<Identity, Long>();
                 idMap = objectMap.putIfAbsent(objId, newMap);
                 if (idMap == null) {
                     idMap = newMap;
                 }
             }
-            AtomicLong value = idMap.get(owner);
-            if (value == null) {
-                AtomicLong newVal = new AtomicLong();
-                value = idMap.putIfAbsent(owner, newVal);
-                if (value == null) {
-                    value = newVal;
-                }
+            long currentVal;
+            synchronized (idMap) {
+                Long val = idMap.get(owner);
+                currentVal = (val == null) ? 1 : val + 1;
+                idMap.put(owner, currentVal);
             }
-            long currentVal = value.incrementAndGet();
 
             synchronized (affinityGraph) {
+                // Add the vertex while synchronized to ensure no interference
+                // from the graph pruner.
                 LabelVertex vowner = addOrGetVertex(owner);
                 // add or update edges between task owner and identities
-                for (Map.Entry<Identity, AtomicLong> entry : idMap.entrySet()) {
+                for (Map.Entry<Identity, Long> entry : idMap.entrySet()) {
                     Identity ident = entry.getKey();
 
                     // Our folded graph has no self-loops:  only add an
@@ -241,8 +235,7 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
                             // period info
                             pruneTask.incrementEdge(newEdge);
                         } else {
-                            AtomicLong otherValue = entry.getValue();
-                            if (currentVal <= otherValue.get()) {
+                            if (currentVal <= entry.getValue()) {
                                 edge.incrementWeight();
                                 // period info
                                 pruneTask.incrementEdge(edge);
@@ -271,16 +264,12 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-            getObjectUseMap()
-    {
+    public ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap() {
         return objectMap;
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-            getConflictMap()
-    {
+    public ConcurrentMap<Long, Map<Object, Long>> getConflictMap() {
         return conflictMap;
     }
 
@@ -321,24 +310,19 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         if (objId == null) {
             throw new NullPointerException("objId must not be null");
         }
-        ConcurrentMap<Object, AtomicLong> objMap = conflictMap.get(nodeId);
+        Map<Object, Long> objMap = conflictMap.get(nodeId);
         if (objMap == null) {
-            ConcurrentMap<Object, AtomicLong> newMap =
-                    new ConcurrentHashMap<Object, AtomicLong>();
+            Map<Object, Long> newMap = new HashMap<Object, Long>();
             objMap = conflictMap.putIfAbsent(nodeId, newMap);
             if (objMap == null) {
                 objMap = newMap;
             }
         }
-        AtomicLong count = objMap.get(objId);
-        if (count == null) {
-            AtomicLong newCount = new AtomicLong();
-            count = objMap.putIfAbsent(objId, newCount);
-            if (count == null) {
-                count = newCount;
-            }
+        synchronized (objMap) {
+            Long count = objMap.get(objId);
+            long currentVal = (count == null) ? 1 : count + 1;
+            objMap.put(objId, currentVal);
         }
-        count.incrementAndGet();
         pruneTask.updateConflict(objId, nodeId);
     }
 
@@ -375,6 +359,8 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         // length of the window.
         private final int count;
         // The current snapshot count, used to initially fill up our window.
+        // We run long enough to fill at least one window before the pruner
+        // can begin.
         private int current = 1;
 
         // The change information we keep for each snapshot.  A new change info
@@ -387,11 +373,6 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         // NodeId -> <ObjId, count times conflicted>
         // Note that the conflict count is not currently used
         private Map<Long, Map<Object, Integer>> currentPeriodConflicts;
-
-        // A lock to guard all uses of the current period information above.
-        // Specifically, we want to ensure that updates to these structures
-        // aren't ones currently being pruned.
-        private final Object currentPeriodLock = new Object();
 
         // Queues of snapshot information.  As a snapshot time period ends,
         // we add its change info to the back of the appropriate queue.  If
@@ -407,6 +388,12 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         private final Deque<Map<Long, Map<Object, Integer>>>
             periodConflictQueue =
                 new ArrayDeque<Map<Long, Map<Object, Integer>>>();
+
+        // A lock to guard all uses of the current period information above
+        // and the queues.
+        // Specifically, we want to ensure that updates to these structures
+        // aren't ones currently being pruned.
+        private final Object currentPeriodLock = new Object();
 
         /**
          * Creates a PruneTask.
@@ -425,6 +412,10 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
          */
         public void run() {
             stats.pruneCountInc();
+            Map<Object, Map<Identity, Integer>> periodObject;
+            Map<WeightedEdge, Integer> periodEdgeIncrements;
+            Map<Long, Map<Object, Integer>> periodConflicts;
+
             // Note: We want to make sure we don't have snapshots that are so
             // short that we cannot do all our pruning within one.
             synchronized (currentPeriodLock) {
@@ -437,38 +428,37 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
                     current++;
                     return;
                 }
+                // Remove the earliest snasphot.
+                periodObject = periodObjectQueue.removeFirst();
+                periodEdgeIncrements = periodEdgeIncrementsQueue.removeFirst();
+                periodConflicts = periodConflictQueue.remove();
             }
 
             long startTime = System.currentTimeMillis();
-            
-            // Remove the earliest snasphot.
-            Map<Object, Map<Identity, Integer>>
-                periodObject = periodObjectQueue.remove();
-            Map<WeightedEdge, Integer> 
-                periodEdgeIncrements = periodEdgeIncrementsQueue.remove();
-            Map<Long, Map<Object, Integer>>
-                periodConflicts = periodConflictQueue.remove();
 
             // For each object, remove the added access counts
             for (Map.Entry<Object, Map<Identity, Integer>> entry :
                 periodObject.entrySet())
             {
-                ConcurrentMap<Identity, AtomicLong> idMap =
-                        objectMap.get(entry.getKey());
-                for (Map.Entry<Identity, Integer> updateEntry :
-                     entry.getValue().entrySet())
-                {
-                    Identity updateId = updateEntry.getKey();
-                    long updateValue = updateEntry.getValue();
-                    AtomicLong val = idMap.get(updateId);
-                    // correct? should be using compareAndSet?
-                    val.addAndGet(-updateValue);
-                    if (val.get() <= 0) {
-                        idMap.remove(updateId);
+                Map<Identity, Long> idMap = objectMap.get(entry.getKey());
+                synchronized (idMap) {
+                    for (Map.Entry<Identity, Integer> updateEntry :
+                         entry.getValue().entrySet())
+                    {
+                        Identity updateId = updateEntry.getKey();
+                        long updateValue = updateEntry.getValue();
+                        Long idMapVal = idMap.get(updateId);
+                        long newVal =
+                            (idMapVal == null) ? 0 : idMapVal - updateValue;
+                        if (newVal <= 0) {
+                            idMap.remove(updateId);
+                        } else {
+                            idMap.put(updateId, newVal);
+                        }
                     }
-                }
-                if (idMap.isEmpty()) {
-                    objectMap.remove(entry.getKey());
+                    if (idMap.isEmpty()) {
+                        objectMap.remove(entry.getKey(), idMap);
+                    }
                 }
             }
 
@@ -500,30 +490,27 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
                  periodConflicts.entrySet())
             {
                 Long nodeId = entry.getKey();
-                ConcurrentMap<Object, AtomicLong> objMap =
-                        conflictMap.get(nodeId);
+                Map<Object, Long> objMap = conflictMap.get(nodeId);
                 // If the node went down, we might have removed the entry
                 if (objMap != null) {
-                    for (Map.Entry<Object, Integer> updateEntry :
-                          entry.getValue().entrySet())
-                    {
-                        Object objId = updateEntry.getKey();
-                        Integer periodVal = updateEntry.getValue();
-                        AtomicLong conflictVal = objMap.get(objId);
-                        long oldVal;
-                        long newVal;
-                        do {
-                            oldVal = conflictVal.get();
-                            newVal = oldVal - periodVal;
-                        } while (!conflictVal.compareAndSet(oldVal, newVal));
-
-                        if (newVal <= 0) {
-                            // This could remove a just incremented value!
-                            objMap.remove(objId);
+                    synchronized (objMap) {
+                        for (Map.Entry<Object, Integer> updateEntry :
+                              entry.getValue().entrySet())
+                        {
+                            Object objId = updateEntry.getKey();
+                            Integer periodVal = updateEntry.getValue();
+                            Long objMapVal = objMap.get(objId);
+                            long newVal =
+                                (objMapVal == null) ? 0 : objMapVal - periodVal;
+                            if (newVal <= 0) {
+                                objMap.remove(objId);
+                            } else {
+                                objMap.put(objId, newVal);
+                            }
                         }
-                    }
-                    if (objMap.isEmpty()) {
-                        conflictMap.remove(nodeId);
+                        if (objMap.isEmpty()) {
+                            conflictMap.remove(nodeId);
+                        }
                     }
                 }
             }
@@ -591,13 +578,13 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         private void addPeriodStructures() {
             currentPeriodObject =
                     new HashMap<Object, Map<Identity, Integer>>();
-            periodObjectQueue.add(currentPeriodObject);
+            periodObjectQueue.addLast(currentPeriodObject);
             currentPeriodEdgeIncrements =
                     new HashMap<WeightedEdge, Integer>();
-            periodEdgeIncrementsQueue.add(currentPeriodEdgeIncrements);
+            periodEdgeIncrementsQueue.addLast(currentPeriodEdgeIncrements);
             currentPeriodConflicts =
                     new HashMap<Long, Map<Object, Integer>>();
-            periodConflictQueue.add(currentPeriodConflicts);
+            periodConflictQueue.addLast(currentPeriodConflicts);
         }
     }
 }

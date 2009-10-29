@@ -18,32 +18,25 @@
  */
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
-import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.test.util.DummyIdentity;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
-import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Assert;
 
 /**
  * A graph builder that returns a pre-made graph for the Zachary karate
  * club network.
  */
-class ZachBuilder implements AffinityGraphBuilder {
-
-    private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
-
-    private final HashMap<Identity, LabelVertex> identMap =
-                new HashMap<Identity, LabelVertex>();
+class ZachBuilder extends AbstractTestGraphBuilder {
     public ZachBuilder() {
-        graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
+        super(createGraph());
+    }
+    static private UndirectedSparseGraph<LabelVertex, WeightedEdge>
+                createGraph()
+   {
+        UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+                new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
         // Create a graph for the Zachary network:
         // W. W. Zachary, An information flow model for conflict and
         // fission in small group,
@@ -135,57 +128,6 @@ class ZachBuilder implements AffinityGraphBuilder {
         Assert.assertEquals(34, graph.getVertexCount());
         Assert.assertEquals(78, graph.getEdgeCount());
 
-        for (LabelVertex v : graph.getVertices()) {
-            identMap.put(v.getIdentity(), v);
-        }
-    }
-
-    /** {@inheritDoc} */
-    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         return graph;
-    }
-
-    /** {@inheritDoc} */
-    public LabelVertex getVertex(Identity id) {
-        return identMap.get(id);
-    }
-
-    /** {@inheritDoc} */
-    public Runnable getPruneTask() {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    /** {@inheritDoc} */
-    public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-            getConflictMap()
-    {
-        return new ConcurrentHashMap<Long, ConcurrentMap<Object, AtomicLong>>();
-    }
-
-    /** {@inheritDoc} */
-    public void removeNode(long nodeId) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    /** {@inheritDoc} */
-    public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-            getObjectUseMap()
-    {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    /** {@inheritDoc} */
-    public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
-        return;
-    }
-
-    /** {@inheritDoc} */
-    public void shutdown() {
-        // do nothing
-    }
-
-    /** {@inheritDoc} */
-    public AffinityGroupFinder getAffinityGroupFinder() {
-        return null;
     }
 }

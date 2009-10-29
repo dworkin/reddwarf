@@ -21,8 +21,8 @@ package com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
+import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Graph builder interface for use with the distributed label propagation
@@ -38,8 +38,7 @@ public interface DLPAGraphBuilder extends AffinityGraphBuilder {
      *
      * @return the map of local object uses
      */
-    ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-            getObjectUseMap();
+    ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap();
 
     /**
      * Returns a map of detected cross node data conflicts.  Conflicts
@@ -52,7 +51,7 @@ public interface DLPAGraphBuilder extends AffinityGraphBuilder {
      * 
      * @return the map of detected cross node data conflicts
      */
-    ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>> getConflictMap();
+    ConcurrentMap<Long, Map<Object, Long>> getConflictMap();
 
     /**
      * Note that a node has failed.  Does nothing if the {@code nodeId} is

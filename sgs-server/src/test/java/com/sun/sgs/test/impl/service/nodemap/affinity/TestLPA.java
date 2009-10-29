@@ -21,7 +21,6 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
@@ -31,7 +30,6 @@ import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.WatchdogService;
@@ -52,7 +50,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -497,7 +494,7 @@ public class TestLPA {
         expected.add(PartialToyBuilder.NODE2);
         expected.add(PartialToyBuilder.NODE3);
         assertTrue(expected.containsAll(lp1.getNodeConflictMap().keySet()));
-        Map<Object, AtomicLong> map =
+        Map<Object, Long> map =
                 lp1.getNodeConflictMap().get(PartialToyBuilder.NODE2);
         assertEquals(1, map.size());
         assertTrue(map.containsKey("obj1"));
@@ -577,13 +574,13 @@ public class TestLPA {
 
     private void printNodeConflictMap(LabelPropagation lp) {
 
-        for (Map.Entry<Long, ConcurrentMap<Object, AtomicLong>> entry :
+        for (Map.Entry<Long, Map<Object, Long>> entry :
              lp.getNodeConflictMap().entrySet())
         {
             StringBuilder sb1 = new StringBuilder();
             sb1.append(entry.getKey());
             sb1.append(":  ");
-            for (Map.Entry<Object, AtomicLong> subEntry :
+            for (Map.Entry<Object, Long> subEntry :
                  entry.getValue().entrySet())
             {
                 sb1.append(subEntry.getKey() + "," + subEntry.getValue() + " ");
@@ -851,14 +848,13 @@ public class TestLPA {
         }
     }
     // Simple builder spread across 3 nodes
-    private class PartialToyBuilder implements DLPAGraphBuilder {
-        private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
-        private final Map<Identity, LabelVertex> identMap =
-                new HashMap<Identity, LabelVertex>();
-        private final ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-                conflictMap;
-        private final ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-                objUseMap;
+    private class PartialToyBuilder extends AbstractTestGraphBuilder 
+            implements DLPAGraphBuilder
+    {
+        private final ConcurrentMap<Long, Map<Object, Long>> conflictMap =
+                new ConcurrentHashMap<Long, Map<Object, Long>>();
+        private final ConcurrentMap<Object, Map<Identity, Long>> objUseMap =
+                new ConcurrentHashMap<Object, Map<Identity, Long>>();
 
         static final long NODE1 = 1;
         static final long NODE2 = 2;
@@ -872,106 +868,58 @@ public class TestLPA {
         // ids 2,4 used obj2
         // ids 4,5 used obj3
         public PartialToyBuilder(long node) {
-            super();
-            graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
-            objUseMap = new ConcurrentHashMap<Object, 
-                                ConcurrentMap<Identity, AtomicLong>>();
-            conflictMap = new ConcurrentHashMap<Long,
-                                ConcurrentMap<Object, AtomicLong>>();
-
+            super(CreatePartialToyBuilderGraph(node));
             if (node == NODE1) {
                 // Create a partial graph
                 Identity[] idents = {new DummyIdentity("1"),
                                      new DummyIdentity("2")};
-                LabelVertex[] nodes = new LabelVertex[2];
-                for (int i = 0; i < nodes.length; i++) {
-                    nodes[i] = new LabelVertex(idents[i]);
-                    graph.addVertex(nodes[i]);
-                }
-                graph.addEdge(new WeightedEdge(2), nodes[0], nodes[1]);
-
-
                 // Obj uses
-                ConcurrentMap<Identity, AtomicLong> tempMap =
-                        new ConcurrentHashMap<Identity, AtomicLong>();
-                tempMap.put(idents[0], new AtomicLong(2));
-                tempMap.put(idents[1], new AtomicLong(2));
+                Map<Identity, Long> tempMap =
+                        new HashMap<Identity, Long>();
+                tempMap.put(idents[0], 2L);
+                tempMap.put(idents[1], 2L);
                 objUseMap.put("obj1", tempMap);
-                tempMap =  new ConcurrentHashMap<Identity, AtomicLong>();
-                tempMap.put(idents[1], new AtomicLong(1));
+                tempMap =  new HashMap<Identity, Long>();
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("obj2", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                ConcurrentHashMap<Object, AtomicLong> conflict =
-                        new ConcurrentHashMap<Object, AtomicLong>();
-                conflict.put("obj2", new AtomicLong(1));
+                HashMap<Object, Long> conflict = new HashMap<Object, Long>();
+                conflict.put("obj2", 1L);
                 conflictMap.put(NODE3, conflict);
             } else if (node == NODE2) {
                 // Create a partial graph
                 Identity ident = new DummyIdentity("3");
-                LabelVertex ver = new LabelVertex(ident);
-                graph.addVertex(ver);
-
+                
                 // Obj uses
-                ConcurrentMap<Identity, AtomicLong> tempMap =
-                        new ConcurrentHashMap<Identity, AtomicLong>();
-                tempMap.put(ident, new AtomicLong(1));
+                Map<Identity, Long> tempMap = new HashMap<Identity, Long>();
+                tempMap.put(ident, 1L);
                 objUseMap.put("obj1", tempMap);
 
                 // conflicts - data cache evictions due to conflict
-                ConcurrentHashMap<Object, AtomicLong> conflict =
-                        new ConcurrentHashMap<Object, AtomicLong>();
-                conflict.put("obj1", new AtomicLong(1));
+                HashMap<Object, Long> conflict = new HashMap<Object, Long>();
+                conflict.put("obj1", 1L);
                 conflictMap.put(NODE1, conflict);
             } else if (node == NODE3) {
                 Identity[] idents = {new DummyIdentity("4"),
                                      new DummyIdentity("5")};
-                LabelVertex[] nodes = new LabelVertex[2];
-                for (int i = 0; i < nodes.length; i++) {
-                    nodes[i] = new LabelVertex(idents[i]);
-                    graph.addVertex(nodes[i]);
-                }
-                graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
 
                 // Obj uses
-                ConcurrentMap<Identity, AtomicLong> tempMap =
-                        new ConcurrentHashMap<Identity, AtomicLong>();
-                tempMap.put(idents[0], new AtomicLong(1));
-                tempMap.put(idents[1], new AtomicLong(1));
+                Map<Identity, Long> tempMap = new HashMap<Identity, Long>();
+                tempMap.put(idents[0], 1L);
+                tempMap.put(idents[1], 1L);
                 objUseMap.put("obj3", tempMap);
-                tempMap =  new ConcurrentHashMap<Identity, AtomicLong>();
-                tempMap.put(idents[0], new AtomicLong(1));
+                tempMap =  new HashMap<Identity, Long>();
+                tempMap.put(idents[0], 1L);
                 objUseMap.put("obj2", tempMap);
-
+                
                 // conflicts - data cache evictions due to conflict
                 // none on this node
             }
-            for (LabelVertex v : graph.getVertices()) {
-                identMap.put(v.getIdentity(), v);
-            }
         }
 
         /** {@inheritDoc} */
-        public UndirectedSparseGraph<LabelVertex, WeightedEdge>
-                getAffinityGraph()
-        {
-            return graph;
-        }
-        
-        /** {@inheritDoc} */
-        public LabelVertex getVertex(Identity id) {
-            return identMap.get(id);
-        }
-
-        /** {@inheritDoc} */
-        public Runnable getPruneTask() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        /** {@inheritDoc} */
-        public ConcurrentMap<Long, ConcurrentMap<Object, AtomicLong>>
-                getConflictMap()
-        {
+        public ConcurrentMap<Long, Map<Object, Long>> getConflictMap() {
             return conflictMap;
         }
 
@@ -981,25 +929,45 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Object, ConcurrentMap<Identity, AtomicLong>>
-                getObjectUseMap()
-        {
+        public ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap() {
             return objUseMap;
         }
+    }
 
-        /** {@inheritDoc} */
-        public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
-            return;
-        }
+    //
+    private UndirectedSparseGraph<LabelVertex, WeightedEdge>
+            CreatePartialToyBuilderGraph(long node)
+    {
+        UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+                new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
-        /** {@inheritDoc} */
-        public void shutdown() {
-            // do nothing
-        }
+        if (node == PartialToyBuilder.NODE1) {
+            // Create a partial graph
+            Identity[] idents = {new DummyIdentity("1"),
+                                 new DummyIdentity("2")};
+            LabelVertex[] nodes = new LabelVertex[2];
+            for (int i = 0; i < nodes.length; i++) {
+                nodes[i] = new LabelVertex(idents[i]);
+                graph.addVertex(nodes[i]);
+            }
+            graph.addEdge(new WeightedEdge(2), nodes[0], nodes[1]);
 
-        /** {@inheritDoc} */
-        public AffinityGroupFinder getAffinityGroupFinder() {
-            return null;
+        } else if (node == PartialToyBuilder.NODE2) {
+            // Create a partial graph
+            Identity ident = new DummyIdentity("3");
+            LabelVertex ver = new LabelVertex(ident);
+            graph.addVertex(ver);
+
+        } else if (node == PartialToyBuilder.NODE3) {
+            Identity[] idents = {new DummyIdentity("4"),
+                                 new DummyIdentity("5")};
+            LabelVertex[] nodes = new LabelVertex[2];
+            for (int i = 0; i < nodes.length; i++) {
+                nodes[i] = new LabelVertex(idents[i]);
+                graph.addVertex(nodes[i]);
+            }
+            graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
         }
+        return graph;
     }
 }
