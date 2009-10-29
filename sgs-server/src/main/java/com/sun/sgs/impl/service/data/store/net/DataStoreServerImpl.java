@@ -812,8 +812,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 			       TransactionProxy txnProxy)
 	throws IOException
     {
-	logger.log(Level.CONFIG, "Creating DataStoreServerImpl properties:{0}",
-		   properties);
+        logger.log(Level.CONFIG, "Creating DataStoreServerImpl");
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	store = new CustomDataStoreImpl(properties, systemRegistry, txnProxy);
 	maxTxnTimeout = wrappedProps.getLongProperty(
@@ -844,6 +843,14 @@ public class DataStoreServerImpl implements DataStoreServer {
 		}
 	    },
 	    reapDelay, reapDelay, TimeUnit.MILLISECONDS);
+
+        logger.log(Level.CONFIG,
+                   "Created DataStoreServerImpl with properties:" +
+                   "\n  " + MAX_TXN_TIMEOUT_PROPERTY + "=" +
+                   maxTxnTimeout +
+                   "\n  " + PORT_PROPERTY + "=" + requestedPort +
+                   "\n  " + REAP_DELAY_PROPERTY + "=" + reapDelay);
+        
     }
 
     /* -- Implement DataStoreServer -- */

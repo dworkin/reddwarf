@@ -227,7 +227,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	buf.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
 	    putString(name).
 	    putBytes(channelIdBytes);
-	writeOrEnqueueIfLoginNotHandled(ByteBuffer.wrap(buf.getBuffer()));
+	write(ByteBuffer.wrap(buf.getBuffer()));
     }
 
     /** {@inheritDoc} */
@@ -238,7 +238,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	buf.put(SimpleSgsProtocol.CHANNEL_LEAVE).
 	    put(channelIdBytes).
 	    flip();
-	writeOrEnqueueIfLoginNotHandled(buf);
+	write(buf);
     }
 
     /***
@@ -396,7 +396,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /**
      * Schedules an asynchronous task to resume reading.
      */
-    protected void scheduleRead() {
+    protected final void scheduleRead() {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "scheduling read, protocol:{0}", this);
 	}
@@ -410,9 +410,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Starts reading.
+     * Resumes reading from the underlying connection.
      */
-    protected void readNow() {
+    protected final void readNow() {
 	if (isOpen()) {
 	    readHandler.read();
 	} else {
@@ -421,13 +421,13 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Writes a message to the write handler if login has been handled,
+     * Writes a message to the underlying connection if login has been handled,
      * otherwise enqueues the message to be sent when the login has not yet been
      * handled.
      *
      * @param	buf a buffer containing a complete protocol message
      */
-    protected void writeOrEnqueueIfLoginNotHandled(ByteBuffer buf) {
+    protected final void write(ByteBuffer buf) {
 	synchronized (lock) {
 	    if (!loginHandled) {
 		messageQueue.add(buf);
@@ -438,13 +438,13 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
     
     /**
-     * Writes a message to the write handler.
+     * Writes a message to the underlying connection.
      *
      * @param	message a buffer containing a complete protocol message
      * @param	flush if {@code true}, then set the {@code loginHandled}
      *		flag to {@code true} and flush the message queue
      */
-    protected void writeNow(ByteBuffer message, boolean flush) {
+    protected final void writeNow(ByteBuffer message, boolean flush) {
 	try {
 	    writeHandler.write(message);
 		    
@@ -490,7 +490,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      * @param	delivery a delivery requirement
      */
     protected void writeBuffer(ByteBuffer buf, Delivery delivery) {
-	writeOrEnqueueIfLoginNotHandled(buf);
+	write(buf);
     }
     
     /**

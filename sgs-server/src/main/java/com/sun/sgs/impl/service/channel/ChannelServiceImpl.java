@@ -86,9 +86,36 @@ import javax.management.JMException;
  * 
  * <p>The {@link #ChannelServiceImpl constructor} requires the <a
  * href="../../../impl/kernel/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> property.
+ * <code>com.sun.sgs.app.name</code></a> property and also supports
+ * the following additional properties: <p>
  *
- * <p>TBD: add summary comment about how the implementation works.
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #EVENTS_PER_TXN_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_EVENTS_PER_TXN}
+ *
+ * <dd style="padding-top: .5em">Specifies the maximum number of events to
+ * process in a single transaction.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #SERVER_PORT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_SERVER_PORT}
+ *
+ * <dd style="padding-top: .5em">Specifies the port to use for the
+ * {@code ChannelServer} of the local node.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #WRITE_BUFFER_SIZE_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_WRITE_BUFFER_SIZE}
+ *
+ * <dd style="padding-top: .5em">Specifies the approximate write buffer capacity
+ *      per channel.<p>
+ *
+ * </dl> <p>
  */
 public final class ChannelServiceImpl
     extends AbstractService implements ChannelManager
@@ -117,27 +144,27 @@ public final class ChannelServiceImpl
 	PKG_NAME + ".server.";
     
     /** The name of the server port property. */
-    private static final String SERVER_PORT_PROPERTY =
+    static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
 	
     /** The default server port: {@value #DEFAULT_SERVER_PORT}. */
-    private static final int DEFAULT_SERVER_PORT = 0;
+    static final int DEFAULT_SERVER_PORT = 0;
 
     /** The property name for the maximum number of events to process in a
      * single transaction.
      */
-    private static final String EVENTS_PER_TXN_PROPERTY =
+    static final String EVENTS_PER_TXN_PROPERTY =
 	PKG_NAME + ".events.per.txn";
 
     /** The default events per transaction: {@value #DEFAULT_EVENTS_PER_TXN}. */
-    private static final int DEFAULT_EVENTS_PER_TXN = 1;
+    static final int DEFAULT_EVENTS_PER_TXN = 1;
     
     /** The name of the write buffer size property. */
-    private static final String WRITE_BUFFER_SIZE_PROPERTY =
+    static final String WRITE_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".write.buffer.size";
 
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE}. */
-    private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+    static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
     /** The name of the session relocation timeout property. */
     private static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
@@ -284,10 +311,8 @@ public final class ChannelServiceImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating ChannelServiceImpl");
 	
-	logger.log(
-	    Level.CONFIG, "Creating ChannelServiceImpl properties:{0}",
-	    properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	try {
@@ -392,6 +417,13 @@ public final class ChannelServiceImpl
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
+
+            logger.log(Level.CONFIG,
+                       "Created ChannelServiceImpl with properties:" +
+                       "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
+                       "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort +
+                       "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" +
+                       writeBufferSize);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

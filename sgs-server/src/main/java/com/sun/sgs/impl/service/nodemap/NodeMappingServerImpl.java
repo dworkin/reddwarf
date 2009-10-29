@@ -261,9 +261,8 @@ public final class NodeMappingServerImpl
          throws Exception 
     {     
         super(properties, systemRegistry, txnProxy, logger);
+        logger.log(Level.CONFIG, "Creating NodeMappingServerImpl");
 
-        logger.log(Level.CONFIG, "Creating NodeMappingServerImpl"); 
-        
         watchdogService = txnProxy.getService(WatchdogService.class);
        
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -277,8 +276,6 @@ public final class NodeMappingServerImpl
                                             new Class[] { Properties.class },
                                             properties);
 
-        logger.log(Level.CONFIG, "Node assign policy: {0}",
-                   assignPolicy.getClass().getName());
         /*
          * Check service version.
          */
@@ -306,10 +303,6 @@ public final class NodeMappingServerImpl
                 RELOCATION_EXPIRE_PROPERTY, DEFAULT_RELOCATION_EXPIRE_TIME,
                 1, Long.MAX_VALUE);
 
-        logger.log(Level.CONFIG,
-                   "Remove expire time: {0}, relocate expire time {1}",
-                   removeExpireTime, relocationExpireTime);
-
         // Register our node listener with the watchdog service.
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
@@ -324,6 +317,16 @@ public final class NodeMappingServerImpl
         fullName = "NodeMappingServiceImpl[host:" + 
                    InetAddress.getLocalHost().getHostName() + 
                    ", port:" + port + "]";
+
+        logger.log(Level.CONFIG,
+                   "Created NodeMappingServerImpl with properties:" +
+                   "\n  " + ASSIGN_POLICY_CLASS_PROPERTY + "=" +
+                   assignPolicy.getClass().getName() +
+                   "\n  " + RELOCATION_EXPIRE_PROPERTY + "=" +
+                   relocationExpireTime +
+                   "\n  " + REMOVE_EXPIRE_PROPERTY + "=" + removeExpireTime +
+                   "\n  " + SERVER_PORT_PROPERTY + "=" + requestedPort);
+        
     }
     
     /* -- Implement AbstractService -- */

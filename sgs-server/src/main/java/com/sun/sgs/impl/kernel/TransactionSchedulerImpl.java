@@ -207,8 +207,7 @@ final class TransactionSchedulerImpl
                              AccessCoordinatorHandle accessCoordinator)
         throws Exception
     {
-        logger.log(Level.CONFIG, "Creating a Transaction Scheduler");
-
+        logger.log(Level.CONFIG, "Creating TransactionSchedulerImpl");
         if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
         }
@@ -244,10 +243,6 @@ final class TransactionSchedulerImpl
         this.requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
-        if (logger.isLoggable(Level.CONFIG)) {
-            logger.log(Level.CONFIG, "Using {0} transaction consumer threads",
-                       requestedThreads);
-        }
         this.executor = Executors.newCachedThreadPool();
         for (int i = 0; i < requestedThreads; i++) {
             executor.submit(new TaskConsumer());
@@ -256,6 +251,14 @@ final class TransactionSchedulerImpl
         // initialize the default timeout for scheduled tasks
         ScheduledTaskImpl.Builder.setDefaultTimeout(
                 transactionCoordinator.getDefaultTimeout());
+
+        logger.log(Level.CONFIG,
+                   "Created TransactionSchedulerImpl with properties:" +
+                   "\n  " + SCHEDULER_RETRY_PROPERTY + "=" +
+                   retryPolicy.getClass().getName() +
+                   "\n  " + SCHEDULER_QUEUE_PROPERTY + "=" +
+                   backingQueue.getClass().getName() +
+                   "\n  " + CONSUMER_THREADS_PROPERTY + "=" + requestedThreads);
     }
 
     /**

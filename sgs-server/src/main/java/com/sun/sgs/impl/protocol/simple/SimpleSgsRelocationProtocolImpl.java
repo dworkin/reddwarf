@@ -329,7 +329,7 @@ public class SimpleSgsRelocationProtocolImpl
 			suspendCompletionFuture.done();
 		    }
 		    if (relocationInfo != null) {
-			relocationInfo.completed();
+			relocationInfo.sendRelocateNotification();
 		    }
 		}
 		break;
@@ -406,7 +406,11 @@ public class SimpleSgsRelocationProtocolImpl
 	    this.relocationKey = relocationKey;
 	}
 
-	void completed() {
+	/**
+	 * Sends a relocate notification to the underlying session, and
+	 * monitors the underlying connection for timely disconnection.
+	 */
+	void sendRelocateNotification() {
 	    for (ProtocolDescriptor descriptor : descriptors) {
 		if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
 		    byte[] redirectionData =

@@ -54,7 +54,7 @@ public interface Node {
         ORANGE,
 
         /**
-         * The component has failed, been shutdown, or its state is unknown.
+         * The node has failed, been shutdown, or its state is unknown.
          */
         RED;
 

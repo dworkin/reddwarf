@@ -105,14 +105,6 @@ import java.util.Arrays;
  *      interval must be greater than or equal to {@code 100} milliseconds and
  *      less than or equal to {@code 300000} milliseconds.<p>
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.watchdog.server.id.block.size
- *	</b></code><br>
- *	<i>Default:</i> {@code 256}<br>
- *
- * <dd style="padding-top: .5em"> 
- *	Specifies the block size to use when reserving node IDs.  The value
- *	must be greater than {@code 8}.<p>
  * </dl> <p>
  * 
  * Note that this server caches NodeImpls outside the data service to
@@ -275,8 +267,7 @@ public final class WatchdogServerImpl
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	logger.log(Level.CONFIG, "Creating WatchdogServerImpl properties:{0}",
-		   properties);
+        logger.log(Level.CONFIG, "Creating WatchdogServerImpl");
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	isFullStack = fullStack;
@@ -349,6 +340,13 @@ public final class WatchdogServerImpl
 	}
 	
 	checkExpirationThread.start();
+
+        logger.log(Level.CONFIG,
+                   "Created WatchdogServerImpl with properties:" +
+                   "\n  " + PORT_PROPERTY + "=" + requestedPort +
+                   "\n  " + RENEW_INTERVAL_PROPERTY + "=" + renewInterval +
+                   "\n  " + TIMEFLUSH_INTERVAL_PROPERTY + "=" +
+                   timeflushInterval);
     }
 
     /** Calls NodeImpl.markAllNodesFailed. */
