@@ -900,11 +900,11 @@ public final class ChannelServiceImpl
 		    }
 		}
 		
-		// While a channel request is being handled (and potentially
-		// delivered to a client session), prevent commencing relocation
-		// preparation for a session relocating from this node (by
-		// synchronizing on 'outgoingSessionRelocationInfo').  A client
-		// session relocating from a node should not receive any more
+		// TBD: While a channel request is being handled (and
+		// potentially delivered to a client session), prevent
+		// commencing relocation preparation for a session
+		// relocating from this node.  A client session
+		// relocating from a node should not receive any more
 		// requests.
 		RelocationInfo info =
 		    outgoingSessionRelocationInfo.get(sessionRefId);
