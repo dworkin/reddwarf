@@ -188,10 +188,16 @@ public class InstallMojo extends AbstractSgsMojo {
         } catch (ArtifactNotFoundException anfe) {
             throw new MojoExecutionException("Artifact not found", anfe);
         }
+
+        //check that sgsHome exists
+        if (sgsHome == null) {
+            throw new MojoExecutionException(
+                    "The sgsHome configuration parameter is not set!");
+        }
         
         //check for previous installation
-        if(sgsHome.exists() && sgsHome.isDirectory()) {
-            if(cleanSgsHome) {
+        if (sgsHome.exists() && sgsHome.isDirectory()) {
+            if (cleanSgsHome) {
                 try {
                     this.getLog().info("Removing previous Project Darkstar " +
                                        "installation at " + sgsHome);

@@ -56,6 +56,14 @@
       
     </plugins>
 
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+        <filtering>true</filtering>
+      </testResource>
+    </testResources>
+
+
     <!-- Include the wagon-svn extension so we can deploy
 	 to Maven2 repositories hosted in SVN repositories
 	 on java.net -->
@@ -144,7 +152,7 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.maven.shared</groupId>
+      <groupId>org.apache.maven.plugin-testing</groupId>
       <artifactId>maven-plugin-testing-harness</artifactId>
       <version>${maven-plugin-testing-harness.version}</version>
       <scope>test</scope>
@@ -154,6 +162,7 @@
 
   <properties>
     <projectYear>2009</projectYear>
+    <minimum.sgs.version>0.9.11</minimum.sgs.version>
     <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
 
     <maven.version>2.0.9</maven.version>
@@ -162,7 +171,7 @@
     <plexus-archiver.version>1.0-alpha-11</plexus-archiver.version>
 
     <junit.version>4.5</junit.version>
-    <maven-plugin-testing-harness.version>1.1</maven-plugin-testing-harness.version>
+    <maven-plugin-testing-harness.version>1.2</maven-plugin-testing-harness.version>
     <wagon-svn.version>1.9</wagon-svn.version>
   </properties>
 </project>

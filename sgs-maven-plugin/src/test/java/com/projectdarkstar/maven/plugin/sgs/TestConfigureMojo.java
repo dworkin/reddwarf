@@ -47,9 +47,12 @@ import java.io.File;
  */
 @RunWith(JUnit4.class)
 public class TestConfigureMojo extends AbstractTestSgsMojo {
-    
+
+    private static final String POM = "target/test-classes/unit/configure/config.xml";
+    private File outputDirectory;
+
     private AbstractSgsMojo mojo;
-    private File dummyHome;
+    private File sgsHome;
     private File dummyFile;
     private File sgsBoot;
     private File sgsServer;
@@ -61,40 +64,36 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
     
     @Before
     public void buildDummyHomeMojo() throws Exception {
-        mojo = buildEmptyMojo();
-        dummyHome = new File(getBasedir(),
-                             "target" + File.separator +
-                             "test-classes" + File.separator +
-                             "unit" + File.separator +
-                             "dummy.home");
-        this.setVariableValueToObject(mojo, "sgsHome", dummyHome);
-        
+        mojo = this.lookupDummyMojo(ConfigureMojo.class, "configure", POM);
+        sgsHome = (File) this.getVariableValueFromObject(mojo, "sgsHome");
         dummyFile = new File(getBasedir(),
                              "target" + File.separator +
                              "test-classes" + File.separator +
                              "unit" + File.separator +
+                             "configure" + File.separator +
                              "dummy.properties");
-        sgsBoot = new File(mojo.sgsHome,
+        sgsBoot = new File(sgsHome,
                            "conf" + File.separator +
                            ConfigureMojo.SGS_BOOT);
-        sgsServer = new File(mojo.sgsHome,
+        sgsServer = new File(sgsHome,
                              "conf" + File.separator +
                              ConfigureMojo.SGS_SERVER);
-        sgsLogging = new File(mojo.sgsHome,
+        sgsLogging = new File(sgsHome,
                               "conf" + File.separator +
                               ConfigureMojo.SGS_LOGGING);
+
+        outputDirectory = new File(getBasedir(),
+                             "target" + File.separator +
+                             "test-classes" + File.separator +
+                             "unit" + File.separator +
+                             "configure");
+        this.executeInstall(POM, outputDirectory);
     }
     
     @After
     public void scrubHome() throws Exception {
-        if(sgsBoot.exists()) {
-            sgsBoot.delete();
-        }
-        if(sgsServer.exists()) {
-            sgsServer.delete();
-        }
-        if(sgsLogging.exists()) {
-            sgsLogging.delete();
+        if (sgsHome.exists()) {
+            FileUtils.deleteDirectory(sgsHome);
         }
     }
     
@@ -104,11 +103,15 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
         mojo.execute();
         
         Assert.assertTrue(sgsBoot.exists());
-        Assert.assertFalse(sgsServer.exists());
-        Assert.assertFalse(sgsLogging.exists());
+        Assert.assertTrue(sgsServer.exists());
+        Assert.assertTrue(sgsLogging.exists());
         
         Assert.assertEquals(FileUtils.fileRead(sgsBoot),
                             FileUtils.fileRead(dummyFile));
+        Assert.assertNotSame(FileUtils.fileRead(sgsServer),
+                             FileUtils.fileRead(dummyFile));
+        Assert.assertNotSame(FileUtils.fileRead(sgsLogging),
+                             FileUtils.fileRead(dummyFile));
     }
     
     @Test
@@ -116,12 +119,16 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
         this.setVariableValueToObject(mojo, "sgsServer", dummyFile);
         mojo.execute();
         
-        Assert.assertFalse(sgsBoot.exists());
+        Assert.assertTrue(sgsBoot.exists());
         Assert.assertTrue(sgsServer.exists());
-        Assert.assertFalse(sgsLogging.exists());
-        
+        Assert.assertTrue(sgsLogging.exists());
+
+        Assert.assertNotSame(FileUtils.fileRead(sgsBoot),
+                             FileUtils.fileRead(dummyFile));
         Assert.assertEquals(FileUtils.fileRead(sgsServer),
                             FileUtils.fileRead(dummyFile));
+        Assert.assertNotSame(FileUtils.fileRead(sgsLogging),
+                             FileUtils.fileRead(dummyFile));
     }
     
     @Test
@@ -129,10 +136,14 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
         this.setVariableValueToObject(mojo, "sgsLogging", dummyFile);
         mojo.execute();
         
-        Assert.assertFalse(sgsBoot.exists());
-        Assert.assertFalse(sgsServer.exists());
+        Assert.assertTrue(sgsBoot.exists());
+        Assert.assertTrue(sgsServer.exists());
         Assert.assertTrue(sgsLogging.exists());
-        
+
+        Assert.assertNotSame(FileUtils.fileRead(sgsBoot),
+                             FileUtils.fileRead(dummyFile));
+        Assert.assertNotSame(FileUtils.fileRead(sgsServer),
+                             FileUtils.fileRead(dummyFile));
         Assert.assertEquals(FileUtils.fileRead(sgsLogging),
                             FileUtils.fileRead(dummyFile));
     }

@@ -32,6 +32,9 @@
 
 package com.projectdarkstar.maven.plugin.sgs;
 
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.repository.DefaultArtifactRepository;
+import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
 import org.apache.maven.plugin.testing.AbstractMojoTestCase;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.junit.Before;
@@ -39,13 +42,57 @@ import org.junit.After;
 import org.junit.Test;
 
 import java.io.File;
+import java.util.Collections;
 
 /**
  * Common tests for sgs mojos.
  */
 public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
+
+    // support install for all subclass tests
+    private String groupId = "com.projectdarkstar.server";
+    private String artifactId = "sgs-server-dist";
+    private String type = "zip";
+    private String version = "0.9.11";
+    private boolean cleanSgsHome = true;
+
+    protected void fillDefaultValues(InstallMojo mojo) throws Exception {
+        this.setVariableValueToObject(mojo, "groupId", groupId);
+        this.setVariableValueToObject(mojo, "artifactId", artifactId);
+        this.setVariableValueToObject(mojo, "type", type);
+        this.setVariableValueToObject(mojo, "version", version);
+        this.setVariableValueToObject(mojo, "cleanSgsHome", cleanSgsHome);
+
+        ArtifactRepository localRepository = new DefaultArtifactRepository(
+                "local", "file://" + getBasedir() + "/target/local-repo",
+                new DefaultRepositoryLayout());
+        this.setVariableValueToObject(mojo, "localRepository", localRepository);
+
+        ArtifactRepository remoteRepository = new DefaultArtifactRepository(
+                "java.net",
+                "http://download.java.net/maven/2",
+                new DefaultRepositoryLayout());
+        this.setVariableValueToObject(
+                mojo, "remoteRepositories",
+                Collections.singletonList(remoteRepository));
+
+    }
+
+    protected void executeInstall(String pom,
+                                  File outputDirectory) throws Exception {
+        InstallMojo mojo = lookupDummyMojo(InstallMojo.class, "install", pom);
+        fillDefaultValues(mojo);
+        this.setVariableValueToObject(mojo, "outputDirectory", outputDirectory);
+        mojo.execute();
+    }
+
+    protected <T> T lookupDummyMojo(Class<T> mojoClass, String goal, String pom)
+            throws Exception {
+        File testPom = new File( getBasedir(), pom);
+        return mojoClass.cast(lookupMojo(goal, testPom));
+    }
     
-    protected abstract AbstractSgsMojo buildEmptyMojo();
+    protected abstract AbstractSgsMojo buildEmptyMojo() throws Exception;
     
     @Before
     public void setUp() throws Exception {
@@ -73,7 +120,7 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
                                   "target" + File.separator +
                                   "test-classes" + File.separator +
                                   "unit" + File.separator +
-                                  "dummy.home");
+                                  "abstract");
         this.setVariableValueToObject(mojo, "sgsHome", dummyHome);
         mojo.checkConfig();
     }
@@ -97,6 +144,7 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
                                   "target" + File.separator +
                                   "test-classes" + File.separator +
                                   "unit" + File.separator +
+                                  "abstract" + File.separator +
                                   "dummy.properties");
         mojo.checkDirectory(dummyFile);
     }
@@ -108,7 +156,7 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
                                   "target" + File.separator +
                                   "test-classes" + File.separator +
                                   "unit" + File.separator +
-                                  "dummy.home");
+                                  "abstract");
         mojo.checkDirectory(dummyHome);
     }
     
@@ -131,7 +179,7 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
                                   "target" + File.separator +
                                   "test-classes" + File.separator +
                                   "unit" + File.separator +
-                                  "dummy.home");
+                                  "abstract");
         mojo.checkFile(dummyHome);
     }
     
@@ -142,6 +190,7 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
                                   "target" + File.separator +
                                   "test-classes" + File.separator +
                                   "unit" + File.separator +
+                                  "abstract" + File.separator +
                                   "dummy.properties");
         mojo.checkFile(dummyFile);
     }
