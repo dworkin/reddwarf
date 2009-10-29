@@ -953,8 +953,11 @@ public class TestChannelServiceImplRelocatingSessions
 	    this.controlledPreparation = controlledPreparation;
 	}
 	    
-	public void disconnected(BigInteger sessionRefId) {
-	    disconnectedSessions.add(sessionRefId);
+	public void disconnected(BigInteger sessionRefId, boolean isRelocating)
+	{
+	    if (!isRelocating) {
+		disconnectedSessions.add(sessionRefId);
+	    }
 	}
 
 	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,

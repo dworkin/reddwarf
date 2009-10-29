@@ -517,8 +517,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	if (sessionRefId != null) {
-	    sessionService.removeHandler(
- 		sessionRefId, isTerminating());
+	    sessionService.removeHandler(sessionRefId, !isTerminating());
 	}
 	
 	if (isTerminating()) {
@@ -1259,41 +1258,45 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    if (!isConnected()) {
 		return false;
 	    }
-	    
+	    byte[] relocationKey;
 	    try {
 		/*
 		 * Notify new node that session is being relocated there and
 		 * obtain relocation key.
 		 */
-		byte[] relocationKey =
+		relocationKey =
 		    server.relocatingSession(
  			identity, sessionRefId.toByteArray(),
 			sessionService.getLocalNodeId());
-		synchronized (this) {
-		    this.relocationKey = relocationKey;
-		}
-		
-		/*
-		 * Notify client to relocate its session to the new node
-		 * specifying the relocation key.
-		 */
-		synchronized (lock) {
-		    relocatePrepareCompletionHandler = this;
-		}
-
-		sessionService.notifyPrepareToRelocate(
-		    sessionRefId, newNode.getId());
 		
 	    } catch (Exception e) {
-		// If there is a problem contacting the destination node,
-		// then disconnect the client session immediately.
+		// If there is a problem contacting the destination node or
+		// obtaining the relocation key, disconnect the client
+		// session immediately.
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e,
 			"relocating client session:{0} throws", this);
 		}
 		handleDisconnect(false, true);
+		return false;
 	    }
+	    
+	    synchronized (this) {
+		this.relocationKey = relocationKey;
+	    }
+		
+	    /*
+	     * Notify client to relocate its session to the new node
+	     * specifying the relocation key.
+	     */
+	    synchronized (lock) {
+		relocatePrepareCompletionHandler = this;
+	    }
+	    
+	    sessionService.notifyPrepareToRelocate(
+		sessionRefId, newNode.getId());
+	    // TBD: why is this return value false?
 	    return false;
 	}
 

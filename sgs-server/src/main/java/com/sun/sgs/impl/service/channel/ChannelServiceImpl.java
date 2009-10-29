@@ -115,6 +115,16 @@ import javax.management.JMException;
  * <dd style="padding-top: .5em">Specifies the approximate write buffer capacity
  *      per channel.<p>
  *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #SESSION_RELOCATION_TIMEOUT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_SESSION_RELOCATION_TIMEOUT}
+ *
+ * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
+ *	for waiting for a pending client session relocating to this node to
+ *	finish processing its pending requests before processing a new
+ *	request. 
+ *      <p>
  * </dl> <p>
  */
 public final class ChannelServiceImpl
@@ -167,13 +177,13 @@ public final class ChannelServiceImpl
     static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
     /** The name of the session relocation timeout property. */
-    private static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
+    static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
 	PKG_NAME + ".session.relocation.timeout";
 
     /** The default session relocation timeout:
      * {@value #DEFAULT_SESSION_RELOCATION_TIMEOUT}.
      */
-    private static final int DEFAULT_SESSION_RELOCATION_TIMEOUT = 5000;
+    static final int DEFAULT_SESSION_RELOCATION_TIMEOUT = 5000;
 
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
@@ -244,18 +254,18 @@ public final class ChannelServiceImpl
 	    new ConcurrentHashMap<BigInteger,
 				  Map<BigInteger, LocalMemberInfo>>();
 
-    /** Map of relocation information (new node IDs and completion
-     * handlers) for client sessions relocating from this node, keyed by
+    /** Map of relocation information (new node ID and completion
+     * handler) for client sessions relocating from this node, keyed by
      * the relocating session's ID. */
-    private final ConcurrentHashMap<BigInteger, RelocationInfo>
-	relocatingSessions =
-	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
+    private final Map<BigInteger, RelocationInfo>
+	outgoingSessionRelocationInfo = Collections.synchronizedMap(
+	    new HashMap<BigInteger, RelocationInfo>());
 
     /** Map for storing pending requests for client sessions relocating to
      * this node, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger,
 				    SortedMap<Long, PendingRequests>>
-	relocatedSessionPendingRequests =
+	incomingSessionPendingRequests =
 	    new ConcurrentHashMap<BigInteger,
 				  SortedMap<Long, PendingRequests>>();
 
@@ -423,7 +433,9 @@ public final class ChannelServiceImpl
                        "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
                        "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort +
                        "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" +
-                       writeBufferSize);
+                       writeBufferSize +
+		       "\n  " + SESSION_RELOCATION_TIMEOUT_PROPERTY + "=" +
+		       sessionRelocationTimeout);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -677,8 +689,10 @@ public final class ChannelServiceImpl
 		    new ChannelSendTask(channelRefId, channelInfo.delivery,
 					message);
 		synchronized (channelInfo) {
-		    // TBD: Is this check for ordered unreliable channels
-		    // as well? 
+		    // This check only needs to be made for reliable
+		    // channels.  Channel messages for ordered-unreliable
+		    // channels are not send to channel servers more than
+		    // once.
 		    if (channelInfo.delivery.equals(Delivery.RELIABLE) &&
 			timestamp <= channelInfo.msgTimestamp)
 		    {
@@ -745,10 +759,9 @@ public final class ChannelServiceImpl
 	    BigInteger sessionRefId, long newNodeId)
 	{
 	    removeLocalSessionFromAllChannels(sessionRefId);
-	    
 	    // Notify completion handler that relocation preparation is done.
 	    RelocationInfo relocationInfo =
-		relocatingSessions.get(sessionRefId);
+		outgoingSessionRelocationInfo.get(sessionRefId);
 	    if (relocationInfo != null) {
 		relocationInfo.handler.completed();
 	    }
@@ -809,30 +822,10 @@ public final class ChannelServiceImpl
 	private boolean handleChannelRequest(
 	    BigInteger sessionRefId, long timestamp, ChannelRequestTask task)
 	{
-	    RelocationInfo info = relocatingSessions.get(sessionRefId);
-	    if (info != null) {
-		// Session is relocating from this node.
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(
-			Level.FINE, "Dropping channel request for " +
-			"relocating session:{0} channel:{1} timestamp:{2} " +
-			"localNodeId:{3} newNodeId:{4}",
-			toHexString(sessionRefId),
-			toHexString(task.channelRefId),
-			timestamp, localNodeId, info.newNodeId);
-		}
-		return false;
-	    }
-
-	    // TBD: The following may need to check the data store to
-	    // see which node the session is assigned to.
-	    boolean relocatingToLocalNode =
-		sessionService.isRelocatingToLocalNode(sessionRefId);
 	    SessionProtocol protocol =
 		sessionService.getSessionProtocol(sessionRefId);
-
 	    if (protocol == null) {
-		if (!relocatingToLocalNode) {
+		if (!sessionService.isRelocatingToLocalNode(sessionRefId)) {
 		    // The session is not locally-connected and is not
 		    // known to be relocating to the local node.
 		    if (logger.isLoggable(Level.FINE)) {
@@ -851,12 +844,12 @@ public final class ChannelServiceImpl
 		// session hasn't been established yet, so enqueue the
 		// request until relocation is complete.
 		SortedMap<Long, PendingRequests> pendingRequestsMap =
-		    relocatedSessionPendingRequests.get(sessionRefId);
+		    incomingSessionPendingRequests.get(sessionRefId);
 		if (pendingRequestsMap == null) {
 		    SortedMap<Long, PendingRequests> newMap =
 			Collections.synchronizedSortedMap(
 			    new TreeMap<Long, PendingRequests>());
-		    pendingRequestsMap = relocatedSessionPendingRequests.
+		    pendingRequestsMap = incomingSessionPendingRequests.
 			putIfAbsent(sessionRefId, newMap);
 		    if (pendingRequestsMap == null) {
 			pendingRequestsMap = newMap;
@@ -872,15 +865,15 @@ public final class ChannelServiceImpl
 		    }
 		    pendingRequests.addTask(task);
 		}
-		// TBD: there still may be a race condition in here...
+
 		protocol = sessionService.getSessionProtocol(sessionRefId);
 		if (protocol != null) {
-		    // Client relocated while adding a task to the queue.
-		    // The task could have been added to the queue after
-		    // the 'relocated' notification, so it wouldn't have
-		    // been processed.  Therefore notify the channel
-		    // service that the session has been relocated so that
-		    // it can process the task queue.
+		    // Client relocated to this node the specified task was
+		    // added to the pending requests map.  The task could
+		    // have been added after the 'relocated' notification,
+		    // so it wouldn't have been processed.  Therefore
+		    // notify the channel service that the session has been
+		    // relocated so that it can process the task queue.
 		    sessionStatusListener.relocated(sessionRefId);
 		}
 		
@@ -891,7 +884,7 @@ public final class ChannelServiceImpl
 		// request locally.  If the session just relocated, make
 		// sure the pending requests (if any) are processed first.
 		SortedMap<Long, PendingRequests> pendingRequestsMap =
-		    relocatedSessionPendingRequests.get(sessionRefId);
+		    incomingSessionPendingRequests.get(sessionRefId);
 		if (pendingRequestsMap != null) {
 		    synchronized (pendingRequestsMap) {
 			// If the specified session is relocating to this
@@ -906,6 +899,29 @@ public final class ChannelServiceImpl
 			}
 		    }
 		}
+		
+		// While a channel request is being handled (and potentially
+		// delivered to a client session), prevent commencing relocation
+		// preparation for a session relocating from this node (by
+		// synchronizing on 'outgoingSessionRelocationInfo').  A client
+		// session relocating from a node should not receive any more
+		// requests.
+		RelocationInfo info =
+		    outgoingSessionRelocationInfo.get(sessionRefId);
+		if (info != null) {
+		    // Session is relocating from this node.
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.log(
+			    Level.FINE, "Dropping channel request for " +
+			    "relocating session:{0} channel:{1} " +
+			    "timestamp:{2} localNodeId:{3} newNodeId:{4}",
+			    toHexString(sessionRefId),
+			    toHexString(task.channelRefId),
+			    timestamp, localNodeId, info.newNodeId);
+		    }
+		    return false;
+		}
+
 		try {
 		    task.run(sessionRefId, timestamp);
 		    return true;
@@ -1069,7 +1085,7 @@ public final class ChannelServiceImpl
 	     * channel messages.  If the channel is relieable and the
 	     * session's message timestamp for the channel is less than the
 	     * channel's current timestamp, then retrieve missing messages.
-	     * TBD: Cache saved messages at the local node?
+	     * TBD: (performance) Cache saved messages at the local node?
 	     */
 	  synchronized (channelInfo) {
 	    if (delivery.equals(Delivery.RELIABLE) &&
@@ -1240,8 +1256,10 @@ public final class ChannelServiceImpl
 	 * that it is currently a member of.
 	 */
 	if (channelMap != null) {
-	    for (BigInteger channelRefId : channelMap.keySet()) {
-		removeLocalChannelMember(channelRefId, sessionRefId);
+	    synchronized (channelMap) {
+		for (BigInteger channelRefId : channelMap.keySet()) {
+		    removeLocalChannelMember(channelRefId, sessionRefId);
+		}
 	    }
 	}
     }
@@ -1767,16 +1785,21 @@ public final class ChannelServiceImpl
         /**
          * {@inheritDoc}
 	 */
-	public void disconnected(final BigInteger sessionRefId) {
-	    // Clean up session's transient information.
+	public void disconnected(
+	    BigInteger sessionRefId, boolean isRelocating)
+	{
 	    removeLocalSessionFromAllChannels(sessionRefId);
-	    
-	    SortedMap<Long, PendingRequests> pendingRequestsMap =
-		relocatedSessionPendingRequests.remove(sessionRefId);
-	    if (pendingRequestsMap != null) {
-		synchronized (pendingRequestsMap) {
-		    pendingRequestsMap.clear();
-		    pendingRequestsMap.notifyAll();
+	    if (isRelocating) {
+		outgoingSessionRelocationInfo.remove(sessionRefId);
+	    } else {
+		// Clean up pending requests, if any.
+		SortedMap<Long, PendingRequests> pendingRequestsMap =
+		    incomingSessionPendingRequests.remove(sessionRefId);
+		if (pendingRequestsMap != null) {
+		    synchronized (pendingRequestsMap) {
+			pendingRequestsMap.clear();
+			pendingRequestsMap.notifyAll();
+		    }
 		}
 	    }
 	}
@@ -1787,10 +1810,8 @@ public final class ChannelServiceImpl
 	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
 				      SimpleCompletionHandler handler)
 	{
-	    // TBD: can't relocate until previous relocation is complete,
-	    // i.e., all enqueued requests (if any) need to be delivered to
-	    // session first.
-	    
+	    outgoingSessionRelocationInfo.put(
+		sessionRefId, new RelocationInfo(newNodeId, handler));
 	    Map<BigInteger, LocalMemberInfo> channelMap =
 		localPerSessionChannelMap.get(sessionRefId);		
 	    if (channelMap == null) {
@@ -1798,16 +1819,12 @@ public final class ChannelServiceImpl
 		handler.completed();
 	    } else {
 		// Transfer the session's channel membership set to new node.
-		relocatingSessions.put(sessionRefId,
-				       new RelocationInfo(newNodeId, handler));
 		try {
 		    int size = channelMap.size();
 		    BigInteger[] channelRefIds = new BigInteger[size];
 		    byte[] deliveryOrdinals = new byte[size];
 		    long[] msgTimestamps = new long[size];
 		    int i = 0;
-		    // TBD: Does the channelMap really need to be locked for
-		    // the iteration?
 		    synchronized (channelMap) {
 			for (Map.Entry<BigInteger, LocalMemberInfo> entry :
 				 channelMap.entrySet())
@@ -1840,7 +1857,7 @@ public final class ChannelServiceImpl
 	    // to the client session.
 
 	    SortedMap<Long, PendingRequests> pendingRequestsMap =
-		relocatedSessionPendingRequests.get(sessionRefId);
+		incomingSessionPendingRequests.get(sessionRefId);
 	    if (pendingRequestsMap != null) {
 		synchronized (pendingRequestsMap) {
 		    for (PendingRequests pendingRequests :
@@ -1851,7 +1868,7 @@ public final class ChannelServiceImpl
 		    pendingRequestsMap.clear();
 		    pendingRequestsMap.notifyAll();
 		}
-		relocatedSessionPendingRequests.remove(sessionRefId);
+		incomingSessionPendingRequests.remove(sessionRefId);
 	    }
 	}
     }

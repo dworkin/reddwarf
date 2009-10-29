@@ -296,17 +296,17 @@ public final class ClientSessionServiceImpl
     /** The map of relocation information for sessions relocating to
      * this node, keyed by relocation key. */
     private final ConcurrentHashMap<BigInteger, RelocationInfo>
-	relocationKeys =
+	incomingSessionRelocationKeys =
 	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
 
     /** The map of relocation information for sessions relocating to this
      * node, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, RelocationInfo>
-	relocatingSessions =
+	incomingSessionRelocationInfo =
 	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
     
     /** The set of identities that are relocating to this node. */
-    private final Set<Identity> relocatingIdentities =
+    private final Set<Identity> incomingRelocatingIdentities =
 	Collections.synchronizedSet(new HashSet<Identity>());
     
     /** The maximum number of session events to service per transaction. */
@@ -596,7 +596,7 @@ public final class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public boolean isRelocatingToLocalNode(BigInteger sessionRefId) {
-	return relocatingSessions.containsKey(sessionRefId);
+	return incomingSessionRelocationInfo.containsKey(sessionRefId);
     }
 
     /* -- Implement IdentityRelocationListener -- */
@@ -757,7 +757,8 @@ public final class ClientSessionServiceImpl
 	    BigInteger relocationKey, SessionProtocol protocol,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 	{
-	    RelocationInfo info = relocationKeys.remove(relocationKey);
+	    RelocationInfo info =
+		incomingSessionRelocationKeys.remove(relocationKey);
 	    if (info == null) {
 		// No information for specified relocation key.
 		// Session is already relocated, or it's a possible
@@ -1061,7 +1062,6 @@ public final class ClientSessionServiceImpl
 	/** {@inheritDoc} */
 	public byte[] relocatingSession(
 	    Identity identity, byte[] sessionId, long oldNodeId)
-	// throws RelocationFailedException
 	{
 	    callStarted();
 	    try {
@@ -1069,9 +1069,6 @@ public final class ClientSessionServiceImpl
 		    logger.log(Level.FINEST, "sessionId:{0} oldNodeId:{1}",
 			       HexDumper.toHexString(sessionId), oldNodeId);
 		}
-		// TBD: do we need to double-check to make sure that the
-		// node mapping service has really assigned this session
-		// here?
 		
 		// Cache relocation information.
 		byte[] relocationKey = getNextRelocationKey();
@@ -1079,9 +1076,9 @@ public final class ClientSessionServiceImpl
 		RelocationInfo info =
 		    new RelocationInfo(identity, sessionRefId);
 		BigInteger key = new BigInteger(1, relocationKey);
-		relocationKeys.put(key, info);
-		relocatingSessions.put(sessionRefId, info);
-		relocatingIdentities.add(identity);
+		incomingSessionRelocationKeys.put(key, info);
+		incomingSessionRelocationInfo.put(sessionRefId, info);
+		incomingRelocatingIdentities.add(identity);
 
 		// Modify ClientSession's state to indicate that it has been
 		// relocated to the local node.
@@ -1098,8 +1095,15 @@ public final class ClientSessionServiceImpl
 			    } },
 			taskOwner);
 		} catch (Exception e) {
-		    // TBD: this probably means that the client session is gone,
-		    // so throw an exception?
+		    // This exception probably means that the client
+		    // session is gone, so throw an exception.  This will
+		    // cause the requester to disconnect the client session
+		    // because it can't assign the new node ID to the
+		    // session.
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Assigning new node ID:{0} to session:{1} throws",
+			localNodeId, HexDumper.toHexString(sessionId));
 		    throw new RuntimeException(e);
 		}
 		
@@ -1304,7 +1308,7 @@ public final class ClientSessionServiceImpl
     boolean validateUserLogin(Identity identity, ClientSessionHandler handler,
 			      boolean loggingIn)
     {
-	if (loggingIn && relocatingIdentities.contains(identity)) {
+	if (loggingIn && incomingRelocatingIdentities.contains(identity)) {
 	    return false;
 	}
 		
@@ -1356,7 +1360,8 @@ public final class ClientSessionServiceImpl
      * @param	sessionRefId the session ID, as a {@code BigInteger}
      * @param	handler the client session handler to cache
      * @param	identity if the session has been relocated, a non-null
-     *		identity to be removed from the relocatingIdentities cache
+     *		identity to be removed from the
+     *		{@code incomingRelocatingIdentities} cache
      */
     void addHandler(BigInteger sessionRefId,
 		    ClientSessionHandler handler,
@@ -1364,9 +1369,9 @@ public final class ClientSessionServiceImpl
     {
         assert handler != null;
 	handlers.put(sessionRefId, handler);
-	relocatingSessions.remove(sessionRefId);
+	incomingSessionRelocationInfo.remove(sessionRefId);
 	if (identity != null) {
-	    relocatingIdentities.remove(identity);
+	    incomingRelocatingIdentities.remove(identity);
 	    //  Notify status listeners that the specified client session
 	    //  has completed relocating to this node.
 	    for (ClientSessionStatusListener statusListener :
@@ -1390,19 +1395,18 @@ public final class ClientSessionServiceImpl
      * cleans up other session-related transient data, and if {@code
      * isDisconnecting} is {@code true} notifies all {@link
      * ClientSessionStatusListener}s of the session's disconnection.  This
-     * method is invoked by the handler when the session becomes
-     * disconnected.  If a session is disconnected due to the session
-     * relocating to another node, then {@code isDisconnecting} will be
-     * {@code false}.
+     * method is invoked by the handler (in order to clean up the session's
+     * transient data structures) when the session is disconnecting
+     * its connection due to session termination or session relocation.  If
+     * a session is disconnecting because the session relocating to another
+     * node, then {@code isDisconnecting} will be {@code false}.
      */
-    void removeHandler(BigInteger sessionRefId, boolean isDisconnecting) {
+    void removeHandler(BigInteger sessionRefId, boolean isRelocating) {
 	if (shuttingDown()) {
 	    return;
 	}
 	// Notify session listeners of disconnection
-	if (isDisconnecting) {
-	    notifyStatusListenersOfDisconnection(sessionRefId);
-	}
+	notifyStatusListenersOfDisconnection(sessionRefId, isRelocating);
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
 	prepareRelocationMap.remove(sessionRefId); // just in case...
@@ -1413,13 +1417,13 @@ public final class ClientSessionServiceImpl
      * the session with the specified {@code sessionRefId} has disconnected.
      */
     private void notifyStatusListenersOfDisconnection(
-	BigInteger sessionRefId)
+	BigInteger sessionRefId, boolean isRelocating)
     {
 	for (ClientSessionStatusListener statusListener :
 		 sessionStatusListeners)
 	{
 	    try {
-		statusListener.disconnected(sessionRefId);
+		statusListener.disconnected(sessionRefId, isRelocating);
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
@@ -1800,7 +1804,7 @@ public final class ClientSessionServiceImpl
 	 * needs to be removed.
 	 */
 	public void run() {
-	    if (relocationKeys.remove(relocationKey) != null) {
+	    if (incomingSessionRelocationKeys.remove(relocationKey) != null) {
 		logger.log(
 		    Level.FINE, "Scheduling clean up of session:{0} that " +
 		    "failed to relocate to local node:{1}",
@@ -1816,9 +1820,9 @@ public final class ClientSessionServiceImpl
 				    dataService, false, true);
 			    }
 			} }, info.identity);
-		relocatingSessions.remove(info.sessionRefId);
-		relocatingIdentities.remove(info.identity);
-		notifyStatusListenersOfDisconnection(info.sessionRefId);
+		incomingSessionRelocationInfo.remove(info.sessionRefId);
+		incomingRelocatingIdentities.remove(info.identity);
+		notifyStatusListenersOfDisconnection(info.sessionRefId, false);
 	    }
 	}
     }

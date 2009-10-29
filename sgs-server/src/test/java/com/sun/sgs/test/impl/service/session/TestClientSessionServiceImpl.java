@@ -339,7 +339,8 @@ public class TestClientSessionServiceImpl extends Assert {
     private static class DummyStatusListener
 	implements ClientSessionStatusListener
     {
-	public void disconnected(BigInteger sessionRefId) { }
+	public void disconnected(BigInteger sessionRefId,
+				 boolean isRelocating) { }
 
 	public void prepareToRelocate(BigInteger sessionRefId, long newNode,
 				      SimpleCompletionHandler handler) { }

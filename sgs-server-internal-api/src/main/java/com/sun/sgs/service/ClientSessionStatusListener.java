@@ -37,15 +37,16 @@ import com.sun.sgs.app.ClientSession;
 public interface ClientSessionStatusListener {
 
     /**
-     * Notifies this listener that the session with the given
-     * {@code sessionRefId} has disconnected so that any cached
-     * or persistent data associated with the client session can
-     * be cleaned up.  This method is not invoked when the client
-     * session disconnects due to relocating to another node.
+     * Notifies this listener that the session with the given {@code
+     * sessionRefId} has disconnected so that any relevant cached or
+     * persistent data associated with the client session can be cleaned
+     * up.
      * 
-     * @param sessionRefId the client session ID
+     * @param	sessionRefId the client session ID
+     * @param	isRelocating if {@code true}, the disconnection is due to
+     *	        the client session relocating to another node
      */
-    void disconnected(BigInteger sessionRefId);
+    void disconnected(BigInteger sessionRefId, boolean isRelocating);
 
     /**
      * Notifies this listener that the session with the given
