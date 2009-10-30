@@ -53,13 +53,31 @@
 	  </execution>
 	</executions>
       </plugin>
+
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-surefire-plugin</artifactId>
+	<configuration>
+	  <redirectTestOutputToFile>true</redirectTestOutputToFile>
+	</configuration>
+      </plugin>
       
     </plugins>
 
     <testResources>
       <testResource>
         <directory>src/test/resources</directory>
+	<excludes>
+	  <exclude>**/*.zip</exclude>
+	</excludes>
         <filtering>true</filtering>
+      </testResource>
+      <testResource>
+        <directory>src/test/resources</directory>
+	<includes>
+	  <include>**/*.zip</include>
+	</includes>
+        <filtering>false</filtering>
       </testResource>
     </testResources>
 

@@ -1,0 +1,30 @@
+<project>
+  <build>
+    <plugins>
+      <plugin>
+	<groupId>com.projectdarkstar.maven.plugin</groupId>
+        <artifactId>sgs-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>install</goal>
+              <goal>deploy-dependencies</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+	  <sgsHome>${basedir}/target/test-classes/unit/deploy-dependencies/sgs-server-dist-${minimum.sgs.version}</sgsHome>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-boot</artifactId>
+      <version>${minimum.sgs.version}</version>
+    </dependency>
+  </dependencies>
+
+</project>

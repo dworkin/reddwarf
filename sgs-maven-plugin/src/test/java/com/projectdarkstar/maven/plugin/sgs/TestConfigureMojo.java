@@ -87,7 +87,6 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
                              "test-classes" + File.separator +
                              "unit" + File.separator +
                              "configure");
-        this.executeInstall(POM, outputDirectory);
     }
     
     @After
@@ -99,6 +98,7 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
     
     @Test
     public void testExecuteSgsBootConfig() throws Exception{
+        this.executeInstall(POM, outputDirectory);
         this.setVariableValueToObject(mojo, "sgsBoot", dummyFile);
         mojo.execute();
         
@@ -116,6 +116,7 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
     
     @Test
     public void testExecuteSgsServerConfig() throws Exception{
+        this.executeInstall(POM, outputDirectory);
         this.setVariableValueToObject(mojo, "sgsServer", dummyFile);
         mojo.execute();
         
@@ -133,6 +134,7 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
     
     @Test
     public void testExecuteSgsLoggingConfig() throws Exception{
+        this.executeInstall(POM, outputDirectory);
         this.setVariableValueToObject(mojo, "sgsLogging", dummyFile);
         mojo.execute();
         
@@ -150,6 +152,7 @@ public class TestConfigureMojo extends AbstractTestSgsMojo {
     
     @Test
     public void testExecuteAllConfig() throws Exception{
+        this.executeInstall(POM, outputDirectory);
         this.setVariableValueToObject(mojo, "sgsBoot", dummyFile);
         this.setVariableValueToObject(mojo, "sgsServer", dummyFile);
         this.setVariableValueToObject(mojo, "sgsLogging", dummyFile);

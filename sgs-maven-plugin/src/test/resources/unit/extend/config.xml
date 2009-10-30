@@ -1,0 +1,22 @@
+<project>
+  <build>
+    <plugins>
+      <plugin>
+	<groupId>com.projectdarkstar.maven.plugin</groupId>
+        <artifactId>sgs-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>install</goal>
+              <goal>extend</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+	  <sgsHome>${basedir}/target/test-classes/unit/extend/sgs-server-dist-${minimum.sgs.version}</sgsHome>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

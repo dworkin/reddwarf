@@ -59,7 +59,7 @@ public class BootMojo extends AbstractSgsMojo {
      * @since 1.0-alpha-1
      */
     private File alternateBoot;
-    
+
     public void execute()
         throws MojoExecutionException
     {
