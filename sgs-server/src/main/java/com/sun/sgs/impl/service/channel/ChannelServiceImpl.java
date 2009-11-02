@@ -114,8 +114,8 @@ import javax.management.JMException;
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_WRITE_BUFFER_SIZE}
  *
- * <dd style="padding-top: .5em">Specifies the approximate write buffer capacity
- *      per channel.<p>
+ * <dd style="padding-top: .5em">Specifies the approximate write buffer
+ *      capacity *      per channel.<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	{@value #SESSION_RELOCATION_TIMEOUT_PROPERTY}
@@ -123,9 +123,9 @@ import javax.management.JMException;
  *	<i>Default:</i> {@value #DEFAULT_SESSION_RELOCATION_TIMEOUT}
  *
  * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
- *	for waiting for a pending client session relocating to this node to
- *	finish processing its pending requests before processing a new
- *	request. 
+ *	to save reliable channel messages so that relocating client
+ *	sessions can obtain channel messages that were missed during
+ *	relocation. 
  *      <p>
  * </dl> <p>
  */
@@ -303,9 +303,8 @@ public final class ChannelServiceImpl
     /** The maximum number of channel events to service per transaction. */
     final int eventsPerTxn;
 
-    /** The timeout expiration for a client session relocating to this
-     * node, in milliseconds.
-     */
+    /** The timeout expiration, in milliseconds, for a client session to
+     * relocate. */
     final int sessionRelocationTimeout;
     
     /** Our JMX exposed statistics. */
@@ -438,7 +437,7 @@ public final class ChannelServiceImpl
                        "Created ChannelServiceImpl with properties:" +
                        "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
                        "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort +
-                       "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" +
+                       "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" + 
                        writeBufferSize +
 		       "\n  " + SESSION_RELOCATION_TIMEOUT_PROPERTY + "=" +
 		       sessionRelocationTimeout);
@@ -829,6 +828,11 @@ public final class ChannelServiceImpl
 	    BigInteger sessionRefId, long timestamp, ChannelRequestTask task)
 	{
 	  try {
+	    // Lock the specified session to prevent preparing the
+	    // session to relocate from this node while the session's
+	    // channel request is being handled.  A client session
+	    // relocating from a node should not have any concurrent or
+	    // future channel requests processed for it.
 	    lockSession(sessionRefId);
 	    
 	    SessionProtocol protocol =
@@ -901,20 +905,20 @@ public final class ChannelServiceImpl
 			// during relocation to be processed.
 			while (!pendingRequestsMap.isEmpty()) {
 			    try {
-				pendingRequestsMap.wait(
-				    sessionRelocationTimeout);
+				pendingRequestsMap.wait(500);
 			    } catch (InterruptedException e) {
+			    }
+			    protocol = 
+				sessionService.getSessionProtocol(sessionRefId);
+			    if (protocol == null) {
+				// Session disconnected while processing
+				// pending requests.
+				return false;
 			    }
 			}
 		    }
 		}
 		
-		// TBD: While a channel request is being handled (and
-		// potentially delivered to a client session), prevent
-		// commencing relocation preparation for a session
-		// relocating from this node.  A client session
-		// relocating from a node should not receive any more
-		// requests.
 		RelocationInfo info =
 		    outgoingSessionRelocationInfo.get(sessionRefId);
 		if (info != null) {
@@ -1054,9 +1058,9 @@ public final class ChannelServiceImpl
 			long currentTimestamp =
 			    addLocalNodeToChannel(channelRefId);
 			if (currentTimestamp == -1L) {
-			    // channel is closed, so send leave message.
-			    // TBD: if this returns false, there may be a
-			    // problem...
+			    // The channel is closed, so send leave message.
+			    // If invocation returns false, the session
+			    // probably disconnected.
 			    serverImpl.handleChannelRequest(
  				sessionRefId, timestamp,
 				new ChannelLeaveTask(channelRefId));
@@ -1098,7 +1102,7 @@ public final class ChannelServiceImpl
 	     * channel messages.  If the channel is relieable and the
 	     * session's message timestamp for the channel is less than the
 	     * channel's current timestamp, then retrieve missing messages.
-	     * TBD: (performance) Cache saved messages at the local node?
+	     * TB: D(performance) Cache saved messages at the local node?
 	     */
 	  synchronized (channelInfo) {
 	    if (delivery.equals(Delivery.RELIABLE) &&
@@ -1821,16 +1825,15 @@ public final class ChannelServiceImpl
 	/**
 	 * {@inheritDoc}
 	 */
-	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
+	public void prepareToRelocate(final BigInteger sessionRefId,
+				      final long newNodeId,
 				      SimpleCompletionHandler handler)
 	{
-	    /*
-	     * Put session in map of (outgoing) sessions relocating from
-	     * this node, locking the session during the operation to
-	     * prevent any requests from being processed after the session
-	     * is marked for relocation.
-	     */
 	    try {
+		// Put session in the map of (outgoing) sessions relocating
+		// from this node, locking the session during the operation to
+		// prevent any channel requests from being processed after the
+		// session is marked for relocation.
 		lockSession(sessionRefId);
 		outgoingSessionRelocationInfo.put(
 		    sessionRefId, new RelocationInfo(newNodeId, handler));
@@ -1841,37 +1844,40 @@ public final class ChannelServiceImpl
 	    Map<BigInteger, LocalMemberInfo> channelMap =
 		localPerSessionChannelMap.get(sessionRefId);		
 	    if (channelMap == null) {
-		// The session is not a member of any channel.
+		// The session is not a member of any channel, so preparation
+		// is complete.
 		handler.completed();
 	    } else {
 		// Transfer the session's channel membership set to new node.
-		try {
-		    int size = channelMap.size();
-		    BigInteger[] channelRefIds = new BigInteger[size];
-		    byte[] deliveryOrdinals = new byte[size];
-		    long[] msgTimestamps = new long[size];
-		    int i = 0;
-		    synchronized (channelMap) {
-			for (Map.Entry<BigInteger, LocalMemberInfo> entry :
-				 channelMap.entrySet())
-			{
-			    channelRefIds[i] = entry.getKey();
-			    LocalMemberInfo memberInfo = entry.getValue();
-			    deliveryOrdinals[i] = (byte)
-				memberInfo.channelInfo.delivery.ordinal();
-			    msgTimestamps[i] = memberInfo.msgTimestamp;
-			    i++;
-			}
+		int size = channelMap.size();
+		final BigInteger[] channelRefIds = new BigInteger[size];
+		final byte[] deliveryOrdinals = new byte[size];
+		final long[] msgTimestamps = new long[size];
+		int i = 0;
+		synchronized (channelMap) {
+		    for (Map.Entry<BigInteger, LocalMemberInfo> entry :
+			     channelMap.entrySet())
+		    {
+			channelRefIds[i] = entry.getKey();
+			LocalMemberInfo memberInfo = entry.getValue();
+			deliveryOrdinals[i] = (byte)
+			    memberInfo.channelInfo.delivery.ordinal();
+			msgTimestamps[i] = memberInfo.msgTimestamp;
+			i++;
 		    }
-		    // TBD:IoTask?
-		    getChannelServer(newNodeId).
-			relocateChannelMemberships(
-			    sessionRefId, localNodeId,
-			    channelRefIds, deliveryOrdinals, msgTimestamps);
-		    
-		} catch (IOException e) {
-		    // TBD: probably want to disconnect the session...
 		}
+		taskScheduler.scheduleTask(
+		    new AbstractKernelRunnable("relocateMemberships") {
+			public void run() {
+			    runIoTask(new IoRunnable() {
+			        public void run() throws IOException {
+				    getChannelServer(newNodeId).
+					relocateChannelMemberships(
+ 					    sessionRefId, localNodeId,
+					    channelRefIds, deliveryOrdinals,
+					    msgTimestamps);
+				} }, newNodeId);
+			} }, taskOwner);
 	    }
 	}
 
@@ -2324,7 +2330,6 @@ public final class ChannelServiceImpl
 		try {
 		    protocol.channelJoin(name, channelRefId, delivery);
 		} catch (IOException e) {
-		    // TBD: session disconnecting?
 		    logger.logThrow(Level.WARNING, e, "channelJoin throws");
 		}
 	    }
