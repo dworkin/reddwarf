@@ -66,6 +66,7 @@ public class TestInstallMojo extends AbstractTestSgsMojo {
         Assert.assertNotNull(mojo);
 
         fillDefaultValues(mojo);
+        fillRepositories(mojo);
         mojo.execute();
         
         File sgsHome = (File) this.getVariableValueFromObject(mojo, "sgsHome");
@@ -81,6 +82,7 @@ public class TestInstallMojo extends AbstractTestSgsMojo {
         Assert.assertNotNull(mojo);
 
         fillDefaultValues(mojo);
+        fillRepositories(mojo);
         this.setVariableValueToObject(mojo, "sgsHome", null);
         mojo.execute();
     }
@@ -91,6 +93,7 @@ public class TestInstallMojo extends AbstractTestSgsMojo {
         Assert.assertNotNull(mojo);
 
         fillDefaultValues(mojo);
+        fillRepositories(mojo);
         this.setVariableValueToObject(mojo, "artifactId", "does-not-exist");
         mojo.execute();
     }
@@ -101,6 +104,7 @@ public class TestInstallMojo extends AbstractTestSgsMojo {
         Assert.assertNotNull(mojo);
 
         fillDefaultValues(mojo);
+        fillRepositories(mojo);
         File sgsHome = (File) this.getVariableValueFromObject(mojo, "sgsHome");
         if (sgsHome.exists() && sgsHome.isDirectory()) {
             FileUtils.deleteDirectory(sgsHome);
@@ -120,6 +124,7 @@ public class TestInstallMojo extends AbstractTestSgsMojo {
         Assert.assertNotNull(mojo);
 
         fillDefaultValues(mojo);
+        fillRepositories(mojo);
         File sgsHome = (File) this.getVariableValueFromObject(mojo, "sgsHome");
         if (sgsHome.exists() && sgsHome.isDirectory()) {
             FileUtils.deleteDirectory(sgsHome);
@@ -139,6 +144,7 @@ public class TestInstallMojo extends AbstractTestSgsMojo {
         Assert.assertNotNull(mojo);
 
         fillDefaultValues(mojo);
+        fillRepositories(mojo);
         File sgsHome = (File) this.getVariableValueFromObject(mojo, "sgsHome");
         if (sgsHome.exists() && sgsHome.isDirectory()) {
             FileUtils.deleteDirectory(sgsHome);

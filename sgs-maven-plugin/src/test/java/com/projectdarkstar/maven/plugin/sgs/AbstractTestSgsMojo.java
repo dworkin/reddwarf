@@ -62,6 +62,9 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
         this.setVariableValueToObject(mojo, "type", type);
         this.setVariableValueToObject(mojo, "version", version);
         this.setVariableValueToObject(mojo, "cleanSgsHome", cleanSgsHome);
+    }
+
+    protected void fillRepositories(AbstractSgsMojo mojo) throws Exception {
 
         ArtifactRepository localRepository = new DefaultArtifactRepository(
                 "local", "file://" + getBasedir() + "/target/local-repo",
@@ -82,6 +85,7 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
                                   File outputDirectory) throws Exception {
         InstallMojo mojo = lookupDummyMojo(InstallMojo.class, "install", pom);
         fillDefaultValues(mojo);
+        fillRepositories(mojo);
         this.setVariableValueToObject(mojo, "outputDirectory", outputDirectory);
         mojo.execute();
     }

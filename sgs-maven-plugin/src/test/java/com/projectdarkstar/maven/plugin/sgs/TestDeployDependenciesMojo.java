@@ -32,13 +32,10 @@
 
 package com.projectdarkstar.maven.plugin.sgs;
 
-import org.apache.maven.plugin.MojoExecutionException;
 import org.codehaus.plexus.util.FileUtils;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.junit.Test;
-import org.junit.Assert;
-import org.junit.Before;
 import org.junit.After;
 import java.io.File;
 
@@ -54,10 +51,6 @@ public class TestDeployDependenciesMojo extends AbstractTestSgsMojo {
     private DeployDependenciesMojo mojo;
     private File sgsHome;
     private File deployDir;
-    private File dummyFile1;
-    private File dummyFile2;
-    private File dummyZip;
-    private File noFile;
 
     protected AbstractSgsMojo buildEmptyMojo() {
         return new DeployDependenciesMojo();
@@ -72,6 +65,7 @@ public class TestDeployDependenciesMojo extends AbstractTestSgsMojo {
                                    "test-classes" + File.separator +
                                    "unit" + File.separator +
                                    "deploy-dependencies");
+        fillRepositories(mojo);
     }
     
     @After
