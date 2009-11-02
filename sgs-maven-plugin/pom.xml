@@ -117,7 +117,7 @@
     <repository>
       <id>java.net-maven2-repository</id>
       <name>java.net Maven2 Repository</name>
-      <url>java-net:/maven2-repository/trunk/www/repository/</url>
+      <url>java-net:/maven2-repository/trunk/repository/</url>
     </repository>
   </distributionManagement>
 
