@@ -77,6 +77,8 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
@@ -253,6 +255,10 @@ public final class ChannelServiceImpl
 	localPerSessionChannelMap =
 	    new ConcurrentHashMap<BigInteger,
 				  Map<BigInteger, LocalMemberInfo>>();
+
+    /** The map of per-session locks, keyed by session ID. */
+    private final ConcurrentHashMap<BigInteger, Lock> sessionLocks =
+	new ConcurrentHashMap<BigInteger, Lock>();
 
     /** Map of relocation information (new node ID and completion
      * handler) for client sessions relocating from this node, keyed by
@@ -803,7 +809,7 @@ public final class ChannelServiceImpl
 		callFinished();
 	    }
 	}
-
+	
 	/**
 	 * Handles the channel request {@code task} for the specified
 	 * session and timestamp.  <p>
@@ -822,6 +828,9 @@ public final class ChannelServiceImpl
 	private boolean handleChannelRequest(
 	    BigInteger sessionRefId, long timestamp, ChannelRequestTask task)
 	{
+	  try {
+	    lockSession(sessionRefId);
+	    
 	    SessionProtocol protocol =
 		sessionService.getSessionProtocol(sessionRefId);
 	    if (protocol == null) {
@@ -938,6 +947,10 @@ public final class ChannelServiceImpl
 		    return false;
 		}
 	    }
+	    
+	  } finally {
+	      unlockSession(sessionRefId);
+	  }
 	}
     }
 
@@ -1802,6 +1815,7 @@ public final class ChannelServiceImpl
 		    }
 		}
 	    }
+	    sessionLocks.remove(sessionRefId);
 	}
 
 	/**
@@ -1810,8 +1824,20 @@ public final class ChannelServiceImpl
 	public void prepareToRelocate(BigInteger sessionRefId, long newNodeId,
 				      SimpleCompletionHandler handler)
 	{
-	    outgoingSessionRelocationInfo.put(
-		sessionRefId, new RelocationInfo(newNodeId, handler));
+	    /*
+	     * Put session in map of (outgoing) sessions relocating from
+	     * this node, locking the session during the operation to
+	     * prevent any requests from being processed after the session
+	     * is marked for relocation.
+	     */
+	    try {
+		lockSession(sessionRefId);
+		outgoingSessionRelocationInfo.put(
+		    sessionRefId, new RelocationInfo(newNodeId, handler));
+	    } finally {
+		unlockSession(sessionRefId);
+	    }
+	    
 	    Map<BigInteger, LocalMemberInfo> channelMap =
 		localPerSessionChannelMap.get(sessionRefId);		
 	    if (channelMap == null) {
@@ -1915,6 +1941,43 @@ public final class ChannelServiceImpl
      */
     static long getLocalNodeId() {
 	return txnProxy.getService(DataService.class).getLocalNodeId();
+    }
+
+    /**
+     * Obtains the lock associated with the specified {@code sessionRefId}.
+     * If the lock is not currently available, this method waits until the
+     * lock is freed.
+     *
+     * @param	sessionRefId a session ID
+     */
+    private void lockSession(BigInteger sessionRefId) {
+	Lock lock = sessionLocks.get(sessionRefId);
+	if (lock == null) {
+	    Lock newLock = new ReentrantLock();
+	    lock = sessionLocks.putIfAbsent(sessionRefId, newLock);
+	    if (lock == null) {
+		lock = newLock;
+	    }
+	}
+	lock.lock();
+    }
+
+    /**
+     * Frees the lock associated with the specified (@code sessionRefId}.
+     * This method must be invoked to free the lock held by invoking the
+     * {@code lockSession} method.
+     *
+     * @param	sessionRefId a session ID
+     */
+    private void unlockSession(BigInteger sessionRefId) {
+	Lock lock = sessionLocks.get(sessionRefId);
+	if (lock != null) {
+	    lock.unlock();
+	} else {
+	    logger.log(Level.WARNING,
+		       "Atttempt to unlock missing lock for session:{0}",
+		       HexDumper.toHexString(sessionRefId.toByteArray()));
+	}
     }
 
     /**
