@@ -115,7 +115,7 @@ import javax.management.JMException;
  *	<i>Default:</i> {@value #DEFAULT_WRITE_BUFFER_SIZE}
  *
  * <dd style="padding-top: .5em">Specifies the approximate write buffer
- *      capacity *      per channel.<p>
+ *      capacity per channel.<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	{@value #SESSION_RELOCATION_TIMEOUT_PROPERTY}
@@ -1102,7 +1102,7 @@ public final class ChannelServiceImpl
 	     * channel messages.  If the channel is relieable and the
 	     * session's message timestamp for the channel is less than the
 	     * channel's current timestamp, then retrieve missing messages.
-	     * TB: D(performance) Cache saved messages at the local node?
+	     * TBD: (performance) Cache saved messages at the local node?
 	     */
 	  synchronized (channelInfo) {
 	    if (delivery.equals(Delivery.RELIABLE) &&
@@ -1831,9 +1831,9 @@ public final class ChannelServiceImpl
 	{
 	    try {
 		// Put session in the map of (outgoing) sessions relocating
-		// from this node, locking the session during the operation to
-		// prevent any channel requests from being processed after the
-		// session is marked for relocation.
+		// from this node, locking the session during the operation
+		// to prevent any channel requests from being processed
+		// during or after the session is marked for relocation.
 		lockSession(sessionRefId);
 		outgoingSessionRelocationInfo.put(
 		    sessionRefId, new RelocationInfo(newNodeId, handler));

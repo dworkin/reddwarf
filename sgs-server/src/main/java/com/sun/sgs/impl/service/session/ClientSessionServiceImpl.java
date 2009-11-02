@@ -1757,9 +1757,6 @@ public final class ClientSessionServiceImpl
 	    ClientSessionHandler sessionHandler = handlers.get(sessionRefId);
 	    if (sessionHandler != null) {
 		prepareRelocationMap.remove(sessionRefId);
-		// TBD: notify NMS that preparation is complete, or just
-		// wait for it to clean up the info associated with the
-		// identity?
 		logger.log(
 		    Level.FINE, "Disconnecting session:{0} that timed out " +
 		    "relocating from node:{1}", sessionHandler.identity,
