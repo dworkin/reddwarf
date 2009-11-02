@@ -33,7 +33,6 @@
 package com.projectdarkstar.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
-
 import java.io.File;
 
 /**

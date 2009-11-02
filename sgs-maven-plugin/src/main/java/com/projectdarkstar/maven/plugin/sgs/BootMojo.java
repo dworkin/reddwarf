@@ -34,10 +34,9 @@ package com.projectdarkstar.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.codehaus.plexus.util.cli.Commandline;
-import org.codehaus.plexus.util.cli.CommandLineUtils;
 import org.codehaus.plexus.util.cli.CommandLineException;
+import org.codehaus.plexus.util.cli.CommandLineUtils;
 import org.codehaus.plexus.util.cli.StreamConsumer;
-
 import java.io.File;
 
 /**

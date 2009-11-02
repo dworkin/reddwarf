@@ -184,7 +184,7 @@
     <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
 
     <maven.version>2.0.9</maven.version>
-    <maven-common-artifact-filters.version>1.1</maven-common-artifact-filters.version>
+    <maven-common-artifact-filters.version>1.2</maven-common-artifact-filters.version>
     <plexus-utils.version>1.5.6</plexus-utils.version>
     <plexus-archiver.version>1.0-alpha-11</plexus-archiver.version>
 

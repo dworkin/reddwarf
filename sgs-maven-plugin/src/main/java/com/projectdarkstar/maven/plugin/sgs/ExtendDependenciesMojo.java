@@ -32,25 +32,23 @@
 
 package com.projectdarkstar.maven.plugin.sgs;
 
-import com.projectdarkstar.maven.plugin.sgs.util.TransitivityFilter;
-
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.resolver.ArtifactResolver;
-import org.apache.maven.artifact.resolver.ArtifactResolutionException;
-import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
-import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
-import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.metadata.ArtifactMetadataSource;
-import org.apache.maven.shared.artifact.filter.collection.FilterArtifacts;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
+import org.apache.maven.artifact.resolver.ArtifactResolutionException;
+import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
+import org.apache.maven.artifact.resolver.ArtifactResolver;
 import org.apache.maven.shared.artifact.filter.collection.ArtifactIdFilter;
-import org.apache.maven.shared.artifact.filter.collection.ClassifierFilter;
-import org.apache.maven.shared.artifact.filter.collection.TypeFilter;
-import org.apache.maven.shared.artifact.filter.collection.ScopeFilter;
 import org.apache.maven.shared.artifact.filter.collection.ArtifactFilterException;
+import org.apache.maven.shared.artifact.filter.collection.ClassifierFilter;
+import org.apache.maven.shared.artifact.filter.collection.FilterArtifacts;
+import org.apache.maven.shared.artifact.filter.collection.ProjectTransitivityFilter;
+import org.apache.maven.shared.artifact.filter.collection.ScopeFilter;
+import org.apache.maven.shared.artifact.filter.collection.TypeFilter;
 import org.codehaus.plexus.util.StringUtils;
-
 import java.io.File;
 import java.util.Set;
 import java.util.Iterator;
@@ -103,12 +101,15 @@ public class ExtendDependenciesMojo extends AbstractExtendMojo {
     private String[] includeTypes;
 
     /**
-     * A list of scopes to include.  By default, all scopes are included.
+     * A single scope identifier.  Only artifacts from the given scope are
+     * included.  If both the includeScope and the excludeScope configuration
+     * properties are set, the excludeScope property will be ignored.  By
+     * default, only artifacts that satisfy the compile scope are included.
      *
      * @parameter
      * @since 1.0-beta-1
      */
-    private String[] includeScopes;
+    private String includeScope;
 
     /**
      * A list of artifactIds from the project's dependencies to exclude
@@ -137,12 +138,14 @@ public class ExtendDependenciesMojo extends AbstractExtendMojo {
     private String[] excludeTypes;
 
     /**
-     * A list of scopes to exclude.
+     * A single scope identifier.  All artifacts from the given scope are
+     * excluded.  If both the includeScope and the excludeScope configuration
+     * properties are set, the excludeScope property will be ignored.
      *
      * @parameter
      * @since 1.0-beta-1
      */
-    private String[] excludeScopes;
+    private String excludeScope;
 
     /**
      * Exclude transitive dependencies.  Default value is false.
@@ -246,8 +249,8 @@ public class ExtendDependenciesMojo extends AbstractExtendMojo {
 
     private FilterArtifacts buildFilter() {
         //default to using dependencies with scope compile
-        if(includeScopes == null) {
-            includeScopes = new String[]{"compile"};
+        if(includeScope == null && excludeScope == null) {
+            includeScope = "compile";
         }
 
         FilterArtifacts f = new FilterArtifacts();
@@ -257,10 +260,10 @@ public class ExtendDependenciesMojo extends AbstractExtendMojo {
                                          safeJoin(excludeClassifiers, ",")));
         f.addFilter(new TypeFilter(safeJoin(includeTypes, ","),
                                    safeJoin(excludeTypes, ",")));
-        f.addFilter(new ScopeFilter(safeJoin(includeScopes, ","),
-                                    safeJoin(excludeScopes, ",")));
-        f.addFilter(new TransitivityFilter(project.getDependencyArtifacts(),
-                                           excludeTransitive));
+        f.addFilter(new ScopeFilter(includeScope,
+                                    excludeScope));
+        f.addFilter(new ProjectTransitivityFilter(project.getDependencyArtifacts(),
+                                                  excludeTransitive));
 
         return f;
     }

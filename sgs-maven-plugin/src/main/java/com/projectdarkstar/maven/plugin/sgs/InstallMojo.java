@@ -33,18 +33,17 @@
 package com.projectdarkstar.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.artifact.factory.ArtifactFactory;
-import org.apache.maven.artifact.resolver.ArtifactResolver;
-import org.apache.maven.artifact.resolver.ArtifactResolutionException;
-import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
-import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.Artifact;
-import org.codehaus.plexus.archiver.UnArchiver;
+import org.apache.maven.artifact.factory.ArtifactFactory;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
+import org.apache.maven.artifact.resolver.ArtifactResolutionException;
+import org.apache.maven.artifact.resolver.ArtifactResolver;
 import org.codehaus.plexus.archiver.ArchiverException;
+import org.codehaus.plexus.archiver.UnArchiver;
 import org.codehaus.plexus.archiver.manager.ArchiverManager;
 import org.codehaus.plexus.archiver.manager.NoSuchArchiverException;
 import org.codehaus.plexus.util.FileUtils;
-
 import java.util.List;
 import java.io.File;
 import java.io.IOException;

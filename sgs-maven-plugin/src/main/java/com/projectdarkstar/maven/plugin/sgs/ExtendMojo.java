@@ -33,7 +33,6 @@
 package com.projectdarkstar.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
-
 import java.io.File;
 
 /**
@@ -48,6 +47,7 @@ public class ExtendMojo extends AbstractExtendMojo {
      * The extension jar files to deploy into the Project Darkstar server.
      *
      * @parameter
+     * @required
      * @since 1.0-beta-1
      */
     private File[] files;

@@ -34,7 +34,6 @@ package com.projectdarkstar.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.codehaus.plexus.util.FileUtils;
-
 import java.io.File;
 import java.io.IOException;
 
