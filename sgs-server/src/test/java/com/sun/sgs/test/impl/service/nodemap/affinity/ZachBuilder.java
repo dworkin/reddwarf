@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.test.util.DummyIdentity;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import org.junit.Assert;
 
@@ -32,10 +33,8 @@ class ZachBuilder extends AbstractTestGraphBuilder {
     public ZachBuilder() {
         super(createGraph());
     }
-    static private UndirectedSparseGraph<LabelVertex, WeightedEdge>
-                createGraph()
-   {
-        UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+    static private UndirectedGraph<LabelVertex, WeightedEdge> createGraph() {
+        UndirectedGraph<LabelVertex, WeightedEdge> graph =
                 new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
         // Create a graph for the Zachary network:
         // W. W. Zachary, An information flow model for conflict and

@@ -80,7 +80,6 @@ public class GraphListener implements ProfileListener {
      * @param properties application properties
      * @param systemRegistry the registry of available system components
      * @param txnProxy the transaction proxy
-     * @param nms the node mapping service currently being created
      * @param nodeId the local node id
      * 
      * @throws Exception if an error occurs
@@ -88,7 +87,6 @@ public class GraphListener implements ProfileListener {
     public GraphListener(Properties properties,
                          ComponentRegistry systemRegistry,
                          TransactionProxy txnProxy,
-                         NodeMappingService nms,
                          long nodeId)
         throws Exception
     {
@@ -107,6 +105,10 @@ public class GraphListener implements ProfileListener {
         if (builderName != null) {
             builder = createBuilder(Class.forName(builderName),
                                     properties, systemRegistry, txnProxy);
+        // TBD: The following code is commented out while our default is none,
+        // mostly to keep findbugs quiet.  In the future, we expect the
+        // WeightedGraphBuilder to be the default if we're not in single node
+        // mode.
 //        } else if (type != NodeType.singleNode) {
 //            // Default is currently NONE, might become the distributed LPA/
 //            // weighted graph listener in the future.

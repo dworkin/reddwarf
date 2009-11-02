@@ -25,7 +25,8 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.UndirectedGraph;
+import edu.uci.ics.jung.graph.util.Graphs;
 import java.util.HashMap;
 
 /**
@@ -33,13 +34,13 @@ import java.util.HashMap;
  * graph as input and implements {@link AffinityGraphBuilder}.
  */
 public class AbstractTestGraphBuilder implements AffinityGraphBuilder {
-    private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
+    private final UndirectedGraph<LabelVertex, WeightedEdge> graph;
 
     private final HashMap<Identity, LabelVertex> identMap =
                 new HashMap<Identity, LabelVertex>();
 
     public AbstractTestGraphBuilder(
-                    UndirectedSparseGraph<LabelVertex, WeightedEdge> graph)
+            UndirectedGraph<LabelVertex, WeightedEdge> graph)
     {
         this.graph = graph;
         for (LabelVertex v : graph.getVertices()) {
@@ -48,18 +49,13 @@ public class AbstractTestGraphBuilder implements AffinityGraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
-        return graph;
+    public UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
+        return Graphs.unmodifiableUndirectedGraph(graph);
     }
 
     /** {@inheritDoc} */
     public LabelVertex getVertex(Identity id) {
         return identMap.get(id);
-    }
-
-    /** {@inheritDoc} */
-    public Runnable getPruneTask() {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     /** {@inheritDoc} */

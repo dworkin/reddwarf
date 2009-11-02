@@ -48,7 +48,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
@@ -419,7 +418,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         throws IOException
     {
         if (objIds == null) {
-            // This is unexpected;  the other node should have returned
+            // This is unexpected;  the other node should have sent
             // an empty collection.
             logger.log(Level.FINE, "unexpected null objIds");
             return;
@@ -648,8 +647,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             return retMap;
         }
         
-        ConcurrentMap<Object, Map<Identity, Long>> objectMap =
-                builder.getObjectUseMap();
+        Map<Object, Map<Identity, Long>> objectMap = builder.getObjectUseMap();
         assert (objectMap != null);
 
         synchronized (verticesLock) {
@@ -751,8 +749,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     private boolean updateRemoteLabels() {
         // reinitialize the remote label map
         remoteLabelMap.clear();
-        ConcurrentMap<Object, Map<Identity, Long>> objectMap =
-                builder.getObjectUseMap();
+        Map<Object, Map<Identity, Long>> objectMap = builder.getObjectUseMap();
         assert (objectMap != null);
         
         boolean failed = false;

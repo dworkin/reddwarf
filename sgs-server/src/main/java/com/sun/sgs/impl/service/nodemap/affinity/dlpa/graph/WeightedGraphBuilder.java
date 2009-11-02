@@ -25,10 +25,11 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import
+   com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
+import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -39,7 +40,9 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.util.Graphs;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -51,7 +54,6 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
@@ -70,14 +72,9 @@ import javax.management.JMException;
  * been used by which identities.  Edges between identities are weighted, and
  * represent the number of object accesses the two identities have in common.
  */
-public class WeightedGraphBuilder implements DLPAGraphBuilder {
-    /** Our property base name. */
-    private static final String PROP_NAME =
-            "com.sun.sgs.impl.service.nodemap.affinity";
-    /** Our logger. */
-    protected static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PROP_NAME));
-
+public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder 
+        implements DLPAGraphBuilder
+{
     /** Map for tracking object-> map of identity-> number accesses
      * (thus we keep track of the number of accesses each identity has made
      * for an object, to aid maintaining weighted edges)
@@ -86,7 +83,7 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         objectMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
     
     /** Our graph of object accesses. */
-    private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
+    private final UndirectedGraph<LabelVertex, WeightedEdge>
         affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
     /**
@@ -159,13 +156,14 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
             long nodeId = dataService.getLocalNodeId();
             lpa = new LabelPropagation(this, wdog, nodeId, properties);
         } else {
+            // TBD:  should this be a configuration error?
             lpaServer = null;
             lpa = null;
         }
 
-        // TBD:  Register with the caching data store here.
-        // Get the data store from the txnProxy, making sure it's the correct
-        // type.  Register ourselves as a listener for conflict info.
+        // TBD:  Register with the data store here.
+        // Get the data store from the txnProxy and register ourselves as a
+        // listener for conflict info.
 
         // Create our JMX MBean
         stats = new AffinityGraphBuilderStats(col,
@@ -254,13 +252,8 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Runnable getPruneTask() {
-        return pruneTask;
-    }
-
-    /** {@inheritDoc} */
-    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
-        return affinityGraph;
+    public UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
+        return Graphs.unmodifiableUndirectedGraph(affinityGraph);
     }
 
     /** {@inheritDoc} */
@@ -346,7 +339,17 @@ public class WeightedGraphBuilder implements DLPAGraphBuilder {
         }
         return v;
     }
-    
+
+    /**
+     * Get the task which prunes the graph.  This is useful for testing.
+     *
+     * @return the runnable which prunes the graph.
+     * @throws UnsupportedOperationException if this builder does not support
+     *    graph pruning.
+     */
+    public Runnable getPruneTask() {
+        return pruneTask;
+    }
     /**
      * The graph pruner.  It runs periodically, and is the only code
      * that removes edges and vertices from the graph.

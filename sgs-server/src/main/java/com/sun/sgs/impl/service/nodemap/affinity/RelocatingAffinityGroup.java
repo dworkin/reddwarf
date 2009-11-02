@@ -71,6 +71,10 @@ public class RelocatingAffinityGroup implements AffinityGroup {
     private long calcMostUsedNode() {
         Map<Long, Integer> nodeCountMap = new HashMap<Long, Integer>();
         for (Long nodeId : identities.values()) {
+            if (nodeId == -1) {
+                // Node id was unknown, so don't count it
+                continue;
+            }
             Integer count = nodeCountMap.get(nodeId);
             int val = (count == null) ? 0 : count.intValue();
             val++;

@@ -19,13 +19,12 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -99,7 +98,7 @@ public abstract class AbstractLPA {
     /** The graph in which we're finding communities.  This is a live
      * graph for some graph builders;  we have to be able to handle changes.
      */
-    protected volatile UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
+    protected volatile UndirectedGraph<LabelVertex, WeightedEdge> graph;
 
     /** For now, we're only grabbing the vertices of interest at the
      * start of the algorithm.   This could change so we update for each run,
@@ -129,6 +128,9 @@ public abstract class AbstractLPA {
         } else {
             executor = null;
         }
+        logger.log(Level.CONFIG,
+                       "Creating LPA with properties:" +
+                       "\n  " + NUM_THREADS_PROPERTY + "=" + numThreads);
     }
 
     /**
@@ -142,6 +144,8 @@ public abstract class AbstractLPA {
         // Most graph builders return a pointer to the "live" graph,
         // but the BipartiteGraphBuilder constructs the graph on the fly
         // with each call.   As a result, graph cannot simply be a final field.
+        // Additionally, getAffinityGraph should only be called ONCE per
+        // alogorithm run, or we'll lose the labels when the graph is rebuilt.
         graph = builder.getAffinityGraph();
         assert (graph != null);
 
@@ -285,7 +289,7 @@ public abstract class AbstractLPA {
      * @param vertices the vertices that we gather groups from
      * @param reinitialize if {@code true}, reinitialize the labels
      * @param gen the generation number
-     * @return the affinity groups
+     * @return the affinity groups, which may be empty if no groups are found
      */
     protected static Set<AffinityGroup> gatherGroups(
             List<LabelVertex> vertices, boolean reinitialize, long gen)

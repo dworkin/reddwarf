@@ -22,8 +22,12 @@ package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import
+   com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import
+   com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
@@ -31,7 +35,6 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
@@ -45,7 +48,7 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
-import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -53,7 +56,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
@@ -69,18 +71,12 @@ import javax.management.JMException;
  * related data structures.  It has no dependencies on new multi-node parts
  * of the system.
  */
-public class DistGraphBuilderServerImpl 
+public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
     implements DistGraphBuilderServer, AffinityGraphBuilder, AffinityGroupFinder
 {
-    /** Our property base name. */
-    private static final String PROP_NAME =
-            "com.sun.sgs.impl.service.nodemap.affinity";
     /** The property name for the server port. */
     public static final String SERVER_PORT_PROPERTY =
-            PROP_NAME + ".server.port";
-    /** Our logger. */
-    protected static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PROP_NAME));
+            PROP_BASE + ".server.port";
 
     /** The default value of the server port. */
     public static final int DEFAULT_SERVER_PORT = 44537;
@@ -149,8 +145,8 @@ public class DistGraphBuilderServerImpl
         int periodCount = wrappedProps.getIntProperty(
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
                 1, Integer.MAX_VALUE);
-        long snapshot =
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        long snapshot = 
+                wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         builderStats = new AffinityGraphBuilderStats(col,
                                                      builder.getAffinityGraph(),
                                                      periodCount, snapshot);
@@ -203,7 +199,7 @@ public class DistGraphBuilderServerImpl
     }
 
     /** {@inheritDoc} */
-    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
+    public UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         return builder.getAffinityGraph();
     }
 
@@ -212,7 +208,13 @@ public class DistGraphBuilderServerImpl
         return builder.getVertex(id);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Get the task which prunes the graph.  This is useful for testing.
+     *
+     * @return the runnable which prunes the graph.
+     * @throws UnsupportedOperationException if this builder does not support
+     *    graph pruning.
+     */
     public Runnable getPruneTask() {
         return builder.getPruneTask();
     }
@@ -229,7 +231,9 @@ public class DistGraphBuilderServerImpl
      * this would be some work, it might be worthwhile to implement if we
      * find this LPA implementation is useful in deployed systems.
      */
-    public Set<AffinityGroup> findAffinityGroups() {
+    public Set<AffinityGroup> findAffinityGroups() 
+            throws AffinityGroupFinderFailedException
+    {
         long gen = generation.incrementAndGet();
         Set<AffinityGroup> groups = lpa.findAffinityGroups();
         // Need to translate each group into a relocating affinity group
@@ -253,7 +257,9 @@ public class DistGraphBuilderServerImpl
             }
             retVal.add(new RelocatingAffinityGroup(ag.getId(), idMap, gen));
         }
-
+        if (retVal.isEmpty()) {
+            throw new AffinityGroupFinderFailedException("no groups found");
+        }
         return retVal;
     }
 

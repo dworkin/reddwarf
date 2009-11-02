@@ -23,6 +23,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import
+   com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
@@ -161,7 +163,9 @@ public class SingleLabelPropagation extends AbstractLPA
      *
      * @return the affinity groups
      */
-    public Set<AffinityGroup> findAffinityGroups() {
+    public Set<AffinityGroup> findAffinityGroups() 
+            throws AffinityGroupFinderFailedException
+    {
         long startTime = System.currentTimeMillis();
         stats.runsCountInc();
         long gen = generation.incrementAndGet();
@@ -282,6 +286,10 @@ public class SingleLabelPropagation extends AbstractLPA
                 }
             }
             logger.log(Level.FINE, sb.toString());
+        }
+        if (groups.isEmpty()) {
+            stats.failedCountInc();
+            throw new AffinityGroupFinderFailedException("no groups found");
         }
         return groups;
     }

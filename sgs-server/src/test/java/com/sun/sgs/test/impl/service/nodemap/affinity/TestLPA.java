@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
@@ -37,6 +38,7 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -67,24 +69,8 @@ import static org.junit.Assert.fail;
  */
 @RunWith(FilteredNameRunner.class)
 public class TestLPA {
-    /** The default initial unique port for this test suite. */
-    private final static int DEFAULT_PORT = 20000;
-
-    /** The property that can be used to select an initial port. */
-    private final static String PORT_PROPERTY = "test.sgs.port";
-
     /** Max number of times we'll call Thread.sleep in a loop. */
     private final static int MAX_SLEEP_COUNT = 50;
-
-    /** The next unique port to use for this test suite. */
-    private final static AtomicInteger nextUniquePort;
-
-    static {
-        Integer systemPort = Integer.getInteger(PORT_PROPERTY);
-        int port = systemPort == null ? DEFAULT_PORT
-                                      : systemPort.intValue();
-        nextUniquePort = new AtomicInteger(port);
-    }
 
     private TestLPAServer server;
     private SgsTestNode serverNode;
@@ -257,10 +243,10 @@ public class TestLPA {
         assertTrue(groups.size() != 0);
     }
 
-    @Test
+    @Test(expected = AffinityGroupFinderFailedException.class)
     public void testLPAAlgorithmNoClient() throws Exception {
         Set<AffinityGroup> groups = server.findAffinityGroups();
-        assertEquals(0, groups.size());
+        // We expect no groups to be found an the exception thrown
     }
 
     // Need to rework this test - we now log the error, should shut down
@@ -935,10 +921,10 @@ public class TestLPA {
     }
 
     //
-    private UndirectedSparseGraph<LabelVertex, WeightedEdge>
+    private UndirectedGraph<LabelVertex, WeightedEdge>
             CreatePartialToyBuilderGraph(long node)
     {
-        UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+        UndirectedGraph<LabelVertex, WeightedEdge> graph =
                 new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
         if (node == PartialToyBuilder.NODE1) {

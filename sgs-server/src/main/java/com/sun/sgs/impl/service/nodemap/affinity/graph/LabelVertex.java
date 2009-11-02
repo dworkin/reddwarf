@@ -28,7 +28,7 @@ import com.sun.sgs.auth.Identity;
  * the same label are in the same cluster.
  * <p>
  * We are using the identity's hash code for the label for faster
- * comparisions.  This has some risk of us clustering identities
+ * comparisons.  This has some risk of us clustering identities
  * that actually are not related, because hash codes are not guaranteed
  * to be unique.
  */
@@ -41,7 +41,7 @@ public final class LabelVertex {
     private volatile int hashCode = 0;
 
     /**
-     * Constructs a new vertex repesenting the given {@code id} and
+     * Constructs a new vertex representing the given {@code id} and
      * initializes the label information to the hashcode of the {@code id}.
      * @param id the identity this vertex represents
      */

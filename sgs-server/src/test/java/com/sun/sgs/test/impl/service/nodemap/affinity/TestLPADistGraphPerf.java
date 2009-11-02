@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
@@ -43,7 +44,7 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.IntegrationTest;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
-import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -129,7 +130,7 @@ public class TestLPADistGraphPerf {
         this.numThreads = numThreads;
     }
 
-    @Test
+    @Test(expected = AffinityGroupFinderFailedException.class)
     public void warmupZach() throws Exception {
         for (int i = 0; i < WARMUP_RUNS; i++) {
             GraphListener serverListener = (GraphListener)
@@ -138,6 +139,8 @@ public class TestLPADistGraphPerf {
                 serverListener.getGraphBuilder().
                     getAffinityGroupFinder().findAffinityGroups();
         }
+
+        // There's no graph, so we expect an exception to be thrown
     }
 
     @Test
@@ -373,7 +376,7 @@ public class TestLPADistGraphPerf {
             detail.addAccess(new String("o39"));
             builder3.updateGraph(idents[33], detail);
 
-            UndirectedSparseGraph<LabelVertex, WeightedEdge> graphModel =
+            UndirectedGraph<LabelVertex, WeightedEdge> graphModel =
                     new ZachBuilder().getAffinityGraph();
             System.out.println("MODEL GRAPH IS " + graphModel);
             GraphListener serverListener = (GraphListener)
@@ -386,7 +389,7 @@ public class TestLPADistGraphPerf {
             // We can find it if we look for the group finder.
             AffinityGraphBuilder serverBuilder =
                     (AffinityGraphBuilder) builder.getAffinityGroupFinder();
-            UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+            UndirectedGraph<LabelVertex, WeightedEdge> graph =
                     serverBuilder.getAffinityGraph();
             System.out.println("GRAPH IS " + graph);
             Assert.assertEquals(34, graph.getVertexCount());

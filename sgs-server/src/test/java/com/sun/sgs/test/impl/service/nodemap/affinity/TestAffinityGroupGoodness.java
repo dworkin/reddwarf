@@ -27,6 +27,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.tools.test.FilteredNameRunner;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Collection;
 import java.util.HashSet;
@@ -239,10 +240,9 @@ public class TestAffinityGroupGoodness {
         public TestToyBuilder() {
             super(createGraph());
         }
-        static private UndirectedSparseGraph<LabelVertex, WeightedEdge>
-                createGraph()
+        static private UndirectedGraph<LabelVertex, WeightedEdge> createGraph()
         {
-            UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+            UndirectedGraph<LabelVertex, WeightedEdge> graph =
                     new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
             LabelVertex[] nodes = new LabelVertex[6];
@@ -274,10 +274,9 @@ public class TestAffinityGroupGoodness {
         public TestToyWeightBuilder() {
             super(createGraph());
         }
-        static private UndirectedSparseGraph<LabelVertex, WeightedEdge>
-                createGraph()
+        static private UndirectedGraph<LabelVertex, WeightedEdge> createGraph()
         {
-            UndirectedSparseGraph<LabelVertex, WeightedEdge> graph =
+            UndirectedGraph<LabelVertex, WeightedEdge> graph =
                     new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
             LabelVertex[] nodes = new LabelVertex[6];

@@ -22,11 +22,12 @@ package com.sun.sgs.impl.service.nodemap.affinity.single;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import
+   com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
+import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -34,7 +35,9 @@ import com.sun.sgs.management.AffinityGraphBuilderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.TransactionProxy;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.util.Graphs;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -46,31 +49,25 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
  * A minimal graph builder for single node testing.  This is mostly a copy
  * of the WeightedGraphBuilder, with the parts about node conflicts deleted.
  */
-public class SingleGraphBuilder implements AffinityGraphBuilder {
-    /** Our property base name. */
-    private static final String PROP_NAME =
-            "com.sun.sgs.impl.service.nodemap.affinity";
-    /** Our logger. */
-    protected static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PROP_NAME));
-
+public class SingleGraphBuilder extends AbstractAffinityGraphBuilder
+        implements AffinityGraphBuilder
+{
     /** Map for tracking object-> map of identity-> number accesses
      * (thus we keep track of the number of accesses each identity has made
      * for an object, to aid maintaining weighted edges).
      */
-    private final ConcurrentMap<Object, Map<Identity, Long>>
-        objectMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
+    private final ConcurrentMap<Object, Map<Identity, Long>> objectMap =
+            new ConcurrentHashMap<Object, Map<Identity, Long>>();
 
     /** Our graph of object accesses. */
-    private final UndirectedSparseGraph<LabelVertex, WeightedEdge>
-        affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
+    private final UndirectedGraph<LabelVertex, WeightedEdge> affinityGraph =
+            new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
     /**
      * A map of identity->graph vertex, allowing fast lookups of particular
@@ -241,14 +238,10 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
 
         stats.processingTimeInc(System.currentTimeMillis() - startTime);
     }
-    /** {@inheritDoc} */
-    public Runnable getPruneTask() {
-        return pruneTask;
-    }
 
     /** {@inheritDoc} */
-    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
-        return affinityGraph;
+    public UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
+        return Graphs.unmodifiableUndirectedGraph(affinityGraph);
     }
 
     /** {@inheritDoc} */
@@ -298,6 +291,17 @@ public class SingleGraphBuilder implements AffinityGraphBuilder {
             identMap.put(id, v);
         }
         return v;
+    }
+
+    /**
+     * Get the task which prunes the graph.  This is useful for testing.
+     *
+     * @return the runnable which prunes the graph.
+     * @throws UnsupportedOperationException if this builder does not support
+     *    graph pruning.
+     */
+    public Runnable getPruneTask() {
+        return pruneTask;
     }
 
     /**

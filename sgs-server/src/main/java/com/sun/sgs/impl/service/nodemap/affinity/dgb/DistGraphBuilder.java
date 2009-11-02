@@ -22,10 +22,11 @@ package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import
+   com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.IoRunnable;
@@ -36,14 +37,13 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Properties;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * The portion of the distributed affinity graph builder which resides on
@@ -52,17 +52,12 @@ import java.util.logging.Logger;
  * <p>
  * If the server cannot be contacted, we report the failure to the watchdog.
  */
-public class DistGraphBuilder implements AffinityGraphBuilder {
-    /** Our property base name. */
-    private static final String PROP_NAME =
-            "com.sun.sgs.impl.service.nodemap.affinity";
+public class DistGraphBuilder extends AbstractAffinityGraphBuilder 
+        implements AffinityGraphBuilder
+{
     /** The property name for the server host. */
     private static final String SERVER_HOST_PROPERTY =
-            PROP_NAME + ".server.host";
-
-    /** Our logger. */
-    protected static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PROP_NAME));
+            PROP_BASE + ".server.host";
 
     /** The default number of IO task retries **/
     private static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
@@ -162,7 +157,7 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
      * {@code UnsupportedOperationException}, because the graph is not
      * held on the local node.
      */
-    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
+    public UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         throw new UnsupportedOperationException(
                 "Cannot obtain the affinity graph from a local node");
     }
@@ -191,11 +186,6 @@ public class DistGraphBuilder implements AffinityGraphBuilder {
     /** {@inheritDoc} */
     public AffinityGroupFinder getAffinityGroupFinder() {
         return serverImpl;
-    }
-
-    /** {@inheritDoc} */
-    public Runnable getPruneTask() {
-        throw new UnsupportedOperationException("pruning not yet implemented");
     }
 
     /**

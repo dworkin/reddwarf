@@ -171,7 +171,11 @@ public class AffinityGroupFinderStats extends StandardMBean
 
     /** {@inheritDoc} */
     public void findAffinityGroups() {
-        finder.findAffinityGroups();
+        try {
+            finder.findAffinityGroups();
+        } catch (AffinityGroupFinderFailedException e) {
+            // do nothing
+        }
     }
 
     // Overrides for StandardMBean information, giving JMX clients

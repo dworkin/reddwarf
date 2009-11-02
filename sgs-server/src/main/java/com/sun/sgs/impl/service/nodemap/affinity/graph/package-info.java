@@ -23,12 +23,12 @@
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex vertices}
  * which represent identities in the system with an attached label, and
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge
- * weighted edges} which represent the count of common object uses between
- * identities.
+ * weighted edges} which represent associations between identities.
  * <p>
  * Each node constructs a 
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener} which
- * consumes task information about which identities are using which objects.
+ * consumes task information about how identities are associated.  One such
+ * association could be identities accessing the same objects.
  * The graph listener creates an
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder}
  * based on the property value {@value

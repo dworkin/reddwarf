@@ -19,27 +19,31 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import java.util.Set;
-
 /**
- *  The affinity group finder finds affinity groups within a
- *  Darkstar cluster.
+ * Thrown if the {@link AffinityGroupFinder} could not find affinity groups.
  */
-public interface AffinityGroupFinder {
-    /**
-     * Finds affinity groups across all nodes in the Darkstar cluster.
-     * If an error is encountered during a run, an empty collection is
-     * returned.  Errors include nodes not responding to server requests.
-     * 
-     * @throws AffinityGroupFinderFailedException if there is an error or
-     *             no groups are found
-     * @return the affinity groups
-     */
-    Set<AffinityGroup> findAffinityGroups()
-            throws AffinityGroupFinderFailedException;
+public class AffinityGroupFinderFailedException extends Exception {
+    /** The version of the serialized form. */
+    private static final long serialVersionUID = 1;
 
     /**
-     * Shuts down the affinity group finder.
+     * Creates an instance of this class with the specified detail
+     * message.
+     *
+     * @param	message the detail message or <code>null</code>
      */
-    void shutdown();
+    public AffinityGroupFinderFailedException(String message) {
+        super(message);
+    }
+
+    /**
+     * Creates an instance of this class with the specified detail
+     * message and cause.
+     *
+     * @param	message the detail message or <code>null</code>
+     * @param	cause the cause or <code>null</code>
+     */
+    public AffinityGroupFinderFailedException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

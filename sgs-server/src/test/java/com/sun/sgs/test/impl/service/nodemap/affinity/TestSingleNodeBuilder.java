@@ -19,7 +19,7 @@
 
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
-import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleGraphBuilder;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -79,7 +79,8 @@ public class TestSingleNodeBuilder extends GraphBuilderTests {
     @Override
     public void testGraphBuilderBadCount() throws Exception {
         props = getProps(serverNode);
-        props.setProperty(DLPAGraphBuilder.PERIOD_COUNT_PROPERTY, "0");
+        props.setProperty(AbstractAffinityGraphBuilder.PERIOD_COUNT_PROPERTY,
+                          "0");
 
         SgsTestNode newNode = null;
         try {

@@ -25,6 +25,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
@@ -81,6 +82,7 @@ public class GraphBuilderTests {
             e.printStackTrace();
         }
     }
+    // The name of our test application
     protected final String appName;
 
     // The listener created for each test
@@ -96,7 +98,7 @@ public class GraphBuilderTests {
     protected int serverPort;
     /**
      * Create this test class.
-     * @param builderName the type of graph builder to use
+     * @param appName the name of our application
      */
     public GraphBuilderTests(String appName) {
         this.appName = appName;
@@ -509,9 +511,12 @@ public class GraphBuilderTests {
     public void testGraphPruner() throws Exception {
         // First period
         testFourReports();
-        builder.getPruneTask().run();
+        Method getPruneTaskMethod =
+                UtilReflection.getMethod(builder.getClass(), "getPruneTask");
+        Runnable pruneTask = (Runnable) getPruneTaskMethod.invoke(builder);
+        pruneTask.run();
         // Second period - nothing added to graph, so expect it to empty out
-        builder.getPruneTask().run();
+        pruneTask.run();
         Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
@@ -521,7 +526,7 @@ public class GraphBuilderTests {
     public void testGraphPrunerCountTwo() throws Exception {
         node.shutdown(false);
         Properties p = new Properties();
-        p.setProperty(AffinityGraphBuilder.PERIOD_COUNT_PROPERTY, "2");
+        p.setProperty(AbstractAffinityGraphBuilder.PERIOD_COUNT_PROPERTY, "2");
         startNewNode(p);
 
         LabelVertex vertA = new LabelVertex(new IdentityImpl("A"));
@@ -532,7 +537,10 @@ public class GraphBuilderTests {
         // Each update to the graph is followed by a pruning task run,
         // to simulate a pruning time period.
         testFourReports();
-        builder.getPruneTask().run();
+        Method getPruneTaskMethod =
+                UtilReflection.getMethod(builder.getClass(), "getPruneTask");
+        Runnable pruneTask = (Runnable) getPruneTaskMethod.invoke(builder);
+        pruneTask.run();
         // 2nd period
 
         // Graph should still be intact:  not enough periods to clean up yet.
@@ -547,7 +555,7 @@ public class GraphBuilderTests {
         addFourReports();
 
         // 3rd period - no additions
-        builder.getPruneTask().run();
+        pruneTask.run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
         Assert.assertEquals(4, graph.getEdgeCount());
@@ -558,7 +566,7 @@ public class GraphBuilderTests {
         Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
 
         // 4th period - no additions, back to single weights
-        builder.getPruneTask().run();
+        pruneTask.run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
         Assert.assertEquals(4, graph.getEdgeCount());
@@ -568,18 +576,18 @@ public class GraphBuilderTests {
         Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
 
         // 5th period - no additions, back to empty graph
-        builder.getPruneTask().run();
+        pruneTask.run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
 
         testFourReports();
         // 6th period
-        builder.getPruneTask().run();
+        pruneTask.run();
         addFourReports();
 
         // 7th period
-        builder.getPruneTask().run();
+        pruneTask.run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
         Assert.assertEquals(4, graph.getEdgeCount());
@@ -591,7 +599,7 @@ public class GraphBuilderTests {
         addFourReports();
 
         // 8th period - no addition
-        builder.getPruneTask().run();
+        pruneTask.run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
         Assert.assertEquals(4, graph.getEdgeCount());
@@ -601,7 +609,7 @@ public class GraphBuilderTests {
         Assert.assertEquals(2, graph.findEdge(vertC, vertD).getWeight());
 
         // 9th period
-        builder.getPruneTask().run();
+        pruneTask.run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(4, graph.getVertexCount());
         Assert.assertEquals(4, graph.getEdgeCount());
@@ -611,7 +619,7 @@ public class GraphBuilderTests {
         Assert.assertEquals(1, graph.findEdge(vertC, vertD).getWeight());
 
         // 10th period
-        builder.getPruneTask().run();
+        pruneTask.run();
         graph = builder.getAffinityGraph();
         Assert.assertEquals(0, graph.getEdgeCount());
         Assert.assertEquals(0, graph.getVertexCount());
@@ -663,7 +671,7 @@ public class GraphBuilderTests {
     public void testGraphBuilderBadCount() throws Exception {
         Properties p = new Properties();
         props = getProps(serverNode);
-        p.setProperty(AffinityGraphBuilder.PERIOD_COUNT_PROPERTY, "0");
+        p.setProperty(AbstractAffinityGraphBuilder.PERIOD_COUNT_PROPERTY, "0");
 
         try {
             startNewNode(p);

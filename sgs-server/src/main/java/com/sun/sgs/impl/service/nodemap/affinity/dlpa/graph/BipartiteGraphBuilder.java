@@ -25,10 +25,11 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import
+   com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
+import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -39,23 +40,23 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
-import edu.uci.ics.jung.graph.UndirectedSparseMultigraph;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.management.JMException;
 
 /**
@@ -67,14 +68,9 @@ import javax.management.JMException;
  * does not contain parallel edges.
  * 
  */
-public class BipartiteGraphBuilder implements DLPAGraphBuilder {
-    /** Our property base name. */
-    private static final String PROP_NAME =
-            "com.sun.sgs.impl.service.nodemap.affinity";
-    /** Our logger. */
-    protected static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PROP_NAME));
-    
+public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder 
+        implements DLPAGraphBuilder
+{
     /** The graph of object accesses. */
     private final CopyableGraph<Object, WeightedEdge>
         bipartiteGraph = 
@@ -150,12 +146,13 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
             long nodeId = dataService.getLocalNodeId();       
             lpa = new LabelPropagation(this, wdog, nodeId, properties);
         } else {
+            // TBD:  should this be a configuration error?
             lpaServer = null;
             lpa = null;
         }
-        // TBD:  Register with the caching data store here.
-        // Get the data store from the txnProxy, making sure it's the correct
-        // type.  Register ourselves as a listener for conflict info.
+        // TBD:  Register with the data store here.
+        // Get the data store from the txnProxy and register ourselves as a
+        // listener for conflict info.
 
         // Create our JMX MBean
         stats = new AffinityGraphBuilderStats(col,
@@ -209,12 +206,7 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public Runnable getPruneTask() {
-        return pruneTask;
-    }
-
-    /** {@inheritDoc} */
-    public UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
+    public UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
         long startTime = System.currentTimeMillis();
 
         // Copy our input graph
@@ -223,81 +215,80 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
         System.out.println("Time for graph copy is : " +
                 (System.currentTimeMillis() - startTime) + 
                 "msec");
-       
-        // An intermediate graph, used to track which object paths have
-        // been seen.  It contains parallel edges between Identity vertices,
-        // with each edge representing a different object.
-        Graph<Identity, AffinityEdge> affinityGraph = 
-            new UndirectedSparseMultigraph<Identity, AffinityEdge>();
 
-        // vertices in the affinity graph
-        Collection<Identity> vertices = new HashSet<Identity>();
-        
         // Our final, folded graph.  No parallel edges;  they have been
         // collapsed into a single weighted edge.
-        UndirectedSparseGraph<LabelVertex, WeightedEdge> foldedGraph =
+        UndirectedGraph<LabelVertex, WeightedEdge> foldedGraph =
             new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
         // Clear out our identity->vertex map to prepare for new data.
         identMap.clear();
-        
+
+        // Keep the set of object vertices handy.
+        Set<Object> objVerts = new HashSet<Object>();
+
         // Separate out the vertex set for our new folded graph.
         for (Object vert : graphCopy.getVertices()) {
-            // This should work, because the types haven't been erased.
-            // Testing for String or Long would probably be an issue with
-            // the current AccessedObjects, I think -- would need to check
-            // again.
             if (vert instanceof Identity) {
                 Identity ivert = (Identity) vert;
-                vertices.add(ivert);
-                affinityGraph.addVertex(ivert);
                 LabelVertex v = new LabelVertex(ivert);
                 foldedGraph.addVertex(v);
                 identMap.put(ivert, v);
+            } else {
+                objVerts.add(vert);
             }
         }
-        
-        for (Identity v1 : vertices) {
-            for (Object intermediate : graphCopy.getNeighbors(v1)) {
-                for (Object v2 : graphCopy.getNeighbors(intermediate)) {
-                    if (v2.equals(v1)) {
+
+        for (Object objVert : objVerts) {
+            if (!(objVert instanceof Identity)) {
+                List<Object> neighbors =
+                        new ArrayList<Object>(graphCopy.getNeighbors(objVert));
+                int length = neighbors.size();
+                Identity v1 = null;
+                Identity v2 = null;
+                for (int i = 0; i < length - 1; i++) {
+                    Object neighbor = neighbors.get(i);
+                    if (neighbor instanceof Identity) {
+                        v1 = (Identity) neighbor;
+                    } else {
+                        // our graph is messed up
+                        System.out.println("unexpected vertex type " +
+                                           neighbor);
                         continue;
                     }
-                    Identity v2Ident = (Identity) v2;
-                    boolean addEdge = true;
-                    for (AffinityEdge e : 
-                         affinityGraph.findEdgeSet(v1, v2Ident)) 
-                    {
-                        if (e.getId().equals(intermediate)) {
-                            // ignore; we've already processed this path
-                            addEdge = false;
-                            break;
+                    
+                    for (int j = i + 1; j < length; j++) {
+                        neighbor = neighbors.get(j);
+                        if (neighbor instanceof Identity) {
+                            v2 = (Identity) neighbor;
+                        } else {
+                            // our graph is messed up
+                            System.out.println("unexpected vertex type " +
+                                               neighbor);
+                            continue;
+                        }
+
+                        // The weight of the edge representing this use
+                        // is the min of the counts of each identity's use
+                        // of the object
+                        long e1Weight =
+                            graphCopy.findEdge(v1, objVert).getWeight();
+                        long e2Weight =
+                            graphCopy.findEdge(v2, objVert).getWeight();
+                        long minWeight = Math.min(e1Weight, e2Weight);
+
+                        LabelVertex label1 = getVertex(v1);
+                        LabelVertex label2 = getVertex(v2);
+                        WeightedEdge edge =
+                                foldedGraph.findEdge(label1, label2);
+                        if (edge == null) {
+                            foldedGraph.addEdge(new WeightedEdge(minWeight),
+                                                label1, label2);
+                        } else {
+                            edge.addWeight(minWeight);
                         }
                     }
-                    if (addEdge) {                     
-                        long e1Weight = 
-                            graphCopy.findEdge(v1, intermediate).getWeight();
-                        long e2Weight = 
-                            graphCopy.findEdge(intermediate, v2).getWeight();
-                        long minWeight = Math.min(e1Weight, e2Weight);
-                        affinityGraph.addEdge(
-                            new AffinityEdge(intermediate, minWeight), 
-                            v1, v2Ident);
-                    }
                 }
-            } 
-        }
-
-        // Now collapse the parallel edges in the affinity graph
-        for (AffinityEdge e : affinityGraph.getEdges()) {
-            Pair<Identity> endpoints = affinityGraph.getEndpoints(e);
-            LabelVertex v1 = getVertex(endpoints.getFirst());
-            LabelVertex v2 = getVertex(endpoints.getSecond());
-            WeightedEdge edge = foldedGraph.findEdge(v1, v2);
-            if (edge == null) {
-                foldedGraph.addEdge(new WeightedEdge(e.getWeight()), v1, v2);
-            } else {
-                edge.addWeight(e.getWeight());
             }
         }
 
@@ -386,6 +377,17 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
     /** {@inheritDoc} */
     public AffinityGroupFinder getAffinityGroupFinder() {
         return lpaServer;
+    }
+
+    /**
+     * Get the task which prunes the graph.  This is useful for testing.
+     *
+     * @return the runnable which prunes the graph.
+     * @throws UnsupportedOperationException if this builder does not support
+     *    graph pruning.
+     */
+    public Runnable getPruneTask() {
+        return pruneTask;
     }
 
     /**
@@ -562,53 +564,6 @@ public class BipartiteGraphBuilder implements DLPAGraphBuilder {
                         new HashMap<Long, Map<Object, Integer>>();
                 periodConflictQueue.add(currentPeriodConflicts);
             }
-        }
-    }
-
-    /**
-     * Weighted edges in our affinity graph.  Edges are between two vertices,
-     * and contain a weight for the number of times both vertices (identities)
-     * have accessed the object this edge represents.
-     */
-    private static class AffinityEdge extends WeightedEdge {
-        // the object this edge represents
-        private final Object objId;
-
-        /**
-         * Create a new edge with initial weight {@code 1}.
-         *
-         * @param id  the object id of the object this edge represents
-         */
-        AffinityEdge(Object id) {
-            this(id, 1);
-        }
-
-        /**
-         * Create a new edge with the given initial weight.
-         *
-         * @param id  the object id of the object this edge represents
-         * @param value the initial weight value
-         */
-        AffinityEdge(Object id, long value) {
-            super(value);
-            if (id == null) {
-                throw new NullPointerException("id must not be null");
-            }
-            objId = id;
-        }
-
-        /**
-         * Returns the object id of the object this edge represents.
-         *
-         * @return the object id of the object this edge represents
-         */
-        public Object getId() {
-            return objId;
-        }
-
-        /** {@inheritDoc} */
-        public String toString() {
-            return "E:" + objId + ":" + getWeight();
         }
     }
 

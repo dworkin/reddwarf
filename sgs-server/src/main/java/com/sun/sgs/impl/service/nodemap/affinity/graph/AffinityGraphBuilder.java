@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.graph;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 
 /**
  * Graph builder interface.  Graph builder objects take task access information
@@ -42,33 +42,6 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * The graphs contain only application information (no system service
  * information) to limit the size of the graphs.
  * <p>
- * Graph builders support the following properties:
- * <p>
- * <dl style="margin-left: 1em">
- *
- * <dt>	<i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder.snapshot.period
- *	</b></code><br>
- *	<i>Default:</i> {@code 300000} (5 minutes)<br>
- *
- * <dd style="padding-top: .5em">The amount of time, in milliseconds, for
- *      each snapshot of retained data.  Older snapshots are discarded as
- *      time goes on. A longer snapshot period gives us more history, but
- *      also longer compute times to use that history, as more data must
- *      be processed.<p>
- *
- * <dt>	<i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder.snapshot.count
- *	</b></code><br>
- *	<i>Default:</i> {@code 1}
- *
- * <dd style="padding-top: .5em">The number of snapshots to retain.  A
- *       larger value means more history will be retained.  Using a smaller
- *       snapshot period with a larger count means more total history will be
- *       retained, with a smaller amount discarded at the start of each
- *       new snapshot.<p>
- * </dl>
- * <p>
  * Graph builders are typically instantiated by the node {@link GraphListener}.
  * In order to be instantiated by the {@code GraphListener}, they should
  * implement a constructor taking the arguments
@@ -76,22 +49,7 @@ import edu.uci.ics.jung.graph.UndirectedSparseGraph;
  * The transaction proxy can be {@code null} for testing outside of the
  * Darkstar service framework.
  */
-public interface AffinityGraphBuilder {
-    /** The base name for graph builder properties. */
-    String PROP_BASE = "com.sun.sgs.impl.service.nodemap.affinity";
-
-    /** The property controlling time snapshots, in milliseconds. */
-    String PERIOD_PROPERTY = PROP_BASE + ".snapshot.period";
-
-    /** The default time snapshot period. */
-    long DEFAULT_PERIOD = 1000 * 60 * 5;
-
-    /** The property controlling how many past snapshots to retain. */
-    String PERIOD_COUNT_PROPERTY = PROP_BASE + ".snapshot.count";
-
-    /** The default snapshot count. */
-    int DEFAULT_PERIOD_COUNT = 1;
-
+public interface AffinityGraphBuilder { 
     /**
      * Update the graph based on the objects accessed in a task.
      *
@@ -109,13 +67,15 @@ public interface AffinityGraphBuilder {
      * edges representing each object accessed by both identity
      * endpoints. An empty graph will be returned if there is no affinity
      * data collected.
+     * <p>
+     * The returned graph can not be modified.
      *
      * @return the graph of access information
      * @throws UnsupportedOperationException if this builder cannot access
      *      the affinity graph.  Typically, this occurs because the builder
      *      itself is distributed.
      */
-    UndirectedSparseGraph<LabelVertex, WeightedEdge> getAffinityGraph();
+    UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph();
 
     /**
      * Shut down this builder.
@@ -138,13 +98,4 @@ public interface AffinityGraphBuilder {
      * @return the affinity group finder or {@code null}
      */
     AffinityGroupFinder getAffinityGroupFinder();
-
-    /**
-     * Get the task which prunes the graph.  This is useful for testing.
-     *
-     * @return the runnable which prunes the graph.
-     * @throws UnsupportedOperationException if this builder does not support
-     *    graph pruning.
-     */
-    Runnable getPruneTask();
 }

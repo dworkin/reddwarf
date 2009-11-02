@@ -27,7 +27,10 @@ import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
@@ -40,6 +43,7 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.tools.test.IntegrationTest;
 import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
+import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Arrays;
 import java.util.Collection;
@@ -47,9 +51,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
@@ -72,6 +73,8 @@ public class TestLPAPerf {
 
     // Number of threads, set with data below for each run
     private int numThreads;
+    // Builder, used for dist runs
+    private final String builderName;
 
     // server used for single node tests
     private static LabelPropagationServer lpaServer;
@@ -84,22 +87,25 @@ public class TestLPAPerf {
 
     // profile collector
     private static ProfileCollector collector;
-
-    /** The default initial unique port for this test suite. */
-    private final static int DEFAULT_PORT = 20000;
-
-    /** The property that can be used to select an initial port. */
-    private final static String PORT_PROPERTY = "test.sgs.port";
-
     
     @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(new Object[][]
-            {{1}, {2}, {4}, {8}, {16}});
+            {{1, WeightedGraphBuilder.class.getName()},
+             {2, WeightedGraphBuilder.class.getName()},
+             {4, WeightedGraphBuilder.class.getName()},
+             {8, WeightedGraphBuilder.class.getName()},
+             {16, WeightedGraphBuilder.class.getName()},
+             {1, BipartiteGraphBuilder.class.getName()},
+             {2, BipartiteGraphBuilder.class.getName()},
+             {4, BipartiteGraphBuilder.class.getName()},
+             {8, WeightedGraphBuilder.class.getName()},
+             {16, BipartiteGraphBuilder.class.getName()}});
     }
 
-    public TestLPAPerf(int numThreads) {
+    public TestLPAPerf(int numThreads, String builderName) {
         this.numThreads = numThreads;
+        this.builderName = builderName;
     }
 
     @BeforeClass
@@ -230,6 +236,7 @@ public class TestLPAPerf {
                 new LabelPropagationServer(collector, wdog, props);
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
+        props.put(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
 
         LabelPropagation lp1 =
             new LabelPropagation(
@@ -265,7 +272,13 @@ public class TestLPAPerf {
             maxMod = Math.max(maxMod, mod);
             minMod = Math.min(minMod, mod);
         }
-        System.out.printf("DIST (%d runs, %d threads): " +
+        String name;
+        if (WeightedGraphBuilder.class.getName().equals(builderName)) {
+            name = "DIST weighted";
+        } else {
+            name = "DIST bipartite";
+        }
+        System.out.printf(name + " (%d runs, %d threads): " +
                   "avg time : %4.2f ms, " +
                   " time range [%d - %d ms] " +
                   " avg iters : %4.2f, avg modularity: %.4f, " +
@@ -282,11 +295,11 @@ public class TestLPAPerf {
     
     // A Zachary karate club which is distributed over 3 nodes, round-robin.
     private class DistributedZachBuilder implements DLPAGraphBuilder {
-        private final UndirectedSparseGraph<LabelVertex, WeightedEdge> graph;
+        private final UndirectedGraph<LabelVertex, WeightedEdge> graph;
         private final HashMap<Identity, LabelVertex> identMap =
                 new HashMap<Identity, LabelVertex>();
-        private final ConcurrentMap<Long, Map<Object, Long>> conflictMap;
-        private final ConcurrentMap<Object, Map<Identity, Long>> objUseMap;
+        private final Map<Long, Map<Object, Long>> conflictMap;
+        private final Map<Object, Map<Identity, Long>> objUseMap;
 
         static final long NODE1 = 1;
         static final long NODE2 = 2;
@@ -301,8 +314,8 @@ public class TestLPAPerf {
         public DistributedZachBuilder(long node) {
             super();
             graph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
-            objUseMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
-            conflictMap = new ConcurrentHashMap<Long, Map<Object, Long>>();
+            objUseMap = new HashMap<Object, Map<Identity, Long>>();
+            conflictMap = new HashMap<Long, Map<Object, Long>>();
             LabelVertex[] nodes = new LabelVertex[35];
             DummyIdentity[] idents = new DummyIdentity[35];
             int nodeAsInt = (int) node;
@@ -742,7 +755,7 @@ public class TestLPAPerf {
         }
 
         /** {@inheritDoc} */
-        public UndirectedSparseGraph<LabelVertex, WeightedEdge>
+        public UndirectedGraph<LabelVertex, WeightedEdge>
                 getAffinityGraph()
         {
             return graph;
@@ -752,14 +765,9 @@ public class TestLPAPerf {
         public LabelVertex getVertex(Identity id) {
             return identMap.get(id);
         }
-        
-        /** {@inheritDoc} */
-        public Runnable getPruneTask() {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Long, Map<Object, Long>> getConflictMap() {
+        public Map<Long, Map<Object, Long>> getConflictMap() {
             return conflictMap;
         }
 
@@ -769,7 +777,7 @@ public class TestLPAPerf {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap() {
+        public Map<Object, Map<Identity, Long>> getObjectUseMap() {
             return objUseMap;
         }
 

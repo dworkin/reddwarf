@@ -147,12 +147,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
     @Test
     public void testConstructor1() {
         // empty obj use
-        ConcurrentMap<Object, Map<Identity, Long>> objUse =
+        Map<Object, Map<Identity, Long>> objUse =
                 graphBuilder.getObjectUseMap();
         Assert.assertNotNull(objUse);
         Assert.assertEquals(0, objUse.size());
         // empty conflicts
-        ConcurrentMap<Long, Map<Object, Long>> conflicts =
+        Map<Long, Map<Object, Long>> conflicts =
                 graphBuilder.getConflictMap();
         Assert.assertNotNull(conflicts);
         Assert.assertEquals(0, conflicts.size());
@@ -193,7 +193,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Object obj = new String("obj");
         long nodeId = 99L;
         meth.invoke(builder, obj, nodeId, false);
-        ConcurrentMap<Long, Map<Object, Long>> conflictMap =
+        Map<Long, Map<Object, Long>> conflictMap =
                 graphBuilder.getConflictMap();
         Assert.assertEquals(1, conflictMap.size());
         Map<Object, Long> objMap = conflictMap.get(nodeId);
@@ -243,7 +243,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         meth.invoke(builder, obj, badNodeId, false);
         meth.invoke(builder, obj1, badNodeId, false);
         meth.invoke(builder, obj1, badNodeId, true);
-        ConcurrentMap<Long, Map<Object, Long>> conflictMap =
+        Map<Long, Map<Object, Long>> conflictMap =
                 graphBuilder.getConflictMap();
         Assert.assertEquals(2, conflictMap.size());
         Map<Object, Long> objMap = conflictMap.get(nodeId);

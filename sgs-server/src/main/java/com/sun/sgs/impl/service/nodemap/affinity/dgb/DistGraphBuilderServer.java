@@ -34,5 +34,5 @@ public interface DistGraphBuilderServer extends Remote {
      * @param objIds the object IDs of objects accessed by the owner
      * @throws IOException if there is a communication problem
      */
-    void updateGraph(Identity owner, Object[] objIds) throws IOException;;
+    void updateGraph(Identity owner, Object[] objIds) throws IOException;
 }
