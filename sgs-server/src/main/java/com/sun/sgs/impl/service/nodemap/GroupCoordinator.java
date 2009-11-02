@@ -19,16 +19,17 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.NoNodesAvailableException;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.TransactionProxy;
 import java.util.Properties;
 
 /**
- * Thing that manages groups of identities. The class that implements this
+ * Thing that manages sets of identities. The class that implements this
  * interface should be public, not abstract, and should provide a public
- * constructor with {@link Properties}, {@link NodeMappingServerImpl}, and
- * {@link DataService} parameters.
+ * constructor with {@link Properties}, {@link NodeMappingServerImpl},
+ * {@link ComponentRegistry}, and {@link TransactionProxy} parameters.
  */
 public interface GroupCoordinator {
 
@@ -44,7 +45,7 @@ public interface GroupCoordinator {
 
     /**
      * Move one or more identities off of the old node. If the old node is alive
-     * a single group of identities will be selected to move. How the group
+     * a set of identities will be selected to move. How the set
      * is selected is implementation dependent. If the node is not alive,
      * all groups will be moved. Note that is this does not guarantee that all
      * identities will be moved.

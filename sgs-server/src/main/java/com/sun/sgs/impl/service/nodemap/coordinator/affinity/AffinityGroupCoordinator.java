@@ -19,9 +19,11 @@
 
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
-import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
+import com.sun.sgs.impl.service.nodemap.coordinator.affinity.user.UserGroupFinderServerImpl;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.service.NoNodesAvailableException;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
+import com.sun.sgs.impl.service.nodemap.coordinator.simple.SimpleCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -47,7 +49,7 @@ import javax.management.JMException;
  * composed of identities having some affinity with the other members of the
  * group.
  */
-public class AffinityGroupCoordinator implements GroupCoordinator {
+public class AffinityGroupCoordinator extends SimpleCoordinator {
 
     /** Package name for this class. */
     private static final String PKG_NAME =
@@ -56,16 +58,11 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
     private static final String FINDER_CLASS_PROPERTY =
             PKG_NAME + ".finder.class";
 
-    /** The logger for this class. */
-    private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PKG_NAME + ".coordinator"));
-
-    private final NodeMappingServerImpl server;
-    private final GroupFinder finder;
+    private final AffinityGroupFinder finder;
     
     // Map nodeID -> groupSet where groupSet is groupId -> group
-    private final Map<Long, NavigableSet<AffinityGroup>> groups =
-                               new HashMap<Long, NavigableSet<AffinityGroup>>();
+    private final Map<Long, NavigableSet<AffinityGroupImpl>> groups =
+                               new HashMap<Long, NavigableSet<AffinityGroupImpl>>();
 
     /**
      * Construct an affinity group coordinator.
@@ -76,9 +73,13 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
                                     TransactionProxy txnProxy)
         throws Exception
     {
-        logger.log(Level.CONFIG, "Creating AffinityGroupCoordinator");
+        super(properties,
+              server,
+              systemRegistry,
+              txnProxy,
+              new LoggerWrapper(Logger.getLogger(PKG_NAME + ".coordinator")));
 
-        this.server = server;
+        logger.log(Level.CONFIG, "Creating AffinityGroupCoordinator");
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
@@ -87,7 +88,7 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
                                                    systemRegistry, txnProxy);
         } else {
             finder = wrappedProps.getClassInstanceProperty(
-                                FINDER_CLASS_PROPERTY, GroupFinder.class,
+                                FINDER_CLASS_PROPERTY, AffinityGroupFinder.class,
                                 new Class[] { Properties.class,
                                               AffinityGroupCoordinator.class,
                                               ComponentRegistry.class,
@@ -111,18 +112,14 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
 
     @Override
     public void start() {
-        if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "starting coordinator");
-        }
+        super.start();
         finder.start();
     }
 
     @Override
     public void stop() {
-        if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "stopping coordinator");
-        }
         finder.stop();
+        super.stop();
     }
 
     // TODO - do a better job with locking
@@ -134,12 +131,15 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
             throw new NullPointerException("oldNode can not be null");
         }
 
-        NavigableSet<AffinityGroup> groupSet = groups.get(oldNode.getId());
+        NavigableSet<AffinityGroupImpl> groupSet = groups.get(oldNode.getId());
 
-        // No groups on old node, exit
-        if (groupSet == null) return;
+        // No groups on old node, move one
+        if (groupSet == null) {
+            super.offload(oldNode);
+            return;
+        }
 
-        for (AffinityGroup group : groupSet) {
+        for (AffinityGroupImpl group : groupSet) {
 
             long newNodeId = server.chooseNode();
 
@@ -162,6 +162,15 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
     @Override
     public void shutdown() {
         finder.shutdown();
+        super.shutdown();
+    }
+
+
+    public AffinityGroupImpl newInstance(long groupId,
+                                         Map<Identity, Long> identities,
+                                         long generation)
+    {
+        return new AffinityGroupImpl(groupId, identities, generation);
     }
 
     /**
@@ -170,23 +179,24 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
      *
      * TODO - synchronization right? or do it better
      */
-    synchronized void newGroups(Collection<AffinityGroup> newGroups) {
+    synchronized public void newGroups(Collection<AffinityGroup> newGroups) {
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER, "received {0} new groups",newGroups.size());
         }
         groups.clear();
         for (AffinityGroup group : newGroups) {
-            newGroup(group);
+            assert group instanceof AffinityGroupImpl;
+            newGroup((AffinityGroupImpl)group);
         }
     }
 
-    private void newGroup(AffinityGroup group) {
+    private void newGroup(AffinityGroupImpl group) {
 
         // The findTargetNode call may cause client sessions to move
         long targetNodeId = group.findTargetNode(server);
-        NavigableSet<AffinityGroup> groupSet = groups.get(targetNodeId);
+        NavigableSet<AffinityGroupImpl> groupSet = groups.get(targetNodeId);
         if (groupSet == null) {
-            groupSet = new TreeSet<AffinityGroup>();
+            groupSet = new TreeSet<AffinityGroupImpl>();
             groups.put(targetNodeId, groupSet);
         }
         if (logger.isLoggable(Level.FINER)) {
@@ -206,7 +216,7 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
 
         @Override
         public List<GroupInfo> getGroups(long nodeId) {
-            NavigableSet<AffinityGroup> groupSet = groups.get(nodeId);
+            NavigableSet<AffinityGroupImpl> groupSet = groups.get(nodeId);
 
             if (groupSet == null) return null;
 
@@ -214,7 +224,7 @@ public class AffinityGroupCoordinator implements GroupCoordinator {
                                      new ArrayList<GroupInfo>(groupSet.size());
 
             // TODO CME potential here
-            for (AffinityGroup group : groupSet) {
+            for (AffinityGroupImpl group : groupSet) {
                 groupInfoList.add(group.getGroupInfo());
             }
             return groupInfoList;

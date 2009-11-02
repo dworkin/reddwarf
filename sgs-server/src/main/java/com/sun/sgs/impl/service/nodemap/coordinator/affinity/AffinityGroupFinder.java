@@ -19,10 +19,16 @@
 
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.TransactionProxy;
+
 /**
- * Thing that finds groups
+ * Thing that finds groups. The class that implements this
+ * interface should be public, not abstract, and should provide a public
+ * constructor with {@link Properties}, {@link AffinityGroupCoordinator},
+ * {@link ComponentRegistry}, and {@link TransactionProxy} parameters.
  */
-public interface GroupFinder {
+public interface AffinityGroupFinder {
 
     /**
      * Start finding groups.

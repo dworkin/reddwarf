@@ -17,16 +17,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
+package com.sun.sgs.impl.service.nodemap.coordinator.affinity.user;
 
+import com.sun.sgs.auth.Identity;
 import java.io.IOException;
 import java.rmi.Remote;
+import java.util.Map;
 
 /**
- * Remote interface of the user group finder service.
+ *
  */
-public interface UserGroupFinderServer extends Remote {
+public interface UserGroupSource extends Remote {
 
-    void registerUserGroupSource(UserGroupSource source, long nodeId)
-        throws IOException;
+    Map<Identity,Long> getAssociations() throws IOException;
+
+    void start() throws IOException;
+
+    void stop() throws IOException;
 }

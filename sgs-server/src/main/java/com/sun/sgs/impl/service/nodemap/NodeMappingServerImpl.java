@@ -387,7 +387,6 @@ public final class NodeMappingServerImpl
                               ComponentRegistry.class, TransactionProxy.class },
                 properties, this, systemRegistry, txnProxy);
         }
-        groupCoordinator.start();
 
         logger.log(Level.CONFIG, "Group coordinator: {0}",
                    groupCoordinator.getClass().getName());
@@ -417,7 +416,7 @@ public final class NodeMappingServerImpl
     
     /** {@inheritDoc} */
     protected void doReady() {
-        // do nothing
+        groupCoordinator.start();
     }
     
     /** 

@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
+package com.sun.sgs.impl.service.nodemap.coordinator.affinity.user;
 
+import com.sun.sgs.impl.service.nodemap.coordinator.affinity.*;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -42,7 +43,7 @@ import java.util.logging.Logger;
  * Server side implementation of component that finds groups based on hints
  * provided by the application.
  */
-public class UserGroupFinderServerImpl implements GroupFinder,
+public class UserGroupFinderServerImpl implements AffinityGroupFinder,
                                                   UserGroupFinderServer
 {
     /** Package name for this class. */
@@ -83,7 +84,9 @@ public class UserGroupFinderServerImpl implements GroupFinder,
     private final long updatePeriod;
     private RecurringTaskHandle updateTask = null;
 
-    UserGroupFinderServerImpl(Properties properties,
+    private long generation = 0;
+
+    public UserGroupFinderServerImpl(Properties properties,
                               AffinityGroupCoordinator coordinator,
                               ComponentRegistry systemRegistry,
                               TransactionProxy txnProxy)
@@ -138,7 +141,7 @@ public class UserGroupFinderServerImpl implements GroupFinder,
         }
     }
 
-    /* --- Implement GroupFinder -- */
+    /* --- Implement AffinityGroupFinder -- */
 
     @Override
     public synchronized void start() {
@@ -204,9 +207,12 @@ public class UserGroupFinderServerImpl implements GroupFinder,
     // the coordinator.
     private synchronized void updateCoordinator() {
         if (!started()) return;
-        
+
+        generation++;
+
         if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "starting update");
+            logger.log(Level.FINE,
+                       "starting update for generation " + generation);
         }
         
         // Map groupId -> map(Identity -> nodeId)
@@ -233,7 +239,8 @@ public class UserGroupFinderServerImpl implements GroupFinder,
                                 new ArrayList<AffinityGroup>(groups.size());
 
         for (Map.Entry<Long, Map<Identity, Long>> e : groups.entrySet()) {
-            affinityGroups.add(new AffinityGroup(e.getKey(), e.getValue()));
+            affinityGroups.add(coordinator.newInstance(e.getKey(), e.getValue(),
+                                                       generation));
         }
         coordinator.newGroups(affinityGroups);
     }

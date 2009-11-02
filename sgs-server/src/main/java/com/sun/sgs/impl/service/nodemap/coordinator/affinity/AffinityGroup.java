@@ -1,4 +1,5 @@
 /*
+/*
  * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -20,165 +21,35 @@
 package com.sun.sgs.impl.service.nodemap.coordinator.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
-import com.sun.sgs.management.GroupCoordinatorMXBean.GroupInfo;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
- * Affinity group.
+ * An affinity group in the system.  Affinity groups are sets of
+ * identities that have formed a community.
  * <p>
- * This object implements Comparable and when placed in an sorted collection
- * these objects will be sorted based on the number of identities in the group.
+ * Affinity groups have an identifier and a generation number. Affinity groups
+ * with different generation numbers cannot be compared.  In particular, two
+ * groups which have the same affinity group identifier but different
+ * generation numbers cannot be assumed to be related in any way.
  */
-class AffinityGroup implements Comparable {
-
-    private final long agid;
-
-    // Map Identity -> nodeId
-    private final Map<Identity, Long> identities;
-
-    private long targetNodeId = -1;
-
-    AffinityGroup(long agid, Map<Identity, Long> identities) {
-        assert identities.size() > 0;
-        this.agid = agid;
-        this.identities = identities;
-        System.out.println("group: " + agid);
-        for (Map.Entry<Identity, Long> e : identities.entrySet()) {
-            System.out.println("Identity: " + e.getKey().getName() + " on node " + e.getValue());
-        }
-    }
+public interface AffinityGroup {
+    /**
+     * Returns the affinity group identifier.
+     * @return the affinity group identifier
+     */
+    long getId();
 
     /**
-     * Find the node that most identities in this group belong to, and move any
-     * stragglers to that node.
-     *
-     * @param server the node mapping server
-     *
-     * @return the target node
+     * Returns the set of {@code Identities} which are members of this group.
+     * @return the set of {@code Identities} which are members of this group
      */
-    long findTargetNode(NodeMappingServerImpl server) {
-        // Find the node that most identites belong to, and move any
-        // stragglers to that node. TODO - better way to do this???
-
-        int leadingCount = 0;
-
-        // Map nodeId -> count of members on that node
-        Map<Long, Integer> map = new HashMap<Long, Integer>(identities.size());
-
-        for (long nodeId : identities.values()) {
-            Integer count = map.get(nodeId);
-            if (count == null) {
-                count = new Integer(0);
-            } 
-            count++;
-            map.put(nodeId, count);
-
-            if (count > leadingCount) {
-                leadingCount = count;
-                targetNodeId = nodeId;
-            }
-        }
-        System.out.println("group: " + agid + " found target node to be " + targetNodeId +
-                           " with " + leadingCount + " of " + identities.size() + " members");
-        moveStragglers(server);
-        return targetNodeId;
-    }
+    Set<Identity> getIdentities();
 
     /**
-     * Set the target node for this group.
-     *
-     * @param nodeId a node id
-     * @param server the node mapping server
+     * Returns a generation number for this affinity group. Affinity groups
+     * with the same identifier but different generations cannot be compared;
+     * they are independent.
+     * @return the generation number for this affinity group
      */
-    void setTargetNode(long nodeId, NodeMappingServerImpl server) {
-        assert nodeId >= 0;
-        if (nodeId != targetNodeId) {
-            targetNodeId = nodeId;
-            moveStragglers(server);
-        }
-    }
-
-    private void moveStragglers(NodeMappingServerImpl server) {
-        assert targetNodeId >= 0;
-        Set<Identity> stragglers = new HashSet<Identity>();
-        for (Map.Entry<Identity, Long> entry : identities.entrySet()) {
-            if (entry.getValue() != targetNodeId) {
-                stragglers.add(entry.getKey());
-                entry.setValue(targetNodeId);
-            }
-        }
-        System.out.println("group: " + agid + " found " + stragglers.size() + " stragglers");
-        if (!stragglers.isEmpty()) {
-            server.moveIdentities(stragglers, null, targetNodeId);
-        }
-    }
-
-    @Override
-    public int compareTo(Object obj) {
-        if (obj == null) {
-            throw new NullPointerException();
-        }
-        if (this.equals(obj)) return 0;
-
-        // Sorting is based on the number of identities. (size of group)
-        return identities.size() <
-                              ((AffinityGroup)obj).identities.size() ? -1 : 1;
-    }
-
-    @Override
-    public String toString() {
-        return "AffinityGroup: " + agid + " targetNodeId: " + targetNodeId +
-               " #identities: " + identities.size();
-    }
-
-    /**
-     * Get a group info object for this group.
-     *
-     * @return a group info object for this group
-     */
-    GroupInfo getGroupInfo() {
-        return new GroupInfoImpl(agid, targetNodeId, identities.keySet());
-    }
-
-    /**
-     * Wrapper class for group information.
-     */
-    private static class GroupInfoImpl implements GroupInfo {
-
-        private final long groupId;
-        private final long nodeId;
-        private final List<String> idNames;
-
-        GroupInfoImpl(long groupId, long nodeId, Set<Identity> identities) {
-            this.groupId = groupId;
-            this.nodeId = nodeId;
-            this.idNames = new ArrayList<String>(identities.size());
-
-            // TODO - CME potential
-            for (Identity identity : identities) {
-                idNames.add(identity.getName());
-            }
-        }
-
-        @Override
-        public long getGroupId() {
-            return groupId;
-        }
-
-        @Override
-        public long getTargetNodeId() {
-            return nodeId;
-        }
-
-        @Override
-        public List<String> getIdentities() {
-            return idNames;
-        }
-    }
+    long getGeneration();
 }
