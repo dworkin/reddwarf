@@ -106,13 +106,13 @@ import static com.sun.sgs.impl.service.channel.ChannelServiceImpl.
  *
  * </dl> <p>
  */
-abstract class ChannelImpl implements ManagedObject, Serializable {
+class ChannelImpl implements ManagedObject, Serializable {
 
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
     /** The logger for this class. */
-    protected static final LoggerWrapper logger =
+    private static final LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
 
@@ -144,10 +144,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static BindingKeyedMap<ChannelImpl> channelsMap = null;
 
     /** The channel name. */
-    protected final String name;
+    private final String name;
 
     /** The ID from a managed reference to this instance. */
-    protected final BigInteger channelRefId;
+    private final BigInteger channelRefId;
 
     /** The wrapped channel instance. */
     private ManagedReference<ChannelWrapper> wrappedChannelRef;
@@ -156,7 +156,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private final ManagedReference<ChannelListener> listenerRef;
 
     /** The delivery requirement for messages sent on this channel. */
-    protected final Delivery delivery;
+    private final Delivery delivery;
 
     /** The node IDs of ChannelServers that have locally connected
      * members of this channel. */
@@ -208,7 +208,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * @param channelWrapper the previous channel wrapper, or {@code null} if
      *	      the channe is being created for the first time
      */
-    protected ChannelImpl(String name, ChannelListener listener,
+    private ChannelImpl(String name, ChannelListener listener,
 			  Delivery delivery, int writeBufferCapacity,
 			  ChannelWrapper channelWrapper)
     {
@@ -292,6 +292,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	return newInstance(name, listener, delivery, writeBufferCapacity, null);
     }
     
+    /**
+     * Constructs a new {@code Channel} with the given {@code name}, {@code
+     * listener}, {@code delivery} guarantee, write-buffer capacity and
+     * {@code channelWrapper}.  If the {@code channelWrapper} is null,
+     * then this is a newly-created channel.  Otherwise, the channel is
+     * being "recreated" due to a "leaveAll" event.
+     */
     private static Channel newInstance(String name,
 				       ChannelListener listener,
 				       Delivery delivery,
@@ -299,11 +306,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				       ChannelWrapper channelWrapper)
     {
 	ChannelImpl channel =
-	    delivery.equals(Delivery.UNRELIABLE) ?
-	    new UnreliableChannel(name, listener, delivery,
-				  writeBufferCapacity, channelWrapper) :
-	    new OrderedChannel(name, listener, delivery,
-			       writeBufferCapacity, channelWrapper);
+	    new ChannelImpl(name, listener, delivery,
+			    writeBufferCapacity, channelWrapper);
 	return channel.getWrappedChannel();
     }
     
@@ -512,7 +516,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * an optimization, if the local node is the coordinator for this channel
      * and the event queue is empty, then service the event immediately.
      */
-    protected void addEvent(ChannelEvent event) {
+    private void addEvent(ChannelEvent event) {
 
 	EventQueue eventQueue = eventQueueRef.get();
 
@@ -671,7 +675,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		ChannelServiceImpl.getChannelService().
 		    isLocalChannelMember(channelRefId, senderRefId) :
 		true;
-	    handleSendEvent(
+	    addEvent(
 		new SendEvent(senderRefId, msgBytes, eventQueueRef.get(),
 			      isChannelMember));
 
@@ -690,16 +694,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    throw e;
 	}
     }
-
-    /**
-     * Handles a send event containing a message and a sender (which may be
-     * {@code null}.  A subclass should handle the send event according to
-     * the channel's delivery guarantee.
-     *
-     * @param	sendEvent a send event
-     */
-    protected abstract void handleSendEvent(SendEvent sendEvent);
-
+    
     /**
      * If this channel has a null {@code ChannelListener}, forwards the
      * specified {@code message} to the channel by invoking this channel's
@@ -828,7 +823,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * Returns the wrapped channel for this instance.
      */
-    protected ChannelWrapper getWrappedChannel() {
+    private ChannelWrapper getWrappedChannel() {
 	return wrappedChannelRef.get();
     }
 
