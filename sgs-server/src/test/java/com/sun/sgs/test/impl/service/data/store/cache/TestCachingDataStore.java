@@ -35,8 +35,6 @@ import static com.sun.sgs.impl.service.data.store.cache.
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.DEFAULT_SERVER_PORT;
 import static com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStore.EVICTION_RESERVE_SIZE_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_HOST_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_PORT_PROPERTY;
@@ -51,6 +49,7 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.WatchdogService;
@@ -254,25 +253,50 @@ public class TestCachingDataStore extends TestDataStoreImpl {
     private static class DummyWatchdogService implements WatchdogService {
 	DummyWatchdogService() { }
 	/* Service */
+	@Override
 	public String getName() { return "DummyWatchdogService"; }
+	@Override
 	public void ready() { }
+	@Override
 	public void shutdown() { }
 	/* WatchdogService */
+	@Override
+	public Health getLocalNodeHealth() { return null; }
+	@Override
+	public Health getLocalNodeHealthNonTransactional() { return null; }
+	@Override
 	public boolean isLocalNodeAlive() { return true; }
+	@Override
 	public boolean isLocalNodeAliveNonTransactional() { return true; }
+	@Override
 	public Iterator<Node> getNodes() { return null; }
+	@Override
 	public Node getNode(long nodeId) { return null; }
+	@Override
 	public Node getBackup(long nodeId) { return null; }
+	@Override
 	public void addNodeListener(NodeListener listener) { }
+	@Override
 	public void addRecoveryListener(RecoveryListener listener) { }
+	@Override
+	public void reportHealth(long nodeId, Health health, String component)
+	{
+	    if (!health.isAlive()) {
+		reportFailure(nodeId, component);
+	    }
+	}
+	@Override
 	public void reportFailure(long nodeId, String className) {
 	    DataStore s = store;
 	    if (s != null) {
 		s.shutdown();
 	    }
 	}
+	@Override
 	public long currentAppTimeMillis() { return 0; }
+	@Override
 	public long getAppTimeMillis(long systemTimeMillis) { return 0; }
+	@Override
 	public long getSystemTimeMillis(long appTimeMillis) { return 0; }
     }
 }

@@ -1174,7 +1174,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /** {@inheritDoc} */
     @Override
-    public void nodeFailed(Node node) {
+    public void nodeHealthUpdate(Node node) {
 	/*
 	 * Note that we may want to insure that the data store is shutdown for
 	 * a particular node before marking the node as not alive.  That would
@@ -1182,12 +1182,10 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	 * even though the watchdog considers it to have failed.
 	 * -tjb@sun.com (07/27/2009)
 	 */
-	shutdownNode(node.getId());
+	if (!node.isAlive()) {
+	    shutdownNode(node.getId());
+	}
     }
-
-    /** {@inheritDoc} */
-    @Override
-    public void nodeStarted(Node node) { }
 
     /* -- Implement FailureReporter -- */
 
