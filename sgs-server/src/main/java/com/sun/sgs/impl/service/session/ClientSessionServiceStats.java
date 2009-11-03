@@ -35,7 +35,7 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
 
     final ProfileOperation addSessionStatusListenerOp;
     final ProfileOperation getSessionProtocolOp;
-    final ProfileOperation isConnectedOp;
+    final ProfileOperation isRelocatingToLocalNodeOp;
     
     ClientSessionServiceStats(ProfileCollector collector) {
         ProfileConsumer consumer = 
@@ -49,8 +49,8 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
                                      type, level);
         getSessionProtocolOp =
             consumer.createOperation("getSessionProtocol", type, level);
-        isConnectedOp =
-            consumer.createOperation("isConnectedOp", type, level);
+        isRelocatingToLocalNodeOp =
+            consumer.createOperation("isRelocatingToLocalNodeOp", type, level);
     }
 
     /** {@inheritDoc} */
@@ -66,7 +66,8 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
     }
 
     /** {@inheritDoc} */
-    public long getIsConnectedCalls() {
-        return ((AggregateProfileOperation) isConnectedOp).getCount();
+    public long getIsRelocatingToLocalNodeCalls() {
+        return ((AggregateProfileOperation)
+		    isRelocatingToLocalNodeOp).getCount();
     }
 }

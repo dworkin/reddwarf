@@ -565,9 +565,7 @@ public final class ClientSessionServiceImpl
     public void addSessionStatusListener(
         ClientSessionStatusListener listener)
     {
-        if (listener == null) {
-            throw new NullPointerException("null listener");
-        }
+	Objects.checkNull("listener", listener);
 	checkNonTransactionalContext();
         serviceStats.addSessionStatusListenerOp.report();
         sessionStatusListeners.add(listener);
@@ -575,10 +573,9 @@ public final class ClientSessionServiceImpl
     
     /** {@inheritDoc} */
     public SessionProtocol getSessionProtocol(BigInteger sessionRefId) {
-	if (sessionRefId == null) {
-	    throw new NullPointerException("null sessionRefId");
-	}
-	checkNonTransactionalContext();
+	Objects.checkNull("sessionRefId", sessionRefId);
+	// This operation is used within a transaction by ChannelService.
+	//checkNonTransactionalContext();
         serviceStats.getSessionProtocolOp.report();
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	
@@ -586,16 +583,10 @@ public final class ClientSessionServiceImpl
     }
 
     /** {@inheritDoc} */
-    public boolean isConnected(BigInteger sessionRefId) {
-	if (sessionRefId == null) {
-	    throw new NullPointerException("null sessionRefId");
-	}
-        serviceStats.isConnectedOp.report();
-	return handlers.get(sessionRefId) != null;
-    }
-
-    /** {@inheritDoc} */
     public boolean isRelocatingToLocalNode(BigInteger sessionRefId) {
+	Objects.checkNull("sessionRefId", sessionRefId);
+	checkNonTransactionalContext();
+        serviceStats.isRelocatingToLocalNodeOp.report();
 	return incomingSessionRelocationInfo.containsKey(sessionRefId);
     }
 
@@ -729,7 +720,7 @@ public final class ClientSessionServiceImpl
 			    "Disconnecting unprepared session:{0} whose " +
 			    "identity:{1} was remapped from localNodeId:{2} " +
 			    "to node:{3}",
-			    HexDumper.toHexString(sessionRefId.toByteArray()),
+			    HexDumper.toHexString(sessionRefId),
 			    id, localNodeId, newNode.getId());
 		    }
 		    sessionHandler.handleDisconnect(false, false);
@@ -768,7 +759,7 @@ public final class ClientSessionServiceImpl
 			Level.FINE,
 			"Attempt to relocate to node:{0} with " +
 			"invalid relocation key:{1}", localNodeId,
-			HexDumper.toHexString(relocationKey.toByteArray()));
+			HexDumper.toHexString(relocationKey));
 		}
 		(new SetupCompletionFuture(null, completionHandler)).
 		    setException(
@@ -1429,7 +1420,7 @@ public final class ClientSessionServiceImpl
 		    logger.logThrow(
 			Level.WARNING, e, "notifying listener:{0} of " +
 			"disconnected session:{1} throws", statusListener,
-			HexDumper.toHexString(sessionRefId.toByteArray()));
+			HexDumper.toHexString(sessionRefId));
 		}
 	    }
 	}
@@ -1503,9 +1494,7 @@ public final class ClientSessionServiceImpl
      * {@code Identity} as the owner.
      */
     void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
-	if (ownerIdentity == null) {
-	    throw new NullPointerException("Owner identity cannot be null");
-	}
+	Objects.checkNull("ownerIdentity", ownerIdentity);
         transactionScheduler.scheduleTask(task, ownerIdentity);
     }
 
@@ -1522,9 +1511,7 @@ public final class ClientSessionServiceImpl
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	if (ownerIdentity == null) {
-	    throw new NullPointerException("Owner identity cannot be null");
-	}
+	Objects.checkNull("ownerIdentity", ownerIdentity);
 	transactionScheduler.runTask(task, ownerIdentity);
     }
     

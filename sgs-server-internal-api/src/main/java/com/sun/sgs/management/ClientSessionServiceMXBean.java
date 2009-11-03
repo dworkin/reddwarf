@@ -24,6 +24,7 @@
 package com.sun.sgs.management;
 
 import com.sun.sgs.service.ClientSessionService;
+
 /**
  * The management interface for the client session service.
  * <p>
@@ -65,12 +66,12 @@ public interface ClientSessionServiceMXBean {
     long getGetSessionProtocolCalls();
 
     /**
-     * Returns the number of times {@link 
-     * ClientSessionService#isConnected isConnected}
-     * has been called.
+     * Returns the number of times {@link
+     * ClientSessionService#isRelocatingToLocalNode
+     * isRelocatingToLocalNode} has been called.
      * 
-     * @return the number of times {@code isConnected} 
+     * @return the number of times {@code isRelocatingToLocalNode} 
      *         has been called
      */
-    long getIsConnectedCalls();
+    long getIsRelocatingToLocalNodeCalls();
 }

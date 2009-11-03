@@ -65,25 +65,6 @@ public interface ClientSessionService extends Service {
 
     /**
      * Returns {@code true} if the session with the specified {@code
-     * sessionRefId} is connected to the local node, and {@code false}
-     * otherwise.
-     *
-     * <p> The {@code sessionRefId} is the ID obtained by invoking {@link
-     * ManagedReference#getId getId} on a {@link ManagedReference} to the
-     * associated {@code ClientSession}.
-     *
-     * <p>This method may be invoked from a transactional or
-     * non-transactional context.
-     *
-     * @param	sessionRefId a client session ID, as a {@code BigInteger}
-     * @return	{@code true} if the session with the specified {@code
-     *		sessionRefId} is connected to the local node, and {@code
-     *		false} otherwise
-     */
-    boolean isConnected(BigInteger sessionRefId);
-    
-    /**
-     * Returns {@code true} if the session with the specified {@code
      * sessionRefId} is known to be relocating to the local node, and
      * returns {@code false} otherwise.
      *

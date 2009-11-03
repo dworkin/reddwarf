@@ -598,32 +598,7 @@ public abstract class AbstractService implements Service {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
     }
-
-    /**
-     * Returns the caller's stack trace, in the typical format.
-     *
-     * @return	the caller's stack trace, in the typical format
-     */
-    public static String getStackTrace() {
-	Throwable throwable = (new Throwable()).fillInStackTrace();
-	StackTraceElement[] traceElements = throwable.getStackTrace();
-	StringBuffer buf = new StringBuffer(256);
-	for (int i = 1; i < traceElements.length; i++) {
-	    buf.append("\tat " + traceElements[i].toString() + "\n");
-	}
-	return buf.toString();
-    }
-
-    /**
-     * Returns the specified {@code bigInt} as a hex-formatted string.
-     *
-     * @param	bigInt a big integer to format
-     * @return	the specified {@code bigInt} as a hex-formatted string
-     */
-    public static String toHexString(BigInteger bigInt) {
-	return HexDumper.toHexString(bigInt.toByteArray());
-    }
-
+    
     /**
      * An immutable class to hold the current version of the keys
      * and data persisted by a service.
