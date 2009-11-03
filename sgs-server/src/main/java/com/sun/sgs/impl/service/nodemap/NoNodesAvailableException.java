@@ -27,7 +27,7 @@ package com.sun.sgs.impl.service.nodemap;
  * Note that this exception is very specific;  perhaps we'll want a more
  * general exception to be thrown from {@link NodeAssignPolicy#chooseNode}. 
  */
-class NoNodesAvailableException extends Exception {
+public class NoNodesAvailableException extends Exception {
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 

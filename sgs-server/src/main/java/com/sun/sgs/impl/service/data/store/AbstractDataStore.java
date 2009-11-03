@@ -114,7 +114,7 @@ public abstract class AbstractDataStore
 	checkNull("abortLogger", abortLogger);
 	this.txnProxy = txnProxy;
 	this.logger = logger;
-	this.abortLogger = logger;
+	this.abortLogger = abortLogger;
 	String className = getClass().getName();
 	AccessCoordinator accessCoordinator =
 	    systemRegistry.getComponent(AccessCoordinator.class);

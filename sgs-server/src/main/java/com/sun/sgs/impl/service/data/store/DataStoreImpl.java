@@ -736,8 +736,8 @@ public class DataStoreImpl extends AbstractDataStore {
 	super(systemRegistry, txnProxy,
 	      new LoggerWrapper(Logger.getLogger(CLASSNAME)),
 	      new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort")));
-	logger.log(
-	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
+        logger.log(Level.CONFIG, "Creating DataStoreImpl");
+
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	String specifiedDirectory =
 	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
@@ -794,6 +794,11 @@ public class DataStoreImpl extends AbstractDataStore {
 	    removeUnusedAllocationPlaceholders(dbTxn);
 	    done = true;
 	    dbTxn.commit();
+            logger.log(Level.CONFIG,
+                       "Created DataStoreImpl with properties:" +
+                       "\n  " + DIRECTORY_PROPERTY + "=" + specifiedDirectory +
+                       "\n  " + ENVIRONMENT_CLASS_PROPERTY + "=" +
+                       env.getClass().getName());
 	    return;
 	} catch (RuntimeException e) { 
 	    exception = e;

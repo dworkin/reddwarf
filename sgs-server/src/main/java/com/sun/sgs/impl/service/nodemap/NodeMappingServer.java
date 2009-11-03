@@ -42,10 +42,12 @@ interface NodeMappingServer extends Remote {
      *    <b> should this be a set? </b>
      * @param requestingNode the id of the node requesting assignment
      *
+     * @return the ID of the node that the identity was assigned to,
+     *         or -1 if the assignment failed
      * @throws	IOException if a communication problem occurs while
      *          invoking this method
      */
-    void assignNode(Class service, Identity id, long requestingNode) 
+    long assignNode(Class service, Identity id, long requestingNode)
         throws IOException;
     
     /**
@@ -70,9 +72,10 @@ interface NodeMappingServer extends Remote {
     /**
      * Register a {@link NotifyClient} object to be called when changes
      * occur on a particular node.  Only one listener object can be 
-     * registered per {@code nodeId}, and registering a listener a 
-     * {@code nodeId} will clear any previously registered listener for
-     * that {@code nodeId}.
+     * registered per {@code nodeId}, and registering a listener
+     * will clear any previously registered listener for that {@code nodeId}.<p>
+     *
+     * Registration must only be made during service startup.
      *
      * @param client the callback client
      * @param nodeId the node which {@code client} is interested in changes to

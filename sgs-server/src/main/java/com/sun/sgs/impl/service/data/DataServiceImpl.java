@@ -341,12 +341,7 @@ public final class DataServiceImpl implements DataService {
 			   TransactionProxy txnProxy)
 	throws Exception
     {
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG,
-		       "Creating DataServiceImpl properties:{0}, " +
-		       "systemRegistry:{1}, txnProxy:{2}",
-		       properties, systemRegistry, txnProxy);
-	}
+        logger.log(Level.CONFIG, "Creating DataServiceImpl");
 	DataStore storeToShutdown = null;
 	try {
 	    PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -439,6 +434,20 @@ public final class DataServiceImpl implements DataService {
 		    },
 		    txnProxy.getCurrentOwner());
 	    storeToShutdown = null;
+
+            logger.log(Level.CONFIG,
+                       "Created DataServiceImpl with properties:" +
+                       "\n  " + DATA_STORE_CLASS_PROPERTY + "=" +
+                       dataStoreClassName +
+                       "\n  " + DEBUG_CHECK_INTERVAL_PROPERTY + "=" +
+                       debugCheckInterval +
+                       "\n  " + DETECT_MODIFICATIONS_PROPERTY + "=" +
+                       detectModifications +
+                       "\n  " + OPTIMISTIC_WRITE_LOCKS + "=" +
+                       optimisticWriteLocks +
+                       "\n  " + TRACK_STALE_OBJECTS_PROPERTY + "=" +
+                       trackStaleObjects);
+            
 	} catch (RuntimeException e) {
 	    getExceptionLogger(e).logThrow(
 		Level.SEVERE, e, "DataService initialization failed");

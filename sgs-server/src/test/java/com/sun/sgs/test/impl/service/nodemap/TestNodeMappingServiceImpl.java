@@ -22,7 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.LocalNodePolicy;
+import com.sun.sgs.impl.service.nodemap.policy.LocalNodePolicy;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.util.AbstractService.Version;
@@ -31,6 +31,7 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -362,8 +363,12 @@ public class TestNodeMappingServiceImpl {
     public void testAssignNode() throws Exception {   
         // Assign outside a transaction
         final Identity id = new IdentityImpl("first");
-        nodeMappingService.assignNode(NodeMappingService.class, id);
-                
+        long nodeId =
+                nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        if (nodeId < 0) {
+            fail("Unexpected assignNode failure");
+        }
         verifyMapCorrect(id);
 	TestListener l = nodeListenerMap.get(serverNode.getNodeId());
         l.waitForNotification();
@@ -437,87 +442,26 @@ public class TestNodeMappingServiceImpl {
             }, taskOwner);
         }
     }
-    
+
     @Test
-    public void testRoundRobinAutoMove() throws Exception {
-        // Remove what happened at setup().  I know, I know...
-        tearDown();
-	serviceProps = SgsTestNode.getDefaultProperties(
-	    "TestNodeMappingServiceImpl", null, null);
-        
-        final int MOVE_COUNT = 5;
-        // Create a new nodeMappingServer which will move an identity
-        // automatically every so often.  
-        serviceProps.setProperty(
-                "com.sun.sgs.impl.service.nodemap.policy.movecount", 
-                String.valueOf(MOVE_COUNT));
+    public void testAssignNodeNoNodes() throws Exception {
+        WatchdogService watchdogService =
+                    (WatchdogService)serverNode.getWatchdogService();
 
-        setUp(serviceProps);
-        addNodes(null);
+        // By reporting health as YELLOW there should not be any nodes available
+        // for assignment
+        watchdogService.reportHealth(
+                                serverNode.getDataService().getLocalNodeId(),
+                                Health.YELLOW, "A");
 
-        final List<Identity> ids = new ArrayList<Identity>();
-        final List<Node> assignments = new ArrayList<Node>();
-        
-        final WatchdogService watchdog = serverNode.getWatchdogService();
-        // First, Gather up any ids assigned by the other services
-        // The set of nodes the watchdog knows about
-        final Set<Node> nodes = new HashSet<Node>();
-        
-        // Gather up the nodes
-        txnScheduler.runTask(
-            new TestAbstractKernelRunnable() {
-                public void run() throws Exception {
-                    Iterator<Node> iter = watchdog.getNodes();
-                    while (iter.hasNext()) {
-                        nodes.add(iter.next());
-                    }       
+        long nodeId = nodeMappingService.assignNode(NodeMappingService.class,
+                                                    new IdentityImpl("first"));
 
-                }
-        }, taskOwner);
-        
-        // For each node, gather up the identities
-        for (final Node node : nodes) {
-        txnScheduler.runTask(
-            new TestAbstractKernelRunnable() {
-                public void run() throws Exception {
-                    Iterator<Identity> idIter = 
-                        nodeMappingService.getIdentities(node.getId());
-                    while (idIter.hasNext()) {
-                        Identity id = idIter.next();
-                        ids.add(id);
-                        assignments.add(nodeMappingService.getNode(id));
-                    }    
-                }
-            }, taskOwner);
+        if (nodeId >= 0) {
+            fail("Expected assignNode to fail (-1), got: " + nodeId);
         }
-        
-        // Now start adding our identities.  The round robin policy
-        // should cause a random identity to move while we do this.
-        for (int i = 0; i < MOVE_COUNT; i++) {
-            Identity id = new IdentityImpl("identity" + i);
-            ids.add(id);
-            nodeMappingService.assignNode(DataService.class, id);
-            verifyMapCorrect(id);
+    }
 
-            GetNodeTask task = new GetNodeTask(id);
-            txnScheduler.runTask(task, taskOwner);
-            assignments.add(task.getNode());
-        }
-
-        // We expected an automatic move to have occurred.
-        boolean foundDiff = false;
-        final int size = ids.size();
-        for (int i = 0; i < size; i++) {
-            GetNodeTask task = new GetNodeTask(ids.get(i));
-            txnScheduler.runTask(task, taskOwner);
-            Node current = task.getNode();
-            foundDiff = foundDiff || 
-                        (current.getId() != assignments.get(i).getId());
-        }
-
-        assertTrue("expected an id to move", foundDiff);
-     }
-    
     @Test
     public void testLocalNodePolicy() throws Exception {
         // Remove what happened at setup().  I know, I know...
@@ -1253,12 +1197,9 @@ public class TestNodeMappingServiceImpl {
         Object oldServer = swapToEvilServer(nodeMappingService);
         
         Identity id = new IdentityImpl("first");
-        nodeMappingService.assignNode(NodeMappingService.class, id);
-
-        Thread.sleep(100);
+        
         try {
-            assertFalse(serverNode.getWatchdogService().
-                        isLocalNodeAliveNonTransactional());
+            nodeMappingService.assignNode(NodeMappingService.class, id);
         } catch (IllegalStateException e) {
             // All OK, the server is probably shutting down
         }
@@ -1309,12 +1250,9 @@ public class TestNodeMappingServiceImpl {
         nodeMappingService.assignNode(NodeMappingService.class, id);
 
         Object oldServer = swapToEvilServer(nodeMappingService);
-        nodeMappingService.setStatus(NodeMappingService.class, id, false);
         
-        Thread.sleep(100);
         try {
-            assertFalse(serverNode.getWatchdogService().
-                        isLocalNodeAliveNonTransactional());
+            nodeMappingService.setStatus(NodeMappingService.class, id, false);
         } catch (IllegalStateException e) {
             // All OK, the server is probably shutting down
         }
