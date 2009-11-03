@@ -62,4 +62,18 @@ public final class Exceptions {
         return exception;
     }
 
+    /**
+     * Returns the caller's stack trace, in the typical format.
+     *
+     * @return	the caller's stack trace, in the typical format
+     */
+    public static String getStackTrace() {
+	Throwable throwable = (new Throwable()).fillInStackTrace();
+	StackTraceElement[] traceElements = throwable.getStackTrace();
+	StringBuffer buf = new StringBuffer(256);
+	for (int i = 1; i < traceElements.length; i++) {
+	    buf.append("\tat " + traceElements[i].toString() + "\n");
+	}
+	return buf.toString();
+    }
 }
