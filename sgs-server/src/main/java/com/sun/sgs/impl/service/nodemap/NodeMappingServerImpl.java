@@ -1119,6 +1119,9 @@ public final class NodeMappingServerImpl
         
         /** {@inheritDoc} */
         public void nodeHealthUpdate(Node node) {
+            if (shuttingDown()) {
+                return;
+            }
             long nodeId = node.getId();
 
             if (logger.isLoggable(Level.FINE)) {
@@ -1143,6 +1146,10 @@ public final class NodeMappingServerImpl
                     break;
 
                 case RED :
+                    // If we are the node failing (or shutting down) punt
+                    if (nodeId == dataService.getLocalNodeId()) {
+                        return;
+                    }
                     try {
                         // Remove the service node listener for the node
                         // and tell the assign policy, i.e. this will call
@@ -1151,6 +1158,11 @@ public final class NodeMappingServerImpl
                         unregisterNodeListener(nodeId);
                         coordinator.offload(node);
                     } catch (Exception ex) {
+                        // TODO - This logging message causes the unit test
+                        // TestKernelSimpleAppRestart to fail. Either need to
+                        // fix the test, remove this (or change it to FINER or
+                        // somthing), or rework so that a shutdown does not
+                        // cause an offload...
                         logger.logThrow(Level.WARNING, ex,
                                         "Unable to offload failed node: {0}",
                                         node);
