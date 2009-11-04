@@ -181,6 +181,9 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      */
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
+    // TBD:  we need to have a state, and not allow a run when we're shutting
+    //     down, or shutdown while we're running.  Will also need an
+    //     enable/disable.
     /** A lock to ensure we block a run of the algorithm if a current run
      * is still going.  TBD:  what behavior do we want?  Throw an exception?
      * "merge" the two run attempts - e.g. second run just returns the result
@@ -188,7 +191,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      */
     private final Object runningLock = new Object();
     /** True if we're in the midst of an algorithm run. */
-    private boolean running = false;
+    private volatile boolean running = false;
 
     /**  The algorithm run number, used to ensure that LPAClients are reporting
      * results from the expected run.
@@ -376,9 +379,10 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
     /** {@inheritDoc} */
     public void shutdown() {
-        for (LPAClient client : clientProxyMap.values()) {
+        for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
             try {
-                client.shutdown();
+                ce.getValue().shutdown();
+                clientProxyMap.remove(ce.getKey());
             } catch (IOException e) {
                 // It's OK if we cannot reach the client.  The entire system
                 // might be coming down.

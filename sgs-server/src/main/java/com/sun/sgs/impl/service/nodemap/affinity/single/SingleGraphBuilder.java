@@ -61,6 +61,8 @@ public class SingleGraphBuilder extends AbstractAffinityGraphBuilder
     /** Map for tracking object-> map of identity-> number accesses
      * (thus we keep track of the number of accesses each identity has made
      * for an object, to aid maintaining weighted edges).
+     * TBD: consider changing this to another data structure not using
+     * inner maps.
      */
     private final ConcurrentMap<Object, Map<Identity, Long>> objectMap =
             new ConcurrentHashMap<Object, Map<Identity, Long>>();

@@ -101,6 +101,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * The map of conflicts in the system, nodeId->objId, count.
      * Updates are multi-threaded.  This includes both conflicts detected
      * locally, and conflicts that other nodes tell us about.
+     * TBD: consider changing this to another data structure not using
+     * inner maps.
      */
     private final ConcurrentMap<Long, Map<Object, Long>>
         nodeConflictMap = new ConcurrentHashMap<Long, Map<Object, Long>>();
@@ -109,6 +111,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * This sums all uses of that identity on other nodes. The count takes
      * weights for object uses into account.
      * Updates are currently single threaded, node by node.
+     * TBD: consider changing this to another data structure not using
+     * inner maps.
      */
     private final ConcurrentMap<Identity, Map<Integer, Long>>
         remoteLabelMap =
@@ -420,6 +424,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         if (objIds == null) {
             // This is unexpected;  the other node should have sent
             // an empty collection.
+            // TBD:  should fail - could return a boolean indicating failure,
+            // or should fail locally?
             logger.log(Level.FINE, "unexpected null objIds");
             return;
         }
@@ -643,6 +649,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         if (objIds == null) {
             // This is unexpected;  the other node should have passed in an
             // empty collection
+            // TBD:  should fail - could return a boolean indicating failure,
+            // or should fail locally?
             logger.log(Level.FINE, "unexpected null objIds");
             return retMap;
         }
@@ -942,24 +950,18 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
 
     // For testing
     /**
-     * Returns a copy of the node conflict map.
-     * @return a copy of the node conflict map.
+     * Returns the node conflict map.
+     * @return the node conflict map.
      */
-    public ConcurrentMap<Long, Map<Object, Long>>
-            getNodeConflictMap()
-    {
-        ConcurrentMap<Long, Map<Object, Long>> copy =
-            new ConcurrentHashMap<Long, Map<Object, Long>>(nodeConflictMap);
-        return copy;
+    public ConcurrentMap<Long, Map<Object, Long>> getNodeConflictMap() {
+        return nodeConflictMap;
     }
 
     /**
-     * Returns a copy of the remote label map.
-     * @return a copy of the remote label map
+     * Returns the remote label map.
+     * @return the remote label map
      */
     public ConcurrentMap<Identity, Map<Integer, Long>> getRemoteLabelMap() {
-        ConcurrentMap<Identity, Map<Integer, Long>> copy =
-            new ConcurrentHashMap<Identity, Map<Integer, Long>>(remoteLabelMap);
-        return copy;
+        return remoteLabelMap;
     }
 }

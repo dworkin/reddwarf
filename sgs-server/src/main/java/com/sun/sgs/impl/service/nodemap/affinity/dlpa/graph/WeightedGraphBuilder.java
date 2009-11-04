@@ -100,6 +100,8 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
      * node for it, we are told of the eviction.
      * Map of nodes to objects that were evicted to go to that node, with a
      * count.
+     * TBD: consider changing this to another data structure not using
+     * inner maps.
      */
     private final ConcurrentMap<Long, Map<Object, Long>> conflictMap =
         new ConcurrentHashMap<Long, Map<Object, Long>>();

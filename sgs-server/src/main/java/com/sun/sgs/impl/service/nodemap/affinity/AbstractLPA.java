@@ -87,6 +87,7 @@ public abstract class AbstractLPA {
     protected final Random ran = new Random();
 
     /** Our executor, for running tasks in parallel. */
+    // TBD:  use taskScheduler?
     protected final ExecutorService executor;
 
     /** The number of threads this algorithm should use. */

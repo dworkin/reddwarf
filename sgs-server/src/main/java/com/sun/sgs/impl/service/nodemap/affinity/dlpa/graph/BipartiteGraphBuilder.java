@@ -170,8 +170,7 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
     }
     
     /** {@inheritDoc} */
-    public synchronized void updateGraph(Identity owner, 
-                                         AccessedObjectsDetail detail)
+    public void updateGraph(Identity owner, AccessedObjectsDetail detail)
     {
         long startTime = System.currentTimeMillis();
         stats.updateCountInc();

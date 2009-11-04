@@ -84,7 +84,7 @@ public class RelocatingAffinityGroup implements AffinityGroup {
         int highestCount = -1;
         for (Entry<Long, Integer> entry : nodeCountMap.entrySet()) {
             int count = entry.getValue();
-            if (highestCount > count) {
+            if (highestCount < count) {
                 highestCount = count;
                 retNode = entry.getKey();
             }         
