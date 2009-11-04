@@ -342,7 +342,7 @@ public class TestNodeMappingServiceImpl {
             assertTrue(listener.isClear());
 
             nodemap.ready();
-            // Listener should be notified.
+            // Listener should be notified
             listener.waitForNotification();
             
             // no old node
@@ -870,11 +870,22 @@ public class TestNodeMappingServiceImpl {
         }
         // ... and invoke the method
         moveMethod.invoke(server, id, null, firstNode, firstNodeId);
-        
-        txnScheduler.runTask(task, taskOwner);
-        Node secondNode = task.getNode();
+
+	long secondNodeId;
+	Node secondNode;
+	long stop = System.currentTimeMillis() + 1000;
+	
+	do {
+	    // Keep getting identity's node assignment until it changes...
+	    txnScheduler.runTask(task, taskOwner);
+	    secondNode = task.getNode();
+	    secondNodeId = secondNode.getId();
+	    
+	} while (secondNodeId == firstNodeId &&
+		 System.currentTimeMillis() < stop);
+	
         TestListener secondNodeListener = 
-                nodeListenerMap.get(secondNode.getId());
+	    nodeListenerMap.get(secondNodeId);
 
 	firstNodeListener.waitForNotification();
 	secondNodeListener.waitForNotification();
@@ -1302,10 +1313,10 @@ public class TestNodeMappingServiceImpl {
      */
     private class GetNodeTask extends TestAbstractKernelRunnable {
         /** The identity */
-        private Identity id;
+        private final Identity id;
         /** The node the identity is assigned to */
-        private Node node;
-        private long nodeId;
+        private volatile Node node;
+        private volatile long nodeId;
         GetNodeTask(Identity id) {
             this.id = id;
         }
@@ -1327,6 +1338,7 @@ public class TestNodeMappingServiceImpl {
         // A notificationLock to let us know when the listener has been called.
         private final Object notificationLock = new Object();
         private boolean notified;
+
         public void mappingAdded(Identity identity, Node node) {
             addedIds.add(identity);
             addedNodes.add(node);
@@ -1366,6 +1378,7 @@ public class TestNodeMappingServiceImpl {
                 {
                     notificationLock.wait(100);
                 }
+		assertTrue(notified);
             }
         }
         public void waitForNotification() throws InterruptedException {
@@ -1386,7 +1399,7 @@ public class TestNodeMappingServiceImpl {
         }
     }
 
-        /* Check that the listener was notified of id moving from this node,
+    /* Check that the listener was notified of id moving from this node,
      * to node "to".
      */
     private void checkIdRemoved(TestListener listener, Identity id, Node to) {
