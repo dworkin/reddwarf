@@ -28,7 +28,7 @@ import java.io.Serializable;
  * id->node mapping.  This class is immutable.
  *
  */
-class IdentityMO implements ManagedObject, Serializable {
+public class IdentityMO implements ManagedObject, Serializable {
     /** Serialization version. */
     private static final long serialVersionUID = 1L;
     
@@ -55,7 +55,7 @@ class IdentityMO implements ManagedObject, Serializable {
      * Returns the identity.
      * @return the identity
      */
-    Identity getIdentity() {
+    public Identity getIdentity() {
         return id;
     }
     

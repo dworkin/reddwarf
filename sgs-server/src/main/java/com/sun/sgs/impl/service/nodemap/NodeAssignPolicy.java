@@ -37,7 +37,7 @@ public interface NodeAssignPolicy {
      *  An id representing the server node.
      */
     long SERVER_NODE = -1L;
-   
+ 
     /**
      * Choose a node to assign an identity, or set of identities to.
      *
@@ -77,7 +77,25 @@ public interface NodeAssignPolicy {
      * @param nodeId  the node ID
      */
     void nodeUnavailable(long nodeId);
-    
+
+    /**
+     * Returns {@code true} of the specified node is available for assignment.
+     *
+     * @param nodeId a node ID
+     *
+     * @return {@code true} of the specified node is available for assignment,
+     *         otherwise {@code false}
+     */
+    boolean isNodeAvailable(long nodeId);
+
+    /**
+     * Indicates whether any nodes are available for assignment.
+     *
+     * @return {@code true} if a node is available for assignment, otherwise
+     *         {@code false}
+     */
+    boolean nodesAvailable();
+
     /**
      * Reset the policy, informing it that no nodes are available.
      */

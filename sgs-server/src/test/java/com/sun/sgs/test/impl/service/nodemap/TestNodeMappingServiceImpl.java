@@ -87,7 +87,7 @@ public class TestNodeMappingServiceImpl {
             Class nmsImpl = NodeMappingServiceImpl.class;
             moveMethod = UtilReflection.getMethod(NodeMappingServerImpl.class,
                     "mapToNewNode", Identity.class, String.class,
-                     Node.class, long.class);
+                     Node.class, long.class, long.class);
             assertValidMethod = 
                 UtilReflection.getMethod(nmsImpl,
                                          "assertValid", Identity.class);
@@ -869,7 +869,7 @@ public class TestNodeMappingServiceImpl {
             lis.clear();
         }
         // ... and invoke the method
-        moveMethod.invoke(server, id, null, firstNode, firstNodeId);
+        moveMethod.invoke(server, id, null, firstNode, -1, firstNodeId);
         
         txnScheduler.runTask(task, taskOwner);
         Node secondNode = task.getNode();
@@ -922,7 +922,7 @@ public class TestNodeMappingServiceImpl {
             lis.clear();
         }
         // ... and invoke the method
-        moveMethod.invoke(server, id, null, firstNode, firstNodeId);
+        moveMethod.invoke(server, id, null, firstNode, -1, firstNodeId);
 
         // Give the id relocation listener a chance to finish, and the
         // actual node assignment to complete.
@@ -984,7 +984,7 @@ public class TestNodeMappingServiceImpl {
         // ... and invoke the method
         Long newNode =
             (Long) moveMethod.invoke(server, id, null, 
-                                     task.getNode(), firstNodeId);
+                                     task.getNode(), -1, firstNodeId);
 
         // Give the id relocation listener a chance to finish.
         idListener.waitForNotification();
@@ -1065,10 +1065,10 @@ public class TestNodeMappingServiceImpl {
         // ... and invoke the method twice
         Long newNode =
             (Long) moveMethod.invoke(server, id, null,
-                                     task.getNode(), firstNodeId);
+                                     task.getNode(), -1, firstNodeId);
         Long secondTryNode =
             (Long) moveMethod.invoke(server, id, null,
-                                     task.getNode(), newNode);
+                                     task.getNode(), -1, newNode);
 
         assertEquals(newNode, secondTryNode);
 
@@ -1151,7 +1151,7 @@ public class TestNodeMappingServiceImpl {
             lis.clear();
         }
         // ... and invoke the method
-        moveMethod.invoke(server, id, null, firstNode, firstNodeId);
+        moveMethod.invoke(server, id, null, firstNode, -1, firstNodeId);
 
         // Ensure that the idListener has been notified.
         idListener.waitForNotification();
@@ -1172,7 +1172,7 @@ public class TestNodeMappingServiceImpl {
         }
         Long secondTryNode =
             (Long) moveMethod.invoke(server, id, null,
-                                     firstNode, firstNodeId);
+                                     firstNode, -1, firstNodeId);
 
         // Give the id relocation listener a chance to finish.
         idListener.waitForNotification();

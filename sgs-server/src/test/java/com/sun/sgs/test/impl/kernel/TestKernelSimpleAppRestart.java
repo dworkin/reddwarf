@@ -48,6 +48,7 @@ public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
 		}
 	    }
 	    void handleError(String line) {
+                System.out.println("line is: " + line);
 		failed(
 		    new RuntimeException(
 			"Unexpected error input: " + line));
