@@ -382,13 +382,20 @@ public abstract class AbstractDummyClient extends Assert {
     }
 
     /**
-     * Sends a SESSION_MESSAGE with the specified content.
+     * Sends a SESSION_MESSAGE to the server with the specified content.
+     * If {@code checkSuspend} is {@code true}, then, if the subclass
+     * supports suspending messages, it should check to see if messages are
+     * suspended before forwarding the message to the server.  The method
+     * default implementation of {@link #sendRaw} will check if messages
+     * are suspended. 
      */
     public abstract void sendMessage(byte[] message, boolean checkSuspend);
 
     /**
      * Writes the specified {@code bytes} directly to the underlying
-     * connection.
+     * connection.  If {@code checkSuspended} is {@code true}, and messages
+     * sending is currently suspended, then throw an {@code
+     * IllegalStateException}. 
      */
     protected void sendRaw(byte[] bytes, boolean checkSuspended) {
 	synchronized (lock) {
@@ -498,13 +505,30 @@ public abstract class AbstractDummyClient extends Assert {
 	}
     }
 
+    /**
+     * Sets a flag that indicates this client should wait for a
+     * SUSPEND_MESSAGES notification, instead of replying with a
+     * SUSPEND_MESSAGES_COMPLETE ack to the server.  To wait for the
+     * SUSPEND_MESSAGES notification, invoke the {@link
+     * #waitForSuspendMessages} method.
+     */
     public void setWaitForSuspendMessages() {
 	checkRelocateProtocolVersion();
 	synchronized (lock) {
 	    waitForSuspendMessages = true;
 	}
     }
-    
+
+    /**
+     * Waits for a SUSPEND_MESSAGES notification to be sent to this
+     * client.  A previous call to {@link #setWaitForSuspendMessages} must
+     * be invoked before the server sends a SUSPEND_MESSAGES notification
+     * in order for this wait to be successful.  This method returns when a
+     * SUSPEND_MESSAGES notification has been received; it does NOT allow a
+     * SUSPEND_MESSAGES_COMPLETE ack to be sent.  To send the
+     * SUSPEND_MESSAGES_COMPLETE ack, invoke the {@link
+     * #sendSuspendMessagesComplete} method.
+     */
     public void waitForSuspendMessages() {
 	checkRelocateProtocolVersion();	
 	synchronized (lock) {
@@ -521,6 +545,9 @@ public abstract class AbstractDummyClient extends Assert {
 	}
     }
 
+    /**
+     * Sends a SUSPEND_MESSAGES_COMPLETE ack to the server.
+     */
     public void sendSuspendMessagesComplete() {
 	checkRelocateProtocolVersion();
 	synchronized (lock) {

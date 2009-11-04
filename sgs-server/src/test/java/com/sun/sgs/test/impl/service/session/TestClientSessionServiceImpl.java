@@ -269,7 +269,7 @@ public class TestClientSessionServiceImpl extends Assert {
     // -- Test addSessionStatusListener --
 
     @Test
-    public void testRegisterSessionStatusListenerNullArg() {
+    public void testAddSessionStatusListenerNullArg() {
 	try {
 	    serverNode.getClientSessionService().
 		addSessionStatusListener(null);
@@ -280,7 +280,7 @@ public class TestClientSessionServiceImpl extends Assert {
     }
 
     @Test
-    public void testRegisterSessionStatusListenerInTxn()
+    public void testAddSessionStatusListenerInTxn()
 	throws Exception
     {
 	try {
@@ -297,7 +297,7 @@ public class TestClientSessionServiceImpl extends Assert {
     }
 
     @Test
-    public void testRegisterSessionStatusListenerNoTxn() {
+    public void testAddSessionStatusListenerNoTxn() {
 	serverNode.getClientSessionService().
 	    addSessionStatusListener(new DummyStatusListener());
     }
