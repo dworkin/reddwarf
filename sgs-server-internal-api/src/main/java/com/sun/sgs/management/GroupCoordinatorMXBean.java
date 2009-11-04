@@ -60,21 +60,21 @@ public interface GroupCoordinatorMXBean {
     }
 
     /**
-     * Return {@code true} if the coordinator is running.
+     * Return {@code true} if the coordinator is enabled.
      *
-     * @return {@code true} if the coordinator is running
+     * @return {@code true} if the coordinator is enabled
      */
-    boolean isRunning();
+    boolean isEnabled();
 
     /**
-     * Start the coordinator.
+     * Enable the coordinator.
      */
-    void start();
+    void enable();
 
     /**
-     * Stop the coordinator.
+     * Disable the coordinator.
      */
-    void stop();
+    void disable();
 
     /**
      * Get the total number of groups on all nodes.

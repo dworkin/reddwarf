@@ -62,7 +62,7 @@ public class AffinityGroupCoordinator extends SimpleCoordinator {
     
     // Map nodeID -> groupSet where groupSet is groupId -> group
     private final Map<Long, NavigableSet<AffinityGroupImpl>> groups =
-                               new HashMap<Long, NavigableSet<AffinityGroupImpl>>();
+                           new HashMap<Long, NavigableSet<AffinityGroupImpl>>();
 
     /**
      * Construct an affinity group coordinator.
@@ -88,17 +88,16 @@ public class AffinityGroupCoordinator extends SimpleCoordinator {
                                                    systemRegistry, txnProxy);
         } else {
             finder = wrappedProps.getClassInstanceProperty(
-                                FINDER_CLASS_PROPERTY, AffinityGroupFinder.class,
-                                new Class[] { Properties.class,
-                                              AffinityGroupCoordinator.class,
-                                              ComponentRegistry.class,
-                                              TransactionProxy.class },
-                                properties, this, systemRegistry, txnProxy);
+                               FINDER_CLASS_PROPERTY, AffinityGroupFinder.class,
+                               new Class[] { Properties.class,
+                                             AffinityGroupCoordinator.class,
+                                             ComponentRegistry.class,
+                                             TransactionProxy.class },
+                               properties, this, systemRegistry, txnProxy);
         }
         logger.log(Level.CONFIG, "Group finder: {0}",
                    finder.getClass().getName());
 
-        
         // create our profiling info and register our MBean
         ProfileCollector collector =
             systemRegistry.getComponent(ProfileCollector.class);
@@ -111,15 +110,16 @@ public class AffinityGroupCoordinator extends SimpleCoordinator {
     }
 
     @Override
-    public void start() {
-        super.start();
-        finder.start();
+    public void enable() {
+        super.enable();
+        finder.enable();
     }
 
     @Override
-    public void stop() {
-        finder.stop();
-        super.stop();
+    public void disable() {
+        checkShutdown();
+        finder.disable();
+        super.disable();
     }
 
     // TODO - do a better job with locking
@@ -127,6 +127,7 @@ public class AffinityGroupCoordinator extends SimpleCoordinator {
     public synchronized void offload(Node oldNode)
         throws NoNodesAvailableException
     {
+        checkShutdown();
         if (oldNode == null) {
             throw new NullPointerException("oldNode can not be null");
         }
@@ -161,10 +162,10 @@ public class AffinityGroupCoordinator extends SimpleCoordinator {
 
     @Override
     public void shutdown() {
+        checkShutdown();
         finder.shutdown();
         super.shutdown();
     }
-
 
     public AffinityGroupImpl newInstance(long groupId,
                                          Map<Identity, Long> identities,
@@ -208,7 +209,6 @@ public class AffinityGroupCoordinator extends SimpleCoordinator {
     private class AffinityGroupCoordinatorMXBean
         implements GroupCoordinatorMXBean
     {
-
         @Override
         public int getNumGroups() {
             return groups.size();
@@ -231,18 +231,18 @@ public class AffinityGroupCoordinator extends SimpleCoordinator {
         }
 
         @Override
-        public boolean isRunning() {
+        public boolean isEnabled() {
             return true;    // todo
         }
 
         @Override
-        public void start() {
-            AffinityGroupCoordinator.this.start();
+        public void enable() {
+            AffinityGroupCoordinator.this.enable();
         }
 
         @Override
-        public void stop() {
-            AffinityGroupCoordinator.this.stop();
+        public void disable() {
+            AffinityGroupCoordinator.this.disable();
         }
     }
 }

@@ -416,7 +416,7 @@ public final class NodeMappingServerImpl
     
     /** {@inheritDoc} */
     protected void doReady() {
-        groupCoordinator.start();
+        groupCoordinator.enable();
     }
     
     /** 
@@ -1168,6 +1168,11 @@ public final class NodeMappingServerImpl
                     // This is unlikely to work since the node is dead.
                     offloadNode(node);
                     break;
+            }
+            if (assignPolicy.nodesAvailable()) {
+                groupCoordinator.enable();
+            } else {
+                groupCoordinator.disable();
             }
         }
     }

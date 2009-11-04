@@ -26,29 +26,37 @@ import com.sun.sgs.service.TransactionProxy;
 import java.util.Properties;
 
 /**
- * Thing that manages sets of identities. The class that implements this
- * interface should be public, not abstract, and should provide a public
- * constructor with {@link Properties}, {@link NodeMappingServerImpl},
- * {@link ComponentRegistry}, and {@link TransactionProxy} parameters.
+ * A group coordinator manages groups of identities. How identities are grouped
+ * is implementation dependent. Since grouping activities may generate load on
+ * the system, the coordinator may be disabled if conditions merit.<p>
+ * 
+ * The class that implements this interface should be public, not abstract, and
+ * should provide a public constructor with {@link Properties},
+ * {@link NodeMappingServerImpl}, {@link ComponentRegistry}, and
+ * {@link TransactionProxy} parameters.<p>
+ *
+ * A newly constructed coordinator should be in the disabled state.
  */
 public interface GroupCoordinator {
 
     /**
-     * Stop the coordinator.
+     * Enable coordination. If the coordinator is enabled, calling this method
+     * will have no effect.
      */
-    void start();
+    void enable();
 
     /**
-     * Start the coordinator.
+     * Disable coordination. If the coordinator is disabled, calling this method
+     * will have no effect.
      */
-    void stop();
+    void disable();
 
     /**
      * Move one or more identities off of the old node. If the old node is alive
-     * a set of identities will be selected to move. How the set
+     * a group of identities will be selected to move. How the group
      * is selected is implementation dependent. If the node is not alive,
-     * all groups will be moved. Note that is this does not guarantee that all
-     * identities will be moved.
+     * all identities on that node will be moved. Note that is this method does
+     * not guarantee that any identities are be moved.
      *
      * @param oldNode the node to offload identities
      *
@@ -58,7 +66,9 @@ public interface GroupCoordinator {
     void offload(Node oldNode) throws NoNodesAvailableException;
 
     /**
-     * Guess...
+     * Shutdown the coordinator. The coordinator is disabled and
+     * all resources released. Any further method calls made on the coordinator
+     * will result in a {@code IllegalStateException} being thrown.
      */
     void shutdown();
 }

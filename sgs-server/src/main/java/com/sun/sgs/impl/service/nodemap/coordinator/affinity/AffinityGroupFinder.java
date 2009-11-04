@@ -23,25 +23,34 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.TransactionProxy;
 
 /**
- * Thing that finds groups. The class that implements this
+ * An affinity groups finder will find sets of identities that have formed a
+ * community.<p>
+ *
+ * The class that implements this
  * interface should be public, not abstract, and should provide a public
  * constructor with {@link Properties}, {@link AffinityGroupCoordinator},
- * {@link ComponentRegistry}, and {@link TransactionProxy} parameters.
+ * {@link ComponentRegistry}, and {@link TransactionProxy} parameters.<p>
+ *
+ * A newly constructed coordinator should be in the disabled state.
  */
 public interface AffinityGroupFinder {
 
     /**
-     * Start finding groups.
+     * Enable finding groups. If the finder is enabled, calling this method
+     * will have no effect.
      */
-    void start();
+    void enable();
 
     /**
-     * Stop finding groups.
+     * Disable finding groups. If the finder is disabled, calling this method
+     * will have no effect.
      */
-    void stop();
+    void disable();
 
     /**
-     * Shutdown.
+     * Shutdown the finder. The finder is disabled and
+     * all resources released. Any further method calls made on the finder
+     * will result in a {@code IllegalStateException} being thrown.
      */
     void shutdown();
 }

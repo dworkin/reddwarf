@@ -50,6 +50,8 @@ public class SimpleCoordinator implements GroupCoordinator {
     protected final LoggerWrapper logger;
     protected final DataService dataService;
 
+    private boolean shutdown;
+
     public SimpleCoordinator(Properties properties,
                              NodeMappingServerImpl server,
                              ComponentRegistry systemRegistry,
@@ -72,27 +74,29 @@ public class SimpleCoordinator implements GroupCoordinator {
         this.txnProxy = txnProxy;
         this.logger = logger;
         dataService = txnProxy.getService(DataService.class);
+        shutdown = false;
     }
 
     @Override
-    public void start() {
-        // noop
+    public void enable() {
+        checkShutdown();
         if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "starting coordinator");
+            logger.log(Level.FINE, "enable coordinator");
         }
     }
 
     @Override
-    public void stop() {
-        // noop
+    public void disable() {
+        checkShutdown();
         if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "stopping coordinator");
+            logger.log(Level.FINE, "disable coordinator");
         }
     }
 
     // Note that this method will only ever offload a single identity.
     @Override
     public void offload(Node oldNode) throws NoNodesAvailableException {
+        checkShutdown();
         GetIdTask task =
                   new GetIdTask(NodeMapUtil.getPartialNodeKey(oldNode.getId()));
         try {
@@ -134,10 +138,15 @@ public class SimpleCoordinator implements GroupCoordinator {
      }
 
     @Override
-    public void shutdown() {
-        // nothing to do
+    public synchronized void shutdown() {
+        checkShutdown();
+        shutdown = true;
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "shutting down coordinator");
         }
+    }
+
+    protected synchronized void checkShutdown() {
+        if (shutdown) throw new IllegalStateException("Cooridinator shutdown");
     }
 }

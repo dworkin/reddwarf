@@ -144,7 +144,7 @@ public class UserGroupFinderServerImpl implements AffinityGroupFinder,
     /* --- Implement AffinityGroupFinder -- */
 
     @Override
-    public synchronized void start() {
+    public synchronized void enable() {
         if (started()) return; // already started
 
         if (logger.isLoggable(Level.FINE)) {
@@ -164,10 +164,10 @@ public class UserGroupFinderServerImpl implements AffinityGroupFinder,
     }
 
     @Override
-    public synchronized void stop() {
+    public synchronized void disable() {
         if (started()) {
             if (logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINE, "stopping finder");
+                logger.log(Level.FINE, "disabling finder");
             }
             if (updateTask != null) {
                 updateTask.cancel();
@@ -179,7 +179,7 @@ public class UserGroupFinderServerImpl implements AffinityGroupFinder,
 
     @Override
     public void shutdown() {
-        stop();
+        disable();
         exporter.unexport();
     }
     
