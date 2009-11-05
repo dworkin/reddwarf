@@ -35,6 +35,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
+import com.sun.sgs.impl.hook.HookLocator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -474,6 +475,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
      public void setBinding(String name, Object object) {
+        object = HookLocator.getManagedObjectReplacementHook().replaceManagedObject(object);
          serviceStats.setBindingOp.report();
 	 setBindingInternal(name, object, false);
     }
@@ -492,6 +494,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public void removeObject(Object object) {
+        object = HookLocator.getManagedObjectReplacementHook().replaceManagedObject(object);
         serviceStats.removeObjOp.report();
 	Context context = null;
 	ManagedReferenceImpl<?> ref = null;
@@ -532,6 +535,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public void markForUpdate(Object object) {
+        object = HookLocator.getManagedObjectReplacementHook().replaceManagedObject(object);
         serviceStats.markForUpdateOp.report();
 	Context context = null;
 	ManagedReferenceImpl<?> ref = null;
@@ -564,6 +568,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public <T> ManagedReference<T> createReference(T object) {
+        object = HookLocator.getManagedObjectReplacementHook().replaceManagedObject(object);
         serviceStats.createRefOp.report();
 	Context context = null;
 	try {
@@ -592,6 +597,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public BigInteger getObjectId(Object object) {
+        object = HookLocator.getManagedObjectReplacementHook().replaceManagedObject(object);
 	serviceStats.getObjectIdOp.report();
 	Context context = null;
 	try {
