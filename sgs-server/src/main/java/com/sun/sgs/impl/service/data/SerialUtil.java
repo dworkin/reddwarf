@@ -25,6 +25,8 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
+import com.sun.sgs.impl.hook.*;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -88,7 +90,7 @@ final class SerialUtil {
 	ObjectInputStream in = null;
 	try {
 	    in = new CustomClassDescriptorObjectInputStream(
-		new CompressByteArrayInputStream(data), classSerial);
+		new CompressByteArrayInputStream(data), classSerial, HookLocator.getSerializationHook());
 	    return in.readObject();
 	} catch (ClassNotFoundException e) {
 	    throw new ObjectIOException(
@@ -112,22 +114,27 @@ final class SerialUtil {
      * Defines an ObjectInputStream whose reading of class descriptors is
      * customized by an instance of ClassSerialization.
      */
-    private static final class CustomClassDescriptorObjectInputStream
-	extends ObjectInputStream
-    {
-	private final ClassSerialization classSerial;
-	CustomClassDescriptorObjectInputStream(InputStream in,
-					       ClassSerialization classSerial)
-	    throws IOException
-	{
-	    super(in);
-	    this.classSerial = classSerial;
-	}
-	protected ObjectStreamClass readClassDescriptor()
-	    throws ClassNotFoundException, IOException
-	{
-	    return classSerial.readClassDescriptor(this);
-	}
+    private static final class CustomClassDescriptorObjectInputStream extends ObjectInputStream {
+
+        private final ClassSerialization classSerial;
+        private final SerializationHook serializationHook;
+
+        CustomClassDescriptorObjectInputStream(InputStream in,
+                                               ClassSerialization classSerial,
+                                               SerializationHook serializationHook) throws IOException {
+            super(in);
+            this.classSerial = classSerial;
+            this.serializationHook = serializationHook;
+            enableResolveObject(true);
+        }
+
+        protected ObjectStreamClass readClassDescriptor() throws ClassNotFoundException, IOException {
+            return classSerial.readClassDescriptor(this);
+        }
+
+        protected Object resolveObject(Object obj) {
+            return serializationHook.resolveObject(obj);
+        }
     }
 
     /**
@@ -179,7 +186,7 @@ final class SerialUtil {
 	try {
 	    ByteArrayOutputStream baos = new CompressByteArrayOutputStream();
 	    out = new CheckReferencesObjectOutputStream(
-		baos, object, classSerial);
+		baos, object, classSerial, HookLocator.getSerializationHook());
 	    out.writeObject(object);
 	    out.flush();
 	    return baos.toByteArray();
@@ -275,19 +282,22 @@ final class SerialUtil {
     {
 	/** The top level managed object being serialized. */
 	private final ManagedObject topLevelObject;
+        private final SerializationHook serializationHook;
 
-	/**
+        /**
 	 * Creates an instance that writes to a stream for a managed object
 	 * being serialized.
 	 */
 	CheckReferencesObjectOutputStream(OutputStream out,
-					  ManagedObject topLevelObject,
-					  ClassSerialization classSerial)
+                                          ManagedObject topLevelObject,
+                                          ClassSerialization classSerial,
+                                          SerializationHook serializationHook)
 	    throws IOException
 	{
 	    super(out, classSerial);
 	    this.topLevelObject = topLevelObject;
-	    AccessController.doPrivileged(
+            this.serializationHook = serializationHook;
+            AccessController.doPrivileged(
 		new PrivilegedAction<Void>() {
 		    public Void run() {
 			enableReplaceObject(true);
@@ -298,6 +308,7 @@ final class SerialUtil {
 
 	/** Check for references to managed objects. */
 	protected Object replaceObject(Object object) throws IOException {
+            object = serializationHook.replaceObject(topLevelObject, object);
 	    if (object == null) {
 		return null;
 	    }
