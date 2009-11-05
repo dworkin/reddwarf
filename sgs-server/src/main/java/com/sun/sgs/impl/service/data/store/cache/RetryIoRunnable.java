@@ -28,7 +28,9 @@ import java.util.logging.Logger;
 /**
  * A {@code Runnable} that supports retrying an I/O operation so long as the
  * data store has not been shutdown, and exits and reports failure if the I/O
- * operation fails for too long.
+ * operation fails for too long. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  *
  * @param	<R> the type of result of the I/O operation
  */
@@ -56,8 +58,8 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
      * IOException}, or an exception that implements {@link
      * ExceptionRetryStatus} and whose {@link ExceptionRetryStatus#shouldRetry
      * shouldRetry} method returns {@code true}, then it will be retried until
-     * the retry timeout is reached.  Other exceptions will be treated as a
-     * permanent failure.
+     * the retry timeout is reached.  Other exceptions will be treated as
+     * permanent failures.
      *
      * @return	the result of the I/O operation
      * @throws	IOException if the I/O operation fails
@@ -69,8 +71,8 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
      * Checks if the I/O operation should be abandoned due to a shutdown
      * request. <p>
      *
-     * This implementation returns {@code true} if the data store has completed
-     * shutting down transactions.
+     * The default implementation returns {@code true} if the data store has
+     * completed shutting down transactions.
      */
     boolean shutdownRequested() {
 	return store.getShutdownTxnsCompleted();
@@ -85,8 +87,8 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
     abstract void runWithResult(R result);
 
     /**
-     * Calls {@link #callOnce} until it succeeds, until it fails for the
-     * maximum amount of time allowed for I/O retries, or until {@link
+     * Calls {@link #callOnce} until it either succeeds, fails for the maximum
+     * amount of time allowed for I/O retries, or until {@link
      * #shutdownRequested} returns {@code true}.  If {@code callOnce} succeeds,
      * calls {@link #runWithResult} with the resulting value and then returns.
      * If the I/O operation fails for more than the maximum time, calls {@link

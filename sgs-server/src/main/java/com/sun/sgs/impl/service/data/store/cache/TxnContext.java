@@ -292,14 +292,15 @@ class TxnContext {
 
     /**
      * Adds an entry to the cache for an object that is being cached for read
-     * after being fetched from the server.  The associated lock should be
-     * held, and the caller should have reserved space in the cache.
+     * after being fetched from the server without having first created an
+     * entry marked as being fetched.  The associated lock should be held, and
+     * the caller should have reserved space in the cache.
      *
      * @param	oid the object ID of the object
      * @param	data the data for the object
      * @param	reserve for tracking cache reservations
      */
-    ObjectCacheEntry noteCachedObject(
+    ObjectCacheEntry noteCachedImmediateObject(
 	long oid, byte[] data, ReserveCache reserve)
     {
 	assert Thread.holdsLock(store.getCache().getObjectLock(oid));

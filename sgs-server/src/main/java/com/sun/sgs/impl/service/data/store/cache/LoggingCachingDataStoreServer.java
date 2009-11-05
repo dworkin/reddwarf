@@ -20,13 +20,14 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import static java.util.logging.Level.FINEST;
 import java.io.IOException;
+import java.util.logging.Level;
+import static java.util.logging.Level.FINEST;
 
 /**
  * A {@code CachingDataStoreServer} that delegates its operations to an
- * underlying server and logs all calls.  This class is part of the
- * implementation of {@link CachingDataStore}.
+ * underlying server and logs all calls at level {@link Level#FINEST FINEST}.
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 

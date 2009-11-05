@@ -20,8 +20,11 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 /**
- * A cache entry for an object.  This class is part of the implementation of
- * {@link CachingDataStore}.
+ * A cache entry for an object.  Only the {@link #key} field may be accessed
+ * without holding the associated lock.  For all other fields and methods, the
+ * lock should be held. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
@@ -38,8 +41,7 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
     }
 
     /**
-     * Creates a cache entry for an created object newly created by a
-     * transaction.
+     * Creates a cache entry for an object newly created by a transaction.
      *
      * @param	oid the object ID
      * @param	contextId the context ID associated with the transaction
@@ -68,7 +70,8 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     /**
      * Creates a cache entry for an object that has been fetched for read from
-     * the server on behalf of a transaction.
+     * the server on behalf of a transaction without having first created an
+     * entry marked as being fetched.
      *
      * @param	oid the object ID
      * @param	contextId the context ID associated with the transaction

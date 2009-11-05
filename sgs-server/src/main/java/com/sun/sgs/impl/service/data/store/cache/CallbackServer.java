@@ -33,7 +33,9 @@ public interface CallbackServer extends Remote {
      * to read access.  If the method returns {@code true}, then the object has
      * been downgraded as requested.  If the method returns false, then the
      * node will arrange to call {@link UpdateQueue#downgradeObject} to notify
-     * the server that it has downgraded the object.
+     * the server that it has downgraded the object.  It is not an error for
+     * the node to already have the object cached for read or to have already
+     * evicted the object.
      *
      * @param	oid the object ID
      * @param	conflictNodeId the ID of the node requesting the downgrade
@@ -49,6 +51,7 @@ public interface CallbackServer extends Remote {
      * returns {@code true}, then the object has been evicted as requested.  If
      * the method returns false, then the node will arrange to call {@link
      * UpdateQueue#evictObject} to notify the server that it has evicted the
+     * object.  It is not an error for the node to have already evicted the
      * object.
      *
      * @param	oid the object ID
@@ -66,7 +69,9 @@ public interface CallbackServer extends Remote {
      * the name binding has been downgraded as requested.  If the method
      * returns false, then the node will arrange to call {@link
      * UpdateQueue#downgradeBinding} to notify the server that it has
-     * downgraded the name binding.
+     * downgraded the name binding.  It is not an error for the node to already
+     * have the name binding cached for read or to have already evicted the
+     * name binding.
      *
      * @param	name the name
      * @param	conflictNodeId the ID of the node requesting the downgrade
@@ -82,7 +87,8 @@ public interface CallbackServer extends Remote {
      * returns {@code true}, then the name binding has been evicted from the
      * node's cache as requested.  If the method returns false, then the node
      * will arrange to call {@link UpdateQueue#downgradeBinding} to notify the
-     * server that it has evicted the name binding.
+     * server that it has evicted the name binding.  It is not an error for the
+     * node to have already evicted the name binding.
      *
      * @param	name the name
      * @param	conflictNodeId the ID of the node requesting the eviction

@@ -29,10 +29,10 @@ import java.rmi.Remote;
 public interface CachingDataStoreServer extends Remote {
 
     /**
-     * Registers a node with the data server, supplying a callback server that
-     * the data server can use to make callback requests.  Returns the ID for
-     * the new node and the socket port that the node should connect to for
-     * sending updates to the server's update queue.
+     * Registers a node with the server, supplying a callback server that the
+     * server can use to make callback requests.  Returns the ID for the new
+     * node and the socket port that the node should connect to for sending
+     * updates to the server's update queue.
      *
      * @param	callbackServer the callback server
      * @return	the node ID and update queue port
@@ -89,7 +89,9 @@ public interface CachingDataStoreServer extends Remote {
     long newObjectIds(int numIds) throws IOException;
 
     /**
-     * Obtains read access to an object.
+     * Obtains read access to an object.  If the return value is not {@code
+     * null} and it's {@code callbackEvict} field is {@code true}, then the
+     * caller should evict the requested object after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the object ID
@@ -110,15 +112,14 @@ public interface CachingDataStoreServer extends Remote {
 	/** The object data. */
 	public final byte[] data;
 
-	/** Whether there is a conflicting write request. */
+	/** Whether to evict the object. */
 	public final boolean callbackEvict;
 
 	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	data the object data
-	 * @param	callbackEvict whether this is a conflicting write
-	 *		request
+	 * @param	callbackEvict whether to evict the object
 	 */
 	public GetObjectResults(byte[] data, boolean callbackEvict) {
 	    checkNull("data", data);
@@ -137,7 +138,12 @@ public interface CachingDataStoreServer extends Remote {
     }
 
     /**
-     * Obtains write access to an object.
+     * Obtains write access to an object.  If the return value is not {@code
+     * null} and it's {@code callbackEvict} field is {@code true}, then the
+     * caller should evict the requested object after using it.  If the return
+     * value is not {@code null} and it's {@code callbackDowngrade} field is
+     * {@code true}, then the caller should downgrade the requested object to
+     * read access after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the object ID
@@ -156,17 +162,15 @@ public interface CachingDataStoreServer extends Remote {
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
 
-	/** Whether there is a conflicting read request. */
+	/** Whether to downgrade the object. */
 	public final boolean callbackDowngrade;
 
 	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	data the object data
-	 * @param	callbackEvict whether there is a conflicting write
-	 *		request
-	 * @param	callbackDowngrade whether there is a conflicting read
-	 *		request
+	 * @param	callbackEvict whether to evict the object
+	 * @param	callbackDowngrade whether to downgrade the object
 	 */
 	public GetObjectForUpdateResults(
 	    byte[] data, boolean callbackEvict, boolean callbackDowngrade)
@@ -187,11 +191,13 @@ public interface CachingDataStoreServer extends Remote {
     }
 
     /**
-     * Upgrades access to an object from read to write access.
+     * Upgrades access to an object from read to write access.  If the return
+     * value is {@code true}, then the caller should downgrade the requested
+     * object to read access after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the object ID
-     * @return	whether there is a conflicting read request
+     * @return	whether to downgrade the object
      * @throws	CacheConsistencyException if the requesting node does not have
      *		read access for the object ID
      * @throws	IllegalArgumentException if {@code nodeId} has not been
@@ -208,7 +214,9 @@ public interface CachingDataStoreServer extends Remote {
      * will not refer to objects that have already been removed, and may not
      * refer to objects created after an iteration has begun.  It is not an
      * error to specify the identifier for an object that has already been
-     * removed.
+     * removed.  If the return value is not {@code null} and its {@code
+     * callbackEvict} field is {@code true}, then the caller should evict the
+     * next object after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the identifier of the object to search after, or
@@ -233,7 +241,7 @@ public interface CachingDataStoreServer extends Remote {
 	/** The object data associated with the next object. */
 	public final byte[] data;
 
-	/** Whether there is a conflicting write request. */
+	/** Whether to evict the next object. */
 	public final boolean callbackEvict;
 
 	/**
@@ -241,8 +249,7 @@ public interface CachingDataStoreServer extends Remote {
 	 *
 	 * @param	oid the next object ID
 	 * @param	data the object data
-	 * @param	callbackEvict whether there is a conflicting write
-	 *		request
+	 * @param	callbackEvict whether to evict the next object
 	 */
 	public NextObjectResults(
 	    long oid, byte[] data, boolean callbackEvict) {
@@ -271,7 +278,11 @@ public interface CachingDataStoreServer extends Remote {
 
     /**
      * Obtains read access to a name binding.  If the name is not bound,
-     * obtains read access to the next name binding instead.
+     * obtains read access to the next name binding instead.  If the return
+     * value's {@code callbackEvict} field is {@code true}, then the caller
+     * should evict after using it either the requested name, if the return
+     * value's {@code found} field is {@code true}, or else the next name, if
+     * the {@code found} field is {@code false}.
      *
      * @param	nodeId the ID of the requesting node
      * @param	name the name
@@ -287,15 +298,15 @@ public interface CachingDataStoreServer extends Remote {
      *
      * If {@link #found} is {@code true}, then the name is bound.  In that
      * case, {@link #nextName} is {@code null}, {@link #oid} is the object ID
-     * that is bound to the name, and {@link #callbackEvict} records whether
-     * there is a conflicting write request for the name. <p>
+     * that is bound to the name, and {@link #callbackEvict} records whether to
+     * evict the requested name. <p>
      *
      * If {@code found} is {@code false}, then the name was not bound.  In that
      * case, {@code nextName} is the next bound name following the name, or
      * {@code null} if there is no next bound name, {@code oid} is the object
      * ID that is bound to that next name, or {@code -1} if {@code nextName} is
-     * {@code null}, and {@code callbackEvict} records whether there is a
-     * conflicting write request for the next name.
+     * {@code null}, and {@code callbackEvict} records whether to evict the
+     * next name.
      */
     class GetBindingResults implements Serializable {
 
@@ -318,11 +329,7 @@ public interface CachingDataStoreServer extends Remote {
 	 */
 	public final long oid;
 
-	/**
-	 * Whether there is a conflicting write request for the requested name,
-	 * if {@code found} is {@code true}, else of the next name, if {@code
-	 * found} is {@code false}.
-	 */
+	/** Whether to evict the requested or next name. */
 	public final boolean callbackEvict;
 
 	/**
@@ -331,8 +338,8 @@ public interface CachingDataStoreServer extends Remote {
 	 * @param	found whether the requested name was found
 	 * @param	nextName the next bound name or {@code null}
 	 * @param	oid the object ID or {@code -1}
-	 * @param	callbackEvict whether there is a conflicting write
-	 *		request
+	 * @param	callbackEvict whether to evict the requested or next
+	 *		name
 	 */
 	public GetBindingResults(
 	    boolean found, String nextName, long oid, boolean callbackEvict)
@@ -356,7 +363,15 @@ public interface CachingDataStoreServer extends Remote {
 
     /**
      * Obtains write access to a name binding.  If the name is not bound,
-     * obtains write access to the next name binding instead.
+     * obtains write access to the next name binding instead.  If the return
+     * value's {@code callbackEvict} field is {@code true}, then the caller
+     * should evict after using it either the requested name, if the return
+     * value's {@code found} field is {@code true}, or else the next name, if
+     * the {@code found} field is {@code false}.  If the return value's {@code
+     * callbackDowngrade} field is {@code true}, then the caller should
+     * downgrade to read access after using it either the requested name, if
+     * the return value's {@code found} field is {@code true}, or else the next
+     * name, if the {@code found} field is {@code false}.
      *
      * @param	nodeId the ID of the requesting node
      * @param	name the name
@@ -374,7 +389,7 @@ public interface CachingDataStoreServer extends Remote {
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
 	
-	/** Whether there is a conflicting read request. */
+	/** Whether the requested or next name should be downgraded. */
 	public final boolean callbackDowngrade;
 
 	/**
@@ -382,11 +397,11 @@ public interface CachingDataStoreServer extends Remote {
 	 *
 	 * @param	found whether the requested name was found
 	 * @param	nextName the next bound name
-	 * @param	oid the object ID
-	 * @param	callbackEvict whether there is a conflicting write
-	 *		request
-	 * @param	callbackDowngrade whether there is a conflicting read
-	 *		request
+	 * @param	oid the object ID or {@code -1}
+	 * @param	callbackEvict whether to evict the requested or next
+	 *		name
+	 * @param	callbackDowngrade whether to downgrade the requested or
+	 *		next name
 	 */
 	public GetBindingForUpdateResults(boolean found,
 					  String nextName,
@@ -411,10 +426,18 @@ public interface CachingDataStoreServer extends Remote {
     }
 
     /**
-     * Obtains access to a name binding needed for removing the binding,
-     * including write access to the name binding if it is bound.  If the name
-     * is bound, obtains write access to the next bound name; if it is not
-     * bound, obtains read access to the next bound name.
+     * Obtains access needed to remove a name binding, including write access
+     * to the name binding if it is bound.  If the name is bound, obtains write
+     * access to the next bound name; if it is not bound, obtains read access
+     * to the next bound name.  If the return value's {@code callbackEvict}
+     * field is {@code true}, then the caller should evict the requested name
+     * after using it.  If the return value's {@code callbackDowngrade} field
+     * is {@code true}, then the caller should downgrade the requested name to
+     * read access after using it.  If the return value's {@code
+     * nextCallbackEvict} field is {@code true}, then the caller should evict
+     * the next name after using it.  If the return value's {@code
+     * nextCallbackDowngrade} field is {@code true}, then the caller should
+     * downgrade the next name to read access after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	name the name
@@ -433,16 +456,14 @@ public interface CachingDataStoreServer extends Remote {
      * requested name, or {@code null} if there is no next bound name, {@link
      * #nextOid} is the object ID that is bound to that next name, or {@code
      * -1} if {@code nextName} is {@code null}, and {@link #nextCallbackEvict}
-     * records whether there is a conflicting write request for the next
-     * name. <p>
+     * records whether to evict the next name. <p>
      *
      * If {@link #found} is {@code true}, then the name is bound.  In that
      * case, {@link #oid} is the object ID that is bound to the requested name,
-     * {@link #callbackEvict} records whether there is a conflicting write
-     * request for the requested name, {@link #callbackDowngrade} records
-     * whether there is a conflicting read request for the name, and {@link
-     * #nextCallbackDowngrade} records whether there is a conflicting read
-     * request for the next name. <p>
+     * {@link #callbackEvict} records whether to evict the requested name,
+     * {@link #callbackDowngrade} records whether to downgrade the name to read
+     * access, and {@link #nextCallbackDowngrade} records whether to downgrade
+     * the next name to read access. <p>
      *
      * If {@code found} is {@code false}, then the name is not bound.  In that
      * case, {@code oid} is {@code -1}, and {@code callbackEvict}, {@code
@@ -468,14 +489,10 @@ public interface CachingDataStoreServer extends Remote {
 	 */
 	public final long oid;
 
-	/**
-	 * Whether there is a conflicting write request for the requested name.
-	 */
+	/** Whether to evict the requested name. */
 	public final boolean callbackEvict;
 
-	/**
-	 * Whether there is a conflicting read request for the requested name.
-	 */
+	/** Whether to downgrade the requested name. */
 	public final boolean callbackDowngrade;
 
 	/**
@@ -484,15 +501,10 @@ public interface CachingDataStoreServer extends Remote {
 	 */
 	public final long nextOid;
 
-	/**
-	 * Whether there is a conflicting write request for the next bound
-	 * name.
-	 */
+	/** Whether to evict the next name. */
 	public final boolean nextCallbackEvict;
 
-	/**
-	 * Whether there is a conflicting read request for the next bound name.
-	 */
+	/** Whether to downgrade the next name. */
 	public final boolean nextCallbackDowngrade;
 
 	/**
@@ -501,15 +513,12 @@ public interface CachingDataStoreServer extends Remote {
 	 * @param	found whether the name is bound
 	 * @param	nextName the next bound name
 	 * @param	oid the object ID
-	 * @param	callbackEvict whether there is a conflicting write
-	 *		request for the name
-	 * @param	callbackDowngrade whether there is a conflicting
-	 *		read request for the name
+	 * @param	callbackEvict whether to evict the name
+	 * @param	callbackDowngrade whether to downgrade the name
 	 * @param	nextOid the object ID for the next bound name
-	 * @param	nextCallbackEvict whether there is a conflicting
-	 *		write request for the next name
-	 * @param	nextCallbackDowngrade whether there is a conflicting
-	 *		read request for the next name
+	 * @param	nextCallbackEvict whether to evict the next name
+	 * @param	nextCallbackDowngrade whether to downgrade the next
+	 *		name
 	 */
 	public GetBindingForRemoveResults(boolean found,
 					  String nextName,
@@ -549,6 +558,8 @@ public interface CachingDataStoreServer extends Remote {
      * Returns information about the next name after the specified name that
      * has a binding, or {@code null} if there are no more bound names.  If
      * {@code name} is {@code null}, then the search starts at the beginning.
+     * If the return value's {@code callbackEvict} field is {@code true}, the
+     * caller should evict the next name after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	name the name
@@ -567,8 +578,7 @@ public interface CachingDataStoreServer extends Remote {
      * requested name, or {@code null} if there is no next bound name.  The
      * {@link #oid} field is the object ID that is bound to that next name, or
      * {@code -1} if {@code nextName} is {@code null}.  The {@link
-     * #callbackEvict} field records whether there is a conflicting write
-     * request for the next name.
+     * #callbackEvict} field records whether to evict the next name.
      */
     final class NextBoundNameResults implements Serializable {
 
@@ -587,7 +597,7 @@ public interface CachingDataStoreServer extends Remote {
 	 */
 	public final long oid;
 
-	/** Whether there is a conflicting write request for the next name. */
+	/** Whether to evict the next name. */
 	public final boolean callbackEvict;
 
 	/**
@@ -595,8 +605,7 @@ public interface CachingDataStoreServer extends Remote {
 	 *
 	 * @param	nextName the next name or {@code null}
 	 * @param	oid the object ID or {@code -1}
-	 * @param	callbackEvict whether there is a conflicting write
-	 *		request
+	 * @param	callbackEvict whether to evict the next name
 	 */
 	public NextBoundNameResults(
 	    String nextName, long oid, boolean callbackEvict)

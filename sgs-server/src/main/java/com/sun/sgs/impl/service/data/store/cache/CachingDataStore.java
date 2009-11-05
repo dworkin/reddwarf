@@ -2447,7 +2447,7 @@ public class CachingDataStore extends AbstractDataStore
 		    ObjectCacheEntry entry = cache.getObjectEntry(results.oid);
 		    if (entry == null) {
 			/* No entry -- create it */
-			context.noteCachedObject(
+			context.noteCachedImmediateObject(
 			    results.oid, results.data, reserve);
 			return results.oid;
 		    } else if (entry.getValue() != null) {

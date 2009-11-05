@@ -29,8 +29,10 @@ import java.util.Set;
 
 /**
  * A {@link Locker} that stores information about a node, including storing
- * information about locks held and whether the node has been shutdown.  This
- * class is part of the implementation of {@link CachingDataStoreServerImpl}.
+ * information about locks held, the associated update queue server, whether
+ * the node has been shutdown, and the number of currently active calls being
+ * made by the node.  This class is part of the implementation of {@link
+ * CachingDataStoreServerImpl}.
  */
 class NodeInfo extends MultiLocker<Object> {
 
@@ -49,10 +51,16 @@ class NodeInfo extends MultiLocker<Object> {
     /** The update queue server for the node. */
     final RequestQueueServer<UpdateQueueRequest> updateQueueServer;
 
-    /** Whether the node has been shutdown. */
+    /**
+     * Whether the node has been requested to shutdown.  Synchronize on this
+     * instance when accessing this field.
+     */
     private boolean shutdown = false;
 
-    /** The number of active calls on behalf of this node. */
+    /**
+     * The number of active calls currently being made on behalf of this node.
+     * Synchronize on this instance when accessing this field.
+     */
     private int activeCalls = 0;
 
     /**
@@ -92,7 +100,7 @@ class NodeInfo extends MultiLocker<Object> {
     }
 
     /**
-     * Notes that this node has locked a key.
+     * Notifies this locker that the associated node has locked a key.
      *
      * @param	key the key
      */
@@ -103,7 +111,8 @@ class NodeInfo extends MultiLocker<Object> {
     }
 
     /**
-     * Notes that this node has released the lock for a key.
+     * Notifies this locker that the associated node has released the lock for
+     * a key.
      *
      * @param	key the key
      */
@@ -153,7 +162,7 @@ class NodeInfo extends MultiLocker<Object> {
     }
 
     /**
-     * Note the start of a call made on behalf of this node.
+     * Notes the start of a call made on behalf of the associated node.
      *
      * @throws	IllegalStateException if the node has failed
      */
@@ -165,7 +174,7 @@ class NodeInfo extends MultiLocker<Object> {
 	activeCalls++;
     }
 
-    /** Note the end of a call made on behalf of this node. */
+    /** Notes the end of a call made on behalf of the associated node. */
     synchronized void nodeCallFinished() {
 	activeCalls--;
 	if (shutdown && activeCalls == 0) {

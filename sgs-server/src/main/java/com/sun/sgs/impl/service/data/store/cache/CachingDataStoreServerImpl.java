@@ -233,7 +233,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	PKG + ".update.queue.port";
 
     /** The default update queue port. */
-    public static final int DEFAULT_UPDATE_QUEUE_PORT = 44542;
+    public static final int DEFAULT_UPDATE_QUEUE_PORT = 0;
 
     /** The number of node IDs to allocate at once. */
     private static final int NODE_ID_ALLOCATION_BLOCK_SIZE = 100;

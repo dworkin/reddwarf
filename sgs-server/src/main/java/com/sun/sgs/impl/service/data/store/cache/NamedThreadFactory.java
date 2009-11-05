@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A thread factory that creates daemon threads with names that use a prefix
  * followed by a instance number.
  */
-public class NamedThreadFactory implements ThreadFactory {
+class NamedThreadFactory implements ThreadFactory {
 
     /** The prefix for each name. */
     private final String namePrefix;
@@ -40,7 +40,7 @@ public class NamedThreadFactory implements ThreadFactory {
      *
      * @param	namePrefix the prefix to use for names
      */
-    public NamedThreadFactory(String namePrefix) {
+    NamedThreadFactory(String namePrefix) {
 	checkNull("namePrefix", namePrefix);
 	this.namePrefix = namePrefix;
     }

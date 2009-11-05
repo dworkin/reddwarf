@@ -20,11 +20,12 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 /**
- * Keeps track of reserving and releasing space in the cache.  The constructors
- * reserve cache space, the {@code used} methods record that it has been used,
- * and the {@code done} method releases any space that is unused.  Callers
- * should make sure that they are not holding locks on the cache when calling
- * the constructors to avoid deadlocks with eviction. <p>
+ * Keeps track of reserving and releasing space in the cache.  The {@link
+ * #ReserveCache constructors} reserve cache space, the {@link #used} methods
+ * record that it has been used, and the {@link #done} method releases any
+ * space that is unused.  Callers should make sure that they are not holding
+ * locks on the cache when calling the constructors to avoid deadlocks with
+ * eviction. <p>
  *
  * This class is part of the implementation of {@link CachingDataStore}.
  */
@@ -33,7 +34,7 @@ class ReserveCache {
     /** The cache. */
     private final Cache cache;
 
-    /** The number of cache entries that have not been used. */
+    /** The number of reserved cache entries that have not been used. */
     private int unusedCacheEntries;
 
     /**
@@ -55,7 +56,8 @@ class ReserveCache {
     ReserveCache(Cache cache, int numCacheEntries) {
 	this.cache = cache;
 	if (numCacheEntries < 1) {
-	    throw new IllegalArgumentException();
+	    throw new IllegalArgumentException(
+		"The number of cache entries must be at least 1");
 	}
 	unusedCacheEntries = numCacheEntries;
 	cache.reserve(numCacheEntries);
@@ -75,7 +77,7 @@ class ReserveCache {
 	this.cache = otherReserve.cache;
 	if (numCacheEntries < 1) {
 	    throw new IllegalArgumentException(
-		"The number of cache entries must be greater than 0");
+		"The number of cache entries must be at least 1");
 	} else if (numCacheEntries > otherReserve.unusedCacheEntries) {
 	    throw new IllegalArgumentException(
 		"Other reserve doesn't have enough entries");

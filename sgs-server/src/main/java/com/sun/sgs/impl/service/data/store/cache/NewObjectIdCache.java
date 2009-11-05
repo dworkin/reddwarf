@@ -26,12 +26,18 @@ import java.util.logging.Logger;
 
 /**
  * Requests and caches new object IDs from the {@link CachingDataStoreServer}.
+ * This class allocates new object IDs in batches, allocating the first batch
+ * in the constructor.  When half of the current batch of IDs is used up, it
+ * allocates another batch in a separate thread, in hopes that the next batch
+ * of IDs will be available by the time the current batch is completely
+ * used. <p>
+ *
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 class NewObjectIdCache {
 
     /** The name of this class. */
-    private static final String CLASSNAME =
-	NewObjectIdCache.class.getName();
+    private static final String CLASSNAME = NewObjectIdCache.class.getName();
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -43,31 +49,38 @@ class NewObjectIdCache {
     /** The number of new object IDs to allocate at a time. */
     private final int batchSize;
 
-    /** A thread for obtaining new object IDs.  This thread may be dead. */
+    /**
+     * A thread for obtaining new object IDs, which may be dead, or {@code
+     * null} if this instance is being constructed.  Synchronize on this
+     * instance when accessing this field.
+     */
     private Thread newObjectsThread;
 
     /**
      * The current range for allocating IDs, or {@code null} if this instance
-     * is being constructed.
+     * is being constructed.  Synchronize on this instance when accessing this
+     * field.
      */
     private Range currentRange = null;
 
     /**
      * The next range for allocating IDs, or {@code null} if the next range of
-     * IDs has not been obtained yet.
+     * IDs has not been obtained yet.  Synchronize on this instance when
+     * accessing this field.
      */
     private Range nextRange = null;
 
     /**
-     * Creates an instance of this class.
+     * Creates an instance of this class, starts a thread that allocates IDs,
+     * and waits for the first range to be allocated.
      *
      * @param	store the data store
      * @param	batchSize the number of new object IDs to allocate at a time 
      */
     NewObjectIdCache(CachingDataStore store, int batchSize) {
+	this.store = store;
+	this.batchSize = batchSize;
 	synchronized (this) {
-	    this.store = store;
-	    this.batchSize = batchSize;
 	    newObjectsThread = createNewObjectsThread();
 	    newObjectsThread.start();
 	    while (currentRange == null && !store.getShutdownRequested()) {
@@ -80,8 +93,11 @@ class NewObjectIdCache {
     }
 
     /**
-     * Returns a new object ID or {@code -1} if it is unable to obtain the ID
-     * before the client started shutting down.
+     * Returns a new object ID.
+     *
+     * @return	the new object ID
+     * @throws	IllegalStateException if the data store has started shutting
+     *		down
      */
     synchronized long getNewObjectId() {
 	if (!currentRange.isEmpty()) {
@@ -123,6 +139,10 @@ class NewObjectIdCache {
     /** Shuts down this instance. */
     synchronized void shutdown() {
 	if (newObjectsThread != null && newObjectsThread.isAlive()) {
+	    /*
+	     * The thread will find out that a shutdown is underway by checking
+	     * with the data store, so no need to set a flag here.
+	     */
 	    newObjectsThread.interrupt();
 	    while (true) {
 		try {
@@ -194,19 +214,19 @@ class NewObjectIdCache {
 	    return "Range[first:" + first + ", last:" + last + "]";
 	}
 
-	/** Checks if the range is empty */
+	/** Checks if the range has no available IDs. */
 	boolean isEmpty() {
 	    return first > last;
 	}
 
-	/** Checks if the range is at last half empty. */
+	/** Checks if the range has no more than half of its IDs available. */
 	boolean isHalfEmpty() {
 	    return first > half;
 	}
 
 	/** Allocates and returns the next available ID. */
 	long next() {
-	    assert first <= last;
+	    assert !isEmpty();
 	    return first++;
 	}
     }

@@ -22,8 +22,9 @@ package com.sun.sgs.impl.service.data.store.cache;
 import com.sun.sgs.impl.util.lock.LockRequest;
 
 /**
- * A lock request from a node.  This class is part of the implementation of
- * {@link CachingDataStoreServerImpl}.
+ * A lock request from a node, which also tracks whether the associated item
+ * has been called back.  This class is part of the implementation of {@link
+ * CachingDataStoreServerImpl}.
  */
 class NodeRequest extends LockRequest<Object> {
 
@@ -66,7 +67,11 @@ class NodeRequest extends LockRequest<Object> {
 	}
     }
 
-    /** Returns the node information for this request. */
+    /**
+     * Returns the node information for this request.
+     *
+     * @return	the node information for this request
+     */
     NodeInfo getNodeInfo() {
 	return (NodeInfo) getLocker();
     }

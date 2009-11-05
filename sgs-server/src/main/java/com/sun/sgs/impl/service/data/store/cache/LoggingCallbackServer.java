@@ -22,12 +22,13 @@ package com.sun.sgs.impl.service.data.store.cache;
 import static com.sun.sgs.impl.sharedutil.Exceptions.initCause;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
+import java.util.logging.Level;
 import static java.util.logging.Level.FINEST;
 
 /**
  * A {@code CallbackServer} that delegates its operations to an underlying
- * server and logs all calls.  This class is part of the implementation of
- * {@link CachingDataStore}.
+ * server and logs all calls at level {@link Level#FINEST FINEST}.  This class
+ * is part of the implementation of {@link CachingDataStore}.
  */
 class LoggingCallbackServer implements CallbackServer {
 
@@ -38,7 +39,7 @@ class LoggingCallbackServer implements CallbackServer {
     private final LoggerWrapper logger;
 
     /** The local node ID, or -1 if not set. */
-    private volatile long nodeId;
+    private volatile long nodeId = -1;
 
     /**
      * Creates an instance of this class.

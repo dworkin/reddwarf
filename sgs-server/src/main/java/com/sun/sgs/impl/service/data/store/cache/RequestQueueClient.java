@@ -81,6 +81,10 @@ public final class RequestQueueClient extends Thread {
     /** The name of this class. */
     private static final String CLASSNAME = RequestQueueClient.class.getName();
 
+    /** The logger for this class. */
+    static final LoggerWrapper logger = new LoggerWrapper(
+	Logger.getLogger(CLASSNAME));
+
     /**
      * The property for specifying the maximum time in milliseconds to continue
      * attempting to make new connections and send requests when failures have
@@ -120,10 +124,6 @@ public final class RequestQueueClient extends Thread {
     /** The default sent queue size. */
     public static final int DEFAULT_SENT_QUEUE_SIZE = 100;
 
-    /** The logger for this class. */
-    static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(CLASSNAME));
-
     /** The node ID for this request queue. */
     private final long nodeId;
 
@@ -139,12 +139,12 @@ public final class RequestQueueClient extends Thread {
     /** The retry wait time in milliseconds. */
     private final long retryWait;
 
-    /** A queue of requests waiting to be sent. */
+    /** The queue of requests waiting to be sent. */
     final BlockingDeque<Request> requests;
 
     /**
-     * A queue of requests, and their associated request numbers, that have
-     * been sent to the server but have not received responses.
+     * The queue of requests, and their associated request numbers, that have
+     * been sent to the server but the client has not received responses.
      */
     final BlockingDeque<RequestHolder> sentRequests;
 

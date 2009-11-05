@@ -21,12 +21,13 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.util.Arrays;
+import java.util.logging.Level;
 import static java.util.logging.Level.FINEST;
 
 /**
  * A {@code UpdateQueueServer} that delegates its operations to an underlying
- * server and logs all calls.  This class is part of the implementation of
- * {@link CachingDataStore}.
+ * server and logs all calls at {@link Level#FINEST FINEST}.  This class is
+ * part of the implementation of {@link CachingDataStore}.
  */
 class LoggingUpdateQueueServer implements UpdateQueueServer {
 
@@ -63,8 +64,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 	    logger.log(FINEST,
 		       "commit nodeId:" + nodeId +
 		       ", oids:" + Arrays.toString(oids) +
+		       ", oidValues:" + toStringAbbrev(oidValues) +
 		       ", newOids:" + newOids +
 		       ", names:" + Arrays.toString(names) +
+		       ", nameValues:" + Arrays.toString(nameValues) +
 		       ", newNames:" + newNames);
 	}
 	try {
@@ -74,8 +77,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		logger.log(FINEST,
 			   "commit nodeId:" + nodeId +
 			   ", oids:" + Arrays.toString(oids) +
+			   ", oidValues:" + toStringAbbrev(oidValues) +
 			   ", newOids:" + newOids +
 			   ", names:" + Arrays.toString(names) +
+			   ", nameValues:" + Arrays.toString(nameValues) +
 			   ", newNames:" + newNames +
 			   " returns");
 	    }
@@ -84,8 +89,10 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		logger.logThrow(FINEST, e,
 				"commit nodeId:" + nodeId +
 				", oids:" + Arrays.toString(oids) +
+				", oidValues:" + toStringAbbrev(oidValues) +
 				", newOids:" + newOids +
 				", names:" + Arrays.toString(names) +
+				", nameValues:" + Arrays.toString(nameValues) +
 				", newNames:" + newNames +
 				" throws");
 	    }
@@ -231,5 +238,30 @@ class LoggingUpdateQueueServer implements UpdateQueueServer {
 		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
+    }
+
+    /* -- Other methods -- */
+
+    /**
+     * Print the contents of an array of arrays of bytes, but just printing
+     * each element's size or that it is null.
+     */
+    private static String toStringAbbrev(byte[][] array) {
+	if (array == null) {
+	    return "null";
+	}
+	StringBuilder sb = new StringBuilder("[");
+	for (int i = 0; i < array.length; i++) {
+	    if (i != 0) {
+		sb.append(", ");
+	    }
+	    if (array[i] == null) {
+		sb.append("null");
+	    } else {
+		sb.append("byte[").append(array[i].length).append("]");
+	    }
+	}
+	sb.append("]");
+	return sb.toString();
     }
 }

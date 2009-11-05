@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 /**
  * A {@code CompletionHandler} that reports node failure if an operation fails.
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 abstract class FailingCompletionHandler implements CompletionHandler {
 
