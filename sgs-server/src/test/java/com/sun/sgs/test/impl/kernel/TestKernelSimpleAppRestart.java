@@ -36,6 +36,8 @@ public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
     public void testRunSimpleApp() throws Exception {
         logging.setProperty(
 	    "com.sun.sgs.impl.service.watchdog.server.level", "SEVERE");
+        logging.setProperty(
+            "com.sun.sgs.impl.service.nodemap.server.level", "SEVERE");
 	runApp(3);
 	runApp(6);
     }

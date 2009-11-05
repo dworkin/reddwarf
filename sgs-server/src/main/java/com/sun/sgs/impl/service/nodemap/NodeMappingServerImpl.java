@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
@@ -1156,13 +1157,12 @@ public final class NodeMappingServerImpl
                         // assignPolicy.nodeUnavailable().
                         //
                         unregisterNodeListener(nodeId);
+                    } catch (IOException ignore) {
+                        // can't happen, local call
+                    }
+                    try {
                         coordinator.offload(node);
-                    } catch (Exception ex) {
-                        // TODO - This logging message causes the unit test
-                        // TestKernelSimpleAppRestart to fail. Either need to
-                        // fix the test, remove this (or change it to FINER or
-                        // somthing), or rework so that a shutdown does not
-                        // cause an offload...
+                    } catch (NoNodesAvailableException ex) {
                         logger.logThrow(Level.WARNING, ex,
                                         "Unable to offload failed node: {0}",
                                         node);
@@ -1224,7 +1224,7 @@ public final class NodeMappingServerImpl
      */
     private final class OffloadTask extends AbstractKernelRunnable {
 
-        final long nodeId;
+        private final long nodeId;
 
         OffloadTask(long nodeId) {
             super("OffloadTask for node " + nodeId);
@@ -1232,13 +1232,12 @@ public final class NodeMappingServerImpl
         }
 
         @Override
-        public void run() {
+        public void run() throws Exception {
 
             // If shuting down just exit, this task will be canceled by shutdown
             if (shuttingDown()) {
                 return;
             }
-
             try {
                 final GetNodeTask atask = new GetNodeTask(nodeId);
                 runTransactionally(atask);
@@ -1252,12 +1251,17 @@ public final class NodeMappingServerImpl
                     coordinator.offload(node);
                     return; // continue offloading
                 }
-            } catch (Exception ex) {
-                logger.logThrow(Level.WARNING, ex,
+            } catch (Exception e) {
+                if ((e instanceof ExceptionRetryStatus) &&
+                    (((ExceptionRetryStatus)e).shouldRetry()))
+                {
+                    throw e;
+                }
+                logger.logThrow(Level.WARNING, e,
                                 "Offload failed for node: {0}", nodeId);
             }
             // Either the node has failed or its healh has improved, or there
-            // was an exception
+            // was a non-retryable exception
             cancelOffload(nodeId);
         }
     }

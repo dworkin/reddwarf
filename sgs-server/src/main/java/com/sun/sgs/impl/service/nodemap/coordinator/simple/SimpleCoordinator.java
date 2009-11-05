@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.nodemap.coordinator.simple;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.IdentityMO;
 import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
@@ -145,14 +147,19 @@ public class SimpleCoordinator implements GroupCoordinator {
             this.logger = logger;
         }
 
-        public void run() {
+        public void run() throws Exception {
             try {
                 String key = dataService.nextServiceBoundName(nodekey);
                 done = (key == null || !key.contains(nodekey));
                 if (!done) {
-                    idmo = (IdentityMO) dataService.getServiceBinding(key);
+                    idmo = (IdentityMO)dataService.getServiceBinding(key);
                 }
             } catch (Exception e) {
+                if ((e instanceof ExceptionRetryStatus) &&
+                    (((ExceptionRetryStatus)e).shouldRetry()))
+                {
+                    throw e;
+                }
                 done = true;
                 logger.logThrow(Level.WARNING, e,
                                 "Failed to get key or binding for {0}",
@@ -170,9 +177,9 @@ public class SimpleCoordinator implements GroupCoordinator {
         }
 
         /**
-         *  The identity MO retrieved from the data store, or null if
-         *  the task has not yet executed or there was an error while
-         *  executing.
+         * The identity MO retrieved from the data store, or null if
+         * the task has not yet executed or there was an error while
+         * executing.
          * @return the IdentityMO
          */
         public IdentityMO getId() {
