@@ -34,29 +34,56 @@ package com.sun.sgs.tests.overhead;
 
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.util.ScalableHashSet;
 import java.io.Serializable;
+import java.util.Iterator;
 
 /**
- * A self rescheduling task that sums up the values of the given list
- * of {@link ManagedInteger}s and sets this value on the single associated
- * {@link ManagedInteger} object.
+ *
  */
-public class SumTask implements Task, Serializable {
-    
-    private final long sum;
-    
-    public SumTask(long sum) {
-	this.sum = sum;
+public class ReferenceTask implements Task, Serializable {
+
+    private final int accesses;
+    private final ManagedReference<ScalableHashSet<MutableObject>> set;
+    private final int setSize = 1000;
+
+    private Iterator<MutableObject> iterator;
+
+    public ReferenceTask(int accesses) {
+        this.accesses = accesses;
+
+        ScalableHashSet<MutableObject> actualSet =
+                                       new ScalableHashSet<MutableObject>();
+        for (int i = 0; i < setSize; i++) {
+            actualSet.add(new MutableObject());
+        }
+        
+        this.iterator = actualSet.iterator();
+        this.set = AppContext.getDataManager().createReference(actualSet);
     }
 
-    @Override
-    public void run() throws Exception {
-	long realSum = 0;
-	for (long i = 0; i < sum; i++) {
-	    realSum++;
-	}
+    public void run() {
+        int access = 0;
+        while (access < accesses) {
+            if (!iterator.hasNext()) {
+                iterator = set.get().iterator();
+            }
 
-        AppContext.getTaskManager().scheduleTask(new SumTask(sum));
+            iterator.next().update();
+            access++;
+        }
+
+        AppContext.getTaskManager().scheduleTask(this);
+    }
+
+    private static class MutableObject implements ManagedObject, Serializable {
+        private int value = 0;
+
+        public void update() {
+            value++;
+        }
     }
 
 }

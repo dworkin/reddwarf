@@ -50,12 +50,49 @@ import com.sun.sgs.app.AppContext;
  * task performance information out to the console.
  */
 public class Overhead implements AppListener, Serializable {
-    
+
+    private static final String TYPE = "com.sun.sgs.tests.overhead.type";
+    private static final Type DEFAULT_TYPE = Type.SUM;
+
+    private static enum Type {
+        SUM,
+        REFERENCE,
+        NAME
+    }
+
+
+    // properties for SUM type
     private static final String SUM = "com.sun.sgs.tests.overhead.sum";
     private static final long DEFAULT_SUM = 1000000;
+
+    // properties for REFERENCE type
+    private static final String ACCESS = "com.sun.sgs.tests.overhead.access";
+    private static final int DEFAULT_ACCESS = 1;
     
     public void initialize(Properties props) {
-        long sum;
+        Type type;
+        String typeProp = props.getProperty(TYPE);
+        try {
+            type = Type.valueOf(typeProp);
+        } catch (Exception ignore) {
+            type = DEFAULT_TYPE;
+        }
+
+        switch (type) {
+            case SUM:
+                sum(props);
+                break;
+            case REFERENCE:
+                reference(props);
+                break;
+            case NAME:
+                name(props);
+                break;
+        }
+    }
+
+    private void sum(Properties props) {
+	long sum;
         String sumProp = props.getProperty(SUM);
         try {
             sum = Long.valueOf(sumProp);
@@ -64,8 +101,26 @@ public class Overhead implements AppListener, Serializable {
         }
         
 	for(int i = 0; i < 4; i++) {
-	    AppContext.getTaskManager().scheduleTask(new SumTask(sum));
+            AppContext.getTaskManager().scheduleTask(new SumTask(sum));
 	}
+    }
+
+    private void reference(Properties props) {
+        int access;
+        String accessProp = props.getProperty(ACCESS);
+        try {
+            access = Integer.valueOf(accessProp);
+        } catch (NumberFormatException ignore) {
+            access = DEFAULT_ACCESS;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            AppContext.getTaskManager().scheduleTask(new ReferenceTask(access));
+        }
+    }
+
+    private void name(Properties props) {
+        
     }
 
     /**

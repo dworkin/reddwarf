@@ -156,7 +156,7 @@
   </profiles>
 
   <properties>
-    <sgs-server.version>0.9.10</sgs-server.version>
+    <sgs-server.version>0.9.11</sgs-server.version>
     <jvm.args>-server -XX:+AggressiveOpts -XX:+UseParallelOldGC -Xmx768M -XX:NewRatio=1</jvm.args>
     <jvm.args.extra></jvm.args.extra>
     <logging.properties>${project.build.directory}/test-classes/logging.properties</logging.properties>
