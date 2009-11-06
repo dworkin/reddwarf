@@ -34,7 +34,7 @@ import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /**
- * A thread for accepting and dispatching server connections of a request
+ * A listener for accepting and dispatching server connections of a request
  * queue.  When a socket connection is accepted, the listener will read a
  * {@code long}, which should not be negative, from the socket's input stream
  * to determine the node ID of the server that should handle the connection.
@@ -44,12 +44,18 @@ import java.util.logging.Logger;
  * If attempts to accept sockets, read the node ID from the socket input
  * stream, or pass the socket to the server continue to fail, the listener will
  * shut down.
+ *
+ * @see		RequestQueueClient
  */
 public final class RequestQueueListener extends Thread {
 
     /** The name of this class. */
     private static final String CLASSNAME =
 	RequestQueueListener.class.getName();
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /**
      * The property for specifying the maximum time in milliseconds to continue
@@ -70,10 +76,6 @@ public final class RequestQueueListener extends Thread {
     /** The default retry wait time in milliseconds. */
     public static final long DEFAULT_RETRY_WAIT = 100;
 
-    /** The logger for this class. */
-    private static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(CLASSNAME));
-
     /** The socket server. */
     private final ServerSocket serverSocket;
 
@@ -89,13 +91,16 @@ public final class RequestQueueListener extends Thread {
     /** The retry wait time in milliseconds. */
     private final long retryWait;
 
-    /** Whether the listener should shutdown. */
+    /**
+     * Whether the listener should shutdown.  Synchronize on this instance when
+     * accessing this field.
+     */
     private boolean shutdown;
 
     /**
      * The time in milliseconds of the first in the current run of failures
      * when attempting to accept connections, or {@code -1} if the last attempt
-     * succeeded.
+     * succeeded.  Synchronize on this instance when accessing this field.
      */
     private long failureStarted = -1;
 
@@ -292,10 +297,14 @@ public final class RequestQueueListener extends Thread {
      * Notes that a connection was accepted successfully for the specified
      * node.
      */
-    private synchronized void noteConnected(long nodeId) {
-	logger.log(FINER,
-		   "RequestQueueListener nodeId:" + nodeId +
-		   " connected successfully");
-	failureStarted = -1;
+    private void noteConnected(long nodeId) {
+	if (logger.isLoggable(FINER)) {
+	    logger.log(FINER,
+		       "RequestQueueListener nodeId:" + nodeId +
+		       " connected successfully");
+	}
+	synchronized (this) {
+	    failureStarted = -1;
+	}
     }
 }

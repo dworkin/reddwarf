@@ -79,6 +79,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     /** The request queue listener server dispatcher. */
     SimpleServerDispatcher serverDispatcher;
 
+    /** A failure reporter for checking if failure occurred. */
+    NoteFailure failureReporter;
+
     /** The request queue listener or {@code null}. */
     RequestQueueListener listener;
 
@@ -89,6 +92,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Before
     public void beforeTest() {
 	serverDispatcher = new SimpleServerDispatcher();
+	failureReporter = new NoteFailure();
+
     }
 
     /** Close the server socket and shutdown the connect thread, if present. */
@@ -101,6 +106,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	if (connect != null) {
 	    connect.shutdown();
 	}
+	if (failureReporter != null) {
+	    failureReporter.checkNotCalled();
+	}
     }
 
     /* -- Tests -- */
@@ -110,13 +118,13 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocket() {
 	new RequestQueueListener(
-	    null, serverDispatcher, noopFailureReporter, emptyProperties);
+	    null, serverDispatcher, failureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullServerDispatcher() {
 	new RequestQueueListener(
-	    unboundServerSocket, null, noopFailureReporter, emptyProperties);
+	    unboundServerSocket, null, failureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
@@ -128,7 +136,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test(expected=NullPointerException.class)
     public void testConstructorNullProperties() {
 	new RequestQueueListener(
-	    unboundServerSocket, serverDispatcher, noopFailureReporter, null);
+	    unboundServerSocket, serverDispatcher, failureReporter, null);
     }
 
     /* Test socket accept */

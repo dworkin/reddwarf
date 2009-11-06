@@ -21,18 +21,11 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 /**
  * A handler to be notified when an operation on an {@link UpdateQueue} has
- * either completed successfully or produced a failure.  This class is part of
- * the implementation of {@link CachingDataStore}.
+ * completed successfully.  This class is part of the implementation of {@link
+ * CachingDataStore}.
  */
 public interface CompletionHandler {
 
     /** Notifies this handler that the operation completed successfully. */
     void completed();
-
-    /**
-     * Notifies this handler that the operation failed with an exception.
-     *
-     * @param	exception the exception that caused the failure
-     */
-    void failed(Throwable exception);
 }

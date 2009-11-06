@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 /**
  * Provides support for determining when and whether to retry I/O operations.
+ * This class is part of the implementation of {@link CachingDataStore}.
  */
 class ShouldRetryIo {
 
@@ -76,9 +77,9 @@ class ShouldRetryIo {
     }
 
     /**
-     * Notes that an I/O operation has succeeded.  Use this method when 
-     * I/O operation succeeds but retries are still needed, so that the timer
-     * for failing I/O operations is reset.
+     * Notes that an I/O operation has succeeded.  Use this method when an I/O
+     * operation succeeds but retries are still needed, so that the timer for
+     * failing I/O operations is reset.
      */
     void ioSucceeded() {
 	failureStarted = -1;

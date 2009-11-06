@@ -57,8 +57,8 @@ import java.util.logging.Logger;
  * an exception, then {@code false} will be written to the output stream,
  * followed by the name of the exception class and the exception message.  Both
  * of these values are written by writing {@code false} if the value is {@code
- * null}, although the class name should never be {@code}, or else {@code true}
- * followed by the UTF8 encoding of the string. <p>
+ * null}, although the class name should never be {@code null}, or else {@code
+ * true} followed by the UTF8 encoding of the string. <p>
  *
  * Requests are numbered between {@code 0} and the configured maximum request
  * value.  To insure the correct handling of duplicate requests, the client
@@ -71,11 +71,17 @@ import java.util.logging.Logger;
  * will continue produce the same exception.
  *
  * @param	<R> the type of request
+ * @see		RequestQueueClient
+ * @see		RequestQueueListener
  */
 public class RequestQueueServer<R extends Request> {
 
     /** The name of this class. */
     private static final String CLASSNAME = RequestQueueServer.class.getName();
+
+    /** The logger for this class. */
+    static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /**
      * The property for specifying the largest request number, which must be at
@@ -96,10 +102,6 @@ public class RequestQueueServer<R extends Request> {
     /** The default maximum number of outstanding requests. */
     public static final int DEFAULT_MAX_OUTSTANDING = 10000;
 
-    /** The logger for this class. */
-    static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(CLASSNAME));
-
     /** The node ID for this server. */
     final long nodeId;
 
@@ -114,7 +116,7 @@ public class RequestQueueServer<R extends Request> {
 
     /**
      * The current connection, or {@code null} if not currently connected.
-     * Synchronize on this object when accessing.
+     * Synchronize on this instance when accessing this field.
      */
     private Connection connection = null;
 
@@ -254,7 +256,7 @@ public class RequestQueueServer<R extends Request> {
 	private volatile boolean disconnect;
 	
 	/**
-	 * Creates an instance of this class.
+	 * Creates an instance of this class and starts the thread.
 	 *
 	 * @param	socket the new socket
 	 */

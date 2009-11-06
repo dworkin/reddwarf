@@ -41,11 +41,8 @@ public interface Request {
     /**
      * Notes that a request has been completed.  Used to inform the client that
      * the server has completed the request.
-     *
-     * @param	exception the exception thrown when the request was performed,
-     *		or {@code null} if no exception was thrown
      */
-    void completed(Throwable exception);
+    void completed();
 
     /**
      * A object for reading and performing requests.  Used by the server to
@@ -68,8 +65,7 @@ public interface Request {
 	 * Performs a request.
 	 *
 	 * @param	request the request
-	 * @throws	Exception if the performing the request throws an
-	 *		exception 
+	 * @throws	Exception if the request fails
 	 */
 	void performRequest(R request) throws Exception;
     }

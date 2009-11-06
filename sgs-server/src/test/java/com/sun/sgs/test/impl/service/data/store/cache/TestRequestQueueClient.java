@@ -46,10 +46,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -88,6 +92,9 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     /** The request queue listener server dispatcher. */
     private SimpleServerDispatcher serverDispatcher;
 
+    /** A failure reporter for checking if failure occurred. */
+    private NoteFailure failureReporter;
+
     /** The request queue listener. */
     private RequestQueueListener listener;
 
@@ -104,13 +111,17 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Before
     public void beforeTest() throws IOException {
 	serverDispatcher = new SimpleServerDispatcher();
+	failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    new ServerSocket(PORT), serverDispatcher, noopFailureReporter,
+	    new ServerSocket(PORT), serverDispatcher, failureReporter,
 	    emptyProperties);
     }
 
     @After
     public void afterTest() throws Exception {
+	if (failureReporter != null) {
+	    failureReporter.checkNotCalled();
+	}
 	if (clientThread != null) {
 	    clientThread.shutdown();
 	    clientThread = null;
@@ -131,12 +142,12 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test(expected=IllegalArgumentException.class)
     public void testConstructorNegativeNodeId() {
 	new RequestQueueClient(
-	    -1, socketFactory, noopFailureReporter, emptyProperties);
+	    -1, socketFactory, failureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocketFactory() {
-	new RequestQueueClient(1, null, noopFailureReporter, emptyProperties);
+	new RequestQueueClient(1, null, failureReporter, emptyProperties);
     }
 
     @Test(expected=NullPointerException.class)
@@ -146,7 +157,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullProperties() {
-	new RequestQueueClient(1, socketFactory, noopFailureReporter, null);
+	new RequestQueueClient(1, socketFactory, failureReporter, null);
     }
 
     /* Test connection handling */
@@ -173,7 +184,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test
     public void testAddRequestNullRequest() {
 	client = new RequestQueueClient(
-	    1, socketFactory, noopFailureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, emptyProperties);
 	try {
 	    client.addRequest(null);
 	    fail("Expected NullPointerException");
@@ -184,7 +195,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test
     public void testAddRequestShutdown() {
 	client = new RequestQueueClient(
-	    1, socketFactory, noopFailureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, emptyProperties);
 	client.shutdown();
 	try {
 	    client.addRequest(new DummyRequest());
@@ -201,10 +212,10 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    new RequestQueueServer<SimpleRequest>(
 		1, new SimpleRequestHandler(), emptyProperties));
 	client = new RequestQueueClient(
-	    1, socketFactory, noopFailureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, emptyProperties);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
-	assertEquals(null, request.awaitCompleted(extraWait));
+	request.awaitCompleted(extraWait);
     }
 
     /* Test shutdown */
@@ -234,7 +245,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1, socketFactory, failureReporter, emptyProperties);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
-	assertEquals(null, request.awaitCompleted(extraWait));
+	request.awaitCompleted(extraWait);
 	client.shutdown();
 	client.shutdown();
 	failureReporter.checkNotCalled();
@@ -264,7 +275,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    }
 	};
 	clientThread.start();
-	assertEquals(null, firstRequest.awaitCompleted(100000));
+	firstRequest.awaitCompleted(100000);
 	client.shutdown();
 	client.shutdown();
 	failureReporter.checkNotCalled();
@@ -282,7 +293,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    new RequestQueueServer<SimpleRequest>(
 		1, new SimpleRequestHandler(), emptyProperties));
 	client = new RequestQueueClient(
-	    1, socketFactory, noopFailureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, emptyProperties);
 	clientThread = new InterruptableThread() {
 	    private int count = 0;
 	    boolean runOnce() throws Exception {
@@ -298,7 +309,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    private int count = 0;
 	    boolean runOnce() throws Exception {
 		SimpleRequest request = requests.takeFirst();
-		assertEquals(null, request.awaitCompleted(extraWait));
+		request.awaitCompleted(extraWait);
 		return ++count > total;
 	    }
 	};
@@ -321,6 +332,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
      */
     @Test
     public void testSendRequestsWithIOFailures() throws Exception {
+	final NoteFailure failureReporter = new NoteFailure();
 	final int total =
 	    Math.max(100, Integer.getInteger("test.message.count", 1000));
 	final long seed =
@@ -336,33 +348,50 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 		emptyProperties));
 	client = new RequestQueueClient(
 	    1, new FailingSocketFactory(new Random(seed + 1)),
-	    noopFailureReporter, emptyProperties);
+	    failureReporter, emptyProperties);
+	final AtomicBoolean clientDone = new AtomicBoolean(false);
 	clientThread = new InterruptableThread() {
 	    private int count = 0;
 	    boolean runOnce() throws Exception {
 		SimpleRequest request = new SimpleRequest(++count);
-		client.addRequest(request);
+		try {
+		    client.addRequest(request);
+		    System.err.println("Added request " + request);
+		} catch (IllegalStateException e) {
+		    if (count > total - 50) {
+			clientDone.set(true);
+			return true;
+		    } else {
+			throw e;
+		    }
+		}
 		requests.putLast(request);
 		return count > total;
 	    }
 	};
 	clientThread.start();
+	final Set<SimpleRequest> failingRequests =
+	    Collections.synchronizedSet(new HashSet<SimpleRequest>());
 	InterruptableThread receiveThread = new InterruptableThread() {
 	    private int count = 0;
 	    private String lastMessage;
 	    boolean runOnce() throws Exception {
-		SimpleRequest request = requests.takeFirst();
-		Throwable result = request.awaitCompleted(10000);
+		SimpleRequest request;
+		try {
+		    request = requests.takeFirst();
+		} catch (InterruptedException e) {
+		    if (clientDone.get()) {
+			return true;
+		    } else {
+			throw e;
+		    }
+		}
 		++count;
 		if (count < total - 50) {
-		    assertEquals(null, result);
+		    request.awaitCompleted(5000);
+		    assertEquals(null, failureReporter.getException());
 		} else {
-		    assertEquals(RuntimeException.class, result.getClass());
-		    if (lastMessage == null) {
-			lastMessage = result.getMessage();
-		    } else {
-			assertEquals(lastMessage, result.getMessage());
-		    }
+		    failingRequests.add(request);
 		}
 		return count > total;
 	    }
@@ -373,6 +402,13 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	} finally {
 	    receiveThread.shutdown();
 	}
+	Thread.sleep(1000);
+	for (SimpleRequest request : failingRequests) {
+	    assertFalse("Completed", request.getCompleted());
+	}
+	Throwable exception = failureReporter.getException();
+	assertFalse("Null exception", exception == null);
+	assertEquals(RuntimeException.class, exception.getClass());
     }
 
     @Test
@@ -436,12 +472,6 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	private boolean completed;
 
 	/**
-	 * If this request has been completed, the exception thrown or {@code
-	 * null}.
-	 */
-	private Throwable exception;
-
-	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	n the number of this request
@@ -485,9 +515,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	}
 
 	/** {@inheritDoc} */
-	public synchronized void completed(Throwable exception) {
+	public synchronized void completed() {
 	    completed = true;
-	    this.exception = exception;
 	    notifyAll();
 	}
 
@@ -495,12 +524,10 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	 * Waits for the request to be completed.
 	 *
 	 * @param	timeout the number of milliseconds to wait
-	 * @return	the exception thrown when performing the request or
-	 *		{@code null}
 	 * @throws	InterruptedException if the current thread is
 	 *		interrupted 
 	 */
-	synchronized Throwable awaitCompleted(long timeout)
+	synchronized void awaitCompleted(long timeout)
 	    throws InterruptedException
 	{
 	    long start = System.currentTimeMillis();
@@ -518,7 +545,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    }
 	    System.err.println("SimpleRequest.awaitCompleted actual wait: " +
 			       (System.currentTimeMillis() - start));
-	    return exception;
+	}
+
+	/** Returns whether the request was completed. */
+	synchronized boolean getCompleted() {
+	    return completed;
 	}
 
 	@Override

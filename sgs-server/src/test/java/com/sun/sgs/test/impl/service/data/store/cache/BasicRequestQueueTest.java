@@ -41,12 +41,6 @@ class BasicRequestQueueTest extends Assert {
     /** Empty properties. */
     static final Properties emptyProperties = new Properties();
 
-    /** A no-op failure reporter. */
-    static final FailureReporter noopFailureReporter =
-	new FailureReporter() {
-	    public void reportFailure(Throwable exception) { }
-	};
-
     /** Slop time when waiting. */
     final long extraWait = Long.getLong("test.extra.wait", 200);
 
@@ -93,7 +87,7 @@ class BasicRequestQueueTest extends Assert {
 	    }
 	}
 	public void writeRequest(DataOutput out) { }
-	public void completed(Throwable exception) { }
+	public void completed() { }
 	public String toString() {
 	    return "DummyRequest[n:" + n + "]";
 	}
@@ -104,10 +98,10 @@ class BasicRequestQueueTest extends Assert {
      * method has been called.
      */
     class NoteFailure implements FailureReporter {
-	private boolean called;
+	private Throwable exception = null;
 
 	public synchronized void reportFailure(Throwable exception) {
-	    called = true;
+	    this.exception = exception;
 	    notifyAll();
 	}
 
@@ -121,14 +115,14 @@ class BasicRequestQueueTest extends Assert {
 	{
 	    long start = System.currentTimeMillis();
 	    long wait = minTimeout + extraWait;
-	    while (!called) {
+	    while (exception == null) {
 		wait(wait);
 		if (System.currentTimeMillis() > start + wait) {
 		    fail("Failed to call reportFailure in " + wait + " ms");
 		}
 	    }
 	    long time = System.currentTimeMillis() - start;
-	    assertTrue(called);
+	    assertTrue("Expected to be called", exception != null);
 	    assertTrue("Called reportFailure earlier than " + minTimeout +
 		       " ms: " + time + " ms",
 		       time >= minTimeout);
@@ -138,7 +132,17 @@ class BasicRequestQueueTest extends Assert {
 
 	/** Check that the {@code reportFailure} method has not been called. */
 	synchronized void checkNotCalled() {
-	    assertFalse("Failure reporter should not be called", called);
+	    if (exception != null) {
+		AssertionError err = new AssertionError(
+		    "Failure reporter should not be called: " + exception);
+		err.initCause(exception);
+		throw err;
+	    }
+	}
+
+	/** Returns the reported exception or null. */
+	synchronized Throwable getException() {
+	    return exception;
 	}
     }
 

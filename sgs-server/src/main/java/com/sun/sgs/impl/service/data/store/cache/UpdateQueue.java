@@ -196,7 +196,7 @@ class UpdateQueue {
 	completed(contextId);
 	queue.addRequest(
 	    new Commit(oids, oidValues, newOids, names, nameValues, newNames,
-		       new FailingCompletionHandler(store) {
+		       new CompletionHandler() {
 			   @Override
 		           public void completed() {
 			       pendingAcknowledgeSet.remove(contextId);

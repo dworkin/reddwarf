@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import static com.sun.sgs.impl.sharedutil.Exceptions.initCause;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -44,12 +45,14 @@ import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /**
- * A thread that implements the client side of a request queue.  The {@link
- * #addRequest addRequest} method adds requests, which are transmitted to the
- * server side and run there exactly once.  Requests for which no response has
- * been received are retransmitted to the server as needed after a network
- * failure.  Once a request has been performed, its {@link Request#completed
- * Request.completed} method will be called. <p>
+ * The client side of a request queue.  The {@link #addRequest addRequest}
+ * method adds requests, which are transmitted to the server side and run there
+ * exactly once.  Requests for which no acknowledgement has been received are
+ * retransmitted to the server as needed after a network failure.  Once a
+ * request has been performed, its {@link Request#completed Request.completed}
+ * method will be called.  Requests are not permitted to have a return value.
+ * If evaluating a request on the server side throws an exception, the
+ * exception is treated as a failure. <p>
  *
  * Here's the network protocol:
  *
@@ -75,6 +78,9 @@ import java.util.logging.Logger;
  *	<code>(String) </code><i>exceptionMessage</i>
  * </ul>
  * </ul>
+ *
+ * @see		RequestQueueListener
+ * @see		RequestQueueServer
  */
 public final class RequestQueueClient extends Thread {
 
@@ -82,8 +88,8 @@ public final class RequestQueueClient extends Thread {
     private static final String CLASSNAME = RequestQueueClient.class.getName();
 
     /** The logger for this class. */
-    static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(CLASSNAME));
+    static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /**
      * The property for specifying the maximum time in milliseconds to continue
@@ -130,7 +136,7 @@ public final class RequestQueueClient extends Thread {
     /** The socket factory. */
     private final SocketFactory socketFactory;
 
-    /** The object to call if the listener fails. */ 
+    /** The object to call if the request queue fails. */ 
     private final FailureReporter failureReporter;
 
     /** The maximum retry time in milliseconds. */
@@ -144,11 +150,15 @@ public final class RequestQueueClient extends Thread {
 
     /**
      * The queue of requests, and their associated request numbers, that have
-     * been sent to the server but the client has not received responses.
+     * been sent to the server but have not been acknowledged.
      */
     final BlockingDeque<RequestHolder> sentRequests;
 
-    /** Requests from earlier connections that need to be resent, if any. */
+    /**
+     * Requests from earlier connections that need to be resent, if any.
+     * Access to this field does not need to be synchronized because it is only
+     * accessed by this thread.
+     */
     final List<RequestHolder> resendRequests = new ArrayList<RequestHolder>();
 
     /**
@@ -158,15 +168,15 @@ public final class RequestQueueClient extends Thread {
     private boolean shutdown;
 
     /**
-     * The time in milliseconds of the first in the current run of failures
+     * The time in milliseconds of the first in the current run of I/O failures
      * when attempting to make connections, or {@code -1} if the last attempt
-     * succeeded.  Synchronize on this thread when accessing.
+     * succeeded.  Synchronize on this thread when accessing this field.
      */
     private long failureStarted = -1;
 
     /**
      * The current connection, or {@code null} if not currently connected.
-     * Synchronize on this thread when accessing.
+     * Synchronize on this thread when accessing this field.
      */
     private Connection connection;
 
@@ -179,9 +189,10 @@ public final class RequestQueueClient extends Thread {
     /**
      * Creates an instance of this class and starts the thread.  The {@link
      * FailureReporter#reportFailure reportFailure} method of {@code
-     * failureReporter} will be called if the listener shuts itself down due to
+     * failureReporter} will be called if the queue shuts itself down due to
      * repeated failures when attempting to connect to the request queue
-     * server.  The failure reporter will not be called if a shutdown is
+     * server, or because evaluating a request on the server produced an
+     * exception.  The failure reporter will not be called if a shutdown is
      * requested explicitly by a call to the {@link #shutdown} method.
      *
      * @param	nodeId the node ID associated with this request queue
@@ -312,8 +323,7 @@ public final class RequestQueueClient extends Thread {
 		noteConnectionException(t);
 	    }
 	}
-	logger.log(FINE,
-		   "RequestQueueClient nodeId:" + nodeId + " shut down");
+	logger.log(FINE, "RequestQueueClient nodeId:" + nodeId + " shut down");
     }
 
     /** A factory for creating connected sockets. */
@@ -354,6 +364,7 @@ public final class RequestQueueClient extends Thread {
 	}
 
 	/** {@inheritDoc} */
+	@Override
 	public Socket createSocket() throws IOException {
 	    return new Socket(host, port);
 	}
@@ -377,7 +388,8 @@ public final class RequestQueueClient extends Thread {
 	if (shutdown) {
 	    return;
 	}
-	if (exception instanceof IOException) {
+	boolean ioFailure = exception instanceof IOException;
+	if (ioFailure) {
 	    if (logger.isLoggable(FINER)) {
 		logger.logThrow(FINER, exception,
 				"RequestQueueClient nodeId:" + nodeId + 
@@ -392,7 +404,7 @@ public final class RequestQueueClient extends Thread {
 	if (failureStarted == -1) {
 	    failureStarted = now;
 	}
-	if (now > failureStarted + maxRetry) {
+	if (!ioFailure || now > failureStarted + maxRetry) {
 	    shutdown = true;
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, exception,
@@ -485,8 +497,9 @@ public final class RequestQueueClient extends Thread {
 	     * present since they should be sent first, making sure to maintain
 	     * their order.
 	     */
-	    while (!sentRequests.isEmpty()) {
-		resendRequests.add(0, sentRequests.removeLast());
+	    if (!sentRequests.isEmpty()) {
+		resendRequests.addAll(0, sentRequests);
+		sentRequests.clear();
 	    }
 	    socket = socketFactory.createSocket();
 	    /* Configure the socket's input stream to timeout */
@@ -535,8 +548,9 @@ public final class RequestQueueClient extends Thread {
 	 * ReceiveThread}.
 	 *
 	 * @throws	Exception if a problem occurs writing requests to the
-	 *		socket output stream or reading responses from the
-	 *		socket input stream
+	 *		socket output stream, reading responses from the
+	 *		socket input stream, or performing the request on the
+	 *		server
 	 */
 	void handleConnection() throws Exception {
 	    try {
@@ -582,13 +596,17 @@ public final class RequestQueueClient extends Thread {
 		}
 		/* Throw exception seen by the receive thread, if any */
 		Throwable receiveException =
-		    receiveThread.getReceiveException();
+		    receiveThread.getException();
 		if (receiveException instanceof Exception) {
 		    throw (Exception) receiveException;
 		} else if (receiveException instanceof Error) {
 		    throw (Error) receiveException;
+		} else if (receiveException != null) {
+		    throw initCause(
+			new AssertionError(
+			    "Unexpected exception: " + receiveException),
+			receiveException);
 		}
-		assert receiveException == null;
 	    } finally {
 		try {
 		    socket.close();
@@ -604,10 +622,11 @@ public final class RequestQueueClient extends Thread {
 	    private final DataInput in;
 
 	    /**
-	     * The exception thrown when reading server input or {@code null}.
-	     * Synchronize on this thread when accessing this field.
+	     * The exception thrown by the server or when reading server input,
+	     * or {@code null}.  Synchronize on this thread when accessing this
+	     * field.
 	     */
-	    private Throwable receiveException;
+	    private Throwable exception;
 
 	    /**
 	     * The number of sent messages awaiting replies.  Synchronize on
@@ -648,29 +667,38 @@ public final class RequestQueueClient extends Thread {
 			    }
 			}
 			Throwable requestException = readResponse();
+			RequestHolder holder = sentRequests.removeFirst();
+			if (requestException != null) {
+			    if (logger.isLoggable(FINEST)) {
+				logger.logThrow(
+				    FINEST, requestException,
+				    "RequestQueueClient nodeId:" + nodeId +
+				    " received reply" +
+				    " requestNumber:" + holder.requestNumber +
+				    "failed");
+			    }
+			    setException(requestException);
+			    return;
+			}
 			if (firstMessage) {
 			    noteConnected();
 			    firstMessage = false;
 			}
-			RequestHolder holder = sentRequests.removeFirst();
 			if (logger.isLoggable(FINEST)) {
 			    logger.log(
 				FINEST,
 				"RequestQueueClient nodeId:" + nodeId +
 				" received reply" +
 				" requestNumber:" + holder.requestNumber +
-				(requestException == null
-				 ? " succeeded"
-				 : " failed: " + requestException));
+				" succeeded");
 			}
-			holder.request.completed(requestException);
+			holder.request.completed();
 			synchronized (this) {
 			    pendingReplies--;
 			}
 		    }
-		    return;
 		} catch (Throwable t) {
-		    setReceiveException(t);
+		    setException(t);
 		}
 	    }
 
@@ -708,18 +736,18 @@ public final class RequestQueueClient extends Thread {
 	     *
 	     * @return	the exception or {@code null}
 	     */
-	    synchronized Throwable getReceiveException() {
-		return receiveException;
+	    synchronized Throwable getException() {
+		return exception;
 	    }
 
 	    /**
 	     * Sets the exception that the receive thread got when reading
 	     * responses from the server.
 	     */
-	    private void setReceiveException(Throwable exception) {
+	    private void setException(Throwable exception) {
 		if (!disconnect) {
 		    synchronized (this) {
-			receiveException = exception;
+			this.exception = exception;
 		    }
 		    disconnect(false);
 		}

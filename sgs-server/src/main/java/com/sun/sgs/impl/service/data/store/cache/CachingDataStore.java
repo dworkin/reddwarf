@@ -2540,12 +2540,11 @@ public class CachingDataStore extends AbstractDataStore
      * A {@link KernelRunnable} that downgrades an object after accessing it
      * for read.
      */
-    private class DowngradeObjectTask extends FailingCompletionHandler
-	implements KernelRunnable
+    private class DowngradeObjectTask 
+	implements CompletionHandler, KernelRunnable
     {
 	private final long oid;
 	DowngradeObjectTask(long oid) {
-	    super(CachingDataStore.this);
 	    this.oid = oid;
 	}
 	public void run() {
@@ -2618,12 +2617,9 @@ public class CachingDataStore extends AbstractDataStore
      * A {@code CompletionHandler} that updates the cache for an object that
      * has been evicted.
      */
-    private class EvictObjectCompletionHandler
-	extends FailingCompletionHandler
-    {
+    private class EvictObjectCompletionHandler implements CompletionHandler {
 	final long oid;
 	EvictObjectCompletionHandler(long oid) {
-	    super(CachingDataStore.this);
 	    this.oid = oid;
 	    pendingEvictions.incrementAndGet();
 	}
@@ -2634,10 +2630,6 @@ public class CachingDataStore extends AbstractDataStore
 		cache.removeObjectEntry(oid);
 		pendingEvictions.decrementAndGet();
 	    }
-	}
-	public void failed(Throwable exception) {
-	    pendingEvictions.decrementAndGet();
-	    super.failed(exception);
 	}
     }
 
@@ -2748,10 +2740,9 @@ public class CachingDataStore extends AbstractDataStore
      * A {@code CompletionHandler} that does nothing on successful
      * completion.
      */
-    private class NullCompletionHandler extends FailingCompletionHandler {
-	NullCompletionHandler() {
-	    super(CachingDataStore.this);
-	}
+    private static class NullCompletionHandler implements CompletionHandler {
+	NullCompletionHandler() { }
+	@Override
 	public void completed() { }
     }
 
@@ -2828,10 +2819,9 @@ public class CachingDataStore extends AbstractDataStore
      * A {@code CompletionHandler} that updates the cache for a binding that
      * has been downgraded.
      */
-    private class DowngradeCompletionHandler extends FailingCompletionHandler {
+    private class DowngradeCompletionHandler implements CompletionHandler {
 	private final BindingKey nameKey;
 	DowngradeCompletionHandler(BindingKey nameKey) {
-	    super(CachingDataStore.this);
 	    this.nameKey = nameKey;
 	}
 	public void completed() {
@@ -2913,12 +2903,9 @@ public class CachingDataStore extends AbstractDataStore
      * A {@code CompletionHandler} that updates the cache for a binding that
      * has been evicted.
      */
-    private class EvictBindingCompletionHandler
-	extends FailingCompletionHandler
-    {
+    private class EvictBindingCompletionHandler implements CompletionHandler {
 	private final BindingKey nameKey;
 	EvictBindingCompletionHandler(BindingKey nameKey) {
-	    super(CachingDataStore.this);
 	    this.nameKey = nameKey;
 	    pendingEvictions.incrementAndGet();
 	}
@@ -2930,10 +2917,6 @@ public class CachingDataStore extends AbstractDataStore
 		pendingEvictions.decrementAndGet();
 	    }
 	}
-	public void failed(Throwable exception) {
-	    pendingEvictions.decrementAndGet();
-	    super.failed(exception);
-	}
     }
 
     /**
@@ -2941,14 +2924,13 @@ public class CachingDataStore extends AbstractDataStore
      * that has been evicted.
      */
     private class EvictUnboundNameCompletionHandler
-	extends FailingCompletionHandler
+	implements CompletionHandler
     {
 	final BindingKey nameKey;
 	final BindingKey entryKey;
 	EvictUnboundNameCompletionHandler(BindingKey nameKey,
 					  BindingKey entryKey)
 	{
-	    super(CachingDataStore.this);
 	    this.nameKey = nameKey;
 	    this.entryKey = entryKey;
 	}

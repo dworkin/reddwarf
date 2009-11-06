@@ -31,7 +31,10 @@ import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
-/** Maintains state associated with a transaction. */
+/**
+ * Maintains the state that the {@link CachingDataStore} associates with a
+ * transaction.
+ */
 class TxnContext {
 
     /** The logger for this class. */
@@ -139,11 +142,9 @@ class TxnContext {
 	if (!prepared) {
 	    throw new IllegalStateException(
 		"Transaction has not been prepared: " + txn);
-	} else if (!getModified()) {
-	    throw new IllegalStateException(
-		"Transaction is not modified: " + txn);
+	} else if (getModified()) {
+	    commitInternal();
 	}
-	commitInternal();
     }
 
     /** Aborts the transaction. */
@@ -151,6 +152,7 @@ class TxnContext {
 	store.getUpdateQueue().abort(contextId, prepared);
 	Cache cache = store.getCache();
 	if (modifiedObjects != null) {
+	    /* Roll back modified objects */
 	    for (SavedObjectValue saved : modifiedObjects) {
 		Object lock = cache.getObjectLock(saved.key);
 		synchronized (lock) {
@@ -167,6 +169,7 @@ class TxnContext {
 	    }
 	}
 	if (modifiedBindings != null) {
+	    /* Roll back modified bindings */
 	    for (Entry<BindingKey, SavedBindingValue> savedEntry :
 		     modifiedBindings.entrySet())
 	    {

@@ -72,15 +72,9 @@ abstract class UpdateQueueRequest implements Request {
     }
 
     @Override
-    public void completed(Throwable exception) {
+    public void completed() {
 	if (completionHandler != null) {
-	    if (exception == null) {
-		completionHandler.completed();
-	    } else {
-		completionHandler.failed(
-		    new Exception("Request " + this + " failed: " + exception,
-				  exception));
-	    }
+	    completionHandler.completed();
 	}
     }
 
