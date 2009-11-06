@@ -1191,7 +1191,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * An action to send a message.
+     * An action to send a message.  This commit action is created by the
+     * associated session's {@code ClientSessionImpl} when processing a
+     * request to send a message to the client.<p>
+     *
+     * When this action is executed, it notifies the session's {@link
+     * SessionProtocol}  to send the message obtained from the
+     * {@link SendEvent} specified during construction.
      */
     class SendMessageAction implements Action {
 
@@ -1226,8 +1232,26 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * An action to move the associated client session from this node to
-     * another node.
+     * An action to start the process of moving the associated client
+     * session from this node to another node (the {@code newNode}
+     * specified during construction).  This commit action is created by
+     * the associated session's {@code ClientSessionImpl} when processing a
+     * request to move the client to a new node. <p>
+     *
+     * When this action is executed, it sends a {@link
+     * ClientSessionServer#relocatingSession relocatingSession}
+     * notification to the new node's {@code ClientSessionServer} to obtain
+     * a relocation key for the client session.  Once the relocation key is
+     * obtained, it notifies the client session service to notify all
+     * registered {@link ClientSessionStatusListener}s (i.e., the
+     * {@code ChannelService}) to prepare to relocate the client session.<p>
+     *
+     * When all {@code ClientSessionStatusListener}s have completed
+     * preparing the client session to relocate, this instance's {@link
+     * MoveAction#completed completed} method is invoked, which, in turn
+     * notifies the associated session's {@link SessionProtocol} to
+     * relocate the client's connection, supplying the new node's
+     * information and the relocation key.
      */
     class MoveAction implements Action, SimpleCompletionHandler {
 
@@ -1359,7 +1383,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * An action to disconnect the client session.
+     * An action to disconnect the client session.  This commit action is
+     * created by the associated session's {@code ClientSessionImpl} when
+     * processing a request to disconnect the client session.
      */
     class DisconnectAction implements Action {
 	/** {@inheritDoc} */

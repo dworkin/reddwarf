@@ -25,11 +25,13 @@ import com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy;
 import java.util.Properties;
 
 /**
- * A configurable (at runtime) node policy.  By default, it: always
- * assigns to the local requesting node.  Round robin assignment is used
- * when the server is making the request due to node failure. <p>
+ * A configurable (at runtime) node policy.  By default, it always assigns
+ * to the local requesting node (i.e., LocalNodePolicy) and round robin
+ * assignment is used when the server is making the request due to node
+ * failure. <p>
  *
- * Use the "set" method to modify the policy.
+ * Use the {@link #setRoundRobinPolicy} and {@link #setLocalNodePolicy}
+ * methods to modify the policy.
  */
 public class ConfigurableNodePolicy extends RoundRobinPolicy {
 
@@ -37,6 +39,9 @@ public class ConfigurableNodePolicy extends RoundRobinPolicy {
     
     /** 
      * Creates a new instance with the default local node policy.
+     * Constructing an instance of this class resets the default policy for
+     * all instances of this class.
+     *
      * @param props service properties
      */
     public ConfigurableNodePolicy(Properties props) {

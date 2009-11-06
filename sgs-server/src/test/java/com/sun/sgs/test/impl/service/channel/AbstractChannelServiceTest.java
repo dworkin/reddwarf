@@ -1062,8 +1062,8 @@ public abstract class AbstractChannelServiceTest extends Assert {
      * until the "{@link #releaseChannelServerMethodHeld
      * releaseChannelServerMethodHeld} method is invoke with the specified
      * {@code node}.  Invocations to a {@code ChannelServer} on a local
-     * node will not be held because such invocations are made directly and
-     * not through a proxy.
+     * node will not be held because such invocations are made directly on
+     * the server implementation and not through a proxy.
      */
     protected void holdChannelServerMethodToNode(
 	SgsTestNode node, final String methodName)
@@ -1082,6 +1082,11 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	}
     }
 
+    /**
+     * Waits for a notification of the method specified by a previous
+     * invocation to {@link #holdChannelServerMethodToNode} to the
+     * specified node.
+     */
     protected void waitForHeldChannelServerMethodToNode(SgsTestNode node) 
 	throws Exception
     {
