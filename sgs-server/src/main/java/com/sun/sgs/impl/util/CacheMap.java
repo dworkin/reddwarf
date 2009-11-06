@@ -27,7 +27,9 @@ import java.util.Map;
 /**
  * A map with values that are softly-referenced.  An entry is removed if
  * its associated value gets garbage-collected, or, if the cache was
- * constructed with a timeout, when the timeout expires for that entry.
+ * constructed with a timeout, when the timeout expires for that entry.  A
+ * timeout is typically used to have the implementation automatically
+ * remove values that become stale after a certain period of time.
  *
  * @param	<K> the key type
  * @param	<V> the value type

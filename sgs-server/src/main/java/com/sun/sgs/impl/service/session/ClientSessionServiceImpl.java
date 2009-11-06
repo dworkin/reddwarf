@@ -394,6 +394,7 @@ public final class ClientSessionServiceImpl
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreClientSessionServiceProxy") {
 		    public void run() {
+			// TBD: this could use a BindingKeyedMap.
 			dataService.setServiceBinding(
 			    getClientSessionServerKey(localNodeId),
 			    new ManagedSerializable<ClientSessionServer>(
@@ -599,8 +600,10 @@ public final class ClientSessionServiceImpl
      *
      * Before an identity is relocated from this node the {@link
      * #prepareToRelocate} method is invoked on this listener.  If the
-     * identity corresponds to a local client session, then the client
-     * session should be relocated to the new node.<p>
+     * identity corresponds to a local client session, then this service
+     * starts to prepare the client session for relocation.  First, it adds
+     * a {@code MoveEvent} to the client session's event queue so that the
+     * client session can be marked as relocating.
      */
     private class IdentityRelocationListenerImpl
 	implements IdentityRelocationListener
@@ -683,7 +686,17 @@ public final class ClientSessionServiceImpl
     }
 
     /* -- Implement NodeMappingListener -- */
-    
+
+    /**
+     * The client session service's {@code NodeMappingListener}
+     * implementation is interested in mappings that have been removed from
+     * the local node that correspond to client sessions that are
+     * relocating from this node.  When the node mapping service removes
+     * the identity mapping of a relocating session from this node, that
+     * means relocation preparation is complete and the client session
+     * corresponding to the identity can be notified to relocate its
+     * connection to the new node.
+     */
     private class NodeMappingListenerImpl implements NodeMappingListener {
 
 	/** {@inheritDoc} */
@@ -714,14 +727,26 @@ public final class ClientSessionServiceImpl
 			    sessionRefId, localNodeId);
 		    }
 		} else {
-		    if (logger.isLoggable(Level.WARNING)) {
-			logger.log(
-			    Level.WARNING,
-			    "Disconnecting unprepared session:{0} whose " +
-			    "identity:{1} was remapped from localNodeId:{2} " +
-			    "to node:{3}",
-			    HexDumper.toHexString(sessionRefId),
-			    id, localNodeId, newNode.getId());
+		    if (newNode != null) {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+			        Level.WARNING,
+				"Disconnecting unprepared session:{0} whose " +
+				"identity:{1} was remapped from " +
+				"localNodeId:{2} to node:{3}",
+				HexDumper.toHexString(sessionRefId),
+				id, localNodeId, newNode.getId());
+			}
+		    } else {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+				Level.WARNING,
+				"Disconnecting session:{0} whose " +
+				"identity:{1} was removed prematurely " +
+				"from localNodeId:{2} ",
+				HexDumper.toHexString(sessionRefId),
+				id, localNodeId);
+			}
 		    }
 		    sessionHandler.handleDisconnect(false, false);
 		}
@@ -731,6 +756,10 @@ public final class ClientSessionServiceImpl
 
     /* -- Implement ProtocolListener -- */
 
+    /**
+     * This {@code ProtocolListener} implementation handles new and
+     * relocated client sessions.
+     */
     private class ProtocolListenerImpl implements ProtocolListener {
 
 	/** {@inheritDoc} */

@@ -165,6 +165,8 @@ public class ClientSessionImpl
 	this.wrappedSessionRef =
 	    dataService.createReference(new ClientSessionWrapper(sessionRef));
 	idBytes = id.toByteArray();
+	// TBD: these service bindings could be stored in a BindingKeyedMap
+	// instead.
 	dataService.setServiceBinding(getSessionKey(), this);
 	dataService.setServiceBinding(getSessionNodeKey(), this);
 	dataService.setServiceBinding(getEventQueueKey(), new EventQueue(this));
@@ -389,6 +391,7 @@ public class ClientSessionImpl
 	dataService.markForUpdate(this);
 	dataService.removeServiceBinding(getSessionNodeKey());
 	nodeId = newNodeId;
+	// TBD: this could use a BindingKeyedMap.
 	dataService.setServiceBinding(getSessionNodeKey(), this);
     }
 
@@ -729,6 +732,7 @@ public class ClientSessionImpl
 	    (ManagedObject) listener :
 	    new ListenerWrapper(listener);
 	String listenerKey = getListenerKey();
+	// TBD: this could use a BindingKeyedMap.
 	dataService.setServiceBinding(listenerKey, managedObject);
     }
 
@@ -927,6 +931,12 @@ public class ClientSessionImpl
 	}
     }
 
+    /**
+     * A client session 'send' event, enqueued by a {@code
+     * ClientSession.send} invocation.  When this event commits, a task is
+     * scheduled to deliver the message, specified during construction, to
+     * the client session.
+     */
     static class SendEvent extends SessionEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -973,6 +983,19 @@ public class ClientSessionImpl
 	}
     }
 
+    /**
+     * A client session 'move' event.  This event is processed on the
+     * client session's old node to mark the session as relocating.  Once
+     * the session is marked for relocation, the associated session's event
+     * processing is suspended until the session is relocated to the new
+     * node. <p>
+     * 
+     * When this event commits, a task is scheduled to commence preparation
+     * for the client session to relocate.  The first action is to obtain a
+     * relocation key from the new node and notify interested parties to
+     * prepare for relocation. See {@link ClientSessionHandler#MoveAction}
+     * for details.
+     */
     private static class MoveEvent extends SessionEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -1021,6 +1044,16 @@ public class ClientSessionImpl
 	}
     }
 
+    /**
+     * A client session 'disconnect' event, enqueued when the session's
+     * associated {@code ClientSessionWrapper} is removed, or if there is a
+     * problem during client login, after the client session has been
+     * persisted. <p>
+     *
+     * When this event commits, a task is scheduled to disconnect the
+     * client session, cleanup its persistent data, and notify the client
+     * session's listener of the disconnection.
+     */
     private static class DisconnectEvent extends SessionEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -1268,6 +1301,7 @@ public class ClientSessionImpl
 	public void run() {
 	    DataService dataService =
 		ClientSessionServiceImpl.getDataService();
+	    // TBD: this could use a BindingKeyedMap.
 	    String key = dataService.nextServiceBoundName(lastKey);
 	    if (key != null && key.startsWith(nodePrefix)) {
 		TaskService taskService =
