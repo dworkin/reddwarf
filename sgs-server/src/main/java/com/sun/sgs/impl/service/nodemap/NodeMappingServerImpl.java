@@ -1135,10 +1135,12 @@ public final class NodeMappingServerImpl
                     if (notifyMap.containsKey(nodeId)) {
                         assignPolicy.nodeAvailable(nodeId);
                     }
+                    cancelOffload(nodeId);
                     break;
 
                 case YELLOW :
                     assignPolicy.nodeUnavailable(nodeId);
+                    cancelOffload(nodeId);
                     break;
 
                 case ORANGE :
@@ -1160,13 +1162,7 @@ public final class NodeMappingServerImpl
                     } catch (IOException ignore) {
                         // can't happen, local call
                     }
-                    try {
-                        coordinator.offload(node);
-                    } catch (NoNodesAvailableException ex) {
-                        logger.logThrow(Level.WARNING, ex,
-                                        "Unable to offload failed node: {0}",
-                                        node);
-                    }
+                    scheduleOffload(nodeId);
                     break;
 
                 default :
@@ -1198,8 +1194,8 @@ public final class NodeMappingServerImpl
                                             new OffloadTask(nodeId),
                                             taskOwner,
                                             0, offloadDelay);
-                handle.start();
                 offloadTasks.put(nodeId, handle);
+                handle.start();
             }
         }
     }
@@ -1210,12 +1206,13 @@ public final class NodeMappingServerImpl
      * @param nodeId a node ID
      */
     private void cancelOffload(long nodeId) {
-        synchronized (offloadTasks) {
-            RecurringTaskHandle handle = offloadTasks.remove(nodeId);
+        final RecurringTaskHandle handle;
 
-            if (handle != null) {
-                handle.cancel();
-            }
+        synchronized (offloadTasks) {
+            handle = offloadTasks.remove(nodeId);
+        }
+        if (handle != null) {
+            handle.cancel();
         }
     }
 
@@ -1244,13 +1241,24 @@ public final class NodeMappingServerImpl
 
                 final Node node = atask.getNode();
 
-                // Only offload while health is poor, not dead
-                if ((node != null) &&
-                    node.getHealth().equals(Node.Health.ORANGE))
-                {
-                    coordinator.offload(node);
-                    return; // continue offloading
+                // If the node is still around, check if need to offload
+                if (node != null) {
+
+                    // Offload if ORANGE or RED, note that if RED everything
+                    // gets offloaded and this task can be canceled
+                    if (node.getHealth().worseThan(Node.Health.YELLOW)) {
+                        coordinator.offload(node);
+                    }
+                    
+                    if (node.isAlive()) {
+                        return; // continue offloading
+                    }
                 }
+                // Dropping out here will cause the task to be canceled. Note
+                // that we can't cancel due to improved health, since health
+                // may have gotten worse since GetNodeTask ran. We can cancel
+                // if RED since offload() moves everyone in that case and
+                // a node can never improve once there.
             } catch (Exception e) {
                 if ((e instanceof ExceptionRetryStatus) &&
                     (((ExceptionRetryStatus)e).shouldRetry()))
@@ -1260,8 +1268,7 @@ public final class NodeMappingServerImpl
                 logger.logThrow(Level.WARNING, e,
                                 "Offload failed for node: {0}", nodeId);
             }
-            // Either the node has failed or its healh has improved, or there
-            // was a non-retryable exception
+            // Either the node has failed or there was a non-retryable exception
             cancelOffload(nodeId);
         }
     }

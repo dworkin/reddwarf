@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.nodemap.coordinator.simple;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.IdentityMO;
 import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
