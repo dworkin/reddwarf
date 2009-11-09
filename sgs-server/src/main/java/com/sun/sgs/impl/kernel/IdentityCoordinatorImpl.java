@@ -42,7 +42,7 @@ import javax.security.auth.login.LoginException;
  * This package-private implementation of <code>IdentityCoordinator</code> is
  * the implementation used by the system when configuring an application. It
  * manages an ordered collection of <code>IdentityAuthenticator</code>s. The
- * ordering is used to determine precidence when more than one authenticator
+ * ordering is used to determine precedence when more than one authenticator
  * can consume the same credentials.
  * <p>
  * This implementation is kept private to this package so that the context
@@ -67,7 +67,7 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
     /**
      * Creates an instance of <code>IdentityCoordinatorImpl</code> that has
      * the given <code>IdentityAuthenticators</code> available to authenticate
-     * identities. The order of the authenticators determines precidence
+     * identities. The order of the authenticators determines precedence
      * when more than one authenticator supports a given credentials type.
      *
      * @param authenticators the available <code>IdentityAuthenticator</code>s
