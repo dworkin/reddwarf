@@ -239,9 +239,9 @@ public final class ChannelServiceImpl
 	    new CacheMap<BigInteger, Set<BigInteger>>(1000);
 
     /** The cache of channel event queues, keyed by channel ID. */ 
-    private final ConcurrentHashMap<BigInteger, Queue<ChannelEventInfo>>
-	eventQueueCache =
-	    new ConcurrentHashMap<BigInteger, Queue<ChannelEventInfo>>();
+    private final ConcurrentHashMap<BigInteger, Queue<MembershipEventInfo>>
+	membershipEventsCache =
+	    new ConcurrentHashMap<BigInteger, Queue<MembershipEventInfo>>();
 
     /** The local channel membership info, keyed by channel ID. */
     private final ConcurrentHashMap<BigInteger, LocalChannelInfo>
@@ -1325,11 +1325,11 @@ public final class ChannelServiceImpl
      * @param	eventTimestamp the event's timestamp
      * @param	expirationTimestamp the event queue's timestamp
      */
-    void cacheEvent(ChannelEventType eventType,
-		    BigInteger channelRefId,
-		    BigInteger sessionRefId,
-		    long eventTimestamp,
-		    long expirationTimestamp)
+    void cacheMembershipEvent(MembershipEventType eventType,
+			      BigInteger channelRefId,
+			      BigInteger sessionRefId,
+			      long eventTimestamp,
+			      long expirationTimestamp)
     {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
@@ -1339,11 +1339,12 @@ public final class ChannelServiceImpl
 		HexDumper.toHexString(sessionRefId),
 		eventTimestamp, expirationTimestamp);
 	}
-	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
+	Queue<MembershipEventInfo> queue =
+	    membershipEventsCache.get(channelRefId);
 	if (queue == null) {
-	    Queue<ChannelEventInfo> newQueue =
-	       new LinkedList<ChannelEventInfo>();
-	    queue = eventQueueCache.putIfAbsent(channelRefId, newQueue);
+	    Queue<MembershipEventInfo> newQueue =
+	       new LinkedList<MembershipEventInfo>();
+	    queue = membershipEventsCache.putIfAbsent(channelRefId, newQueue);
 	    if (queue == null) {
 		queue = newQueue;
 	    }
@@ -1353,9 +1354,9 @@ public final class ChannelServiceImpl
 	    removeExpiredChannelEvents(queue, eventTimestamp);
 	    // cache event.
 	    queue.offer(
-		new ChannelEventInfo(eventType, sessionRefId,
-				     eventTimestamp,
-				     expirationTimestamp));
+		new MembershipEventInfo(eventType, sessionRefId,
+					eventTimestamp,
+					expirationTimestamp));
 	}
     }
     
@@ -1404,12 +1405,13 @@ public final class ChannelServiceImpl
 		       HexDumper.toHexString(sessionRefId), isChannelMember,
 		       timestamp);
 	}
-	Queue<ChannelEventInfo> queue = eventQueueCache.get(channelRefId);
+	Queue<MembershipEventInfo> queue =
+	    membershipEventsCache.get(channelRefId);
 	if (queue != null) {
 	    synchronized (queue) {
 		// remove events with timestamp <= eventTimestamp.
 		removeExpiredChannelEvents(queue, timestamp);
-		for (ChannelEventInfo info : queue) {
+		for (MembershipEventInfo info : queue) {
 		    if (info.eventTimestamp > timestamp) {
 			break;
 		    }
@@ -1458,12 +1460,12 @@ public final class ChannelServiceImpl
      * to the specified {@code timestamp}.
      */
     private void removeExpiredChannelEvents(
-	Queue<ChannelEventInfo> queue, long timestamp)
+	Queue<MembershipEventInfo> queue, long timestamp)
     {
 	assert Thread.holdsLock(queue);
 	
 	while (!queue.isEmpty()) {
-	    ChannelEventInfo info = queue.peek();
+	    MembershipEventInfo info = queue.peek();
 	    if (info.expirationTimestamp > timestamp) {
 		return;
 	    }
@@ -1794,7 +1796,7 @@ public final class ChannelServiceImpl
      */
     void closedChannel(BigInteger channelRefId) {
 	coordinatorTaskQueues.remove(channelRefId);
-	eventQueueCache.remove(channelRefId);
+	membershipEventsCache.remove(channelRefId);
 	synchronized (contextList) {
 	    channelTaskQueues.remove(channelRefId);
 	}
@@ -2563,8 +2565,8 @@ public final class ChannelServiceImpl
 	}
     }
 
-    /** Channel event types. */
-    static enum ChannelEventType { JOIN, LEAVE };
+    /** Channel membership event types. */
+    static enum MembershipEventType { JOIN, LEAVE };
 
     /**
      * Channel event information for join/leave requests.  If a channel is
@@ -2574,17 +2576,17 @@ public final class ChannelServiceImpl
      * can be quickly and correctly determined without having to verify
      * the membership with the session's (potentially remote) node.
      */
-    private static class ChannelEventInfo {
+    private static class MembershipEventInfo {
 
-	final ChannelEventType eventType;
+	final MembershipEventType eventType;
 	final BigInteger sessionRefId;
 	final long eventTimestamp;
 	final long expirationTimestamp;
 	
-	ChannelEventInfo(ChannelEventType eventType,
-			 BigInteger sessionRefId,
-			 long eventTimestamp,
-			 long expirationTimestamp)
+	MembershipEventInfo(MembershipEventType eventType,
+			    BigInteger sessionRefId,
+			    long eventTimestamp,
+			    long expirationTimestamp)
 	{
 	    this.eventType = eventType;
 	    this.sessionRefId = sessionRefId;

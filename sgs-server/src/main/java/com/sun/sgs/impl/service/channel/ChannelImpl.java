@@ -37,7 +37,7 @@ import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableDeque;
 import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
-import com.sun.sgs.impl.service.channel.ChannelServiceImpl.ChannelEventType;
+import com.sun.sgs.impl.service.channel.ChannelServiceImpl.MembershipEventType;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
@@ -2111,8 +2111,8 @@ class ChannelImpl implements ManagedObject, Serializable {
 	protected void completed() {
 	    long eventQueueTimestamp = getEventQueueTimestamp();
 	    if (eventQueueTimestamp > timestamp) {
-		channelService.cacheEvent(
-		    ChannelEventType.JOIN, channelRefId, sessionRefId,
+		channelService.cacheMembershipEvent(
+		    MembershipEventType.JOIN, channelRefId, sessionRefId,
 		    timestamp, eventQueueTimestamp);
 	    }
 	    super.completed();
@@ -2207,8 +2207,8 @@ class ChannelImpl implements ManagedObject, Serializable {
 	protected void completed() {
 	    long eventQueueTimestamp = getEventQueueTimestamp();
 	    if (eventQueueTimestamp > timestamp) {
-		channelService.cacheEvent(
-		    ChannelEventType.LEAVE, channelRefId, sessionRefId,
+		channelService.cacheMembershipEvent(
+		    MembershipEventType.LEAVE, channelRefId, sessionRefId,
 		    timestamp, eventQueueTimestamp);
 	    }
 	    super.completed();
