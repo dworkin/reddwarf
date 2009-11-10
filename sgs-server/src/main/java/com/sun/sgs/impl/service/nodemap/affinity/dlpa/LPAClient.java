@@ -54,7 +54,8 @@ public interface LPAClient extends Remote {
     void startIteration(int iteration) throws IOException;
 
     /**
-     * Returns the affinity groups found on this node.
+     * Returns the affinity groups found on this node.  An empty set is returned
+     * if there are no affinity groups on this node.
      * Called by the LPAServer.  The LPAServer must call this with
      * {@code done} set to {@code true} if it intends to start another algorithm
      * run at any time in the future, even if the current run fails.
@@ -88,7 +89,7 @@ public interface LPAClient extends Remote {
     /**
      * Get the labels for all vertices in our affinity graph for identities
      * that have used the given objects. If no such vertices exist, nothing
-     * is done.
+     * is done and an empty map is returned.
      * Called by other LPAClients.
      * 
      * @param objIds the collection of objects, representing potential graph

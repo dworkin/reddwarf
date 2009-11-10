@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
@@ -31,6 +32,7 @@ import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Set;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -47,14 +49,16 @@ public class TestAffinityGroupGoodness {
 
         final long gen = 1;
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
-        AffinitySet a = new AffinitySet(1, gen);
-        a.addIdentity(new DummyIdentity("1"));
-        a.addIdentity(new DummyIdentity("2"));
-        a.addIdentity(new DummyIdentity("3"));
+        HashSet<Identity> identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("1"));
+        identitySet.add(new DummyIdentity("2"));
+        identitySet.add(new DummyIdentity("3"));
+        AffinitySet a = new AffinitySet(1, gen, identitySet);
         group1.add(a);
-        AffinitySet b = new AffinitySet(2, gen);
-        b.addIdentity(new DummyIdentity("4"));
-        b.addIdentity(new DummyIdentity("5"));
+        identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("4"));
+        identitySet.add(new DummyIdentity("5"));
+        AffinitySet b = new AffinitySet(2, gen, identitySet);
         group1.add(b);
 
         double modularity = 
@@ -63,14 +67,16 @@ public class TestAffinityGroupGoodness {
         Assert.assertEquals(0.22, modularity, .001);
 
         Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
-        a = new AffinitySet(3, gen);
-        a.addIdentity(new DummyIdentity("1"));
-        a.addIdentity(new DummyIdentity("3"));
+        identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("1"));
+        identitySet.add(new DummyIdentity("3"));
+        a = new AffinitySet(3, gen, identitySet);
         group2.add(a);
-        b = new AffinitySet(4, gen);
-        b.addIdentity(new DummyIdentity("2"));
-        b.addIdentity(new DummyIdentity("4"));
-        b.addIdentity(new DummyIdentity("5"));
+        identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("2"));
+        identitySet.add(new DummyIdentity("4"));
+        identitySet.add(new DummyIdentity("5"));
+        b = new AffinitySet(4, gen, identitySet);
         group2.add(b);
 
         modularity = 
@@ -89,14 +95,16 @@ public class TestAffinityGroupGoodness {
 
         final long gen = 1;
         Collection<AffinityGroup> group1 = new HashSet<AffinityGroup>();
-        AffinitySet a = new AffinitySet(1, gen);
-        a.addIdentity(new DummyIdentity("1"));
-        a.addIdentity(new DummyIdentity("2"));
-        a.addIdentity(new DummyIdentity("3"));
+        HashSet<Identity> identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("1"));
+        identitySet.add(new DummyIdentity("2"));
+        identitySet.add(new DummyIdentity("3"));
+        AffinitySet a = new AffinitySet(1, gen, identitySet);
         group1.add(a);
-        AffinitySet b = new AffinitySet(2, gen);
-        b.addIdentity(new DummyIdentity("4"));
-        b.addIdentity(new DummyIdentity("5"));
+        identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("4"));
+        identitySet.add(new DummyIdentity("5"));
+        AffinitySet b = new AffinitySet(2, gen, identitySet);
         group1.add(b);
 
         double modularity =
@@ -105,14 +113,17 @@ public class TestAffinityGroupGoodness {
         Assert.assertEquals(0.22, modularity, .001);
 
         Collection<AffinityGroup> group2 = new HashSet<AffinityGroup>();
-        a = new AffinitySet(3, gen);
-        a.addIdentity(new DummyIdentity("1"));
-        a.addIdentity(new DummyIdentity("3"));
+        identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("1"));
+        identitySet.add(new DummyIdentity("3"));
+        a = new AffinitySet(3, gen, identitySet);
         group2.add(a);
-        b = new AffinitySet(4, gen);
-        b.addIdentity(new DummyIdentity("2"));
-        b.addIdentity(new DummyIdentity("4"));
-        b.addIdentity(new DummyIdentity("5"));
+        identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("2"));
+        identitySet.add(new DummyIdentity("4"));
+        identitySet.add(new DummyIdentity("5"));
+        b = new AffinitySet(4, gen, identitySet);
+        
         group2.add(b);
 
         modularity =
@@ -131,44 +142,47 @@ public class TestAffinityGroupGoodness {
         final long gen = 1;
         AffinityGraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
-        AffinitySet a = new AffinitySet(1, gen);
-        a.addIdentity(new DummyIdentity("1"));
-        a.addIdentity(new DummyIdentity("2"));
-        a.addIdentity(new DummyIdentity("3"));
-        a.addIdentity(new DummyIdentity("4"));
-        a.addIdentity(new DummyIdentity("5"));
-        a.addIdentity(new DummyIdentity("6"));
-        a.addIdentity(new DummyIdentity("7"));
-        a.addIdentity(new DummyIdentity("8"));
-        a.addIdentity(new DummyIdentity("11"));
-        a.addIdentity(new DummyIdentity("12"));
-        a.addIdentity(new DummyIdentity("13"));
-        a.addIdentity(new DummyIdentity("14"));
-        a.addIdentity(new DummyIdentity("17"));
-        a.addIdentity(new DummyIdentity("18"));
-        a.addIdentity(new DummyIdentity("20"));
-        a.addIdentity(new DummyIdentity("22"));
+
+        HashSet<Identity> identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("1"));
+        identitySet.add(new DummyIdentity("2"));
+        identitySet.add(new DummyIdentity("3"));
+        identitySet.add(new DummyIdentity("4"));
+        identitySet.add(new DummyIdentity("5"));
+        identitySet.add(new DummyIdentity("6"));
+        identitySet.add(new DummyIdentity("7"));
+        identitySet.add(new DummyIdentity("8"));
+        identitySet.add(new DummyIdentity("11"));
+        identitySet.add(new DummyIdentity("12"));
+        identitySet.add(new DummyIdentity("13"));
+        identitySet.add(new DummyIdentity("14"));
+        identitySet.add(new DummyIdentity("17"));
+        identitySet.add(new DummyIdentity("18"));
+        identitySet.add(new DummyIdentity("20"));
+        identitySet.add(new DummyIdentity("22"));
+        AffinitySet a = new AffinitySet(1, gen, identitySet);
         groups.add(a);
 
-        AffinitySet b = new AffinitySet(2, gen);
-        b.addIdentity(new DummyIdentity("9"));
-        b.addIdentity(new DummyIdentity("10"));
-        b.addIdentity(new DummyIdentity("15"));
-        b.addIdentity(new DummyIdentity("16"));
-        b.addIdentity(new DummyIdentity("19"));
-        b.addIdentity(new DummyIdentity("21"));
-        b.addIdentity(new DummyIdentity("23"));
-        b.addIdentity(new DummyIdentity("24"));
-        b.addIdentity(new DummyIdentity("25"));
-        b.addIdentity(new DummyIdentity("26"));
-        b.addIdentity(new DummyIdentity("27"));
-        b.addIdentity(new DummyIdentity("28"));
-        b.addIdentity(new DummyIdentity("29"));
-        b.addIdentity(new DummyIdentity("30"));
-        b.addIdentity(new DummyIdentity("31"));
-        b.addIdentity(new DummyIdentity("32"));
-        b.addIdentity(new DummyIdentity("33"));
-        b.addIdentity(new DummyIdentity("34"));
+        identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("9"));
+        identitySet.add(new DummyIdentity("10"));
+        identitySet.add(new DummyIdentity("15"));
+        identitySet.add(new DummyIdentity("16"));
+        identitySet.add(new DummyIdentity("19"));
+        identitySet.add(new DummyIdentity("21"));
+        identitySet.add(new DummyIdentity("23"));
+        identitySet.add(new DummyIdentity("24"));
+        identitySet.add(new DummyIdentity("25"));
+        identitySet.add(new DummyIdentity("26"));
+        identitySet.add(new DummyIdentity("27"));
+        identitySet.add(new DummyIdentity("28"));
+        identitySet.add(new DummyIdentity("29"));
+        identitySet.add(new DummyIdentity("30"));
+        identitySet.add(new DummyIdentity("31"));
+        identitySet.add(new DummyIdentity("32"));
+        identitySet.add(new DummyIdentity("33"));
+        identitySet.add(new DummyIdentity("34"));
+        AffinitySet b = new AffinitySet(2, gen, identitySet);
         groups.add(b);
 
         double modularity =
@@ -183,45 +197,45 @@ public class TestAffinityGroupGoodness {
         final long gen = 1;
         AffinityGraphBuilder builder = new ZachBuilder();
         Collection<AffinityGroup> groups = new HashSet<AffinityGroup>();
-        AffinitySet a = new AffinitySet(49, gen);
-        a.addIdentity(new DummyIdentity("17"));
+        AffinitySet a = new AffinitySet(49, gen, new DummyIdentity("17"));
         groups.add(a);
 
-        AffinitySet b = new AffinitySet(2, gen);
-        b.addIdentity(new DummyIdentity("1"));
-        b.addIdentity(new DummyIdentity("2"));
-        b.addIdentity(new DummyIdentity("3"));
-        b.addIdentity(new DummyIdentity("4"));
-        b.addIdentity(new DummyIdentity("5"));
-        b.addIdentity(new DummyIdentity("6"));
-        b.addIdentity(new DummyIdentity("7"));
-        b.addIdentity(new DummyIdentity("8"));
-        b.addIdentity(new DummyIdentity("9"));
-        b.addIdentity(new DummyIdentity("10"));
-        b.addIdentity(new DummyIdentity("11"));
-        b.addIdentity(new DummyIdentity("12"));
-        b.addIdentity(new DummyIdentity("13"));
-        b.addIdentity(new DummyIdentity("14"));
-        b.addIdentity(new DummyIdentity("15"));
-        b.addIdentity(new DummyIdentity("16"));
-//        b.addIdentity(new DummyIdentity("17"));
-        b.addIdentity(new DummyIdentity("18"));
-        b.addIdentity(new DummyIdentity("19"));
-        b.addIdentity(new DummyIdentity("20"));
-        b.addIdentity(new DummyIdentity("21"));
-        b.addIdentity(new DummyIdentity("22"));
-        b.addIdentity(new DummyIdentity("23"));
-        b.addIdentity(new DummyIdentity("24"));
-        b.addIdentity(new DummyIdentity("25"));
-        b.addIdentity(new DummyIdentity("26"));
-        b.addIdentity(new DummyIdentity("27"));
-        b.addIdentity(new DummyIdentity("28"));
-        b.addIdentity(new DummyIdentity("29"));
-        b.addIdentity(new DummyIdentity("30"));
-        b.addIdentity(new DummyIdentity("31"));
-        b.addIdentity(new DummyIdentity("32"));
-        b.addIdentity(new DummyIdentity("33"));
-        b.addIdentity(new DummyIdentity("34"));
+        HashSet<Identity> identitySet = new HashSet<Identity>();
+        identitySet.add(new DummyIdentity("1"));
+        identitySet.add(new DummyIdentity("2"));
+        identitySet.add(new DummyIdentity("3"));
+        identitySet.add(new DummyIdentity("4"));
+        identitySet.add(new DummyIdentity("5"));
+        identitySet.add(new DummyIdentity("6"));
+        identitySet.add(new DummyIdentity("7"));
+        identitySet.add(new DummyIdentity("8"));
+        identitySet.add(new DummyIdentity("9"));
+        identitySet.add(new DummyIdentity("10"));
+        identitySet.add(new DummyIdentity("11"));
+        identitySet.add(new DummyIdentity("12"));
+        identitySet.add(new DummyIdentity("13"));
+        identitySet.add(new DummyIdentity("14"));
+        identitySet.add(new DummyIdentity("15"));
+        identitySet.add(new DummyIdentity("16"));
+//        identitySet.add(new DummyIdentity("17"));
+        identitySet.add(new DummyIdentity("18"));
+        identitySet.add(new DummyIdentity("19"));
+        identitySet.add(new DummyIdentity("20"));
+        identitySet.add(new DummyIdentity("21"));
+        identitySet.add(new DummyIdentity("22"));
+        identitySet.add(new DummyIdentity("23"));
+        identitySet.add(new DummyIdentity("24"));
+        identitySet.add(new DummyIdentity("25"));
+        identitySet.add(new DummyIdentity("26"));
+        identitySet.add(new DummyIdentity("27"));
+        identitySet.add(new DummyIdentity("28"));
+        identitySet.add(new DummyIdentity("29"));
+        identitySet.add(new DummyIdentity("30"));
+        identitySet.add(new DummyIdentity("31"));
+        identitySet.add(new DummyIdentity("32"));
+        identitySet.add(new DummyIdentity("33"));
+        identitySet.add(new DummyIdentity("34"));
+        AffinitySet b = new AffinitySet(2, gen, identitySet);
         groups.add(b);
 
         double modularity =

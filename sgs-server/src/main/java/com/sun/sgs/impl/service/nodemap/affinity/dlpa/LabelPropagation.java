@@ -260,7 +260,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                     logger.log(Level.FINE,
                             "{0}: returning {1} precalculated groups",
                             localNodeId, groups.size());
-                    return new HashSet<AffinityGroup>(groups);
+                    return Collections.unmodifiableSet(groups);
                 }
                 state = State.GATHERING_GROUPS;
             }
@@ -290,7 +290,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         }
         logger.log(Level.FINEST, "{0}: returning {1} groups",
                    localNodeId, groups.size());
-        return new HashSet<AffinityGroup>(groups);
+        return Collections.unmodifiableSet(groups);
     }
 
     /** 
@@ -399,18 +399,14 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             }
         }
 
-        // Tell the server we're ready for the iterations to begin
+        // Tell the server we're ready for the iterations to begin.  If we
+        // cannot contact the server, the server will eventually detect this
+        // by timing out waiting for a response from this node.
         final boolean runFailed = failed;
-        boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
+        LabelPropagationServer.runIoTask(new IoRunnable() {
             public void run() throws IOException {
                 server.readyToBegin(localNodeId, runFailed);
             } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
-        if (!ok) {
-            // The run has failed, and the server should detect this when
-            // it times out waiting for responses.
-            logger.log(Level.WARNING, "{0}: could not contact server",
-                                      localNodeId);
-        }
         synchronized (stateLock) {
             state = State.WAITING_FOR_SERVER;
             stateLock.notifyAll();
@@ -623,15 +619,11 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         // Tell the server we've finished this iteration
         final boolean converged = !changed;
         final boolean runFailed = failed;
-        boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
+        LabelPropagationServer.runIoTask(new IoRunnable() {
             public void run() throws IOException {
                 server.finishedIteration(localNodeId, converged,
                                          runFailed, iteration);
             } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
-        if (!ok) {
-            logger.log(Level.WARNING, "{0}: could not contact server",
-                                      localNodeId);
-        }
 
         synchronized (stateLock) {
             state = State.WAITING_FOR_SERVER;
@@ -783,7 +775,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                        localNodeId, nodeId);
             Map<Object, Map<Integer, List<Long>>> labels = null;
             GetRemoteLabelsRunnable task = 
-                new GetRemoteLabelsRunnable(proxy,
+                new GetRemoteLabelsRunnable(proxy, 
                                             new HashSet<Object>(map.keySet()));
             boolean ok = 
                 LabelPropagationServer.runIoTask(task, wdog, nodeId,
@@ -795,6 +787,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 failed = true;
                 logger.log(Level.WARNING,
                         "{0}: could not contact node {1}", localNodeId, nodeId);
+                break;
             }
 
             if (labels == null) {
@@ -847,11 +840,13 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                             updateCount += Math.min(localCount, rc.longValue());
                         }
                         labelCount.put(rlabel, updateCount);
-                        logger.log(Level.FINEST,
+                        if (logger.isLoggable(Level.FINEST)) {
+                            logger.log(Level.FINEST,
                                 "{0}: label {1}, updateCount {2}, " +
                                 "localCount {3}, : ident {4}",
                                 localNodeId, rlabel, updateCount,
                                 localCount, ident);
+                        }
                     }
                 }
             }
@@ -866,9 +861,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      */
     private static class GetRemoteLabelsRunnable implements IoRunnable {
         private Map<Object, Map<Integer, List<Long>>> labels;
-        private final HashSet<Object> objects;
+        private final Set<Object> objects;
         private final LPAClient proxy;
-        GetRemoteLabelsRunnable(LPAClient proxy, HashSet<Object> objects) {
+        GetRemoteLabelsRunnable(LPAClient proxy, Set<Object> objects) {
             this.proxy = proxy;
             this.objects = objects;
         }
@@ -893,12 +888,11 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 LabelPropagationServer.runIoTask(task, wdog, localNodeId,
                                                  maxIoAttempts, retryWaitTime,
                                                  CLASS_NAME);
-            if (ok) {
-                proxy = task.getProxy();
-            } else {
-                logger.log(Level.WARNING, "{0}: could not contact server",
-                                          localNodeId);
+            if (!ok) {
+                // We've asked to shut ourselves down, just return quickly.
+                return null;
             }
+            proxy = task.getProxy();
             if (proxy != null) {
                 nodeProxies.put(nodeId, proxy);
             } else {

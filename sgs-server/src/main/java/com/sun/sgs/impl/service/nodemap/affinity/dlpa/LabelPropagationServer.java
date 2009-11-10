@@ -301,11 +301,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         prepareAlgorithm(clientProxyCopy);
 
         if (runFailed) {
-            handleFailure();
-            if (runException == null) {
-                runException =
-                    new AffinityGroupFinderFailedException("could not prepare");
-            }
+            handleFailure("could not prepare");
             throw runException;
         }
 
@@ -321,11 +317,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
 
         // Now, gather up our results
         if (runFailed) {
-            handleFailure();
-            if (runException == null) {
-                runException = new AffinityGroupFinderFailedException(
-                                            "could not complete iterations");
-            }
+            handleFailure("could not complete iterations");
             throw runException;
         }
 
@@ -358,23 +350,23 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
             running = false;
             runningLock.notifyAll();
         }
-        if (retVal.isEmpty()) {
-            stats.failedCountInc();
-            throw new AffinityGroupFinderFailedException("no groups found");
-        }
         return retVal;
     }
 
     /**
-     * Helper function while cleans up on failure.
+     * Helper function while cleans up on failure and sets {@code runException}
+     * if it has not yet been set.
      */
-    private void handleFailure() {
+    private void handleFailure(String msg) {
         synchronized (runningLock) {
             running = false;
             runningLock.notifyAll();
         }
         stats.failedCountInc();
         stats.setNumGroups(0);
+        if (runException == null) {
+            runException = new AffinityGroupFinderFailedException("msg");
+        }
     }
 
     /** {@inheritDoc} */

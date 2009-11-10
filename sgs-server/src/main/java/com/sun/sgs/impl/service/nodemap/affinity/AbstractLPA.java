@@ -27,6 +27,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -213,22 +214,24 @@ public abstract class AbstractLPA {
      * with the highest count amongst {@code vertex}'s neighbors.
      *
      * @param vertex the vertex whose neighbors labels will be examined
-     * @return a list of labels with the higest counts
+     * @return an unmodifiable list of labels with the highest counts
      */
-    protected List<Integer> getMaxCountLabels(LabelVertex vertex) {
-        // A map of labels -> counts, counting how many
-        // of our neighbors use a particular label.
-        Map<Integer, Long> labelMap = new HashMap<Integer, Long>();
-
-        // Put our neighbors labels into the label map.  We assume there
-        // are no parallel edges, but edges will have weights.
+    private List<Integer> getMaxCountLabels(LabelVertex vertex) {
+        // Get the neighbor edges.
         Collection<WeightedEdge> edges = graph.getIncidentEdges(vertex);
         if (edges == null) {
             // JUNG returns null if vertex is not present; this can occur
             // if our graph was pruned while the algorithm is running
-            return new ArrayList<Integer>();
+            return Collections.emptyList();
         }
 
+        // A map of labels -> counts, counting how many
+        // of our neighbors use a particular label.
+        Map<Integer, Long> labelMap = new HashMap<Integer, Long>(edges.size());
+
+        // Put our neighbors labels into the label map.  We assume there
+        // are no parallel edges, but edges will have weights.
+        //
         // As we iterate, calculate the maximum count of any particular label
         // for use later
         long maxCount = -1L;
@@ -264,7 +267,7 @@ public abstract class AbstractLPA {
                 maxLabelList.add(entry.getKey());
             }
         }
-        return maxLabelList;
+        return Collections.unmodifiableList(maxLabelList);
     }
 
     /**
@@ -290,7 +293,7 @@ public abstract class AbstractLPA {
      * @param vertices the vertices that we gather groups from
      * @param reinitialize if {@code true}, reinitialize the labels
      * @param gen the generation number
-     * @return the affinity groups, which may be empty if no groups are found
+     * @return an unmodifiable set of affinity groups found in the graph
      */
     protected static Set<AffinityGroup> gatherGroups(
             List<LabelVertex> vertices, boolean reinitialize, long gen)
@@ -303,10 +306,11 @@ public abstract class AbstractLPA {
             int label = vertex.getLabel();
             AffinitySet ag = groupMap.get(label);
             if (ag == null) {
-                ag = new AffinitySet(label, gen);
+                ag = new AffinitySet(label, gen, vertex.getIdentity());
                 groupMap.put(label, ag);
+            } else {
+                ag.addIdentity(vertex.getIdentity());
             }
-            ag.addIdentity(vertex.getIdentity());
             if (reinitialize) {
                 // At the end of an algorithm run, we save a pass through
                 // all vertices in the graph if we reinitialize the vertices
@@ -314,6 +318,7 @@ public abstract class AbstractLPA {
                 vertex.initializeLabel();
             }
         }
-        return new HashSet<AffinityGroup>(groupMap.values());
+        return Collections.unmodifiableSet(
+                new HashSet<AffinityGroup>(groupMap.values()));
     }
 }

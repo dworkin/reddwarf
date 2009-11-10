@@ -35,8 +35,10 @@ public class AffinitySet implements AffinityGroup, Serializable {
     private static final long serialVersionUID = 1L;
     /** The identity of the affinity group. */
     private final long id;
-    /** The set of identities comprising the group. */
-    private final HashSet<Identity> identities = new HashSet<Identity>();
+    /** The set of identities comprising the group. Note this needs
+     *  to be declared a concrete class so we know it is serializable.
+     */
+    private final HashSet<Identity> identities;
     /** The generation of this affinity set. */
     private final long generation;
 
@@ -44,10 +46,26 @@ public class AffinitySet implements AffinityGroup, Serializable {
      * Constructs a new affinity group with the given ID.
      * @param id the affinity group identity
      * @param generation the generation number of this group
+     * @param identity the first identity in this affinity set
      */
-    public AffinitySet(long id, long generation) {
+    public AffinitySet(long id, long generation, Identity identity) {
         this.id = id;
         this.generation = generation;
+        identities = new HashSet<Identity>();
+        identities.add(identity);
+    }
+
+    /**
+     * Constructs a new affinity group with the given ID.
+     * @param id the affinity group identity
+     * @param generation the generation number of this group
+     * @param identitySet the initial set of identities to include
+     */
+    public AffinitySet(long id, long generation, HashSet<Identity> identitySet)
+    {
+        this.id = id;
+        this.generation = generation;
+        identities = identitySet;
     }
 
     /** {@inheritDoc} */
@@ -75,7 +93,7 @@ public class AffinitySet implements AffinityGroup, Serializable {
      * Add the given identity to this affinity group.
      * @param id the identity to add
      */
-    public synchronized void addIdentity(Identity id) {
+    synchronized void addIdentity(Identity id) {
         identities.add(id);
     }
 }

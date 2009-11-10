@@ -20,6 +20,9 @@
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import java.util.Properties;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -75,10 +78,29 @@ public class AbstractAffinityGraphBuilder {
     protected static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PROP_BASE));
 
+    /** Our properties. */
+    protected final PropertiesWrapper wrappedProps;
+
+    /** The time, in milliseconds for each period snapshot. */
+    protected final long snapshot;
+
+    /** The number of snapshots the graph pruner should maintain. */
+    protected final int periodCount;
+
     /**
-     * Protected constructor to ensure no one builds this utility class.
+     * Parses common graph builder properties.
+     *
+     * @param properties the configuration properties for this graph builder
      */
-    protected AbstractAffinityGraphBuilder() {
-        // do nothing
+    protected AbstractAffinityGraphBuilder(Properties properties) {
+        wrappedProps = new PropertiesWrapper(properties);
+        snapshot =
+                wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        periodCount = wrappedProps.getIntProperty(
+                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
+                1, Integer.MAX_VALUE);
+        logger.log(Level.CONFIG, "graph builder created with period {0} " +
+                                 " and period count {1}",
+                                 snapshot, periodCount);
     }
 }

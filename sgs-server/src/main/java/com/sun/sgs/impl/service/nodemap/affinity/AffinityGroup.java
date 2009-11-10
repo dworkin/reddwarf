@@ -27,7 +27,7 @@ import java.util.Set;
  * identities that have formed a community.
  * <p>
  * Affinity groups have an identifier and a generation number. Affinity groups
- * with different generation numbrers cannot be compared.  In particular, two
+ * with different generation numbers cannot be compared.  In particular, two
  * groups which have the same affinity group identifier but different
  * generation numbers cannot be assumed to be related in any way.
  */

@@ -30,7 +30,6 @@ import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
@@ -131,16 +130,11 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
      * @throws Exception if an error occurs
      */
     public WeightedGraphBuilder(Properties properties,
-                                 ComponentRegistry systemRegistry,
-                                 TransactionProxy txnProxy)
+                                ComponentRegistry systemRegistry,
+                                TransactionProxy txnProxy)
         throws Exception
     {
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        long snapshot =
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
-        int periodCount = wrappedProps.getIntProperty(
-                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
-                1, Integer.MAX_VALUE);
+        super(properties);
 
         WatchdogService wdog = txnProxy.getService(WatchdogService.class);
         // Create the LPA algorithm pieces
@@ -259,12 +253,12 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap() {
+    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
         return objectMap;
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Long, Map<Object, Long>> getConflictMap() {
+    public Map<Long, Map<Object, Long>> getConflictMap() {
         return conflictMap;
     }
 

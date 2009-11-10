@@ -40,6 +40,7 @@ import com.sun.sgs.test.util.UtilReflection;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.util.Graphs;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Collection;
@@ -115,32 +116,38 @@ public class TestLPA {
         final long generation = 1;
         Set<AffinityGroup> group1 = new HashSet<AffinityGroup>();
         {
-            AffinitySet a = new AffinitySet(1, generation);
-            a.addIdentity(new DummyIdentity("1"));
-            a.addIdentity(new DummyIdentity("2"));
-            a.addIdentity(new DummyIdentity("3"));
+            HashSet<Identity> identitySet = new HashSet<Identity>();
+            identitySet.add(new DummyIdentity("1"));
+            identitySet.add(new DummyIdentity("2"));
+            identitySet.add(new DummyIdentity("3"));
+            AffinitySet a = new AffinitySet(1, generation, identitySet);
             group1.add(a);
-            AffinitySet b = new AffinitySet(2, generation);
-            b.addIdentity(new DummyIdentity("4"));
-            b.addIdentity(new DummyIdentity("5"));
+            identitySet = new HashSet<Identity>();
+            identitySet.add(new DummyIdentity("4"));
+            identitySet.add(new DummyIdentity("5"));
+            AffinitySet b = new AffinitySet(2, generation, identitySet);
             group1.add(b);
         }
         Set<AffinityGroup> group2 = new HashSet<AffinityGroup>();
         {
-            AffinitySet a = new AffinitySet(1, generation);
-            a.addIdentity(new DummyIdentity("6"));
-            a.addIdentity(new DummyIdentity("7"));
+            HashSet<Identity> identitySet = new HashSet<Identity>();
+            identitySet.add(new DummyIdentity("6"));
+            identitySet.add(new DummyIdentity("7"));
+            AffinitySet a = new AffinitySet(1, generation, identitySet);
             group2.add(a);
-            AffinitySet b = new AffinitySet(3, generation);
-            b.addIdentity(new DummyIdentity("8"));
-            b.addIdentity(new DummyIdentity("9"));
+            identitySet = new HashSet<Identity>();
+            identitySet.add(new DummyIdentity("8"));
+            identitySet.add(new DummyIdentity("9"));
+            AffinitySet b = new AffinitySet(3, generation, identitySet);
+            
             group2.add(b);
         }
         Set<AffinityGroup> group3 = new HashSet<AffinityGroup>();
         {
-            AffinitySet a = new AffinitySet(4, generation);
-            a.addIdentity(new DummyIdentity("10"));
-            a.addIdentity(new DummyIdentity("11"));
+            HashSet<Identity> identitySet = new HashSet<Identity>();
+            identitySet.add(new DummyIdentity("10"));
+            identitySet.add(new DummyIdentity("11"));
+            AffinitySet a = new AffinitySet(4, generation, identitySet);
             group3.add(a);
         }
 
@@ -243,10 +250,11 @@ public class TestLPA {
         assertTrue(groups.size() != 0);
     }
 
-    @Test(expected = AffinityGroupFinderFailedException.class)
+    @Test
     public void testLPAAlgorithmNoClient() throws Exception {
         Set<AffinityGroup> groups = server.findAffinityGroups();
-        // We expect no groups to be found an the exception thrown
+        // We expect no groups to be found
+        assertTrue(groups.isEmpty());
     }
 
     // Need to rework this test - we now log the error, should shut down
@@ -854,7 +862,7 @@ public class TestLPA {
         // ids 2,4 used obj2
         // ids 4,5 used obj3
         public PartialToyBuilder(long node) {
-            super(CreatePartialToyBuilderGraph(node));
+            super(createPartialToyBuilderGraph(node));
             if (node == NODE1) {
                 // Create a partial graph
                 Identity[] idents = {new DummyIdentity("1"),
@@ -905,7 +913,7 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Long, Map<Object, Long>> getConflictMap() {
+        public Map<Long, Map<Object, Long>> getConflictMap() {
             return conflictMap;
         }
 
@@ -915,14 +923,14 @@ public class TestLPA {
         }
 
         /** {@inheritDoc} */
-        public ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap() {
+        public Map<Object, Map<Identity, Long>> getObjectUseMap() {
             return objUseMap;
         }
     }
 
     //
     private UndirectedGraph<LabelVertex, WeightedEdge>
-            CreatePartialToyBuilderGraph(long node)
+            createPartialToyBuilderGraph(long node)
     {
         UndirectedGraph<LabelVertex, WeightedEdge> graph =
                 new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
@@ -954,6 +962,6 @@ public class TestLPA {
             }
             graph.addEdge(new WeightedEdge(), nodes[0], nodes[1]);
         }
-        return graph;
+        return Graphs.unmodifiableUndirectedGraph(graph);
     }
 }

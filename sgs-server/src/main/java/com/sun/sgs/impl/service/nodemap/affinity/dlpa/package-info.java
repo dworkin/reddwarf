@@ -34,7 +34,7 @@
  * {@link com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient} when to
  * start an algorithm run and synchronizes each iteration of the algorithm.
  * Information about affinity groups are communicated as the serializable
- * {@link com.sun.sgs.impl.service.nodemap.affinity.dlpa.AffinitySet}.
+ * {@link com.sun.sgs.impl.service.nodemap.affinity.AffinitySet}.
  * <p>
  * Affinity groups returned by this implementation are of type
  * {@link com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup}.

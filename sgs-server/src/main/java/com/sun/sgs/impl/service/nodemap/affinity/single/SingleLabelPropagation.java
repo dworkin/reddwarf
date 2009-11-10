@@ -287,10 +287,6 @@ public class SingleLabelPropagation extends AbstractLPA
             }
             logger.log(Level.FINE, sb.toString());
         }
-        if (groups.isEmpty()) {
-            stats.failedCountInc();
-            throw new AffinityGroupFinderFailedException("no groups found");
-        }
         return groups;
     }
 }

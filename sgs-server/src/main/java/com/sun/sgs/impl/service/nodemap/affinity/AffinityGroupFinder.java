@@ -28,12 +28,12 @@ import java.util.Set;
 public interface AffinityGroupFinder {
     /**
      * Finds affinity groups across all nodes in the Darkstar cluster.
-     * If an error is encountered during a run, an empty collection is
-     * returned.  Errors include nodes not responding to server requests.
+     * If no groups are found, an empty set is returned. If an error is
+     * encountered during a run, an {@code AffinityGroupFinderFailedException}
+     * is thrown. Errors include nodes not responding to server requests.
      * 
-     * @throws AffinityGroupFinderFailedException if there is an error or
-     *             no groups are found
-     * @return the affinity groups
+     * @throws AffinityGroupFinderFailedException if there is an error
+     * @return the affinity groups, or an empty set if none are found
      */
     Set<AffinityGroup> findAffinityGroups()
             throws AffinityGroupFinderFailedException;

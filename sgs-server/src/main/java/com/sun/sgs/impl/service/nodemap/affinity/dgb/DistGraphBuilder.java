@@ -27,7 +27,6 @@ import
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.AccessedObject;
@@ -94,7 +93,7 @@ public class DistGraphBuilder extends AbstractAffinityGraphBuilder
                             TransactionProxy txnProxy)
         throws Exception
     {
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        super(properties);
 
         watchdogService = txnProxy.getService(WatchdogService.class);
 

@@ -28,7 +28,6 @@ import
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.management.AffinityGraphBuilderMXBean;
@@ -127,12 +126,7 @@ public class SingleGraphBuilder extends AbstractAffinityGraphBuilder
                               boolean needStats)
         throws Exception
     {
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        long snapshot =
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
-        int periodCount = wrappedProps.getIntProperty(
-                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
-                1, Integer.MAX_VALUE);
+        super(properties);
 
         ProfileCollector col =
                 systemRegistry.getComponent(ProfileCollector.class);

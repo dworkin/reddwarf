@@ -30,7 +30,6 @@ import
     com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
@@ -42,6 +41,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import edu.uci.ics.jung.graph.UndirectedGraph;
 import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+import edu.uci.ics.jung.graph.util.Graphs;
 import edu.uci.ics.jung.graph.util.Pair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -61,7 +61,7 @@ import javax.management.JMException;
 
 /**
  * A graph builder which builds a bipartite graph of identities and
- * object ids, with edges between them.  Identities never are never
+ * object ids, with edges between them.  Identities are never
  * liked with other edges, nor are object ids linked to other object ids.
  * <p>
  * This graph builder folds the graph upon request.  The folded graph
@@ -123,13 +123,8 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
                                  TransactionProxy txnProxy)
         throws Exception
     {
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        long snapshot =
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
-        int periodCount = wrappedProps.getIntProperty(
-                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
-                1, Integer.MAX_VALUE);
-
+        super(properties);
+        
         // Create the LPA algorithm pieces
         NodeType type =
             NodeType.valueOf(
@@ -211,9 +206,8 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
         // Copy our input graph
         CopyableGraph<Object, WeightedEdge> graphCopy = 
             new CopyableGraph<Object, WeightedEdge>(bipartiteGraph);
-        System.out.println("Time for graph copy is : " +
-                (System.currentTimeMillis() - startTime) + 
-                "msec");
+        logger.log(Level.FINE, "Time for graph copy is : {0} msec",
+                System.currentTimeMillis() - startTime);
 
         // Our final, folded graph.  No parallel edges;  they have been
         // collapsed into a single weighted edge.
@@ -251,8 +245,8 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
                         v1 = (Identity) neighbor;
                     } else {
                         // our graph is messed up
-                        System.out.println("unexpected vertex type " +
-                                           neighbor);
+                        logger.log(Level.FINE, "unexpected vertex type {0}",
+                                                neighbor);
                         continue;
                     }
                     
@@ -262,8 +256,8 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
                             v2 = (Identity) neighbor;
                         } else {
                             // our graph is messed up
-                            System.out.println("unexpected vertex type " +
-                                               neighbor);
+                            logger.log(Level.FINE, "unexpected vertex type {0}",
+                                                neighbor);
                             continue;
                         }
 
@@ -293,16 +287,16 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
 
         // Include the folded time in our total processing time
         stats.processingTimeInc(System.currentTimeMillis() - startTime);
-        return foldedGraph;
+        return Graphs.unmodifiableUndirectedGraph(foldedGraph);
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Long, Map<Object, Long>> getConflictMap() {
+    public Map<Long, Map<Object, Long>> getConflictMap() {
         return conflictMap;
     }
 
     /** {@inheritDoc} */
-    public ConcurrentMap<Object, Map<Identity, Long>> getObjectUseMap() {
+    public Map<Object, Map<Identity, Long>> getObjectUseMap() {
         ConcurrentMap<Object, Map<Identity, Long>> retMap =
             new ConcurrentHashMap<Object, Map<Identity, Long>>();
         // Copy our input graph
@@ -318,7 +312,8 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
                         idMap.put((Identity) v1, edge.getWeight());
                     } else {
                         // our graph is messed up
-                        System.out.println("unexpected vertex type " + v1);
+                        logger.log(Level.FINE, "unexpected vertex type {0}",
+                                                v1);
                     }
                 }
                 retMap.put(vert, idMap);

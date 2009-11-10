@@ -35,7 +35,6 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -125,11 +124,11 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
                                long nodeId)
             throws Exception
     {
+        super(properties);
         transactionScheduler =
 	    systemRegistry.getComponent(TransactionScheduler.class);
 	this.txnProxy = txnProxy;
 	taskOwner = txnProxy.getCurrentOwner();
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         ProfileCollector col =
                 systemRegistry.getComponent(ProfileCollector.class);
@@ -141,12 +140,6 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
         // Create our group finder and graph builder JMX MBeans
         AffinityGroupFinderStats stats =
                 new AffinityGroupFinderStats(this, col, -1);
-
-        int periodCount = wrappedProps.getIntProperty(
-                PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
-                1, Integer.MAX_VALUE);
-        long snapshot = 
-                wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         builderStats = new AffinityGraphBuilderStats(col,
                                                      builder.getAffinityGraph(),
                                                      periodCount, snapshot);
@@ -256,9 +249,6 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
                 }
             }
             retVal.add(new RelocatingAffinityGroup(ag.getId(), idMap, gen));
-        }
-        if (retVal.isEmpty()) {
-            throw new AffinityGroupFinderFailedException("no groups found");
         }
         return retVal;
     }
