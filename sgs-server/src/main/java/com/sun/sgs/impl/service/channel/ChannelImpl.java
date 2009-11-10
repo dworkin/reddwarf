@@ -150,7 +150,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     private final BigInteger channelRefId;
 
     /** The wrapped channel instance. */
-    private ManagedReference<ChannelWrapper> wrappedChannelRef;
+    private final ManagedReference<ChannelWrapper> wrappedChannelRef;
 
     /** The reference to this channel's listener. */
     private final ManagedReference<ChannelListener> listenerRef;

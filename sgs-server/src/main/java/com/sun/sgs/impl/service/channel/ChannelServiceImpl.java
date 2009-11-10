@@ -762,7 +762,7 @@ public final class ChannelServiceImpl
 	/**
 	 * {@inheritDoc}
 	 */
-	public void channelMembershipsUpdated(
+	public void relocateChannelMembershipsCompleted(
 	    BigInteger sessionRefId, long newNodeId)
 	{
 	    removeLocalSessionFromAllChannels(sessionRefId);
@@ -2225,8 +2225,8 @@ public final class ChannelServiceImpl
      * A task that adds a relocating session's node to the channels in the
      * {@code channelRefId}'s array (specified during construction).  When
      * this task is complete, it notifies the old node that relocation
-     * preparation is complete by invoking the {@code channelMembershipsUpdated}
-     * method.
+     * preparation is complete by invoking the {@code
+     * relocateChannelMembershipsCompleted} method.
      */
     private class AddRelocatingSessionNodeToChannels
 	extends AbstractKernelRunnable
@@ -2273,7 +2273,7 @@ public final class ChannelServiceImpl
 	    runIoTask(
 		new IoRunnable() {
 		    public void run() throws IOException {
-			server.channelMembershipsUpdated(
+			server.relocateChannelMembershipsCompleted(
 			    sessionRefId, localNodeId);
 		    } },
 		oldNodeId);

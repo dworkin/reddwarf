@@ -148,9 +148,9 @@ public interface ChannelServer extends Remote {
      * persistent membership information to indicate that the specified
      * session on the local node is now joined to each channel.  When the
      * cache and persistent membership information is updated, the {@link
-     * #channelMembershipsUpdated channelMembershipsUpdated} method should
-     * be invoked on the old node's {@code ChannelServer} with the
-     * specified {@code sessionRefId} and the new node's ID.
+     * #relocateChannelMembershipsCompleted relocateChannelMembershipsCompleted}
+     * method should * be invoked on the old node's {@code ChannelServer} with
+     * the specified {@code sessionRefId} and the new node's ID.
      *
      * @param	sessionRefId the ID of a client session relocating to the
      *		local node
@@ -187,7 +187,8 @@ public interface ChannelServer extends Remote {
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void channelMembershipsUpdated(BigInteger sessionRefId, long newNodeId)
+    void relocateChannelMembershipsCompleted(
+	BigInteger sessionRefId, long newNodeId)
 	throws IOException;
 			 
     /**
