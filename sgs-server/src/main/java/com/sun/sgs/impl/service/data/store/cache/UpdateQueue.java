@@ -39,7 +39,6 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.NoSuchElementException;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Semaphore;
@@ -47,9 +46,23 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  * The facility that data store nodes use to send updates to the data server.
+ * The implementation uses a {@link RequestQueueClient} to communicate requests
+ * to the server in order.  It limits the number of unacknowledged commit
+ * requests that can appear in the queue to make sure that the node does not
+ * outstrip the capacity of the server.  Eviction and downgrade requests are
+ * not limited in the queue, though, since they represent a response to
+ * requests already being processed on the server. <p>
+ *
  * This class is part of the implementation of {@link CachingDataStore}.
  */
 class UpdateQueue {
+
+    /**
+     * The ratio between the maximum number of commit requests permitted to be
+     * waiting in the queue and the maximum total number of waiting requests,
+     * which includes downgrades and evictions.
+     */
+    private static final int REQUEST_QUEUE_PROPORTION = 2;
 
     /** The data store. */
     private final CachingDataStore store;
@@ -67,7 +80,7 @@ class UpdateQueue {
      * transaction for transactions that are either active or waiting to be
      * submitted to the request queue.  The entries are ordered with the lowest
      * context ID first in order to find the items that are no longer waiting
-     * for earlier transactions to complete.  Synchronize on this object when
+     * for earlier transactions to finish.  Synchronize on this object when
      * adding new entries to insure that they are added in order.
      */
     private final NavigableMap<Long, PendingTxnInfo> pendingSubmitMap =
@@ -93,7 +106,8 @@ class UpdateQueue {
      * @param	store the data store
      * @param	host the server host name
      * @param	port the server port
-     * @param	updateQueueSize the size of the update queue
+     * @param	updateQueueSize the maximum number of commit requests
+     *		permitted to be waiting in the queue
      * @throws	IOException if there is an I/O failure
      */
     UpdateQueue(final CachingDataStore store,
@@ -106,9 +120,8 @@ class UpdateQueue {
 	queue = new RequestQueueClient(
 	    store.getNodeId(),
 	    new RequestQueueClient.BasicSocketFactory(host, port),
-	    store,
-	    /* FIXME: Pass properties? */
-	    new Properties());
+	    store, store.getMaxRetry(), store.getRetryWait(),
+	    REQUEST_QUEUE_PROPORTION * updateQueueSize);
 	commitAvailable = new Semaphore(updateQueueSize);
     }
 
@@ -132,9 +145,10 @@ class UpdateQueue {
 
     /**
      * Prepares for commit by reserving a slot in the update queue for the
-     * commit request.  Returns if successful, else throws an exception.
+     * commit request, waiting for space in the queue if needed.  Returns if
+     * successful, else throws an exception.
      *
-     * @param	stop the time in milliseconds when waiting should fail
+     * @param	stop the time in milliseconds when the transaction times out
      * @throws	ResourceUnavailableException if no space becomes available in
      *		the update queue before the transaction times out
      * @throws	TransactionInterruptedException if the thread is interrupted
@@ -193,7 +207,7 @@ class UpdateQueue {
 		int newNames)
     {
 	pendingAcknowledgeSet.add(contextId);
-	completed(contextId);
+	txnFinished(contextId);
 	queue.addRequest(
 	    new Commit(oids, oidValues, newOids, names, nameValues, newNames,
 		       new CompletionHandler() {
@@ -216,7 +230,7 @@ class UpdateQueue {
 	if (prepared) {
 	    commitAvailable.release();
 	}
-	completed(contextId);
+	txnFinished(contextId);
     }
 	
 
@@ -246,6 +260,7 @@ class UpdateQueue {
      * @param	oid the object ID to evict
      * @param	completionHandler the handler to notify when the downgrade has
      *		been completed 
+     * @throws	IllegalArgumentException if {@code oid} is negative
      */
     void downgradeObject(
 	long contextId, long oid, CompletionHandler completionHandler)
@@ -291,31 +306,32 @@ class UpdateQueue {
     }
 
     /**
-     * Returns the context ID of the oldest transaction that is still pending,
-     * or {@link Long#MIN_VALUE Long.MIN_VALUE} if there are no pending
-     * transactions
+     * Returns the context ID of the oldest transaction which has not finished,
+     * or whose commit request has been sent to the server but not yet
+     * acknowledged, or {@link Long#MIN_VALUE Long.MIN_VALUE} if there are no
+     * pending transactions
      *
      * @return	the lowest pending context ID or {@code Long.MIN_VALUE}
      */
     long lowestPendingContextId() {
-	long lowestSubmit;
-	try {
-	    lowestSubmit = pendingSubmitMap.firstKey();
-	} catch (NoSuchElementException e) {
-	    lowestSubmit = Long.MIN_VALUE;
-	}
 	try {
 	    return pendingAcknowledgeSet.first();
 	} catch (NoSuchElementException e) {
-	    return lowestSubmit;
+	}
+	try {
+	    return pendingSubmitMap.firstKey();
+	} catch (NoSuchElementException e) {
+	    return Long.MIN_VALUE;
 	}
     }
 
     /* -- Private methods -- */
 
     /**
-     * Adds a request to the table if the associated transaction is still
-     * pending, and otherwise adds it directly to the update queue.
+     * Adds a request to the pending submission map if the associated
+     * transaction is still waiting to be submitted to the server, and
+     * otherwise adds the request directly to the update queue.  The context ID
+     * should be a value that has been returned by beginTxn.
      *
      * @param	contextId the transaction context ID
      * @param	request the request
@@ -328,13 +344,13 @@ class UpdateQueue {
     }
 
     /**
-     * Notes that the transaction with the associated context ID has completed,
+     * Notes that the transaction with the associated context ID has finished,
      * either by committing or aborting.
      */
-    private void completed(long contextId) {
+    private void txnFinished(long contextId) {
 	PendingTxnInfo info = pendingSubmitMap.get(contextId);
 	assert info != null;
-	info.setComplete();
+	info.setFinished();
 	try {
 	    if (contextId != pendingSubmitMap.firstKey()) {
 		return;
@@ -371,15 +387,15 @@ class UpdateQueue {
     /** Records information about an active or pending transaction. */
     private static class PendingTxnInfo {
 
-	/** Whether the transaction has been completed. */
-	private boolean complete = false;
+	/** Whether the transaction has finished. */
+	private boolean finished = false;
 
 	/**
-	 * Whether the transaction is still present in the pending transaction
-	 * map, meaning that it has or could receive, associated requests,
-	 * because there are still active transactions with lower context IDs.
+	 * Whether the transaction is still present in the pending submit map,
+	 * meaning that it has or could receive, associated requests, because
+	 * there are still active transactions with lower context IDs.
 	 */
-	private boolean pending = true;
+	private boolean pendingSubmit = true;
 
 	/** The requests associated with this transaction or {@code null}. */
 	private List<Request> requests = null;
@@ -387,26 +403,26 @@ class UpdateQueue {
 	/** Creates an instance of this class. */
 	PendingTxnInfo() { }
 
-	/** Notes that the associated transaction is complete. */
-	synchronized void setComplete() {
-	    assert !complete;
-	    complete = true;
+	/** Notes that the associated transaction has finished. */
+	synchronized void setFinished() {
+	    assert !finished;
+	    finished = true;
 	}
 
 	/**
 	 * Returns the requests for the associated transaction.  Returns {@code
-	 * null} if the transaction is not yet complete.  If the transaction is
-	 * pending, returns a list containing the associated requests, if any,
-	 * and marks the transaction as not pending.  If the transaction is not
-	 * pending, returns an empty list.
+	 * null} if the transaction has not yet finished.  If the transaction
+	 * is waiting to be submitted to the server, returns a list containing
+	 * the associated requests, if any, and marks the transaction as not
+	 * pending.  If the transaction is not pending, returns an empty list.
 	 *
 	 * @return	the requests or {@code null}
 	 */
 	synchronized List<Request> getRequests() {
-	    if (!complete) {
+	    if (!finished) {
 		return null;
-	    } else if (pending) {
-		pending = false;
+	    } else if (pendingSubmit) {
+		pendingSubmit = false;
 		if (requests != null) {
 		    return requests;
 		}
@@ -417,15 +433,15 @@ class UpdateQueue {
 	/**
 	 * Attempts to associate a request with this transaction.  The request
 	 * is added, and {@code true} is returned, if this transaction is still
-	 * pending, otherwise returns {@code false}.  If the return value is
-	 * {@code false}, the caller should add the request directly to the
-	 * request queue.
+	 * waiting to be submitted to the server, otherwise returns {@code
+	 * false}.  If the return value is {@code false}, the caller should add
+	 * the request directly to the request queue.
 	 *
 	 * @param	request the request
 	 * @return	whether the request was added
 	 */
 	synchronized boolean addRequest(Request request) {
-	    if (!pending) {
+	    if (!pendingSubmit) {
 		return false;
 	    }
 	    if (requests == null) {

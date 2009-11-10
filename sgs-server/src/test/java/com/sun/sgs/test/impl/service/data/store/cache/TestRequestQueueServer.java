@@ -81,26 +81,19 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test(expected=IllegalArgumentException.class)
     public void testConstructorNegativeNodeId() {
-	new RequestQueueServer<Request>(
-	    -1, dummyRequestHandler, emptyProperties);
+	new RequestQueueServer<Request>(-1, dummyRequestHandler);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullRequestHandler() {
-	new RequestQueueServer<Request>(1, null, emptyProperties);
-    }
-
-    @Test(expected=NullPointerException.class)
-    public void testConstructorNullProperties() {
-	new RequestQueueServer<Request>(1, dummyRequestHandler, null);
+	new RequestQueueServer<Request>(1, null);
     }
 
     /* Test handleConnection */
 
     @Test
     public void testHandleConnectionNullSocket() throws Exception {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	try {
 	    server.handleConnection(null);
 	    fail("Expected NullPointerException");
@@ -110,8 +103,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test
     public void testHandleConnectionUnboundSocket() throws Exception {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	Socket socket = new Socket();
 	try {
 	    server.handleConnection(socket);
@@ -124,8 +116,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     
     @Test
     public void testHandleConnectionWithExistingConnection() throws Exception {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	serverSocket = new ServerSocket(PORT);
 	for (int i = 0; i < 2; i++) {
 	    final CountDownLatch ready = new CountDownLatch(1);
@@ -148,16 +139,14 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test
     public void testDisconnectNotConnected() throws Exception {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	server.disconnect();
 	server.disconnect();
     }
 
     @Test
     public void testDisconnectConnected() throws Exception {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
@@ -180,8 +169,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test
     public void testEarlierRequestNegativeRequests() {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	try {
 	    server.earlierRequest(-1, 0);
 	    fail("Expected IllegalArgumentException");
@@ -198,8 +186,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test
     public void testEarlierRequestTooLargeRequests() {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	try {
 	    server.earlierRequest(32768, 0);
 	    fail("Expected IllegalArgumentException");
@@ -216,8 +203,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test
     public void testEarlierRequestMisc() {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	assertFalse(server.earlierRequest(0, 0));
 	assertTrue(server.earlierRequest(0, 1));
 	assertTrue(server.earlierRequest(0, 9999));
@@ -259,8 +245,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 
     @Test
     public void testRequestReadThrowsIOException() throws Exception {
-	server = new RequestQueueServer<Request>(
-	    1, dummyRequestHandler, emptyProperties);
+	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
@@ -291,8 +276,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 		public Request readRequest(DataInput in) throws IOException {
 		    throw new RuntimeException("Yow!");
 		}
-	    },
-	    emptyProperties);
+	    });
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
@@ -329,8 +313,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 		    performed.incrementAndGet();
 		    throw new RuntimeException(String.valueOf(++i));
 		}
-	    },
-	    emptyProperties);
+	    });
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
@@ -375,8 +358,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 		    return new DummyRequest();
 		}
 		public void performRequest(Request request) { }
-	    },
-	    emptyProperties);
+	    });
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
@@ -416,8 +398,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 		public void performRequest(Request request) {
 		    requests.incrementAndGet();
 		}
-	    },
-	    emptyProperties);
+	    });
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
@@ -464,8 +445,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 		public void performRequest(Request request) {
 		    requests.incrementAndGet();
 		}
-	    },
-	    emptyProperties);
+	    });
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {
@@ -535,8 +515,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 		    return new DummyRequest();
 		}
 		public void performRequest(Request request) { }
-	    },
-	    emptyProperties);
+	    });
 	serverSocket = new ServerSocket(PORT);
 	final CountDownLatch ready = new CountDownLatch(1);
 	connect = new InterruptableThread() {

@@ -19,15 +19,10 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
-import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
 import com.sun.sgs.impl.service.data.store.cache.Request;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
     ServerDispatcher;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
-    MAX_RETRY_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
-    RETRY_WAIT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.DataOutputStream;
@@ -36,7 +31,6 @@ import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Before;
@@ -65,13 +59,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 
     /** The shorter retry wait to use for tests. */
     private static final long RETRY_WAIT = 10;
-
-    /** Properties specifying the shorter maximum retry and retry waits. */
-    private static final Properties props = new Properties();
-    static {
-	props.setProperty(MAX_RETRY_PROPERTY, String.valueOf(MAX_RETRY));
-	props.setProperty(RETRY_WAIT_PROPERTY, String.valueOf(RETRY_WAIT));
-    }
 
     /** The server socket or {@code null}. */
     ServerSocket serverSocket;
@@ -118,25 +105,34 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocket() {
 	new RequestQueueListener(
-	    null, serverDispatcher, failureReporter, emptyProperties);
+	    null, serverDispatcher, failureReporter, MAX_RETRY, RETRY_WAIT);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullServerDispatcher() {
 	new RequestQueueListener(
-	    unboundServerSocket, null, failureReporter, emptyProperties);
+	    unboundServerSocket, null, failureReporter, MAX_RETRY, RETRY_WAIT);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullFailureReporter() {
 	new RequestQueueListener(
-	    unboundServerSocket, serverDispatcher, null, emptyProperties);
+	    unboundServerSocket, serverDispatcher, null, MAX_RETRY,
+	    RETRY_WAIT);
     }
 
-    @Test(expected=NullPointerException.class)
-    public void testConstructorNullProperties() {
+    @Test(expected=IllegalArgumentException.class)
+    public void testConstructorIllegalMaxRetry() {
 	new RequestQueueListener(
-	    unboundServerSocket, serverDispatcher, failureReporter, null);
+	    unboundServerSocket, serverDispatcher, failureReporter, -1,
+	    RETRY_WAIT);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testConstructorIllegalRetryWait() {
+	new RequestQueueListener(
+	    unboundServerSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    -33);
     }
 
     /* Test socket accept */
@@ -149,7 +145,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void testAcceptFails() throws Exception {
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    unboundServerSocket, serverDispatcher, failureReporter, props);
+	    unboundServerSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	failureReporter.checkCalled(MAX_RETRY);
     }
 
@@ -162,7 +159,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		try {
@@ -181,7 +179,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -206,7 +205,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -237,7 +237,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -275,7 +276,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		    throw new NullPointerException("Whoa!");
 		}
 	    },
-	    failureReporter, props);
+	    failureReporter, MAX_RETRY, RETRY_WAIT);
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
 		Socket socket = null;
@@ -306,7 +307,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	DummyRequestQueueServer server = new DummyRequestQueueServer(1);
 	serverDispatcher.setServer(1, server);
 	connect = new InterruptableThread() {
@@ -342,7 +344,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	DummyRequestQueueServer server33 = new DummyRequestQueueServer(33);
 	serverDispatcher.setServer(33, server33);
 	DummyRequestQueueServer server999 = new DummyRequestQueueServer(999);
@@ -384,7 +387,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	Thread.sleep(extraWait);
 	listener.shutdown();
 	/* Make sure the server socket has been shutdown */
@@ -408,7 +412,8 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, serverDispatcher, failureReporter, props);
+	    serverSocket, serverDispatcher, failureReporter, MAX_RETRY,
+	    RETRY_WAIT);
 	serverDispatcher.setServer(33, new DummyRequestQueueServer(33));
 	connect = new InterruptableThread() {
 	    boolean runOnce() {
@@ -453,7 +458,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     static class DummyRequestQueueServer extends RequestQueueServer<Request> {
 	final AtomicInteger connectionCount = new AtomicInteger();
 	DummyRequestQueueServer(long nodeId) {
-	    super(nodeId, new DummyRequestHandler(), emptyProperties);
+	    super(nodeId, new DummyRequestHandler());
 	}
 	@Override
 	public void handleConnection(Socket socket) {

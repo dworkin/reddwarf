@@ -21,12 +21,10 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Properties;
 import static java.util.logging.Level.FINE;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
@@ -56,25 +54,6 @@ public final class RequestQueueListener extends Thread {
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
-    /**
-     * The property for specifying the maximum time in milliseconds to continue
-     * trying to accept and dispatch connections in the presence of failures
-     * without any successfully dispatched connections.
-     */
-    public static final String MAX_RETRY_PROPERTY = "max.retry";
-
-    /** The default maximum retry time in milliseconds. */
-    public static final long DEFAULT_MAX_RETRY = 1000;
-
-    /**
-     * The property for specifying the time in milliseconds to wait after a
-     * connection failure before attempting to accept connections again.
-     */
-    public static final String RETRY_WAIT_PROPERTY = "retry.wait";
-
-    /** The default retry wait time in milliseconds. */
-    public static final long DEFAULT_RETRY_WAIT = 100;
 
     /** The socket server. */
     private final ServerSocket serverSocket;
@@ -117,25 +96,36 @@ public final class RequestQueueListener extends Thread {
      * @param	serverDispatcher the object for finding the {@link
      *		RequestQueueServer} 
      * @param	failureReporter the failure reporter
-     * @param	properties additional configuration properties
+     * @param	maxRetry the maximum time in milliseconds to continue trying
+     *		to accept and dispatch connections in the presence of failures
+     *		without any successfully dispatched connections
+     * @param	retryWait the time in milliseconds to wait after a
+     *		connection failure before attempting to accept connections
+     *		again
      */
     public RequestQueueListener(ServerSocket serverSocket,
 				ServerDispatcher serverDispatcher,
 				FailureReporter failureReporter,
-				Properties properties)
+				long maxRetry,
+				long retryWait)
     {
 	super(CLASSNAME);
 	checkNull("serverSocket", serverSocket);
 	checkNull("serverDispatcher", serverDispatcher);
 	checkNull("failureReporter", failureReporter);
+	if (maxRetry < 1) {
+	    throw new IllegalArgumentException(
+		"The maxRetry must not be less than 1");
+	}
+	if (retryWait < 1) {
+	    throw new IllegalArgumentException(
+		"The retryWait must not be less than 1");
+	}
 	this.serverSocket = serverSocket;
 	this.serverDispatcher = serverDispatcher;
 	this.failureReporter = failureReporter;
-	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	maxRetry = wrappedProps.getLongProperty(
-	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 1, Long.MAX_VALUE);
-	retryWait = wrappedProps.getLongProperty(
-	    RETRY_WAIT_PROPERTY, DEFAULT_RETRY_WAIT, 1, Long.MAX_VALUE);
+	this.maxRetry = maxRetry;
+	this.retryWait = retryWait;
 	start();
 	if (logger.isLoggable(FINE)) {
 	    logger.log(FINE,

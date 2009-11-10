@@ -111,6 +111,13 @@ import java.util.logging.Logger;
  *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
  *	transaction timeout
  *
+ * <dt> <i>Property:</i> <code><b>{@value #MAX_RETRY_PROPERTY}</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_MAX_RETRY}</code>
+ *
+ * <dd style="padding-top: .5em">The number of milliseconds to continue
+ *	retrying I/O operations before determining that the failure is
+ *	permanent.  The value must be non-negative. <p>
+ *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  *	that an attempt to obtain a lock will be allowed to continue before
  *	being aborted.  The value must be greater than <code>0</code>, and
@@ -130,6 +137,12 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The number of maps to use for associating keys
  *	and maps.  The value must be greater than <code>0</code>.  The number
  *	of maps controls the amount of concurrency. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #RETRY_WAIT_PROPERTY}</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_RETRY_WAIT}</code>
+ *
+ * <dd style="padding-top: .5em">The number of milliseconds to wait before
+ *	retrying a failed I/O operation.  The value must be non-negative. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #TXN_TIMEOUT_PROPERTY}</b></code><br>
  *	<i>Default:</i> The value of the <code>{@value
@@ -203,6 +216,16 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	computeLockTimeout(BOUNDED_TIMEOUT_DEFAULT);
 
     /**
+     * The property for specifying the number of milliseconds to continue
+     * retrying I/O operations before determining that the failure is
+     * permanent.
+     */
+    public static final String MAX_RETRY_PROPERTY = PKG + ".max.retry";
+
+    /** The default maximum retry, in milliseconds. */
+    public static final long DEFAULT_MAX_RETRY = 1000;
+
+    /**
      * The property for specifying the number of threads to use for performing
      * callbacks.
      */
@@ -221,6 +244,15 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 
     /** The default number of key maps. */
     public static final int DEFAULT_NUM_KEY_MAPS = 8;
+
+    /**
+     * The property for specifying the number of milliseconds to wait before
+     * retrying a failed I/O operation.
+     */
+    public static final String RETRY_WAIT_PROPERTY = PKG + ".retry.wait";
+
+    /** The default retry wait, in milliseconds. */
+    public static final long DEFAULT_RETRY_WAIT = 10;
 
     /** The property for specifying the transaction timeout in milliseconds. */
     public static final String TXN_TIMEOUT_PROPERTY = PKG + ".txn.timeout";
@@ -387,6 +419,8 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    ? DEFAULT_LOCK_TIMEOUT : computeLockTimeout(txnTimeout);
 	long lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
+	long maxRetry = wrappedProps.getLongProperty(
+	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 0, Long.MAX_VALUE);
 	int numCallbackThreads = wrappedProps.getIntProperty(
 	    NUM_CALLBACK_THREADS_PROPERTY, DEFAULT_NUM_CALLBACK_THREADS, 1,
 	    Integer.MAX_VALUE);
@@ -396,13 +430,17 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	int requestedUpdateQueuePort = wrappedProps.getIntProperty(
 	    UPDATE_QUEUE_PORT_PROPERTY, DEFAULT_UPDATE_QUEUE_PORT, 0, 65535);
+	long retryWait = wrappedProps.getLongProperty(
+	    RETRY_WAIT_PROPERTY, DEFAULT_RETRY_WAIT, 0, Long.MAX_VALUE);
 	if (logger.isLoggable(CONFIG)) {
 	    logger.log(CONFIG,
 		       "Creating CachingDataStoreServerImpl with properties:" +
 		       "\n  db environment class: " + dbEnvClass +
 		       "\n  directory: " + directory +
 		       "\n  lock timeout: " + lockTimeout +
+		       "\n  max retry: " + maxRetry +
 		       "\n  num key maps: " + numKeyMaps +
+		       "\n  retry wait: " + retryWait +
 		       "\n  server port: " + requestedServerPort +
 		       "\n  txn timeout: " + txnTimeout +
 		       "\n  update queue port: " + requestedUpdateQueuePort);
@@ -453,7 +491,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 			return getNodeInfo(nodeId).updateQueueServer;
 		    }
 		},
-		this, properties);
+		this, maxRetry, retryWait);
 	    serverPort = serverExporter.export(
 		new LoggingCachingDataStoreServer(this, logger),
 		"CachingDataStoreServer", requestedServerPort);
@@ -516,8 +554,7 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 		lockManager, nodeId, callbackServer,
 		new RequestQueueServer<UpdateQueueRequest>(
 		    nodeId,
-		    new UpdateQueueRequestHandler(updateQueueServer, nodeId),
-		    new Properties()));
+		    new UpdateQueueRequestHandler(updateQueueServer, nodeId)));
 	    synchronized (nodeInfoMap) {
 		assert !nodeInfoMap.containsKey(nodeInfo.nodeId);
 		nodeInfoMap.put(nodeInfo.nodeId, nodeInfo);

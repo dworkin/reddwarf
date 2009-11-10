@@ -33,7 +33,10 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
 
-/** The subclass of all requests used by {@link UpdateQueue}. */
+/**
+ * The subclass of all requests used by {@link UpdateQueue}, with nested
+ * classes that implement the specific requests.
+ */
 abstract class UpdateQueueRequest implements Request {
 
     /** The identifier for {@link Commit} requests. */
@@ -57,7 +60,10 @@ abstract class UpdateQueueRequest implements Request {
      */
     private final CompletionHandler completionHandler;
 
-    /** Creates an instance with no completion handler. */
+    /**
+     * Creates an instance with no completion handler, for use in constructing
+     * request objects on the server side.
+     */
     UpdateQueueRequest() {
 	completionHandler = null;
     }
@@ -71,6 +77,7 @@ abstract class UpdateQueueRequest implements Request {
 	this.completionHandler = completionHandler;
     }
 
+    /** {@inheritDoc} */
     @Override
     public void completed() {
 	if (completionHandler != null) {
@@ -187,6 +194,7 @@ abstract class UpdateQueueRequest implements Request {
 		"]";
 	}
 
+	@Override
 	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
@@ -194,6 +202,7 @@ abstract class UpdateQueueRequest implements Request {
 		nodeId, oids, oidValues, newOids, names, nameValues, newNames);
 	}
 
+	@Override
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(COMMIT);
 	    writeLongs(oids, out);
@@ -223,12 +232,14 @@ abstract class UpdateQueueRequest implements Request {
 	    return "EvictObject[oid:" + oid + "]";
 	}
 
+	@Override
 	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.evictObject(nodeId, oid);
 	}
 
+	@Override
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(EVICT_OBJECT);
 	    out.writeLong(oid);
@@ -253,12 +264,14 @@ abstract class UpdateQueueRequest implements Request {
 	    return "DowngradeObject[oid:" + oid + "]";
 	}
 
+	@Override
 	void performRequest(UpdateQueueServer server, long nodeId) 
 	    throws CacheConsistencyException
 	{
 	    server.downgradeObject(nodeId, oid);
 	}
 
+	@Override
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(DOWNGRADE_OBJECT);
 	    out.writeLong(oid);
@@ -283,12 +296,14 @@ abstract class UpdateQueueRequest implements Request {
 	    return "EvictBinding[name:" + name + "]";
 	}
 
+	@Override
 	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.evictBinding(nodeId, name);
 	}
 
+	@Override
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(EVICT_BINDING);
 	    writeString(name, out);
@@ -313,12 +328,14 @@ abstract class UpdateQueueRequest implements Request {
 	    return "DowngradeBinding[name:" + name + "]";
 	}
 
+	@Override
 	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.downgradeBinding(nodeId, name);
 	}
 
+	@Override
 	public void writeRequest(DataOutput out) throws IOException {
 	    out.write(DOWNGRADE_BINDING);
 	    writeString(name, out);

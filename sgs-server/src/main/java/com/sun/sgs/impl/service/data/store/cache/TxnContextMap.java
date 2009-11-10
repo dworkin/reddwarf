@@ -23,7 +23,8 @@ import com.sun.sgs.service.Transaction;
 
 /**
  * Maintains the association between transactions and instances of {@link
- * TxnContext}, which manage per-transaction state.
+ * TxnContext}, which manage per-transaction state for the {@link
+ * CachingDataStore}.
  */
 class TxnContextMap {
 
@@ -148,15 +149,6 @@ class TxnContextMap {
 	}
     }
 
-    /**
-     * Shuts down this instance after a node shutdown has been requested,
-     * waiting for active transactions to complete.
-     */
-    void shutdown() {
-	store.awaitTxnShutdown();
-	store.getUpdateQueue().shutdown();
-    }
-
     /* -- Private methods and nested classes -- */
 
     /**
@@ -191,6 +183,9 @@ class TxnContextMap {
      *
      * @param	txn the transaction
      * @param	checkTimeout whether to check for transaction timeout
+     * @return	the associated context
+     * @throws	IllegalStateException if the current context is for a different
+     *		transaction or if the transaction has not been joined
      */
     private TxnContext getContextJoined(
 	Transaction txn, boolean checkTimeout)

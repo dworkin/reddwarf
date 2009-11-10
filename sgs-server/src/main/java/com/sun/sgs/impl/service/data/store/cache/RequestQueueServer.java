@@ -21,7 +21,6 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import static com.sun.sgs.impl.util.DataStreamUtil.writeString;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -30,7 +29,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.Properties;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.FINEST;
 import static java.util.logging.Level.WARNING;
@@ -83,36 +81,17 @@ public class RequestQueueServer<R extends Request> {
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    /**
-     * The property for specifying the largest request number, which must be at
-     * least {@code 2} and not larger than {@value java.lang.Short#MAX_VALUE}.
-     */
-    public static final String MAX_REQUEST_PROPERTY = "max.request";
+    /** The maximum request number. */
+    private static final int MAX_REQUEST = Short.MAX_VALUE;
 
-    /** The default maximum request number. */
-    public static final int DEFAULT_MAX_REQUEST = Short.MAX_VALUE;
-
-    /**
-     * The property for specifying the largest number of requests that can be
-     * outstanding, which must be at least {@code 1} and less than the value
-     * specified for the largest request number.
-     */
-    public static final String MAX_OUTSTANDING_PROPERTY = "max.outstanding";
-
-    /** The default maximum number of outstanding requests. */
-    public static final int DEFAULT_MAX_OUTSTANDING = 10000;
+    /** The largest number of requests that can be outstanding. */
+    private static final int MAX_OUTSTANDING = 10000;
 
     /** The node ID for this server. */
     final long nodeId;
 
     /** Handler for reading and performing requests. */
     final Request.RequestHandler<R> requestHandler;
-
-    /** The largest request number. */
-    final int maxRequest;
-
-    /** The largest number of outstanding requests. */
-    final int maxOutstanding;
 
     /**
      * The current connection, or {@code null} if not currently connected.
@@ -141,12 +120,10 @@ public class RequestQueueServer<R extends Request> {
      *
      * @param	nodeId the node ID for this server
      * @param	requestHandler the handler for reading and performing requests
-     * @param	properties additional configuration properties
      * @throws	IllegalArgumentException if {@code nodeId} is negative
      */
     public RequestQueueServer(long nodeId,
-			      Request.RequestHandler<R> requestHandler,
-			      Properties properties)
+			      Request.RequestHandler<R> requestHandler)
     {
 	if (nodeId < 0) {
 	    throw new IllegalArgumentException(
@@ -155,20 +132,10 @@ public class RequestQueueServer<R extends Request> {
 	this.nodeId = nodeId;
 	checkNull("requestHandler", requestHandler);
 	this.requestHandler = requestHandler;
-	PropertiesWrapper wrappedProperties =
-	    new PropertiesWrapper(properties);
-	maxRequest = wrappedProperties.getIntProperty(
-	    MAX_REQUEST_PROPERTY, DEFAULT_MAX_REQUEST, 2, Short.MAX_VALUE);
-	maxOutstanding = wrappedProperties.getIntProperty(
-	    MAX_OUTSTANDING_PROPERTY, DEFAULT_MAX_OUTSTANDING, 1,
-	    maxRequest - 1);
-	lastRequest = maxRequest;
+	lastRequest = MAX_REQUEST;
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER,
-		       "Created RequestQueueServer" +
-		       " nodeId:" + nodeId +
-		       ", maxRequest:" + maxRequest +
-		       ", maxOutstanding:" + maxOutstanding);
+		       "Created RequestQueueServer" + " nodeId:" + nodeId);
 	}
     }
 
@@ -218,25 +185,25 @@ public class RequestQueueServer<R extends Request> {
      *		maximum permitted number of requests outstanding
      */
     public boolean earlierRequest(int x, int y) {
-	if (x < 0 || x > maxRequest) {
+	if (x < 0 || x > MAX_REQUEST) {
 	    throw new IllegalArgumentException("Illegal request: " + x);
-	} else if (y < 0 || y > maxRequest) {
+	} else if (y < 0 || y > MAX_REQUEST) {
 	    throw new IllegalArgumentException("Illegal request: " + y);
 	}
-	int diff = (y - x) % (maxRequest + 1);
+	int diff = (y - x) % (MAX_REQUEST + 1);
 	if (diff < 0) {
-	    diff += (maxRequest + 1);
+	    diff += (MAX_REQUEST + 1);
 	}
 	if (diff == 0) {
 	    return false;
-	} else if (diff < maxOutstanding) {
+	} else if (diff < MAX_OUTSTANDING) {
 	    return true;
-	} else if (diff > (maxRequest - maxOutstanding)) {
+	} else if (diff > (MAX_REQUEST - MAX_OUTSTANDING)) {
 	    return false;
 	} else {
 	    throw new IllegalArgumentException(
 		"Too many requests outstanding: " +
-		(maxRequest - maxOutstanding));
+		(MAX_REQUEST - MAX_OUTSTANDING));
 	}
     }
 

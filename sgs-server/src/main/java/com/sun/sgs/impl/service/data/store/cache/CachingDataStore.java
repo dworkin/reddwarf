@@ -185,8 +185,8 @@ import java.util.logging.Logger;
  *	</b></code> <br>
  *	<i>Default:</i>	<code>{@value #DEFAULT_UPDATE_QUEUE_SIZE}</code>
  *
- * <dd style="padding-top: .5em">The maximum number of requests that can be
- *	queued waiting to send to the server.  The value must be no smaller
+ * <dd style="padding-top: .5em">The maximum number of commit requests that can
+ *	be queued waiting to send to the server.  The value must be no smaller
  *	than <code>{@value #MIN_CACHE_SIZE}</code>. <p>
  *
  * </dl>
@@ -2326,6 +2326,13 @@ public class CachingDataStore extends AbstractDataStore
 	    case NOT_READY:
 	    case READY:
 		state = State.SHUTDOWN_REQUESTED;
+		while (txnCount > 0) {
+		    try {
+			stateSync.wait();
+		    } catch (InterruptedException e) {
+		    }
+		}
+		state = State.SHUTDOWN_TXNS_COMPLETED;
 		break;
 	    case SHUTDOWN_REQUESTED:
 	    case SHUTDOWN_TXNS_COMPLETED:
@@ -2342,11 +2349,10 @@ public class CachingDataStore extends AbstractDataStore
 		throw new AssertionError();
 	    }
 	}
-	/* Prevent new transactions and wait for active ones to complete */
-	if (contextMap != null) {
-	    contextMap.shutdown();
-	}
 	/* Stop facilities used by active transactions */
+	if (updateQueue != null) {
+	    updateQueue.shutdown();
+	}
 	dataConflictThread.interrupt();
 	evictionThread.interrupt();
 	try {
@@ -3091,36 +3097,6 @@ public class CachingDataStore extends AbstractDataStore
 	    assert txnCount >= 0;
 	    if (state == State.SHUTDOWN_REQUESTED && txnCount == 0) {
 		stateSync.notifyAll();
-	    }
-	}
-    }
-
-    /**
-     * Waits for active transactions to complete, assuming that a shutdown has
-     * been requested.
-     *
-     * @throws	IllegalStateException if shutdown has not been requested
-     */
-    void awaitTxnShutdown() {
-	synchronized (stateSync) {
-	    switch (state) {
-	    case NOT_READY:
-	    case READY:
-		throw new IllegalStateException("Shutdown not requested");
-	    case SHUTDOWN_REQUESTED:
-		while (txnCount > 0) {
-		    try {
-			stateSync.wait();
-		    } catch (InterruptedException e) {
-		    }
-		}
-		state = State.SHUTDOWN_TXNS_COMPLETED;
-		break;
-	    case SHUTDOWN_TXNS_COMPLETED:
-	    case SHUTDOWN_COMPLETED:
-		return;
-	    default:
-		throw new AssertionError();
 	    }
 	}
     }

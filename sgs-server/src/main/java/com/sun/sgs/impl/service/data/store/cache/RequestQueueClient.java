@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.data.store.cache;
 import static com.sun.sgs.impl.sharedutil.Exceptions.initCause;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import static com.sun.sgs.impl.util.DataStreamUtil.readString;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -35,7 +34,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 import static java.util.logging.Level.FINE;
@@ -90,45 +88,6 @@ public final class RequestQueueClient extends Thread {
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
-    /**
-     * The property for specifying the maximum time in milliseconds to continue
-     * attempting to make new connections and send requests when failures have
-     * prevented any successful responses.
-     */
-    public static final String MAX_RETRY_PROPERTY = "max.retry";
-
-    /** The default maximum retry time in milliseconds. */
-    public static final long DEFAULT_MAX_RETRY = 1000;
-
-    /**
-     * The property for specifying the time in milliseconds to wait after a
-     * connection failure before attempting to make a new connection.
-     */
-    public static final String RETRY_WAIT_PROPERTY = "retry.wait";
-
-    /** The default retry wait time in milliseconds. */
-    public static final long DEFAULT_RETRY_WAIT = 100;
-
-    /**
-     * The property for specifying the size of the queue that holds requests
-     * waiting to be sent to the server.
-     */
-    public static final String REQUEST_QUEUE_SIZE_PROPERTY =
-	"request.queue.size";
-
-    /** The default request queue size. */
-    public static final int DEFAULT_REQUEST_QUEUE_SIZE = 100;
-
-    /**
-     * The property for specifying the size of the queue of requests that have
-     * been sent to the server but have not received responses.
-     */
-    public static final String SENT_QUEUE_SIZE_PROPERTY =
-	"sent.queue.size";
-
-    /** The default sent queue size. */
-    public static final int DEFAULT_SENT_QUEUE_SIZE = 100;
 
     /** The node ID for this request queue. */
     private final long nodeId;
@@ -199,13 +158,23 @@ public final class RequestQueueClient extends Thread {
      * @param	socketFactory the factory for creating sockets that connect to
      *		the server
      * @param	failureReporter the failure reporter
-     * @param	properties additional configuration properties
-     * @throws	IllegalArgumentException if {@code nodeId} is negative
+     * @param	maxRetry the maximum time in milliseconds to continue
+     *		attempting to make new connections and send requests when
+     *		failures have prevented any successful responses
+     * @param	retryWait the time in milliseconds to wait after a connection
+     *		failure before attempting to make a new connection
+     * @param	queueSize the size of the queue that holds requests
+     *		waiting to be sent to or acknowledged by the server
+     * @throws	IllegalArgumentException if {@code nodeId} is negative, or if
+     *		{@code maxRetry}, {@code retryWait}, or {@code queueSize} is
+     *		less than {@code 1}
      */
     public RequestQueueClient(long nodeId,
 			      SocketFactory socketFactory,
 			      FailureReporter failureReporter,
-			      Properties properties)
+			      long maxRetry,
+			      long retryWait,
+			      int queueSize)
     {
 	super(CLASSNAME);
 	if (nodeId < 0) {
@@ -214,22 +183,21 @@ public final class RequestQueueClient extends Thread {
 	}
 	checkNull("socketFactory", socketFactory);
 	checkNull("failureReporter", failureReporter);
+	if (maxRetry < 1) {
+	    throw new IllegalArgumentException(
+		"The maxRetry must not be less than 1");
+	}
+	if (retryWait < 1) {
+	    throw new IllegalArgumentException(
+		"The retryWait must not be less than 1");
+	}
 	this.nodeId = nodeId;
 	this.socketFactory = socketFactory;
 	this.failureReporter = failureReporter;
-	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	maxRetry = wrappedProps.getLongProperty(
-	    MAX_RETRY_PROPERTY, DEFAULT_MAX_RETRY, 1, Long.MAX_VALUE);
-	retryWait = wrappedProps.getLongProperty(
-	    RETRY_WAIT_PROPERTY, DEFAULT_RETRY_WAIT, 1, Long.MAX_VALUE);
-	int requestQueueSize = wrappedProps.getIntProperty(
-	    REQUEST_QUEUE_SIZE_PROPERTY, DEFAULT_REQUEST_QUEUE_SIZE,
-	    1, Integer.MAX_VALUE);
-	int sentQueueSize = wrappedProps.getIntProperty(
-	    SENT_QUEUE_SIZE_PROPERTY, DEFAULT_SENT_QUEUE_SIZE, 1,
-	    Integer.MAX_VALUE);
-	requests = new LinkedBlockingDeque<Request>(requestQueueSize);
-	sentRequests = new LinkedBlockingDeque<RequestHolder>(sentQueueSize);
+	this.maxRetry = maxRetry;
+	this.retryWait = retryWait;
+	requests = new LinkedBlockingDeque<Request>(queueSize);
+	sentRequests = new LinkedBlockingDeque<RequestHolder>(queueSize);
 	start();
 	if (logger.isLoggable(FINE)) {
 	    logger.log(FINE,
@@ -237,9 +205,8 @@ public final class RequestQueueClient extends Thread {
 		       " nodeId:" + nodeId +
 		       ", socketFactory:" + socketFactory +
 		       ", maxRetry:" + maxRetry +
-		       ", retryWait:" + retryWait +
-		       ", requestQueueSize:" + requestQueueSize +
-		       ", sentQueueSize:" + sentQueueSize);
+		       ", queueSize:" + queueSize +
+		       ", retryWait:" + retryWait);
 	}
     }
 

@@ -24,14 +24,6 @@ import com.sun.sgs.impl.service.data.store.cache.Request.RequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueClient;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueClient.
     BasicSocketFactory;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueClient.
-    MAX_RETRY_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueClient.
-    REQUEST_QUEUE_SIZE_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueClient.
-    RETRY_WAIT_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.RequestQueueClient.
-    SENT_QUEUE_SIZE_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueClient.
     SocketFactory;
 import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
@@ -48,7 +40,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.BlockingDeque;
@@ -72,22 +63,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     /** The shorter retry wait to use for tests. */
     private static final long RETRY_WAIT = 10;
 
-    /** The shorter queue size for use in tests. */
-    private static final int QUEUE_SIZE = 10;
-
-    /**
-     * Properties specifying the shorter maximum retry and retry waits, and
-     * queue size.
-     */
-    private static final Properties props = new Properties();
-    static {
-	props.setProperty(MAX_RETRY_PROPERTY, String.valueOf(MAX_RETRY));
-	props.setProperty(RETRY_WAIT_PROPERTY, String.valueOf(RETRY_WAIT));
-	props.setProperty(
-	    REQUEST_QUEUE_SIZE_PROPERTY, String.valueOf(QUEUE_SIZE));
-	props.setProperty(
-	    SENT_QUEUE_SIZE_PROPERTY, String.valueOf(QUEUE_SIZE));
-    }
+    /** The queue size for use in tests. */
+    private static final int QUEUE_SIZE = 100;
 
     /** The request queue listener server dispatcher. */
     private SimpleServerDispatcher serverDispatcher;
@@ -114,7 +91,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
 	    new ServerSocket(PORT), serverDispatcher, failureReporter,
-	    emptyProperties);
+	    MAX_RETRY, RETRY_WAIT);
     }
 
     @After
@@ -141,23 +118,38 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 
     @Test(expected=IllegalArgumentException.class)
     public void testConstructorNegativeNodeId() {
-	new RequestQueueClient(
-	    -1, socketFactory, failureReporter, emptyProperties);
+	new RequestQueueClient(-1, socketFactory, failureReporter, MAX_RETRY,
+			       RETRY_WAIT, QUEUE_SIZE);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullSocketFactory() {
-	new RequestQueueClient(1, null, failureReporter, emptyProperties);
+	new RequestQueueClient(1, null, failureReporter, MAX_RETRY, RETRY_WAIT,
+			       QUEUE_SIZE);
     }
 
     @Test(expected=NullPointerException.class)
     public void testConstructorNullFailureHandler() {
-	new RequestQueueClient(1, socketFactory, null, emptyProperties);
+	new RequestQueueClient(1, socketFactory, null, MAX_RETRY, RETRY_WAIT,
+			       QUEUE_SIZE);
     }
 
-    @Test(expected=NullPointerException.class)
-    public void testConstructorNullProperties() {
-	new RequestQueueClient(1, socketFactory, failureReporter, null);
+    @Test(expected=IllegalArgumentException.class)
+    public void testConstructorIllegalMaxRetry() {
+	new RequestQueueClient(1, socketFactory, failureReporter, 0, RETRY_WAIT,
+			       QUEUE_SIZE);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testConstructorIllegalRetryWait() {
+	new RequestQueueClient(1, socketFactory, failureReporter, MAX_RETRY, 0,
+			       QUEUE_SIZE);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testConstructorIllegalQueueSize() {
+	new RequestQueueClient(1, socketFactory, failureReporter, MAX_RETRY,
+			       RETRY_WAIT, 0);
     }
 
     /* Test connection handling */
@@ -167,7 +159,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	listener.shutdown();
 	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, props);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	failureReporter.checkCalled(MAX_RETRY);	
     }
 
@@ -175,7 +168,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     public void testConnectionServerUnknown() throws Exception {
 	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, props);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	failureReporter.checkCalled(MAX_RETRY);
     }	
 
@@ -184,7 +178,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test
     public void testAddRequestNullRequest() {
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	try {
 	    client.addRequest(null);
 	    fail("Expected NullPointerException");
@@ -195,7 +190,8 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
     @Test
     public void testAddRequestShutdown() {
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	client.shutdown();
 	try {
 	    client.addRequest(new DummyRequest());
@@ -210,9 +206,10 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		1, new SimpleRequestHandler(), emptyProperties));
+		1, new SimpleRequestHandler()));
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
 	request.awaitCompleted(extraWait);
@@ -225,10 +222,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		1, new SimpleRequestHandler(), emptyProperties));
+		1, new SimpleRequestHandler()));
 	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	client.shutdown();
 	client.shutdown();
 	failureReporter.checkNotCalled();
@@ -239,10 +237,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		1, new SimpleRequestHandler(), emptyProperties));
+		1, new SimpleRequestHandler()));
 	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	SimpleRequest request = new SimpleRequest(1);
 	client.addRequest(request);
 	request.awaitCompleted(extraWait);
@@ -256,10 +255,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		1, new SimpleRequestHandler(), emptyProperties));
+		1, new SimpleRequestHandler()));
 	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	final SimpleRequest firstRequest = new SimpleRequest(1);
 	clientThread = new InterruptableThread() {
 	    private int next = 1;
@@ -291,9 +291,10 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		1, new SimpleRequestHandler(), emptyProperties));
+		1, new SimpleRequestHandler()));
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, emptyProperties);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	clientThread = new InterruptableThread() {
 	    private int count = 0;
 	    boolean runOnce() throws Exception {
@@ -344,11 +345,10 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
 		1,
-		new FailingRequestHandler(new Random(seed), total - 50),
-		emptyProperties));
+		new FailingRequestHandler(new Random(seed), total - 50)));
 	client = new RequestQueueClient(
 	    1, new FailingSocketFactory(new Random(seed + 1)),
-	    failureReporter, emptyProperties);
+	    failureReporter, MAX_RETRY, RETRY_WAIT, QUEUE_SIZE);
 	final AtomicBoolean clientDone = new AtomicBoolean(false);
 	clientThread = new InterruptableThread() {
 	    private int count = 0;
@@ -433,11 +433,11 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 			    }
 			}
 		    }
-		},
-		props));
+		}));
 	NoteFailure failureReporter = new NoteFailure();
 	client = new RequestQueueClient(
-	    1, socketFactory, failureReporter, props);
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
 	client.addRequest(new SimpleRequest(1));
 	failureReporter.checkCalled(2 * MAX_RETRY);
     }
