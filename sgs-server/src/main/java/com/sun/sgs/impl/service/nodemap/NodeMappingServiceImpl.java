@@ -622,7 +622,7 @@ public class NodeMappingServiceImpl
 
                 if (maxAttempts-- == 0) {
                     logger.logThrow(Level.SEVERE, ioe,
-                            "A communication error occured while calling the " +
+                            "A communication error occurred while calling the " +
                             "server. Reporting this node - {0} as failed.",
                             localNodeId);
 

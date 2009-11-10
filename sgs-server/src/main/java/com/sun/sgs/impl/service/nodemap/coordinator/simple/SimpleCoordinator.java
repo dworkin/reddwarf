@@ -42,7 +42,7 @@ public class SimpleCoordinator implements GroupCoordinator {
 
     /** Package name for this class. */
     private static final String PKG_NAME =
-                            "com.sun.sgs.impl.service.nodemap.affinity.simple";
+                          "com.sun.sgs.impl.service.nodemap.coordinator.simple";
 
     protected final NodeMappingServerImpl server;
     protected final ComponentRegistry systemRegistry;
@@ -52,6 +52,14 @@ public class SimpleCoordinator implements GroupCoordinator {
 
     private boolean shutdown;
 
+    /**
+     * Public constructor.
+     *
+     * @param properties server properties
+     * @param server node mapping server
+     * @param systemRegistry system registry
+     * @param txnProxy transaction proxy
+     */
     public SimpleCoordinator(Properties properties,
                              NodeMappingServerImpl server,
                              ComponentRegistry systemRegistry,
@@ -63,6 +71,15 @@ public class SimpleCoordinator implements GroupCoordinator {
              new LoggerWrapper(Logger.getLogger(PKG_NAME + ".coordinator")));
     }
 
+    /**
+     * Constructor for use by subclasses.
+     *
+     * @param properties server properties
+     * @param server node mapping server
+     * @param systemRegistry system registry
+     * @param txnProxy transaction proxy
+     * @param logger logger to use
+     */
     protected SimpleCoordinator(Properties properties,
                                 NodeMappingServerImpl server,
                                 ComponentRegistry systemRegistry,

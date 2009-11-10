@@ -24,7 +24,7 @@ import com.sun.sgs.impl.service.nodemap.NodeAssignPolicy;
 import java.util.Properties;
 
 /**
- *  The simpliest node policy possible: always assign to the local requesting
+ *  The simplest node policy possible: always assign to the local requesting
  *  node.  Round robin assignment is used when the server is making the 
  *  request due to node failure.
  */

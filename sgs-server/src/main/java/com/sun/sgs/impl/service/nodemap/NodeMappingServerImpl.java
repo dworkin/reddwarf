@@ -831,7 +831,7 @@ public final class NodeMappingServerImpl
      * the identity.
      *
      * @param id the identity to move
-     * @param oldNode the last node the identity was mapped to, or null if there
+     * @param node the last node the identity was mapped to, or null if there
      *        was no prior mapping
      * @param targetNodeId target node to move to or -1
      *
@@ -1220,7 +1220,6 @@ public final class NodeMappingServerImpl
      * Task to offload identities from a node in distress.
      */
     private final class OffloadTask extends AbstractKernelRunnable {
-
         private final long nodeId;
 
         OffloadTask(long nodeId) {
