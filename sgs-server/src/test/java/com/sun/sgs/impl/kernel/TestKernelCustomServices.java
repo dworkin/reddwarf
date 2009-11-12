@@ -25,11 +25,14 @@ import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties.ServiceNodeTypes;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
+import java.beans.PropertyChangeEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -57,6 +60,9 @@ public class TestKernelCustomServices {
     /** List of authenticators that have been created. */
     private static List<String> availableAuthenticators =
                                 new ArrayList<String>();
+    /** List of profile listeners that have been created. */
+    private static List<String> availableProfileListeners =
+                                new ArrayList<String>();
 
     /** The main test node. */
     private SgsTestNode serverNode;
@@ -80,6 +86,9 @@ public class TestKernelCustomServices {
         runningServices.clear();
         runningManagers.clear();
         availableAuthenticators.clear();
+        availableProfileListeners.clear();
+
+        Thread.sleep(100);
     }
 
     /** Utility methods. */
@@ -893,6 +902,115 @@ public class TestKernelCustomServices {
                 Authenticator2.class.getName()));
     }
 
+    @Test
+    public void noProfileListeners() throws Exception {
+        Properties props = getSingleNodeProperties();
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.isEmpty());
+    }
+
+    @Test
+    public void invalidProfileListener() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(Kernel.PROFILE_LISTENERS,
+                          InvalidProfileListener.class.getName());
+
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.isEmpty());
+    }
+
+    @Test
+    public void singleProfileListener() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(Kernel.PROFILE_LISTENERS,
+                          ProfileListener1.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener1.class.getName()));
+    }
+
+    @Test
+    public void multiProfileListeners() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(Kernel.PROFILE_LISTENERS,
+                          ProfileListener1.class.getName() + ":" +
+                          ProfileListener2.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener1.class.getName()));
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener2.class.getName()));
+    }
+
+    @Test
+    public void singleExtProfileListener() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(BootProperties.EXTENSION_PROFILE_LISTENERS_PROPERTY,
+                          ProfileListener1.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener1.class.getName()));
+    }
+
+    @Test
+    public void multiExtProfileListeners() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(BootProperties.EXTENSION_PROFILE_LISTENERS_PROPERTY,
+                          ProfileListener1.class.getName() + ":" +
+                          ProfileListener2.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener1.class.getName()));
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener2.class.getName()));
+    }
+
+    @Test
+    public void combinedSingleProfileListeners() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(Kernel.PROFILE_LISTENERS,
+                          ProfileListener1.class.getName());
+        props.setProperty(BootProperties.EXTENSION_PROFILE_LISTENERS_PROPERTY,
+                          ProfileListener2.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener1.class.getName()));
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener2.class.getName()));
+        Assert.assertTrue(
+                availableProfileListeners.indexOf(
+                ProfileListener2.class.getName()) <
+                availableProfileListeners.indexOf(
+                ProfileListener1.class.getName()));
+    }
+
+    @Test
+    public void combinedMultiProfileListeners() throws Exception {
+        Properties props = getSingleNodeProperties();
+        props.setProperty(Kernel.PROFILE_LISTENERS,
+                          ProfileListener1.class.getName() + ":" +
+                          ProfileListener2.class.getName());
+        props.setProperty(BootProperties.EXTENSION_PROFILE_LISTENERS_PROPERTY,
+                          ProfileListener3.class.getName());
+        startCoreNode(props);
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener1.class.getName()));
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener2.class.getName()));
+        Assert.assertTrue(availableProfileListeners.contains(
+                ProfileListener3.class.getName()));
+        Assert.assertTrue(
+                availableProfileListeners.indexOf(
+                ProfileListener3.class.getName()) <
+                availableProfileListeners.indexOf(
+                ProfileListener1.class.getName()));
+        Assert.assertTrue(
+                availableProfileListeners.indexOf(
+                ProfileListener1.class.getName()) <
+                availableProfileListeners.indexOf(
+                ProfileListener2.class.getName()));
+    }
+
 
     /** Dummy Services and Managers for use in the tests. */
 
@@ -1012,6 +1130,50 @@ public class TestKernelCustomServices {
 
     public static class InvalidAuthenticator extends AbstractAuthenticator {
         public InvalidAuthenticator() { super(null); }
+    }
+
+    public static abstract class AbstractProfileListener
+            implements ProfileListener {
+
+        public AbstractProfileListener(Properties p,
+                                       Identity i,
+                                       ComponentRegistry c) {
+            availableProfileListeners.add(this.getClass().getName());
+        }
+
+        public void propertyChange(PropertyChangeEvent event) {
+
+        }
+
+        public void report(ProfileReport profileReport) {
+
+        }
+
+        public void shutdown() {
+
+        }
+    }
+
+    public static class ProfileListener1 extends AbstractProfileListener {
+        public ProfileListener1(Properties p, Identity i, ComponentRegistry c) {
+            super(p, i, c);
+        }
+    }
+
+    public static class ProfileListener2 extends AbstractProfileListener {
+        public ProfileListener2(Properties p, Identity i, ComponentRegistry c) {
+            super(p, i, c);
+        }
+    }
+
+    public static class ProfileListener3 extends AbstractProfileListener {
+        public ProfileListener3(Properties p, Identity i, ComponentRegistry c) {
+            super(p, i, c);
+        }
+    }
+
+    public static class InvalidProfileListener extends AbstractProfileListener {
+        public InvalidProfileListener() { super(null, null, null); }
     }
 
 }
