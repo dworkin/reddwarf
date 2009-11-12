@@ -257,7 +257,7 @@ public class SimpleClient implements ServerSession {
 	synchronized (lock) {
 	    checkConnected();
 	    if (isSuspended) {
-		throw new IOException("client suspended");
+		throw new IllegalStateException("client suspended");
 	    }
 	    ByteBuffer msg = ByteBuffer.allocate(1 + message.remaining());
 	    msg.put(SimpleSgsProtocol.SESSION_MESSAGE)
@@ -729,7 +729,7 @@ public class SimpleClient implements ServerSession {
 				"suspend) throws");
 			}
 		    }
-		    throw new RuntimeException("client suspended");
+		    throw new IllegalStateException("client not suspended");
 		}
 	    }
 		    
@@ -1021,7 +1021,7 @@ public class SimpleClient implements ServerSession {
         public void send(ByteBuffer message) throws IOException {
 	    synchronized (lock) {
 		if (isSuspended) {
-		    throw new IOException("client suspended");
+		    throw new IllegalStateException("client suspended");
 		}
 		if (!isJoined.get()) {
 		    throw new IllegalStateException(
