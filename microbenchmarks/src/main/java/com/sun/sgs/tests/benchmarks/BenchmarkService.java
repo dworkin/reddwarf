@@ -91,10 +91,14 @@ public class BenchmarkService implements Service {
     private long getObjectId1000;
     private long markForUpdate100;
     private long markForUpdate1000;
-    private long get100;
-    private long get1000;
-    private long getForUpdate100;
-    private long getForUpdate1000;
+    private long getCold100;
+    private long getCold1000;
+    private long getHot100;
+    private long getHot1000;
+    private long getForUpdateCold100;
+    private long getForUpdateCold1000;
+    private long getForUpdateHot100;
+    private long getForUpdateHot1000;
 
     public BenchmarkService(Properties props,
                             ComponentRegistry systemRegistry,
@@ -170,10 +174,14 @@ public class BenchmarkService implements Service {
             getObjectId1000 = getObjectIdOverhead(10000, 10, 1000);
             markForUpdate100 = markForUpdateOverhead(10000, 100, 100);
             markForUpdate1000 = markForUpdateOverhead(10000, 10, 1000);
-            get100 = getOverhead(10000, 100, 100);
-            get1000 = getOverhead(10000, 10, 1000);
-            getForUpdate100 = getForUpdateOverhead(10000, 100, 100);
-            getForUpdate1000 = getForUpdateOverhead(10000, 10, 1000);
+            getCold100 = getColdOverhead(10000, 100, 100);
+            getCold1000 = getColdOverhead(10000, 10, 1000);
+            getHot100 = getHotOverhead(10000, 100, 100);
+            getHot1000 = getHotOverhead(10000, 10, 1000);
+            getForUpdateCold100 = getForUpdateColdOverhead(10000, 100, 100);
+            getForUpdateCold1000 = getForUpdateColdOverhead(10000, 10, 1000);
+            getForUpdateHot100 = getForUpdateHotOverhead(10000, 100, 100);
+            getForUpdateHot1000 = getForUpdateHotOverhead(10000, 10, 1000);
             System.out.println();
 
             System.out.println("DataManager Overhead Summary");
@@ -197,10 +205,14 @@ public class BenchmarkService implements Service {
             System.out.printf("  %8d ns/op, %s\n", getObjectId1000, "getObjectId, 1000 bytes");
             System.out.printf("  %8d ns/op, %s\n", markForUpdate100, "markForUpdate, 100 bytes");
             System.out.printf("  %8d ns/op, %s\n", markForUpdate1000, "markForUpdate, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", get100, "get, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", get1000, "get, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", getForUpdate100, "getForUpdate, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", getForUpdate1000, "getForUpdate, 1000 bytes");
+            System.out.printf("  %8d ns/op, %s\n", getCold100, "get, 100 bytes, cold");
+            System.out.printf("  %8d ns/op, %s\n", getCold1000, "get, 1000 bytes, cold");
+            System.out.printf("  %8d ns/op, %s\n", getHot100, "get, 100 bytes, hot");
+            System.out.printf("  %8d ns/op, %s\n", getHot1000, "get, 1000 bytes, hot");
+            System.out.printf("  %8d ns/op, %s\n", getForUpdateCold100, "getForUpdate, 100 bytes, cold");
+            System.out.printf("  %8d ns/op, %s\n", getForUpdateCold1000, "getForUpdate, 1000 bytes, cold");
+            System.out.printf("  %8d ns/op, %s\n", getForUpdateHot100, "getForUpdate, 100 bytes, hot");
+            System.out.printf("  %8d ns/op, %s\n", getForUpdateHot1000, "getForUpdate, 1000 bytes, hot");
         }
 
         private long txnOverhead() {
@@ -358,34 +370,68 @@ public class BenchmarkService implements Service {
             return (perTxn - txnTime - getBindingOverhead * ops) / ops;
         }
 
-        private long getOverhead(final long txns,
-                                 final long ops,
-                                 final int objectSize) {
+        private long getColdOverhead(final long txns,
+                                     final long ops,
+                                     final int objectSize) {
             setReferences(ops, objectSize);
 
-            long time = performOperations(txns, ops, objectSize, Operation.GET);
+            long time = performOperations(txns, ops, objectSize, Operation.GET_COLD);
             if (time < 0) { return -1; }
 
             long perTxn = log(time, txns,
                               "getBinding, " + objectSize + " bytes, 1 time",
-                              "get, " + objectSize + " bytes, " + (ops - 1) + " times");
+                              "get, " + objectSize + " bytes, " + (ops - 1) + " times, cold");
             long getBindingOverhead = objectSize == 100 ? getBindingCold100 : getBindingCold1000;
             return (perTxn - txnTime - getBindingOverhead) / (ops - 1);
         }
 
-        private long getForUpdateOverhead(final long txns,
-                                          final long ops,
-                                          final int objectSize) {
+        private long getHotOverhead(final long txns,
+                                    final long ops,
+                                    final int objectSize) {
             setReferences(ops, objectSize);
 
-            long time = performOperations(txns, ops, objectSize, Operation.GET_FOR_UPDATE);
+            long time = performOperations(txns, ops, objectSize, Operation.GET_HOT);
             if (time < 0) { return -1; }
 
             long perTxn = log(time, txns,
                               "getBinding, " + objectSize + " bytes, 1 time",
-                              "getForUpdate, " + objectSize + " bytes, " + (ops - 1) + " times");
+                              "get, " + objectSize + " bytes, 1 time, cold",
+                              "get, " + objectSize + " bytes, " + (ops - 2) + " times, hot");
+            long getBindingOverhead = objectSize == 100 ? getBindingCold100 : getBindingCold1000;
+            long getOverhead = objectSize == 100 ? getCold100 : getCold1000;
+            return (perTxn - txnTime - getBindingOverhead - getOverhead) / (ops - 2);
+        }
+
+        private long getForUpdateColdOverhead(final long txns,
+                                              final long ops,
+                                              final int objectSize) {
+            setReferences(ops, objectSize);
+
+            long time = performOperations(txns, ops, objectSize, Operation.GET_FOR_UPDATE_COLD);
+            if (time < 0) { return -1; }
+
+            long perTxn = log(time, txns,
+                              "getBinding, " + objectSize + " bytes, 1 time",
+                              "getForUpdate, " + objectSize + " bytes, " + (ops - 1) + " times, cold");
             long getBindingOverhead = objectSize == 100 ? getBindingCold100 : getBindingCold1000;
             return (perTxn - txnTime - getBindingOverhead) / (ops - 1);
+        }
+
+        private long getForUpdateHotOverhead(final long txns,
+                                             final long ops,
+                                             final int objectSize) {
+            setReferences(ops, objectSize);
+
+            long time = performOperations(txns, ops, objectSize, Operation.GET_FOR_UPDATE_HOT);
+            if (time < 0) { return -1; }
+
+            long perTxn = log(time, txns,
+                              "getBinding, " + objectSize + " bytes, 1 time",
+                              "getForUpdate, " + objectSize + " bytes, 1 time, cold",
+                              "getForUpdate, " + objectSize + " bytes, " + (ops - 2) + " times, hot");
+            long getBindingOverhead = objectSize == 100 ? getBindingCold100 : getBindingCold1000;
+            long getForUpdateOverhead = objectSize == 100 ? getForUpdateCold100 : getForUpdateCold1000;
+            return (perTxn - txnTime - getBindingOverhead - getForUpdateOverhead) / (ops - 2);
         }
 
         private void setReferences(final long numReferences, final int objectSize) {
@@ -475,18 +521,32 @@ public class BenchmarkService implements Service {
                                         tmp = (ManagedInteger) dataService.getBinding("name" + j);
                                         dataService.markForUpdate(tmp);
                                         break;
-                                    case GET:
+                                    case GET_COLD:
                                         if (j == 0) {
                                             tmp = (ManagedInteger) dataService.getBinding("top");
                                         } else {
                                             tmp = tmp.nextNode.get();
                                         }
                                         break;
-                                    case GET_FOR_UPDATE:
+                                    case GET_HOT:
+                                        if (j == 0) {
+                                            tmp = (ManagedInteger) dataService.getBinding("top");
+                                        } else {
+                                            tmp.nextNode.get();
+                                        }
+                                        break;
+                                    case GET_FOR_UPDATE_COLD:
                                         if (j == 0) {
                                             tmp = (ManagedInteger) dataService.getBinding("top");
                                         } else {
                                             tmp = tmp.nextNode.getForUpdate();
+                                        }
+                                        break;
+                                    case GET_FOR_UPDATE_HOT:
+                                        if (j == 0) {
+                                            tmp = (ManagedInteger) dataService.getBinding("top");
+                                        } else {
+                                            tmp.nextNode.getForUpdate();
                                         }
                                         break;
                                 }
@@ -513,10 +573,12 @@ public class BenchmarkService implements Service {
 
 
     private static class ManagedInteger implements ManagedObject, Serializable {
-        public int i = 0;
+        private static int nextValue = 0;
+        public int i;
         public byte[] buffer;
         public ManagedReference<ManagedInteger> nextNode = null;
         public ManagedInteger(int size) {
+            i = nextValue++;
             buffer = new byte[size];
         }
         public void update() { i++; }
@@ -536,8 +598,10 @@ public class BenchmarkService implements Service {
         REMOVE_OBJECT,
         GET_OBJECT_ID,
         MARK_FOR_UPDATE,
-        GET,
-        GET_FOR_UPDATE
+        GET_COLD,
+        GET_HOT,
+        GET_FOR_UPDATE_COLD,
+        GET_FOR_UPDATE_HOT
     }
 
 }
