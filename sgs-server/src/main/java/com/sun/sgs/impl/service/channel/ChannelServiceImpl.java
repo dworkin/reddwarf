@@ -238,7 +238,7 @@ public final class ChannelServiceImpl
 	channelMembershipCache =
 	    new CacheMap<BigInteger, Set<BigInteger>>(1000);
 
-    /** The cache of channel event queues, keyed by channel ID. */ 
+    /** The cache of channel membership event queues, keyed by channel ID. */ 
     private final ConcurrentHashMap<BigInteger, Queue<MembershipEventInfo>>
 	membershipEventsCache =
 	    new ConcurrentHashMap<BigInteger, Queue<MembershipEventInfo>>();
@@ -586,7 +586,7 @@ public final class ChannelServiceImpl
 			HexDumper.toHexString(sessionRefId), localNodeId);
 		}
 
-		return handleChannelRequest(
+		return handleNotification(
 		    sessionRefId, timestamp,
 		    new ChannelJoinTask(
 			name, channelRefId,
@@ -617,7 +617,7 @@ public final class ChannelServiceImpl
 		}
 
 		ChannelLeaveTask task = new ChannelLeaveTask(channelRefId);
-		boolean success = handleChannelRequest(
+		boolean success = handleNotification(
 		    sessionRefId, msgTimestamp, task);
 		task.cleanupIfNoLocalChannelMembership();
 		return success;
@@ -732,7 +732,7 @@ public final class ChannelServiceImpl
 			// the process of moving from this node. In either
 			// case, the transient structures associated with
 			// the session will be cleaned up.
-			handleChannelRequest(sessionRefId, timestamp, task);
+			handleNotification(sessionRefId, timestamp, task);
 		    }
 		}
 	    } finally {
@@ -792,7 +792,7 @@ public final class ChannelServiceImpl
 		synchronized (channelInfo) {
 		    for (BigInteger sessionRefId : channelInfo.members) {
 
-			if (!handleChannelRequest(
+			if (!handleNotification(
 				sessionRefId, timestamp, task))
 			{
 			    // Session is not connected, and is not relocating
@@ -826,7 +826,7 @@ public final class ChannelServiceImpl
 	 * If the session is not connected to this node or is relocating
 	 * from this node, then {@code false} is returned.
 	 */
-	private boolean handleChannelRequest(
+	private boolean handleNotification(
 	    BigInteger sessionRefId, long timestamp, ChannelRequestTask task)
 	{
 	  try {
@@ -1064,7 +1064,7 @@ public final class ChannelServiceImpl
 			    // The channel is closed, so send leave message.
 			    // If invocation returns false, the session
 			    // probably disconnected.
-			    serverImpl.handleChannelRequest(
+			    serverImpl.handleNotification(
  				sessionRefId, timestamp,
 				new ChannelLeaveTask(channelRefId));
 			    return;
@@ -1128,7 +1128,7 @@ public final class ChannelServiceImpl
 		    for (Map.Entry<Long, byte[]> entry :
 			     missingMessages.entrySet())
 		    {
-			serverImpl.handleChannelRequest(
+			serverImpl.handleNotification(
 			    sessionRefId, entry.getKey(),
 			    new ChannelSendTask(
  				channelRefId, channelInfo.delivery,
@@ -1310,16 +1310,17 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Caches the channel event with the specified {@code eventType}, {@code
-     * channelRefId}, {@code sessionRefId}, and {@code eventTimestamp}.  The
-     * event will remain cached until its corresponding event queue reaches
-     * the specified {@code expirationTimestamp}. <p>
+     * Caches the channel membershp event with the specified {@code
+     * eventType}, {@code channelRefId}, {@code sessionRefId}, and {@code
+     * eventTimestamp}.  The event will remain cached until its
+     * corresponding event queue reaches the specified {@code
+     * expirationTimestamp}. <p>
      *
      * Note: this method removes any expired events (those with an {@code
      * expirationTimestamp} less than the specified {@code eventTimestamp}
      * from the specified channel's queue of cached events.
      *
-     * @param	eventType an event type
+     * @param	eventType an membership event type
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID, or {@code null}
      * @param	eventTimestamp the event's timestamp
@@ -1410,7 +1411,7 @@ public final class ChannelServiceImpl
 	if (queue != null) {
 	    synchronized (queue) {
 		// remove events with timestamp <= eventTimestamp.
-		removeExpiredChannelEvents(queue, timestamp);
+		removeExpiredMembershipEvents(queue, timestamp);
 		for (MembershipEventInfo info : queue) {
 		    if (info.eventTimestamp > timestamp) {
 			break;
@@ -1455,11 +1456,11 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Removes from the specified channel event {@code queue}, each cached
-     * channel event with an {@code expirationTimestamp} less than or equal
-     * to the specified {@code timestamp}.
+     * Removes from the specified membership event {@code queue}, each cached
+     * channel membership event with an {@code expirationTimestamp} less than or
+     * equal to the specified {@code timestamp}.
      */
-    private void removeExpiredChannelEvents(
+    private void removeExpiredMembershipEvents(
 	Queue<MembershipEventInfo> queue, long timestamp)
     {
 	assert Thread.holdsLock(queue);
