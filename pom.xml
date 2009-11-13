@@ -178,7 +178,7 @@
 
   <properties>
     <sgs-client.version>${version}</sgs-client.version>
-    <sgs-shared.version>1.9</sgs-shared.version>
+    <sgs-shared.version>1.10</sgs-shared.version>
     <org.apache.mina.version>1.1.0</org.apache.mina.version>
     <slf4j-api.version>1.4.0</slf4j-api.version>
     <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
