@@ -16,18 +16,8 @@
   <dependencies>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-server-api</artifactId>
+      <artifactId>sgs-server</artifactId>
       <version>${sgs-server.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-server-internal-api</artifactId>
-      <version>${sgs-server.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-shared</artifactId>
-      <version>${sgs-shared.version}</version>
     </dependency>
   </dependencies>
 
@@ -167,7 +157,6 @@
 
   <properties>
     <sgs-server.version>0.9.11</sgs-server.version>
-    <sgs-shared.version>1.0</sgs-shared.version>
     <sgs-maven-plugin.version>1.0-beta-1</sgs-maven-plugin.version>
     <jvm.args>-server -XX:+AggressiveOpts -XX:+UseParallelOldGC -Xmx768M -XX:NewRatio=1</jvm.args>
     <jvm.args.extra></jvm.args.extra>

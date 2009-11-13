@@ -37,11 +37,13 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
@@ -65,12 +67,16 @@ public class BenchmarkService implements Service {
     private final TransactionScheduler txnScheduler;
     private final TransactionProxy txnProxy;
     private final Identity owner;
+    private final InterceptSchedulerQueue schedulerQueue;
 
     private final DataService dataService;
     private final TaskService taskService;
     //private final ChannelManager channelManager;
 
     private long txnTime;
+    private long taskTime;
+    private long scheduleTaskInTask;
+    private long scheduleTaskInTxn;
     private long createReference100;
     private long createReference1000;
     private long setBinding100;
@@ -105,6 +111,7 @@ public class BenchmarkService implements Service {
                             TransactionProxy txnProxy) {
         this.txnScheduler = systemRegistry.getComponent(
                 TransactionScheduler.class);
+        this.schedulerQueue = InterceptSchedulerQueue.theQueue;
         this.txnProxy = txnProxy;
         this.owner = txnProxy.getCurrentOwner();
 
@@ -151,6 +158,12 @@ public class BenchmarkService implements Service {
             System.out.println();
             System.out.println("Transaction Overhead Benchmark");
             txnTime = txnOverhead();
+            System.out.println();
+
+            System.out.println("TaskManager Overhead Benchmark");
+            taskTime = taskOverhead(100000);
+            scheduleTaskInTask = scheduleTaskInTaskOverhead(100000);
+            scheduleTaskInTxn = scheduleTaskInTxnOverhead(100000);
             System.out.println();
 
             System.out.println("DataManager Overhead Benchmark");
@@ -232,6 +245,93 @@ public class BenchmarkService implements Service {
             long endNanos = System.nanoTime();
             return log(endNanos - startNanos, txns,
                        "empty transactions");
+        }
+        
+        private long taskOverhead(final long txns) {
+            // seed the queue with special tasks
+            for (long i = 0; i < txns; i++) {
+                try {
+                    txnScheduler.runTask(new KernelRunnable() {
+                        public String getBaseTaskType() { return "ScheduleTask"; }
+                        public void run() {
+                            taskService.scheduleTask(new SpecialTask(false));
+                        }
+                    }, owner);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return -1;
+                }
+            }
+
+            long startNanos = System.nanoTime();
+            for (long i = 0; i < txns; i++) {
+                try {
+                    ScheduledTask t = schedulerQueue.getNextBenchmarkTask(true);
+                    txnScheduler.runTask(t.getTask(), owner);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return -1;
+                }
+            }
+            long endNanos = System.nanoTime();
+            schedulerQueue.clear();
+            return log(endNanos - startNanos, txns,
+                       "empty tasks");
+        }
+
+        private long scheduleTaskInTaskOverhead(final long txns) {
+            // seed the queue with special tasks
+            for (long i = 0; i < txns; i++) {
+                try {
+                    txnScheduler.runTask(new KernelRunnable() {
+                        public String getBaseTaskType() { return "ScheduleTask"; }
+                        public void run() {
+                            taskService.scheduleTask(new SpecialTask(true));
+                        }
+                    }, owner);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return -1;
+                }
+            }
+
+            long startNanos = System.nanoTime();
+            for (long i = 0; i < txns; i++) {
+                try {
+                    ScheduledTask t = schedulerQueue.getNextBenchmarkTask(true);
+                    txnScheduler.runTask(t.getTask(), owner);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return -1;
+                }
+            }
+            long endNanos = System.nanoTime();
+            schedulerQueue.clear();
+            long perTxn = log(endNanos - startNanos, txns,
+                              "scheduleTask in empty task");
+            return perTxn - taskTime;
+        }
+
+        private long scheduleTaskInTxnOverhead(final long txns) {
+            long startNanos = System.nanoTime();
+            for (long i = 0; i < txns; i++) {
+                try {
+                    txnScheduler.runTask(new KernelRunnable() {
+                        public String getBaseTaskType() { return "Empty"; }
+                        public void run() {
+                            taskService.scheduleTask(new SpecialTask(false));
+                        }
+                    }, owner);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return -1;
+                }
+            }
+            long endNanos = System.nanoTime();
+            schedulerQueue.clear();
+            long perTxn = log(endNanos - startNanos, txns,
+                              "scheduleTask in empty txn");
+            return perTxn - taskTime;
         }
 
         private long createReferenceOverhead(final long txns, final long ops, final int objectSize) {
@@ -602,6 +702,20 @@ public class BenchmarkService implements Service {
         GET_HOT,
         GET_FOR_UPDATE_COLD,
         GET_FOR_UPDATE_HOT
+    }
+
+    private static class SpecialTask implements Task, Serializable {
+        private boolean schedule;
+        public SpecialTask(boolean schedule) {
+            this.schedule = schedule;
+        }
+
+        public void run() throws Exception {
+            if (schedule) {
+                AppContext.getTaskManager().scheduleTask(new SpecialTask(false));
+            }
+        }
+
     }
 
 }
