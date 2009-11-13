@@ -43,6 +43,7 @@ import com.sun.sgs.protocol.RequestFailureException;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.SessionRelocationProtocol;
+import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.SimpleCompletionHandler;

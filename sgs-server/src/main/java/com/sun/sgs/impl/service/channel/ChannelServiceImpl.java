@@ -1352,7 +1352,7 @@ public final class ChannelServiceImpl
 	}
 	synchronized (queue) {
 	    // remove events with expirationTimestamp <= eventTimestamp.
-	    removeExpiredChannelEvents(queue, eventTimestamp);
+	    removeExpiredMembershipEvents(queue, eventTimestamp);
 	    // cache event.
 	    queue.offer(
 		new MembershipEventInfo(eventType, sessionRefId,
