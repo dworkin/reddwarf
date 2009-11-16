@@ -22,7 +22,6 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionException;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
@@ -30,13 +29,12 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.util.Properties;
-import java.util.logging.Level;
 
 /**
- * An abstract implementation of a service.  It manages state
- * transitions (i.e., initialized, ready, shutting down, shutdown), in
- * progress call tracking for services with embedded remote servers,
- * and shutdown support.
+ * An abstract implementation of a service, with support for checking service
+ * versions.  It manages state transitions (i.e., initialized, ready, shutting
+ * down, shutdown), in progress call tracking for services with embedded remote
+ * servers, and shutdown support.
  *
  * <p>The {@link #getName getName} method invokes the instance's {@code
  * toString} method, so a concrete subclass of {@code AbstractService}
@@ -67,29 +65,20 @@ import java.util.logging.Level;
  *
  * </dl>
  */
-public abstract class AbstractService extends AbstractComponent
-    implements Service
-{
-    /** The application name. */
-    protected final String appName;
+public abstract class AbstractService extends AbstractBasicService {
 
     /** The data service. */
     protected final DataService dataService;
 
     /**
      * Constructs an instance with the specified {@code properties}, {@code
-     * systemRegistry}, {@code txnProxy}, and {@code logger}.  It initializes
-     * the {@code appName} field to the value of the {@code
-     * com.sun.sgs.app.name} property and sets this service's state to {@code
-     * INITIALIZED}.
+     * systemRegistry}, {@code txnProxy}, and {@code logger}.  It sets this
+     * service's state to {@code INITIALIZED}.
      *
      * @param	properties service properties
      * @param	systemRegistry system registry
      * @param	txnProxy transaction proxy
      * @param	logger the service's logger
-     *
-     * @throws	IllegalArgumentException if the {@code com.sun.sgs.app.name}
-     *		property is not defined in {@code properties}
      */
     protected AbstractService(Properties properties,
 			      ComponentRegistry systemRegistry,
@@ -97,50 +86,8 @@ public abstract class AbstractService extends AbstractComponent
 			      LoggerWrapper logger)
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	
-	appName = properties.getProperty(StandardProperties.APP_NAME);
-	if (appName == null) {
-	    throw new IllegalArgumentException(
-		"The " + StandardProperties.APP_NAME +
-		" property must be specified");
-	}	
-
 	this.dataService = txnProxy.getService(DataService.class);
     }
-
-    /** {@inheritDoc} */
-    public String getName() {
-	return toString();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>If this service is in the {@code INITIALIZED} state, this
-     * method sets the state to {@code READY} and invokes the {@link
-     * #doReady doReady} method.  If this service is already in the
-     * {@code READY} state, this method performs no actions.  If this
-     * service is shutting down, or is already shut down, this method
-     * throws {@code IllegalStateException}.
-     *
-     * @throws	Exception if a problem occurs
-     * @throws	IllegalStateException if this service is shutting down
-     *		or is already shut down
-     */
-    public void ready() throws Exception {
-	logger.log(Level.FINEST, "ready");
-	setReady();
-	doReady();
-    }
-
-    /**
-     * Performs ready operations.  This method is invoked by the
-     * {@link #ready ready} method only once so that the subclass can
-     * perform any operations necessary during the "ready" phase.
-     *
-     * @throws	Exception if a problem occurs
-     */
-    protected abstract void doReady() throws Exception;
 
     /**
      * Checks the service version.  If a version is not associated with the

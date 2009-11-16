@@ -43,7 +43,7 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.impl.util.AbstractComponent;
+import com.sun.sgs.impl.util.AbstractBasicService;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
@@ -169,7 +169,7 @@ import java.util.logging.Logger;
  * particular, the methods that obtain multiple locks are {@link
  * #getBindingForUpdate} and {@link #getBindingForRemove}.
  */
-public class CachingDataStoreServerImpl extends AbstractComponent
+public class CachingDataStoreServerImpl extends AbstractBasicService
     implements CachingDataStoreServer, NodeListener, UpdateQueueServer,
     FailureReporter
 {
@@ -513,28 +513,6 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	    doShutdown();
 	    throw e;
 	}
-    }
-
-    /**
-     * Like {@link DataStore#ready DataStore.ready}, this method should be
-     * called when services have been created, in this case to allow the server
-     * to access the watchdog service.
-     *
-     * @throws	Exception if an error occurs 
-     */
-    public void ready() throws Exception {
-	synchronized (readySync) {
-	    if (failureBeforeWatchdog != null) {
-		if (failureBeforeWatchdog instanceof Error) {
-		    throw (Error) failureBeforeWatchdog;
-		} else {
-		    throw (Exception) failureBeforeWatchdog;
-		}
-	    }
-	    dataService = txnProxy.getService(DataService.class);
-	    watchdogService = txnProxy.getService(WatchdogService.class);
-	}
-	watchdogService.addNodeListener(this);
     }
 
     /* -- Implement CachingDataStoreServer -- */
@@ -1289,7 +1267,23 @@ public class CachingDataStoreServerImpl extends AbstractComponent
 	}
     }
 
-    /* -- AbstractComponent methods -- */
+    /* -- AbstractBasicService methods -- */
+
+    /** {@inheritDoc} */
+    protected void doReady() throws Exception {
+	synchronized (readySync) {
+	    if (failureBeforeWatchdog != null) {
+		if (failureBeforeWatchdog instanceof Error) {
+		    throw (Error) failureBeforeWatchdog;
+		} else {
+		    throw (Exception) failureBeforeWatchdog;
+		}
+	    }
+	    dataService = txnProxy.getService(DataService.class);
+	    watchdogService = txnProxy.getService(WatchdogService.class);
+	}
+	watchdogService.addNodeListener(this);
+    }
 
     /** {@inheritDoc} */
     @Override

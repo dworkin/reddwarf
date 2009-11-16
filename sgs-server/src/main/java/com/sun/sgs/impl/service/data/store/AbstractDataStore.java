@@ -26,7 +26,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import static com.sun.sgs.impl.util.
-    AbstractComponent.checkNonTransactionalContext;
+    AbstractService.checkNonTransactionalContext;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
