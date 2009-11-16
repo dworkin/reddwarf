@@ -79,7 +79,7 @@ public class SimpleClient implements ServerSession {
 
     /**
      * The current {@code ClientConnection}, if connected, or
-     * {@code} null if disconnected.
+     * {@code null} if disconnected.
      */
     private volatile ClientConnection clientConnection = null;
 
@@ -478,6 +478,7 @@ public class SimpleClient implements ServerSession {
                 }
                 clientConnection = null;
                 connectionStateChanging = false;
+		isSuspended = false;
             }
             String reason = null;
             if (message != null) {
@@ -786,7 +787,7 @@ public class SimpleClient implements ServerSession {
             logger.log(Level.FINER, "Relocate successful");
             reconnectKey = msg.getBytes(msg.limit() - msg.position());
             loggedIn = true;
-	    clientListener.reconnected();
+	    notifyReconnected();
 	}
 	
 	/**
