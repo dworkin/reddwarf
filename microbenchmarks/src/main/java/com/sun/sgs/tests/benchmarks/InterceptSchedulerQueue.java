@@ -47,6 +47,8 @@ public class InterceptSchedulerQueue extends FIFOSchedulerQueue {
     
     // separate queue to store tasks scheduled by the benchmark
     private LinkedBlockingQueue<ScheduledTask> queue;
+    // store the first SpecialTask that comes off the queue
+    private ScheduledTask benchmarkTask;
 
     public InterceptSchedulerQueue(Properties p) {
         super(p);
@@ -54,13 +56,14 @@ public class InterceptSchedulerQueue extends FIFOSchedulerQueue {
         theQueue = this;
     }
 
-    public ScheduledTask getNextBenchmarkTask(boolean wait)
+    public ScheduledTask getBenchmarkTask()
             throws InterruptedException {
-        ScheduledTask task = queue.poll();
-        if ((task != null) || (!wait)) {
-            return task;
+        if (benchmarkTask != null) {
+            return benchmarkTask;
         }
-        return queue.take();
+
+        benchmarkTask = queue.take();
+        return benchmarkTask;
     }
 
     public void addTask(ScheduledTask task) {
@@ -70,10 +73,20 @@ public class InterceptSchedulerQueue extends FIFOSchedulerQueue {
 
         if (task.getTask().getBaseTaskType().equals(
                 "com.sun.sgs.tests.benchmarks.BenchmarkService$SpecialTask")) {
-            addBenchmarkTask(task);
+            if (benchmarkTask == null) {
+                benchmarkTask = task;
+            }
+            //addBenchmarkTask(task);
         } else {
             super.addTask(task);
         }
+    }
+
+    public void timedTaskReady(ScheduledTask task) {
+        boolean success;
+        do {
+            success = queue.offer(task);
+        } while(!success);
     }
 
     public void addBenchmarkTask(ScheduledTask task) {
@@ -88,6 +101,7 @@ public class InterceptSchedulerQueue extends FIFOSchedulerQueue {
 
     public void clear() {
         queue.clear();
+        benchmarkTask = null;
     }
 
 }

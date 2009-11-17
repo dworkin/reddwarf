@@ -77,10 +77,6 @@ public class BenchmarkService implements Service {
     private long taskTime;
     private long scheduleTaskInTask;
     private long scheduleTaskInTxn;
-    private long createReference100;
-    private long createReference1000;
-    private long setBinding100;
-    private long setBinding1000;
     private long getBindingCold100;
     private long getBindingCold1000;
     private long getBindingHot100;
@@ -105,6 +101,14 @@ public class BenchmarkService implements Service {
     private long getForUpdateCold1000;
     private long getForUpdateHot100;
     private long getForUpdateHot1000;
+    private long createReferenceCold100;
+    private long createReferenceCold1000;
+    private long createReferenceHot100;
+    private long createReferenceHot1000;
+    private long setBindingCold100;
+    private long setBindingCold1000;
+    private long setBindingHot100;
+    private long setBindingHot1000;
 
     public BenchmarkService(Properties props,
                             ComponentRegistry systemRegistry,
@@ -137,7 +141,7 @@ public class BenchmarkService implements Service {
 
     private static long log(long totalNanos, long numTxns, String... messages) {
         long nanosPerTxn = totalNanos / numTxns;
-        String nanosPerTxnOutput = String.format("  %8d ns/txn", nanosPerTxn);
+        String nanosPerTxnOutput = String.format("  %9d ns/txn", nanosPerTxn);
         System.out.println(nanosPerTxnOutput + ", " + messages[0]);
         for (int i = 1; i < messages.length; i++) {
             System.out.println("                   " + messages[i]);
@@ -167,65 +171,73 @@ public class BenchmarkService implements Service {
             System.out.println();
 
             System.out.println("DataManager Overhead Benchmark");
-            createReference100 = createReferenceOverhead(10000, 100, 100);
-            createReference1000 = createReferenceOverhead(10000, 10, 1000);
-            setBinding100 = setBindingOverhead(10000, 100, 100);
-            setBinding1000 = setBindingOverhead(10000, 10, 1000);
             getBindingCold100 = getBindingColdOverhead(10000, 100, 100);
-            getBindingCold1000 = getBindingColdOverhead(10000, 10, 1000);
+            getBindingCold1000 = getBindingColdOverhead(1000, 100, 1000);
             getBindingHot100 = getBindingHotOverhead(10000, 100, 100);
-            getBindingHot1000 = getBindingHotOverhead(10000, 10, 1000);
+            getBindingHot1000 = getBindingHotOverhead(1000, 100, 1000);
             getBindingForUpdateCold100 = getBindingForUpdateColdOverhead(10000, 100, 100);
-            getBindingForUpdateCold1000 = getBindingForUpdateColdOverhead(10000, 10, 1000);
+            getBindingForUpdateCold1000 = getBindingForUpdateColdOverhead(1000, 100, 1000);
             getBindingForUpdateHot100 = getBindingForUpdateHotOverhead(10000, 100, 100);
-            getBindingForUpdateHot1000 = getBindingForUpdateHotOverhead(10000, 10, 1000);
+            getBindingForUpdateHot1000 = getBindingForUpdateHotOverhead(1000, 100, 1000);
             removeBinding100 = removeBindingOverhead(1000, 100, 100);
-            removeBinding1000 = removeBindingOverhead(1000, 10, 1000);
+            removeBinding1000 = removeBindingOverhead(1000, 100, 1000);
             removeObject100 = removeObjectOverhead(1000, 100, 100);
-            removeObject1000 = removeObjectOverhead(1000, 10, 1000);
+            removeObject1000 = removeObjectOverhead(1000, 100, 1000);
             getObjectId100 = getObjectIdOverhead(10000, 100, 100);
-            getObjectId1000 = getObjectIdOverhead(10000, 10, 1000);
+            getObjectId1000 = getObjectIdOverhead(1000, 100, 1000);
             markForUpdate100 = markForUpdateOverhead(10000, 100, 100);
-            markForUpdate1000 = markForUpdateOverhead(10000, 10, 1000);
+            markForUpdate1000 = markForUpdateOverhead(1000, 100, 1000);
             getCold100 = getColdOverhead(10000, 100, 100);
-            getCold1000 = getColdOverhead(10000, 10, 1000);
+            getCold1000 = getColdOverhead(1000, 100, 1000);
             getHot100 = getHotOverhead(10000, 100, 100);
-            getHot1000 = getHotOverhead(10000, 10, 1000);
+            getHot1000 = getHotOverhead(1000, 100, 1000);
             getForUpdateCold100 = getForUpdateColdOverhead(10000, 100, 100);
-            getForUpdateCold1000 = getForUpdateColdOverhead(10000, 10, 1000);
+            getForUpdateCold1000 = getForUpdateColdOverhead(1000, 100, 1000);
             getForUpdateHot100 = getForUpdateHotOverhead(10000, 100, 100);
-            getForUpdateHot1000 = getForUpdateHotOverhead(10000, 10, 1000);
+            getForUpdateHot1000 = getForUpdateHotOverhead(1000, 100, 1000);
+            createReferenceCold100 = createReferenceColdOverhead(10000, 100, 100);
+            createReferenceCold1000 = createReferenceColdOverhead(1000, 100, 1000);
+            createReferenceHot100 = createReferenceHotOverhead(10000, 100, 100);
+            createReferenceHot1000 = createReferenceHotOverhead(1000, 100, 1000);
+            setBindingCold100 = setBindingColdOverhead(10000, 100, 100);
+            setBindingCold1000 = setBindingColdOverhead(1000, 100, 1000);
+            setBindingHot100 = setBindingHotOverhead(10000, 100, 100);
+            setBindingHot1000 = setBindingHotOverhead(1000, 100, 1000);
             System.out.println();
 
             System.out.println("DataManager Overhead Summary");
-            System.out.printf("  %8d ns/op, %s\n", createReference100, "createReference, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", createReference1000, "createReference, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", setBinding100, "setBinding, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", setBinding1000, "setBinding, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", getBindingCold100, "getBinding, 100 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getBindingCold1000, "getBinding, 1000 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getBindingHot100, "getBinding, 100 bytes, hot");
-            System.out.printf("  %8d ns/op, %s\n", getBindingHot1000, "getBinding, 1000 bytes, hot");
-            System.out.printf("  %8d ns/op, %s\n", getBindingForUpdateCold100, "getBindingForUpdate, 100 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getBindingForUpdateCold1000, "getBindingForUpdate, 1000 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getBindingForUpdateHot100, "getBindingForUpdate, 100 bytes, hot");
-            System.out.printf("  %8d ns/op, %s\n", getBindingForUpdateHot1000, "getBindingForUpdate, 1000 bytes, hot");
-            System.out.printf("  %8d ns/op, %s\n", removeBinding100, "removeBinding, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", removeBinding1000, "removeBinding, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", removeObject100, "removeObject, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", removeObject1000, "removeObject, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", getObjectId100, "getObjectId, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", getObjectId1000, "getObjectId, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", markForUpdate100, "markForUpdate, 100 bytes");
-            System.out.printf("  %8d ns/op, %s\n", markForUpdate1000, "markForUpdate, 1000 bytes");
-            System.out.printf("  %8d ns/op, %s\n", getCold100, "get, 100 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getCold1000, "get, 1000 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getHot100, "get, 100 bytes, hot");
-            System.out.printf("  %8d ns/op, %s\n", getHot1000, "get, 1000 bytes, hot");
-            System.out.printf("  %8d ns/op, %s\n", getForUpdateCold100, "getForUpdate, 100 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getForUpdateCold1000, "getForUpdate, 1000 bytes, cold");
-            System.out.printf("  %8d ns/op, %s\n", getForUpdateHot100, "getForUpdate, 100 bytes, hot");
-            System.out.printf("  %8d ns/op, %s\n", getForUpdateHot1000, "getForUpdate, 1000 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", getBindingCold100, "getBinding, 100 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getBindingCold1000, "getBinding, 1000 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getBindingHot100, "getBinding, 100 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", getBindingHot1000, "getBinding, 1000 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", getBindingForUpdateCold100, "getBindingForUpdate, 100 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getBindingForUpdateCold1000, "getBindingForUpdate, 1000 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getBindingForUpdateHot100, "getBindingForUpdate, 100 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", getBindingForUpdateHot1000, "getBindingForUpdate, 1000 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", removeBinding100, "removeBinding, 100 bytes");
+            System.out.printf("  %9d ns/op, %s\n", removeBinding1000, "removeBinding, 1000 bytes");
+            System.out.printf("  %9d ns/op, %s\n", removeObject100, "removeObject, 100 bytes");
+            System.out.printf("  %9d ns/op, %s\n", removeObject1000, "removeObject, 1000 bytes");
+            System.out.printf("  %9d ns/op, %s\n", getObjectId100, "getObjectId, 100 bytes");
+            System.out.printf("  %9d ns/op, %s\n", getObjectId1000, "getObjectId, 1000 bytes");
+            System.out.printf("  %9d ns/op, %s\n", markForUpdate100, "markForUpdate, 100 bytes");
+            System.out.printf("  %9d ns/op, %s\n", markForUpdate1000, "markForUpdate, 1000 bytes");
+            System.out.printf("  %9d ns/op, %s\n", getCold100, "get, 100 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getCold1000, "get, 1000 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getHot100, "get, 100 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", getHot1000, "get, 1000 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", getForUpdateCold100, "getForUpdate, 100 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getForUpdateCold1000, "getForUpdate, 1000 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", getForUpdateHot100, "getForUpdate, 100 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", getForUpdateHot1000, "getForUpdate, 1000 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", createReferenceCold100, "createReference, 100 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", createReferenceCold1000, "createReference, 1000 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", createReferenceHot100, "createReference, 100 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", createReferenceHot1000, "createReference, 1000 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", setBindingCold100, "setBinding, 100 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", setBindingCold1000, "setBinding, 1000 bytes, cold");
+            System.out.printf("  %9d ns/op, %s\n", setBindingHot100, "setBinding, 100 bytes, hot");
+            System.out.printf("  %9d ns/op, %s\n", setBindingHot1000, "setBinding, 1000 bytes, hot");
         }
 
         private long txnOverhead() {
@@ -246,32 +258,30 @@ public class BenchmarkService implements Service {
             return log(endNanos - startNanos, txns,
                        "empty transactions");
         }
-        
+
         private long taskOverhead(final long txns) {
-            // seed the queue with special tasks
-            for (long i = 0; i < txns; i++) {
-                try {
-                    txnScheduler.runTask(new KernelRunnable() {
-                        public String getBaseTaskType() { return "ScheduleTask"; }
-                        public void run() {
-                            taskService.scheduleTask(new SpecialTask(false));
-                        }
-                    }, owner);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return -1;
-                }
+            // seed the queue with a special task
+            try {
+                txnScheduler.runTask(new KernelRunnable() {
+                    public String getBaseTaskType() { return "ScheduleTask"; }
+                    public void run() {
+                        taskService.schedulePeriodicTask(new SpecialTask(false), 0, 600000);
+                    }
+                }, owner);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return -1;
             }
 
             long startNanos = System.nanoTime();
-            for (long i = 0; i < txns; i++) {
-                try {
-                    ScheduledTask t = schedulerQueue.getNextBenchmarkTask(true);
+            try {
+                ScheduledTask t = schedulerQueue.getBenchmarkTask();
+                for (long i = 0; i < txns; i++) {
                     txnScheduler.runTask(t.getTask(), owner);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return -1;
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return -1;
             }
             long endNanos = System.nanoTime();
             schedulerQueue.clear();
@@ -280,30 +290,28 @@ public class BenchmarkService implements Service {
         }
 
         private long scheduleTaskInTaskOverhead(final long txns) {
-            // seed the queue with special tasks
-            for (long i = 0; i < txns; i++) {
-                try {
-                    txnScheduler.runTask(new KernelRunnable() {
-                        public String getBaseTaskType() { return "ScheduleTask"; }
-                        public void run() {
-                            taskService.scheduleTask(new SpecialTask(true));
-                        }
-                    }, owner);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return -1;
-                }
+            // seed the queue with a special task
+            try {
+                txnScheduler.runTask(new KernelRunnable() {
+                    public String getBaseTaskType() { return "ScheduleTask"; }
+                    public void run() {
+                        taskService.schedulePeriodicTask(new SpecialTask(true), 0, 600000);
+                    }
+                }, owner);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return -1;
             }
 
             long startNanos = System.nanoTime();
-            for (long i = 0; i < txns; i++) {
-                try {
-                    ScheduledTask t = schedulerQueue.getNextBenchmarkTask(true);
+            try {
+                ScheduledTask t = schedulerQueue.getBenchmarkTask();
+                for (long i = 0; i < txns; i++) {
                     txnScheduler.runTask(t.getTask(), owner);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return -1;
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return -1;
             }
             long endNanos = System.nanoTime();
             schedulerQueue.clear();
@@ -332,22 +340,6 @@ public class BenchmarkService implements Service {
             long perTxn = log(endNanos - startNanos, txns,
                               "scheduleTask in empty txn");
             return perTxn - taskTime;
-        }
-
-        private long createReferenceOverhead(final long txns, final long ops, final int objectSize) {
-            long time = performOperations(txns, ops, objectSize, Operation.CREATE_REFERENCE);
-            if (time < 0) { return -1; }
-            long perTxn = log(time, txns,
-                              "createReference, " + objectSize + " bytes, " + ops + " times");
-            return (perTxn - txnTime) / ops;
-        }
-
-        private long setBindingOverhead(final long txns, final long ops, final int objectSize) {
-            long time = performOperations(txns, ops, objectSize, Operation.SET_BINDING);
-            if (time < 0) { return -1; }
-            long perTxn = log(time, txns,
-                              "setBinding, " + objectSize + " bytes, " + ops + " times");
-            return (perTxn - txnTime) / ops;
         }
 
         private long getBindingColdOverhead(final long txns,
@@ -534,6 +526,50 @@ public class BenchmarkService implements Service {
             return (perTxn - txnTime - getBindingOverhead - getForUpdateOverhead) / (ops - 2);
         }
 
+        private long createReferenceColdOverhead(final long txns, final long ops, final int objectSize) {
+            long time = performOperations(txns, ops, objectSize, Operation.CREATE_REFERENCE_COLD);
+            if (time < 0) { return -1; }
+            long perTxn = log(time, txns,
+                              "createReference, " + objectSize + " bytes, " + ops + " times");
+            return (perTxn - txnTime) / ops;
+        }
+
+        private long createReferenceHotOverhead(final long txns, final long ops, final int objectSize) {
+            // set the initial bindings
+            setReferences(ops, objectSize);
+
+            long time = performOperations(txns, ops, objectSize, Operation.CREATE_REFERENCE_HOT);
+            if (time < 0) { return -1; }
+            long perTxn = log(time, txns,
+                              "getBinding, " + objectSize + " bytes, 1 time",
+                              "get, " + objectSize + " bytes, 1 time, cold",
+                              "createReference, " + objectSize + " bytes, " + (ops - 1) + " times");
+            long getBindingOverhead = objectSize == 100 ? getBindingCold100 : getBindingCold1000;
+            long getOverhead = objectSize == 100 ? getCold100 : getCold1000;
+            return (perTxn - txnTime - getBindingOverhead - getOverhead) / (ops - 1);
+        }
+
+        private long setBindingColdOverhead(final long txns, final long ops, final int objectSize) {
+            long time = performOperations(txns, ops, objectSize, Operation.SET_BINDING_COLD);
+            if (time < 0) { return -1; }
+            long perTxn = log(time, txns,
+                              "setBinding, " + objectSize + " bytes, " + ops + " times");
+            return (perTxn - txnTime) / ops;
+        }
+
+        private long setBindingHotOverhead(final long txns, final long ops, final int objectSize) {
+            // set the initial bindings
+            setBindings(ops, objectSize);
+
+            long time = performOperations(txns, ops, objectSize, Operation.SET_BINDING_HOT);
+            if (time < 0) { return -1; }
+            long perTxn = log(time, txns,
+                              "getBinding, " + objectSize + " bytes, " + ops + " times",
+                              "setBinding, " + objectSize + " bytes, " + ops + " times");
+            long getBindingOverhead = objectSize == 100 ? getBindingCold100 : getBindingCold1000;
+            return (perTxn - txnTime - getBindingOverhead * ops) / ops;
+        }
+
         private void setReferences(final long numReferences, final int objectSize) {
             try {
                 txnScheduler.runTask(new KernelRunnable() {
@@ -588,12 +624,6 @@ public class BenchmarkService implements Service {
                             ManagedInteger tmp = null;
                             for (int j = 0; j < ops; j++) {
                                 switch(op) {
-                                    case CREATE_REFERENCE:
-                                        dataService.createReference(new ManagedInteger(objectSize));
-                                        break;
-                                    case SET_BINDING:
-                                        dataService.setBinding("name" + j, new ManagedInteger(objectSize));
-                                        break;
                                     case GET_BINDING_COLD:
                                         tmp = (ManagedInteger) dataService.getBinding("name" + j);
                                         break;
@@ -649,6 +679,24 @@ public class BenchmarkService implements Service {
                                             tmp.nextNode.getForUpdate();
                                         }
                                         break;
+                                    case CREATE_REFERENCE_COLD:
+                                        dataService.createReference(new ManagedInteger(objectSize));
+                                        break;
+                                    case CREATE_REFERENCE_HOT:
+                                        if (j == 0) {
+                                            tmp = (ManagedInteger) dataService.getBinding("top");
+                                            tmp = tmp.nextNode.get();
+                                        } else {
+                                            dataService.createReference(tmp);
+                                        }
+                                        break;
+                                    case SET_BINDING_COLD:
+                                        dataService.setBinding("name" + j, new ManagedInteger(objectSize));
+                                        break;
+                                    case SET_BINDING_HOT:
+                                        tmp = (ManagedInteger) dataService.getBinding("name" + j);
+                                        dataService.setBinding("name" + j, tmp);
+                                        break;
                                 }
                             }
                         }
@@ -688,12 +736,14 @@ public class BenchmarkService implements Service {
     }
 
     private static enum Operation {
-        CREATE_REFERENCE,
-        SET_BINDING,
         GET_BINDING_COLD,
         GET_BINDING_HOT,
         GET_BINDING_FOR_UPDATE_COLD,
         GET_BINDING_FOR_UPDATE_HOT,
+        CREATE_REFERENCE_COLD,
+        CREATE_REFERENCE_HOT,
+        SET_BINDING_COLD,
+        SET_BINDING_HOT,
         REMOVE_BINDING,
         REMOVE_OBJECT,
         GET_OBJECT_ID,
@@ -702,20 +752,6 @@ public class BenchmarkService implements Service {
         GET_HOT,
         GET_FOR_UPDATE_COLD,
         GET_FOR_UPDATE_HOT
-    }
-
-    private static class SpecialTask implements Task, Serializable {
-        private boolean schedule;
-        public SpecialTask(boolean schedule) {
-            this.schedule = schedule;
-        }
-
-        public void run() throws Exception {
-            if (schedule) {
-                AppContext.getTaskManager().scheduleTask(new SpecialTask(false));
-            }
-        }
-
     }
 
 }
