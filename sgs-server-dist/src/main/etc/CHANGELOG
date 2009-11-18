@@ -1,3 +1,6 @@
+Version 0.9.12
+- Fix issues #201
+
 Version 0.9.11:
 - Introduced application level clock accessible via the watchdog service.
   The task service uses this clock instead of system time to determine

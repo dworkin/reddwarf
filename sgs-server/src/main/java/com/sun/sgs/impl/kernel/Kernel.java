@@ -389,28 +389,35 @@ class Kernel {
      * for profiling data.
      */
     private void loadProfileListeners(ProfileCollector profileCollector) {
-        String listenerList = wrappedProperties.getProperty(PROFILE_LISTENERS);
+        List<String> listenerList =
+                wrappedProperties.getListProperty(
+                PROFILE_LISTENERS, String.class, "");
+        List<String> extListenerList =
+                wrappedProperties.getListProperty(
+                BootProperties.EXTENSION_PROFILE_LISTENERS_PROPERTY,
+                String.class, "");
 
-        if (listenerList != null) {
-            for (String listenerClassName : listenerList.split(":")) {
-                try {
-                    profileCollector.addListener(listenerClassName);
-                } catch (InvocationTargetException e) {
-                    // Strip off exceptions found via reflection
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.logThrow(Level.WARNING, e.getCause(), 
-                                "Failed to load ProfileListener {0} ... " +
-                                "it will not be available for profiling",
-                                listenerClassName);
-                    }
-              
-                } catch (Exception e) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.logThrow(Level.WARNING, e, 
-                                "Failed to load ProfileListener {0} ... " +
-                                "it will not be available for profiling",
-                                 listenerClassName);
-                    }
+        List<String> allListenerNames = extListenerList;
+        allListenerNames.addAll(listenerList);
+
+        for (String listenerClassName : allListenerNames) {
+            try {
+                profileCollector.addListener(listenerClassName);
+            } catch (InvocationTargetException e) {
+                // Strip off exceptions found via reflection
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.logThrow(Level.WARNING, e.getCause(),
+                                    "Failed to load ProfileListener {0} ... " +
+                                    "it will not be available for profiling",
+                                    listenerClassName);
+                }
+
+            } catch (Exception e) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.logThrow(Level.WARNING, e,
+                                    "Failed to load ProfileListener {0} ... " +
+                                    "it will not be available for profiling",
+                                    listenerClassName);
                 }
             }
         }
