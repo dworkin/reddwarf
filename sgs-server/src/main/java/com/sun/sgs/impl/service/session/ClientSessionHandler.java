@@ -330,7 +330,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /**
      * Returns {@code true} if this client session has begun preparing to
-     * relocate to another node.
+     * relocate, or has relocated to another node.
      */
      boolean isRelocating() {
 	 synchronized (lock) {
@@ -345,8 +345,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * conditions are true:
      *
      * 1) this handler has been marked for disconnection
-     * 2) the session is not relocating, OR if the session is relocating,
-     * its relocation has not completed.
+     * 2) the session is not relocating, OR, the session is relocating
+     * and its relocation has not completed.
      */
     private boolean isTerminating() {
 	synchronized (lock) {
@@ -418,9 +418,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
     
     /**
-     * Returns the protocol for the associated client session.
+     * Returns the protocol for the associated client session, or {@code
+     * null} if the session is relocating.
      *
-     * @return	a protocol
+     * @return	a protocol, or {@code null} if the session is relocating
      */
     SessionProtocol getSessionProtocol() {
 	return isRelocating() ? null : protocol;
@@ -609,6 +610,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		}
 	    }
 	}
+	synchronized (lock) {
+	    state = State.DISCONNECTED;
+	}
     }
 
     /**
@@ -621,7 +625,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 	    shutdown = true;
 	    disconnectHandled = true;
-	    state = State.DISCONNECTED;
 	    closeConnection();
 	}
     }
@@ -1166,9 +1169,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 * {@code success} is {@code true}, all enqueued messages will be
 	 * delivered to the client session.
 	 *
-	 * @param	session	a client session
 	 * @param	success if {@code true}, login was successful
-	 * @param	exception a login failure exception, or {@code null}
+	 * @param	ex a login failure exception, or {@code null}
 	 *		(only valid if {@code success} is {@code false}
 	 * @throws 	TransactionException if there is a problem with the
 	 *		current transaction
@@ -1178,6 +1180,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    loginException = ex;
 	}
 
+	/** {@inheritDoc} */
 	public boolean flush() {
 	    if (!isConnected()) {
 		return false;
@@ -1283,16 +1286,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    if (!isConnected()) {
 		return false;
 	    }
-	    byte[] relocationKey;
+	    byte[] key;
 	    try {
 		/*
 		 * Notify new node that session is being relocated there and
 		 * obtain relocation key.
 		 */
-		relocationKey =
-		    server.relocatingSession(
- 			identity, sessionRefId.toByteArray(),
-			sessionService.getLocalNodeId());
+		key = server.relocatingSession(
+ 			  identity, sessionRefId.toByteArray(),
+			  sessionService.getLocalNodeId());
 		
 	    } catch (Exception e) {
 		// If there is a problem contacting the destination node or
@@ -1308,7 +1310,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 	    
 	    synchronized (this) {
-		this.relocationKey = relocationKey;
+		this.relocationKey = key;
 	    }
 		
 	    /*
@@ -1364,19 +1366,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    newNode, descriptors, ByteBuffer.wrap(relocationKey),
 		    relocateCompletionHandler);
 		
-	    } catch (IOException e) {
+	    } catch (Exception e) {
 		// If there is a problem contacting the client,
 		// then disconnect the client session immediately.
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e,
-			"relocating client session:{0} throws", this);
-		}
-		handleDisconnect(false, true);
-	    } catch (RuntimeException e) {
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
- 			Level.WARNING, e,
 			"relocating client session:{0} throws", this);
 		}
 	    }
@@ -1404,6 +1399,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     {
 	private boolean isCompleted = false;
 
+	/** {@inheritDoc} */
 	public synchronized void completed(Future<Void> result) {
 	    // TBD: need to check result for Exception and disconnect if an
 	    // exception is thrown.

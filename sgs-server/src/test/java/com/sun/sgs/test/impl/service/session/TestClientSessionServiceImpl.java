@@ -25,16 +25,12 @@ import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
-import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
-import com.sun.sgs.tools.test.IntegrationTest;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.util.Properties;
@@ -318,16 +314,11 @@ public class TestClientSessionServiceImpl extends Assert {
     public void testGetSessionProtocolInTxn()
 	throws Exception
     {
-	try {
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() {
-		    serverNode.getClientSessionService().
-			getSessionProtocol(new BigInteger(1, new byte[] {0}));
-		}}, taskOwner);
-	    fail("expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		serverNode.getClientSessionService().
+		    getSessionProtocol(new BigInteger(1, new byte[] {0}));
+	    }}, taskOwner);
     }
 
     @Test

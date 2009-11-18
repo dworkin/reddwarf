@@ -73,7 +73,6 @@ import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -210,11 +209,20 @@ public final class ClientSessionServiceImpl
     static final String DEFAULT_PROTOCOL_ACCEPTOR =
 	"com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor";
 
-    /** The default length of a relocation key, in bytes.
-     * TBD: the relocation key length should be configurable.
-     */
-    private static final int DEFAULT_RELOCATION_KEY_LENGTH = 16;
+    /** The relocation key length property. */
+    static final String RELOCATION_KEY_LENGTH_PROPERTY =
+	PKG_NAME + ".relocation.key.length";
+    
+    /** The default length of a relocation key, in bytes. */
+    static final int DEFAULT_RELOCATION_KEY_LENGTH = 16;
 
+    /** The relocation timeout property. */
+    static final String RELOCATION_TIMEOUT_PROPERTY =
+	PKG_NAME + ".relocation.timeout";
+    
+    /** The default relocation timeout, in milliseconds. */
+    static final long DEFAULT_RELOCATION_TIMEOUT = 5000L;
+    
     /** A random number generator for relocation keys. */
     private static final SecureRandom random = new SecureRandom();
     
@@ -319,6 +327,12 @@ public final class ClientSessionServiceImpl
      */
     final boolean allowNewLogin;
 
+    /** The session relocation key length. */
+    final int relocationKeyLength;
+
+    /** The session relocation timeout. */
+    final long relocationTimeout;
+
     /** Our JMX exposed statistics. */
     final ClientSessionServiceStats serviceStats;
 
@@ -351,6 +365,12 @@ public final class ClientSessionServiceImpl
 		1, Integer.MAX_VALUE);
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
+	    relocationKeyLength = wrappedProps.getIntProperty(
+ 		RELOCATION_KEY_LENGTH_PROPERTY, DEFAULT_RELOCATION_KEY_LENGTH,
+		16, Integer.MAX_VALUE);
+	    relocationTimeout = wrappedProps.getLongProperty(
+		RELOCATION_TIMEOUT_PROPERTY, DEFAULT_RELOCATION_TIMEOUT,
+		1000L, Long.MAX_VALUE);
 
             /* Export the ClientSessionServer. */
 	    int serverPort = wrappedProps.getIntProperty(
@@ -452,6 +472,10 @@ public final class ClientSessionServiceImpl
                        "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" +
                        writeBufferSize +
                        "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
+		       "\n  " + RELOCATION_KEY_LENGTH_PROPERTY + "=" +
+		       relocationKeyLength +
+		       "\n  " + RELOCATION_TIMEOUT_PROPERTY + "=" +
+		       relocationTimeout +
                        "\n  " + PROTOCOL_ACCEPTOR_PROPERTY + "=" +
                        protocolAcceptor.getClass().getName() +
                        "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort);
@@ -669,7 +693,7 @@ public final class ClientSessionServiceImpl
 		    taskScheduler.scheduleTask(
  			new MonitorSessionRelocatingFromLocalNodeTask(
 			    sessionRefId),
-			id, System.currentTimeMillis() + 5000L);
+			id, System.currentTimeMillis() + relocationTimeout);
 		    
 		} else {
 		    // Duplicate request to prepare for relocation;  add
@@ -716,16 +740,8 @@ public final class ClientSessionServiceImpl
 		// Remove session from table of relocation preparers.
 		if (prepareRelocationMap.remove(sessionRefId) != null) {
 		    // Notify client to start relocating its connection.
-		    try {
-			sessionHandler.setRelocatePreparationComplete();
-		    } catch (Exception e) {
-			logger.logThrow(
- 			    Level.WARNING, e,
-			    "Problem completing reloction preparation for " +
-			    "session:{0} localNodeId:{1}",
-
-			    sessionRefId, localNodeId);
-		    }
+		    sessionHandler.setRelocatePreparationComplete();
+		    
 		} else {
 		    if (newNode != null) {
 			if (logger.isLoggable(Level.WARNING)) {
@@ -1024,6 +1040,9 @@ public final class ClientSessionServiceImpl
 			try {
 			    flushContextsLock.wait();
 			} catch (InterruptedException e) {
+			    logger.log(Level.SEVERE,
+				       "FlushContextsThread interrupted, " +
+				       "node:{0}", localNodeId);
 			    return;
 			}
 		    }
@@ -1130,8 +1149,7 @@ public final class ClientSessionServiceImpl
 		// Schedule task to monitor relocation.
 		taskScheduler.scheduleTask(
 		    new MonitorSessionRelocatingToLocalNodeTask(key, info),
-		    identity,
-		    System.currentTimeMillis() + 5000L);
+		    identity, System.currentTimeMillis() + relocationTimeout);
 				      
 		return relocationKey;
 
@@ -1241,8 +1259,8 @@ public final class ClientSessionServiceImpl
      *
      * @return the next relocation key
      */
-    private static byte[] getNextRelocationKey() {
-	byte[] key = new byte[DEFAULT_RELOCATION_KEY_LENGTH];
+    private byte[] getNextRelocationKey() {
+	byte[] key = new byte[relocationKeyLength];
 	random.nextBytes(key);
 	return key;
     }
@@ -1371,7 +1389,7 @@ public final class ClientSessionServiceImpl
     
     /**
      * Adds the handler for the specified session to the internal
-     * sessio n handler map.  This method is invoked by the handler
+     * session handler map.  This method is invoked by the handler
      * once the client has successfully logged in or has
      * successfully relocated.  If the client has relocated, the
      * {@code identity} should be non-null, otherwise, the identity
@@ -1512,9 +1530,13 @@ public final class ClientSessionServiceImpl
 	}
 
 	PrepareRelocationInfo info = prepareRelocationMap.get(sessionRefId);
-	// TBD: assert info != null?
 	if (info != null) {
 	    info.prepareToRelocate();
+	} else {
+	    logger.log(Level.WARNING,
+		       "Ignoring request for session:{0} whichi is not " +
+		       "relocating from local node:{1}",
+		       sessionRefId, localNodeId);
 	}
     }
 

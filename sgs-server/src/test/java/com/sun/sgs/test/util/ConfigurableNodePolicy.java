@@ -57,7 +57,7 @@ public class ConfigurableNodePolicy extends RoundRobinPolicy {
     }
 
     /**
-     * Sets the policy to local node assigment.
+     * Sets the policy to local node assignment.
      */
     public static void setLocalNodePolicy() {
 	isRoundRobin = false;

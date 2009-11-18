@@ -73,7 +73,6 @@ import java.util.Set;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -107,10 +106,6 @@ public abstract class AbstractChannelServiceTest extends Assert {
 
     private static Map<Long, MethodInfo> holdMethodMap =
 	new HashMap<Long, MethodInfo>();
-
-    private Object methodHeldLock = new Object();
-    
-    private boolean methodHeld = false;
     
     /** The number for creating host names. */
     private int hostNum = 1;

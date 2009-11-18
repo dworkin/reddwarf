@@ -102,7 +102,7 @@ public class ClientSessionImpl
     /** The set of delivery requirements for this session. */
     private final Set<Delivery> deliveries;
 
-    /** The node ID for this session (final because sessions can't move yet). */
+    /** The node ID for this session. */
     private long nodeId;
 
     /** Indicates whether this session is connected. */
@@ -307,14 +307,13 @@ public class ClientSessionImpl
 
     /**
      * Initiates a relocation of this client session from the current node
-     * to {@code newNode}.  If the client session is no longer connected,
-     * then this request is ignored.
+     * to {@code newNode}.  If the client session is no longer connected or
+     * the session is already relocating then this request is ignored.
      *
      * @param	newNodeId the ID of the node this session is relocating to
      */
     void addMoveEvent(long newNodeId) {
-	if (isConnected()) {
-	    // TBD: what if this session is already relocating?
+	if (isConnected() && !isRelocating()) {
 	    addEvent(new MoveEvent(newNodeId));
 	}
     }
@@ -345,7 +344,7 @@ public class ClientSessionImpl
     /**
      * Marks this client session as having completed relocation, and then
      * services this session's event queue.  This method is invoked when
-     * the associated client connects to the new node to re-estblish the
+     * the associated client connects to the new node to re-establish the
      * client session.
      *
      * @throws	IllegalStateException if this method is invoked from a node
@@ -799,8 +798,8 @@ public class ClientSessionImpl
     }
 
     /**
-     * Returns {@code true} if session is on local node, and returns
-     * {@code false} otherwise.
+     * Returns {@code true} if session is on local node and is not
+     * relocating, and returns {@code false} otherwise.
      */
     private boolean isLocalSession() {
 	return nodeId == sessionService.getLocalNodeId() &&
@@ -1100,7 +1099,8 @@ public class ClientSessionImpl
 	 * Constructs an event queue for the specified {@code sessionImpl}.
 	 */
 	EventQueue(ClientSessionImpl sessionImpl) {
-	    DataService dataService = ClientSessionServiceImpl.getDataService();
+	    DataService dataService =
+		sessionImpl.sessionService.getDataService();
 	    sessionRef = dataService.createReference(sessionImpl);
 	    queueRef = dataService.createReference(
 		new ManagedQueue<SessionEvent>());

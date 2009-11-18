@@ -62,7 +62,7 @@ public interface ClientSessionServer extends Remote {
      * {@code identity} and {@code sessionId} is relocating to this
      * server's node from the old node (specified by {@code oldNodeId}).
      *
-     * <p>This method returns a relocation key to be used to reesablish
+     * <p>This method returns a relocation key to be used to re-establish
      * the session on this node.  The returned relocation key should be
      * supplied to the {@link ProtocolListener#relocatedSession
      * relocatedSession} method of the appropriate {@link

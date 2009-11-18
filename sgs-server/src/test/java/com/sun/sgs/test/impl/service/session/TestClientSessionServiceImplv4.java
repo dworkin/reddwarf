@@ -34,19 +34,13 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionStatusListener;
-import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.test.util.AbstractDummyClient;
 import com.sun.sgs.test.util.ConfigurableNodePolicy;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -65,7 +59,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,8 +81,6 @@ public class TestClientSessionServiceImplv4 extends Assert {
     private static final String APP_NAME = "TestClientSessionServiceImplv4";
     
     private static final byte PROTOCOL_v4 = 0x04;
-
-    private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
     protected static final int WAIT_TIME = 5000;
 
@@ -129,9 +120,6 @@ public class TestClientSessionServiceImplv4 extends Assert {
 
     protected boolean allowNewLogin = false;
 
-    /** If {@code true}, shuts off some printing during performance tests. */
-    private boolean isPerformanceTest = false;
-    
     /** The transaction scheduler. */
     private TransactionScheduler txnScheduler;
 
@@ -844,10 +832,6 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	    // Replace each node's ClientSessionServer, bound in the data
 	    // service, with a wrapped server that delays before sending
 	    // the message.
-	    final DataService ds = dataService;
-	    TransactionScheduler txnScheduler =
-		serverNode.getSystemRegistry().
-		    getComponent(TransactionScheduler.class);
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		@SuppressWarnings("unchecked")
 		public void run() {
@@ -1119,7 +1103,6 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	DummyClient client = createDummyClient(user);
 	assertTrue(client.connect(serverNode.getAppPort()).login());
 
-	isPerformanceTest = true;
 	int numIterations = 10;
 	final ByteBuffer msg = ByteBuffer.allocate(0);
 	long startTime = System.currentTimeMillis();

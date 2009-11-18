@@ -32,7 +32,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.junit.Assert;
 
@@ -188,7 +187,7 @@ public abstract class AbstractDummyClient extends Assert {
      * true} waits for the request to be acknowledged, returning {@code
      * true} if login was successful, and {@code false} if login was
      * redirected, otherwise a {@code RuntimeException} is thrown
-     * because the login operation timed out before being acknowldeged.
+     * because the login operation timed out before being acknowledged.
      *
      * If {@code waitForLogin} is false, this method returns {@code
      * true} if the login is known to be successful (the outcome may

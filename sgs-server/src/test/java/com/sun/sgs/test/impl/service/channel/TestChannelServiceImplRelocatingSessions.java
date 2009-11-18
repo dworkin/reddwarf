@@ -19,27 +19,17 @@
 
 package com.sun.sgs.test.impl.service.channel;
 
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
-import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 

@@ -25,16 +25,10 @@ import com.sun.sgs.test.impl.service.session.TestClientSessionServiceImplv4.
 import com.sun.sgs.test.util.IdentityAssigner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.tools.test.FilteredNameRunner;
-import com.sun.sgs.tools.test.IntegrationTest;
-import java.util.Properties;
 
-import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 @RunWith(FilteredNameRunner.class)
 public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImplv4 {
@@ -148,7 +142,7 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
 	DummyClient otherClient = createDummyClient("foo");
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	try {
-	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    int newPort = newNode.getAppPort();
 	    assertFalse(otherClient.connect(newPort).login());
 	    client.relocate(newPort, true, true);
 	    checkBindings(1);
@@ -168,11 +162,9 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
 	DummyClient otherClient = createDummyClient("foo");
 	SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	try {
-	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    int newPort = newNode.getAppPort();
 	    client.relocate(newPort, true, true);
-	    int objectCount = getObjectCount();
 	    assertTrue(otherClient.connect(newPort).login());
-	    //waitForExpectedObjectCount(objectCount);
 	    checkBindings(1);
 	    client.assertDisconnectedCallbackInvoked(false);
 	} finally {
