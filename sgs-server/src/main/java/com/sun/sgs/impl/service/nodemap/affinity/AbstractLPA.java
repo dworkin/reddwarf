@@ -65,7 +65,7 @@ import java.util.logging.Logger;
  * Set logging to Level.FINE and construct with {@code gatherStats} set to
  *  {@code true} to print some high level statistics about each algorithm run.
  */
-public abstract class AbstractLPA {
+public abstract class AbstractLPA extends BasicState {
     /** Our base property name. */
     protected static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";

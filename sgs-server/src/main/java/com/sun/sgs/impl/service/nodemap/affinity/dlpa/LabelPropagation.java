@@ -688,7 +688,17 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         }
         return retMap;
     }
-    
+
+    /** {@inheritDoc} */
+    public void enable() {
+        builder.enable();
+    }
+
+    /** {@inheritDoc} */
+    public void disable() {
+        builder.disable();
+    }
+
     /** {@inheritDoc} */
     public void shutdown() {
         clientExporter.unexport();

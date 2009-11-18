@@ -19,27 +19,15 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import java.util.Set;
-
 /**
- *  The affinity group finder finds affinity groups within a
- *  Darkstar cluster.
+ * Stub, to be replaced by Keith's version.
  */
 public interface AffinityGroupFinder {
-    /**
-     * Finds affinity groups across all nodes in the Darkstar cluster.
-     * If no groups are found, an empty set is returned. If an error is
-     * encountered during a run, an {@code AffinityGroupFinderFailedException}
-     * is thrown. Errors include nodes not responding to server requests.
-     * 
-     * @throws AffinityGroupFinderFailedException if there is an error
-     * @return the affinity groups, or an empty set if none are found
-     */
-    Set<AffinityGroup> findAffinityGroups()
-            throws AffinityGroupFinderFailedException;
 
-    /**
-     * Shuts down the affinity group finder.
-     */
+    /** Enables the finder. */
+    void enable();
+    /** Disables the finder. */
+    void disable();
+    /** Shuts down the finder. */
     void shutdown();
 }

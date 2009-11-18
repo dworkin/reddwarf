@@ -109,4 +109,20 @@ public interface LPAClient extends Remote {
      * @throws IOException if there is a communication problem
      */
     void shutdown() throws IOException;
+
+    /**
+     * Indicates that the affinity group finding system is disabled,
+     * so no new data should be collected (old can be disgarded).
+     *
+     * @throws IOException if there is a communication problem
+     */
+    void disable() throws IOException;
+
+    /**
+     * Indicates that the affinity group finding system is enabled,
+     * so new data should be collected again.
+     *
+     * @throws IOException if there is a communication problem
+     */
+    void enable() throws IOException;
 }

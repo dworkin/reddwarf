@@ -27,6 +27,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 /**
+ * Stub, to be replaced by Keith's version (used for testing until we merge).
+ * <p>
  * An affinity group which can relocate its member identities to other nodes.
  * Key ideas swiped from Keith's branch to help us with merging.
  * <p>

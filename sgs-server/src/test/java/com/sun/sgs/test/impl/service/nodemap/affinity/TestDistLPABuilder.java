@@ -21,9 +21,9 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.kernel.NodeType;
@@ -36,9 +36,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentMap;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -82,19 +80,21 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         
     }
 
-    @Before
-    public void beforeEachTest() throws Exception {
-        super.beforeEachTest();
-        graphBuilder = (DLPAGraphBuilder) listener.getGraphBuilder();
+    @Override
+    public void beforeEachTest(Properties addProps) throws Exception {
+        super.beforeEachTest(addProps);
+        graphBuilder = (DLPAGraphBuilder) builder;
     }
 
-    protected Properties getProps(SgsTestNode serverNode) throws Exception {
+    protected Properties getProps(SgsTestNode serverNode, Properties addProps)
+            throws Exception
+    {
         Properties p =
                 SgsTestNode.getDefaultProperties(APP_NAME, serverNode, null);
         if (builderName == null) {
-            p.remove(GraphListener.GRAPH_CLASS_PROPERTY);
+            p.remove(LPADriver.GRAPH_CLASS_PROPERTY);
         } else {
-            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+            p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY, builderName);
         }
         if (serverNode == null) {
             serverPort = SgsTestNode.getNextUniquePort();
@@ -103,6 +103,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         }
         p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
+        p.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        if (addProps != null) {
+            for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
+                p.put(entry.getKey(), entry.getValue());
+            }
+        }
         return p;
     }
     
@@ -112,12 +118,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         SgsTestNode newNode = null;
         try {
             Properties p = getProps(serverNode);
-            p.remove(GraphListener.GRAPH_CLASS_PROPERTY);
+            p.remove(LPADriver.GRAPH_CLASS_PROPERTY);
             newNode =  new SgsTestNode(serverNode, null, p);
-            GraphListener newListener =
-               (GraphListener) graphListenerField.get(
-                                    newNode.getNodeMappingService());
-            Assert.assertNull(newListener.getGraphBuilder());
+            LPADriver newDriver = (LPADriver)
+                finderField.get(newNode.getNodeMappingService());
+            Assert.assertNull(newDriver.getGraphBuilder());
+            Assert.assertNull(newDriver.getGraphListener());
         } finally {
             if (newNode != null) {
                 newNode.shutdown(false);
@@ -130,13 +136,13 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         SgsTestNode newNode = null;
         try {
             Properties p = getProps(serverNode);
-            p.setProperty(GraphListener.GRAPH_CLASS_PROPERTY,
-                          GraphListener.GRAPH_CLASS_NONE);
+            p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY,
+                          LPADriver.GRAPH_CLASS_NONE);
             newNode =  new SgsTestNode(serverNode, null, p);
-            GraphListener newListener =
-               (GraphListener) graphListenerField.get(
-                                    newNode.getNodeMappingService());
-            Assert.assertNull(newListener.getGraphBuilder());
+            LPADriver newDriver = (LPADriver)
+                finderField.get(newNode.getNodeMappingService());
+            Assert.assertNull(newDriver.getGraphBuilder());
+            Assert.assertNull(newDriver.getGraphListener());
         } finally {
             if (newNode != null) {
                 newNode.shutdown(false);
@@ -157,6 +163,20 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Assert.assertNotNull(conflicts);
         Assert.assertEquals(0, conflicts.size());
 
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testBadConfig() throws Exception {
+        afterEachTest();
+
+        Properties addProps = new Properties();
+        addProps.setProperty(StandardProperties.NODE_TYPE,
+                             NodeType.singleNode.toString());
+        try {
+            beforeEachTest(addProps);
+        } catch (InvocationTargetException e) {
+            unwrapException(e);
+        }
     }
 
     @Test(expected=NullPointerException.class)

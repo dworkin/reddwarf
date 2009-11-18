@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
@@ -138,6 +138,10 @@ public class DistGraphBuilder extends AbstractAffinityGraphBuilder
     /** {@inheritDoc} */
     public void updateGraph(final Identity owner, AccessedObjectsDetail detail)
     {
+        checkForShutdownState();
+        if (state == State.DISABLED) {
+            return;
+        }
         final Object[] ids = new Object[detail.getAccessedObjects().size()];
         int index = 0;
         for (AccessedObject access : detail.getAccessedObjects()) {
@@ -174,16 +178,35 @@ public class DistGraphBuilder extends AbstractAffinityGraphBuilder
     }
 
 
-
     /** {@inheritDoc} */
-    public void shutdown() {
-        if (serverImpl != null) {
-            serverImpl.shutdown();
+    public void enable() {
+        if (setEnabledState()) {
+            if (serverImpl != null) {
+                serverImpl.enable();
+            }
         }
     }
 
     /** {@inheritDoc} */
-    public AffinityGroupFinder getAffinityGroupFinder() {
+    public void disable() {
+        if (setDisabledState()) {
+            if (serverImpl != null) {
+                serverImpl.disable();
+            }
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void shutdown() {
+        if (setShutdownState()) {
+            if (serverImpl != null) {
+                serverImpl.shutdown();
+            }
+        }
+    }
+
+    /** {@inheritDoc} */
+    public LPAAffinityGroupFinder getAffinityGroupFinder() {
         return serverImpl;
     }
 

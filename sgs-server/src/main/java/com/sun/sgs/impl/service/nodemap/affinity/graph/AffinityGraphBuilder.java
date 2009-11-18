@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.UndirectedGraph;
 
@@ -51,7 +51,8 @@ import edu.uci.ics.jung.graph.UndirectedGraph;
  */
 public interface AffinityGraphBuilder { 
     /**
-     * Update the graph based on the objects accessed in a task.
+     * Update the graph based on the objects accessed in a task. If the
+     * builder is disabled, does nothing.
      *
      * @param owner  the task owner (the object making the accesses)
      * @param detail detailed information about the object accesses, including
@@ -59,6 +60,7 @@ public interface AffinityGraphBuilder {
      * @throws UnsupportedOperationException if this builder cannot access
      *      the affinity graph.  Typically, this occurs because the builder
      *      itself is distributed.
+     * @throws IllegalStateException if the builder is shut down
      */
     void updateGraph(Identity owner, AccessedObjectsDetail detail);
 
@@ -78,7 +80,25 @@ public interface AffinityGraphBuilder {
     UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph();
 
     /**
-     * Shut down this builder.
+     * Enables this builder.  Enabled builders can be disabled or shutdown.
+     * Multiple calls to enable are allowed.
+     * @throws IllegalStateException if the builder has been shut down
+     */
+    void enable();
+
+    /**
+     * Disables this builder. Disabled builders can be enabled or shutdown.
+     * Multiple calls to disable are allowed.
+     * <p>
+     * While disabled, no new graph updates are applied, but the graph
+     * pruners continue to discard old data.
+     * @throws IllegalStateException if the builder has been shut down
+     */
+    void disable();
+
+    /**
+     * Shuts down this builder. Once shut down, a builder cannot be enabled
+     * or disabled.  Multiple calls to shutdown are allowed.
      */
     void shutdown();
 
@@ -97,5 +117,5 @@ public interface AffinityGraphBuilder {
      *
      * @return the affinity group finder or {@code null}
      */
-    AffinityGroupFinder getAffinityGroupFinder();
+    LPAAffinityGroupFinder getAffinityGroupFinder();
 }

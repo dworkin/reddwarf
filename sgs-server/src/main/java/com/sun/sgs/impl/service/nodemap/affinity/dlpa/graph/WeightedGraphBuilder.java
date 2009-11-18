@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import
@@ -146,34 +146,35 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
         if (type == NodeType.coreServerNode) {
             lpaServer = new LabelPropagationServer(col, wdog, properties);
             lpa = null;
+            pruneTask = null;
+            stats = null;
         } else if (type == NodeType.appNode) {
             lpaServer = null;
             DataService dataService = txnProxy.getService(DataService.class);
             long nodeId = dataService.getLocalNodeId();
             lpa = new LabelPropagation(this, wdog, nodeId, properties);
+
+            // TODO: Register ourselves with the data servce as a listener
+            // for conflict info.
+
+            // Create our JMX MBean
+            stats = new AffinityGraphBuilderStats(col,
+                        affinityGraph, periodCount, snapshot);
+            try {
+                col.registerMBean(stats,
+                                  AffinityGraphBuilderMXBean.MXBEAN_NAME);
+            } catch (JMException e) {
+                // Continue on if we couldn't register this bean, although
+                // it's probably a very bad sign
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            pruneTask = new PruneTask(periodCount);
+            Timer pruneTimer = new Timer("AffinityGraphPruner", true);
+            pruneTimer.schedule(pruneTask, snapshot, snapshot);
         } else {
-            // TBD:  should this be a configuration error?
-            lpaServer = null;
-            lpa = null;
+            throw new IllegalArgumentException(
+                    "Cannot use DLPA algorithm on singe node");
         }
-
-        // TBD:  Register with the data store here.
-        // Get the data store from the txnProxy and register ourselves as a
-        // listener for conflict info.
-
-        // Create our JMX MBean
-        stats = new AffinityGraphBuilderStats(col,
-                    affinityGraph, periodCount, snapshot);
-        try {
-            col.registerMBean(stats, AffinityGraphBuilderMXBean.MXBEAN_NAME);
-        } catch (JMException e) {
-            // Continue on if we couldn't register this bean, although
-            // it's probably a very bad sign
-            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-        }
-        pruneTask = new PruneTask(periodCount);
-        Timer pruneTimer = new Timer("AffinityGraphPruner", true);
-        pruneTimer.schedule(pruneTask, snapshot, snapshot);
     }
     
     /**
@@ -183,6 +184,14 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
      * from changes to data structures made by the pruner.
      */
     public void updateGraph(Identity owner, AccessedObjectsDetail detail) {
+        checkForShutdownState();
+        if (state == State.DISABLED) {
+            return;
+        }
+
+        // We don't ever expect this to be called from the server node!
+        assert (stats != null);
+        assert (pruneTask != null);
         long startTime = System.currentTimeMillis();
         stats.updateCountInc();
 
@@ -263,13 +272,36 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
     }
 
     /** {@inheritDoc} */
-    public void shutdown() {
-        pruneTask.cancel();
-        if (lpaServer != null) {
-            lpaServer.shutdown();
+    public void disable() {
+        if (setDisabledState()) {
+            if (lpaServer != null) {
+                lpaServer.disable();
+            }
+            // nothing special is done for client side
         }
-        if (lpa != null) {
-            lpa.shutdown();
+    }
+    /** {@inheritDoc} */
+    public void enable() {
+        if (setEnabledState()) {
+            if (lpaServer != null) {
+                lpaServer.enable();
+            }
+            // nothing special is done for client side
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void shutdown() {
+        if (setShutdownState()) {
+            if (pruneTask != null) {
+                pruneTask.cancel();
+            }
+            if (lpaServer != null) {
+                lpaServer.shutdown();
+            }
+            if (lpa != null) {
+                lpa.shutdown();
+            }
         }
     }
 
@@ -279,7 +311,7 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
     }
     
     /** {@inheritDoc} */
-    public AffinityGroupFinder getAffinityGroupFinder() {
+    public LPAAffinityGroupFinder getAffinityGroupFinder() {
         return lpaServer;
     }
     
@@ -575,6 +607,7 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
          * Update our queues for this period.
          */
         private void addPeriodStructures() {
+            assert Thread.holdsLock(currentPeriodLock);
             currentPeriodObject =
                     new HashMap<Object, Map<Identity, Integer>>();
             periodObjectQueue.addLast(currentPeriodObject);

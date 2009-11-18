@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.single;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -49,7 +49,7 @@ import javax.management.JMException;
  * networks" Raghavan, Albert and Kumara 2007.
  */
 public class SingleLabelPropagation extends AbstractLPA 
-        implements AffinityGroupFinder
+        implements LPAAffinityGroupFinder
 {
     /** Our graph builder. */
     private final AffinityGraphBuilder builder;
@@ -137,12 +137,22 @@ public class SingleLabelPropagation extends AbstractLPA
         return maxCount;
     }
 
-    /**
-     * Shut down any resources that were started.
-     */
+    /** {@inheritDoc} */
+    public void disable() {
+        setDisabledState();
+    }
+
+    /** {@inheritDoc} */
+    public void enable() {
+        setEnabledState();
+    }
+
+    /** {@inheritDoc} */
     public void shutdown() {
-        if (executor != null) {
-            executor.shutdown();
+        if (setShutdownState()) {
+            if (executor != null) {
+                executor.shutdown();
+            }
         }
     }
 
@@ -166,6 +176,7 @@ public class SingleLabelPropagation extends AbstractLPA
     public Set<AffinityGroup> findAffinityGroups() 
             throws AffinityGroupFinderFailedException
     {
+        checkForDisabledOrShutdownState();
         long startTime = System.currentTimeMillis();
         stats.runsCountInc();
         long gen = generation.incrementAndGet();

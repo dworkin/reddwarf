@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity.single;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import
@@ -172,6 +172,11 @@ public class SingleGraphBuilder extends AbstractAffinityGraphBuilder
      * @param objIds the object ids of objects accessed by the identity
      */
     public void updateGraph(Identity owner, Object[] objIds) {
+        checkForShutdownState();
+        if (state == State.DISABLED) {
+            return;
+        }
+
         long startTime = System.currentTimeMillis();
         stats.updateCountInc();
 
@@ -241,9 +246,23 @@ public class SingleGraphBuilder extends AbstractAffinityGraphBuilder
     }
 
     /** {@inheritDoc} */
+    public void enable() {
+        if (setEnabledState()) {
+            lpa.enable();
+        }
+    }
+    
+    /** {@inheritDoc} */
+    public void disable() {
+        if (setDisabledState()) {
+            lpa.disable();
+        }
+    }
+
+    /** {@inheritDoc} */
     public void shutdown() {
-        pruneTask.cancel();
-        if (lpa != null) {
+        if (setShutdownState()) {
+            pruneTask.cancel();
             lpa.shutdown();
         }
     }
@@ -254,7 +273,7 @@ public class SingleGraphBuilder extends AbstractAffinityGraphBuilder
     }
 
     /** {@inheritDoc} */
-    public AffinityGroupFinder getAffinityGroupFinder() {
+    public LPAAffinityGroupFinder getAffinityGroupFinder() {
         return lpa;
     }
 

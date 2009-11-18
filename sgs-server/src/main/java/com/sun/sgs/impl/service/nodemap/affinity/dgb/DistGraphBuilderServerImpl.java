@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -71,7 +71,8 @@ import javax.management.JMException;
  * of the system.
  */
 public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
-    implements DistGraphBuilderServer, AffinityGraphBuilder, AffinityGroupFinder
+    implements DistGraphBuilderServer, AffinityGraphBuilder,
+               LPAAffinityGroupFinder
 {
     /** The property name for the server port. */
     public static final String SERVER_PORT_PROPERTY =
@@ -169,20 +170,44 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
 
     /** {@inheritDoc} */
     public void updateGraph(Identity owner, Object[] objIds) {
+        checkForShutdownState();
         builder.updateGraph(owner, objIds);
     }
 
-    // Implement AffinityGraphBuilder
+    // Implement LPAAffinityGraphBuilder
 
     /** {@inheritDoc} */
-    public void shutdown() {
-        // This method is in both AffinityGraphBuilder and AffinityGroupFinder
-        builder.shutdown();
-        lpa.shutdown();
+    public void disable() {
+        if (setDisabledState()) {
+            // We don't tell our clients, so they will still be sending
+            // graph updates via RMI.  But our builder will discard them.
+            // A better solution would be to have clients register with this
+            // server, so they could be called here -- that's a heavy-weight
+            // option.
+            // For now, can't entirely disable this variation.
+            builder.disable();
+            lpa.disable();
+        }
     }
 
     /** {@inheritDoc} */
-    public AffinityGroupFinder getAffinityGroupFinder() {
+    public void enable() {
+        if (setEnabledState()) {
+            builder.enable();
+            lpa.enable();
+        }
+    }
+    /** {@inheritDoc} */
+    public void shutdown() {
+        // This method is in both AffinityGraphBuilder and AffinityGroupFinder
+        if (setShutdownState()) {
+            builder.shutdown();
+            lpa.shutdown();
+        }
+    }
+
+    /** {@inheritDoc} */
+    public LPAAffinityGroupFinder getAffinityGroupFinder() {
         return this;
     }
 
@@ -212,7 +237,7 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
         return builder.getPruneTask();
     }
 
-    // Implement AffinityGroupFinder
+    // Implement LPAAffinityGroupFinder
 
     /**
      * {@inheritDoc}
@@ -227,6 +252,8 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
     public Set<AffinityGroup> findAffinityGroups() 
             throws AffinityGroupFinderFailedException
     {
+        checkForDisabledOrShutdownState();
+
         long gen = generation.incrementAndGet();
         Set<AffinityGroup> groups = lpa.findAffinityGroups();
         // Need to translate each group into a relocating affinity group

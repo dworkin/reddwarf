@@ -32,7 +32,7 @@
  * The graph listener creates an
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder}
  * based on the property value {@value
- * com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener#GRAPH_CLASS_PROPERTY}.
+ * com.sun.sgs.impl.service.nodemap.affinity.LPADriver#GRAPH_CLASS_PROPERTY}.
  * The builder ensures that the correct supporting LPA implementation is
  * also instantiated.  The builder can provide some JMX data.
  */

@@ -20,144 +20,50 @@
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
-import com.sun.sgs.service.TransactionProxy;
 import java.beans.PropertyChangeEvent;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Properties;
 
 /**
  * A listener which detects object uses by Identities within tasks and builds
  * a graph based on that information.
- * <p>
- * The following property is supported:
- * <p>
- * <dl style="margin-left: 1em">
- *
- * <dt>	<i>Property:</i> <code><b>
- *   com.sun.sgs.impl.service.nodemap.affinity.graphbuilder.class
- *	</b></code><br>
- *	<i>Default:</i>
- *    {@code
- *    com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder}
- * <br>
- *
- * <dd style="padding-top: .5em">The graph builder to use.  Set to
- *   {@code None} if no affinity group finding is required, which is
- *   useful for testing. <p>
- * </dl>
  */
 public class GraphListener implements ProfileListener {
-    /** The base name for properties. */
-    private static final String PROP_BASE =
-            "com.sun.sgs.impl.service.nodemap.affinity";
-    /** The property for specifying the graph builder class. */
-    public static final String GRAPH_CLASS_PROPERTY =
-        PROP_BASE + ".graphbuilder.class";
-    
-    /**
-     * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
-     * affinity group finding should be instantiated (useful for testing).
-     */
-    public static final String GRAPH_CLASS_NONE = "None";
-
-    /** The affinity graph builder, null if there is none. */
+    /** The affinity graph builder. */
     private final AffinityGraphBuilder builder;
 
     /**
-     * Constructs a new listener instance. 
+     * Constructs a new listener for affinity graph data.
+     * <p>
+     * NOTE: this constructor should never be used, but is provided to
+     * satisfy the {@code ProfileListener} documentation.
      *
-     * @param properties application properties
-     * @param systemRegistry the registry of available system components
-     * @param txnProxy the transaction proxy
-     * @param nodeId the local node id
-     * 
-     * @throws Exception if an error occurs
+     * @param properties the configuration properties
+     * @param owner task owner for any tasks run by this listener
+     * @param registry the system registry
      */
     public GraphListener(Properties properties,
-                         ComponentRegistry systemRegistry,
-                         TransactionProxy txnProxy,
-                         long nodeId)
-        throws Exception
-    {
-        ProfileCollector col =
-                systemRegistry.getComponent(ProfileCollector.class);
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        NodeType type =
-            NodeType.valueOf(
-                properties.getProperty(StandardProperties.NODE_TYPE));
-        String builderName = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
-        if (GRAPH_CLASS_NONE.equals(builderName)) {
-            // do not instantiate anything
-            builder = null;
-            return;
-        }
-        if (builderName != null) {
-            builder = createBuilder(Class.forName(builderName),
-                                    properties, systemRegistry, txnProxy);
-        // TBD: The following code is commented out while our default is none,
-        // mostly to keep findbugs quiet.  In the future, we expect the
-        // WeightedGraphBuilder to be the default if we're not in single node
-        // mode.
-//        } else if (type != NodeType.singleNode) {
-//            // Default is currently NONE, might become the distributed LPA/
-//            // weighted graph listener in the future.
-//            builder = null;
-        } else {
-            // Either we're in multi-node, but the current default is
-            // no action, or we're in single node and no builder was requested.
-            //
-            // If we're in single node, and no builder was requested,
-            // don't bother creating anything.  Affinity groups will make
-            // no sense.
-            builder = null;
-        }
-
-        // Add the self as listener if there is a builder and we are
-        // not a core server node.
-        if (builder != null && type != NodeType.coreServerNode) {
-            col.addListener(this, false);
-        }
+                         Identity owner,
+                         ComponentRegistry registry) {
+        throw new NullPointerException("null builder not allowed");
     }
-
     /**
-     * Private helper to create an AffinityGraphBuilder, searching for
-     * two different ctor signatures.
+     * Constructs a new listener for affinity graph data.
+     *
+     * @param builder the affinity graph builder to report to
+     * 
+     * @throws NullPointerException if the builder is {@code null}
      */
-    private AffinityGraphBuilder createBuilder(Class<?> bClass,
-                                               Properties props,
-                                               ComponentRegistry systemRegistry,
-                                               TransactionProxy txnProxy)
-        throws Exception
+    public GraphListener(AffinityGraphBuilder builder)
     {
-        Constructor<?> ctor;
-        try {
-            // find the constructor
-            ctor = bClass.getConstructor(Properties.class,
-                                         ComponentRegistry.class,
-                                         TransactionProxy.class);
-            // return a new instance
-            return (AffinityGraphBuilder)
-                    (ctor.newInstance(props, systemRegistry, txnProxy));
-        } catch (InvocationTargetException e) {
-            // Try to unwrap any nested exceptions - they will be wrapped
-            // because we are instantiating via reflection
-            Throwable cause = e.getCause();
-            if (cause instanceof Exception) {
-                throw (Exception) cause;
-            } else {
-                throw e;
-            }
+        if (builder == null) {
+            throw new NullPointerException("null builder not allowed");
         }
+        this.builder = builder;
     }
 
     /** {@inheritDoc} */
@@ -167,9 +73,7 @@ public class GraphListener implements ProfileListener {
 
     /** {@inheritDoc} */
     public void shutdown() {
-        if (builder != null) {
-            builder.shutdown();
-        }
+        // do nothing
     }
     
     /** {@inheritDoc} */
@@ -189,14 +93,5 @@ public class GraphListener implements ProfileListener {
         }
 
         builder.updateGraph(owner, detail);
-    }
-
-    /**
-     * Returns the graph builder used by this listener, or {@code null} if
-     * we are not building graphs.
-     * @return the graph builder or {@code null} if there is none
-     */
-    public AffinityGraphBuilder getGraphBuilder() {
-        return builder;
     }
 }

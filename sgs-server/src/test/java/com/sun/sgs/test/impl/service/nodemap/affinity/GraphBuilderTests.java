@@ -24,6 +24,8 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
+import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
@@ -34,8 +36,11 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.NodeType;
+import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
@@ -63,7 +68,7 @@ public class GraphBuilderTests {
     private static Class<?> profileReportImplClass;
     protected static Constructor<?> profileReportImplConstructor;
     protected static Method setAccessedObjectsDetailMethod;
-    protected static Field graphListenerField;
+    protected static Field finderField;
     static {
         try {
             profileReportImplClass =
@@ -75,16 +80,15 @@ public class GraphBuilderTests {
             setAccessedObjectsDetailMethod =
                 UtilReflection.getMethod(profileReportImplClass,
                     "setAccessedObjectsDetail", AccessedObjectsDetail.class);
-            graphListenerField =
-                    UtilReflection.getField(NodeMappingServiceImpl.class,
-                                            "graphListener");
+            finderField =
+                UtilReflection.getField(NodeMappingServiceImpl.class, "finder");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
     // The name of our test application
     protected final String appName;
-
+ 
     // The listener created for each test
     protected GraphListener listener;
     // The builder used by the listener
@@ -94,6 +98,11 @@ public class GraphBuilderTests {
 
     protected SgsTestNode serverNode;
     protected SgsTestNode node;
+
+    // The LPA drivers, one for updating graphs, the other for finding groups.
+    // These can be the same instance
+    protected LPADriver graphDriver;
+    protected LPADriver groupDriver;
 
     protected int serverPort;
     /**
@@ -107,17 +116,30 @@ public class GraphBuilderTests {
 
     @Before
     public void beforeEachTest() throws Exception {
-        props = getProps(null);
+        beforeEachTest(null);
+    }
+
+    protected void beforeEachTest(Properties addProps) throws Exception {
+        props = getProps(null, addProps);
         serverNode = new SgsTestNode(appName, null, props);
+        groupDriver = (LPADriver)
+            finderField.get(serverNode.getNodeMappingService());
         // Create a new app node
-        props = getProps(serverNode);
+        props = getProps(serverNode, addProps);
         node = new SgsTestNode(serverNode, null, props);
-        listener = (GraphListener)
-                graphListenerField.get(node.getNodeMappingService());
-        builder = listener.getGraphBuilder();
+        graphDriver = (LPADriver)
+                finderField.get(node.getNodeMappingService());
+        listener = graphDriver.getGraphListener();
+        builder = graphDriver.getGraphBuilder();
     }
 
     protected Properties getProps(SgsTestNode serverNode) throws Exception {
+        return getProps(serverNode, null);
+    }
+
+    protected Properties getProps(SgsTestNode serverNode, Properties addProps)
+            throws Exception
+    {
         Properties p =
                 SgsTestNode.getDefaultProperties(appName, serverNode, null);
         if (serverNode == null) {
@@ -127,6 +149,12 @@ public class GraphBuilderTests {
         }
         p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
+        p.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        if (addProps != null) {
+            for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
+                p.put(entry.getKey(), entry.getValue());
+            }
+        }
         return p;
     }
 
@@ -134,15 +162,17 @@ public class GraphBuilderTests {
         if (node != null) {
             node.shutdown(false);
             node = null;
+            Thread.sleep(100);
         }
         props = getProps(serverNode);
         for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
             props.put(entry.getKey(), entry.getValue());
         }
         node =  new SgsTestNode(serverNode, null, props);
-        listener =
-           (GraphListener) graphListenerField.get(node.getNodeMappingService());
-        builder = listener.getGraphBuilder();
+        graphDriver = (LPADriver)
+                finderField.get(node.getNodeMappingService());
+        listener = graphDriver.getGraphListener();
+        builder = graphDriver.getGraphBuilder();
     }
 
     @After
@@ -676,18 +706,136 @@ public class GraphBuilderTests {
         try {
             startNewNode(p);
         } catch (InvocationTargetException e) {
-            // Try to unwrap any nested exceptions - they will be wrapped
-            // because the kernel instantiating via reflection
-            Throwable cause = e.getCause();
-            while (cause instanceof InvocationTargetException) {
-                cause = cause.getCause();
-            }
-            if (cause instanceof Exception) {
-                throw (Exception) cause;
-            } else {
-                throw e;
-            }
+            unwrapException(e);
         }
+    }
+
+    @Test
+    public void testShutdownTwice() {
+        graphDriver.shutdown();
+        graphDriver.shutdown();
+    }
+
+    @Test
+    public void testEnableTwice() {
+        graphDriver.enable();
+        graphDriver.enable();
+    }
+
+    @Test
+    public void testDisableTwice() {
+        graphDriver.disable();
+        graphDriver.disable();
+    }
+
+    @Test(expected=IllegalStateException.class)
+    public void testShutdownDisable() {
+        graphDriver.shutdown();
+        graphDriver.disable();
+    }
+
+    @Test(expected=IllegalStateException.class)
+    public void testShutdownEnable() {
+        graphDriver.shutdown();
+        graphDriver.enable();
+    }
+
+    @Test(expected=IllegalStateException.class)
+    public void testShutdownUpdateGraph() throws Exception {
+        graphDriver.shutdown();
+        AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        graphDriver.getGraphBuilder().
+                updateGraph(new IdentityImpl("something"), detail);
+    }
+
+    @Test(expected=IllegalStateException.class)
+    public void testShutdownFindGroups() throws Exception {
+        groupDriver.shutdown();
+        groupDriver.getGraphBuilder().
+                getAffinityGroupFinder().findAffinityGroups();
+    }
+
+    @Test
+    public void testListenerDisable() throws Exception {
+        ProfileReport report = makeReport(new IdentityImpl("something"));
+        AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        report = makeReport(new IdentityImpl("somethingElse"));
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        Graph<LabelVertex, WeightedEdge> graph = builder.getAffinityGraph();
+        Assert.assertEquals(1, graph.getEdgeCount());
+        Assert.assertEquals(2, graph.getVertexCount());
+
+        // Now, disable
+        graphDriver.disable();
+
+        // And add more stuff
+        report = makeReport(new IdentityImpl("somethingDifferent"));
+        detail = new AccessedObjectsDetailTest();
+        detail.addAccess(new String("obj1"));
+        setAccessedObjectsDetailMethod.invoke(report, detail);
+        listener.report(report);
+
+        graph = builder.getAffinityGraph();
+        Assert.assertEquals(1, graph.getEdgeCount());
+        Assert.assertEquals(2, graph.getVertexCount());
+
+        // Renable
+        graphDriver.enable();
+        listener.report(report);
+        graph = builder.getAffinityGraph();
+        Assert.assertEquals(3, graph.getEdgeCount());
+        Assert.assertEquals(3, graph.getVertexCount());
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testDriverBadValue() throws Exception {
+        Properties addProps = new Properties();
+        addProps.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "1");
+        try {
+            startNewNode(addProps);
+        } catch (InvocationTargetException e) {
+            unwrapException(e);
+        }
+    }
+
+    @Test
+    public void testDriverSmallValueNoData() throws Exception {
+        afterEachTest();
+
+        Properties addProps = new Properties();
+        // Add in a small update freq, 5 seconds
+        addProps.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "5");
+        beforeEachTest(addProps);
+
+        ProfileCollector col;
+        if (serverNode != null) {
+            col = serverNode.getSystemRegistry().
+                    getComponent(ProfileCollector.class);
+        } else {
+            col = node.getSystemRegistry().
+                    getComponent(ProfileCollector.class);
+        }
+        // Set the profiling level because we will use the results of
+        // profiling in this test
+        col.getConsumer(AffinityGroupFinderStats.CONS_NAME).
+                setProfileLevel(ProfileLevel.MAX);
+        graphDriver.enable();
+        Thread.sleep(5500);
+       
+        AffinityGroupFinderStats stats = (AffinityGroupFinderStats)
+            col.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
+        Assert.assertNotNull(stats);
+        Assert.assertTrue("stats should be updated", stats.getNumberRuns() > 0);
     }
 
     /* Utility methods and classes. */
@@ -696,6 +844,24 @@ public class GraphBuilderTests {
                     null, id, System.currentTimeMillis(), 1);
     }
 
+    /**
+     * Unwraps an InvocationTargetException to throw the root cause.
+     */
+    protected void unwrapException(InvocationTargetException e)
+            throws Exception
+    {
+        // Try to unwrap any nested exceptions - they will be wrapped
+        // because the kernel instantiating via reflection
+        Throwable cause = e.getCause();
+        while (cause instanceof InvocationTargetException) {
+            cause = cause.getCause();
+        }
+        if (cause instanceof Exception) {
+            throw (Exception) cause;
+        } else {
+            throw e;
+        }
+    }
     /**
      * Private implementation of {@code AccessedObjectsDetail}.
      * It allows adding and getting accessed objects only.

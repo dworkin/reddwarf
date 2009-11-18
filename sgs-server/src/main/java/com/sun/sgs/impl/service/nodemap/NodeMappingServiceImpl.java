@@ -23,14 +23,14 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -351,8 +351,8 @@ public class NodeMappingServiceImpl
         relocationHandlers =
             new ConcurrentHashMap<Identity, Queue<SimpleCompletionHandler>>();
 
-    /** A graph listener, used for detecting affinity groups. */
-    private final GraphListener graphListener;
+    /** Affinity Group finder (TEMP) */
+    private final AffinityGroupFinder finder;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -479,10 +479,11 @@ public class NodeMappingServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
 
-            // Create our graph listener.
-            graphListener =
-                new GraphListener(properties, systemRegistry,
-                                  txnProxy, localNodeId);
+            // Create and start our affinity group finder subsystem.
+            // TEMP -- this code to move to coordinator
+            finder = new LPADriver(properties, systemRegistry, txnProxy);
+            finder.enable();
+
             logger.log(Level.CONFIG,
                        "Created NodeMappingServiceImpl with properties:" +
                        "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
@@ -528,7 +529,7 @@ public class NodeMappingServiceImpl
     
     /** {@inheritDoc} */
     protected void doShutdown() {
-        graphListener.shutdown();
+        finder.shutdown();
         try {
             exporter.unexport();
             if (dataService != null) {

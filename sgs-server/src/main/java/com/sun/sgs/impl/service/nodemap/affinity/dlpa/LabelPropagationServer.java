@@ -21,10 +21,11 @@ package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
+import com.sun.sgs.impl.service.nodemap.affinity.BasicState;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -60,7 +61,9 @@ import javax.management.JMException;
  * the iterations of the algorithm, and collecting and merging results from
  * each node when finished.
  */
-public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
+public class LabelPropagationServer extends BasicState
+        implements LPAAffinityGroupFinder, LPAServer
+{
     /** Our property base name. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
@@ -211,7 +214,7 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
      */
     public LabelPropagationServer(ProfileCollector col, WatchdogService wdog,
             Properties properties)
-            throws IOException
+        throws IOException
     {
         this.wdog = wdog;
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -243,12 +246,13 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         }
     }
 
-    // ---- Implement AffinityGroupFinder --- //
+    // ---- Implement LPAAffinityGroupFinder --- //
 
     /** {@inheritDoc} */
     public Set<AffinityGroup> findAffinityGroups() 
             throws AffinityGroupFinderFailedException
     {
+        checkForDisabledOrShutdownState();
         synchronized (runningLock) {
             while (running) {
                 try {
@@ -283,7 +287,6 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
         // combines groups that might cross nodes, and creates new, final
         // affinity group information.
         long startTime = System.currentTimeMillis();
-
         stats.runsCountInc();
 
         // Don't pay any attention to changes while we're running, at least
@@ -370,18 +373,64 @@ public class LabelPropagationServer implements AffinityGroupFinder, LPAServer {
     }
 
     /** {@inheritDoc} */
-    public void shutdown() {
-        for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
-            try {
-                ce.getValue().shutdown();
-                clientProxyMap.remove(ce.getKey());
-            } catch (IOException e) {
-                // It's OK if we cannot reach the client.  The entire system
-                // might be coming down.
+    public void disable() {
+        if (setDisabledState()) {
+            for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
+                runIoTask(new DisableTask(ce.getValue()),
+                    wdog, ce.getKey(), maxIoAttempts,
+                    retryWaitTime, CLASS_NAME);
             }
         }
-        exporter.unexport();
-        executor.shutdownNow();
+    }
+
+    /**  Private task to disable a proxy. */
+    private static class DisableTask implements IoRunnable {
+        private final LPAClient proxy;
+        DisableTask(LPAClient proxy) {
+            this.proxy = proxy;
+        }
+        public void run() throws IOException {
+            proxy.disable();
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void enable() {
+        if (setEnabledState()) {
+            for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
+                runIoTask(new EnableTask(ce.getValue()),
+                    wdog, ce.getKey(), maxIoAttempts,
+                    retryWaitTime, CLASS_NAME);
+            }
+        }
+    }
+
+    /**  Private task to enable a proxy. */
+    private static class EnableTask implements IoRunnable {
+        private final LPAClient proxy;
+        EnableTask(LPAClient proxy) {
+            this.proxy = proxy;
+        }
+        public void run() throws IOException {
+            proxy.enable();
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void shutdown() {
+        if (setShutdownState()) {
+            for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
+                try {
+                    ce.getValue().shutdown();
+                    clientProxyMap.remove(ce.getKey());
+                } catch (IOException e) {
+                    // It's OK if we cannot reach the client.  The entire system
+                    // might be coming down.
+                }
+            }
+            exporter.unexport();
+            executor.shutdownNow();
+        }
     }
 
     // --- Implement LPAServer --- //

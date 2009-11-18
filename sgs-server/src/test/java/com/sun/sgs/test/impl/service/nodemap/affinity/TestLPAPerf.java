@@ -21,16 +21,16 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
+import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
@@ -113,6 +113,7 @@ public class TestLPAPerf {
         Properties props = SgsTestNode.getDefaultProperties("TestLPA", null, null);
         props.put("com.sun.sgs.impl.kernel.profile.level",
                    ProfileLevel.MAX.name());
+        props.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
         // We are creating this SgsTestNode so we can get at its watchdog
         // and profile collector only - the LPAServer we are testing is
         // created outside this framework so we could easily extend the type.
@@ -236,7 +237,7 @@ public class TestLPAPerf {
                 new LabelPropagationServer(collector, wdog, props);
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
-        props.put(GraphListener.GRAPH_CLASS_PROPERTY, builderName);
+        props.put(LPADriver.GRAPH_CLASS_PROPERTY, builderName);
 
         LabelPropagation lp1 =
             new LabelPropagation(
@@ -787,12 +788,20 @@ public class TestLPAPerf {
         }
 
         /** {@inheritDoc} */
+        public void enable() {
+            // do nothing
+        }
+        /** {@inheritDoc} */
+        public void disable() {
+            // do nothing
+        }
+        /** {@inheritDoc} */
         public void shutdown() {
             // do nothing
         }
 
         /** {@inheritDoc} */
-        public AffinityGroupFinder getAffinityGroupFinder() {
+        public LPAAffinityGroupFinder getAffinityGroupFinder() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
