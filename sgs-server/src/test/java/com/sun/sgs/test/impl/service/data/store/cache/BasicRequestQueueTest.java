@@ -36,10 +36,8 @@ import java.util.Map;
 import java.util.Properties;
 import org.junit.Assert;
 
+/** Provides basic facilities for testing request queues. */
 class BasicRequestQueueTest extends Assert {
-
-    /** Empty properties. */
-    static final Properties emptyProperties = new Properties();
 
     /** Slop time when waiting. */
     final long extraWait = Long.getLong("test.extra.wait", 200);
@@ -64,6 +62,13 @@ class BasicRequestQueueTest extends Assert {
 	    long nodeId, RequestQueueServer<? extends Request> server)
 	{
 	    servers.put(nodeId, server);
+	}
+	synchronized void shutdown() {
+	    for (RequestQueueServer<? extends Request> server :
+		     servers.values())
+	    {
+		server.disconnect();
+	    }
 	}
     }
 

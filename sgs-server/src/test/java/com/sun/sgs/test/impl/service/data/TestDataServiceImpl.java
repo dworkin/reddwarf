@@ -6049,8 +6049,8 @@ public class TestDataServiceImpl extends Assert {
     abstract static class ChunkedTask extends TestAbstractKernelRunnable {
 
 	/**
-	 * A count down latch that is set to 1 while waiting, and set to 0 when
-	 * done waiting.
+	 * A count down latch that is set to 1 while waiting to complete all
+	 * chunks of the task, and set to 0 when done waiting.
 	 */
 	private CountDownLatch done = new CountDownLatch(1);
 
@@ -6093,7 +6093,7 @@ public class TestDataServiceImpl extends Assert {
     /**
      * A task for tests that run several repeated tasks concurrently.  Note
      * that only one set of these tasks can be run at a time because this class
-     * uses a static to track running tasks.
+     * uses statics to track running tasks.
      */
     static abstract class RepeatingConcurrentTask
 	implements Serializable, Task

@@ -27,7 +27,8 @@ import static java.util.logging.Level.FINEST;
 /**
  * A {@code CachingDataStoreServer} that delegates its operations to an
  * underlying server and logs all calls at level {@link Level#FINEST FINEST}.
- * This class is part of the implementation of {@link CachingDataStore}.
+ * This class is part of the implementation of {@link
+ * CachingDataStoreServerImpl}.
  */
 class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 

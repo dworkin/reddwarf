@@ -110,6 +110,9 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	if (listener != null) {
 	    listener.shutdown();
 	}
+	if (serverDispatcher != null) {
+	    serverDispatcher.shutdown();
+	}
     }
 
     /* -- Tests -- */

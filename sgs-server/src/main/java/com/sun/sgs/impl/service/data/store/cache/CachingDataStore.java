@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.AbstractDataStore;
 import com.sun.sgs.impl.service.data.store.BindingValue;
@@ -99,7 +100,9 @@ import java.util.logging.Logger;
 
 /**
  * Provides an implementation of {@link DataStore} that caches data on the
- * local node and communicates with a {@link CachingDataStoreServer}. <p>
+ * local node and communicates with a {@link CachingDataStoreServer}.  The
+ * caching data store requires the use of an access coordinator that performs
+ * pessimistic locking, such as {@link LockingAccessCoordinator}. <p>
  *
  * The {@link #CachingDataStore constructor} supports the following
  * configuration properties: <p>

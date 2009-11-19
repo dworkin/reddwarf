@@ -80,7 +80,6 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
     public void beforeTest() {
 	serverDispatcher = new SimpleServerDispatcher();
 	failureReporter = new NoteFailure();
-
     }
 
     /** Close the server socket and shutdown the connect thread, if present. */
@@ -95,6 +94,9 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	}
 	if (failureReporter != null) {
 	    failureReporter.checkNotCalled();
+	}
+	if (serverDispatcher != null) {
+	    serverDispatcher.shutdown();
 	}
     }
 
