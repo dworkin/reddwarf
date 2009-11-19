@@ -480,7 +480,7 @@ public abstract class AbstractBasicService implements Service {
      * @return	{@code true} if the specified exception is retryable, and
      *		{@code false} otherwise
      */
-    public static boolean isRetryableException(Exception e) {
+    public static boolean isRetryableException(Throwable e) {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
     }

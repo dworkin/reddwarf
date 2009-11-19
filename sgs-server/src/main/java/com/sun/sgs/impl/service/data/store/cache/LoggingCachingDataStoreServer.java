@@ -184,7 +184,7 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     }
 
     @Override
-    public boolean upgradeObject(long nodeId, long oid)
+    public UpgradeObjectResults upgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException, IOException
     {
 	if (logger.isLoggable(FINEST)) {
@@ -192,7 +192,7 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 		       "upgradeObject nodeId:" + nodeId + ", oid:" + oid);
 	}
 	try {
-	    boolean result = server.upgradeObject(nodeId, oid);
+	    UpgradeObjectResults result = server.upgradeObject(nodeId, oid);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "upgradeObject nodeId:" + nodeId +

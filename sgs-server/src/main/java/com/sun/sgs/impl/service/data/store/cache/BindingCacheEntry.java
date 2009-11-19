@@ -42,6 +42,22 @@ import java.util.logging.Logger;
  * performing multiple operations simultaneously that might add or modify the
  * same cache entry. <p>
  *
+ * The way that binding entries are marked to indicate that they are being
+ * fetched from the server is different from object entries.  Unless an entry
+ * for a particular binding is already cached, binding requests to the server
+ * typically ask for information about the next available binding, and the key
+ * of that next binding is not known in advance.  To avoid making simultaneous
+ * requests to the server for the same or possibly overlapping information, the
+ * next entry present in the cache after the one for a requested name is used
+ * to represent the pending operation, and is marked "pending previous" when in
+ * use.  It is this pending previous state that is used to mark binding entries
+ * as in use for server requests.  The only exception to this rule occurs when
+ * there is no next entry in the cache when a server request needs to be made.
+ * In that case, a last binding entry is added to the cache, and is also marked
+ * <tt>FETCHING_READ</tt> as a way of noting that the entry should be removed
+ * from the cache if the server request returns an actual next entry that is
+ * lower than the last entry. <p>
+ *
  * This class is part of the implementation of {@link CachingDataStore}.
  *
  * @see	Cache#getBindingLock Cache.getBindingLock
@@ -146,6 +162,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     void updatePreviousKey(BindingKey newPreviousKey,
 			   BindingState newPreviousKeyBound)
     {
+	assert newPreviousKeyBound != null;
 	if (newPreviousKey.compareTo(key) >= 0) {
 	    throw new IllegalArgumentException(
 		"New previous key is too large");
@@ -240,14 +257,8 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 			"pending previous: " + this);
 		}
 	    } else if (getState() == State.FETCHING_UPGRADE) {
-		if (key == BindingKey.LAST) {
-		    throw new AssertionError(
-			"Upgrading last binding entry: " + this);
-		} else if (pendingPrevious) {
-		    throw new AssertionError(
-			"Upgrading binding entry that is pending previous: " +
-			this);
-		}
+		throw new AssertionError(
+		    "Upgrading binding entry: " + this);
 	    } else if (getState() == State.FETCHING_WRITE) {
 		throw new AssertionError(
 		    "Fetching binding entry for write: " + this);

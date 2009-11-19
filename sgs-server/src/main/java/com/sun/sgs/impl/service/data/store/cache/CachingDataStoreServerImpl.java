@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import static com.sun.sgs.impl.kernel.StandardProperties.APP_ROOT;
@@ -62,7 +61,6 @@ import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.service.store.db.DbCursor;
 import com.sun.sgs.service.store.db.DbDatabase;
 import com.sun.sgs.service.store.db.DbEnvironment;
@@ -84,6 +82,10 @@ import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
+/*
+ * TBD: Add profiling.  -tjb@sun.com (11/17/2009)
+ */
+
 /**
  * An implementation of {@code CachingDataStoreServer}. <p>
  *
@@ -98,18 +100,15 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The directory in which to store database
  *	files. <p>
  *
- * <dt> <i>Property:</i> <code><b>{@value #SERVER_PORT_PROPERTY}</b></code><br>
- *	<i>Default:</i>	<code>{@value #DEFAULT_SERVER_PORT}</code>
- *
- * <dd style="padding-top: .5em">The network port used to accept server
- *	requests.  The value should be a non-negative number less than
- *	<code>65536</code>.  If the value specified is <code>0</code>, then an
- *	anonymous port will be chosen. <p>
- *
  * <dt> <i>Property:</i> <code><b>{@value #LOCK_TIMEOUT_PROPERTY}</b></code>
  *	<br>
  *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
  *	transaction timeout
+ *
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ *	that an attempt to obtain a lock will be allowed to continue before
+ *	being aborted.  The value must be greater than <code>0</code>, and
+ *	should be less than the transaction timeout. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #MAX_RETRY_PROPERTY}</b></code> <br>
  *	<i>Default:</i> <code>{@value #DEFAULT_MAX_RETRY}</code>
@@ -117,11 +116,6 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The number of milliseconds to continue
  *	retrying I/O operations before determining that the failure is
  *	permanent.  The value must be non-negative. <p>
- *
- * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
- *	that an attempt to obtain a lock will be allowed to continue before
- *	being aborted.  The value must be greater than <code>0</code>, and
- *	should be less than the transaction timeout. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #NUM_CALLBACK_THREADS_PROPERTY}
  *	</b></code> <br>
@@ -144,6 +138,14 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The number of milliseconds to wait before
  *	retrying a failed I/O operation.  The value must be non-negative. <p>
  *
+ * <dt> <i>Property:</i> <code><b>{@value #SERVER_PORT_PROPERTY}</b></code><br>
+ *	<i>Default:</i>	<code>{@value #DEFAULT_SERVER_PORT}</code>
+ *
+ * <dd style="padding-top: .5em">The network port used to accept server
+ *	requests.  The value should be a non-negative number less than
+ *	<code>65536</code>.  If the value specified is <code>0</code>, then an
+ *	anonymous port will be chosen. <p>
+
  * <dt> <i>Property:</i> <code><b>{@value #TXN_TIMEOUT_PROPERTY}</b></code><br>
  *	<i>Default:</i> The value of the <code>{@value
  *	com.sun.sgs.impl.service.transaction.TransactionCoordinator#TXN_TIMEOUT_PROPERTY}
@@ -256,9 +258,6 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 
     /** The property for specifying the transaction timeout in milliseconds. */
     public static final String TXN_TIMEOUT_PROPERTY = PKG + ".txn.timeout";
-
-    /** The default transaction timeout in milliseconds. */
-    public static final long DEFAULT_TXN_TIMEOUT = 100;
 
     /** The property for specifying the update queue port. */
     public static final String UPDATE_QUEUE_PORT_PROPERTY =
@@ -433,17 +432,21 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	long retryWait = wrappedProps.getLongProperty(
 	    RETRY_WAIT_PROPERTY, DEFAULT_RETRY_WAIT, 0, Long.MAX_VALUE);
 	if (logger.isLoggable(CONFIG)) {
-	    logger.log(CONFIG,
-		       "Creating CachingDataStoreServerImpl with properties:" +
-		       "\n  db environment class: " + dbEnvClass +
-		       "\n  directory: " + directory +
-		       "\n  lock timeout: " + lockTimeout +
-		       "\n  max retry: " + maxRetry +
-		       "\n  num key maps: " + numKeyMaps +
-		       "\n  retry wait: " + retryWait +
-		       "\n  server port: " + requestedServerPort +
-		       "\n  txn timeout: " + txnTimeout +
-		       "\n  update queue port: " + requestedUpdateQueuePort);
+	    logger.log(
+		CONFIG,
+		"Creating CachingDataStoreServerImpl with properties:" +
+		"\n  " + ENVIRONMENT_CLASS_PROPERTY + "=" + dbEnvClass +
+		"\n  " + DIRECTORY_PROPERTY + "=" + directory +
+		"\n  " + LOCK_TIMEOUT_PROPERTY + "=" + lockTimeout +
+		"\n  " + MAX_RETRY_PROPERTY + "=" + maxRetry +
+		"\n  " + NUM_CALLBACK_THREADS_PROPERTY + "=" +
+		numCallbackThreads +
+		"\n  " + NUM_KEY_MAPS_PROPERTY + "=" + numKeyMaps +
+		"\n  " + RETRY_WAIT_PROPERTY + "=" + retryWait +
+		"\n  " + SERVER_PORT_PROPERTY + "=" + requestedServerPort +
+		"\n  " + TXN_TIMEOUT_PROPERTY + "=" + txnTimeout +
+		"\n  " + UPDATE_QUEUE_PORT_PROPERTY + "=" +
+		requestedUpdateQueuePort);
 	}
 	try {
 	    File directoryFile = new File(directory);
@@ -498,7 +501,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    callbackExecutor = Executors.newCachedThreadPool(
 		new NamedThreadFactory(CLASSNAME + ".callback-"));
 	    for (int i = 0; i < numCallbackThreads; i++) {
-		callbackExecutor.submit(new CallbackRequester());
+		callbackExecutor.execute(new CallbackRequester());
 	    }
 	} catch (IOException e) {
 	    if (logger.isLoggable(WARNING)) {
@@ -507,6 +510,12 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    doShutdown();
 	    throw e;
 	} catch (RuntimeException e) {
+	    if (logger.isLoggable(WARNING)) {
+		logger.logThrow(WARNING, e, "Problem starting server");
+	    }
+	    doShutdown();
+	    throw e;
+	} catch (Error e) {
 	    if (logger.isLoggable(WARNING)) {
 		logger.logThrow(WARNING, e, "Problem starting server");
 	    }
@@ -552,8 +561,8 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     public long newObjectIds(int numIds) {
 	callStarted();
 	try {
-	    boolean txnDone = false;
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
 	    try {
 		long result = DbUtilities.getNextObjectId(infoDb, txn, numIds);
 		txnDone = true;
@@ -588,7 +597,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		txn.commit();
 		return (data == null) ? null
 		    : new GetObjectResults(
-			data, getWaiting(oid) != GetWaitingResult.NO_WAITERS);
+			data, getWaiting(oid) == GetWaitingResult.WRITERS);
 	    } finally {
 		if (!txnDone) {
 		    txn.abort();
@@ -639,7 +648,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * @throws	IllegalArgumentException {@inheritDoc}
      */
     @Override
-    public boolean upgradeObject(long nodeId, long oid)
+    public UpgradeObjectResults upgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException
     {
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
@@ -648,13 +657,11 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    boolean found = false;
 	    for (LockRequest<Object> owner : lockManager.getOwners(oid)) {
 		if (nodeInfo == owner.getLocker()) {
-		    if (owner.getForWrite()) {
-			/* Already locked for write -- no conflict */
-			return false;
-		    } else {
-			found = true;
-			break;
+		    found = true;
+		    if (!owner.getForWrite()) {
+			lock(nodeInfo, oid, true);
 		    }
+		    break;
 		}
 	    }
 	    if (!found) {
@@ -666,8 +673,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    WARNING, exception, "Cache consistency failure");
 		throw exception;
 	    }
-	    lock(nodeInfo, oid, true);
-	    return getWaiting(oid) != GetWaitingResult.NO_WAITERS;
+	    GetWaitingResult waiting = getWaiting(oid);
+	    return new UpgradeObjectResults(
+		waiting == GetWaitingResult.WRITERS,
+		waiting == GetWaitingResult.READERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -702,7 +711,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    result = !found ? null
 			: new NextObjectResults(
 			    nextOid, cursor.getValue(),
-			    getWaiting(oid) != GetWaitingResult.NO_WAITERS);
+			    getWaiting(oid) == GetWaitingResult.WRITERS);
 		} finally {
 		    cursor.close();
 		}
@@ -746,7 +755,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
 		} finally {
 		    cursor.close();
-		} 
+		}
 		txnDone = true;
 		txn.commit();
 	    } finally {
@@ -758,7 +767,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    lock(nodeInfo, nextNameKey, false);
 	    return new GetBindingResults(
 		found, found ? null : nextName, oid,
-		getWaiting(nextNameKey) != GetWaitingResult.NO_WAITERS);
+		getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -778,7 +787,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    checkNull("name", name);
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    boolean txnDone = false;
-	    String nextName = null;
+	    String nextName;
 	    boolean found;
 	    long oid;
 	    try {
@@ -863,7 +872,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    if (found) {
 		lock(nodeInfo, nameKey, true);
 	    }
-	    lock(nodeInfo, nextNameKey, oid != -1);
+	    lock(nodeInfo, nextNameKey, found);
 	    GetWaitingResult waitingName = getWaiting(nameKey);
 	    GetWaitingResult waitingNextName = getWaiting(nextNameKey);
 	    return new GetBindingForRemoveResults(
@@ -887,10 +896,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     public NextBoundNameResults nextBoundName(long nodeId, String name) {
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
 	    long oid;
 	    String nextName;
-	    boolean txnDone = false;
-	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    try {
 		DbCursor cursor = namesDb.openCursor(txn);
 		try {
@@ -917,7 +926,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    lock(nodeInfo, nextNameKey, false);
 	    return new NextBoundNameResults(
 		nextName, oid,
-		getWaiting(nextNameKey) != GetWaitingResult.NO_WAITERS);
+		getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -973,7 +982,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    nodeInfo = nodeCallStarted(nodeId);
 	} catch (IllegalStateException e) {
-	    throw new CacheConsistencyException(e.getMessage(), e);
+	    CacheConsistencyException exception =
+		new CacheConsistencyException(e.getMessage(), e);
+	    logger.logThrow(WARNING, exception, "Cache consistency failure");
+	    throw exception;
 	}
 	try {
 	    checkNull("oids", oids);
@@ -1004,12 +1016,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 				   nameValues, newNames);
 		    break;
 		} catch (RuntimeException e) {
-		    if (e instanceof ExceptionRetryStatus &&
-			((ExceptionRetryStatus) e).shouldRetry())
-		    {
-			continue;
+		    if (!isRetryableException(e)) {
+			throw e;
 		    }
-		    throw e;
 		}
 	    }
 	} finally {
@@ -1027,8 +1036,8 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 				int newNames)
 	throws CacheConsistencyException
     {
-	boolean txnDone = false;
 	DbTransaction txn = env.beginTransaction(txnTimeout);
+	boolean txnDone = false;
 	try {
 	    for (int i = 0; i < oids.length; i++) {
 		long oid = oids[i];
@@ -1099,7 +1108,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    nodeInfo = nodeCallStarted(nodeId);
 	} catch (IllegalStateException e) {
-	    throw new CacheConsistencyException(e.getMessage(), e);
+	    CacheConsistencyException exception =
+		new CacheConsistencyException(e.getMessage(), e);
+	    logger.logThrow(WARNING, exception, "Cache consistency failure");
+	    throw exception;
 	}
 	try {
 	    checkOid(oid);
@@ -1124,7 +1136,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    nodeInfo = nodeCallStarted(nodeId);
 	} catch (IllegalStateException e) {
-	    throw new CacheConsistencyException(e.getMessage(), e);
+	    CacheConsistencyException exception =
+		new CacheConsistencyException(e.getMessage(), e);
+	    logger.logThrow(WARNING, exception, "Cache consistency failure");
+	    throw exception;
 	}
 	try {
 	    checkOid(oid);
@@ -1149,7 +1164,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    nodeInfo = nodeCallStarted(nodeId);
 	} catch (IllegalStateException e) {
-	    throw new CacheConsistencyException(e.getMessage(), e);
+	    CacheConsistencyException exception =
+		new CacheConsistencyException(e.getMessage(), e);
+	    logger.logThrow(WARNING, exception, "Cache consistency failure");
+	    throw exception;
 	}
 	try {
 	    BindingKey nameKey = BindingKey.getAllowLast(name);
@@ -1174,7 +1192,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    nodeInfo = nodeCallStarted(nodeId);
 	} catch (IllegalStateException e) {
-	    throw new CacheConsistencyException(e.getMessage(), e);
+	    CacheConsistencyException exception =
+		new CacheConsistencyException(e.getMessage(), e);
+	    logger.logThrow(WARNING, exception, "Cache consistency failure");
+	    throw exception;
 	}
 	try {
 	    BindingKey nameKey = BindingKey.getAllowLast(name);
@@ -1191,10 +1212,10 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     @Override
     public void nodeHealthUpdate(Node node) {
 	/*
-	 * Note that we may want to insure that the data store is shutdown for
-	 * a particular node before marking the node as not alive.  That would
-	 * insure that operations for a failed node were not still underway
-	 * even though the watchdog considers it to have failed.
+	 * TBD: Note that we may want to insure that the data store is
+	 * shutdown for a particular node before marking the node as not alive.
+	 * That would insure that operations for a failed node were not still
+	 * underway even though the watchdog considers it to have failed.
 	 * -tjb@sun.com (07/27/2009)
 	 */
 	if (!node.isAlive()) {
@@ -1415,9 +1436,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * Checks whether there are requests waiting to access to specified key for
-     * read or write.  Returns NO_WAITERS if there are no waiters, READERS if
-     * there are only readers, and WRITERS if there are any writers.
+     * Checks whether there are requests waiting to access the specified key
+     * for read or write.  Returns NO_WAITERS if there are no waiters, READERS
+     * if there are only readers, and WRITERS if there are any writers.
      */
     private GetWaitingResult getWaiting(Object key) {
 	List<LockRequest<Object>> waiters = lockManager.getWaiters(key);
@@ -1466,6 +1487,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	}
     }
 
+    /**
+     * Decrements the call count and the count of calls active for the node.
+     */
     private void nodeCallFinished(NodeInfo nodeInfo) {
 	nodeInfo.nodeCallFinished();
 	callFinished();
@@ -1502,8 +1526,8 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     private long getNextNodeId() {
 	synchronized (nextNodeIdSync) {
 	    if (nextNodeId > lastNodeId) {
-		boolean txnDone = false;
 		DbTransaction txn = env.beginTransaction(txnTimeout);
+		boolean txnDone = false;
 		try {
 		    nextNodeId = DbUtilities.getNextNodeId(
 			infoDb, txn, NODE_ID_ALLOCATION_BLOCK_SIZE);

@@ -192,20 +192,56 @@ public interface CachingDataStoreServer extends Remote {
 
     /**
      * Upgrades access to an object from read to write access.  If the return
-     * value is {@code true}, then the caller should downgrade the requested
-     * object to read access after using it.
+     * value's {@code callbackEvict} field is {@code true}, then the caller
+     * should evict the requested object after using it.  If the return value's
+     * {@code callbackDowngrade} field is {@code true}, then the caller should
+     * downgrade the requested object to read access after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the object ID
-     * @return	whether to downgrade the object
+     * @return	information about the object
      * @throws	CacheConsistencyException if the requesting node does not have
      *		read access for the object ID
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered or if {@code oid} is negative
      * @throws	IOException if a network problem occurs
      */
-    boolean upgradeObject(long nodeId, long oid)
+    UpgradeObjectResults upgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException, IOException;
+
+    /** The results of a call to {@link #upgradeObject}. */
+    final class UpgradeObjectResults implements Serializable {
+
+	/** The version of the serialized form. */
+	private static final long serialVersionUID = 1;
+
+	/** Whether to evict the object. */
+	public final boolean callbackEvict;
+
+	/** Whether to downgrade the object. */
+	public final boolean callbackDowngrade;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	callbackEvict whether to evict the object
+	 * @param	callbackDowngrade whether to downgrade the object
+	 */
+	public UpgradeObjectResults(boolean callbackEvict,
+				    boolean callbackDowngrade)
+	{
+	    this.callbackEvict = callbackEvict;
+	    this.callbackDowngrade = callbackDowngrade;
+	}
+
+	@Override
+	public String toString() {
+	    return "UpgradeObjectResults[" +
+		"callbackEvict:" + callbackEvict +
+		", callbackDowngrade:" + callbackDowngrade +
+		"]";
+	}
+    }
 
     /**
      * Returns information about the next object after the object with the
