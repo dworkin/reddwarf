@@ -39,7 +39,7 @@ public interface DataConflictListener {
    * an object or name binding on this node.  The access is identified by
    * either a {@link BigInteger} that represents the object ID of an object, or
    * by a {@link String} that represents a bound name. <p>
-   * 
+   *
    * The string used to identify name bindings will not match the value
    * specified when creating the name binding in the {@link DataService}
    * because value needs to represent both application and service
@@ -55,4 +55,4 @@ public interface DataConflictListener {
    *		update, else {@code false} if it was for read
    */
   void nodeConflictDetected(Object accessId, long nodeId, boolean forUpdate);
-} 
+}

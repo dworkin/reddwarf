@@ -265,7 +265,7 @@ abstract class UpdateQueueRequest implements Request {
 	}
 
 	@Override
-	void performRequest(UpdateQueueServer server, long nodeId) 
+	void performRequest(UpdateQueueServer server, long nodeId)
 	    throws CacheConsistencyException
 	{
 	    server.downgradeObject(nodeId, oid);

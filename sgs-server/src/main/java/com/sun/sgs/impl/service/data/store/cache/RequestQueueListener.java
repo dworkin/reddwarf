@@ -61,7 +61,7 @@ public final class RequestQueueListener extends Thread {
     /** The object for finding the {@link RequestQueueServer}. */
     private final ServerDispatcher serverDispatcher;
 
-    /** The object to call if the listener fails. */ 
+    /** The object to call if the listener fails. */
     private final FailureReporter failureReporter;
 
     /** The maximum retry time in milliseconds. */
@@ -94,7 +94,7 @@ public final class RequestQueueListener extends Thread {
      *
      * @param	serverSocket the server socket for accepting connections
      * @param	serverDispatcher the object for finding the {@link
-     *		RequestQueueServer} 
+     *		RequestQueueServer}
      * @param	failureReporter the failure reporter
      * @param	maxRetry the maximum time in milliseconds to continue trying
      *		to accept and dispatch connections in the presence of failures
@@ -131,7 +131,7 @@ public final class RequestQueueListener extends Thread {
 	    logger.log(FINE,
 		       "Created RequestQueueListener" +
 		       " serverSocket:" + serverSocket +
-		       ", maxRetry:" + maxRetry + 
+		       ", maxRetry:" + maxRetry +
 		       ", retryWait:" + retryWait);
 	}
     }

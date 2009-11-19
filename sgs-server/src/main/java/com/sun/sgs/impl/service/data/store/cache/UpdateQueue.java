@@ -212,7 +212,7 @@ class UpdateQueue {
 	    new Commit(oids, oidValues, newOids, names, nameValues, newNames,
 		       new CompletionHandler() {
 			   @Override
-		           public void completed() {
+			   public void completed() {
 			       pendingAcknowledgeSet.remove(contextId);
 			       commitAvailable.release();
 			   }
@@ -232,7 +232,7 @@ class UpdateQueue {
 	}
 	txnFinished(contextId);
     }
-	
+
 
     /**
      * Evicts an object from the cache.  The {@link
@@ -242,7 +242,7 @@ class UpdateQueue {
      * @param	contextId the transaction context ID
      * @param	oid the ID of the object to evict
      * @param	completionHandler the handler to notify when the eviction has
-     *		been completed 
+     *		been completed
      * @throws	IllegalArgumentException if {@code oid} is negative
      */
     void evictObject(
@@ -259,7 +259,7 @@ class UpdateQueue {
      * @param	contextId the transaction context ID
      * @param	oid the object ID to evict
      * @param	completionHandler the handler to notify when the downgrade has
-     *		been completed 
+     *		been completed
      * @throws	IllegalArgumentException if {@code oid} is negative
      */
     void downgradeObject(
@@ -276,7 +276,7 @@ class UpdateQueue {
      * @param	contextId the transaction context ID
      * @param	name the name, which may be {@code null}
      * @param	completionHandler the handler to notify when the eviction has
-     *		been completed 
+     *		been completed
      */
     void evictBinding(
 	long contextId, String name, CompletionHandler completionHandler)
@@ -292,7 +292,7 @@ class UpdateQueue {
      * @param	contextId the transaction context ID
      * @param	name the name, which may be {@code null}
      * @param	completionHandler the handler to notify when the downgrade has
-     *		been completed 
+     *		been completed
      */
     void downgradeBinding(
 	long contextId, String name, CompletionHandler completionHandler)

@@ -1,5 +1,6 @@
 Version 0.9.12
-- Fix issues #201
+- Added caching data store (issue #17)
+- Fix issues #201, #205
 
 Version 0.9.11:
 - Introduced application level clock accessible via the watchdog service.

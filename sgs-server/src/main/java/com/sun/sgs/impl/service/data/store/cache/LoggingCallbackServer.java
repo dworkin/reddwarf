@@ -103,7 +103,7 @@ class LoggingCallbackServer implements CallbackServer {
 	    }
 	}
     }
-		    
+
     @Override
     public boolean requestEvictObject(long oid, long conflictNodeId)
 	throws IOException

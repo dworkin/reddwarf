@@ -75,7 +75,7 @@ class NewObjectIdCache {
      * and waits for the first range to be allocated.
      *
      * @param	store the data store
-     * @param	batchSize the number of new object IDs to allocate at a time 
+     * @param	batchSize the number of new object IDs to allocate at a time
      */
     NewObjectIdCache(CachingDataStore store, int batchSize) {
 	this.store = store;

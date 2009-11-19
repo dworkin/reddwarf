@@ -90,7 +90,7 @@ public final class TxnLockManager<K> extends LockManager<K> {
      *
      * This implementation calls the deadlock checker if the request blocks.
      *
-     * @throws	IllegalStateException {@inheritDoc}     
+     * @throws	IllegalStateException {@inheritDoc}
      */
     @Override
     LockConflict<K> lockNoWaitInternal(

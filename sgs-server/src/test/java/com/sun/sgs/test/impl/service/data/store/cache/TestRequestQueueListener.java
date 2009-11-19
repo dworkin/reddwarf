@@ -214,7 +214,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
-		    DataOutputStream out = 
+		    DataOutputStream out =
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(33);
 		    Thread.sleep(1);
@@ -270,7 +270,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	serverSocket = new ServerSocket(PORT);
 	NoteFailure failureReporter = new NoteFailure();
 	listener = new RequestQueueListener(
-	    serverSocket, 
+	    serverSocket,
 	    new ServerDispatcher() {
 		public RequestQueueServer<? extends Request> getServer(
 		    long nodeId)
@@ -284,7 +284,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
-		    DataOutputStream out = 
+		    DataOutputStream out =
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(33);
 		    Thread.sleep(1);
@@ -320,7 +320,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
-		    DataOutputStream out = 
+		    DataOutputStream out =
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(getNodeId());
 		    Thread.sleep(1);
@@ -367,7 +367,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    assertEquals(0, server999.connectionCount.get());
 	    socket.close();
 	    socket = new Socket("localhost", PORT);
-	    new DataOutputStream(socket.getOutputStream()).writeLong(999);	
+	    new DataOutputStream(socket.getOutputStream()).writeLong(999);
 	    Thread.sleep(extraWait);
 	    assertEquals(1, server33.connectionCount.get());
 	    assertEquals(1, server999.connectionCount.get());
@@ -422,7 +422,7 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 		Socket socket = null;
 		try {
 		    socket = new Socket("localhost", PORT);
-		    DataOutputStream out = 
+		    DataOutputStream out =
 			new DataOutputStream(socket.getOutputStream());
 		    out.writeLong(33);
 		    Thread.sleep(1);
@@ -467,5 +467,5 @@ public class TestRequestQueueListener extends BasicRequestQueueTest {
 	    connectionCount.incrementAndGet();
 	    forceClose(socket);
 	}
-    }   
+    }
 }

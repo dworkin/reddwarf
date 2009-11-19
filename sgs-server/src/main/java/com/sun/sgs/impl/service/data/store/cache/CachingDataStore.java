@@ -199,7 +199,7 @@ import java.util.logging.Logger;
  *
  * </dl>
  */
-public class CachingDataStore extends AbstractDataStore
+public final class CachingDataStore extends AbstractDataStore
     implements CallbackServer, FailureReporter
 {
     /** The current package. */
@@ -1614,13 +1614,11 @@ public class CachingDataStore extends AbstractDataStore
 	    return false;
 	case READABLE:
 	    entry.awaitNotPendingPrevious(lock, stop);
-	    if (entry.getReadable()) {
-		/* Readable -- caller will upgrade */
-		return true;
-	    } else {
-		/* Not in cache -- try again */
-		return false;
-	    }
+	    /*
+	     * Return true if readable -- caller will upgrade.  Otherwise not
+	     * in the cache -- try again.
+	     */
+	    return entry.getReadable();
 	case WRITABLE:
 	    /* Already writable */
 	    return true;
@@ -2064,7 +2062,7 @@ public class CachingDataStore extends AbstractDataStore
      * A {@link KernelRunnable} that downgrades an object after accessing it
      * for read.
      */
-    private class DowngradeObjectTask 
+    private class DowngradeObjectTask
 	implements CompletionHandler, KernelRunnable
     {
 	private final long oid;
@@ -2275,11 +2273,11 @@ public class CachingDataStore extends AbstractDataStore
 			 * be evicted
 			 */
 			return;
-		    }			
+		    }
 		    if (entry.getDecaching() || entry.getDowngrading()) {
 			/* Already being evicted or downgraded */
 			return;
-		    } 
+		    }
 		    assert !entry.getPendingPrevious();
 		    /* Downgrade */
 		    entry.setEvictingDowngrade(lock);
@@ -2778,8 +2776,6 @@ public class CachingDataStore extends AbstractDataStore
 	    notifyAll();
 	}
 
-	/* -- Implement Runnable -- */
-
 	@Override
 	public void run() {
 	    try {
@@ -3060,7 +3056,7 @@ public class CachingDataStore extends AbstractDataStore
 				    ", forUpdate:" + forUpdate +
 				    " throws");
 		}
-	    } 
+	    }
 	}
     }
 

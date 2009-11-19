@@ -185,6 +185,16 @@
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
   </Match>
 
+  <!-- These methods are documented to return null -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.AbstractDataStore"/>
+    <Or>
+      <Method name="getClassInfo"/>
+      <Method name="getObject"/>
+    </Or>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
   <!-- Packages com.sun.sgs.impl.service.data.store.{bdb,je} -->
 
   <!-- Cursor methods that are supposed to return null. -->
@@ -225,6 +235,50 @@
     <Class name="com.sun.sgs.impl.service.data.store.db.je.JeTransaction$SimpleXid"/>
     <Method name="getBranchQualifier"/>
     <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.data.store.cache -->
+
+  <!-- OK to catch all exceptions since constructor throws Exception -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.cache.CachingDataStore"/>
+    <Method name="&lt;init&gt;"/>
+    <Bug pattern="REC_CATCH_EXCEPTION"/>
+  </Match>
+
+  <!-- Thread is not created with a default empty run method. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.cache.CachingDataStore$DataConflictThread"/>
+      <Class name="com.sun.sgs.impl.service.data.store.cache.CachingDataStore$EvictionThread"/>
+      <Class name="com.sun.sgs.impl.service.data.store.cache.RequestQueueClient$Connection$ReceiveThread"/>
+      <Class name="com.sun.sgs.impl.service.data.store.cache.RequestQueueServer$Connection"/>
+    </Or>
+    <Bug pattern="DM_USELESS_THREAD"/>
+  </Match>
+
+  <!-- Storing byte arrays without copying them is OK for internal APIs -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer$GetObjectResults"/>
+      <Class name="com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer$NextObjectResults"/>
+    </Or>
+    <Method name="&lt;init&gt;"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!-- No unchecked type in the code -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.cache.TxnContext"/>
+    <Method name="noteModifiedBinding"/>
+    <Bug pattern="GC_UNCHECKED_TYPE_IN_GENERIC_CALL"/>
+  </Match>
+
+  <!-- Null check is not redundant -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.cache.TxnContext"/>
+    <Method name="commitInternal"/>
+    <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
   </Match>
 
   <!-- Package com.sun.sgs.impl.service.data.store.net -->

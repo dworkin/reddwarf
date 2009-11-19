@@ -50,7 +50,7 @@ public class TestCachingDataStorePerformance extends TestDataStorePerformance {
     /** The network port for the {@link CachingDataStoreServer}. */
     private static final int serverPort =
 	Integer.getInteger("test.server.port", DEFAULT_SERVER_PORT);
-    
+
     /** The basic test environment, or {@code null} if not set. */
     private static BasicDataStoreTestEnv staticEnv = null;
 
@@ -71,13 +71,13 @@ public class TestCachingDataStorePerformance extends TestDataStorePerformance {
     protected DataStore getDataStore() throws Exception {
 	String host = serverHost;
 	int port = serverPort;
-        String nodeType = NodeType.appNode.toString();
+	String nodeType = NodeType.appNode.toString();
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
 	    nodeType = NodeType.coreServerNode.toString();
 	}
-        props.setProperty(NODE_TYPE, nodeType);
+	props.setProperty(NODE_TYPE, nodeType);
 	props.setProperty(SERVER_HOST_PROPERTY, host);
 	props.setProperty(SERVER_PORT_PROPERTY, String.valueOf(port));
 	props.setProperty(DIRECTORY_PROPERTY, directory);

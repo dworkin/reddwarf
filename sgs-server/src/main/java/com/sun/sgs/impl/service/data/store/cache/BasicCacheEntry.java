@@ -705,7 +705,7 @@ abstract class BasicCacheEntry<K, V> {
      *
      * @param	expected the expected state
      * @throws	IllegalStateException if the entry does not have the expected
-     *		state 
+     *		state
      */
     private void verifyState(State expected) {
 	if (state != expected) {
@@ -734,7 +734,7 @@ abstract class BasicCacheEntry<K, V> {
     /**
      * Waits for this entry's state value to have all bits set that are set in
      * {@code desiredStateValue}.
-     * 
+     *
      * @param	value the value to check
      * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
@@ -768,7 +768,7 @@ abstract class BasicCacheEntry<K, V> {
     /**
      * Waits for this entry's state value to have all bits cleared that are set
      * in {@code desiredStateValue}.
-     * 
+     *
      * @param	value the value to check
      * @param	lock the associated lock, which should be held
      * @param	stop the time in milliseconds when waiting should fail

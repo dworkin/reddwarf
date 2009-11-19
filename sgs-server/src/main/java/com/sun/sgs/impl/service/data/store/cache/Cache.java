@@ -382,7 +382,7 @@ class Cache {
 
 	/** The number of bindings remaining for the current batch. */
 	private int remainingBindings;
-	
+
 	/**
 	 * Creates an instance of this class.
 	 *
@@ -394,7 +394,7 @@ class Cache {
 	    bindingIterator = bindingMap.values().iterator();
 	    computeBatch();
 	}
-	
+
 	/** Sets remainingObjects and remainingBindings. */
 	private void computeBatch() {
 	    double total = (double) (cacheSize - available());

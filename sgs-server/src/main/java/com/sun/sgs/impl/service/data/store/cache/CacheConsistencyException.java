@@ -49,4 +49,3 @@ public class CacheConsistencyException extends Exception {
 	super(message, cause);
     }
 }
-    

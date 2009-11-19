@@ -154,7 +154,7 @@ import java.util.logging.Logger;
  *	</code>
  *
  * <dd style="padding-top: .5em">The transaction timeout in milliseconds. <p>
- * 
+ *
  * <dt> <i>Property:</i> <code><b>{@value #UPDATE_QUEUE_PORT_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i> <code>{@value #DEFAULT_UPDATE_QUEUE_PORT}</code>
@@ -214,7 +214,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * The default value of the lock timeout property, if no transaction
      * timeout is specified.
      */
-    public static final long DEFAULT_LOCK_TIMEOUT = 
+    public static final long DEFAULT_LOCK_TIMEOUT =
 	computeLockTimeout(BOUNDED_TIMEOUT_DEFAULT);
 
     /**
@@ -393,7 +393,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	      new LoggerWrapper(Logger.getLogger(PKG + ".server")));
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	String dbEnvClass = wrappedProps.getProperty(
-	    ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS);	    
+	    ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS);
 	String directory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
 	if (directory == null) {
 	    String rootDir = properties.getProperty(APP_ROOT);
@@ -527,7 +527,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     /* -- Implement CachingDataStoreServer -- */
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -553,7 +553,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -579,7 +579,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -609,7 +609,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -643,7 +643,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -683,7 +683,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -732,7 +732,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -774,7 +774,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -825,7 +825,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -888,7 +888,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     }
 
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -910,7 +910,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 			hasNext = cursor.findNext();
 			nextName = (hasNext) ? decodeString(cursor.getKey())
 			    : null;
-		    }   
+		    }
 		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
 		} finally {
 		    cursor.close();
@@ -943,9 +943,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    callFinished();
 	}
     }
-	    
+
     /**
-     * {@inheritDoc} 
+     * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
      */
@@ -1010,7 +1010,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    "Illegal newNames: " + newNames);
 	    }
 	    for (int i = 0; true; i++) {
-		assert i < 1000 : "Too many retries";		
+		assert i < 1000 : "Too many retries";
 		try {
 		    commitInternal(nodeInfo, oids, oidValues, newOids, names,
 				   nameValues, newNames);
@@ -1594,7 +1594,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * require callbacks.
      */
     private class CallbackRequest {
-	
+
 	/** Information about the node making the request. */
 	final NodeInfo nodeInfo;
 
@@ -1603,7 +1603,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 
 	/** Whether the item was requested for write. */
 	final boolean forWrite;
-	
+
 	/**
 	 * Creates an instance of this class.
 	 *

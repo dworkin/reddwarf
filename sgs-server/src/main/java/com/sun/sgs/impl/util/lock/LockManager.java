@@ -230,7 +230,7 @@ public class LockManager<K> {
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
+     *		manager
      */
     public LockConflict<K> waitForLock(Locker<K> locker) {
 	checkLockManager(locker);
@@ -244,7 +244,7 @@ public class LockManager<K> {
      * @param	locker the locker holding the lock
      * @param	key the key identifying the lock
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
+     *		manager
      */
     public void releaseLock(Locker<K> locker, K key) {
 	if (logger.isLoggable(FINER)) {
@@ -541,7 +541,7 @@ public class LockManager<K> {
      * @param	key the key identifying the lock
      * @param	downgrade whether the lock should only be downgraded
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
+     *		manager
      */
     void releaseLockInternal(Locker<K> locker, K key, boolean downgrade) {
 	checkLockManager(locker);

@@ -67,7 +67,7 @@ abstract class RetryIoRunnable<R> extends ShouldRetryIo implements Runnable {
      */
     abstract R callOnce() throws Exception;
 
-    /** 
+    /**
      * Checks if the I/O operation should be abandoned due to a shutdown
      * request. <p>
      *

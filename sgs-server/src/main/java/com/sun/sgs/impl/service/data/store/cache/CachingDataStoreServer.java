@@ -424,7 +424,7 @@ public interface CachingDataStoreServer extends Remote {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
-	
+
 	/** Whether the requested or next name should be downgraded. */
 	public final boolean callbackDowngrade;
 
@@ -447,7 +447,7 @@ public interface CachingDataStoreServer extends Remote {
 	{
 	    super(found, nextName, oid, callbackEvict);
 	    this.callbackDowngrade = callbackDowngrade;
-	}	    
+	}
 
 	@Override
 	public String toString() {

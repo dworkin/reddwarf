@@ -43,7 +43,7 @@ class TxnContextMap {
     TxnContextMap(CachingDataStore store) {
 	this.store = store;
     }
-	
+
     /**
      * Joins the transaction and returns the associated context.
      *

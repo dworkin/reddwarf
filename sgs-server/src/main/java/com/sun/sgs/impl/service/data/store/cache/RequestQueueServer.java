@@ -39,7 +39,7 @@ import java.util.logging.Logger;
  * Request.RequestHandler} to manage requests.  Requests are read from socket
  * input using a {@link DataInputStream}, their operations performed, and the
  * result written to socket output using a {@link DataOutputStream}. <p>
- * 
+ *
  * First, the {@code boolean} {@code true} is written to the output stream, to
  * signify that the connection has been established successfully. <p>
  *
@@ -221,7 +221,7 @@ public class RequestQueueServer<R extends Request> {
 
 	/** Whether the connection has been told to disconnect. */
 	private volatile boolean disconnect;
-	
+
 	/**
 	 * Creates an instance of this class and starts the thread.
 	 *

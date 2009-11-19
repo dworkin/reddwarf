@@ -164,7 +164,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	client = new RequestQueueClient(
 	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
 	    QUEUE_SIZE);
-	failureReporter.checkCalled(MAX_RETRY);	
+	failureReporter.checkCalled(MAX_RETRY);
     }
 
     @Test
@@ -174,7 +174,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
 	    QUEUE_SIZE);
 	failureReporter.checkCalled(MAX_RETRY);
-    }	
+    }
 
     /* Test addRequest */
 
@@ -419,7 +419,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	serverDispatcher.setServer(
 	    1,
 	    new RequestQueueServer<SimpleRequest>(
-		1, 
+		1,
 		new SimpleRequestHandler() {
 		    public void performRequest(SimpleRequest request)
 			throws Exception
@@ -528,7 +528,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	 *
 	 * @param	timeout the number of milliseconds to wait
 	 * @throws	InterruptedException if the current thread is
-	 *		interrupted 
+	 *		interrupted
 	 */
 	synchronized void awaitCompleted(long timeout)
 	    throws InterruptedException
@@ -588,7 +588,7 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 		super.performRequest(request);
 	    }
 	}
-    }   
+    }
 
     /**
      * Defines a socket factory that generates sockets whose input stream fails

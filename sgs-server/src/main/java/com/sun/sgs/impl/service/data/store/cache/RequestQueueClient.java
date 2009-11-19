@@ -95,7 +95,7 @@ public final class RequestQueueClient extends Thread {
     /** The socket factory. */
     private final SocketFactory socketFactory;
 
-    /** The object to call if the request queue fails. */ 
+    /** The object to call if the request queue fails. */
     private final FailureReporter failureReporter;
 
     /** The maximum retry time in milliseconds. */
@@ -139,7 +139,7 @@ public final class RequestQueueClient extends Thread {
      */
     private Connection connection;
 
-    /** 
+    /**
      * The number of the next request to be sent.  Access to this field does
      * not need to be synchronized because it is only accessed by this thread.
      */
@@ -359,7 +359,7 @@ public final class RequestQueueClient extends Thread {
 	if (ioFailure) {
 	    if (logger.isLoggable(FINER)) {
 		logger.logThrow(FINER, exception,
-				"RequestQueueClient nodeId:" + nodeId + 
+				"RequestQueueClient nodeId:" + nodeId +
 				" connection closed for I/O exception");
 	    }
 	} else if (logger.isLoggable(WARNING)) {

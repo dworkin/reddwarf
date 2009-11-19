@@ -113,7 +113,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
 	    forceClose(socket);
 	}
     }
-    
+
     @Test
     public void testHandleConnectionWithExistingConnection() throws Exception {
 	server = new RequestQueueServer<Request>(1, dummyRequestHandler);
@@ -271,7 +271,7 @@ public class TestRequestQueueServer extends BasicRequestQueueTest {
     @Test
     public void testRequestReadThrowsOtherException() throws Exception {
 	server = new RequestQueueServer<Request>(
-	    1, 
+	    1,
 	    new DummyRequestHandler() {
 		public Request readRequest(DataInput in) throws IOException {
 		    throw new RuntimeException("Yow!");
