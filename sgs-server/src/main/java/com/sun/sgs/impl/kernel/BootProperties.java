@@ -77,4 +77,11 @@ final class BootProperties {
     static final String EXTENSION_AUTHENTICATORS_PROPERTY =
         "com.sun.sgs.ext.authenticators";
 
+    /**
+     * The property used to specify profile listeners from extension
+     * libraries.
+     */
+    static final String EXTENSION_PROFILE_LISTENERS_PROPERTY =
+        "com.sun.sgs.ext.kernel.profile.listeners";
+
 }
