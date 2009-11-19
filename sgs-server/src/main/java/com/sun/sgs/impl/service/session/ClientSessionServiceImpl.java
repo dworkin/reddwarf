@@ -1672,7 +1672,7 @@ public final class ClientSessionServiceImpl
 	 */
 	public void run() {
 	    String sessionServerKey = getClientSessionServerKey(nodeId);
-	    DataService dataService = getDataService();
+	    DataService dataService = getInstance().getDataService();
 	    try {
 		dataService.removeObject(
 		    dataService.getServiceBinding(sessionServerKey));
@@ -1735,7 +1735,7 @@ public final class ClientSessionServiceImpl
     private static Map<Long, Set<ProtocolDescriptor>>
 	getProtocolDescriptorsMap()
     {
-	DataService dataService = getDataService();
+	DataService dataService = getInstance().getDataService();
 	Map<Long, Set<ProtocolDescriptor>> protocolDescriptorsMap;
 	try {
 	    protocolDescriptorsMap = Objects.uncheckedCast(

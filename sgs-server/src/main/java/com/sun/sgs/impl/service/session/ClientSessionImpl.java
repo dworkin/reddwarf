@@ -780,7 +780,8 @@ public class ClientSessionImpl
      * data service.
      */
     private static EventQueue getEventQueue(byte[] sessionId) {
-	DataService dataService = ClientSessionServiceImpl.getDataService();
+	DataService dataService =
+	    ClientSessionServiceImpl.getInstance().getDataService();
 	String eventQueueKey = getEventQueueKey(sessionId);
 	try {
 	    return (EventQueue) dataService.getServiceBinding(eventQueueKey);
@@ -919,8 +920,11 @@ public class ClientSessionImpl
 				   ClientSessionHandler handler);
 
 	/**
-	 * Returns the cost of this event, which the {@code EventQueue}
-	 * may use to reject events when the total cost is too large.
+	 * Returns the cost of this event, which the {@code EventQueue} may
+	 * use to reject events when the total cost is too large.  The cost
+	 * of the event is the size (in bytes) of a message generated as a
+	 * result of processing the event. <p>
+	 *
 	 * The default implementation returns a cost of zero.
 	 *
 	 * @return the cost of this event
@@ -1132,7 +1136,8 @@ public class ClientSessionImpl
 
 	    boolean success = getQueue().offer(event);
 	    if (success && cost > 0) {
-		ClientSessionServiceImpl.getDataService().markForUpdate(this);
+		ClientSessionServiceImpl.getInstance().
+		    getDataService().markForUpdate(this);
                 writeBufferAvailable -= cost;
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(Level.FINEST,
@@ -1218,7 +1223,7 @@ public class ClientSessionImpl
 
 	    ManagedQueue<SessionEvent> eventQueue = getQueue();
 	    DataService dataService =
-		ClientSessionServiceImpl.getDataService();
+		ClientSessionServiceImpl.getInstance().getDataService();
 	    
 	    for (int i = 0; i < sessionService.eventsPerTxn; i++) {
 		SessionEvent event = eventQueue.poll();
@@ -1259,7 +1264,7 @@ public class ClientSessionImpl
 	public void removingObject() {
 	    try {
 		DataService dataService =
-		    ClientSessionServiceImpl.getDataService();
+		    ClientSessionServiceImpl.getInstance().getDataService();
 		dataService.removeObject(queueRef.get());
 	    } catch (ObjectNotFoundException e) {
 		// already removed.
@@ -1300,7 +1305,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	public void run() {
 	    DataService dataService =
-		ClientSessionServiceImpl.getDataService();
+		ClientSessionServiceImpl.getInstance().getDataService();
 	    // TBD: this could use a BindingKeyedMap.
 	    String key = dataService.nextServiceBoundName(lastKey);
 	    if (key != null && key.startsWith(nodePrefix)) {
@@ -1340,7 +1345,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	public void run() {
 	    DataService dataService =
-		ClientSessionServiceImpl.getDataService();
+		ClientSessionServiceImpl.getInstance().getDataService();
 	    ClientSessionImpl sessionImpl =
 		(ClientSessionImpl) dataService.getServiceBinding(key);
 	    sessionImpl.notifyListenerAndRemoveSession(

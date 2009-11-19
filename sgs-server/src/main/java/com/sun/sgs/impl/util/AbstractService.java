@@ -571,18 +571,14 @@ public abstract class AbstractService implements Service {
     }
     
     /**
-     * Returns the data service relevant to the current context.
+     * Returns the data service.
      *
-     * @return the data service relevant to the current context
+     * @return the data service
      */
-    public static synchronized DataService getDataService() {
-	if (txnProxy == null) {
-	    throw new IllegalStateException("Service not initialized");
-	} else {
-	    return txnProxy.getService(DataService.class);
-	}
+    public DataService getDataService() {
+	return dataService;
     }
-
+    
     /**
      * Returns {@code true} if the specified exception is retryable, and
      * {@code false} otherwise.  A retryable exception is one that

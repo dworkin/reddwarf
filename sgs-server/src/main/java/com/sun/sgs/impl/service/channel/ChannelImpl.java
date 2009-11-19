@@ -252,7 +252,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     
     /** Returns the data service. */
     private static DataService getDataService() {
-	return ChannelServiceImpl.getDataService();
+	return ChannelServiceImpl.getInstance().getDataService();
     }
 
     /**
@@ -356,7 +356,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 
 	Set<BigInteger> channelMembers = null;
 	ChannelServiceImpl channelService =
-	    ChannelServiceImpl.getChannelService();
+	    ChannelServiceImpl.getInstance();
 	
 	if (!servers.isEmpty()) {
 	    channelMembers =
@@ -553,7 +553,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    final long coord = coordNodeId;
 	    final ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
+		ChannelServiceImpl.getInstance();
 	    final BigInteger channelRefId = eventQueue.getChannelRefId();
 	    channelService.getTaskService().scheduleNonDurableTask(
 	        new AbstractKernelRunnable("SendServiceEventQueue") {
@@ -672,7 +672,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 		null;
 	    boolean isChannelMember =
 		senderRefId != null ?
-		ChannelServiceImpl.getChannelService().
+		ChannelServiceImpl.getInstance().
 		    isLocalChannelMember(channelRefId, senderRefId) :
 		true;
 	    addEvent(
@@ -868,7 +868,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	    return false;
 	} else {
 	    if (isCoordinatorReassigned) {
-		ChannelServiceImpl.getDataService().markForUpdate(this);
+	        getDataService().markForUpdate(this);
 		if (delivery.equals(Delivery.RELIABLE)) {
 		    SavedMessageReaper.scheduleNewTask(channelRefId, false);
 		}
@@ -987,7 +987,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	    this.timestamp = timestamp;
 	    this.expiration =
 		System.currentTimeMillis() +
-		ChannelServiceImpl.getChannelService().sessionRelocationTimeout;
+		ChannelServiceImpl.getInstance().sessionRelocationTimeout;
 	}
 
 	/**
@@ -1082,7 +1082,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 
 	private void scheduleTask() {
 	    TaskService taskService = 
-		ChannelServiceImpl.getChannelService().getTaskService();
+		ChannelServiceImpl.getInstance().getTaskService();
 	    if (isDurable) {
 		taskService.scheduleTask(this, 1000L);
 	    } else {
@@ -1193,7 +1193,7 @@ class ChannelImpl implements ManagedObject, Serializable {
      * Returns the channel server for the specified {@code nodeId}.
      */
     private static ChannelServer getChannelServer(long nodeId) {
-	return ChannelServiceImpl.getChannelService().getChannelServer(nodeId);
+	return ChannelServiceImpl.getInstance().getChannelServer(nodeId);
     }
 
     /**
@@ -1506,7 +1506,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 			   HexDumper.toHexString(channel.channelRefId));
 	    }
 	    ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
+		ChannelServiceImpl.getInstance();
 	    DataService dataService = getDataService();
 
 	    /*
@@ -1762,7 +1762,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 
 	    JoinNotifyTask task =
 		new JoinNotifyTask(channel, this, session, sessionRefId);
-	    ChannelServiceImpl.getChannelService().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTask(
 		    channel.channelRefId, task);
 	    return isCompleted();
 	}
@@ -1788,7 +1788,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	NotifyTask(ChannelImpl channel, ChannelEvent channelEvent) {
 	    super(null);
-	    this.channelService = ChannelServiceImpl.getChannelService();
+	    this.channelService = ChannelServiceImpl.getInstance();
 	    this.channelRefId = channel.channelRefId;
 	    this.eventRefId =
 		getDataService().createReference(channelEvent).getId();
@@ -2150,7 +2150,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	
 	    LeaveNotifyTask task =
 		new LeaveNotifyTask(channel, this, session, sessionRefId);
-	    ChannelServiceImpl.getChannelService().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTask(
 		channel.channelRefId, task);
 	    return isCompleted();
 	}
@@ -2253,7 +2253,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	public boolean serviceEvent(ChannelImpl channel) {
 	    assert isProcessing() && !isCompleted();
 	    ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
+		ChannelServiceImpl.getInstance();
 	    if (senderRefId != null) {
 		/*
 		 * Sender is a client, so verify that the sending session
@@ -2305,7 +2305,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	     * channel's servers for delivery.
 	     */
 	    SendNotifyTask task = new SendNotifyTask(channel, this);
-	    ChannelServiceImpl.getChannelService().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTask(
 		channel.channelRefId, task);
 
 	    /*
@@ -2433,7 +2433,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	    assert isProcessing() && !isCompleted();
 	    CloseNotifyTask task =
 		new CloseNotifyTask(channel, removeName);
-	    ChannelServiceImpl.getChannelService().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTask(
 		    channel.channelRefId, task);
 	    return false;
 	}
@@ -2478,7 +2478,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 
 	public void run() {
 	    final ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
+		ChannelServiceImpl.getInstance();
 	    /*
 	     * Send "close" notification to channel's servers.
 	     */ 

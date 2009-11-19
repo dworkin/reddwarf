@@ -1918,8 +1918,9 @@ public final class ChannelServiceImpl
     /**
      * Returns the channel service.
      */
-    static ChannelServiceImpl getChannelService() {
-	return txnProxy.getService(ChannelServiceImpl.class);
+    static synchronized ChannelServiceImpl getInstance() {
+	return (ChannelServiceImpl)
+	    txnProxy.getService(ChannelServiceImpl.class);
     }
     
     /**
@@ -2218,7 +2219,8 @@ public final class ChannelServiceImpl
      */
     static Object getObjectForId(BigInteger refId) {
 	try {
-	    return getDataService().createReferenceForId(refId).get();
+	    return getInstance().getDataService().
+		createReferenceForId(refId).get();
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}

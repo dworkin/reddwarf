@@ -197,7 +197,7 @@ class ChannelWrapper
      * @param	channelRef the new channel reference
      */
     void setChannelRef(ManagedReference<ChannelImpl> channelRef) {
-	ChannelServiceImpl.getDataService().markForUpdate(this);
+	ChannelServiceImpl.getInstance().getDataService().markForUpdate(this);
 	this.channelRef = channelRef;
     }
 
