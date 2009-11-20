@@ -141,6 +141,16 @@ public class WorkloadGeneratorService implements Service {
         setBindings(100, "dummy", size);
         setBindings(bindings, "name", size);
 
+        System.out.println("Calculating uncontended task time");
+        long totalTasks = 10000;
+        long startNanos = System.nanoTime();
+        for (int i = 0; i < totalTasks; i++) {
+            txnScheduler.runTask(new TestTask(), owner);
+        }
+        long endNanos = System.nanoTime();
+        double taskTime = (double) (endNanos - startNanos) / 1000000.0 / totalTasks;
+        System.out.printf("  Task Time: %2.2f%n", taskTime);
+
         // kick off a number of workload generators that should
         // generate tasks with a poisson distribution of interarrival times
         taskScheduler.scheduleTask(new KernelRunnable() {
