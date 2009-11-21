@@ -21,12 +21,18 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.util.WeakIdentityMap;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-
+import com.sun.sgs.impl.util.WeakIdentityMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
-import java.util.*;
-import java.util.logging.*;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Stores information about managed references within a particular transaction.
@@ -34,8 +40,10 @@ import java.util.logging.*;
  */
 final class ReferenceTable {
 
-    private static final LoggerWrapper logger = new LoggerWrapper(Logger.getLogger(ReferenceTable.class.getName()));
+    private static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(ReferenceTable.class.getName()));
 
+    /** Possible ReferenceTable states. */
     private enum State {
         ACTIVE, FLUSHING, CLOSED
     }
@@ -60,9 +68,18 @@ final class ReferenceTable {
     /** Whether to track stale objects. */
     private final boolean trackStaleObjects;
 
+    /** Current state of this object. */
     private State state = State.ACTIVE;
-    private final List<ManagedReferenceImpl<?>> flushQueue = new ArrayList<ManagedReferenceImpl<?>>();
-    private final Collection<ManagedObject> unregisterAfterFlush = new ArrayList<ManagedObject>();
+
+    /** References which are being flushed. */
+    private final List<ManagedReferenceImpl<?>> flushQueue =
+            new ArrayList<ManagedReferenceImpl<?>>();
+
+    /** Managed objects which were unregistered during flushing. */
+    private final Collection<ManagedObject> unregisterAfterFlush =
+            new ArrayList<ManagedObject>();
+
+    /** Cached results of the flush. */
     private FlushInfo flushed;
 
     /**
@@ -191,8 +208,11 @@ final class ReferenceTable {
             beginFlush();
             sizeBefore = flushQueue.size();
             FlushInfo flushInfo = null;
-            // ref.flush() may add more elements to flushQueue, so we must use indexing
-            // instead of foreach (uses Iterator) to avoid ConcurrentModificationException
+            /*
+             * ref.flush() may add more elements to flushQueue, so we must
+             * use indexing instead of foreach (uses Iterator) to avoid
+             * ConcurrentModificationException
+             */
             for (int i = 0; i < flushQueue.size(); i++) {
                 ManagedReferenceImpl<?> ref = flushQueue.get(i);
                 byte[] data = ref.flush();
@@ -206,14 +226,20 @@ final class ReferenceTable {
             flushed = flushInfo;
             return flushInfo;
         } catch (RuntimeException e) {
-            logger.logThrow(Level.WARNING, e, "Failure in flushing objects, flush queue size is " + flushQueue.size()
-                    + " (" + sizeBefore + " existing and " + (flushQueue.size() - sizeBefore) + " new objects)");
+            logger.logThrow(Level.WARNING, e,
+                    "Failure in flushing objects, flush queue size is " +
+                            flushQueue.size() + " (" + sizeBefore +
+                            " existing and " +
+                            (flushQueue.size() - sizeBefore) + " new objects)");
             throw e;
         } finally {
             endFlush();
         }
     }
 
+    /**
+     * Marks the beginning of flushing.
+     */
     private void beginFlush() {
         assert state == State.ACTIVE;
         assert flushQueue.isEmpty();
@@ -222,6 +248,9 @@ final class ReferenceTable {
         flushQueue.addAll(oids.values());
     }
 
+    /**
+     * Marks the end of flushing.
+     */
     private void endFlush() {
         assert state == State.FLUSHING;
         state = State.CLOSED;

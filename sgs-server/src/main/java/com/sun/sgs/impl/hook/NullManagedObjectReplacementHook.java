@@ -19,8 +19,19 @@
 
 package com.sun.sgs.impl.hook;
 
-public class NullManagedObjectReplacementHook implements ManagedObjectReplacementHook {
+/**
+ * ManagedObjectReplacementHook which does nothing.
+ */
+public class NullManagedObjectReplacementHook
+        implements ManagedObjectReplacementHook {
 
+    /**
+     * Returns the parameter unmodified.
+     *
+     * @param object the object.
+     * @param <T>    the type.
+     * @return the same object.
+     */
     public <T> T replaceManagedObject(T object) {
         return object;
     }

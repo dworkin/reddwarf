@@ -19,8 +19,19 @@
 
 package com.sun.sgs.impl.service.data;
 
-public class ReferenceTableUtil {
+/**
+ * Makes it possible to flush the modified objects from outside this package.
+ *
+ * <p>TODO: Refactor the system so that this class will not be needed.
+ */
+public final class ReferenceTableUtil {
 
+    private ReferenceTableUtil() {
+    }
+
+    /**
+     * Flushes the modified objects.
+     */
     public static void flushModifiedObjects() {
         Context context = getActiveContext();
         if (context != null) {

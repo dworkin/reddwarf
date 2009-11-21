@@ -19,9 +19,13 @@
 
 package com.sun.sgs.impl.hook;
 
-public class HookLocator {
+/**
+ * Locates the hooks.
+ */
+public final class HookLocator {
 
-    private static volatile ManagedObjectReplacementHook managedObjectReplacementHook;
+    private static volatile ManagedObjectReplacementHook
+            managedObjectReplacementHook;
     private static volatile SerializationHook serializationHook;
 
     static {
@@ -30,23 +34,51 @@ public class HookLocator {
         setSerializationHook(null);
     }
 
-    public static ManagedObjectReplacementHook getManagedObjectReplacementHook() {
+    private HookLocator() {
+    }
+
+    /**
+     * Returns the ManagedObjectReplacementHook.
+     *
+     * @return the hook.
+     */
+    public static ManagedObjectReplacementHook getManagedObjectReplacementHook(
+    ) {
         return managedObjectReplacementHook;
     }
 
-    public static void setManagedObjectReplacementHook(ManagedObjectReplacementHook managedObjectReplacementHook) {
+    /**
+     * Sets the ManagedObjectReplacementHook.
+     *
+     * @param managedObjectReplacementHook the hook.
+     */
+    public static void setManagedObjectReplacementHook(
+            ManagedObjectReplacementHook managedObjectReplacementHook) {
         if (managedObjectReplacementHook == null) {
-            HookLocator.managedObjectReplacementHook = new NullManagedObjectReplacementHook();
+            HookLocator.managedObjectReplacementHook =
+                    new NullManagedObjectReplacementHook();
         } else {
-            HookLocator.managedObjectReplacementHook = managedObjectReplacementHook;
+            HookLocator.managedObjectReplacementHook =
+                    managedObjectReplacementHook;
         }
     }
 
+    /**
+     * Returns the SerializationHook.
+     *
+     * @return the hook.
+     */
     public static SerializationHook getSerializationHook() {
         return serializationHook;
     }
 
-    public static void setSerializationHook(SerializationHook serializationHook) {
+    /**
+     * Sets the SerializationHook.
+     *
+     * @param serializationHook the hook.
+     */
+    public static void setSerializationHook(
+            SerializationHook serializationHook) {
         if (serializationHook == null) {
             HookLocator.serializationHook = new NullSerializationHook();
         } else {

@@ -19,12 +19,28 @@
 
 package com.sun.sgs.impl.hook;
 
+/**
+ * SerializationHook which does nothing.
+ */
 public class NullSerializationHook implements SerializationHook {
 
+    /**
+     * Returns the parameter unmodified.
+     *
+     * @param topLevelObject the top level object.
+     * @param object         the object.
+     * @return the same object.
+     */
     public Object replaceObject(Object topLevelObject, Object object) {
         return object;
     }
 
+    /**
+     * Returns the parameter unmodified.
+     *
+     * @param object the object.
+     * @return the same object.
+     */
     public Object resolveObject(Object object) {
         return object;
     }

@@ -23,10 +23,10 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.hook.HookLocator;
+import com.sun.sgs.impl.hook.SerializationHook;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
-import com.sun.sgs.impl.hook.*;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -86,11 +86,13 @@ public final class SerialUtil {
      * @return	the object
      * @throws	ObjectIOException if a problem occurs deserializing the object
      */
-    public static Object deserialize(byte[] data, ClassSerialization classSerial) {
+    public static Object deserialize(byte[] data,
+                                     ClassSerialization classSerial) {
 	ObjectInputStream in = null;
 	try {
 	    in = new CustomClassDescriptorObjectInputStream(
-		new CompressByteArrayInputStream(data), classSerial, HookLocator.getSerializationHook());
+		new CompressByteArrayInputStream(data), classSerial,
+                HookLocator.getSerializationHook());
 	    return in.readObject();
 	} catch (ClassNotFoundException e) {
 	    throw new ObjectIOException(
@@ -114,21 +116,24 @@ public final class SerialUtil {
      * Defines an ObjectInputStream whose reading of class descriptors is
      * customized by an instance of ClassSerialization.
      */
-    private static final class CustomClassDescriptorObjectInputStream extends ObjectInputStream {
+    private static final class CustomClassDescriptorObjectInputStream
+            extends ObjectInputStream {
 
         private final ClassSerialization classSerial;
         private final SerializationHook serializationHook;
 
-        CustomClassDescriptorObjectInputStream(InputStream in,
-                                               ClassSerialization classSerial,
-                                               SerializationHook serializationHook) throws IOException {
+        CustomClassDescriptorObjectInputStream(
+                InputStream in,
+                ClassSerialization classSerial,
+                SerializationHook serializationHook) throws IOException {
             super(in);
             this.classSerial = classSerial;
             this.serializationHook = serializationHook;
             enableResolveObject(true);
         }
 
-        protected ObjectStreamClass readClassDescriptor() throws ClassNotFoundException, IOException {
+        protected ObjectStreamClass readClassDescriptor()
+                throws ClassNotFoundException, IOException {
             return classSerial.readClassDescriptor(this);
         }
 
