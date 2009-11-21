@@ -19,14 +19,22 @@
 
 package com.sun.sgs.impl.hook;
 
-import com.sun.sgs.app.*;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.service.DataService;
-import static org.easymock.EasyMock.*;
-import org.junit.*;
-
+import com.sun.sgs.service.data.ManagedObjectReplacementHook;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+import static org.easymock.EasyMock.*;
 
 public class TestHookedDataService extends Assert {
 

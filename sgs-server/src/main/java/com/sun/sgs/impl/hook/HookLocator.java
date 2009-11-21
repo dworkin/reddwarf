@@ -19,6 +19,9 @@
 
 package com.sun.sgs.impl.hook;
 
+import com.sun.sgs.service.data.ManagedObjectReplacementHook;
+import com.sun.sgs.service.data.SerializationHook;
+
 /**
  * Locates the hooks.
  */

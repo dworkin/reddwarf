@@ -17,9 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.hook;
+package com.sun.sgs.service.data;
 
-import com.sun.sgs.impl.service.data.SerialUtil;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
@@ -41,8 +40,8 @@ public interface SerializationHook {
      * hook to replace {@code object} with some other instance, it should return
      * that other instance.
      *
-     * @param topLevelObject the top level managed object being serialized. See 
-     * {@link SerialUtil.CheckReferencesObjectOutputStream#topLevelObject}
+     * @param topLevelObject the top level managed object being serialized. See
+     *                       {@link com.sun.sgs.impl.service.data.SerialUtil.CheckReferencesObjectOutputStream#topLevelObject}
      * @param object         the object to be replaced. See {@link
      *                       ObjectOutputStream#replaceObject(Object)}
      * @return the alternate object that replaced the specified one. See {@link

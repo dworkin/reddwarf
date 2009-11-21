@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.hook;
 
+import com.sun.sgs.service.data.SerializationHook;
+
 /**
  * SerializationHook which does nothing.
  */
