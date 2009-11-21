@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.hook;
+package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.service.data.ManagedObjectReplacementHook;
 

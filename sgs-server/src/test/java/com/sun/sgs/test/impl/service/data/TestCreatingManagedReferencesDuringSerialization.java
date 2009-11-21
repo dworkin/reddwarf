@@ -19,16 +19,22 @@
 
 package com.sun.sgs.test.impl.service.data;
 
-import com.sun.sgs.app.*;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.hook.*;
+import com.sun.sgs.impl.hook.HookLocator;
+import com.sun.sgs.impl.service.data.NullSerializationHook;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.util.*;
-import org.junit.*;
-
+import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.Serializable;
-import java.util.concurrent.atomic.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 public class TestCreatingManagedReferencesDuringSerialization extends Assert {
 
