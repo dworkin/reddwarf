@@ -47,7 +47,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Defines serialization utilities.  This class cannot be instantiated. */
-final class SerialUtil {
+public final class SerialUtil {
 
     /**
      * The first 4 bytes of output streams created by serialization protocol
@@ -86,7 +86,7 @@ final class SerialUtil {
      * @return	the object
      * @throws	ObjectIOException if a problem occurs deserializing the object
      */
-    static Object deserialize(byte[] data, ClassSerialization classSerial) {
+    public static Object deserialize(byte[] data, ClassSerialization classSerial) {
 	ObjectInputStream in = null;
 	try {
 	    in = new CustomClassDescriptorObjectInputStream(
@@ -179,7 +179,7 @@ final class SerialUtil {
      *		and, in particular, if a <code>ManagedObject</code> is
      *		referenced without an intervening <code>ManagedReference</code>
      */
-    static byte[] serialize(ManagedObject object,
+    public static byte[] serialize(ManagedObject object,
 			    ClassSerialization classSerial)
     {
 	ObjectOutputStream out = null;

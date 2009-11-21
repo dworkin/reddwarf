@@ -25,7 +25,7 @@ import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 
 /** Controls how to serialize class descriptors. */
-interface ClassSerialization {
+public interface ClassSerialization {
 
     /**
      * Writes a class descriptor to an object output stream.
