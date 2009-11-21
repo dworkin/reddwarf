@@ -17,11 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.hook;
+package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.impl.hook.HookLocator;
+import com.sun.sgs.impl.service.data.HookedDataService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.data.ManagedObjectReplacementHook;
 import java.lang.reflect.Method;
