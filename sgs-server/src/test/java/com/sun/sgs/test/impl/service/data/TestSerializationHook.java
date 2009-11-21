@@ -20,12 +20,22 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.impl.hook.*;
-import com.sun.sgs.impl.service.data.*;
-import org.junit.*;
+import com.sun.sgs.impl.hook.HookLocator;
+import com.sun.sgs.impl.service.data.ClassSerialization;
+import com.sun.sgs.impl.service.data.NullSerializationHook;
+import com.sun.sgs.impl.service.data.SerialUtil;
+import com.sun.sgs.tools.test.FilteredNameRunner;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamClass;
+import java.io.Serializable;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
-import java.io.*;
-
+@RunWith(FilteredNameRunner.class)
 public class TestSerializationHook extends Assert {
 
     @After

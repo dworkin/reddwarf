@@ -26,6 +26,7 @@ import com.sun.sgs.impl.hook.HookLocator;
 import com.sun.sgs.impl.service.data.HookedDataService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.data.ManagedObjectReplacementHook;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -36,8 +37,10 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import static org.easymock.EasyMock.*;
 
+@RunWith(FilteredNameRunner.class)
 public class TestHookedDataService extends Assert {
 
     private static final Object ORIGINAL = new Object();
