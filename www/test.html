@@ -239,13 +239,7 @@ The Wanderer example has both client and server portions.  The test is
 run with all clients running within a single VM on one machine.  The
 application is either run in single-node mode on another machine, or in
 multi-node mode with the core server and some number of application
-nodes each running on separate machines. <p>
-
-Note that misbehavior in the POM or maybe the Darkstar Maven plugin
-means that system properties specified on the command line for the
-server are ignored if the command is issued from the top level directory
-of the project.  Instead, the call should be made from
-the <tt>request-server</tt> subdirectory.
+nodes each running on separate machines.
 
 <h3>Client command line</h3>
 
@@ -261,7 +255,6 @@ the <tt>request-server</tt> subdirectory.
 <h3>Single-node server command line</h3>
 
 <tt>
-&nbsp;&nbsp;cd request-server<br>
 &nbsp;&nbsp;mvn verify \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Prun-server \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs-server.version=</tt><i>version</i><tt>
@@ -270,7 +263,6 @@ the <tt>request-server</tt> subdirectory.
 
 <h3>Multi-node core server command line</h3>
 <tt>
-&nbsp;&nbsp;cd request-server<br>
 &nbsp;&nbsp;mvn verify \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Prun-server,multi-node-server-core \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs-server.version=</tt><i>version</i><tt>
@@ -280,7 +272,6 @@ the <tt>request-server</tt> subdirectory.
 <h3>Multi-node application node command line</h3>
 
 <tt>
-&nbsp;&nbsp;cd request-server<br>
 &nbsp;&nbsp;mvn verify \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Prun-server,multi-node-server-app \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
