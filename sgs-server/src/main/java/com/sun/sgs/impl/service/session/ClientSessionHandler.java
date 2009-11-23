@@ -119,12 +119,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * preparing this session to relocate to a new node. */
     private MoveAction relocatePrepareCompletionHandler = null;
 
-    /**
-     * If non-null, contains the completion handler for relocating this
-     * session to a new node. */
-    private volatile RelocateCompletionHandler
-	relocateCompletionHandler = null;
-    
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
 
@@ -287,6 +281,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     public void disconnect(RequestCompletionHandler<Void> completionHandler) {
 	RequestCompletionFuture future =
 	    new RequestCompletionFuture(completionHandler);
+	
 	// TBD: should this be allowed to disconnect no matter what?
 	if (!readyForRequests(future)) {
 	    return;
@@ -358,12 +353,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /**
      * Indicates that all parties are done with relocation preparation, and
-     * notifies the client that it is relocating to another node.
+     * notifies the client that it should suspend messages (before
+     * notifying the client to relocate to another node).
      */    
     void setRelocatePreparationComplete() {
 	synchronized (lock) {
 	    if (relocatePrepareCompletionHandler != null) {
-		relocatePrepareCompletionHandler.completed();
+		relocatePrepareCompletionHandler.suspend();
 	    }
 	}
     }
@@ -393,8 +389,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    "session is not logged in",
 		    RequestFailureException.FailureReason.LOGIN_PENDING));
 	    return false;
-	} else if (relocateCompletionHandler != null &&
-		   relocateCompletionHandler.isCompleted()) {
+	} else if (relocatePrepareCompletionHandler != null &&
+		   relocatePrepareCompletionHandler.isCompleted()) {
 	    logger.log(
 		Level.FINE,
 		"request received while session is relocating:{0}", this);
@@ -1251,10 +1247,16 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * {@code ChannelService}) to prepare to relocate the client session.<p>
      *
      * When all {@code ClientSessionStatusListener}s have completed
-     * preparing the client session to relocate, this instance's {@link
-     * MoveAction#completed completed} method is invoked, which, in turn
-     * notifies the associated session's {@link SessionProtocol} to
-     * relocate the client's connection, supplying the new node's
+     * preparing the client session to relocate, this instance's
+     * {@link MoveAction#suspend suspend} method is invoked which
+     * notifies the associated session's {@code SessionProtocol to
+     * suspend sending messages to the server.<p>
+     *
+     * When the suspend operation's {@link SuspendCompletionHandler} is
+     * notified as {@code completed}, that completion handler notifies
+     * this action's {@code completed} method, which, in turn notifies
+     * the associated session's {@link SessionProtocol} to {@code
+     * relocate} the client's connection, supplying the new node's
      * information and the relocation key.
      */
     class MoveAction implements Action, SimpleCompletionHandler {
@@ -1335,7 +1337,43 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    return isCompleted;
 	}
 
-	/** {@inheritDoc} */
+	/**
+	 * Suspends messages to the client before sending the 'relocate'
+	 * notification.   This method is invoked after the session has
+	 * been prepared for relocation.  When message suspension is
+	 * complete, this instance's {@code completed} method is invoked
+	 * to notify the client to relocate.
+	 */
+	public void suspend() {
+	    try {
+		if (!supportsRelocation()) {
+		    logger.log(
+			Level.WARNING,
+			"Disconnecting a non-relocatable session:{0} " +
+			"that was erroneously prepared to relocate", identity);
+		    handleDisconnect(false, true);
+		    return;
+		}
+		((SessionRelocationProtocol) protocol).suspend(
+		    new SuspendCompletionHandler());
+		
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"suspending messages to client session:{0} throws",
+			this); 
+		}
+	    }
+	}
+
+	/** {@inheritDoc} <p>
+	 *
+	 * This method is invoked after the session has been prepared for
+	 * relocation and messages have been suspended from the client
+	 * (i.e., invoked from the {@code SuspendCompletionHandler.completed}
+	 * method).
+	 */
 	public void completed() {
 	    synchronized (this) {
 		assert relocationKey != null;
@@ -1345,36 +1383,49 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		isCompleted = true;
 	    }
 	    
-	    try {
-		Set<ProtocolDescriptor> descriptors =
-		    sessionService.getProtocolDescriptors(newNode.getId());
-		byte[] relocationKey;
-		synchronized (this) {
-		    relocationKey = this.relocationKey;
-		}
-
-		relocateCompletionHandler = new RelocateCompletionHandler();
-		if (!supportsRelocation()) {
-		    logger.log(
-			Level.WARNING,
-			"Disconnecting a non-relocatable session:{0} " +
-			"that was erroneously prepared to relocate", identity);
-		    handleDisconnect(false, true);
-		    return;
-		}
-		((SessionRelocationProtocol) protocol).relocate(
-		    newNode, descriptors, ByteBuffer.wrap(relocationKey),
-		    relocateCompletionHandler);
-		
-	    } catch (Exception e) {
-		// If there is a problem contacting the client,
-		// then disconnect the client session immediately.
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-			Level.WARNING, e,
-			"relocating client session:{0} throws", this);
-		}
+	    final Set<ProtocolDescriptor> descriptors =
+		sessionService.getProtocolDescriptors(newNode.getId());
+	    final byte[] key;
+	    synchronized (this) {
+		key = this.relocationKey;
 	    }
+	    
+	    if (!supportsRelocation()) {
+		logger.log(
+		    Level.WARNING,
+			"Disconnecting a non-relocatable session:{0} " +
+		    "that was erroneously prepared to relocate", identity);
+		handleDisconnect(false, true);
+		return;
+	    }
+
+	    // Add client 'relocate' notification to the task queue to
+	    // ensure that all previous requests sent before the client
+	    // was suspended are processed before relocation.
+	    taskQueue.addTask(
+		new AbstractKernelRunnable("NotifySessionRelocate") {
+		    public void run() {
+			try {
+			    System.err.println("invoking relocate, identity: " +
+					       identity);
+			    ((SessionRelocationProtocol) protocol).relocate(
+ 				newNode, descriptors, ByteBuffer.wrap(key),
+				new RelocateCompletionHandler());
+			} catch (Exception e) {
+			    if (logger.isLoggable(Level.WARNING)) {
+				logger.logThrow(
+				    Level.WARNING, e,
+				    "relocating client session:{0} throws",
+				    this);
+			    }
+			    // If there is a problem with relocation, the
+			    // client session will be cleaned up by one
+			    // of the "monitors" (on the old or new
+			    // node) keeping track of this session's
+			    // relocation, so there is no need to do it
+			    // here.
+			}
+		    } }, identity);
 	}
     }
 
@@ -1392,9 +1443,41 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
+     * A completion handler for notifying the client to suspend messages.
+     * When messages suspension is completed, this handler notifies {@code
+     * MoveAction} that suspension relocation preparation is complete so that
+     * it can send a 'relocate' notification to the client.
+     */
+    private class SuspendCompletionHandler
+	implements RequestCompletionHandler<Void>
+    {
+	private boolean isCompleted = false;
+
+	/** {@inheritDoc} */
+	public synchronized void completed(Future<Void> result) {
+	    synchronized (this) {
+		isCompleted = true;
+	    }
+
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE,
+			   "suspend completed, identity:{0} localNodeId:{1}",
+			   identity, sessionService.getLocalNodeId());
+	    }
+	    if (relocatePrepareCompletionHandler != null) {
+		relocatePrepareCompletionHandler.completed();
+	    }
+	}
+
+	synchronized boolean isCompleted() {
+	    return isCompleted;
+	}
+    }
+    
+    /**
      * A completion handler for notifying the client to relocate.
      */
-    private static class RelocateCompletionHandler
+    private class RelocateCompletionHandler
 	implements RequestCompletionHandler<Void>
     {
 	private boolean isCompleted = false;
@@ -1404,6 +1487,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    // TBD: need to check result for Exception and disconnect if an
 	    // exception is thrown.
 	    isCompleted = true;
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE,
+			   "relocate completed, identity:{0} localNodeId:{1}",
+			   identity, sessionService.getLocalNodeId());
+	    }
 	}
 
 	synchronized boolean isCompleted() {

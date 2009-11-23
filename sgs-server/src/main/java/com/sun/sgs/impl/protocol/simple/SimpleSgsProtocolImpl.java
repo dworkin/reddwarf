@@ -188,6 +188,16 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     protected byte getProtocolVersion() {
 	return PROTOCOL4;
     }
+
+    /**
+     * Returns the associated identity, or {@code null} if the client has
+     * not yet authenticated.
+     *
+     * @return the associated identity, or {@code null}
+     */
+    protected Identity getIdentity() {
+	return identity;
+    }
     
     /* -- Implement SessionProtocol -- */
 

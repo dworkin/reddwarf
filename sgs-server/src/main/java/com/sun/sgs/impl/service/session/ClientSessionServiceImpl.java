@@ -1796,7 +1796,7 @@ public final class ClientSessionServiceImpl
 	    if (sessionHandler != null) {
 		prepareRelocationMap.remove(sessionRefId);
 		logger.log(
-		    Level.FINE, "Disconnecting session:{0} that timed out " +
+		    Level.WARNING, "Disconnecting session:{0} that timed out " +
 		    "relocating from node:{1}", sessionHandler.identity,
 		    localNodeId);
 		sessionHandler.handleDisconnect(false, true);

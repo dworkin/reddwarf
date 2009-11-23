@@ -221,13 +221,20 @@ public class SimpleSgsRelocationProtocolImpl
 	synchronized (lock) {
 	    if (relocationInfo != null) {
 		throw new IllegalStateException("session already relocating");
+	    } else if (suspendCompletionFuture == null ||
+		       !suspendCompletionFuture.isDone())
+	    {
+		throw new IllegalStateException("session is not suspended");
 	    }
-	    relocationInfo =
-		new RelocationInfo(descriptors, relocationKey);
-	    if (suspendCompletionFuture == null) {
-		suspend(completionHandler);
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE,
+			   "relocating, identity:{0} key:{1}", getIdentity(),
+			   HexDumper.toHexString(relocationKey.array()));
 	    }
+	    relocationInfo = new RelocationInfo(descriptors, relocationKey);
 	}
+	
+	relocationInfo.sendRelocateNotification();
     }
     
     /* -- Private methods for sending protocol messages -- */
@@ -327,9 +334,6 @@ public class SimpleSgsRelocationProtocolImpl
 		synchronized (lock) {
 		    if (suspendCompletionFuture != null) {
 			suspendCompletionFuture.done();
-		    }
-		    if (relocationInfo != null) {
-			relocationInfo.sendRelocateNotification();
 		    }
 		}
 		break;
