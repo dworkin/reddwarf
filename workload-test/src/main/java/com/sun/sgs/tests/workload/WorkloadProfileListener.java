@@ -82,10 +82,10 @@ public class WorkloadProfileListener implements ProfileListener {
         }
         this.workloadFile = new File(workloadDirectory, String.valueOf(System.currentTimeMillis()));
         this.output = new PrintWriter(new BufferedWriter(new FileWriter(workloadFile)), true);
-        output.println("Throughput, Latency, Runtime, Ready Count, Successful, " +
+        output.println("Throughput, Latency, Max Latency, Runtime, Ready Count, Successful, " +
                        "Failed, Retried, Retry Percentage, Retries Per Failure, Retries Left" +
                        ", Total, " +
-                       "Throughput, Latency, Runtime, Ready Count, Successful, " +
+                       "Throughput, Latency, Max Latency, Runtime, Ready Count, Successful, " +
                        "Failed, Retried, Retry Percentage, Retries Per Failure, Retries Left");
 
         RecurringTaskHandle handle = taskScheduler.
