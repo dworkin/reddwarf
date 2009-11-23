@@ -74,7 +74,7 @@ public class SimpleServer implements ConnectionListener {
 
     private volatile boolean isRelocating = false;
 
-    private int relocatePort;
+    private volatile int relocatePort;
     
     
     final String TEST_CHANNEL_NAME = "Test Channel";

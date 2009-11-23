@@ -89,7 +89,7 @@ public interface ServerSessionListener {
      * the same server or another server, or its requests may be
      * temporarily suspended.
      *
-     * <p>Once this method is invoked, the associated server session should
+     * <p>Once this method returns, the associated server session should
      * not send any messages to the server until this listener's {@code
      * reconnected} method is invoked. Any messages sent during message
      * suspension and/or server reconnection are not guaranteed to be

@@ -311,6 +311,9 @@ public class SimpleClient implements ServerSession {
         }
     }
 
+    /**
+     * Disconnects the underlying client connection.
+     */
     private void disconnectClientConnection() throws IOException {
 	ClientConnection conn = clientConnection;
 	if (conn != null) {
@@ -318,6 +321,10 @@ public class SimpleClient implements ServerSession {
 	}
     }
 
+    /**
+     * Marks this client as no longer suspended, and invokes the {@code
+     * reconnected} method on the associated {@code SimpleClientListener}.
+     */
     private void notifyReconnected() {
 	synchronized (lock) {
 	    isSuspended = false;
@@ -359,6 +366,7 @@ public class SimpleClient implements ServerSession {
          */
 	private volatile String loginFailureMsg;
 
+	/** The relocation key, or null, if the client is not relocating. */
 	private final byte[] relocateKey;
 
 
@@ -378,6 +386,12 @@ public class SimpleClient implements ServerSession {
 	    relocateKey = null;
 	}
 
+	/**
+	 * Constructs an instance with the specified {@code relocateKey}.
+	 * This constructor is used when the client is relocating its
+	 * connection to a new node.
+	 *
+	 */
 	SimpleClientConnectionListener(byte[] relocateKey) {
 	    this.relocateKey = relocateKey;
 	}
@@ -740,7 +754,7 @@ public class SimpleClient implements ServerSession {
 
 	/**
 	 * Disconnects the existing connection and creates a new connection
-	 * with the specified connectin {@code listener} to the node with
+	 * with the specified connection {@code listener} to the node with
 	 * the specified {@code host} and {@code port}.
 	 *
 	 * @param host the host to connect to
