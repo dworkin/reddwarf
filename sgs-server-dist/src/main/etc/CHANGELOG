@@ -1,7 +1,7 @@
 Version 0.9.12:
 - Added support for client session relocation to client session
   and channel services (issue #12).
-- Fixed issues #172, #175, #176, #192.
+- Fixed issues #172, #175, #176, #192, #201
 
 Version 0.9.11:
 - Introduced application level clock accessible via the watchdog service.
