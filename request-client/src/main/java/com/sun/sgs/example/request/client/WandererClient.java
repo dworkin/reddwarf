@@ -108,7 +108,7 @@ public class WandererClient
 
     /** The application port. */
     private static final int PORT =
-	Integer.getInteger(PREFIX + ".port", 11469);
+	Integer.getInteger(PREFIX + ".port", 62964);
 
     /** The number of clients run by main. */
     private static final int CLIENTS =
@@ -672,8 +672,10 @@ public class WandererClient
 		(failing > 0 ? " failing=" + failing : "") +
 		(disconnected > 0 ? " disconnected=" + disconnected : "") +
 		(logins > 0 ? " login=" + logins : "") +
-		(backlog > 0 ? " backlog=" + (backlog / active) : "") +
-		(throttled > 0 ? " throttle=" + (throttled /active) : "");
+		((backlog > 0 && active > 0)
+		 ? " backlog=" + (backlog / active) : "") +
+		((throttled > 0 && active > 0)
+		 ? " throttle=" + (throttled /active) : "");
 	}
 
 	/** Reset counts for the start of the next reporting period. */

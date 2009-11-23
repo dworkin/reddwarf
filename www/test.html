@@ -245,8 +245,8 @@ nodes each running on separate machines.
 
 <tt>
 &nbsp;&nbsp;mvn process-test-resources \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Ptest-run \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Prun-client \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs-client.version=</tt><i>version</i><tt>
 \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dwanderer.host=</tt><i>server-host</i><tt>
 \<br>
@@ -255,28 +255,28 @@ nodes each running on separate machines.
 <h3>Single-node server command line</h3>
 
 <tt>
-&nbsp;&nbsp;mvn process-test-resources \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Psingle-node-server \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
+&nbsp;&nbsp;mvn verify \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Prun-server \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs-server.version=</tt><i>version</i><tt>
 \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Ddatastore.dir=</tt><i>local-directory</i>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Djvm.args.extra="-Dcom.sun.sgs.impl.service.data.store.DataStoreImpl.directory=</tt><i>local-directory</i>"
 
 <h3>Multi-node core server command line</h3>
 <tt>
-&nbsp;&nbsp;mvn process-test-resources \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Pmulti-node-server-core \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
+&nbsp;&nbsp;mvn verify \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Prun-server,multi-node-server-core \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs-server.version=</tt><i>version</i><tt>
 \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Ddatastore.dir=</tt><i>local-directory</i>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Djvm.args.extra="com.sun.sgs.impl.service.data.store.DataStoreImpl.directory=</tt><i>local-directory</i>"
 
 <h3>Multi-node application node command line</h3>
 
 <tt>
-&nbsp;&nbsp;mvn process-test-resources \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Pmulti-node-server-app \<br>
+&nbsp;&nbsp;mvn verify \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Prun-server,multi-node-server-app \<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
 \<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dcom.sun.sgs.server.host=</tt><i>core-server-host</i>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Djvm.args.extra="-Dcom.sun.sgs.server.host=</tt><i>core-server-host</i>"
 
 <h3>Configuration</h3>
 
@@ -305,11 +305,11 @@ usage.
 
 <h4>Using different databases</h4>
 
-Include <tt>bdb-java</tt> in the value of the <tt>-P</tt> option to use
-BDB Java Edition (JE).  For example:
+Include <tt>je</tt> in the value of the <tt>-P</tt> option to use BDB
+Java Edition (JE).  For example:
 
 <pre>
-  -Psingle-node-server,bdb-java
+  -Prun-server,je
 </pre> <p>
 
 To use different versions of BDB or JE, you need to install them in the

@@ -99,8 +99,8 @@
   </pluginRepositories>
 
   <properties>
-    <sgs-server.version>0.9.9</sgs-server.version>
-    <sgs-client.version>0.9.9</sgs-client.version>
+    <sgs-server.version>0.9.11</sgs-server.version>
+    <sgs-client.version>0.9.11</sgs-client.version>
   </properties>
 
 </project>

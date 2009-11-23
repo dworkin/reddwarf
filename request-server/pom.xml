@@ -41,15 +41,19 @@
 
        mvn verify -Prun-server -Djvm.args.extra="-Dcom.sun.sgs.app.name=NewName"
 
-       When running multiple app nodes on the same machine, the shutdown.port
+       When running multiple app nodes on the same machine, the jmx.port
        property must be different for each app node.  The listen.port must also
        be different:
 
-       mvn verify -Prun-server,multi-node-server-app -Dshutdown.port=1137 -Dlisten.port=11469
-       mvn verify -Prun-server,multi-node-server-app -Dshutdown.port=1136 -Dlisten.port=11470
+       mvn verify -Prun-server,multi-node-server-app \
+		  -Djmx.port=62975 -Dlisten.port=62965
+
+       mvn verify -Prun-server,multi-node-server-app \
+		  -Djmx.port=62976 -Dlisten.port=62966
        ...
 
-       If you wish to use a new Project Darkstar installation, use -DcleanSgsHome=true.
+       If you wish to use a new Project Darkstar installation, use
+       -DcleanSgsHome=true.
     -->
   <profiles>
 
@@ -62,7 +66,7 @@
 	  <plugin>
 	    <groupId>com.projectdarkstar.maven.plugin</groupId>
 	    <artifactId>sgs-maven-plugin</artifactId>
-	    <version>1.0-alpha-3</version>
+	    <version>1.0-beta-1</version>
 	    <executions>
 	      <execution>
 		<id>sgs-run</id>
@@ -117,6 +121,8 @@
       <id>multi-node-server-core</id>
       <properties>
 	<node.type>RequestCore</node.type>
+	<jmx.port>62973</jmx.port>
+	<listen.port>62963</listen.port>
       </properties>
     </profile>
 
@@ -124,8 +130,6 @@
       <id>multi-node-server-app</id>
       <properties>
 	<node.type>RequestApp</node.type>
-	<shutdown.port>1137</shutdown.port>
-	<listen.port>11469</listen.port>
       </properties>
     </profile>
 
@@ -155,12 +159,13 @@
   <properties>
     <jvm.args>-Xmx1g</jvm.args>
     <jvm.args.extra></jvm.args.extra>
-    <logging.properties>${project.build.directory}/test-classes/logging.properties</logging.properties>
-
+    <logging.properties>
+      ${project.build.directory}/test-classes/logging.properties
+    </logging.properties>
     <db.type>db</db.type>
     <node.type>RequestSingle</node.type>
-    <shutdown.port>1138</shutdown.port>
-    <listen.port>11469</listen.port>
+    <jmx.port>62974</jmx.port>
+    <listen.port>62964</listen.port>
     <cleanSgsHome>false</cleanSgsHome>
   </properties>
 
