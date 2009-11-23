@@ -208,7 +208,7 @@ public class SimpleSgsProtocol {
      * Suspend messages notification. Server to client notification.
      * <br>
      * Opcode: {@code 0x14} <br>
-     * Payload: (none)
+     * Payload: (none) <p>
      *
      * This message notifies a client to suspend sending messages to the
      * server until it receives further instruction (such as {@link
@@ -229,7 +229,7 @@ public class SimpleSgsProtocol {
      * server notification. 
      * <br>
      * Opcode: {@code 0x15} <br>
-     * Payload: (none)
+     * Payload: (none) <p>
      *
      * This message notifies the server that the client has received the
      * {@link #SUSPEND_MESSAGES} notification.  Any messages received by the
@@ -245,7 +245,7 @@ public class SimpleSgsProtocol {
      * Resume messages notification. Server to client notification. 
      * <br>
      * Opcode: {@code 0x16} <br>
-     * Payload: (none)
+     * Payload: (none) <p>
      *
      * This message notifies the client that it can resume sending messages
      * to the server. <p>
