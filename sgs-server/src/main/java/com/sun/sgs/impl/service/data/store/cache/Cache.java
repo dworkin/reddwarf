@@ -398,9 +398,14 @@ class Cache {
 	/** Sets remainingObjects and remainingBindings. */
 	private void computeBatch() {
 	    double total = (double) (cacheSize - available());
-	    remainingObjects = (int) (batchSize * (objectCount.get() / total));
-	    remainingBindings =
-		(int) (batchSize * (bindingCount.get() / total));
+	    /*
+	     * Compute the ceiling to insure that, if there are any objects or
+	     * bindings left, that each batch includes at least one of them.
+	     */
+	    remainingObjects = (int) Math.ceil(
+		batchSize * (objectCount.get() / total));
+	    remainingBindings = (int) Math.ceil(
+		batchSize * (bindingCount.get() / total));
 	}
 
 	@Override

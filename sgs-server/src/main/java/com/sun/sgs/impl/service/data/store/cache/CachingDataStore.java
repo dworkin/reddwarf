@@ -1024,7 +1024,9 @@ public final class CachingDataStore extends AbstractDataStore
 			context.noteAccess(entry);
 			result = new BindingValue(entry.getValue(), null);
 			break;
-		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+		    } else if (!assureNextEntry(entry, nameKey, true, lock,
+						stop))
+		    {
 			/* Entry is no longer for next name -- try again */
 			continue;
 		    } else if (entry.getKnownUnbound(nameKey)) {
@@ -1148,7 +1150,9 @@ public final class CachingDataStore extends AbstractDataStore
 			    result = new BindingValue(1, null);
 			    break;
 			}
-		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+		    } else if (!assureNextEntry(entry, nameKey, true, lock,
+						stop))
+		    {
 			/* Entry is no longer for next name -- try again */
 			continue;
 		    } else if (entry.getKnownUnbound(nameKey)) {
@@ -1189,7 +1193,7 @@ public final class CachingDataStore extends AbstractDataStore
 	    synchronized (lock) {
 		entry = cache.getBindingEntry(entryKey);
 		if (entry == null ||
-		    !assureNextEntry(entry, nameKey, lock, stop))
+		    !assureNextEntry(entry, nameKey, true, lock, stop))
 		{
 		    /* Next entry changed -- try again */
 		    continue;
@@ -1510,7 +1514,9 @@ public final class CachingDataStore extends AbstractDataStore
 			    nameWritable = entry.getWritable();
 			    /* Fall through to work on next entry */
 			}
-		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+		    } else if (!assureNextEntry(entry, nameKey, true, lock,
+						stop))
+		    {
 			/* Entry is no longer for next name -- try again */
 			continue;
 		    } else if (entry.getKnownUnbound(nameKey)) {
@@ -1677,7 +1683,8 @@ public final class CachingDataStore extends AbstractDataStore
 			   entry.getWritable())
 		{
 		    /* Both name and next name were writable -- fall through */
-		} else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+		} else if (!assureNextEntry(entry, nameKey, false, lock, stop))
+		{
 		    /* Don't have the next entry -- try again */
 		    return null;
 		} else {
@@ -1699,7 +1706,7 @@ public final class CachingDataStore extends AbstractDataStore
 	synchronized (lock) {
 	    entry = cache.getBindingEntry(nextKey);
 	    if (entry == null ||
-		!assureNextEntry(entry, nameKey, lock, stop) ||
+		!assureNextEntry(entry, nameKey, false, lock, stop) ||
 		!entry.getWritable())
 	    {
 		return null;
@@ -1763,7 +1770,9 @@ public final class CachingDataStore extends AbstractDataStore
 			} else {
 			    /* Fall through to call server */
 			}
-		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+		    } else if (!assureNextEntry(entry, nameKey, false, lock,
+						stop))
+		    {
 			/* The entry is not in the cache -- try again */
 			continue;
 		    } else if (entry.getIsNextEntry(nameKey)) {
@@ -2264,7 +2273,9 @@ public final class CachingDataStore extends AbstractDataStore
 		synchronized (lock) {
 		    if (nameKey.equals(entry.key)) {
 			entry.awaitNotPendingPrevious(lock, stop);
-		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+		    } else if (!assureNextEntry(entry, nameKey, true, lock,
+						stop))
+		    {
 			/* Not next entry -- try again */
 			continue;
 		    } else if (!entry.getIsNextEntry(nameKey)) {
@@ -2418,7 +2429,9 @@ public final class CachingDataStore extends AbstractDataStore
 			    /* Already being evicted */
 			    return;
 			}
-		    } else if (!assureNextEntry(entry, nameKey, lock, stop)) {
+		    } else if (!assureNextEntry(entry, nameKey, true, lock,
+						stop))
+		    {
 			/* Not the next entry -- try again */
 			continue;
 		    } else if (!entry.getIsNextEntry(nameKey)) {
@@ -2714,12 +2727,14 @@ public final class CachingDataStore extends AbstractDataStore
 
     /**
      * Make sure that the entry is not the next entry for a pending operation,
-     * and that it is indeed the next entry in the cache after the specified
-     * key.
+     * that it is indeed the next entry in the cache higher than, and possibly
+     * including, the specified key, and wait for it to be readable.
      *
      * @param	entry the entry
      * @param	previousKey the key for which {@code entry} should be the next
      *		entry in the cache
+     * @param	includeEquals whether to check the cache for an entry that
+     *		equals {@code previousKey}
      * @param	lock the object to use when waiting for notifications
      * @param	stop the time in milliseconds when waiting should fail
      * @return	{@code true} if {@code entry} is the next entry present in the
@@ -2729,20 +2744,24 @@ public final class CachingDataStore extends AbstractDataStore
      */
     private boolean assureNextEntry(BindingCacheEntry entry,
 				    BindingKey previousKey,
+				    boolean includeEquals,
 				    Object lock,
 				    long stop)
     {
 	assert Thread.holdsLock(lock);
 	entry.awaitNotPendingPrevious(lock, stop);
-	if (cache.getHigherBindingEntry(previousKey) != entry) {
+	BindingCacheEntry check =
+	    includeEquals ? cache.getCeilingBindingEntry(previousKey)
+	    : cache.getHigherBindingEntry(previousKey);
+	if (check != entry) {
 	    /*
 	     * Another entry was inserted in the time between when we got this
 	     * entry and when we locked it -- try again
 	     */
 	    return false;
 	} else {
-	    /* Check that entry is readable */
-	    return entry.getReadable();
+	    /* Wait for the entry to be readable */
+	    return entry.awaitReadable(lock, stop);
 	}
     }
 
@@ -3169,7 +3188,8 @@ public final class CachingDataStore extends AbstractDataStore
 			context.noteCachedBinding(
 			    nameKey, nameOid, nameForWrite, reserve);
 		    } else {
-			assert !entry.getPendingPrevious();
+			assert !entry.getPendingPrevious()
+			    : "Entry should not be pending previous: " + entry;
 			context.noteAccess(entry);
 			if (nameForWrite && !entry.getWritable()) {
 			    entry.setUpgradedImmediate(lock);

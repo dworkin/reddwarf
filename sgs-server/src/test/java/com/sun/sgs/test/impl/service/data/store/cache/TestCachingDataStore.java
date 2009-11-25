@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data.store.cache;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
@@ -156,25 +157,77 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 	try {
 	    /* Create objects and bindings */
 	    for (int i = 0; i < 2000; i++) {
-		txn = createTransaction();
-		id = store.createObject(txn);
-		store.setObject(txn, id, new byte[] { 0 });
-		store.setBinding(txn, String.valueOf(i), id);
-		txn.commit();
-		txn = null;
+		for (int j = 0; true; j++) {
+		    assertTrue("Too many iterations: " + j, j < 10);
+		    txn = createTransaction();
+		    try {
+			id = store.createObject(txn);
+			store.setObject(txn, id, new byte[] { 0 });
+			store.setBinding(txn, String.valueOf(i), id);
+			txn.commit();
+			txn = null;
+			break;
+		    } catch (RuntimeException e) {
+			if (!(e instanceof ExceptionRetryStatus) ||
+			    !((ExceptionRetryStatus) e).shouldRetry())
+			{
+			    throw e;
+			} else if (!txn.isAborted()) {
+			    txn.abort(e);
+			}
+		    }
+		}
 	    }
 	    /* Access objects and bindings */
 	    for (int repeat = 0; repeat < 3; repeat++) {
 		for (int i = 0; i < 2000; i++) {
-		    txn = createTransaction();
-		    id = store.getBinding(txn, String.valueOf(i));
-		    boolean forUpdate = (i % 2 == 0);
-		    store.getObject(txn, id, forUpdate);
-		    if (forUpdate) {
-			store.setObject(txn, id, new byte[] { (byte) i });
+		    for (int j = 0; true; j++) {
+			assertTrue("Too many iterations: " + j, j < 10);
+			txn = createTransaction();
+			try {
+			    id = store.getBinding(txn, String.valueOf(i));
+			    boolean forUpdate = (i % 2 == 0);
+			    store.getObject(txn, id, forUpdate);
+			    if (forUpdate) {
+				store.setObject(
+				    txn, id, new byte[] { (byte) i });
+			    }
+			    txn.commit();
+			    txn = null;
+			    break;
+			} catch (RuntimeException e) {
+			    if (!(e instanceof ExceptionRetryStatus) ||
+				!((ExceptionRetryStatus) e).shouldRetry())
+			    {
+				throw e;
+			    } else if (!txn.isAborted()) {
+				txn.abort(e);
+			    }
+			}
 		    }
-		    txn.commit();
-		    txn = null;
+		}
+	    }
+	    /* Clean up */
+	    for (int i = 0; i < 2000; i++) {
+		for (int j = 0; true; j++) {
+		    assertTrue("Too many iterations: " + j, j < 10);
+		    txn = createTransaction();
+		    try {
+			id = store.getBinding(txn, String.valueOf(i));
+			store.removeObject(txn, id);
+			store.removeBinding(txn, String.valueOf(i));
+			txn.commit();
+			txn = null;
+			break;
+		    } catch (RuntimeException e) {
+			if (!(e instanceof ExceptionRetryStatus) ||
+			    !((ExceptionRetryStatus) e).shouldRetry())
+			{
+			    throw e;
+			} else if (!txn.isAborted()) {
+			    txn.abort(e);
+			}
+		    }
 		}
 	    }
 	} finally {
