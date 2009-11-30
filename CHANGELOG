@@ -1,3 +1,6 @@
+Version 0.9.12
+ - Included missing test files testCallbacks.h and README.txt in distribution
+
 Version 0.9.11
  - Changed the channel name from a wchar_t* to a char*
 
