@@ -40,7 +40,7 @@ dist:
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs/private
 	-cp sgs/private/*.h $(TOPDIR)/target/$(DIST_DIR)/sgs/private
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/test
-	-cp test/GNUmakefile test/*.c test/*.mak \
+	-cp test/GNUmakefile test/*.c test/*.mak test/*.h test/*.txt \
 	    $(TOPDIR)/target/$(DIST_DIR)/test
 	-cd $(TOPDIR)/target; zip -r $(DIST_FILE) $(DIST_DIR)
 
