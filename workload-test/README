@@ -1,0 +1,30 @@
+WorkloadGeneratorService
+
+This service is designed to generate a steady load of work
+in the form of transactional tasks submitted to the
+TransactionScheduler.  Upon startup, the service initiates a set
+of self-replicating task generators that submit tasks to the
+TransactionScheduler with an exponential distribution of interarrival
+times.  The result is a standard "Poisson" distribution of events that
+simulates a realistic workload of tasks.
+
+
+See the javadoc of WorkloadGeneratorService for more details.  This project
+also comes with a custom Profiler that is enabled by default and that
+prints out statistics to the console and also to a file once every 5 seconds.
+In order to run the default configuration:
+
+mvn clean verify -Prun-server
+
+In order to run the server using BDB JE and with a different version of PDS:
+
+mvn clean verify -Prun-server,je -Dsgs-server.version=0.9.12-SNAPSHOT
+
+A number of configuration properties are available to customize the runtime of
+the service.  For example, in order to change the number of task generators and
+the number of objects that are accessed for write in each transaction (default is 2):
+
+mvn clean verify -Prun-server -Djvm.args.extra="-Dcom.sun.sgs.tests.workload.generators=500 \
+ -Dcom.sun.sgs.tests.workload.writes=0"
+
+See the javadocs for additional configuration options.
