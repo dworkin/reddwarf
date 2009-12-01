@@ -450,7 +450,10 @@ public class LockManager<K> {
 		    } finally {
 			assert Lock.noteUnsync(this, key);
 		    }
-		    if (isOwner) {
+		    if (conflict != null &&
+                        conflict.getType() == LockConflictType.DEADLOCK) {
+                        break;
+                    } else if (isOwner) {
 			locker.setWaitingFor(null);
 			locker.clearConflict();
 			if (logger.isLoggable(FINER)) {
