@@ -24,7 +24,7 @@
 package com.sun.sgs.protocol;
 
 /**
- * An exception indiating that processing a request has failed, and
+ * An exception indicating that processing a request has failed, and
  * therefore that request has been dropped.  The {@link
  * Throwable#getMessage getMessage} method returns a detail message
  * containing an explanation for the failure (possibly {@code

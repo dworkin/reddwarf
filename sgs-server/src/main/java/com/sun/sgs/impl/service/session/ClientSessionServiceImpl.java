@@ -146,6 +146,22 @@ import javax.management.JMException;
  * specify the fully qualified name of a non-abstract class that implements
  * {@link ProtocolAcceptor}.<p>
  * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #RELOCATION_KEY_LENGTH_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_RELOCATION_KEY_LENGTH}
+ *
+ * <dd style="padding-top: .5em">Specifies the length, in bytes, of a
+ *	relocation key.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #RELOCATION_TIMEOUT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_RELOCATION_TIMEOUT}
+ *
+ * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
+ *	for client session relocation.<p>
+ * 
  * </dl> <p>
  */
 public final class ClientSessionServiceImpl

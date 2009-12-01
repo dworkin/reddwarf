@@ -29,6 +29,8 @@ package com.sun.sgs.service;
  *
  * @see ClientSessionStatusListener#prepareToRelocate(
  *		BigInteger,long,SimpleCompletionHandler)
+ * @see IdentityRelocationListener#prepareToRelocate(
+ *		Identity,long,SimpleCompletionHandler)
  * @see RecoveryListener#recover(Node,SimpleCompletionHandler)
  */
 public interface SimpleCompletionHandler {

@@ -73,26 +73,8 @@ public interface SessionRelocationProtocol extends SessionProtocol {
     void resume() throws IOException;
     
     /**
-     * Notifies the associated client to first suspend sending messages to
-     * the server, notify the {@code completionHandler} when messages have
-     * been suspended, and <i>then</i> relocate its session to the node
-     * specified by the {@code descriptors} using the given relocation key.
-     * Messages received by the {@link SessionProtocolHandler} will be
-     * received and processed until the {@code completionHandler}'s {@link
-     * RequestCompletionHandler#completed completed} method is invoked.  If
-     * messages are not suspended in a timely fashion (i.e, the {@code
-     * completionHandler} is not notified), then the server may disconnect
-     * this session.<p>
-     *
-     * Note: If the session is relocated to the new node before the client
-     * has stopped sending messages and notified the {@code
-     * completionHandler}, messages sent to the server may either get
-     * dropped if the node fails, or messages may be processed out of order
-     * on the old and new nodes. <p>
-     *
-     * Only session messages that have their completion handlers notified
-     * before the specified {@code completionHandler} is notified are
-     * guaranteed to be processed by the server. <p>
+     * Notifies the associated client to relocate its session to the node
+     * specified by the {@code descriptors} using the given relocation key.<p>
      *
      * The associated client session can be reestablished on the new node
      * by notifying the {@link ProtocolListener} of this protocol's
@@ -110,8 +92,8 @@ public interface SessionRelocationProtocol extends SessionProtocol {
      * @param	descriptors protocol descriptors for {@code newNode}
      * @param	relocationKey the key to be supplied to the new node
      * @param	completionHandler a completion handler
-     * @throws	IllegalStateException if the associated session is already
-     *		relocating 
+     * @throws	IllegalStateException if the associated session is not
+     *		suspended or is already relocating 
      * @throws	IOException if an I/O error occurs
      */
     void relocate(Node newNode,

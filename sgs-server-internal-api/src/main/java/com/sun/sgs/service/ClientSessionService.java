@@ -53,8 +53,10 @@ public interface ClientSessionService extends Service {
      * ManagedReference#getId getId} on a {@link ManagedReference} to the
      * associated {@code ClientSession}.
      *
-     * <p>This method is non-transactional and should be called
-     * outside of a transaction.
+     * <p>This method is non-transactional.  However, the method may be
+     * invoked inside or outside of a transaction.  The {@code
+     * SessionProtocol} returned from this method is used to communicate
+     * with a client, so it should only be used outside of a transaction.
      *
      * @param	sessionRefId a client session ID, as a {@code BigInteger}
      * @return	a protocol, or {@code null}
