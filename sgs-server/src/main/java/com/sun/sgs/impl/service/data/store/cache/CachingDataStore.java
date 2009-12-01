@@ -724,6 +724,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    continue;
 		case READABLE:
 		    /* Upgrade */
+		    context.noteAccess(entry);
 		    entry.setFetchingUpgrade(lock);
 		    scheduleFetch(new UpgradeObjectRunnable(context, oid));
 		    AwaitWritableResult result =
@@ -732,6 +733,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    return;
 		case WRITABLE:
 		    /* Already cached for write */
+		    context.noteAccess(entry);
 		    return;
 		default:
 		    throw new AssertionError();
@@ -811,6 +813,7 @@ public final class CachingDataStore extends AbstractDataStore
 			    continue;
 			case READABLE:
 			    /* Upgrade */
+			    context.noteAccess(entry);
 			    entry.setFetchingUpgrade(lock);
 			    scheduleFetch(
 				new UpgradeObjectRunnable(context, oid));
@@ -820,6 +823,7 @@ public final class CachingDataStore extends AbstractDataStore
 			    break;
 			case WRITABLE:
 			    /* Already cached for write */
+			    context.noteAccess(entry);
 			    break;
 			default:
 			    throw new AssertionError();
@@ -930,6 +934,7 @@ public final class CachingDataStore extends AbstractDataStore
 			continue;
 		    case READABLE:
 			/* Upgrade */
+			context.noteAccess(entry);
 			entry.setFetchingUpgrade(lock);
 			scheduleFetch(new UpgradeObjectRunnable(context, oid));
 			AwaitWritableResult result =
@@ -938,6 +943,7 @@ public final class CachingDataStore extends AbstractDataStore
 			break;
 		    case WRITABLE:
 			/* Already cached for write */
+			context.noteAccess(entry);
 			break;
 		    default:
 			throw new AssertionError();

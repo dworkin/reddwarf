@@ -575,6 +575,14 @@ public class TestDataStoreImpl extends Assert {
 
     /* -- Unusual states -- */
     private final Action setObject = new Action() {
+	void setUp() throws Exception {
+	    store.setObject(txn, id, new byte[] { 0 });
+	    long id2 = store.createObject(txn);
+	    store.setObject(txn, id2, new byte[] { 0 });
+	    txn.commit();
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
+	    store.getObject(txn, id2, false);	    
+	}
 	void run() { store.setObject(txn, id, new byte[] { 0 }); }
     };
     @Test
@@ -716,6 +724,14 @@ public class TestDataStoreImpl extends Assert {
 
     /* -- Unusual states -- */
     private final Action setObjects = new Action() {
+	void setUp() throws Exception {
+	    store.setObject(txn, id, new byte[] { 0 });
+	    long id2 = store.createObject(txn);
+	    store.setObject(txn, id2, new byte[] { 0 });
+	    txn.commit();
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
+	    store.getObject(txn, id2, false);	    
+	}
 	void run() {
 	    store.setObjects(txn, new long[] { id }, new byte[][] { { 0 } });
 	}

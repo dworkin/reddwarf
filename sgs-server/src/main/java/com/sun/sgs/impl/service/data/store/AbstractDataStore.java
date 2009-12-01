@@ -180,6 +180,7 @@ public abstract class AbstractDataStore
 	Throwable exception;
 	try {
 	    long result = createObjectInternal(txn);
+	    reportObjectAccess(txn, result, WRITE);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "createObject nodeId:" + nodeId + ", txn:" + txn +
@@ -1084,7 +1085,7 @@ public abstract class AbstractDataStore
     public void prepareAndCommit(Transaction txn) {
 	if (logger.isLoggable(FINER)) {
 	    logger.log(FINER,
-		       "prepareAndCommit nodeId:" + nodeId + ", txn:", txn);
+		       "prepareAndCommit nodeId:" + nodeId + ", txn:" + txn);
 	}
 	Throwable exception;
 	try {

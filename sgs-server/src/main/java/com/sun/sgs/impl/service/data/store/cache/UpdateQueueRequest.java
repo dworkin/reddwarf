@@ -151,6 +151,8 @@ abstract class UpdateQueueRequest implements Request {
 
     /** Represents a call to {@link UpdateQueue#commit}. */
     static class Commit extends UpdateQueueRequest {
+	/** The context ID of the associated transaction, or -1 if unknown. */
+	private final long contextId;
 	private final long[] oids;
 	private final byte[][] oidValues;
 	private final int newOids;
@@ -158,7 +160,8 @@ abstract class UpdateQueueRequest implements Request {
 	private final long[] nameValues;
 	private final int newNames;
 
-	Commit(long[] oids,
+	Commit(long contextId,
+	       long[] oids,
 	       byte[][] oidValues,
 	       int newOids,
 	       String[] names,
@@ -167,6 +170,7 @@ abstract class UpdateQueueRequest implements Request {
 	       CompletionHandler completionHandler)
 	{
 	    super(completionHandler);
+	    this.contextId = contextId;
 	    this.oids = oids;
 	    this.oidValues = oidValues;
 	    this.newOids = newOids;
@@ -176,6 +180,7 @@ abstract class UpdateQueueRequest implements Request {
 	}
 
 	Commit(DataInput in) throws IOException {
+	    contextId = -1;
 	    oids = readLongs(in);
 	    oidValues = readByteArrays(in);
 	    newOids = in.readInt();
@@ -187,6 +192,7 @@ abstract class UpdateQueueRequest implements Request {
 	@Override
 	public String toString() {
 	    return "Commit[" +
+		(contextId != -1 ? "contextId:" + contextId + ", " : "") +
 		"oids:" + Arrays.toString(oids) +
 		", newOids:" + newOids +
 		", names:" + Arrays.toString(names) +

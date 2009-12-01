@@ -642,7 +642,7 @@ public final class RequestQueueClient extends Thread {
 				    "RequestQueueClient nodeId:" + nodeId +
 				    " received reply" +
 				    " requestNumber:" + holder.requestNumber +
-				    "failed");
+				    " failed");
 			    }
 			    setException(requestException);
 			    return;

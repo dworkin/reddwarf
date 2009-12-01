@@ -209,7 +209,8 @@ class UpdateQueue {
 	pendingAcknowledgeSet.add(contextId);
 	txnFinished(contextId);
 	queue.addRequest(
-	    new Commit(oids, oidValues, newOids, names, nameValues, newNames,
+	    new Commit(contextId, oids, oidValues, newOids, names, nameValues,
+		       newNames,
 		       new CompletionHandler() {
 			   @Override
 			   public void completed() {
@@ -308,21 +309,26 @@ class UpdateQueue {
     /**
      * Returns the context ID of the oldest transaction which has not finished,
      * or whose commit request has been sent to the server but not yet
-     * acknowledged, or {@link Long#MIN_VALUE Long.MIN_VALUE} if there are no
+     * acknowledged, or {@link Long#MAX_VALUE Long.MAX_VALUE} if there are no
      * pending transactions
      *
-     * @return	the lowest pending context ID or {@code Long.MIN_VALUE}
+     * @return	the lowest pending context ID or {@code Long.MAX_VALUE}
      */
     long lowestPendingContextId() {
+	long result;
 	try {
-	    return pendingAcknowledgeSet.first();
+	    result = pendingAcknowledgeSet.first();
 	} catch (NoSuchElementException e) {
+	    result = Long.MAX_VALUE;
 	}
 	try {
-	    return pendingSubmitMap.firstKey();
+	    long firstPendingSubmit = pendingSubmitMap.firstKey();
+	    if (firstPendingSubmit < result) {
+		result = firstPendingSubmit;
+	    }
 	} catch (NoSuchElementException e) {
-	    return Long.MIN_VALUE;
 	}
+	return result;
     }
 
     /* -- Private methods -- */
