@@ -25,8 +25,35 @@ import java.math.BigInteger;
 import java.rmi.Remote;
 
 /**
- * A remote interface for communicating between peer channel service
- * implementation.
+ * A remote interface for communicating channel events and other
+ * channel-related requests between peer channel services. <p>
+ *
+ * Each channel event (join, leave, send, close) is assigned a "timestamp"
+ * when the event is added to the channel's event queue.  A timestamp for a
+ * given channel is a sequence number that starts at 1, and is incremented
+ * <i>only</i> when adding a send event to the channel's event queue.
+ * Join, leave, and send requests may share the same timestamp.  For
+ * example, if a send event at a timestamp <code><i>t</i></code> is
+ * followed by a series of join and leave events, the join and leave events
+ * will all have the same timestamp, <code><i>t</i></code>.  The next send
+ * event for the channel will increment the timestamp to the next value,
+ * <code><i>t + 1</i></code>.<p>
+ *
+ * If a session becomes a channel member at a given timestamp
+ * <code><i>t</i></code>, then it should receive all channel messages
+ * greater than that timestamp, i.e., with timestamp <code><i>t +
+ * 1</i></code>.  If a session leaves a channel at a given timestamp
+ * <code><i>t</i></code>, the session should receive channel messages up to
+ * timestamp <code><i>t</i></code>, but should not receive channel messages
+ * greater than that timestamp .<p>
+ *
+ * A channel server that receives a channel event notification (for delivery to
+ * a client session) uses the event's timestamp to determine whether the event
+ * needs to be delivered to a local session.  The timestamp is used to
+ * determine duplicate events (in the case of coordinator recovery), and if
+ * a client session relocates, the session's current timestamp for a
+ * channel can be used to determine whether the session missed any channel
+ * messages while relocating.
  */
 public interface ChannelServer extends Remote {
 
@@ -149,7 +176,7 @@ public interface ChannelServer extends Remote {
      * session on the local node is now joined to each channel.  When the
      * cache and persistent membership information is updated, the {@link
      * #relocateChannelMembershipsCompleted relocateChannelMembershipsCompleted}
-     * method should * be invoked on the old node's {@code ChannelServer} with
+     * method should be invoked on the old node's {@code ChannelServer} with
      * the specified {@code sessionRefId} and the new node's ID.
      *
      * @param	sessionRefId the ID of a client session relocating to the
@@ -180,7 +207,7 @@ public interface ChannelServer extends Remote {
      * relocateChannelMemberships} on the new node's channel server is
      * complete. This channel server should clean up any remaining
      * persistent channel membership information for the session on the old
-     * node (i.e., the local node).  any
+     * node (i.e., the local node).
      *
      * @param	sessionRefId the ID of a relocating client session
      * @param	newNodeId ID of the node the session is relocating to

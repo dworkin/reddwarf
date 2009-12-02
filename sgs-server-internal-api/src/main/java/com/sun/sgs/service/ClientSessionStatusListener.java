@@ -25,8 +25,6 @@ package com.sun.sgs.service;
 
 import java.math.BigInteger;
 
-import com.sun.sgs.app.ClientSession;
-
 /**
  * A listener that services may register with the {@link ClientSessionService}
  * to receive notification of local client session status changes such as

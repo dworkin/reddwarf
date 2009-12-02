@@ -33,9 +33,9 @@ import java.math.BigInteger;
 public interface ClientSessionService extends Service {
 
     /**
-     * Registers the specified status listener with this service.  This
-     * method is non-transactional and should be called outside of a
-     * transaction.
+     * Adds the specified status listener to be notified when a local
+     * session disconnects or is being prepared to relocate.  This method
+     * is non-transactional and should be called outside of a transaction.
      *
      * @param   listener a listener to notify when a session disconnects or
      *		is being prepared to relocate

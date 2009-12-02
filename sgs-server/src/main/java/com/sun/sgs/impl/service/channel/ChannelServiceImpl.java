@@ -700,7 +700,7 @@ public final class ChannelServiceImpl
 		    // channels.  Channel messages for ordered-unreliable
 		    // channels are not send to channel servers more than
 		    // once.
-		    if (channelInfo.delivery.equals(Delivery.RELIABLE) &&
+		    if (isReliable(channelInfo.delivery) &&
 			timestamp <= channelInfo.msgTimestamp)
 		    {
 			// Reliable messages may be retransmitted on
@@ -1033,7 +1033,6 @@ public final class ChannelServiceImpl
 		isRelocating, localNodeId);
 	}
 	// Update channel's local membership set.
-	boolean addedChannelInfo = false;
 	LocalChannelInfo channelInfo =
 	    localChannelMembersMap.get(channelRefId);
 	if (channelInfo == null) {
@@ -1052,7 +1051,6 @@ public final class ChannelServiceImpl
 		channelInfo = localChannelMembersMap.
 		    putIfAbsent(channelRefId, newChannelInfo);
 		if (channelInfo == null) {
-		    addedChannelInfo = true;
 		    channelInfo = newChannelInfo;
 		    if (isRelocating) {
 			// If the relocating session establishes the
@@ -1108,7 +1106,7 @@ public final class ChannelServiceImpl
 	     * TBD: (performance) Cache saved messages at the local node?
 	     */
 	  synchronized (channelInfo) {
-	    if (delivery.equals(Delivery.RELIABLE) &&
+	    if (isReliable(delivery) &&
 		channelInfo.msgTimestamp > timestamp)
 	    {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -1958,6 +1956,16 @@ public final class ChannelServiceImpl
 	return txnProxy.getService(DataService.class).getLocalNodeId();
     }
 
+    /**
+     * Returns {@code true} if this specified {@code delivery} guarantee
+     * supports reliable message delivery, otherwise returns {@code false}.
+     */
+    private static boolean isReliable(Delivery delivery) {
+	return
+	    delivery.equals(Delivery.RELIABLE) ||
+	    delivery.equals(Delivery.UNORDERED_RELIABLE);
+    }
+    
     /**
      * Obtains the lock associated with the specified {@code sessionRefId}.
      * If the lock is not currently available, this method waits until the

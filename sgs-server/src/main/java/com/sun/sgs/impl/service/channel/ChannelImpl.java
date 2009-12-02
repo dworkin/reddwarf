@@ -30,23 +30,19 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableDeque;
 import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.MembershipEventType;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
-import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BindingKeyedCollections;
 import com.sun.sgs.impl.util.BindingKeyedMap;
-import com.sun.sgs.impl.util.BindingKeyedSet;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.KernelCallable;
 import com.sun.sgs.impl.util.ManagedQueue;
@@ -63,6 +59,7 @@ import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -135,7 +132,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     
     /** The empty channel membership set. */
     static final Set<BigInteger> EMPTY_CHANNEL_MEMBERSHIP =
-	Collections.unmodifiableSet(new HashSet<BigInteger>());
+	Collections.emptySet();
 
     /** The random number generator for choosing a new coordinator. */
     private static final Random random = new Random();
@@ -206,7 +203,7 @@ class ChannelImpl implements ManagedObject, Serializable {
      * @param delivery a delivery guarantee
      * @param writeBufferCapacity the capacity of the write buffer, in bytes
      * @param channelWrapper the previous channel wrapper, or {@code null} if
-     *	      the channe is being created for the first time
+     *	      the channel is being created for the first time
      */
     private ChannelImpl(String name, ChannelListener listener,
 			  Delivery delivery, int writeBufferCapacity,
@@ -384,11 +381,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue join request with underlying (unwrapped) client
 	     * session object.
 	     */
-	    int sessionMaxMessageLength = session.getMaxMessageLength();
-	    if (maxMessageLength > sessionMaxMessageLength) {
-		getDataService().markForUpdate(this);
-		maxMessageLength = sessionMaxMessageLength;
-	    }
+	    updateMaxMessageLength(session);
 	    addEvent(
 		new JoinEvent(unwrapSession(session), eventQueueRef.get()));
 
@@ -430,6 +423,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	     */
 	    EventQueue eventQueue = eventQueueRef.get();
 	    for (ClientSession session : sessions) {
+		updateMaxMessageLength(session);
 		addEvent(new JoinEvent(unwrapSession(session), eventQueue));
 	    }
 	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
@@ -458,6 +452,21 @@ class ChannelImpl implements ManagedObject, Serializable {
 	    "client session:" + session +
 	    " does not support delivery guarantee",
 	    delivery);
+    }
+
+    /**
+     * Sets the channel's maximum message length to the client session's
+     * maximum message length if the session's maximum is lower than the
+     * existing maximum for the channel.
+     *
+     * @param	session a client session joining the channel
+     */
+    private void updateMaxMessageLength(ClientSession session) {
+	int sessionMaxMessageLength = session.getMaxMessageLength();
+	if (maxMessageLength > sessionMaxMessageLength) {
+	    getDataService().markForUpdate(this);
+	    maxMessageLength = sessionMaxMessageLength;
+	}
     }
 
     /**
@@ -554,7 +563,6 @@ class ChannelImpl implements ManagedObject, Serializable {
 	    final long coord = coordNodeId;
 	    final ChannelServiceImpl channelService =
 		ChannelServiceImpl.getInstance();
-	    final BigInteger channelRefId = eventQueue.getChannelRefId();
 	    channelService.getTaskService().scheduleNonDurableTask(
 	        new AbstractKernelRunnable("SendServiceEventQueue") {
 		  public void run() {
@@ -869,7 +877,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	} else {
 	    if (isCoordinatorReassigned) {
 	        getDataService().markForUpdate(this);
-		if (delivery.equals(Delivery.RELIABLE)) {
+		if (isReliable()) {
 		    SavedMessageReaper.scheduleNewTask(channelRefId, false);
 		}
 		isCoordinatorReassigned = false;
@@ -931,7 +939,7 @@ class ChannelImpl implements ManagedObject, Serializable {
      * determining which messages have expired and can be removed.
      */
     @SuppressWarnings("unchecked")
-    private static ScalableDeque<ChannelMessageInfo>
+    private static Deque<ChannelMessageInfo>
 	getSavedMessagesQueue(BigInteger channelRefId, boolean createIfAbsent)
     {
 	DataService dataService = getDataService();
@@ -946,7 +954,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 		SavedMessageReaper.scheduleNewTask(channelRefId, false);
 	    }
 	}
-	return (ScalableDeque<ChannelMessageInfo>) messageQueue;
+	return (Deque<ChannelMessageInfo>) messageQueue;
     }
 
     /**
@@ -1034,7 +1042,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	 * well as the map of saved messages, keyed by message timestamp.
 	 */
 	public void run() {
-	    ScalableDeque<ChannelMessageInfo> messageQueue =
+	    Deque<ChannelMessageInfo> messageQueue =
 		getSavedMessagesQueue(channelRefId, false);
 	    if (messageQueue == null) {
 		// Queue no longer exists, so "cancel" periodic task.
@@ -1231,9 +1239,19 @@ class ChannelImpl implements ManagedObject, Serializable {
 	eventQueuesMap.removeOverride(channelRefId.toString());
 	EventQueue eventQueue = eventQueueRef.get();
 	dataService.removeObject(eventQueue);
-	if (delivery.equals(Delivery.RELIABLE)) {
+	if (isReliable()) {
 	    SavedMessageReaper.scheduleNewTask(channelRefId, true);
 	}
+    }
+
+    /**
+     * Returns {@code true} if this channel supports reliable message
+     * delivery, otherwise returns {@code false}.
+     */
+    private boolean isReliable() {
+	return
+	    delivery.equals(Delivery.RELIABLE) ||
+	    delivery.equals(Delivery.UNORDERED_RELIABLE);
     }
     
     /* -- Other classes -- */
@@ -1783,7 +1801,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	private final BigInteger eventRefId;
 	
 	/**
-	 * Constructs an instance.  This contructor must be called within a
+	 * Constructs an instance.  This constructor must be called within a
 	 * transaction.
 	 */
 	NotifyTask(ChannelImpl channel, ChannelEvent channelEvent) {
@@ -1871,7 +1889,7 @@ class ChannelImpl implements ManagedObject, Serializable {
      */
     private abstract static class SessionNotifyTask extends NotifyTask {
 	
-	protected String name;
+	protected final String name;
 	protected final Delivery delivery;
 	protected final BigInteger sessionRefId;
 	private final BigInteger eventQueueRefId;
@@ -1883,7 +1901,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	protected volatile long sessionNodeId;
 
 	/**
-	 * Constructs an instance.  This contructor must be called within a
+	 * Constructs an instance.  This constructor must be called within a
 	 * transaction.
 	 */
 	SessionNotifyTask(ChannelImpl channel,
@@ -2063,7 +2081,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     private static class JoinNotifyTask extends SessionNotifyTask {
 
 	/**
-	 * Constructs an instance.  This contructor must be called within a
+	 * Constructs an instance.  This constructor must be called within a
 	 * transaction.
 	 */
 	JoinNotifyTask(ChannelImpl channel, JoinEvent joinEvent,
@@ -2171,7 +2189,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     private static class LeaveNotifyTask extends SessionNotifyTask {
 
 	/**
-	 * Constructs an instance.  This contructor must be called within a
+	 * Constructs an instance.  This constructor must be called within a
 	 * transaction.
 	 */
 	LeaveNotifyTask(ChannelImpl channel, LeaveEvent leaveEvent,
@@ -2314,7 +2332,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	     * channel can obtain messages sent while those sessions are
 	     * relocating, otherwise, mark this event as completed.
 	     */
-	    if (channel.delivery.equals(Delivery.RELIABLE)) {
+	    if (channel.isReliable()) {
 		channel.saveMessage(message, timestamp);
 	    } else {
 		completed();

@@ -21,7 +21,6 @@ package com.sun.sgs.impl.util;
 
 import java.util.concurrent.Callable;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 
 /**

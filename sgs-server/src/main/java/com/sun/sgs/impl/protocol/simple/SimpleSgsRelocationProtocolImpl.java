@@ -20,39 +20,23 @@
 package com.sun.sgs.impl.protocol.simple;
 
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractCompletionFuture;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
-import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.RelocateFailureException;
-import com.sun.sgs.protocol.RequestFailureException;
-import com.sun.sgs.protocol.RequestFailureException.FailureReason;
 import com.sun.sgs.protocol.RequestCompletionHandler;
-import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.SessionRelocationProtocol;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.Node;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -80,7 +64,7 @@ public class SimpleSgsRelocationProtocolImpl
 
     /** A lock for {@suspendCompletionFuture}, and {@code relocationInfo}
      * fields. */
-    private Object lock = new Object();
+    private final Object lock = new Object();
 
     /** The completion future if suspending messages is in progress, or
      * null. */

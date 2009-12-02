@@ -166,7 +166,7 @@ public class CacheMap<K, V> {
 	 * @param	key the key
 	 * @param	value the value (held softly)
 	 * @param	queue the reference queue
-	 * @param	timeout a timeout (0 = inifinite)
+	 * @param	timeout a timeout (0 = infinite)
 	 */
 	Value(K key, V value, ReferenceQueue<V> queue, long timeout) {
 	    super(value, queue);

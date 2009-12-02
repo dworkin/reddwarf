@@ -25,7 +25,6 @@ package com.sun.sgs.protocol;
 
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.DeliveryNotSupportedException;
-import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;

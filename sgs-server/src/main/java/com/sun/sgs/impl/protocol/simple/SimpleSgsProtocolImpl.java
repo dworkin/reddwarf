@@ -24,7 +24,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.impl.util.AbstractCompletionFuture;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
@@ -117,7 +116,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
     /** A lock for {@code loginHandled} and {@code messageQueue} fields. */
-    private Object lock = new Object();
+    private final Object lock = new Object();
 
     /** Indicates whether the client's login ack has been sent. */
     private boolean loginHandled = false;
