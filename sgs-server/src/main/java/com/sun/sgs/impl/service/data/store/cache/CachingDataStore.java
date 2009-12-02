@@ -77,6 +77,7 @@ import java.net.InetAddress;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -448,7 +449,7 @@ public final class CachingDataStore extends AbstractDataStore
 
     /** A synchronized list of registered data conflict listeners. */
     private final List<DataConflictListener> dataConflictListeners =
-	new ArrayList<DataConflictListener>();
+	Collections.synchronizedList(new ArrayList<DataConflictListener>());
 
     /**
      * A concurrent deque of conflicting data accesses waiting to be delivered

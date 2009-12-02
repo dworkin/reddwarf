@@ -44,6 +44,8 @@ import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -250,12 +252,12 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	SgsTestNode node0 = appNodes.get(0);
 	long nodeId0 = node0.getNodeId();
 	CheckingDataConflictListener listener0 =
-	    new CheckingDataConflictListener();
+	    new CheckingDataConflictListener("a.dummy", dummyId.get());
 	node0.getDataService().addDataConflictListener(listener0);
 	SgsTestNode node1 = appNodes.get(1);
 	long nodeId1 = node1.getNodeId();
 	CheckingDataConflictListener listener1 =
-	    new CheckingDataConflictListener();
+	    new CheckingDataConflictListener("a.dummy", dummyId.get());
 	node1.getDataService().addDataConflictListener(listener1);
 	/* Evict object: Node 0 writes object, node 1 writes object */
 	listener0.setExpected(dummyId.get(), nodeId1, true);
@@ -294,21 +296,32 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	listener1.awaitNotCalled();
     }
 
-    /** A data conflict listener that checks its calls. */
+    /**
+     * A data conflict listener that checks its calls, but only paying
+     * attention to interesting access IDs.
+     */
     private class CheckingDataConflictListener
 	implements DataConflictListener
     {
+	private final Collection<?> interestingIds;
 	private Object expectedAccessId = null;
 	private long expectedNodeId;
 	private boolean expectedForUpdate;
 	private boolean called;
 	private Throwable exception;
 
+	CheckingDataConflictListener(Object... interestingIds) {
+	    this.interestingIds = Arrays.asList(interestingIds);
+	}
+
 	@Override
 	public synchronized void nodeConflictDetected(
 	    Object accessId, long nodeId, boolean forUpdate)
 	{
 	    try {
+		if (!interestingIds.contains(accessId)) {
+		    return;
+		}
 		if (expectedAccessId == null) {
 		    throw new Exception("Unexpected notification");
 		} else {
