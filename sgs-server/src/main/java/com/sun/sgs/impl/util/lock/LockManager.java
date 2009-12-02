@@ -476,6 +476,16 @@ public class LockManager<K> {
 			    assert Lock.noteUnsync(this, key);
 			}
 			if (isOwner) {
+			    if (conflict != null &&
+				(conflict.getType() ==
+				 LockConflictType.DEADLOCK))
+			    {
+				/*
+				 * Being the deadlock victim takes precedence
+				 * even if we have become the owner
+				 */
+				break;
+			    }
 			    locker.setWaitingFor(null);
 			    locker.clearConflict();
 			    if (logger.isLoggable(FINER)) {
