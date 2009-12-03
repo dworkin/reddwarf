@@ -90,7 +90,7 @@ extern "C" {
 #define SGS_MSG_INIT_LEN (SGS_MSG_MAX_LENGTH - SGS_MAX_PAYLOAD_LENGTH)
 
     /* The version number */
-#define SGS_MSG_VERSION '\004'
+#define SGS_MSG_VERSION '\005'
 
     /*The offset of the opcode in the messages*/
 #define SGS_OPCODE_OFFSET 2
@@ -143,6 +143,161 @@ extern "C" {
          */
         SGS_OPCODE_LOGIN_REDIRECT = 0x13,
 
+        /**
+         * Suspend messages notification. Server to client notification.
+         * <br>
+         * Opcode: {@code 0x14} <br>
+         * Payload: (none) <p>
+         *
+         * This message notifies a client to suspend sending messages to the
+         * server until it receives further instruction (such as {@link
+         * #RELOCATE_NOTIFICATION} or {@link #RESUME_MESSAGES}). The client
+         * should send the acknowledgment {@link #SUSPEND_MESSAGES_COMPLETE} to
+         * the server when it has suspended sending messages.  After the server
+         * sends a {@code SUSPEND_MESSAGES} notification to the client, the
+         * server may decide to drop messages from the client if it does not
+         * receive the {@link #SUSPEND_MESSAGES_COMPLETE} acknowledgment in a
+         * timely fashion. <p>
+         *
+         * This opcode was introduced in protocol version {@code 0x05}.
+         */
+        SGS_OPCODE_SUSPEND_MESSAGES = 0x14,
+
+        /**
+         * Acknowledgment of {@link #SUSPEND_MESSAGES} notification. Client to
+         * server notification.
+         * <br>
+         * Opcode: {@code 0x15} <br>
+         * Payload: (none) <p>
+         *
+         * This message notifies the server that the client has received the
+         * {@link #SUSPEND_MESSAGES} notification.  Any messages received by the
+         * server after this notification will be dropped, unless the server
+         * has instructed the client to either resume messages or relocate its
+         * client session to another node. <p>
+         *
+         * This opcode was introduced in protocol version {@code 0x05}.
+         */
+        SGS_OPCODE_SUSPEND_MESSAGES_COMPLETE = 0x15,
+
+        /**
+         * Resume messages notification. Server to client notification.
+         * <br>
+         * Opcode: {@code 0x16} <br>
+         * Payload: (none) <p>
+         *
+         * This message notifies the client that it can resume sending messages
+         * to the server. <p>
+         *
+         * This opcode was introduced in protocol version {@code 0x05}.
+         */
+        SGS_OPCODE_RESUME_MESSAGES = 0x16,
+
+        /**
+         * Relocate session notification. Server to client notification.
+         * <br>
+         * Opcode: {@code 0x17} <br>
+         * Payload:
+         * <ul>
+         * <li> (String) hostname
+         * <li> (int) port
+         * <li> (ByteArray) relocationKey
+         * </ul>
+         *
+         * This message notifies a client to relocate its session on the
+         * current node to a new node. The client receiving this request should
+         * shut down the connection to the original node and establish a
+         * connection to the node indicated by the {@code hostname} and {@code
+         * port} in the payload. The client should then attempt to reestablish
+         * the client session with the server (without logging in) using the
+         * {@code relocationKey} specified in the payload. <p>
+         *
+         * This opcode was introduced in protocol version {@code 0x05}.
+         */
+        SGS_OPCODE_RELOCATE_NOTIFICATION = 0x17,
+
+        /**
+         * Relocation request. Client requesting relocation to a server. <br>
+         * Opcode: {@code 0x18} <br>
+         * Payload:
+         * <ul>
+         * <li> (byte) protocol version
+         * <li> (ByteArray) relocationKey
+         * </ul>
+         *
+         * This message requests that the client's existing client session be
+         * relocated to (and re-established with) the server. The {@code
+         * relocationKey} must match the one that the client received in the
+         * previous {@link #RELOCATE_NOTIFICATION} message.  If relocation is
+         * successful, the server acknowledges the request with a {@link
+         * #RELOCATE_SUCCESS} message containing a {@code reconnectionKey} for
+         * reconnecting to the server. If relocation is not successful, a
+         * {@link #RELOCATE_FAILURE} message is sent to the client.  If the
+         * client receives a {@code RELOCATE_FAILURE} message, the client
+         * should disconnect from the server. <p>
+         *
+         * This opcode was introduced in protocol version {@code 0x05}.
+         */
+        SGS_OPCODE_RELOCATE_REQUEST = 0x18,
+
+        /**
+         * Relocation success. Server response to a client's {@link
+         * #RELOCATE_REQUEST}.
+         * <br>
+         * Opcode: {@code 0x19} <br>
+         * Payload:
+         * <ul>
+         * <li> (ByteArray) reconnectionKey
+         * </ul>
+         * The {@code reconnectionKey} is an opaque reference that can be held by
+         * the client for use in case the client is disconnected and wishes to
+         * reconnect to the server with the same identity using a
+         * {@link #RECONNECT_REQUEST}. <p>
+         *
+         * This opcode was introduced in protocol version {@code 0x05}.
+         */
+        SGS_OPCODE_RELOCATE_SUCCESS = 0x19,
+
+        /**
+         * Relocate failure. Server response to a client's {@link
+         * #RELOCATE_REQUEST}.
+         * <br>
+         * Opcode: {@code 0x1a} <br>
+         * Payload:
+         * <ul>
+         * <li> (String) reason
+         * </ul>
+         * This message indicates that the server rejects the {@link
+         * #RELOCATE_REQUEST} for some reason, for example
+         * <ul>
+         * <li> session not relocating to the server
+         * <li> relocation key mismatch
+         * <li> a user with the same identity is already logged in
+         * </ul> <p>
+         *
+         * This opcode was introduced in protocol version {@code 0x05}.
+         */
+        SGS_OPCODE_RELOCATE_FAILURE = 0x1a,
+
+        /**
+         * Reconnection request. Client requesting reconnect to a server. <br>
+         * Opcode: {@code 0x20} <br>
+         * Payload:
+         * <ul>
+         * <li> (byte) protocol version
+         * <li> (ByteArray) reconnectionKey
+         * </ul>
+         * This message requests that the client be reconnected to an existing
+         * client session with the server. The {@code reconnectionKey} must match
+         * the one that the client received in the previous {@link #LOGIN_SUCCESS}
+         * or {@link #RECONNECT_SUCCESS} message (if reconnection was performed
+         * subsequent to login). If reconnection is successful, the server
+         * acknowledges the request with a {@link #RECONNECT_SUCCESS} message
+         * containing a new {@code reconnectionKey}. If reconnection is not
+         * successful, a {@link #RECONNECT_FAILURE} message is sent to the client.
+         * If the client receives a {@code RECONNECT_FAILURE} message, the client
+         * should disconnect from the server.
+         */
         /**
          * Reconnection request. Client's request to the server
          * <ul>

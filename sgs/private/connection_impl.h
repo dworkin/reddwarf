@@ -92,10 +92,19 @@ extern "C" {
     void sgs_connection_impl_disconnect(sgs_connection_impl *connection);
 
     /*
+     * function sgs_connection_impl_establish_conn()
+     * Creates a connection to the host and port already in the
+     * sgs_session_impl context. This function is used for login
+     * and for relocation
+     */
+    int sgs_connection_impl_establish_conn(sgs_connection_impl *connection);
+
+    /*
      * function: sgs_connection_impl_io_write()
      *
      * Writes buflen bytes from the buf array to the connection's underlying socket.
      */
+    
     int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
             size_t buflen);
 

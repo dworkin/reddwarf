@@ -63,7 +63,13 @@ int sgs_channel_send(sgs_channel_impl *channel, const uint8_t *data,
     int result;
     sgs_session_impl *session = channel->session;
     sgs_message msg;
-    
+
+    /* if the session has messages suspended, simply drop
+     * the channel message and return 0
+     */
+    if (session->in_suspend)
+        return 0;
+
     /** Initialize static fields of message. */
     result = sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), 
 						  SGS_OPCODE_CHANNEL_MESSAGE);

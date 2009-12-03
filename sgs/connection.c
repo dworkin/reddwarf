@@ -179,53 +179,42 @@ void sgs_connection_destroy(sgs_connection_impl *connection) {
     free(connection);
 }
 
-/*
- * sgs_connection_login()
+/* Do the work needed to estalish a connection. This assumes that the
+ * connection passed in has already had the context set up with a host
+ * and port number.
  */
-int sgs_connection_login(sgs_connection_impl *connection, const char *login,
-    const char *password)
-{
+int sgs_connection_impl_establish_conn(sgs_connection_impl *connection) {
     struct hostent *server;
     struct sockaddr_in serv_addr;
-  
+
     /** create the TCP socket (not connected yet). */
     connection->socket_fd = sgs_socket_create(AF_INET, SOCK_STREAM, 0);
     if (connection->socket_fd == SGS_SOCKET_INVALID) return -1;
- 
+
     /** Set socket to non-blocking mode. */
     if (sgs_socket_set_nonblocking(connection->socket_fd) == -1)
         return -1;
-  
+
     /** Resolve hostname to IP(s).  This works even if hostname *is* an IP. */
     server = gethostbyname(connection->ctx->hostname);
     if (server == NULL) {
         errno = SGS_ERR_CHECK_HERRNO;
         return -1;
     }
-  
+
     /** Initialize server_addr to all zeroes, then fill in fields. */
-    memset((char*) &serv_addr, '\0', sizeof(serv_addr));
+    memset((char*) & serv_addr, '\0', sizeof (serv_addr));
     serv_addr.sin_family = AF_INET;
     memcpy(&serv_addr.sin_addr.s_addr, server->h_addr_list[0], server->h_length);
     serv_addr.sin_port = htons(connection->ctx->port);
-  
-    /**
-     * As a "trick", we go ahead and write the login request to the out-buffer
-     * now, even though the socket may not connect instantly (since we use a
-     * non-blocking call to connect()).  However that is ok, since the socket will
-     * not register as writable (and thus we won't actually try to write to it)
-     * until it has connected.
-     */
-    if (sgs_session_impl_login(connection->session, login, password) == -1)
-        return -1;
-  
+
     /**
      * Try to connect to server.  (note, ok to cast sockaddr_in* to sockaddr*
      * according to http://retran.com/beej/sockaddr_inman.html )
      */
-    if (sgs_socket_connect(connection->socket_fd, (const struct sockaddr*) &serv_addr,
-            sizeof(serv_addr)) == -1) {
-    
+    if (sgs_socket_connect(connection->socket_fd, (const struct sockaddr*) & serv_addr,
+            sizeof (serv_addr)) == -1) {
+
         if (errno == EINPROGRESS) {
             /**
              * Connection in progress (not a real error); need to register interest in
@@ -233,7 +222,7 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
              * has finished connecting.
              */
             connection->ctx->reg_fd_cb(connection, connection->socket_fd,
-                POLLOUT);
+                    POLLOUT);
             connection->output_enabled = 1;
 
             /*
@@ -242,29 +231,43 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
              */
 #ifdef WIN32
             connection->ctx->reg_fd_cb(connection, connection->socket_fd,
-                POLLERR);
+                    POLLERR);
 #endif /* WIN32 */
-            
+
             connection->state = SGS_CONNECTION_IMPL_CONNECTING;
             return 0;
-        }
-        else {
+        } else {
             /** some kind of (real) error */
             return -1;
         }
     }
-  
     /**
      * else, connect() completed "instantly" - this can happen when connecting to
      *  a port on the local machine, for example.
      */
     connection->state = SGS_CONNECTION_IMPL_CONNECTED;
-  
+
     /** Register interest in socket writes to send the login request. */
     connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLOUT);
     connection->output_enabled = 1;
-    
+
     return 0;
+}
+/*
+ * sgs_connection_login()
+ */
+int sgs_connection_login(sgs_connection_impl *connection, const char *login,
+    const char *password)
+{
+ /* Do the work needed to establish the network connection */
+
+    if (sgs_connection_impl_establish_conn(connection) == -1){
+        return -1;
+    }
+    /**
+     * Now attempt to login using the supplied login name and password
+     */
+    return sgs_session_impl_login(connection->session, login, password);
 }
 /*
  * sgs_connection_logout()

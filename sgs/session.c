@@ -64,6 +64,12 @@
 int sgs_session_direct_send(sgs_session_impl *session, const uint8_t *data,
         size_t datalen) {
     sgs_message msg;
+    /* check to see if messages have been suspended. If so, return 0 and
+     * drop the message on the floor. This should never happen, so it
+     * is the indication of an error
+     */
+    if (session->in_suspend)
+        return 0;
 
     if (sgs_msg_init(&msg, session->msg_buf, sizeof (session->msg_buf),
             SGS_OPCODE_SESSION_MESSAGE) == -1)
@@ -145,6 +151,21 @@ int sgs_session_impl_login(sgs_session_impl *session, const char *login,
     return 0;
 }
 
+int sgs_session_impl_relocate(sgs_session_impl *session){
+    sgs_message msg;
+    uint8_t protocolVersion = SGS_MSG_VERSION;
+
+    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
+            SGS_OPCODE_RELOCATE_REQUEST) == -1)
+       return -1;
+    if (sgs_msg_add_arb_content(&msg, &protocolVersion, 1) == -1)
+        return -1;
+    if (sgs_msg_add_id(&msg, session->relocation_key, session->relocation_key->buf_len) == -1)
+        return -1;
+    return sgs_connection_impl_io_write(session->connection, session->msg_buf,
+            sgs_msg_get_size(&msg));
+}
+
 /*
  * sgs_session_impl_logout()
  */
@@ -190,6 +211,7 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
 
     session->connection = connection;
     session->reconnect_key = NULL;
+    session->in_suspend = 0;
 
     return session;
 }
@@ -281,6 +303,59 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              * that was stored on the initial login attempt
              */
             return sgs_connection_login(session->connection, session->login, session->password);
+
+        case SGS_OPCODE_SUSPEND_MESSAGES:
+            session->in_suspend = 1;
+            sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), SGS_OPCODE_SUSPEND_MESSAGES_COMPLETE);
+            return sgs_session_impl_send_msg(session);
+
+        case SGS_OPCODE_RESUME_MESSAGES:
+            session->in_suspend = 0;
+            return 0;
+
+        case SGS_OPCODE_RELOCATE_NOTIFICATION:
+            /* Start by getting the host and port for relocation*/
+            offset += 2;
+            readlen = sgs_msg_read_string(&msg, offset,
+                    &(session->connection->ctx->hostname));
+            if (readlen < 0)
+                return -1;
+            else offset += readlen;
+            readlen = sgs_msg_read_uint32(&msg, offset,
+                    &(session->connection->ctx->port));
+            if (readlen < 0)
+                return -1;
+            else offset += readlen;
+            /* Now get the relocation key, which we treat as an sgs_id*/
+            readlen = sgs_msg_read_id(&msg, offset, 0, &(session->relocation_key));
+            if (readlen < 0)
+                return -1;
+            old_connection = session->connection;
+            old_connection->in_redirect = 1;
+            session->connection = sgs_connection_create(old_connection->ctx);
+            sgs_connection_impl_disconnect(old_connection);
+
+            if (sgs_connection_impl_establish_conn(session->connection) == -1)
+                return -1;
+
+            return sgs_session_impl_relocate(session);
+
+        case SGS_OPCODE_RELOCATE_SUCCESS:
+            /* Relocation is complete; turn off the suspend messages
+             * flag and get rid of the relocation key after getting
+             * the new reconnection key
+             */
+            sgs_id_destroy(session->reconnect_key);
+            readlen = sgs_msg_read_id(&msg, offset, 0, &(session->reconnect_key));
+            if (readlen < 0)
+                return -1;
+            session->in_suspend = 0;
+            sgs_id_destroy(session->relocation_key);
+            return 0;
+
+        case SGS_OPCODE_RELOCATE_FAILURE:
+
+            return 0;
 
         case SGS_OPCODE_SESSION_MESSAGE:
 
@@ -414,7 +489,20 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 int sgs_session_impl_send_msg(sgs_session_impl *session) {
     size_t msg_size;
     sgs_message msg;
-
+    uint8_t opcode;
+    
+    /* Check to see if messages are susended; if they are the only messages
+     * that should be sent to the server are those that announce that
+     * the suspended messages are complete and a relocation request. All
+     * other messages will be dropped, and the function will return with a
+     * value of 0
+     */
+    if (session->in_suspend){
+        opcode = sgs_msg_get_opcode(session->msg_buf);
+        if ((opcode != SGS_OPCODE_SUSPEND_MESSAGES_COMPLETE) &&
+                (opcode != SGS_OPCODE_RELOCATE_REQUEST))
+            return 0;
+    }
     if (sgs_msg_deserialize(&msg, session->msg_buf,
             sizeof (session->msg_buf)) == -1)
         return -1;
