@@ -32,6 +32,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -1224,6 +1225,8 @@ public class TestDataServiceImpl extends Assert {
         Properties properties = getProperties();
         properties.setProperty(DataStoreImplClassName + ".directory", dir);
 	properties.setProperty(getLockTimeoutPropertyName(properties), "500");
+	properties.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			       "500");
         properties.setProperty("com.sun.sgs.txn.timeout", "1000");
         serverNodeRestart(properties, true);
 
@@ -2670,6 +2673,8 @@ public class TestDataServiceImpl extends Assert {
         Properties properties = getProperties();
         properties.setProperty(DataStoreImplClassName + ".directory", dir);
 	properties.setProperty(getLockTimeoutPropertyName(properties), "500");
+	properties.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			       "500");
         properties.setProperty("com.sun.sgs.txn.timeout", "1000");
         serverNodeRestart(properties, true);
 
@@ -4253,6 +4258,8 @@ public class TestDataServiceImpl extends Assert {
         Properties properties = getProperties();
         properties.setProperty(DataStoreImplClassName + ".directory", dir);
 	properties.setProperty(getLockTimeoutPropertyName(properties), "500");
+	properties.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			       "500");
         properties.setProperty("com.sun.sgs.txn.timeout", "1000");
         serverNodeRestart(properties, true);
 
