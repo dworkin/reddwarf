@@ -281,14 +281,6 @@ public class TestWatchdogServiceImpl extends Assert {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void testConstructorNoAppName() throws Exception {
-        Properties properties = createProperties(
-            WatchdogServerPropertyPrefix + ".port", "0");
-	new WatchdogServiceImpl(properties, systemRegistry, txnProxy, 
-				dummyShutdownCtrl);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
     public void testConstructorAppButNoServerHost() throws Exception {
         // Server start is false but we didn't specify a server host
         int port = watchdogService.getServer().getPort();

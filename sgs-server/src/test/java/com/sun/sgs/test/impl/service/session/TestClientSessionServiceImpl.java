@@ -269,18 +269,6 @@ public class TestClientSessionServiceImpl extends Assert {
     }
 
     @Test
-    public void testConstructorNoAppName() throws Exception {
-	try {
-	    new ClientSessionServiceImpl(
-		new Properties(), serverNode.getSystemRegistry(),
-		serverNode.getProxy());
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
-    @Test
     public void testConstructorNoPort() throws Exception {
         Properties props =
             createProperties(StandardProperties.APP_NAME, APP_NAME);

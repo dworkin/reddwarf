@@ -254,18 +254,6 @@ public class TestChannelServiceImpl extends Assert {
     }
 
     @Test
-    public void testConstructorNoAppName() throws Exception {
-	try {
-	    new ChannelServiceImpl(
-		new Properties(), serverNode.getSystemRegistry(),
-		serverNode.getProxy());
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
-    @Test
     public void testConstructedVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
