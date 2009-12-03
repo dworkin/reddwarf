@@ -59,11 +59,14 @@ import java.util.logging.Logger;
  *     the algorithm. Set to {@code 1} to run single-threaded.
  * <p>
  * </dl>
+ * The logger for the affinity group finding system is named
+ * {@value #PROP_NAME}.
+ * <p>
  * Set logging to Level.FINEST for a trace of the algorithm (very verbose
  * and slow).
  * Set logging to Level.FINER to see the final labeled graph.
- * Set logging to Level.FINE and construct with {@code gatherStats} set to
- *  {@code true} to print some high level statistics about each algorithm run.
+ * Set logging to Level.FINE for any errors or unexpected conditions encountered
+ * during the run.
  */
 public abstract class AbstractLPA extends BasicState {
     /** Our base property name. */
@@ -253,8 +256,11 @@ public abstract class AbstractLPA extends BasicState {
         // Allow algorithms a shot at updating the labelMap.  In particular,
         // the distributed algorithm needs to update information based on
         // cache eviction data.
-        maxCount = doOtherNeighbors(vertex, labelMap, maxCount, logSB);
+        long maxOtherCount = doOtherNeighbors(vertex, labelMap, logSB);
 
+        if (maxOtherCount > maxCount) {
+            maxCount = maxOtherCount;
+        }
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "{0}: Neighbors of {1} : {2}",
                        localNodeId, vertex, logSB.toString());
@@ -275,21 +281,22 @@ public abstract class AbstractLPA extends BasicState {
      * particular algorithm.
      * @param vertex the vertex whose neighbors labels will be examined
      * @param labelMap a map of labels to counts of neighbors using that label
-     * @param maxCount the maximum count of neighbor labels seen so far
      * @param logSB a StringBuilder for gathering log info about neighbors
-     * @return the updated {@code maxCount}
+     * @return the highest number of times a particular label is used among the
+     *        other neighbors, or {@code -1L} if there are no other neighbors.
      */
     protected abstract long doOtherNeighbors(LabelVertex vertex,
                                              Map<Integer, Long> labelMap,
-                                             long maxCount,
                                              StringBuilder logSB);
 
     /**
      * Return the affinity groups found within the given vertices, putting all
      * vertices with the same label in a group.  The affinity group's id
-     * will be the common label of the group.  Also, as an optimization,
-     * can reinitialize the labels in the graph to their initial setting.
-     *
+     * will be the common label of the group.  As an optimization, this method
+     * can reinitialize the labels in the graph to their initial setting. Each
+     * affinity group in the returned set will have the same generation number,
+     * which will be {@code gen}.
+     * <p>
      * @param vertices the vertices that we gather groups from
      * @param reinitialize if {@code true}, reinitialize the labels
      * @param gen the generation number

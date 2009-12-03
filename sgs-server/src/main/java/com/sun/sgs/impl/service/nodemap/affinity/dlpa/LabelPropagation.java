@@ -56,6 +56,41 @@ import java.util.logging.Level;
  * networks" by U.N. Raghavan, R. Albert and S. Kumara 2007.
  * <p>
  * This is the portion of code that is on each application node.
+ * <p>
+ * The following properties are supported:
+ * <p>
+ * <dl style="margin-left: 1em">
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.server.host
+ *	</b></code><br>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, or {@code localhost} if this node is starting the
+ *      server <br>
+ *
+ * <dd style="padding-top: .5em">The name of the host running the {@code
+ *	NodeMappingServer}. <p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.server.port
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 44537}
+ *
+ * <dd style="padding-top: .5em">The network port for the {@code
+ *	LabelPropagationServer}.  This value must be no less than {@code 0} and
+ *      no greater than {@code 65535}. <p>
+ *
+ *  <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.client.port
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 0} (anonymous port)
+ *
+ * <dd style="padding-top: .5em">The network port for this app node's
+ *      affinity group finder for communicating with affinity group finders
+ *      on other app nodes and with the {@code LabelPropagationServer}.
+ *      This value must be no less than {@code 0} and no greater than
+ *      {@code 65535}. <p>
+ * </dl>
  */
 public class LabelPropagation extends AbstractLPA implements LPAClient {
     /** Our class name. */
@@ -92,15 +127,12 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     /** Our exporter. */
     private final Exporter<LPAClient> clientExporter;
 
-    /** Lock to ensure we aren't modifying the vertices list at the same
-     * time we're processing an asynchronous call from another node.
-     */
-    private final Object verticesLock = new Object();
-
     /**
      * The map of conflicts in the system, nodeId->objId, count.
      * Updates are multi-threaded.  This includes both conflicts detected
-     * locally, and conflicts that other nodes tell us about.
+     * locally, and conflicts that other nodes tell us about.  This map
+     * is updated during the prepare phase of the algorithm and read
+     * during the iterations.
      * TBD: consider changing this to another data structure not using
      * inner maps.
      */
@@ -378,14 +410,17 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             if (proxy != null) {
                 logger.log(Level.FINEST, "{0}: exchanging edges with {1}",
                            localNodeId, nodeId);
-                final Map<Object, Long> map = entry.getValue();
-                assert (map != null);
-
-                boolean ok = LabelPropagationServer.runIoTask(new IoRunnable() {
+                final Set<Object> mapEntries;
+                Map<Object, Long> map = entry.getValue();
+                assert (map != null);             
+                synchronized (map) {
+                    mapEntries = new HashSet<Object>(map.keySet());
+                }
+                boolean ok =
+                        LabelPropagationServer.runIoTask(new IoRunnable() {
                     public void run() throws IOException {
-                        proxy.notifyCrossNodeEdges(
-                            new HashSet<Object>(map.keySet()), localNodeId);
-                    } }, 
+                        proxy.notifyCrossNodeEdges(mapEntries, localNodeId);
+                    } },
                     wdog, nodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
                 if (!ok) {
                     failed = true;
@@ -561,9 +596,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             // Arrange the vertices in a random order for each iteration.
             // For the first iteration, we just use the iterator ordering.
             if (iteration > 1) {
-                synchronized (verticesLock) {
-                    Collections.shuffle(vertices);
-                }
+                Collections.shuffle(vertices);
             }
 
             // For each of the vertices, set the label to the label with the
@@ -650,41 +683,39 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         Map<Object, Map<Identity, Long>> objectMap = builder.getObjectUseMap();
         assert (objectMap != null);
 
-        synchronized (verticesLock) {
-            for (Object obj : objIds) {
-                // look up the set of identities
-                Map<Identity, Long> idents = objectMap.get(obj);
-                Map<Integer, List<Long>> labelWeightMap =
-                        new HashMap<Integer, List<Long>>();
-                // If idents is null, the identity is no longer used, probably
-                // because the graph was pruned (we are using a live object
-                // use map).
-                if (idents != null) {
-                    for (Map.Entry<Identity, Long> entry : idents.entrySet())
-                    {
-                        // Find the label associated with the identity in
-                        // the graph.
-                        LabelVertex vert = builder.getVertex(entry.getKey());
-                        if (vert != null) {
-                            // If the vertex wasn't found in the vertices list,
-                            // it is a new identity since the vertices were
-                            // captured at the start of this algorithm run,
-                            // and we just ignore the label.
-                            // Otherwise, add the label to set of labels for
-                            // this identity.
-                            Integer label = vert.getLabel();
+        for (Object obj : objIds) {
+            // look up the set of identities
+            Map<Identity, Long> idents = objectMap.get(obj);
+            Map<Integer, List<Long>> labelWeightMap =
+                    new HashMap<Integer, List<Long>>();
+            // If idents is null, the identity is no longer used, probably
+            // because the graph was pruned (we are using a live object
+            // use map).
+            if (idents != null) {
+                for (Map.Entry<Identity, Long> entry : idents.entrySet())
+                {
+                    // Find the label associated with the identity in
+                    // the graph.
+                    LabelVertex vert = builder.getVertex(entry.getKey());
+                    if (vert != null) {
+                        // If the vertex wasn't found in the vertices list,
+                        // it is a new identity since the vertices were
+                        // captured at the start of this algorithm run,
+                        // and we just ignore the label.
+                        // Otherwise, add the label to set of labels for
+                        // this identity.
+                        Integer label = vert.getLabel();
 
-                            List<Long> weightList = labelWeightMap.get(label);
-                            if (weightList == null) {
-                                weightList = new ArrayList<Long>();
-                                labelWeightMap.put(label, weightList);
-                            }
-                            weightList.add(entry.getValue());
+                        List<Long> weightList = labelWeightMap.get(label);
+                        if (weightList == null) {
+                            weightList = new ArrayList<Long>();
+                            labelWeightMap.put(label, weightList);
                         }
+                        weightList.add(entry.getValue());
                     }
                 }
-                retMap.put(obj, labelWeightMap);
             }
+            retMap.put(obj, labelWeightMap);
         }
         return retMap;
     }
@@ -725,26 +756,28 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     /** {@inheritDoc} */
     protected long doOtherNeighbors(LabelVertex vertex,
                                     Map<Integer, Long> labelMap,
-                                    long maxCount,
                                     StringBuilder logSB)
     {
         // Account for the remote neighbors:  look up this LabelVertex in
         // the remoteLabelMap
         Map<Integer, Long> remoteMap = remoteLabelMap.get(vertex.getIdentity());
 
+        long maxCount = -1L;
         if (remoteMap != null) {
-            for (Map.Entry<Integer, Long> entry : remoteMap.entrySet()) {
-                Integer label = entry.getKey();
-                if (logger.isLoggable(Level.FINEST)) {
-                    logSB.append("RLabel:" + label +
-                                 "(" + entry.getValue() + ") ");
-                }
-                Long value = labelMap.containsKey(label) ?
-                                labelMap.get(label) : 0;
-                value += entry.getValue();
-                labelMap.put(label, value);
-                if (value > maxCount) {
-                    maxCount = value;
+            synchronized (remoteMap) {
+                for (Map.Entry<Integer, Long> entry : remoteMap.entrySet()) {
+                    Integer label = entry.getKey();
+                    if (logger.isLoggable(Level.FINEST)) {
+                        logSB.append("RLabel:" + label +
+                                     "(" + entry.getValue() + ") ");
+                    }
+                    Long value = labelMap.containsKey(label) ?
+                                    labelMap.get(label) : 0;
+                    value += entry.getValue();
+                    labelMap.put(label, value);
+                    if (value > maxCount) {
+                        maxCount = value;
+                    }
                 }
             }
         }
@@ -779,6 +812,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             }
 
             // Tell the other vertex about the conflicts we know of.
+            // It is not necessary to synchronize on the map, as it only
+            // changes during the prepare algorithm phase, not while iterations
+            // are running.
             Map<Object, Long> map = entry.getValue();
             assert (map != null);
             logger.log(Level.FINEST, "{0}: exchanging labels with {1}",
@@ -837,25 +873,28 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                             labelCount = newMap;
                         }
                     }
-                    for (Map.Entry<Integer, List<Long>> rLabelCount :
-                        remoteLabels.entrySet())
-                    {
-                        Integer rlabel = rLabelCount.getKey();
-                        List<Long> rcounts = rLabelCount.getValue();
-                        Long updateCount = labelCount.get(rlabel);
-                        if (updateCount == null) {
-                            updateCount = Long.valueOf(0);
-                        }
-                        for (Long rc : rcounts) {
-                            updateCount += Math.min(localCount, rc.longValue());
-                        }
-                        labelCount.put(rlabel, updateCount);
-                        if (logger.isLoggable(Level.FINEST)) {
-                            logger.log(Level.FINEST,
-                                "{0}: label {1}, updateCount {2}, " +
-                                "localCount {3}, : ident {4}",
-                                localNodeId, rlabel, updateCount,
-                                localCount, ident);
+                    synchronized (labelCount) {
+                        for (Map.Entry<Integer, List<Long>> rLabelCount :
+                            remoteLabels.entrySet())
+                        {
+                            Integer rlabel = rLabelCount.getKey();
+                            List<Long> rcounts = rLabelCount.getValue();
+                            Long updateCount = labelCount.get(rlabel);
+                            if (updateCount == null) {
+                                updateCount = Long.valueOf(0);
+                            }
+                            for (Long rc : rcounts) {
+                                updateCount +=
+                                        Math.min(localCount, rc.longValue());
+                            }
+                            labelCount.put(rlabel, updateCount);
+                            if (logger.isLoggable(Level.FINEST)) {
+                                logger.log(Level.FINEST,
+                                    "{0}: label {1}, updateCount {2}, " +
+                                    "localCount {3}, : ident {4}",
+                                    localNodeId, rlabel, updateCount,
+                                    localCount, ident);
+                            }
                         }
                     }
                 }

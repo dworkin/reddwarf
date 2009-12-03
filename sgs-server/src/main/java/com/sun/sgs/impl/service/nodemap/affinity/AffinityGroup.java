@@ -47,7 +47,8 @@ public interface AffinityGroup {
 
     /**
      * Returns a generation number for this affinity group. Affinity groups
-     * in the same generation can be regarded as a set and can be compared.
+     * in the same generation were created at approximately the same time, so
+     * they can be used as the set of communities found at that time.
      * Affinity groups with the same identifier but different generations
      * cannot be compared;  they are independent.
      * @return the generation number for this affinity group

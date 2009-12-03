@@ -130,11 +130,10 @@ public class SingleLabelPropagation extends AbstractLPA
     /** {@inheritDoc} */
     protected long doOtherNeighbors(LabelVertex vertex,
                                     Map<Integer, Long> labelMap,
-                                    long maxCount,
                                     StringBuilder logSB)
     {
         // do nothing, no changes
-        return maxCount;
+        return -1L;
     }
 
     /** {@inheritDoc} */

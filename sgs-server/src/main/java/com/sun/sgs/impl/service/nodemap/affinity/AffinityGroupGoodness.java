@@ -119,7 +119,11 @@ public final class AffinityGroupGoodness {
                     }
                 }
             }
-            // totEdges is a[i]
+            // ingroup is e[i,i] * doublem.
+            // totEdges is a[i] * doublem.
+            // Multiply ingroup by doublem here so we can, outside this loop,
+            // divide the sum by doublemsquare to remove the effects of counting
+            // each edge twice.
             sum = sum + (ingroup * doublem - (totEdges * totEdges));
         }
         double q = (double) sum / doublemsquare;

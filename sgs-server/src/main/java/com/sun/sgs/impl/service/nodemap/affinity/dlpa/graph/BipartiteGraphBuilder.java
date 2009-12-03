@@ -62,7 +62,7 @@ import javax.management.JMException;
 /**
  * A graph builder which builds a bipartite graph of identities and
  * object ids, with edges between them.  Identities are never
- * liked with other edges, nor are object ids linked to other object ids.
+ * linked with other edges, nor are object ids linked to other object ids.
  * <p>
  * This graph builder folds the graph upon request.  The folded graph
  * does not contain parallel edges.
@@ -243,53 +243,49 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
         }
 
         for (Object objVert : objVerts) {
-            if (!(objVert instanceof Identity)) {
-                List<Object> neighbors =
-                        new ArrayList<Object>(graphCopy.getNeighbors(objVert));
-                int length = neighbors.size();
-                Identity v1 = null;
-                Identity v2 = null;
-                for (int i = 0; i < length - 1; i++) {
-                    Object neighbor = neighbors.get(i);
+            // We know objVert is not an Identity because of the loop above.
+            List<Object> neighbors =
+                    new ArrayList<Object>(graphCopy.getNeighbors(objVert));
+            int length = neighbors.size();
+            Identity v1 = null;
+            Identity v2 = null;
+            for (int i = 0; i < length - 1; i++) {
+                Object neighbor = neighbors.get(i);
+                if (neighbor instanceof Identity) {
+                    v1 = (Identity) neighbor;
+                } else {
+                    // our graph is messed up
+                    logger.log(Level.FINE, "unexpected vertex type {0}",
+                                            neighbor);
+                    continue;
+                }
+
+                for (int j = i + 1; j < length; j++) {
+                    neighbor = neighbors.get(j);
                     if (neighbor instanceof Identity) {
-                        v1 = (Identity) neighbor;
+                        v2 = (Identity) neighbor;
                     } else {
                         // our graph is messed up
                         logger.log(Level.FINE, "unexpected vertex type {0}",
-                                                neighbor);
+                                            neighbor);
                         continue;
                     }
-                    
-                    for (int j = i + 1; j < length; j++) {
-                        neighbor = neighbors.get(j);
-                        if (neighbor instanceof Identity) {
-                            v2 = (Identity) neighbor;
-                        } else {
-                            // our graph is messed up
-                            logger.log(Level.FINE, "unexpected vertex type {0}",
-                                                neighbor);
-                            continue;
-                        }
 
-                        // The weight of the edge representing this use
-                        // is the min of the counts of each identity's use
-                        // of the object
-                        long e1Weight =
-                            graphCopy.findEdge(v1, objVert).getWeight();
-                        long e2Weight =
-                            graphCopy.findEdge(v2, objVert).getWeight();
-                        long minWeight = Math.min(e1Weight, e2Weight);
+                    // The weight of the edge representing this use
+                    // is the min of the counts of each identity's use
+                    // of the object
+                    long e1Weight = graphCopy.findEdge(v1, objVert).getWeight();
+                    long e2Weight = graphCopy.findEdge(v2, objVert).getWeight();
+                    long minWeight = Math.min(e1Weight, e2Weight);
 
-                        LabelVertex label1 = getVertex(v1);
-                        LabelVertex label2 = getVertex(v2);
-                        WeightedEdge edge =
-                                foldedGraph.findEdge(label1, label2);
-                        if (edge == null) {
-                            foldedGraph.addEdge(new WeightedEdge(minWeight),
-                                                label1, label2);
-                        } else {
-                            edge.addWeight(minWeight);
-                        }
+                    LabelVertex label1 = getVertex(v1);
+                    LabelVertex label2 = getVertex(v2);
+                    WeightedEdge edge = foldedGraph.findEdge(label1, label2);
+                    if (edge == null) {
+                        foldedGraph.addEdge(new WeightedEdge(minWeight),
+                                            label1, label2);
+                    } else {
+                        edge.addWeight(minWeight);
                     }
                 }
             }

@@ -43,7 +43,8 @@ public class AffinitySet implements AffinityGroup, Serializable {
     private final long generation;
 
     /**
-     * Constructs a new affinity group with the given ID.
+     * Constructs a new affinity group with the given ID, generation number,
+     * and an initial identity to include.
      * @param id the affinity group identity
      * @param generation the generation number of this group
      * @param identity the first identity in this affinity set
@@ -56,7 +57,8 @@ public class AffinitySet implements AffinityGroup, Serializable {
     }
 
     /**
-     * Constructs a new affinity group with the given ID.
+     * Constructs a new affinity group with the given ID, generation number,
+     * and a set of initial identities to include.
      * @param id the affinity group identity
      * @param generation the generation number of this group
      * @param identitySet the initial set of identities to include

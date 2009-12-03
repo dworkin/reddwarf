@@ -50,6 +50,52 @@ import java.util.logging.Level;
  * which builds a single large graph for all information in the system.
  * <p>
  * If the server cannot be contacted, we report the failure to the watchdog.
+ * <p>
+ * The following properties are supported:
+ * <p>
+ * <dl style="margin-left: 1em">
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.server.host
+ *	</b></code><br>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, or {@code localhost} if this node is starting the
+ *      server <br>
+ *
+ * <dd style="padding-top: .5em">The name of the host running the {@code
+ *	NodeMappingServer}. <p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.server.port
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 44537}
+ *
+ * <dd style="padding-top: .5em">The network port for the {@code
+ *	LabelPropagationServer}.  This value must be no less than {@code 0} and
+ *      no greater than {@code 65535}. <p>
+ * 
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.snapshot.period
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 300000} (5 minutes)<br>
+ *
+ * <dd style="padding-top: .5em">The amount of time, in milliseconds, for
+ *      each snapshot of retained data.  Older snapshots are discarded as
+ *      time goes on. A longer snapshot period gives us more history, but
+ *      also longer compute times to use that history, as more data must
+ *      be processed.<p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.affinity.snapshot.count
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 1}
+ *
+ * <dd style="padding-top: .5em">The number of snapshots to retain.  A
+ *       larger value means more history will be retained.  Using a smaller
+ *       snapshot period with a larger count means more total history will be
+ *       retained, with a smaller amount discarded at the start of each
+ *       new snapshot.<p>
+ * </dl>
  */
 public class DistGraphBuilder extends AbstractAffinityGraphBuilder 
         implements AffinityGraphBuilder

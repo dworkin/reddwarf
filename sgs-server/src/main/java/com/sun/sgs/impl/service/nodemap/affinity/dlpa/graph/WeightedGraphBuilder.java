@@ -81,14 +81,17 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
     private final ConcurrentMap<Object, Map<Identity, Long>>
         objectMap = new ConcurrentHashMap<Object, Map<Identity, Long>>();
     
-    /** Our graph of object accesses. */
+    /** Our graph of object accesses.  Changes to the graph must be made
+     * with the graph locked.
+     */
     private final UndirectedGraph<LabelVertex, WeightedEdge>
         affinityGraph = new UndirectedSparseGraph<LabelVertex, WeightedEdge>();
 
     /**
      * A map of identity->graph vertex, allowing fast lookups of particular
-     * vertices. Changes to this graph should occur atomically with vertex
-     * changes to the affinity graph.
+     * vertices. Changes to this map should occur atomically with vertex
+     * changes to the affinity graph, with a lock held on the
+     * {@code affinityGraph}.
      */
     private final Map<Identity, LabelVertex> identMap =
             new HashMap<Identity, LabelVertex>();
@@ -110,10 +113,14 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
      * changed.  Groups of changes are chunked into periods, each the length
      * of the time snapshot (configured at construction time). We
      * periodically remove the changes made in the earliest snapshot.
+     * The pruneTask is {@code null} on the core server node because no
+     * graph information is accumulated on that node.
      */
     private final PruneTask pruneTask;
 
-    /** Our JMX exposed information. */
+    /** Our JMX exposed information, or {@code null} if we are on the 
+     * core server node.  No graph actions occur on the core server node.
+     */
     private final AffinityGraphBuilderStats stats;
 
     // Our label propagation algorithm parts
@@ -173,7 +180,7 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
             pruneTimer.schedule(pruneTask, snapshot, snapshot);
         } else {
             throw new IllegalArgumentException(
-                    "Cannot use DLPA algorithm on singe node");
+                    "Cannot use DLPA algorithm on single node");
         }
     }
     
@@ -359,6 +366,7 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
      * @return the graph vertex representing the identity
      */
     private LabelVertex addOrGetVertex(Identity id) {
+        assert Thread.holdsLock(affinityGraph);
         LabelVertex v = getVertex(id);
         if (v == null) {
             v = new LabelVertex(id);
@@ -462,7 +470,7 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
                 // Remove the earliest snasphot.
                 periodObject = periodObjectQueue.removeFirst();
                 periodEdgeIncrements = periodEdgeIncrementsQueue.removeFirst();
-                periodConflicts = periodConflictQueue.remove();
+                periodConflicts = periodConflictQueue.removeFirst();
             }
 
             long startTime = System.currentTimeMillis();

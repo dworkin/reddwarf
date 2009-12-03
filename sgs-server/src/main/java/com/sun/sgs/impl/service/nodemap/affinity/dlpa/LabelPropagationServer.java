@@ -156,7 +156,7 @@ public class LabelPropagationServer extends BasicState
      * This is replaced on each iteration.
      * No synchronization is required on this latch.
      */
-    private CountDownLatch latch;
+    private volatile CountDownLatch latch;
 
     // Algorithm iteration information
     /**
@@ -193,8 +193,10 @@ public class LabelPropagationServer extends BasicState
      * of the ongoing first one?  Abort the first one?
      */
     private final Object runningLock = new Object();
-    /** True if we're in the midst of an algorithm run. */
-    private volatile boolean running = false;
+    /** True if we're in the midst of an algorithm run.  Access while holding
+     * the runningLock.
+     */
+    private boolean running = false;
 
     /**  The algorithm run number, used to ensure that LPAClients are reporting
      * results from the expected run.
@@ -293,8 +295,12 @@ public class LabelPropagationServer extends BasicState
         // to start with.  If a node fails, we'll stop and return no information
         // for now.  When a node fails, a lot of changes will occur in the
         // graphs as we move identities from the failed node to new nodes.
+        //
+        // We make this copy unmodifiable to catch any errors in our code
+        // breaking this assumption.
         final Map<Long, LPAClient> clientProxyCopy =
-                new HashMap<Long, LPAClient>(clientProxyMap);
+                Collections.unmodifiableMap(
+                    new HashMap<Long, LPAClient>(clientProxyMap));
         
         runFailed = false;
         runException = null;
@@ -368,7 +374,7 @@ public class LabelPropagationServer extends BasicState
         stats.failedCountInc();
         stats.setNumGroups(0);
         if (runException == null) {
-            runException = new AffinityGroupFinderFailedException("msg");
+            runException = new AffinityGroupFinderFailedException(msg);
         }
     }
 
@@ -528,11 +534,9 @@ public class LabelPropagationServer extends BasicState
      */
     private void prepareAlgorithm(Map<Long, LPAClient> clientProxies) {
         // Tell each node to prepare for an algorithm run.
-        final Set<Long> clean =
-                Collections.unmodifiableSet(clientProxies.keySet());
         nodeBarrier.clear();
-        nodeBarrier.addAll(clean);
-        latch = new CountDownLatch(clean.size());
+        nodeBarrier.addAll(clientProxies.keySet());
+        latch = new CountDownLatch(clientProxies.keySet().size());
 
         final long runNum = runNumber.incrementAndGet();
         for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
@@ -581,9 +585,7 @@ public class LabelPropagationServer extends BasicState
      * @param clientProxies a map of node ids to LPAClient proxies
      */
     private void runIterations(Map<Long, LPAClient> clientProxies) {
-        final Set<Long> clean =
-                Collections.unmodifiableSet(clientProxies.keySet());
-        final int cleanSize = clean.size();
+        final int cleanSize = clientProxies.keySet().size();
         currentIteration = 0;
         while (!runFailed && !nodesConverged) {
             // Assume we'll converge unless told otherwise; all nodes must
@@ -591,7 +593,7 @@ public class LabelPropagationServer extends BasicState
             // this iteration
             nodesConverged = true;
             assert (nodeBarrier.isEmpty());
-            nodeBarrier.addAll(clean);
+            nodeBarrier.addAll(clientProxies.keySet());
             latch = new CountDownLatch(cleanSize);
             for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet())
             {
@@ -662,11 +664,9 @@ public class LabelPropagationServer extends BasicState
         // on the failed node as being part of any group.
         final Map<Long, Set<AffinityGroup>> returnedGroups =
             new ConcurrentHashMap<Long, Set<AffinityGroup>>();
-        final Set<Long> clean =
-                Collections.unmodifiableSet(clientProxies.keySet());
         nodeBarrier.clear();
-        nodeBarrier.addAll(clean);
-        latch = new CountDownLatch(clean.size());
+        nodeBarrier.addAll(clientProxies.keySet());
+        latch = new CountDownLatch(clientProxies.keySet().size());
         final long runNum = runNumber.get();
         for (final Map.Entry<Long, LPAClient> ce : clientProxies.entrySet()) {
             final Long nodeId = ce.getKey();

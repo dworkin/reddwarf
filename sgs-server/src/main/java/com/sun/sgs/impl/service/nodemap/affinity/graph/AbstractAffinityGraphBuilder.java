@@ -27,14 +27,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * An abstract class to support common AffinityGraphBuilder implementations.
+ * A base class to support common AffinityGraphBuilder implementations.
  * <p>
  * This class supports the following properties:
  * <p>
  * <dl style="margin-left: 1em">
  *
  * <dt>	<i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder.snapshot.period
+ *	com.sun.sgs.impl.service.nodemap.affinity.snapshot.period
  *	</b></code><br>
  *	<i>Default:</i> {@code 300000} (5 minutes)<br>
  *
@@ -45,7 +45,7 @@ import java.util.logging.Logger;
  *      be processed.<p>
  *
  * <dt>	<i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.affinity.GraphBuilder.snapshot.count
+ *	com.sun.sgs.impl.service.nodemap.affinity.snapshot.count
  *	</b></code><br>
  *	<i>Default:</i> {@code 1}
  *
@@ -100,8 +100,9 @@ public class AbstractAffinityGraphBuilder extends BasicState {
         periodCount = wrappedProps.getIntProperty(
                 PERIOD_COUNT_PROPERTY, DEFAULT_PERIOD_COUNT,
                 1, Integer.MAX_VALUE);
-        logger.log(Level.CONFIG, "graph builder created with period {0} " +
-                                 " and period count {1}",
-                                 snapshot, periodCount);
+         logger.log(Level.CONFIG,
+                       "Created graph builder with properties:" +
+                       "\n  " + PERIOD_PROPERTY + "=" + snapshot +
+                       "\n  " + PERIOD_COUNT_PROPERTY + "=" + periodCount);
     }
 }

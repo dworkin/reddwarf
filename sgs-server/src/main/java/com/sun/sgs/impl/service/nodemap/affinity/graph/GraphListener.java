@@ -40,7 +40,9 @@ public class GraphListener implements ProfileListener {
      * Constructs a new listener for affinity graph data.
      * <p>
      * NOTE: this constructor should never be used, but is provided to
-     * satisfy the {@code ProfileListener} documentation.
+     * satisfy the {@code ProfileListener} documentation.  This listener
+     * cannot be provided as as a property, it is created within the system
+     * for the server's use.
      *
      * @param properties the configuration properties
      * @param owner task owner for any tasks run by this listener
