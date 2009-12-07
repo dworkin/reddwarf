@@ -182,7 +182,12 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      */
     private int iteration = -1;
 
-    /** Synchronization for state, runNumber, and iteration. */
+    /**
+     * Synchronization for state, runNumber, and iteration.
+     * Using this lock ensures that results from each phase of the algorithm
+     * runs (prepare and iterations) are seen by the next phase, no matter
+     * which thread actually runs the next phase.
+     */
     private final Object stateLock = new Object();
 
     /** The groups collected in the last run. */
@@ -991,7 +996,10 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
 //        }
 //    }
 
-    // For testing
+    // Methods for testing.  The tests that use these methods do not
+    // require further synchronization because they are either single-threaded
+    // or they are calling methods like prepareAlgorithm, which will ensure
+    // that data being prepared is flushed before returning.
     /**
      * Returns the node conflict map.
      * @return the node conflict map.

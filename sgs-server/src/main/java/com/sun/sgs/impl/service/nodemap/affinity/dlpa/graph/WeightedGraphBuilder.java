@@ -265,7 +265,8 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
 
     /** {@inheritDoc} */
     public UndirectedGraph<LabelVertex, WeightedEdge> getAffinityGraph() {
-        return Graphs.unmodifiableUndirectedGraph(affinityGraph);
+        return Graphs.unmodifiableUndirectedGraph(
+                Graphs.synchronizedUndirectedGraph(affinityGraph));
     }
 
     /** {@inheritDoc} */
@@ -314,7 +315,9 @@ public class WeightedGraphBuilder extends AbstractAffinityGraphBuilder
 
     /** {@inheritDoc} */
     public LabelVertex getVertex(Identity id) {
-        return identMap.get(id);
+        synchronized (affinityGraph) {
+            return identMap.get(id);
+        }
     }
     
     /** {@inheritDoc} */

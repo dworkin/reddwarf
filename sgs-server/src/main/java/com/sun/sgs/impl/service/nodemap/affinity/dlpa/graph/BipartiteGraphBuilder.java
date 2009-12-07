@@ -247,29 +247,13 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
             List<Object> neighbors =
                     new ArrayList<Object>(graphCopy.getNeighbors(objVert));
             int length = neighbors.size();
-            Identity v1 = null;
-            Identity v2 = null;
             for (int i = 0; i < length - 1; i++) {
                 Object neighbor = neighbors.get(i);
-                if (neighbor instanceof Identity) {
-                    v1 = (Identity) neighbor;
-                } else {
-                    // our graph is messed up
-                    logger.log(Level.FINE, "unexpected vertex type {0}",
-                                            neighbor);
-                    continue;
-                }
+                Identity v1 = (Identity) neighbor;
 
                 for (int j = i + 1; j < length; j++) {
                     neighbor = neighbors.get(j);
-                    if (neighbor instanceof Identity) {
-                        v2 = (Identity) neighbor;
-                    } else {
-                        // our graph is messed up
-                        logger.log(Level.FINE, "unexpected vertex type {0}",
-                                            neighbor);
-                        continue;
-                    }
+                    Identity v2 = (Identity) neighbor;
 
                     // The weight of the edge representing this use
                     // is the min of the counts of each identity's use
@@ -303,8 +287,8 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
 
     /** {@inheritDoc} */
     public Map<Object, Map<Identity, Long>> getObjectUseMap() {
-        ConcurrentMap<Object, Map<Identity, Long>> retMap =
-            new ConcurrentHashMap<Object, Map<Identity, Long>>();
+        Map<Object, Map<Identity, Long>> retMap =
+            new HashMap<Object, Map<Identity, Long>>();
         // Copy our input graph
         CopyableGraph<Object, WeightedEdge> graphCopy =
             new CopyableGraph<Object, WeightedEdge>(bipartiteGraph);
