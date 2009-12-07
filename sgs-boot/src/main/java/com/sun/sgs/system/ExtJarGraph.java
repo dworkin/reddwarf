@@ -146,9 +146,10 @@ class ExtJarGraph {
         StringBuilder managersLine = new StringBuilder();
         StringBuilder nodeTypesLine = new StringBuilder();
         StringBuilder authenticatorsLine = new StringBuilder();
+        StringBuilder profileListenersLine = new StringBuilder();
         for (JarNode node : dependencyRoots) {
             buildProperties(node, p, servicesLine, managersLine, nodeTypesLine,
-                            authenticatorsLine);
+                            authenticatorsLine, profileListenersLine);
         }
         if (servicesLine.length() != 0) {
             p.setProperty("com.sun.sgs.ext.services", servicesLine.toString());
@@ -163,6 +164,10 @@ class ExtJarGraph {
         if (authenticatorsLine.length() != 0) {
             p.setProperty("com.sun.sgs.ext.authenticators",
                           authenticatorsLine.toString());
+        }
+        if (profileListenersLine.length() != 0) {
+            p.setProperty("com.sun.sgs.ext.kernel.profile.listeners",
+                          profileListenersLine.toString());
         }
 
         // generate the properties file
@@ -226,12 +231,13 @@ class ExtJarGraph {
                                  StringBuilder servicesLine,
                                  StringBuilder managersLine,
                                  StringBuilder nodeTypesLine,
-                                 StringBuilder authenticatorsLine)
+                                 StringBuilder authenticatorsLine,
+                                 StringBuilder profileListenersLine)
     {
         // gather properties from depdencies first
         for (JarNode dNode : node.dNodes) {
             buildProperties(dNode, p, servicesLine, managersLine, nodeTypesLine,
-                            authenticatorsLine);
+                            authenticatorsLine, profileListenersLine);
         }
 
         // include this node's properties if they haven't already been included
@@ -308,6 +314,14 @@ class ExtJarGraph {
             if ((authenticators != null) && (authenticators.length() != 0)) {
                 addToLine(authenticatorsLine, authenticators);
             }
+
+            String profileListeners = (String) nodeProps.remove(
+                    "com.sun.sgs.impl.kernel.profile.listeners");
+            if ((profileListeners != null) &&
+                (profileListeners.length() != 0)) {
+                addToLine(profileListenersLine, profileListeners);
+            }
+
             // merge any remaining properties, failing if the same property
             // is assigned different values by separate extensions
             for (String key : nodeProps.stringPropertyNames()) {

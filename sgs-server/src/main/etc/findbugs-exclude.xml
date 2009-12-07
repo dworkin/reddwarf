@@ -337,6 +337,16 @@
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
   </Match>
+
+  <!-- Package com.sun.sgs.impl.service.nodemap.affinity.dlpa -->
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.watchdog -->
 
   <!-- Access to abortCause is safe due to checking current thread at beginning of method -->
