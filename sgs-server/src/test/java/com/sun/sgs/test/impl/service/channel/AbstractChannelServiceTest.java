@@ -177,6 +177,10 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	props.setProperty(
  	   "com.sun.sgs.impl.protocol.simple.protocol.version",
 	   Byte.toString(protocolVersion));
+	props.setProperty(
+	    StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY,
+	    "5000");
+			  
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 	port = serverNode.getAppPort();
@@ -222,6 +226,9 @@ public abstract class AbstractChannelServiceTest extends Assert {
 	props.setProperty(
  	   "com.sun.sgs.impl.protocol.simple.protocol.version",
 	   Byte.toString(protocolVersion));
+	props.setProperty(
+	    StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY,
+	    "5000");
 	SgsTestNode node = 
 	    new SgsTestNode(serverNode, DummyAppListener.class, props);
 	wrapChannelServerProxy(node);

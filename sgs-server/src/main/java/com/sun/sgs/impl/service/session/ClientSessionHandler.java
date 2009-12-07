@@ -466,37 +466,41 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Handles a disconnect request (if not already handled) by doing
-     * the following: <ol>
+     * Handles disconnecting the associated client session (if not already
+     * handled) by doing the following: <ol>
      *
-     * <li> sending a disconnect acknowledgment (logout success)
-     *    if 'graceful' is true
+     * <li> notifies the client session service to clean up the client
+     *      session's handler and login information,
      *
-     * <li> if {@code closeConnection} is {@code true}, closing this
-     *    session's connection, otherwise monitor the connection's status
-     *    to ensure that the client disconnects it. 
+     * <li> notifies the node mapping service to deativate the client's
+     *	    identity if the identity is no longer active on this node,
      *
-     * <li> submitting a transactional task to call the 'disconnected'
-     *    callback on the listener for this session.
+     * <li> if {@code closeConnection} is {@code true}, closes this
+     *      session's connection,
      *
-     * <li> notifying the identity that the session has
-     *    logged out.
-     *
-     * <li> notifying the node mapping service that the identity is no
-     *	  longer active. 
+     * <li> if the session is terminating (not relocating), schedules a
+     *      transactional task to invoke, on this session's {@code
+     *      ClientSessionListener}, the {@code disconnected} callback
+     *      with {@code graceful} as its argument and then clean up the
+     *      session's persistent data, and also schedules a task to notify
+     *      the identity that its corresponding session has logged out.
      * </ol>
      *
      * <p>Note:if {@code graceful} is {@code true}, then {@code
-     * closeConnection} must be {@code false} so that the client will receive
-     * the logout success message.  The client may not
-     * receive the message if the connection is disconnected immediately
-     * after sending the message.
+     * closeConnection} must be {@code false} so that the client's {@code
+     * SessionProtocol} can send a notification of logout success to the
+     * client.  The client may not receive such a notification if the
+     * connection is disconnected immediately.
      *
-     * @param	graceful if {@code true}, the disconnection was graceful
-     *		(i.e., due to a logout request).
+     * <p>In the cases of login redirection, session relocation, and
+     * graceful logout, it is the responsibility of the client's {@code
+     * SessionProtocol} to close the client's connection in a timely manner
+     * after notifying the client.
+     *
+     * @param	graceful if {@code true}, indicates that disconnection is
+     *		due to a (graceful) logout request
      * @param	closeConnection if {@code true}, close this session's
-     *		connection immediately, otherwise monitor the connection to
-     *		ensure that it is terminated in a timely manner by the client
+     *		connection immediately
      */
     void handleDisconnect(final boolean graceful, boolean closeConnection) {
 
@@ -518,17 +522,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    sessionService.removeHandler(sessionRefId, !isTerminating());
 	}
 	
-	if (isTerminating()) {
-	    // TBD: Due to the scheduler's behavior, this notification
-	    // may happen out of order with respect to the
-	    // 'notifyLoggedIn' callback.  Also, this notification may
-	    // also happen even though 'notifyLoggedIn' was not invoked.
-	    // Are these behaviors okay?  -- ann (3/19/07)
-	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
-		    public void run() {
-			identity.notifyLoggedOut();
-		    } });
-	}
 	if (sessionService.removeUserLogin(identity, this)) {
 	    deactivateIdentity();
 	}
@@ -553,24 +546,26 @@ class ClientSessionHandler implements SessionProtocolHandler {
 			dataService, graceful, true);
 		}
 	    });
+	    // TBD: Due to the scheduler's behavior, this notification
+	    // may happen out of order with respect to the
+	    // 'notifyLoggedIn' callback.  Also, this notification may
+	    // also happen even though 'notifyLoggedIn' was not invoked.
+	    // Are these behaviors okay?  -- ann (3/19/07)
+	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
+		    public void run() {
+			identity.notifyLoggedOut();
+		    } });
 	}
     }
 
     /**
-     * Schedule a non-transactional task for disconnecting the client.
+     * Schedules a non-transactional task to handle disconnecting the
+     * associated client session.
      *
-     * <p>Note:if {@code graceful} is {@code true}, then {@code
-     * closeConnection} must be {@code false} so that the client will receive
-     * the logout success message.  The client may not
-     * receive the message if the connection is disconnected immediately
-     * after sending the message.
-     *
-     * @param	graceful if {@code true}, disconnection is graceful (i.e.,
-     * 		a logout success message is sent before
-     * 		disconnecting the client session)
+     * @param	graceful if {@code true}, indicates that disconnection is
+     *		due to a (graceful) logout request
      * @param	closeConnection if {@code true}, close this session's
-     *		connection immediately, otherwise monitor the connection to
-     *		ensure that it is terminated in a timely manner by the client
+     *		connection immediately
      */
     private void scheduleHandleDisconnect(
 	final boolean graceful, final boolean closeConnection)
@@ -1249,10 +1244,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * When all {@code ClientSessionStatusListener}s have completed
      * preparing the client session to relocate, this instance's
      * {@link MoveAction#suspend suspend} method is invoked which
-     * notifies the associated session's {@code SessionProtocol to
+     * notifies the associated session's {@code SessionProtocol} to
      * suspend sending messages to the server.<p>
      *
-     * When the suspend operation's {@link SuspendCompletionHandler} is
+     * When the suspend operation's {@code SuspendCompletionHandler} is
      * notified as {@code completed}, that completion handler notifies
      * this action's {@code completed} method, which, in turn notifies
      * the associated session's {@link SessionProtocol} to {@code
@@ -1383,13 +1378,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		isCompleted = true;
 	    }
 	    
-	    final Set<ProtocolDescriptor> descriptors =
-		sessionService.getProtocolDescriptors(newNode.getId());
-	    final byte[] key;
-	    synchronized (this) {
-		key = this.relocationKey;
-	    }
-	    
 	    if (!supportsRelocation()) {
 		logger.log(
 		    Level.WARNING,
@@ -1397,6 +1385,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    "that was erroneously prepared to relocate", identity);
 		handleDisconnect(false, true);
 		return;
+	    }
+	    
+	    final Set<ProtocolDescriptor> descriptors =
+		sessionService.getProtocolDescriptors(newNode.getId());
+	    final byte[] key;
+	    synchronized (this) {
+		key = this.relocationKey;
 	    }
 
 	    // Add client 'relocate' notification to the task queue to
@@ -1406,8 +1401,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		new AbstractKernelRunnable("NotifySessionRelocate") {
 		    public void run() {
 			try {
-			    System.err.println("invoking relocate, identity: " +
-					       identity);
 			    ((SessionRelocationProtocol) protocol).relocate(
  				newNode, descriptors, ByteBuffer.wrap(key),
 				new RelocateCompletionHandler());

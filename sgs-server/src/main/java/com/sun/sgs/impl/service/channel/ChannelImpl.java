@@ -126,7 +126,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     private static final String SAVED_MESSAGES_MAP_PREFIX =
 	PKG_NAME + "message.";
 
-    /** The saved messages map prefix. */
+    /** The saved messages queue prefix. */
     private static final String SAVED_MESSAGES_QUEUE_PREFIX =
 	PKG_NAME + "messageQueue.";
     
@@ -352,12 +352,10 @@ class ChannelImpl implements ManagedObject, Serializable {
 	checkClosed();
 
 	Set<BigInteger> channelMembers = null;
-	ChannelServiceImpl channelService =
-	    ChannelServiceImpl.getInstance();
 	
 	if (!servers.isEmpty()) {
 	    channelMembers =
-		channelService.collectChannelMembership(
+		ChannelServiceImpl.getInstance().collectChannelMembership(
 		    txn, channelRefId, servers);
 	}
 
@@ -632,8 +630,8 @@ class ChannelImpl implements ManagedObject, Serializable {
 
     /** Implements {@link Channel#leaveAll}.
      *
-     * Enqueues a leaveAll event to this channel's event queue and notifies
-     * this channel's coordinator to service the event.
+     * Closes the current channel, and creates a new channel (with a new
+     * channel ID) that uses the existing channel's wrapper.
      */
     void leaveAll() {
 	try {
@@ -871,6 +869,14 @@ class ChannelImpl implements ManagedObject, Serializable {
 	return coordNodeId == getLocalNodeId();
     }
 
+    /**
+     * Returns {@code true} if the local node is the coordinator for this
+     * channel, and returns {@code false} otherwise.  If the coordinator
+     * was just reassigned to this node (i.e., the {@code
+     * isCoordinatorReassigned} field is {@code true}) and this channel
+     * supports reliable message delivery, then schedule a new task to reap
+     * saved messages.
+     */
     private boolean checkCoordinator() {
 	if (!isCoordinator()) {
 	    return false;
@@ -1090,7 +1096,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 
 	private void scheduleTask() {
 	    TaskService taskService = 
-		ChannelServiceImpl.getInstance().getTaskService();
+		ChannelServiceImpl.getTaskService();
 	    if (isDurable) {
 		taskService.scheduleTask(this, 1000L);
 	    } else {
@@ -1126,7 +1132,6 @@ class ChannelImpl implements ManagedObject, Serializable {
      */
     private void reassignCoordinator(long failedCoordNodeId) {
 	DataService dataService = getDataService();
-	dataService.markForUpdate(this);
 	if (coordNodeId != failedCoordNodeId) {
 	    logger.log(
 		Level.SEVERE,
@@ -1140,6 +1145,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	 * Assign a new coordinator, and store event queue in new
 	 * coordinator's event queue map.
 	 */
+	dataService.markForUpdate(this);
 	coordNodeId = chooseCoordinatorNode();
 	isCoordinatorReassigned = true;
 	if (logger.isLoggable(Level.FINER)) {
@@ -1935,7 +1941,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 		}
 		try {
 		    if (sendNotification(server)) {
-			// Join was successful
+			// Notification was successful
 			break;
 		    } else {
 			// If session's node hasn't changed, then it is

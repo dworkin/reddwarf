@@ -645,6 +645,9 @@ public final class WatchdogServerImpl
         }
         processNodeFailures(Arrays.asList(node));
 	statusChangedNodes.add(node);
+	synchronized (notifyClientsLock) {
+	    notifyClientsLock.notifyAll();
+	}
     }
 
     /**

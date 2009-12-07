@@ -120,13 +120,14 @@ public interface Channel extends ManagedObject {
      * this channel.  The returned iterator may only be used in the task
      * that this method was invoked from.
      *
-     * <p>The returned iterator may not reflect changes to the membership
-     * that occurred in the current transaction.  Such membership changes
-     * may be handled asynchronously, after the task making the changes
-     * completes.  Therefore, the iterator <i>may not</i> include sessions
-     * that have been recently joined to the channel, or <i>may</i> include
-     * sessions that have recently left the channel (by being explicitly
-     * removed from the channel, or by being disconnected).
+     * <p>The returned iterator may not reflect recent changes (in the
+     * current transaction or another recent transaction) to the channel's
+     * membership.  Membership changes may be handled asynchronously, after
+     * the task making the changes completes.  Therefore, the iterator
+     * <i>may not</i> include sessions that have been recently joined to
+     * the channel, or <i>may</i> include sessions that have recently left
+     * the channel (by being explicitly removed from the channel, or by
+     * being disconnected).
      *
      * <p>Note: This operation may be expensive, so it should be used
      * judiciously.

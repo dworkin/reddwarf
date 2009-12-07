@@ -871,23 +871,13 @@ public class TestNodeMappingServiceImpl {
         // ... and invoke the method
         moveMethod.invoke(server, id, null, firstNode, firstNodeId);
 
-	long secondNodeId;
-	Node secondNode;
-	long stop = System.currentTimeMillis() + 1000;
-	
-	do {
-	    // Keep getting identity's node assignment until it changes...
-	    txnScheduler.runTask(task, taskOwner);
-	    secondNode = task.getNode();
-	    secondNodeId = secondNode.getId();
-	    
-	} while (secondNodeId == firstNodeId &&
-		 System.currentTimeMillis() < stop);
-	
-        TestListener secondNodeListener = 
-	    nodeListenerMap.get(secondNodeId);
-
 	firstNodeListener.waitForNotification();
+	
+	txnScheduler.runTask(task, taskOwner);
+	Node secondNode = task.getNode();
+        TestListener secondNodeListener = 
+	    nodeListenerMap.get(secondNode.getId());
+
 	secondNodeListener.waitForNotification();
 
         checkIdMoved(firstNodeListener, firstNode,

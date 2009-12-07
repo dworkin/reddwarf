@@ -29,6 +29,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -118,15 +119,17 @@ import javax.management.JMException;
  *      capacity per channel.<p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	{@value #SESSION_RELOCATION_TIMEOUT_PROPERTY}
+ *	{@value com.sun.sgs.impl.kernel.StandardProperties#SESSION_RELOCATION_TIMEOUT_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> {@value #DEFAULT_SESSION_RELOCATION_TIMEOUT}
+ *	<i>Default:</i>
+ *	{@value com.sun.sgs.impl.kernel.StandardProperties#DEFAULT_SESSION_RELOCATION_TIMEOUT}
  *
  * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
- *	to save reliable channel messages so that relocating client
+ *	for client session relocation. This also specifies the amount of
+ *	time to save reliable channel messages so that relocating client
  *	sessions can obtain channel messages that were missed during
- *	relocation. 
- *      <p>
+ *	relocation. <p>
+ * 
  * </dl> <p>
  */
 public final class ChannelServiceImpl
@@ -177,15 +180,6 @@ public final class ChannelServiceImpl
 
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE}. */
     static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
-
-    /** The name of the session relocation timeout property. */
-    static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
-	PKG_NAME + ".session.relocation.timeout";
-
-    /** The default session relocation timeout:
-     * {@value #DEFAULT_SESSION_RELOCATION_TIMEOUT}.
-     */
-    static final int DEFAULT_SESSION_RELOCATION_TIMEOUT = 5000;
 
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
@@ -305,7 +299,7 @@ public final class ChannelServiceImpl
 
     /** The timeout expiration, in milliseconds, for a client session to
      * relocate. */
-    final int sessionRelocationTimeout;
+    final long sessionRelocationTimeout;
     
     /** Our JMX exposed statistics. */
     final ChannelServiceStats serviceStats;
@@ -362,10 +356,10 @@ public final class ChannelServiceImpl
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
 		1, Integer.MAX_VALUE);
-	    sessionRelocationTimeout = wrappedProps.getIntProperty(
-		SESSION_RELOCATION_TIMEOUT_PROPERTY,
-		DEFAULT_SESSION_RELOCATION_TIMEOUT,
-		500, Integer.MAX_VALUE);
+	    sessionRelocationTimeout = wrappedProps.getLongProperty(
+		StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY,
+		StandardProperties.DEFAULT_SESSION_RELOCATION_TIMEOUT,
+		500, Long.MAX_VALUE);
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -439,8 +433,9 @@ public final class ChannelServiceImpl
                        "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort +
                        "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" + 
                        writeBufferSize +
-		       "\n  " + SESSION_RELOCATION_TIMEOUT_PROPERTY + "=" +
-		       sessionRelocationTimeout);
+		       "\n  " +
+		       StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY +
+		       "=" + sessionRelocationTimeout);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -553,13 +548,19 @@ public final class ChannelServiceImpl
 	public MembershipStatus isMember(
 	    BigInteger channelRefId, BigInteger sessionRefId)
 	{
-	    if (sessionService.getSessionProtocol(sessionRefId) == null) {
-		return MembershipStatus.UNKNOWN;
-	    } else {
-		return
-		    isLocalChannelMember(channelRefId, sessionRefId) ?
-		    MembershipStatus.MEMBER :
-		    MembershipStatus.NON_MEMBER;
+	    callStarted();
+	    try {
+		if (sessionService.getSessionProtocol(sessionRefId) == null) {
+		    return MembershipStatus.UNKNOWN;
+		} else {
+		    return
+			isLocalChannelMember(channelRefId, sessionRefId) ?
+			MembershipStatus.MEMBER :
+			MembershipStatus.NON_MEMBER;
+		}
+		
+	    } finally {
+		callFinished();
 	    }
 	}
 	
@@ -698,7 +699,7 @@ public final class ChannelServiceImpl
 		synchronized (channelInfo) {
 		    // This check only needs to be made for reliable
 		    // channels.  Channel messages for ordered-unreliable
-		    // channels are not send to channel servers more than
+		    // channels are not sent to channel servers more than
 		    // once.
 		    if (isReliable(channelInfo.delivery) &&
 			timestamp <= channelInfo.msgTimestamp)
@@ -748,15 +749,21 @@ public final class ChannelServiceImpl
 	    BigInteger[] channelRefIds, byte[] deliveryOrdinals,
 	    long[] msgTimestamps)
 	{
-	    /*
-	     * Schedule task to add the session's new node (the local
-	     * node) to each of its channels if not already present.
-	     */
-	    taskScheduler.scheduleTask(
-		new AddRelocatingSessionNodeToChannels(
-		    sessionRefId, oldNodeId,
-		    channelRefIds, deliveryOrdinals, msgTimestamps),
-		taskOwner);
+	    callStarted();
+	    try {
+		/*
+		 * Schedule task to add the session's new node (the local
+		 * node) to each of its channels if not already present.
+		 */
+		taskScheduler.scheduleTask(
+		    new AddRelocatingSessionNodeToChannels(
+			sessionRefId, oldNodeId,
+			channelRefIds, deliveryOrdinals, msgTimestamps),
+		    taskOwner);
+		
+	    } finally {
+		callFinished();
+	    }
 	}
 	
 	/**
@@ -765,12 +772,18 @@ public final class ChannelServiceImpl
 	public void relocateChannelMembershipsCompleted(
 	    BigInteger sessionRefId, long newNodeId)
 	{
-	    removeLocalSessionFromAllChannels(sessionRefId);
-	    // Notify completion handler that relocation preparation is done.
-	    RelocationInfo relocationInfo =
-		outgoingSessionRelocationInfo.get(sessionRefId);
-	    if (relocationInfo != null) {
-		relocationInfo.handler.completed();
+	    callStarted();
+	    try {
+		removeLocalSessionFromAllChannels(sessionRefId);
+		// Notify completion handler that relocation preparation is done.
+		RelocationInfo relocationInfo =
+		    outgoingSessionRelocationInfo.get(sessionRefId);
+		if (relocationInfo != null) {
+		    relocationInfo.handler.completed();
+		}
+		
+	    } finally {
+		callFinished();
 	    }
 	}
 	

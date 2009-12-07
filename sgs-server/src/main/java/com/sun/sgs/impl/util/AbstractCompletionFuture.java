@@ -47,7 +47,7 @@ public abstract class AbstractCompletionFuture<T>
     private boolean done = false;
     
     /** Lock for accessing the {@code done} field. */
-    private Object lock = new Object();
+    private final Object lock = new Object();
     
     /** An exception cause, or {@code null}. */
     private volatile Throwable exceptionCause = null;

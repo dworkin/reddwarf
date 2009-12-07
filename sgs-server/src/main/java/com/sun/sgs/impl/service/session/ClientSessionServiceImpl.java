@@ -28,6 +28,7 @@ import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.ConfigManager;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionHandler.
     SetupCompletionFuture;
@@ -155,9 +156,10 @@ import javax.management.JMException;
  *	relocation key.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
- *	{@value #RELOCATION_TIMEOUT_PROPERTY}
+ *	{@value com.sun.sgs.impl.kernel.StandardProperties#SESSION_RELOCATION_TIMEOUT_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> {@value #DEFAULT_RELOCATION_TIMEOUT}
+ *	<i>Default:</i>
+ *	{@value com.sun.sgs.impl.kernel.StandardProperties#DEFAULT_SESSION_RELOCATION_TIMEOUT}
  *
  * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
  *	for client session relocation.<p>
@@ -232,13 +234,6 @@ public final class ClientSessionServiceImpl
     /** The default length of a relocation key, in bytes. */
     static final int DEFAULT_RELOCATION_KEY_LENGTH = 16;
 
-    /** The relocation timeout property. */
-    static final String RELOCATION_TIMEOUT_PROPERTY =
-	PKG_NAME + ".relocation.timeout";
-    
-    /** The default relocation timeout, in milliseconds. */
-    static final long DEFAULT_RELOCATION_TIMEOUT = 5000L;
-    
     /** A random number generator for relocation keys. */
     private static final SecureRandom random = new SecureRandom();
     
@@ -385,7 +380,8 @@ public final class ClientSessionServiceImpl
  		RELOCATION_KEY_LENGTH_PROPERTY, DEFAULT_RELOCATION_KEY_LENGTH,
 		16, Integer.MAX_VALUE);
 	    relocationTimeout = wrappedProps.getLongProperty(
-		RELOCATION_TIMEOUT_PROPERTY, DEFAULT_RELOCATION_TIMEOUT,
+		StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY,
+		StandardProperties.DEFAULT_SESSION_RELOCATION_TIMEOUT,
 		1000L, Long.MAX_VALUE);
 
             /* Export the ClientSessionServer. */
@@ -490,8 +486,9 @@ public final class ClientSessionServiceImpl
                        "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
 		       "\n  " + RELOCATION_KEY_LENGTH_PROPERTY + "=" +
 		       relocationKeyLength +
-		       "\n  " + RELOCATION_TIMEOUT_PROPERTY + "=" +
-		       relocationTimeout +
+		       "\n  " +
+		       StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY +
+		       "=" + relocationTimeout +
                        "\n  " + PROTOCOL_ACCEPTOR_PROPERTY + "=" +
                        protocolAcceptor.getClass().getName() +
                        "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort);

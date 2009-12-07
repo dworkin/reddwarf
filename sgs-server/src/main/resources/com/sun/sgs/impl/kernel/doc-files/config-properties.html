@@ -384,14 +384,16 @@ for a complete description and further configuration options.
 
 <dt>com.sun.sgs.impl.protocol.simple.protocol.version
 <span class="default">0x04</span>
+
 <dd>The <code>SimpleSgsProtocol</code> version used by clients
 connecting to the server.  The default value for the protocol
-version is an earlier version of the protocol, <code>0x04</code>,
-in order to support older clients that have not yet been upgraded
-to support the latest version of the protocol which includes additional
-protocol messages for handling client session relocation.  The
-server will reject a connection from a client that uses a protocol
-version other than the value specified by the property.
+version is an earlier version of the protocol, <code>0x04</code>.
+The default protocol supports older clients that have not yet
+been upgraded to support the newer version of the protocol which
+supports client session relocation (introduced in protocol version
+<code>0x05</code>).  The server will reject a connection from a
+client that uses a protocol version other than the value
+specified by the property.
 		
 </dl>
     

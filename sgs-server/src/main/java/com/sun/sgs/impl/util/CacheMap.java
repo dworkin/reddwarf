@@ -54,7 +54,7 @@ public class CacheMap<K, V> {
      * Creates an instance of this class with the specified {@code
      * entryTimeout}.
      *
-     * @param	entryTimeout an entry timeout
+     * @param	entryTimeout an entry timeout, in milliseconds
      */
     public CacheMap(long entryTimeout) {
 	if (entryTimeout < 0) {
@@ -96,7 +96,7 @@ public class CacheMap<K, V> {
      * @param	key the key
      * @return	the value associated with the key or {@code null}	
      */
-    public V get(Object key) {
+    public V get(K key) {
 	processQueue();
 	Value<K, V> value = map.get(key);
 	if (value == null) {
@@ -117,7 +117,7 @@ public class CacheMap<K, V> {
      * @param	key the key
      * @return	the value previously associated with the key or {@code null}
      */
-    public V remove(Object key) {
+    public V remove(K key) {
 	processQueue();
 	Value<K, V> oldValue = map.remove(key);
 	return oldValue != null ? oldValue.get() : null;

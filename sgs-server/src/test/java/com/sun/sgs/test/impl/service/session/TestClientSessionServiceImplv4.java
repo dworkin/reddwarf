@@ -166,6 +166,9 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	props.setProperty(
  	   "com.sun.sgs.impl.protocol.simple.protocol.version",
 	   Byte.toString(protocolVersion));
+	props.setProperty(
+	    StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY,
+	    "5000");
 	
 	serverNode = 
 	    new SgsTestNode(appName, DummyAppListener.class, props, clean);
@@ -204,6 +207,9 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	    props.setProperty(
 		"com.sun.sgs.impl.protocol.simple.protocol.version",
 		Byte.toString(protocolVersion));
+	    props.setProperty(
+	        StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY,
+		"5000");
             SgsTestNode node =
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             additionalNodes.put(host, node);
