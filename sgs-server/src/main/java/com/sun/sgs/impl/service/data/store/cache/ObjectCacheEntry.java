@@ -29,6 +29,12 @@ package com.sun.sgs.impl.service.data.store.cache;
 final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     /**
+     * Records whether the entry represents a newly created object which has
+     * not yet been provided with data.
+     */
+    private boolean noData;
+
+    /**
      * Creates an object cache entry.
      *
      * @param	oid the object ID
@@ -48,7 +54,10 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      * @return	the cache entry
      */
     static ObjectCacheEntry createNew(long oid, long contextId) {
-	return new ObjectCacheEntry(oid, contextId, State.CACHED_WRITE);
+	ObjectCacheEntry result =
+	    new ObjectCacheEntry(oid, contextId, State.CACHED_WRITE);
+	result.noData = true;
+	return result;
     }
 
     /**
@@ -95,6 +104,7 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 	    ", data:" + (data == null ? "null" : "byte[" + data.length + "]") +
 	    ", contextId:" + getContextId() +
 	    ", state:" + getState() +
+	    (noData ? ", noData:true" : "") +
 	    "]";
     }
 
@@ -115,5 +125,23 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      */
     static int keyHashCode(long oid) {
 	return (int) (oid ^ (oid >>> 32));
+    }
+
+    /**
+     * Returns whether the object associated with this entry has been provided
+     * with data.
+     *
+     * @return	whether the entry has data
+     */
+    boolean getHasData() {
+	return !noData;
+    }
+
+    /**
+     * Notes that the object associated with this entry has been provided with
+     * data.
+     */
+    void setHasData() {
+	noData = false;
     }
 }

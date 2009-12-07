@@ -60,6 +60,14 @@ class TxnContext {
     private List<SavedObjectValue> modifiedObjects = null;
 
     /**
+     * Records the number of newly created objects that have not yet been
+     * provided with data.  This number is important because these "no data"
+     * objects will have entries in modifiedObjects but do not represent
+     * modifications made in the transaction until the data is provided.
+     */
+    private int noDataObjects = 0;
+
+    /**
      * A map from binding keys to information about their previous values for
      * bindings modified in this transaction, or {@code null} if no bindings
      * have been modified.
@@ -244,6 +252,11 @@ class TxnContext {
 	assert Thread.holdsLock(cache.getObjectLock(oid));
 	ObjectCacheEntry entry = ObjectCacheEntry.createNew(oid, contextId);
 	cache.addObjectEntry(entry, reserve);
+	if (modifiedObjects == null) {
+	    modifiedObjects = new LinkedList<SavedObjectValue>();
+	}
+	modifiedObjects.add(new SavedObjectValue(entry));
+	noDataObjects++;
     }
 
     /**
@@ -322,12 +335,17 @@ class TxnContext {
 	Object lock = store.getCache().getObjectLock(entry.key);
 	assert Thread.holdsLock(lock);
 	if (!entry.getModified()) {
-	    if (modifiedObjects == null) {
-		modifiedObjects = new LinkedList<SavedObjectValue>();
+	    if (!entry.getHasData()) {
+		entry.setHasData();
+		noDataObjects--;
+	    } else {
+		if (modifiedObjects == null) {
+		    modifiedObjects = new LinkedList<SavedObjectValue>();
+		}
+		SavedObjectValue saved = new SavedObjectValue(entry);
+		assert !modifiedObjects.contains(saved);
+		modifiedObjects.add(saved);
 	    }
-	    SavedObjectValue saved = new SavedObjectValue(entry);
-	    assert !modifiedObjects.contains(saved);
-	    modifiedObjects.add(saved);
 	    entry.setCachedDirty(lock);
 	}
 	entry.setValue(data);
@@ -479,8 +497,8 @@ class TxnContext {
     private void commitInternal() {
 	Cache cache = store.getCache();
 	/* Collect modified objects */
-	int numObjects =
-	    (modifiedObjects == null) ? 0 : modifiedObjects.size();
+	int numObjects = (modifiedObjects == null)
+	    ? 0 : modifiedObjects.size() - noDataObjects;
 	long[] oids = new long[numObjects];
 	byte[][] oidValues = new byte[numObjects][];
 	int newOids = 0;
@@ -491,16 +509,22 @@ class TxnContext {
 		boolean includeNew = (pass == 1);
 		for (SavedObjectValue saved : modifiedObjects) {
 		    if (includeNew == saved.isNew()) {
-			if (saved.isNew()) {
-			    newOids++;
-			}
 			long oid = saved.key;
-			oids[i] = oid;
 			Object lock = cache.getObjectLock(oid);
 			synchronized (lock) {
 			    ObjectCacheEntry entry = cache.getObjectEntry(oid);
+			    if (!entry.getHasData()) {
+				/* Object was never used */
+				entry.setEvictedImmediate(lock);
+				cache.removeObjectEntry(oid);
+				continue;
+			    }
+			    oids[i] = oid;
 			    oidValues[i] = entry.getValue();
 			    entry.setNotModified(lock);
+			}
+			if (saved.isNew()) {
+			    newOids++;
 			}
 			i++;
 		    }
@@ -565,7 +589,9 @@ class TxnContext {
      * transaction.
      */
     private boolean getModified() {
-	return modifiedObjects != null || modifiedBindings != null;
+	return modifiedBindings != null ||
+	    (modifiedObjects != null &&
+	     modifiedObjects.size() > noDataObjects);
     }
 
     /**
@@ -612,7 +638,9 @@ class TxnContext {
 	    synchronized (lock) {
 		ObjectCacheEntry entry = cache.getObjectEntry(key);
 		entry.setValue(restoreValue);
-		entry.setNotModified(lock);
+		if (entry.getHasData()) {
+		    entry.setNotModified(lock);
+		}
 		if (restoreValue == null) {
 		    /* Roll back object creation */
 		    entry.setEvictedImmediate(lock);

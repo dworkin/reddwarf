@@ -178,6 +178,15 @@ public class TestCachingDataStore extends TestDataStoreImpl {
 		    }
 		}
 	    }
+	    /*
+	     * Make sure cache replacement works when there has been aborted
+	     * object creation.
+	     */
+	    txn = createTransaction();
+	    id = store.createObject(txn);
+	    store.setObject(txn, id, new byte[] { 0 });
+	    txn.abort(new RuntimeException("abort"));
+	    txn = null;
 	    /* Access objects and bindings */
 	    for (int repeat = 0; repeat < 3; repeat++) {
 		for (int i = 0; i < 2000; i++) {
