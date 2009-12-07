@@ -31,6 +31,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
@@ -468,6 +469,7 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.watchdog.server.renew.interval", "1500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
+            LPADriver.GRAPH_CLASS_PROPERTY, "None",
             "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
             "com.sun.sgs.impl.service.task.continue.threshold", "10"
         );
