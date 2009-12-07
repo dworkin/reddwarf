@@ -172,7 +172,7 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
         } else {
             graphListener = null;
         }
-        logger.log(Level.SEVERE,
+        logger.log(Level.CONFIG,
                        "Created LPADriver with listener: " + graphListener +
                        ", builder: " + graphBuilder + ", and properties:" +
                        "\n  " + GRAPH_CLASS_PROPERTY + "=" + builderName +
