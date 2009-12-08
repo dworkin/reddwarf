@@ -28,32 +28,34 @@ import java.rmi.Remote;
  * A remote interface for communicating channel events and other
  * channel-related requests between peer channel services. <p>
  *
- * Each channel event (join, leave, send, close) is assigned a "timestamp"
- * when the event is added to the channel's event queue.  A timestamp for a
- * given channel is a sequence number that starts at 1, and is incremented
- * <i>only</i> when adding a send event to the channel's event queue.
- * Join, leave, and send requests may share the same timestamp.  For
- * example, if a send event at a timestamp <code><i>t</i></code> is
- * followed by a series of join and leave events, the join and leave events
- * will all have the same timestamp, <code><i>t</i></code>.  The next send
- * event for the channel will increment the timestamp to the next value,
- * <code><i>t + 1</i></code>.<p>
+ * Each channel event (join, leave, send, close) is assigned a
+ * <i>timestamp</i> when the event is added to the channel's event queue.
+ * An event queue's current timestamp records the timestamp of the latest
+ * send event that the queue has started to process. The initial event
+ * timestamp is <code>1</code>.  A send event increments the next
+ * timestamp, so all future join and leave events will have a later
+ * timestamp.  Because only a send event increments the next timestamp,
+ * join, leave, and send requests may share the same timestamp. If a send
+ * event at timestamp <code><i>t</i></code> is followed directly by a
+ * series of join and leave events, the join and leave events will all
+ * have the later timestamp <code><i>t+1</i></code>.  The next send event
+ * for the channel will also have timestamp <code><i>t+1</i></code>.<p>
  *
  * If a session becomes a channel member at a given timestamp
  * <code><i>t</i></code>, then it should receive all channel messages
- * greater than that timestamp, i.e., with timestamp <code><i>t +
- * 1</i></code>.  If a session leaves a channel at a given timestamp
- * <code><i>t</i></code>, the session should receive channel messages up to
- * timestamp <code><i>t</i></code>, but should not receive channel messages
- * greater than that timestamp .<p>
+ * with a timestamp greater than or equal to <code><i>t</i></code>.  If a
+ * session leaves a channel at a given timestamp <code><i>t</i></code>,
+ * the session should receive channel messages up to timestamp
+ * <code><i>t-1</i></code>, but should not receive channel messages
+ * greater than or equal to timestamp <code><i>t</i></code>.<p>
  *
- * A channel server that receives a channel event notification (for delivery to
- * a client session) uses the event's timestamp to determine whether the event
- * needs to be delivered to a local session.  The timestamp is used to
- * determine duplicate events (in the case of coordinator recovery), and if
- * a client session relocates, the session's current timestamp for a
- * channel can be used to determine whether the session missed any channel
- * messages while relocating.
+ * A channel server that receives a channel event notification (for
+ * delivery to a client session) uses the event's timestamp to determine
+ * whether the event needs to be delivered to a local session.  The
+ * timestamp is used to determine duplicate events (in the case of
+ * coordinator recovery), and if a client session relocates, the
+ * session's current timestamp for a channel can be used to determine
+ * whether the session missed any channel messages while relocating.
  */
 public interface ChannelServer extends Remote {
 
@@ -167,17 +169,24 @@ public interface ChannelServer extends Remote {
     /**
      * Notifies this server that the client session with the specified
      * {@code sessionRefId} is relocating from the node (specified by
-     * {@code oldNodeId}) to the mew node (i.e., the local node) and that
+     * {@code oldNodeId}) to the new node (i.e., the local node) and that
      * the session's channel memberships should be updated accordingly.
      * The {@code channelRefIds} array contains the channel ID of each
-     * channel that the client session belongs to.  This server must update
-     * its local channel membership cache for the specified session and add
-     * persistent membership information to indicate that the specified
-     * session on the local node is now joined to each channel.  When the
-     * cache and persistent membership information is updated, the {@link
-     * #relocateChannelMembershipsCompleted relocateChannelMembershipsCompleted}
-     * method should be invoked on the old node's {@code ChannelServer} with
-     * the specified {@code sessionRefId} and the new node's ID.
+     * channel that the client session belongs to.  The {@code
+     * deliveryOrdinals} array contains the delivery ordinal of each
+     * corresponding channel. The {@code msgTimestamps} array contains the
+     * timestamp of the latest message received by the specified session
+     * (at the point that relocation started) for each corresponding
+     * channel.<p>
+     *
+     * This server must update its local channel membership cache for the
+     * specified session and add persistent membership information to
+     * indicate that the specified session on the local node is now joined
+     * to each channel.  When the cache and persistent membership
+     * information is updated, the {@link #relocateChannelMembershipsCompleted
+     * relocateChannelMembershipsCompleted} method should be invoked on the
+     * old node's {@code ChannelServer} with the specified {@code
+     * sessionRefId} and the new node's ID.
      *
      * @param	sessionRefId the ID of a client session relocating to the
      *		local node

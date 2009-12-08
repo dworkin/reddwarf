@@ -318,6 +318,12 @@ public class SimpleSgsRelocationProtocolImpl
 		synchronized (lock) {
 		    if (suspendCompletionFuture != null) {
 			suspendCompletionFuture.done();
+		    }  else {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+				Level.WARNING, "{0} received unexpected " +
+				"SUSPEND_MESSAGES_COMPLETE");
+			}
 		    }
 		}
 		break;
@@ -347,15 +353,12 @@ public class SimpleSgsRelocationProtocolImpl
 	 *
 	 * <p>Otherwise, if the {@code get} invocation throws an {@code
 	 * ExecutionException} and the exception's cause is a {@link
-	 * LoginRedirectException}, it sends a login redirect message to
-	 * the client with the redirection information obtained from the
-	 * exception.  If the {@code ExecutionException}'s cause is a
-	 * {@link LoginFailureException}, it sends a relocate failure
-	 * message to the client.
+	 * LoginRedirectException} or {@link RelocateFailureException}, it
+	 * sends a relocate failure message to the client.
 	 *
 	 * <p>If the {@code get} method throws an exception other than
 	 * {@code ExecutionException}, or the {@code ExecutionException}'s
-	 * cause is not either a {@code LoginFailureException} or a {@code
+	 * cause is not either a {@code RelocateFailureException} or a {@code
 	 * LoginRedirectException}, then a relocate failed message is sent
 	 * to the client.
 	 */

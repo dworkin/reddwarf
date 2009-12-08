@@ -288,8 +288,8 @@
   <Match>
     <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl"/>
     <Or>
-      <Method name="removeExpiredChannelEvents"/>
-      <Method name="cacheEvent"/>
+      <Method name="removeExpiredMembershipEvents"/>
+      <Method name="cacheMembershipEvent"/>
     </Or>
     <Or>
       <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>

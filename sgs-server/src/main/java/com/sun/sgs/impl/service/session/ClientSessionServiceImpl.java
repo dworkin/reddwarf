@@ -849,8 +849,8 @@ public final class ClientSessionServiceImpl
     
     final class Context extends TransactionContext {
 
-	/** Map of client sessions to an object containing a list of
-	 * actions to make upon transaction commit. */
+	/** Map of client session IDs to an object containing a list of
+	 * actions to perform upon transaction commit. */
         private final Map<BigInteger, CommitActions> commitActions =
 	    new HashMap<BigInteger, CommitActions>();
 

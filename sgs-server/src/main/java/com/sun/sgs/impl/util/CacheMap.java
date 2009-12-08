@@ -25,11 +25,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A map with values that are softly-referenced.  An entry is removed if
- * its associated value gets garbage-collected, or, if the cache was
- * constructed with a timeout, when the timeout expires for that entry.  A
- * timeout is typically used to have the implementation automatically
- * remove values that become stale after a certain period of time.
+ * A map with values that are softly-referenced.  An entry is removed if its
+ * associated value gets garbage-collected, or, if the cache was constructed
+ * with a timeout, and entry is removed (lazily) when the timeout expires for
+ * that entry.  A timeout is typically used to have the implementation
+ * remove values that become stale after a certain period of time.  The
+ * implementation ensures that a caller will not have access to stale
+ * entries (i.e., entries whose timeout has expired).
  *
  * @param	<K> the key type
  * @param	<V> the value type
@@ -55,6 +57,7 @@ public class CacheMap<K, V> {
      * entryTimeout}.
      *
      * @param	entryTimeout an entry timeout, in milliseconds
+     * @throws	IllegalArgumentException if {@code entryTimeout} is negative
      */
     public CacheMap(long entryTimeout) {
 	if (entryTimeout < 0) {
@@ -85,6 +88,7 @@ public class CacheMap<K, V> {
      * @return	{@code true} if the map contains the key, else {@code false}
      */
     public boolean containsKey(K key) {
+	processQueue();
 	return get(key) != null;
 	
     }

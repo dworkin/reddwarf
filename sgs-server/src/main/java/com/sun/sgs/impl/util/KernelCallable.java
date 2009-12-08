@@ -63,13 +63,17 @@ public abstract class KernelCallable<R>
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritDoc} <p>
      *
      * This implementation invokes the {@code call} method of this
      * instance, sets the result, and marks this {@code KernelCallable} as
      * completed.
+     *
+     * @throws IllegalStateException if this method has already been
+     *		invoked 
      */
-    public synchronized void run()  throws Exception {
+    @Override
+    public synchronized void run() throws Exception {
 	if (done) {
 	    throw new IllegalStateException("already completed");
 	}
@@ -95,7 +99,8 @@ public abstract class KernelCallable<R>
     /**
      * Runs the specified {@code callable} (by invoking its {@code call}
      * method) in a transaction using the specified {@code txnScheduler}
-     * and {@code taskOwner} and returns the result.
+     * and {@code taskOwner} and returns the result.  The specified
+     * {@code callable} can only be used once.
      *
      * @param	<R> the return type of the {@code KernelCallable}
      * @param	callable a callable to invoke

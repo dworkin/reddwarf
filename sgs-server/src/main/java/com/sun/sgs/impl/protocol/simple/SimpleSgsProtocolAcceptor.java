@@ -72,7 +72,9 @@ import javax.security.auth.login.LoginException;
  *	version are <b><code>0x05</code></b> which supports client session
  *	relocation, and <b><code>0x04</code></b> (the default), which does not
  *	support client session relocation but is compatible with clients
- *	using the older protocol version. <p>
+ *	using the older protocol version.  Protocol version
+ *	<b><code>0x05</code></b> is incompatible with clients using
+ *	protocol version <b><code>0x04</code></b>.<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	{@value #READ_BUFFER_SIZE_PROPERTY}
@@ -245,8 +247,6 @@ public class SimpleSgsProtocolAcceptor
 		PROTOCOL_VERSION_PROPERTY, DEFAULT_PROTOCOL_VERSION,
 		PROTOCOL4, SimpleSgsProtocol.VERSION);
 
-	    logger.log(Level.CONFIG, "protocol version:{0}", protocolVersion);
-            
             if (!transport.getDelivery().equals(Delivery.RELIABLE)) {
                 transport.shutdown();
                 throw new IllegalArgumentException(
@@ -274,6 +274,8 @@ public class SimpleSgsProtocolAcceptor
 
             logger.log(Level.CONFIG,
                        "Created SimpleSgsProtocolAcceptor with properties:" +
+		       "\n  " + PROTOCOL_VERSION_PROPERTY + "=" +
+		       protocolVersion +
                        "\n  " + DISCONNECT_DELAY_PROPERTY + "=" +
                        disconnectDelay +
                        "\n  " + READ_BUFFER_SIZE_PROPERTY + "=" +
@@ -281,7 +283,7 @@ public class SimpleSgsProtocolAcceptor
                        "\n  " + TRANSPORT_PROPERTY + "=" +
                        transport.getClass().getName());
 	    
-	} catch (Exception e) {
+	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
 		    Level.CONFIG, e,

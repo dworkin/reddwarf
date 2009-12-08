@@ -50,7 +50,7 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
         getSessionProtocolOp =
             consumer.createOperation("getSessionProtocol", type, level);
         isRelocatingToLocalNodeOp =
-            consumer.createOperation("isRelocatingToLocalNodeOp", type, level);
+            consumer.createOperation("isRelocatingToLocalNode", type, level);
     }
 
     /** {@inheritDoc} */

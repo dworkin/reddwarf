@@ -103,8 +103,7 @@ public interface SessionProtocol extends Channel {
      * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
      * @throws	IllegalStateException if the associated session was
-     *		requested to suspend messages (explicitly or due to
-     *		relocation) 
+     *		requested to suspend messages
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs

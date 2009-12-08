@@ -149,9 +149,15 @@ public abstract class AbstractCompletionFuture<T>
      * complete and notifies the associated completion
      * handler. Subsequent invocations to {@link #isDone isDone}
      * will return {@code true}.
+     *
+     * @throws	IllegalStateException if this method has already been
+     *		invoked 
      */
     protected void done() {
 	synchronized (lock) {
+	    if (done) {
+		throw new IllegalStateException("already completed");
+	    }
 	    done = true;
 	    lock.notifyAll();
 	}	

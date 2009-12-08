@@ -55,7 +55,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implements a client session.
+ * Implements a client session.  The non-static, non-transient fields of an
+ * instance of this class are the persistent state of a client session and
+ * are only accessed transactionally.
  */
 public class ClientSessionImpl
     implements ClientSession, NodeAssignment, Serializable
@@ -307,8 +309,8 @@ public class ClientSessionImpl
 
     /**
      * Initiates a relocation of this client session from the current node
-     * to {@code newNode}.  If the client session is no longer connected or
-     * the session is already relocating then this request is ignored.
+     * to {@code newNodeId}.  If the client session is no longer connected
+     * or the session is already relocating then this request is ignored.
      *
      * @param	newNodeId the ID of the node this session is relocating to
      */

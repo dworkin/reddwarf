@@ -30,6 +30,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.channel.ChannelImpl.ChannelMessageInfo;
 import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -628,8 +629,6 @@ public final class ChannelServiceImpl
 	    }
 	}
 
-	
-
 	/** {@inheritDoc} */
 	public BigInteger[] getSessions(BigInteger channelRefId) {
 	    callStarted();
@@ -1113,7 +1112,7 @@ public final class ChannelServiceImpl
 	if (isRelocating) {
 	    /*
 	     * If session is relocating, then it may have missed some
-	     * channel messages.  If the channel is relieable and the
+	     * channel messages.  If the channel is reliable and the
 	     * session's message timestamp for the channel is less than the
 	     * channel's current timestamp, then retrieve missing messages.
 	     * TBD: (performance) Cache saved messages at the local node?
@@ -1132,18 +1131,16 @@ public final class ChannelServiceImpl
 			channelInfo.msgTimestamp, localNodeId);
 		}
 
-		SortedMap<Long, byte[]> missingMessages =
+		List<ChannelMessageInfo> missingMessages =
 		    getChannelMessages(
 			channelRefId, timestamp + 1, channelInfo.msgTimestamp);
 		if (missingMessages != null) {
-		    for (Map.Entry<Long, byte[]> entry :
-			     missingMessages.entrySet())
-		    {
+		    for (ChannelMessageInfo messageInfo : missingMessages) {
 			serverImpl.handleNotification(
-			    sessionRefId, entry.getKey(),
+ 			    sessionRefId, messageInfo.timestamp,
 			    new ChannelSendTask(
  				channelRefId, channelInfo.delivery,
-				entry.getValue()));
+				messageInfo.message));
 		    }
 		}
 	    }
@@ -1192,21 +1189,21 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Returns a sorted map (keyed by timestamp) containing saved channel
-     * messages for the channel with the specified {@code channelRefId}
-     * with timestamps between {@code fromTimestamp} and {@code
-     * toTimestamp} inclusive.
+     * Returns a list containing saved channel messages for the channel
+     * with the specified {@code channelRefId} with timestamps between
+     * {@code fromTimestamp} and {@code toTimestamp} inclusive or
+     * {@code null} if the channel no longer exists.
      */
-    private SortedMap<Long, byte[]> getChannelMessages(
+    private List<ChannelMessageInfo> getChannelMessages(
  	final BigInteger channelRefId, final long fromTimestamp,
 	final long toTimestamp)
     {
 	try {
 	    return runTransactionalCallable(
-		new KernelCallable<SortedMap<Long, byte[]>>(
+		new KernelCallable<List<ChannelMessageInfo>>(
 		    "getChannelMessagesFromTimestamp")
 		{
-		    public SortedMap<Long, byte[]> call() {
+		    public List<ChannelMessageInfo> call() {
 			ChannelImpl channelImpl = (ChannelImpl)
 			    getObjectForId(channelRefId);
 			
@@ -1321,7 +1318,7 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Caches the channel membershp event with the specified {@code
+     * Caches the channel membership event with the specified {@code
      * eventType}, {@code channelRefId}, {@code sessionRefId}, and {@code
      * eventTimestamp}.  The event will remain cached until its
      * corresponding event queue reaches the specified {@code
@@ -1375,13 +1372,14 @@ public final class ChannelServiceImpl
     /**
      * Returns {@code true} if the session with the specified {@code
      * sessionRefId} is a member of the channel with the specified {@code
-     * channelRefId}, and {@code false} otherwise. Membership is determined
+     * channelRefId}, and {@code false} otherwise. This method is only
+     * invoked on the channel's coordinator node.  Membership is determined
      * as follows:<p>
      *
      * The {@code isChannelMember} argument indicates whether the specified
      * session was a member of the channel at the time the event being
      * processed (that is now checking membership) was added to the event
-     * queue.
+     * queue.<p>
      *
      * In order to determine channel membership, this method considers the
      * initial known membership status, {@code isChannelMember}, and then
@@ -1393,7 +1391,7 @@ public final class ChannelServiceImpl
      * expirationTimestamp} less than the specified {@code eventTimestamp}
      * from the specified channel's queue of cached events.
      *
-     * @param	channelRefId a channel ID
+     * @param	channel a channel instance
      * @param	sessionRefId a session ID
      * @param	isChannelMember if {@code true}, the specified session is
      *		considered to be a member when current event was added to
@@ -1405,11 +1403,13 @@ public final class ChannelServiceImpl
      *		sessionRefId} is a member of the channel with the specified
      *		{@code channelRefId}, and {@code false} otherwise
      */
-    boolean isChannelMember(BigInteger channelRefId,
+    boolean isChannelMember(ChannelImpl channel,
 			    BigInteger sessionRefId,
 			    boolean isChannelMember,
 			    long timestamp)
     {
+	assert channel.isCoordinator();
+	BigInteger channelRefId = channel.channelRefId;
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
 		       "channel:{0}, session:{1}, isChannelMember:{2}, " +
@@ -1436,9 +1436,9 @@ public final class ChannelServiceImpl
 				    Level.FINEST, "join:{0}",
 				    HexDumper.toHexString(info.sessionRefId));
 			    }
-			    isChannelMember =
-				isChannelMember ||
-				(info.sessionRefId.equals(sessionRefId));
+			    if (info.sessionRefId.equals(sessionRefId)) {
+				isChannelMember = true;
+			    }
 			    break;
 			    
 			case LEAVE:
@@ -1447,9 +1447,9 @@ public final class ChannelServiceImpl
 				    Level.FINEST, "leave:{0}",
 				    HexDumper.toHexString(info.sessionRefId));
 			    }
-			    isChannelMember =
-				isChannelMember &&
-				(!info.sessionRefId.equals(sessionRefId));
+			    if (info.sessionRefId.equals(sessionRefId)) {
+				isChannelMember = false;
+			    }
 			    break;
 
 			default:
@@ -1467,9 +1467,9 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Removes from the specified membership event {@code queue}, each cached
-     * channel membership event with an {@code expirationTimestamp} less than or
-     * equal to the specified {@code timestamp}.
+     * Removes from the specified membership event {@code queue}, each
+     * cached channel membership event with an {@code expirationTimestamp}
+     * less than the specified {@code timestamp}.
      */
     private void removeExpiredMembershipEvents(
 	Queue<MembershipEventInfo> queue, long timestamp)
@@ -1478,7 +1478,7 @@ public final class ChannelServiceImpl
 	
 	while (!queue.isEmpty()) {
 	    MembershipEventInfo info = queue.peek();
-	    if (info.expirationTimestamp > timestamp) {
+	    if (info.expirationTimestamp >= timestamp) {
 		return;
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -1930,8 +1930,7 @@ public final class ChannelServiceImpl
      * Returns the channel service.
      */
     static synchronized ChannelServiceImpl getInstance() {
-	return (ChannelServiceImpl)
-	    txnProxy.getService(ChannelServiceImpl.class);
+	return txnProxy.getService(ChannelServiceImpl.class);
     }
     
     /**
@@ -2061,6 +2060,13 @@ public final class ChannelServiceImpl
 	transactionScheduler.runTask(task, taskOwner);
     }
 
+    /**
+     * Runs the specified non-durable, transactional {@code callable} using
+     * this service's task owner, and returns the result.
+     *
+     * @param	callable a callable to call
+     * @throws	Exception the exception thrown while calliing {@code callable}
+     */
     <R> R runTransactionalCallable(KernelCallable<R> callable)
 	throws Exception
     {

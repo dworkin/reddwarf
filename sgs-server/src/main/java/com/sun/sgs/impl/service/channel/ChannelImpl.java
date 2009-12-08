@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
@@ -32,6 +33,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableDeque;
 import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
@@ -58,16 +60,16 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import static com.sun.sgs.impl.service.channel.ChannelServiceImpl.
@@ -101,6 +103,18 @@ import static com.sun.sgs.impl.service.channel.ChannelServiceImpl.
  * 	determine which channels are coordinated on a failed node so that
  * 	each channel can be reassigned a new coordinator.<p>
  *
+ * <dt> <i>Map:</i> <b><code>savedMessagesMap</code></b> <br>
+ *	<i>Prefix:</i> <code>{@value
+ *	#SAVED_MESSAGES_MAP_PREFIX}<i>channelId.</i></code> <br>
+ *	<i>Key:</i> <i>{@code timestamp}</i> (as string form of
+ *	{@code Long})<br>
+ *	<i>Value:</i> <b>{@code ChannelMessageInfo}</b>
+ *
+ * <dd style="padding-top: .5em">Map for accessing saved messages for a
+ *	given channel by timestamp.  The map is used when a client
+ *	session relocates to a new node and the channel service discovers
+ *	that the session missed one or more channel messages during
+ *	relocation.<p> 
  * </dl> <p>
  */
 class ChannelImpl implements ManagedObject, Serializable {
@@ -144,7 +158,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     private final String name;
 
     /** The ID from a managed reference to this instance. */
-    private final BigInteger channelRefId;
+    final BigInteger channelRefId;
 
     /** The wrapped channel instance. */
     private final ManagedReference<ChannelWrapper> wrappedChannelRef;
@@ -479,29 +493,6 @@ class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns a sorted map (keyed by timestamp) containing saved channel
-     * messages (if any) with timestamps between {@code fromTimestamp} and
-     * {@code toTimestamp} inclusive.
-     */
-    SortedMap<Long, byte[]> getChannelMessages(
-	long fromTimestamp, long toTimestamp)
-    {
-	SortedMap<Long, byte[]> messages = new TreeMap<Long, byte[]>();
-	if (fromTimestamp <= toTimestamp) {
-	    BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
-		getSavedMessagesMap(channelRefId);
-	    for (long ts = fromTimestamp; ts <= toTimestamp; ts++) {
-		ChannelMessageInfo messageInfo =
-		    savedMessagesMap.get(Long.toString(ts));
-		if (messageInfo != null) {
-		    messages.put(ts, messageInfo.message);
-		}
-	    }
-	}
-	return messages;
-    }
-    
-    /**
      * Returns the underlying {@code ClientSession} for the specified
      * {@code session}.  Note: The client session service wraps each client
      * session object that it hands out to the application.  The channel
@@ -631,7 +622,9 @@ class ChannelImpl implements ManagedObject, Serializable {
     /** Implements {@link Channel#leaveAll}.
      *
      * Closes the current channel, and creates a new channel (with a new
-     * channel ID) that uses the existing channel's wrapper.
+     * channel ID) that uses the existing channel's wrapper.  Since the
+     * application still uses the same channel wrapper for this channel,
+     * the application is not effected.
      */
     void leaveAll() {
 	try {
@@ -716,19 +709,8 @@ class ChannelImpl implements ManagedObject, Serializable {
 	if (listenerRef == null) {
 	    send(sender, message);
 	} else {
-	    try {
-		listenerRef.get().receivedMessage(
-		    getWrappedChannel(), sender, message.asReadOnlyBuffer());
-	    } catch (RuntimeException e) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.logThrow(
-			Level.FINE, e,
-			"Dropping message:{0} for channel:{1} because " +
-			"notifying ChannelListener throws",
-			HexDumper.format(message, 0x50),
-			HexDumper.toHexString(channelRefId));
-		}
-	    }
+	    listenerRef.get().receivedMessage(
+		getWrappedChannel(), sender, message.asReadOnlyBuffer());
 	}
     }
 
@@ -865,7 +847,7 @@ class ChannelImpl implements ManagedObject, Serializable {
      * Returns {@code true} if this node is the coordinator for this
      * channel, otherwise returns {@code false}.
      */
-    private boolean isCoordinator() {
+    boolean isCoordinator() {
 	return coordNodeId == getLocalNodeId();
     }
 
@@ -965,9 +947,13 @@ class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Saves the specified channel {@code message} with the specified
-     * {@code timestamp}.
+     * {@code timestamp}. Reliable messages are saved for a period of time
+     * (the length of time it takes to m ove a client session) so that
+     * channel messages missed during relocation can be obtained and
+     * delivered to a relocated client session.
      */
     private void saveMessage(byte[] message, long timestamp) {
+	assert isReliable();
 	BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
 	    getSavedMessagesMap(channelRefId);
 	ChannelMessageInfo messageInfo =
@@ -977,18 +963,45 @@ class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
+     * Returns a list containing saved channel messages (if any) with
+     * timestamps between {@code fromTimestamp} and {@code toTimestamp}
+     * inclusive.  If {@code fromTimestamp} is greater than {@code
+     * toTimestamp} this method returns {@code null}.
+     */
+    List<ChannelMessageInfo> getChannelMessages(
+	long fromTimestamp, long toTimestamp)
+    {
+	assert isReliable();
+	List<ChannelMessageInfo> messages = null;
+	if (fromTimestamp <= toTimestamp) {
+	    messages = new ArrayList<ChannelMessageInfo>(
+			    (int) (toTimestamp - fromTimestamp + 1));
+	    BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
+		getSavedMessagesMap(channelRefId);
+	    for (long ts = fromTimestamp; ts <= toTimestamp; ts++) {
+		ChannelMessageInfo messageInfo =
+		    savedMessagesMap.get(Long.toString(ts));
+		if (messageInfo != null) {
+		    messages.add(messageInfo);
+		}
+	    }
+	}
+	return messages;
+    }
+    
+    /**
      * Contains a saved channel message with its associated timestamp
      * and expiration time.
      */
-    private static class ChannelMessageInfo
+    static class ChannelMessageInfo
 	implements ManagedObject, Serializable
     {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 	/** The channel message. */
-	private final byte[] message;
+	final byte[] message;
 	/** The message timestamp. */
-	private final long timestamp;
+	final long timestamp;
 	/** The message's expiration time. */
 	private final long expiration;
 
@@ -1057,8 +1070,9 @@ class ChannelImpl implements ManagedObject, Serializable {
 		// Remove messages saved past their expiration time.
 		DataService dataService = getDataService();
 		if (!messageQueue.isEmpty()) {
+		    TaskManager taskManager = AppContext.getTaskManager();
 		    Iterator<ChannelMessageInfo> iter = messageQueue.iterator();
-		    while (iter.hasNext()) {
+		    while (taskManager.shouldContinue() && iter.hasNext()) {
 			ChannelMessageInfo messageInfo = iter.next();
 			if (messageInfo.isExpired()) {
 			    if (logger.isLoggable(Level.FINEST)) {
@@ -1343,7 +1357,26 @@ class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * The channel's event queue.
+     * The channel's event queue.<p>
+     *
+     * Each channel event (join, leave, send, close) is assigned a
+     * <i>timestamp</i> when the event is added to the channel's event
+     * queue.  The current timestamp records the timestamp of the latest
+     * send event that the queue has started to process. The initial event
+     * timestamp is <code>1</code>.  A send event increments the next
+     * timestamp, so all future join and leave events will have a later
+     * timestamp.  Any join and leave events that are immediately prior to
+     * the latest send event will share the send event's timestamp. <p>
+     *
+     * In order to implement reliable join, leave, send, and close events,
+     * the event queue doesn't process one event until it has completed the
+     * processing of all previous events, which means sucessfully
+     * delivering those events to all nodes that need to be notified (for
+     * example, in the case of a send event, that would be notifying all
+     * nodes with sessions joined to the channel). When the event queue
+     * assigns a timestamp to the next send event, the event queue has
+     * already processed all previous join and leave events, up to and
+     * including ones with that send event's timestamp.
      */
     private static class EventQueue
 	implements ManagedObjectRemoval, Serializable
@@ -1410,11 +1443,15 @@ class ChannelImpl implements ManagedObject, Serializable {
 
 	/**
 	 * Attempts to enqueue the specified {@code event}, and returns
-	 * {@code true} if successful, and {@code false} otherwise.
+	 * {@code true} if successful, and {@code false} otherwise.  If
+	 * this node coordinates the channel and the channel's event queue
+	 * is empty, then start processing the event immediately.  If the
+	 * event is successfully added to the queue, then sent a
+	 * notification to the channel's coordinator to service the event
+	 * queue.
 	 *
 	 * @param event the event
-	 * @param isCoordinator {@code true} if the caller is the
-	 *	  channel's coordinator
+	 * @param channel the channel instance
 	 * @return {@code true} if successful, and {@code false} otherwise
 	 * @throws MessageRejectedException if the cost of the event
 	 *         exceeds the available buffer space in the queue
@@ -1508,9 +1545,37 @@ class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Processes (at least) the first event in the queue and
-	 * returns {@code true} if more events need to be serviced and
-	 * {@code false} otherwise.
+	 * Services the channel event queue.  The coordinator processes
+	 * events as follows: <ul>
+	 *
+	 * <li> If the event at the head of the queue has not started
+	 * processing, then it marks the event's state as 'processing' by
+	 * invoking the event's {@code processing} method, and then
+	 * initiates processing by invoking the event's {@code
+	 * serviceEvent} method passing the channel instance.
+	 *
+	 * <li> If the event at the head of the queue has completed
+	 * processing (its {@code serviceEvent} method or {@code
+	 * isCompleted} method returns {@code true}), the event is removed
+	 * from the queue, and the next event can be serviced.
+	 * </ul>
+	 * 
+	 * An event remains in the queue until it has completed processing.
+	 * Reliable events (such as join, leave, and reliable send events)
+	 * require a delivery acknowledgment in order to be reliable in the
+	 * face of coordinator crash.  Therefore the event at the head of
+	 * the queue starts processing inside a transaction, performing any
+	 * necessary persistent updates, then performs non-transactional
+	 * actions after the transaction commits (such as delivering a
+	 * notification), and then marks the event itself as 'completed'
+	 * once the non-transactional actions have completed (such as a
+	 * notification being acknowledged). At this point, the event can
+	 * be removed from the queue, and the next event can be
+	 * serviced. <p>
+	 *
+	 * If the channel coordinator's node crashes while the event at the
+	 * head of the queue is being processed, the channel's new
+	 * coordinator restarts event processing.
 	 */
 	void serviceEventQueue() {
 	    ChannelImpl channel = getChannel();
@@ -1727,7 +1792,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Marks this event as being processed.
+	 * Marks this event as being processed on the local node.
 	 */
 	void processing() {
 	    logger.log(Level.FINEST, "processing event:{0}", this);
@@ -1745,8 +1810,16 @@ class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Returns {@code true} if this event is being processed, and
-	 * {@code false} otherwise.
+	 * Returns {@code true} if this event is being processed on this
+	 * node, and {@code false} otherwise.  Events are marked as
+	 * processing on a given node.  Therefore, if this event is marked
+	 * as processing on a given coordinator node, and the channel's
+	 * coordinator is reassigned to another node and the coordinator
+	 * subsequently invokes this method on this event, the method will
+	 * return {@code false}.  This indicates that the event has not yet
+	 * started processing on the new coordinator's node, and the
+	 * coordinator should (re)start this event's processing on the new
+	 * node. 
 	 */
 	boolean isProcessing() {
 	    return processingOnNodeId == getLocalNodeId();
@@ -1859,15 +1932,10 @@ class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Updates this task's {@code sessionNodeId} and returns {@code true}
-	 * if the session's node ID has changed, and returns {@code false} if
-	 * the session's node ID is unchanged or the session no longer
-	 * exists.  This method must be invoked within a transaction.
+	 * Removes the specified {@code nodeId} from the associated
+	 * channel.
 	 *
-	 * @param addNodeId if {@code true}, adds the specified
-	 *	  {@code nodeId} to the channel's set of server node IDs
-	 * @return {@code true} if the session's node ID is updated, otherwise
-	 *	   {@code false}
+	 * @param nodeId a node ID
 	 */
 	protected void removeNodeIdFromChannel(final long nodeId) {
 	    
@@ -2024,7 +2092,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 	 * @return {@code true} if the session's node ID is updated, otherwise
 	 *	   {@code false}
 	 */
-	protected boolean updateSessionNodeId(final boolean addNodeId) {
+	protected final boolean updateSessionNodeId(final boolean addNodeId) {
 	    
 	    final long oldSessionNodeId = sessionNodeId;
 	    try {
@@ -2307,7 +2375,7 @@ class ChannelImpl implements ManagedObject, Serializable {
 		    }
 
 		    if (!channelService.isChannelMember(
-			    channel.channelRefId, senderRefId,
+			    channel, senderRefId,
 			    isChannelMember, timestamp))
 		    {
 			if (logger.isLoggable(Level.FINEST)) {
