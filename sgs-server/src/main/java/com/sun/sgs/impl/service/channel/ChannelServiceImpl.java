@@ -238,10 +238,27 @@ public final class ChannelServiceImpl
 	membershipEventsCache =
 	    new ConcurrentHashMap<BigInteger, Queue<MembershipEventInfo>>();
 
-    /** The local channel membership info, keyed by channel ID. */
-    private final ConcurrentHashMap<BigInteger, LocalChannelInfo>
-	localChannelMembersMap =
-	    new ConcurrentHashMap<BigInteger, LocalChannelInfo>();
+    /**
+     * The local channel membership info, keyed by channel ID.  This map is
+     * synchronized, but should only be locked long enough to obtain a value
+     * (a LocalChannelInfo instance) and lock that instance; i.e., map
+     * values should be obtained and locked while synchronized on the map
+     * instance.  The locking idiom for this map is:
+     *
+     * <pre>
+     *     LocalChannelInfo channelInfo = lockChannel(channelRefId);
+     *     if (channelInfo != null) {
+     *         try {
+     *              // perform operations using channelInfo
+     *         } finally {
+     *              unlockChannel(channelInfo);
+     *         }
+     *    }
+     * </pre>
+     */
+    private final Map<BigInteger, LocalChannelInfo>
+	localChannelMembersMap = Collections.synchronizedMap(
+ 	    new HashMap<BigInteger, LocalChannelInfo>());
 
     /** The local per-session channel maps (key: channel ID, value: message
      * timestamp), keyed by session ID. */
@@ -641,17 +658,19 @@ public final class ChannelServiceImpl
 			HexDumper.toHexString(channelRefId), localNodeId);
 		}
 
-		LocalChannelInfo channelInfo =
-		    localChannelMembersMap.get(channelRefId);
-		if (channelInfo != null) {
-		    synchronized (channelInfo) {
-			localMembers = channelInfo.members.toArray(
-			    new BigInteger[channelInfo.members.size()]);
-		    }
-		} else {
+		LocalChannelInfo channelInfo = lockChannel(channelRefId);
+		if (channelInfo == null) {
 		    localMembers = new BigInteger[0];
+		    return localMembers;
 		}
-		return localMembers;
+		try {
+		    localMembers =  channelInfo.members.toArray(
+ 			new BigInteger[channelInfo.members.size()]);
+		    return localMembers;
+		    
+		} finally {
+		    unlockChannel(channelInfo);
+		}
 		
 	    } finally {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -683,19 +702,12 @@ public final class ChannelServiceImpl
 			HexDumper.format(message, 0x50),
 			timestamp, localNodeId);
 		}
-		LocalChannelInfo channelInfo =
-		    localChannelMembersMap.get(channelRefId);
+		LocalChannelInfo channelInfo = lockChannel(channelRefId);
 		if (channelInfo == null) {
 		    return;
 		}
 
-		// Lock the channel info (which locks the channel
-		// membership list) while iterating to avoid changes
-		// to membership during iteration.
-		ChannelSendTask task =
-		    new ChannelSendTask(channelRefId, channelInfo.delivery,
-					message);
-		synchronized (channelInfo) {
+		try {
 		    // This check only needs to be made for reliable
 		    // channels.  Channel messages for ordered-unreliable
 		    // channels are not sent to channel servers more than
@@ -720,6 +732,9 @@ public final class ChannelServiceImpl
 			}
 			return;
 		    }
+		    ChannelSendTask task =
+		        new ChannelSendTask(channelRefId, channelInfo.delivery,
+					    message);
 		    // Note: the message timestamp may not be consecutive
 		    // because a non-member sender's message can get dropped.
 		    channelInfo.msgTimestamp = timestamp;
@@ -734,6 +749,8 @@ public final class ChannelServiceImpl
 			// the session will be cleaned up.
 			handleNotification(sessionRefId, timestamp, task);
 		    }
+		} finally {
+		    unlockChannel(channelInfo);
 		}
 	    } finally {
 		callFinished();
@@ -795,13 +812,12 @@ public final class ChannelServiceImpl
 	public void close(BigInteger channelRefId, long timestamp) {
 	    callStarted();
 	    try {
-		LocalChannelInfo channelInfo =
-		    localChannelMembersMap.get(channelRefId);
+		LocalChannelInfo channelInfo = lockChannel(channelRefId);
 		if (channelInfo == null) {
 		    return;
 		}
 		ChannelCloseTask task = new ChannelCloseTask(channelRefId);
-		synchronized (channelInfo) {
+		try {
 		    for (BigInteger sessionRefId : channelInfo.members) {
 
 			if (!handleNotification(
@@ -816,6 +832,8 @@ public final class ChannelServiceImpl
 			    
 		    }
 		    localChannelMembersMap.remove(channelRefId);
+		} finally {
+		    unlockChannel(channelInfo);
 		}
 
 	    } finally {
@@ -1044,83 +1062,73 @@ public final class ChannelServiceImpl
 		HexDumper.toHexString(channelRefId), timestamp,
 		isRelocating, localNodeId);
 	}
-	// Update channel's local membership set.
-	LocalChannelInfo channelInfo =
-	    localChannelMembersMap.get(channelRefId);
-	if (channelInfo == null) {
-	    // checkstyle complains about this double-locking idiom, but it
-	    // prevents having to create a new LocalChannelInfo object
-	    // (which is likely thrown away) each time a member is added to
-	    // a channel.  The 'putIfAbsent' used below to insert the local
-	    // channel info in the ConcurrentHashMap makes this locking
-	    // idiom safe.  The code below needs to synchronize on the
-	    // newly created channel info in case another thread attempts
-	    // to access the channel info before the timestamp is verfied
-	    // to be correct.
-	    LocalChannelInfo newChannelInfo =
-		new LocalChannelInfo(delivery, timestamp);
-	    synchronized (newChannelInfo) {
-		channelInfo = localChannelMembersMap.
-		    putIfAbsent(channelRefId, newChannelInfo);
-		if (channelInfo == null) {
-		    channelInfo = newChannelInfo;
-		    if (isRelocating) {
-			// If the relocating session establishes the
-			// channel info on the local node, then the local
-			// node needs to be added to the channel's list.
-			long currentTimestamp =
-			    addLocalNodeToChannel(channelRefId);
-			if (currentTimestamp == -1L) {
-			    // The channel is closed, so send leave message.
-			    // If invocation returns false, the session
-			    // probably disconnected.
-			    serverImpl.handleNotification(
- 				sessionRefId, timestamp,
-				new ChannelLeaveTask(channelRefId));
-			    return;
-			}
-			// Message timestamp may be out of date with
-			// channel's current timestamp, so update
-			// if necessary.
-			if (currentTimestamp > timestamp) {
-			    channelInfo.msgTimestamp = currentTimestamp;
-			}
-		    }
+
+	// Lock local channel info; create and store if absent.
+	LocalChannelInfo channelInfo = null;
+	boolean addedChannelInfo = false;
+	synchronized (localChannelMembersMap) {
+	    channelInfo = localChannelMembersMap.get(channelRefId);
+	    if (channelInfo == null) {
+		channelInfo = new LocalChannelInfo(delivery, timestamp);
+		localChannelMembersMap.put(channelRefId, channelInfo);
+		addedChannelInfo = true;
+	    }
+	    channelInfo.lock.lock();
+	}
+
+	try {
+	    if (addedChannelInfo && isRelocating) {
+		// If the relocating session establishes the
+		// channel info on the local node, then the local
+		// node needs to be added to the channel's list.
+		long currentTimestamp =
+		    addLocalNodeToChannel(channelRefId);
+		if (currentTimestamp == -1L) {
+		    // The channel is closed, so send leave message.
+		    // If invocation returns false, the session
+		    // probably disconnected.
+		    serverImpl.handleNotification(
+			sessionRefId, timestamp,
+			new ChannelLeaveTask(channelRefId));
+		    return;
+		}
+		// Message timestamp may be out of date with
+		// channel's current timestamp, so update
+		// if necessary.
+		if (currentTimestamp > timestamp) {
+		    channelInfo.msgTimestamp = currentTimestamp;
 		}
 	    }
-	}
-	synchronized (channelInfo) {
+
+	    // Update channel's local membership set.
 	    channelInfo.members.add(sessionRefId);
-	}
 
-	// Update per-session channel set.
-	Map<BigInteger, LocalMemberInfo> channelMap =
-	    localPerSessionChannelMap.get(sessionRefId);
-	if (channelMap == null) {
-	    Map<BigInteger, LocalMemberInfo> newChannelMap =
-		Collections.synchronizedMap(
-		    new HashMap<BigInteger, LocalMemberInfo>());
-	    channelMap = localPerSessionChannelMap.
-		putIfAbsent(sessionRefId, newChannelMap);
+	    // Update per-session channel set.
+	    Map<BigInteger, LocalMemberInfo> channelMap =
+		localPerSessionChannelMap.get(sessionRefId);
 	    if (channelMap == null) {
-		channelMap = newChannelMap;
+		Map<BigInteger, LocalMemberInfo> newChannelMap =
+		    Collections.synchronizedMap(
+		        new HashMap<BigInteger, LocalMemberInfo>());
+		channelMap = localPerSessionChannelMap.
+		    putIfAbsent(sessionRefId, newChannelMap);
+		if (channelMap == null) {
+		    channelMap = newChannelMap;
+		}
 	    }
-	}
-	channelMap.put(channelRefId,
-		       new LocalMemberInfo(channelInfo, timestamp));
-
-	if (isRelocating) {
-	    /*
-	     * If session is relocating, then it may have missed some
-	     * channel messages.  If the channel is reliable and the
-	     * session's message timestamp for the channel is less than the
-	     * channel's current timestamp, then retrieve missing messages.
-	     * TBD: (performance) Cache saved messages at the local node?
-	     */
-	  synchronized (channelInfo) {
-	    if (isReliable(delivery) &&
+	    channelMap.put(channelRefId,
+			   new LocalMemberInfo(channelInfo, timestamp));
+	    
+	    if (isRelocating && isReliable(delivery) &&
 		channelInfo.msgTimestamp > timestamp)
 	    {
+		/*
+		 * If session is relocating, then it may have missed some
+		 * channel messages.  If the channel is reliable and the
+		 * session's message timestamp for the channel is less than the
+		 * channel's current timestamp, then retrieve missing messages.
+		 * TBD: (performance) Cache saved messages at the local node?
+		 */
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
@@ -1144,7 +1152,8 @@ public final class ChannelServiceImpl
 		    }
 		}
 	    }
-	  }
+	} finally {
+	    unlockChannel(channelInfo);
 	}
     }
 
@@ -1240,11 +1249,12 @@ public final class ChannelServiceImpl
     private void removeLocalChannelMember(
 	BigInteger channelRefId, BigInteger sessionRefId)
     {
-	LocalChannelInfo channelInfo =
-	    localChannelMembersMap.get(channelRefId);
+	LocalChannelInfo channelInfo = lockChannel(channelRefId);
 	if (channelInfo != null) {
-	    synchronized (channelInfo) {
+	    try {
 		channelInfo.members.remove(sessionRefId);
+	    } finally {
+		unlockChannel(channelInfo);
 	    }
 	}
     }
@@ -1306,11 +1316,12 @@ public final class ChannelServiceImpl
     boolean isLocalChannelMember(BigInteger channelRefId,
 				 BigInteger sessionRefId)
     {
-	LocalChannelInfo channelInfo =
-	    localChannelMembersMap.get(channelRefId);
+	LocalChannelInfo channelInfo = lockChannel(channelRefId);
 	if (channelInfo != null) {
-	    synchronized (channelInfo) {
+	    try {
 		return channelInfo.members.contains(sessionRefId);
+	    } finally {
+		unlockChannel(channelInfo);
 	    }
 	} else {
 	    return false;
@@ -1508,12 +1519,12 @@ public final class ChannelServiceImpl
 	Transaction txn, BigInteger channelRefId, Set<Long> nodeIds)
     {
 	if (nodeIds.size() == 1 && nodeIds.contains(getLocalNodeId())) {
-	    LocalChannelInfo channelInfo =
-		localChannelMembersMap.get(channelRefId);
-	    
+	    LocalChannelInfo channelInfo = lockChannel(channelRefId);
 	    if (channelInfo != null) {
-		synchronized (channelInfo) {
+		try {
 		    return Collections.unmodifiableSet(channelInfo.members);
+		} finally {
+		    unlockChannel(channelInfo);
 		}
 	    } else {
 		return ChannelImpl.EMPTY_CHANNEL_MEMBERSHIP;
@@ -2416,10 +2427,9 @@ public final class ChannelServiceImpl
 		// Check if there are no more channel members on this
 		// node and, if so, remove the node from the channel's
 		// server list.
-		LocalChannelInfo channelInfo =
-		    localChannelMembersMap.get(channelRefId);
+		LocalChannelInfo channelInfo = lockChannel(channelRefId);
 		if (channelInfo != null) {
-		    synchronized (channelInfo) {
+		    try {
 			if (channelInfo.members.isEmpty()) {
 			    try {
 				runTransactionalTask(
@@ -2439,6 +2449,8 @@ public final class ChannelServiceImpl
 			    }
 			    localChannelMembersMap.remove(channelRefId);
 			}
+		    } finally {
+			unlockChannel(channelInfo);
 		    }
 		}
 	    }
@@ -2626,9 +2638,37 @@ public final class ChannelServiceImpl
     }
 
     /**
+     * Returns the locked {@code LocalChannelInfo} instance for the
+     * specified {@code channelRefId}, or {@code null} if no such instance
+     * exists.  If this method returns a non-null value, the caller is
+     * responsible for unlocking the returned instance by invoking {@code
+     * unlockChannel} passing the instance.
+     */
+    private LocalChannelInfo lockChannel(BigInteger channelRefId) {
+	synchronized (localChannelMembersMap) {
+	    LocalChannelInfo channelInfo =
+		localChannelMembersMap.get(channelRefId);
+	    if (channelInfo != null) {
+		channelInfo.lock.lock();
+	    }
+	    return channelInfo;
+	}
+    }
+    
+    /**
+     * Unlocks the specified {@code channelInfo} instance.
+     */
+    private void unlockChannel(LocalChannelInfo channelInfo) {
+	assert channelInfo != null;
+	channelInfo.lock.unlock();
+    }
+
+    /**
      * Information for a channel with local members.
      */
     private static class LocalChannelInfo {
+	/** A lock for this instance. */
+	final Lock lock = new ReentrantLock();
 	/** The channel's delivery guarantee. */
 	final Delivery delivery;
 	/** The channel's membership set.  Note: user needs to synchronize
