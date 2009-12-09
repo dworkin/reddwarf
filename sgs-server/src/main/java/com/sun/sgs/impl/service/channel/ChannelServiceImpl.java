@@ -791,7 +791,8 @@ public final class ChannelServiceImpl
 	    callStarted();
 	    try {
 		removeLocalSessionFromAllChannels(sessionRefId);
-		// Notify completion handler that relocation preparation is done.
+		// Notify completion handler that relocation preparation is
+		// done. 
 		RelocationInfo relocationInfo =
 		    outgoingSessionRelocationInfo.get(sessionRefId);
 		if (relocationInfo != null) {
@@ -1153,7 +1154,7 @@ public final class ChannelServiceImpl
 		}
 	    }
 	} finally {
-	    unlockChannel(channelInfo);
+	    channelInfo.lock.unlock();
 	}
     }
 
@@ -2424,6 +2425,7 @@ public final class ChannelServiceImpl
 	 */
 	public void cleanupIfNoLocalChannelMembership() {
 	    if (isCompleted) {
+	      synchronized (localChannelMembersMap) {
 		// Check if there are no more channel members on this
 		// node and, if so, remove the node from the channel's
 		// server list.
@@ -2453,6 +2455,7 @@ public final class ChannelServiceImpl
 			unlockChannel(channelInfo);
 		    }
 		}
+	      }
 	    }
 	}
     }

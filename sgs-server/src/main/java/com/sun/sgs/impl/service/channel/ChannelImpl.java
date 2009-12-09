@@ -117,7 +117,7 @@ import static com.sun.sgs.impl.service.channel.ChannelServiceImpl.
  *	relocation.<p> 
  * </dl> <p>
  */
-class ChannelImpl implements ManagedObject, Serializable {
+final class ChannelImpl implements ManagedObject, Serializable {
 
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
@@ -137,8 +137,7 @@ class ChannelImpl implements ManagedObject, Serializable {
     static final String EVENT_QUEUE_MAP_PREFIX = PKG_NAME + "eventQueue.";
 
     /** The saved messages map prefix. */
-    private static final String SAVED_MESSAGES_MAP_PREFIX =
-	PKG_NAME + "message.";
+    static final String SAVED_MESSAGES_MAP_PREFIX = PKG_NAME + "message.";
 
     /** The saved messages queue prefix. */
     private static final String SAVED_MESSAGES_QUEUE_PREFIX =
