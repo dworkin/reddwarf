@@ -232,6 +232,9 @@ public final class TxnLockManager<K> extends LockManager<K> {
 	private boolean checkInternal(
 	    TxnLocker<K> locker, WaiterInfo<K> waiterInfo)
 	{
+	    if (waiterInfo.waitingFor == null) {
+		return false;
+	    }
 	    waiterInfo.pass = pass;
 	    for (LockRequest<K> request : waiterInfo.waitingFor) {
 		TxnLocker<K> owner = (TxnLocker<K>) request.getLocker();

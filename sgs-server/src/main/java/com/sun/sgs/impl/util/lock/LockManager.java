@@ -167,8 +167,8 @@ public class LockManager<K> {
      * prevented the lock from being acquired, or else {@code null} if the lock
      * was acquired.  If the {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.  Otherwise, the caller can repeat this call, and
+     * transaction, and any subsequent lock or wait requests will return the
+     * same deadlock conflict.  Otherwise, the caller can repeat this call, and
      * any conflicts from earlier calls will be ignored.
      *
      * @param	locker the locker requesting the lock
@@ -178,9 +178,8 @@ public class LockManager<K> {
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
      *		manager
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
+     * @throws	IllegalStateException if still waiting for an earlier attempt
+     *		to complete
      */
     public LockConflict<K> lock(Locker<K> locker, K key, boolean forWrite) {
 	LockConflict<K> conflict = lockNoWait(locker, key, forWrite);
@@ -195,8 +194,8 @@ public class LockManager<K> {
      * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
      * {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.  Otherwise, the caller can repeat this call, and
+     * transaction, and any subsequent lock or wait requests will return the
+     * same deadlock conflict.  Otherwise, the caller can repeat this call, and
      * any conflicts from earlier calls will be ignored.
      *
      * @param	locker the locker requesting the lock
@@ -206,9 +205,8 @@ public class LockManager<K> {
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
      *		manager
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
+     * @throws	IllegalStateException if still waiting for an earlier attempt
+     *		to complete
      */
     public LockConflict<K> lockNoWait(
 	Locker<K> locker, K key, boolean forWrite)
@@ -224,7 +222,7 @@ public class LockManager<K> {
      * transaction was not waiting.  If the {@code type} field of the return
      * value is {@link LockConflictType#DEADLOCK DEADLOCK}, then the caller
      * should abort the transaction, and any subsequent lock or wait requests
-     * will throw {@code IllegalStateException}.
+     * will return the same deadlock conflict.
      *
      * @param	locker the locker requesting the lock
      * @return	lock conflict information, or {@code null} if there was no
@@ -334,9 +332,8 @@ public class LockManager<K> {
      * @param	forWrite whether to request a write lock
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
+     * @throws	IllegalStateException if still waiting for an earlier attempt
+     *		to complete
      */
     LockConflict<K> lockNoWaitInternal(
 	Locker<K> locker, K key, boolean forWrite)
@@ -355,10 +352,12 @@ public class LockManager<K> {
 	    LockConflict<K> conflict = locker.getConflict();
 	    if (conflict != null) {
 		if (conflict.type == LockConflictType.DEADLOCK) {
-		    throw new IllegalStateException(
-			"Attempt to obtain a new lock after a deadlock: " +
-			"locker:" + locker + ", key:" + key +
-			", forWrite:" + forWrite);
+		    if (logger.isLoggable(FINER)) {
+			logger.log(FINER,
+				   "lock {0}, {1}, forWrite:{2}\n  returns {3}",
+				   locker, key, forWrite, conflict);
+		    }
+		    return conflict;
 		} else {
 		    /* Ignoring the previous conflict */
 		    locker.clearConflict();

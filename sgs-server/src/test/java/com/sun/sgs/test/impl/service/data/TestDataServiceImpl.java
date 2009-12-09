@@ -77,7 +77,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -5268,6 +5271,143 @@ public class TestDataServiceImpl extends Assert {
 	}
     }
 
+    /** Test random concurrent name binding accesses. */
+    @Test
+    public void testConcurrentBindings() throws Exception {
+	final int bindings = Integer.getInteger("test.bindings", 50);
+	int threads = Integer.getInteger("test.threads", 4);
+	int repeat = Integer.getInteger("test.repeat", 100);
+	int wait = Integer.getInteger("test.wait", 60);
+	System.err.println("Testing with bindings:" + bindings +
+			   ", threads:" + threads +
+			   ", repeat:" + repeat +
+			   ", wait:" + wait);
+	long start = System.currentTimeMillis();
+	/* Set half the bindings */
+	new ChunkedTask() { boolean runChunk() {
+	    ManagedInteger remaining;
+	    DummyManagedObject dummy;
+	    try {
+		remaining =
+		    (ManagedInteger) service.getBinding("remaining");
+		dummy = (DummyManagedObject) service.getBinding("dummy");
+	    } catch (NameNotBoundException e) {
+		remaining = new ManagedInteger(bindings / 2);
+		service.setBinding("remaining", remaining);
+		dummy = new DummyManagedObject();
+		service.setBinding("dummy", dummy);
+	    }
+	    if (remaining.value == 0) {
+		service.removeBinding("remaining");
+		return true;
+	    } else {
+		service.markForUpdate(remaining);
+		while (remaining.value > 0 && taskService.shouldContinue()) {
+		    service.setBinding(
+			String.valueOf(--remaining.value), dummy);
+		}
+		return false;
+	    } } }.runAwaitDone();
+	/* Random work */
+	CountDownLatch done = new CountDownLatch(threads);
+	AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+	for (int i = 0; i < threads; i++) {
+	    txnScheduler.scheduleTask(
+		new RandomWorkTask(bindings, repeat, done, failure),
+		taskOwner);
+	}
+	done.await(wait, TimeUnit.SECONDS);
+	if (failure.get() != null) {
+	    throw new RuntimeException(
+		"Unexpected exception: " + failure.get().getMessage(),
+		failure.get());
+	}
+	/* Remove all bindings */
+	new ChunkedTask() { boolean runChunk() {
+	    ManagedInteger remaining;
+	    try {
+		remaining = (ManagedInteger) service.getBinding("remaining");
+	    } catch (NameNotBoundException e) {
+		remaining = new ManagedInteger(bindings);
+		service.setBinding("remaining", remaining);
+	    }
+	    if (remaining.value == 0) {
+		service.removeBinding("remaining");
+		return true;
+	    } else {
+		service.markForUpdate(remaining);
+		while (remaining.value > 0 && taskService.shouldContinue()) {
+		    try {
+			service.removeBinding(
+			    String.valueOf(--remaining.value));
+		    } catch (NameNotBoundException e) {
+		    }
+		}
+		return false;
+	    } } }.runAwaitDone();
+	long time = System.currentTimeMillis() - start;
+	System.err.println("Test finished in " + (time / 1000) + " seconds");
+    }
+
+    /** Get, set, and remove random bindings */
+    private class RandomWorkTask extends TestAbstractKernelRunnable {
+	private final int bindings;
+	private final AtomicInteger remaining;
+	private final CountDownLatch done;
+	private final AtomicReference<Throwable> failure;
+	private final Random rand = new Random();
+	RandomWorkTask(int bindings, int repeat, CountDownLatch done,
+		       AtomicReference<Throwable> failure)
+	{
+	    this.bindings = bindings;
+	    remaining = new AtomicInteger(repeat);
+	    this.done = done;
+	    this.failure = failure;
+	}
+	public void run() {
+	    if (remaining.get() == 0) {
+		done.countDown();
+		return;
+	    }
+	    try {
+		List<Character> ops = Arrays.asList('r', 'r', 'w', 'x');
+		Collections.shuffle(ops);
+		for (char op : ops) {
+		    String name = String.valueOf(rand.nextInt(bindings));
+		    switch (op) {
+		    case 'r':
+			try {
+			    service.getBinding(name);
+			} catch (NameNotBoundException e) {
+			}
+			break;
+		    case 'w':
+			service.setBinding(name, service.getBinding("dummy"));
+			break;
+		    case 'x':
+			try {
+			    service.removeBinding(name);
+			} catch (NameNotBoundException e) {
+			}
+			break;
+		    default:
+			throw new AssertionError();
+		    }
+		}
+		remaining.getAndDecrement();
+		txnScheduler.scheduleTask(this, taskOwner);
+	    } catch (RuntimeException e) {
+		if (!isRetryable(e)) {
+		    done.countDown();
+		    failure.set(e);
+		    System.err.println(
+			"Failure with remaining: " + remaining.get());
+		}
+		throw e;
+	    }
+	}
+    }
+
     /* -- App and service binding methods -- */
 
     ManagedObject getBinding(boolean app, DataService service, String name) {
@@ -6093,6 +6233,15 @@ public class TestDataServiceImpl extends Assert {
 	private static final long serialVersionUID = 1;
 	BigInteger value;
 	ManagedBigInteger(BigInteger value) {
+	    this.value = value;
+	}
+    }
+
+    /** A managed object that contains an integer, which may be null. */
+    static class ManagedInteger implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1;
+	int value;
+	ManagedInteger(int value) {
 	    this.value = value;
 	}
     }
