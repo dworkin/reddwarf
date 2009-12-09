@@ -2667,18 +2667,17 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Information for a channel with local members.
+     * Information for a channel with local members.  An instance's 'lock' 
+     * must be locked before accessing other fields of the instance.
      */
     private static class LocalChannelInfo {
 	/** A lock for this instance. */
 	final Lock lock = new ReentrantLock();
 	/** The channel's delivery guarantee. */
 	final Delivery delivery;
-	/** The channel's membership set.  Note: user needs to synchronize
-	 * on the outer instance when accessing this set. */
+	/** The channel's membership set. */
 	final Set<BigInteger> members = new HashSet<BigInteger>();
-	/** The last message delivered to the channel. Note: user needs to
-	 * synchronize on the outer instance when accessing this timestamp. */
+	/** The last message delivered to the channel. */
 	long msgTimestamp;
 
 	/** Constructs an instance. */
