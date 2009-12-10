@@ -61,8 +61,8 @@ public interface SessionRelocationProtocol extends SessionProtocol {
 
     /**
      * Notifies the associated client to resume sending messages to the
-     * server.  If messages were not previously suspended, no action is
-     * taken.
+     * server.  If messages were not previously suspended, the method is
+     * not required to take action.
      *
      * @throws	IOException if an I/O error occurs
      */

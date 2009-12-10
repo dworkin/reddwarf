@@ -547,7 +547,7 @@ public abstract class AbstractService implements Service {
                 }
                 if (maxAttempts-- == 0) {
                     logger.logThrow(Level.WARNING, e,
-                            "A communication error occured while running an" +
+                            "A communication error occured while running an " +
                             "IO task. Reporting node {0} as failed.", nodeId);
 
                     // Report failure of remote node since are

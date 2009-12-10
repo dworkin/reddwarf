@@ -226,17 +226,16 @@ public final class ChannelServiceImpl
     private final ConcurrentHashMap<Long, ChannelServer>
 	channelServerCache = new ConcurrentHashMap<Long, ChannelServer>();
 
+    /** The map of channel coordinator information, keyed by channel ID. */
+    private final ConcurrentHashMap<BigInteger, Coordinator>
+	coordinatorMap = new ConcurrentHashMap<BigInteger, Coordinator>();
+    
     /** The cache of channel membership snapshots, keyed by channel ID.
      * The cache entry timeout is one second.
      */
     private final CacheMap<BigInteger, Set<BigInteger>>
 	channelMembershipCache =
 	    new CacheMap<BigInteger, Set<BigInteger>>(1000);
-
-    /** The cache of channel membership event queues, keyed by channel ID. */ 
-    private final ConcurrentHashMap<BigInteger, Queue<MembershipEventInfo>>
-	membershipEventsCache =
-	    new ConcurrentHashMap<BigInteger, Queue<MembershipEventInfo>>();
 
     /**
      * The local channel membership info, keyed by channel ID.  This map is
@@ -286,28 +285,6 @@ public final class ChannelServiceImpl
 	incomingSessionPendingRequests =
 	    new ConcurrentHashMap<BigInteger,
 				  SortedMap<Long, PendingRequests>>();
-
-    /** The map of channel coordinator task queues, keyed by channel ID.
-     * A coordinator task queue orders the delivery of incoming
-     * 'serviceEventQueue' requests so that a given coordinator is not
-     * overwhelmed by concurrent requests to service its event queue.
-     * The tasks in these queues execute within a transaction.
-     */
-    private final ConcurrentHashMap<BigInteger, TaskQueue>
-	coordinatorTaskQueues =
-	    new ConcurrentHashMap<BigInteger, TaskQueue>();
-
-    /** The map of channel task queues, keyed by channel ID.  A channel's
-     * task queue orders the execution of tasks in which the channel's
-     * coordinator sends notifications (join, leave, send, etc.) to the
-     * channel servers for the channel.  The tasks in these queues execute
-     * outside of a transaction.  This map must be accessed while
-     * synchronized on {@code contextList}. A task queue is added when the
-     * first committed context having to do with the channel is flushed,
-     * and is removed when the channel is closed.
-     */
-    private final Map<BigInteger, TaskQueue> channelTaskQueues =
-	new HashMap<BigInteger, TaskQueue>();
 
     /** The write buffer size for new channels. */
     private final int writeBufferSize;
@@ -993,47 +970,6 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Adds a task to service the event queue of the channel with the
-     * specified {@code channelRefId}.<p>
-     *
-     * The service event queue request is enqueued in the given
-     * channel's coordinator task queue so that the requests can be
-     * performed serially, rather than concurrently.  If tasks to
-     * service a given channel's event queue were processed
-     * concurrently, there would be many transaction conflicts because
-     * servicing a channel event accesses a single per-channel data
-     * structure (the channel's event queue).
-     *
-     * @param	channelRefId a channel ID
-     */
-    void addServiceEventQueueTask(final BigInteger channelRefId) {
-	checkNonTransactionalContext();
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST,
-		"add task to service event queue, channelId:{0}",
-		HexDumper.toHexString(channelRefId));
-	}
-
-	TaskQueue taskQueue = coordinatorTaskQueues.get(channelRefId);
-	if (taskQueue == null) {
-	    TaskQueue newTaskQueue =
-		transactionScheduler.createTaskQueue();
-	    taskQueue = coordinatorTaskQueues.
-		putIfAbsent(channelRefId, newTaskQueue);
-	    if (taskQueue == null) {
-		taskQueue = newTaskQueue;
-	    }
-	}
-
-	taskQueue.addTask(
-	    new AbstractKernelRunnable("ServiceEventQueue") {
-		public void run() {
-		    ChannelImpl.serviceEventQueue(channelRefId);
-		} }, taskOwner);
-    }
-
-    /**
      * Updates the local channel members set by adding the specified {@code
      * sessionRefId} as a local member of the channel with the specified
      * {@code channelRefId}.  ALSO adds the {@code channelRefId} to the the
@@ -1302,7 +1238,7 @@ public final class ChannelServiceImpl
 	    }
 	}
     }
-
+    
     /**
      * Returns {@code true} if the session with the specified
      * {@code sessionRefId} is a local member of the channel with
@@ -1329,185 +1265,6 @@ public final class ChannelServiceImpl
 	}
     }
 
-    /**
-     * Caches the channel membership event with the specified {@code
-     * eventType}, {@code channelRefId}, {@code sessionRefId}, and {@code
-     * eventTimestamp}.  The event will remain cached until its
-     * corresponding event queue reaches the specified {@code
-     * expirationTimestamp}. <p>
-     *
-     * Note: this method removes any expired events (those with an {@code
-     * expirationTimestamp} less than the specified {@code eventTimestamp}
-     * from the specified channel's queue of cached events.
-     *
-     * @param	eventType an membership event type
-     * @param	channelRefId a channel ID
-     * @param	sessionRefId a session ID, or {@code null}
-     * @param	eventTimestamp the event's timestamp
-     * @param	expirationTimestamp the event queue's timestamp
-     */
-    void cacheMembershipEvent(MembershipEventType eventType,
-			      BigInteger channelRefId,
-			      BigInteger sessionRefId,
-			      long eventTimestamp,
-			      long expirationTimestamp)
-    {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "CACHE eventType:{0}, channelRefId:{1}, " +
-		"sessionRefId:{2}, eventTimestamp:{3}, expirationTimestamp:{4}",
-		eventType, HexDumper.toHexString(channelRefId),
-		HexDumper.toHexString(sessionRefId),
-		eventTimestamp, expirationTimestamp);
-	}
-	Queue<MembershipEventInfo> queue =
-	    membershipEventsCache.get(channelRefId);
-	if (queue == null) {
-	    Queue<MembershipEventInfo> newQueue =
-	       new LinkedList<MembershipEventInfo>();
-	    queue = membershipEventsCache.putIfAbsent(channelRefId, newQueue);
-	    if (queue == null) {
-		queue = newQueue;
-	    }
-	}
-	synchronized (queue) {
-	    // remove events with expirationTimestamp <= eventTimestamp.
-	    removeExpiredMembershipEvents(queue, eventTimestamp);
-	    // cache event.
-	    queue.offer(
-		new MembershipEventInfo(eventType, sessionRefId,
-					eventTimestamp,
-					expirationTimestamp));
-	}
-    }
-    
-    /**
-     * Returns {@code true} if the session with the specified {@code
-     * sessionRefId} is a member of the channel with the specified {@code
-     * channelRefId}, and {@code false} otherwise. This method is only
-     * invoked on the channel's coordinator node.  Membership is determined
-     * as follows:<p>
-     *
-     * The {@code isChannelMember} argument indicates whether the specified
-     * session was a member of the channel at the time the event being
-     * processed (that is now checking membership) was added to the event
-     * queue.<p>
-     *
-     * In order to determine channel membership, this method considers the
-     * initial known membership status, {@code isChannelMember}, and then
-     * checks the specified channel's queue of cached events for join/leave
-     * requests for the specified session with timestamps less than or equal
-     * to the specified timestamp. <p>
-     *
-     * Note: this method removes any expired events (those with an {@code
-     * expirationTimestamp} less than the specified {@code eventTimestamp}
-     * from the specified channel's queue of cached events.
-     *
-     * @param	channel a channel instance
-     * @param	sessionRefId a session ID
-     * @param	isChannelMember if {@code true}, the specified session is
-     *		considered to be a member when current event was added to
-     *		the event queue
-     * @param	timestamp the timestamp of the currently executing event,
-     *		beyond which join/leave requests should not be considered
-     *		in determining channel membership
-     * @return	{@code true} if the session with the specified {@code
-     *		sessionRefId} is a member of the channel with the specified
-     *		{@code channelRefId}, and {@code false} otherwise
-     */
-    boolean isChannelMember(ChannelImpl channel,
-			    BigInteger sessionRefId,
-			    boolean isChannelMember,
-			    long timestamp)
-    {
-	assert channel.isCoordinator();
-	BigInteger channelRefId = channel.channelRefId;
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST,
-		       "channel:{0}, session:{1}, isChannelMember:{2}, " +
-		       "timestamp:{3}", HexDumper.toHexString(channelRefId),
-		       HexDumper.toHexString(sessionRefId), isChannelMember,
-		       timestamp);
-	}
-	Queue<MembershipEventInfo> queue =
-	    membershipEventsCache.get(channelRefId);
-	if (queue != null) {
-	    synchronized (queue) {
-		// remove events with timestamp <= eventTimestamp.
-		removeExpiredMembershipEvents(queue, timestamp);
-		for (MembershipEventInfo info : queue) {
-		    if (info.eventTimestamp > timestamp) {
-			break;
-		    }
-		    
-		    switch (info.eventType) {
-			    
-			case JOIN:
-			    if (logger.isLoggable(Level.FINEST)) {
-				logger.log(
-				    Level.FINEST, "join:{0}",
-				    HexDumper.toHexString(info.sessionRefId));
-			    }
-			    if (info.sessionRefId.equals(sessionRefId)) {
-				isChannelMember = true;
-			    }
-			    break;
-			    
-			case LEAVE:
-			    if (logger.isLoggable(Level.FINEST)) {
-				logger.log(
-				    Level.FINEST, "leave:{0}",
-				    HexDumper.toHexString(info.sessionRefId));
-			    }
-			    if (info.sessionRefId.equals(sessionRefId)) {
-				isChannelMember = false;
-			    }
-			    break;
-
-			default:
-			    break;
-		    }
-		}
-	    }
-	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "isChannelMember returns: {0}",
-		       isChannelMember);
-	}
-	
-	return isChannelMember;
-    }
-
-    /**
-     * Removes from the specified membership event {@code queue}, each
-     * cached channel membership event with an {@code expirationTimestamp}
-     * less than the specified {@code timestamp}.
-     */
-    private void removeExpiredMembershipEvents(
-	Queue<MembershipEventInfo> queue, long timestamp)
-    {
-	assert Thread.holdsLock(queue);
-	
-	while (!queue.isEmpty()) {
-	    MembershipEventInfo info = queue.peek();
-	    if (info.expirationTimestamp >= timestamp) {
-		return;
-	    }
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "REMOVE eventType:{0}, sessionRefId:{1}, " +
-		    "eventTimestamp:{2}, expirationTimestamp:{3}",
-		    info.eventType,
-		    (info.sessionRefId != null ?
-		     HexDumper.toHexString(info.sessionRefId) :
-		     "null"), 
-		    info.eventTimestamp, info.expirationTimestamp);
-	    }
-	    queue.poll();
-	}
-    }
-    
     /**
      * Collects a snapshot of the channel membership for the channel with
      * the specified {@code channelRefId} and set of member {@code
@@ -1774,16 +1531,19 @@ public final class ChannelServiceImpl
 
 	/**
 	 * If the context is committed, flushes channel tasks (enqueued
-	 * during this transaction) to the task handler's map, notifies
-	 * the task handler that there are tasks to process, and
-	 * returns true; otherwise returns false.
+	 * during this transaction) to their respective coordinator's
+	 * channel server task queues, then (for all channels needing
+	 * servicing) notifies their respective coordinators that their
+	 * event queues need servicing, and returns true; otherwise
+	 * returns false.
 	 */
 	private boolean flush() {
 	    assert Thread.holdsLock(contextList);
 	    if (isCommitted) {
 		for (BigInteger channelRefId : internalTaskLists.keySet()) {
-		    flushTasks(
-			channelRefId, internalTaskLists.get(channelRefId));
+		    getCoordinator(channelRefId).
+			addChannelNotificationTasks(
+			    internalTaskLists.get(channelRefId));
 		}
 		for (BigInteger channelRefId : channelsToService) {
 		    addServiceEventQueueTask(channelRefId);
@@ -1794,35 +1554,13 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Adds the tasks in the specified {@code taskList} to the specified
-     * channel's task queue. This method is invoked when a context is
-     * flushed during transaction commit.
-     */
-    private void flushTasks(
-	BigInteger channelRefId, List<KernelRunnable> taskList)
-	
-    {
-        assert Thread.holdsLock(contextList);
-	TaskQueue taskQueue = channelTaskQueues.get(channelRefId);
-	if (taskQueue == null) {
-	    taskQueue = taskScheduler.createTaskQueue();
-	    channelTaskQueues.put(channelRefId, taskQueue);
-	}
-	for (KernelRunnable task : taskList) {
-	    taskQueue.addTask(task, taskOwner);
-	}
-    }
-
-    /**
      * Notifies this service that the channel with the specified {@code
      * channelRefId} is closed so that this service can clean up any
      * per-channel data structures (relating to the channel coordinator).
      */
     void closedChannel(BigInteger channelRefId) {
-	coordinatorTaskQueues.remove(channelRefId);
-	membershipEventsCache.remove(channelRefId);
 	synchronized (contextList) {
-	    channelTaskQueues.remove(channelRefId);
+	    coordinatorMap.remove(channelRefId);
 	}
     }
     /* -- Implement ClientSessionStatusListener -- */
@@ -2784,6 +2522,337 @@ public final class ChannelServiceImpl
 		}
 	    }
 	    
+	}
+    }
+
+    /* -- Implement Coordinator -- */
+
+    /**
+     * Adds a task to service the event queue of the channel with the
+     * specified {@code channelRefId}.  This method is only invoked on the
+     * channel's coordinator node.<p>  
+     *
+     * @param	channelRefId a channel ID
+     */
+    void addServiceEventQueueTask(final BigInteger channelRefId) {
+	checkNonTransactionalContext();
+	getCoordinator(channelRefId).addServiceEventQueueTask();
+
+    }
+
+    /**
+     * Caches the channel membership event with the specified {@code
+     * eventType}, {@code channelRefId}, {@code sessionRefId}, and {@code
+     * eventTimestamp}.  This method is only invoked on the channel's
+     * coordinator node.
+     *
+     * @param	eventType an membership event type
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID, or {@code null}
+     * @param	eventTimestamp the event's timestamp
+     * @param	expirationTimestamp the event queue's timestamp
+     */
+    void cacheMembershipEvent(MembershipEventType eventType,
+			      BigInteger channelRefId,
+			      BigInteger sessionRefId,
+			      long eventTimestamp,
+			      long expirationTimestamp)
+    {
+	getCoordinator(channelRefId).
+	    cacheMembershipEvent(eventType, sessionRefId,
+				 eventTimestamp, expirationTimestamp);
+    }
+    
+    /**
+     * Returns {@code true} if the session with the specified {@code
+     * sessionRefId} is a member of the channel with the specified {@code
+     * channelRefId}, and {@code false} otherwise. This method is only
+     * invoked on the channel's coordinator node.
+     *
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
+     * @param	isChannelMember if {@code true}, the specified session is
+     *		considered to be a member when current event was added to
+     *		the event queue
+     * @param	timestamp the timestamp of the currently executing event,
+     *		beyond which join/leave requests should not be considered
+     *		in determining channel membership
+     * @return	{@code true} if the session with the specified {@code
+     *		sessionRefId} is a member of the channel with the specified
+     *		{@code channelRefId}, and {@code false} otherwise
+     */
+    boolean isChannelMember(BigInteger channelRefId,
+			    BigInteger sessionRefId,
+			    boolean isChannelMember,
+			    long timestamp)
+    {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST,
+		       "channel:{0}, session:{1}, isChannelMember:{2}, " +
+		       "timestamp:{3}", HexDumper.toHexString(channelRefId),
+		       HexDumper.toHexString(sessionRefId), isChannelMember,
+		       timestamp);
+	}
+	Coordinator coordinator = coordinatorMap.get(channelRefId);
+
+	if (coordinator != null) {
+	    isChannelMember = coordinator.
+		isChannelMember(sessionRefId, isChannelMember, timestamp);
+	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "isChannelMember returns: {0}",
+		       isChannelMember);
+	}
+	
+	return isChannelMember;
+    }
+
+    /**
+     * Returns the {@code Coordinator} instance for the specified {@code
+     * channelRefId}, constructing a new instance if absent.
+     */
+    private Coordinator getCoordinator(BigInteger channelRefId) {
+	
+	Coordinator coord = coordinatorMap.get(channelRefId);
+	if (coord == null) {
+	    Coordinator newCoord = new Coordinator(channelRefId);
+	    coord = coordinatorMap.putIfAbsent(channelRefId, newCoord);
+	    if (coord == null) {
+		coord = newCoord;
+	    }
+	}
+	return coord;
+    }
+
+    /**
+     * Channel coordinator transient data and operations.  A coordinator
+     * instance manages incoming 'serviceEventQueue' requests for the
+     * coordinator, manages the ordering of outgoing channel server
+     * notifications, and maintains a cache of recent membership events
+     * for determining a sending client session's membership.
+     */
+    private class Coordinator {
+
+	/** The channel ID. */
+	private final BigInteger channelRefId;
+	
+	/** A transactional task queue for ordering the delivery of
+	 * 'serviceEventQueue' requests for this coordinator so the
+	 * coordinator is not overwhelmed by concurrent requests to
+	 * service its event queue.
+	 */
+	private final TaskQueue coordinatorNotifications;
+	
+	/** A non-transactional task queue for ordering the execution
+	 * of channel server notifications (join, leave, send, etc.) 
+	 * send by this coordinator to one or more channel servers for
+	 * the channel.
+	 */
+	private TaskQueue channelServerNotifications;
+
+	/** A cache of channel membership events. */
+	private final Queue<MembershipEventInfo> membershipEventsQueue;
+	
+	/** Constructs an instance with the specified {@code channelRefId}. */
+	Coordinator(BigInteger channelRefId) {
+	    this.channelRefId = channelRefId;
+	    membershipEventsQueue = new LinkedList<MembershipEventInfo>();
+	    coordinatorNotifications =
+		transactionScheduler.createTaskQueue();
+	}
+
+	/**
+	 * Adds the tasks in the specified {@code taskList} to this
+	 * coordinator's channel server notification task queue. This
+	 * method is invoked when a context is flushed during
+	 * transaction commit.
+	 */
+	void addChannelNotificationTasks(List<KernelRunnable> taskList) {
+	    assert Thread.holdsLock(contextList);
+	    if (channelServerNotifications == null) {
+		channelServerNotifications = taskScheduler.createTaskQueue();
+	    }
+	    for (KernelRunnable task : taskList) {
+		channelServerNotifications.addTask(task, taskOwner);
+	    }
+	}
+
+	/**
+	 * Adds a task to service the event queue associated with this
+	 * coordinator.<p>
+	 *
+	 * The service event queue request is enqueued in the coordinator
+	 * notification task queue so that the requests can be performed
+	 * serially, rather than concurrently.  If tasks to service a
+	 * channel's event queue were processed concurrently, there would
+	 * be many transaction conflicts because servicing a channel event
+	 * accesses a single per-channel data structure (the channel's
+	 * event queue).
+	 */
+	void addServiceEventQueueTask() {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "add task to service event queue, channelId:{0}",
+		    HexDumper.toHexString(channelRefId));
+	    }
+
+	    coordinatorNotifications.addTask(
+	        new AbstractKernelRunnable("ServiceEventQueue") {
+		    public void run() {
+			ChannelImpl.serviceEventQueue(channelRefId);
+		    } }, taskOwner);
+	}
+
+	/**
+	 * Caches the channel membership event with the specified {@code
+	 * eventType}, {@code sessionRefId}, and {@code eventTimestamp}.
+	 * The event will remain cached until its corresponding event
+	 * queue reaches the specified {@code expirationTimestamp}. <p>
+	 *
+	 * Note: this method removes any expired events (those with an {@code
+	 * expirationTimestamp} less than the specified {@code eventTimestamp}
+	 * from the queue of cached events.
+	 *
+	 * @param	eventType an membership event type
+	 * @param	sessionRefId a session ID, or {@code null}
+	 * @param	eventTimestamp the event's timestamp
+	 * @param	expirationTimestamp the event queue's timestamp
+	 */
+	void cacheMembershipEvent(MembershipEventType eventType,
+				  BigInteger sessionRefId,
+				  long eventTimestamp,
+				  long expirationTimestamp)
+	{
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST, "CACHE eventType:{0}, channelRefId:{1}, " +
+		    "sessionRefId:{2}, eventTimestamp:{3}, " +
+		    "expirationTimestamp:{4}", eventType,
+		    HexDumper.toHexString(channelRefId),
+		    HexDumper.toHexString(sessionRefId),
+		    eventTimestamp, expirationTimestamp);
+	    }
+	    synchronized (membershipEventsQueue) {
+		// remove events with expirationTimestamp <= eventTimestamp.
+		removeExpiredMembershipEvents(eventTimestamp);
+		// cache event.
+		membershipEventsQueue.offer(
+		    new MembershipEventInfo(eventType, sessionRefId,
+					    eventTimestamp,
+					    expirationTimestamp));
+	    }
+	}
+
+	/**
+	 * Returns {@code true} if the session with the specified {@code
+	 * sessionRefId} is a member of this coordinator's channel, and
+	 * {@code false} otherwise. This method is only invoked on the
+	 * channel's coordinator node.  Membership is determined as
+	 * follows:<p>
+	 *
+	 * The {@code isChannelMember} argument indicates whether the
+	 * specified session was a member of the channel at the time the
+	 * event being processed (that is now checking membership) was added
+	 * to the event queue.<p>
+	 *
+	 * In order to determine channel membership, this method considers
+	 * the initial known membership status, {@code isChannelMember}, and
+	 * then checks the queue of cached events for join/leave requests
+	 * for the specified session with timestamps less than or equal to
+	 * the specified timestamp. <p>
+	 *
+	 * Note: this method removes any expired events (those with an {@code
+	 * expirationTimestamp} less than the specified {@code eventTimestamp}
+	 * from the queue of cached events.
+	 *
+	 * @param sessionRefId a session ID
+	 * @param isChannelMember if {@code true}, the specified session is
+	 *	  considered to be a member when current event was added to
+	 *	  the event queue
+	 * @param timestamp the timestamp of the currently executing event,
+	 *        beyond which join/leave requests should not be considered
+	 *        in determining channel membership
+	 * @return  {@code true} if the session with the specified {@code
+	 *          sessionRefId} is a member of the channel with the specified
+	 *          {@code channelRefId}, and {@code false} otherwise
+	 */
+	boolean isChannelMember(BigInteger sessionRefId,
+				boolean isChannelMember,
+				long timestamp)
+	{
+	    synchronized (membershipEventsQueue) {
+		// remove events with timestamp <= eventTimestamp.
+		removeExpiredMembershipEvents(timestamp);
+		for (MembershipEventInfo info : membershipEventsQueue) {
+		    if (info.eventTimestamp > timestamp) {
+			break;
+		    }
+		    
+		    switch (info.eventType) {
+			    
+			case JOIN:
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.log(
+				    Level.FINEST, "join:{0}",
+				    HexDumper.toHexString(info.sessionRefId));
+			    }
+			    if (!isChannelMember &&
+				info.sessionRefId.equals(sessionRefId))
+			    {
+				isChannelMember = true;
+			    }
+			    break;
+			    
+			case LEAVE:
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.log(
+				    Level.FINEST, "leave:{0}",
+				    HexDumper.toHexString(info.sessionRefId));
+			    }
+			    if (isChannelMember &&
+				info.sessionRefId.equals(sessionRefId))
+			    {
+				isChannelMember = false;
+			    }
+			    break;
+
+			default:
+			    break;
+		    }
+		}
+	    }
+	
+	    return isChannelMember;
+	}
+
+	/**
+	 * Removes from the membership event queue, each cached channel
+	 * membership event with an {@code expirationTimestamp} less than
+	 * the specified {@code timestamp}.  This method must be invoked
+	 * while synchronized on {@code membershipEventsQueue}.
+	 */
+	private void removeExpiredMembershipEvents(long timestamp) {
+	    assert Thread.holdsLock(membershipEventsQueue);
+	    
+	    while (!membershipEventsQueue.isEmpty()) {
+		MembershipEventInfo info = membershipEventsQueue.peek();
+		if (info.expirationTimestamp >= timestamp) {
+		    return;
+		}
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"REMOVE eventType:{0}, sessionRefId:{1}, " +
+			"eventTimestamp:{2}, expirationTimestamp:{3}",
+			info.eventType,
+			(info.sessionRefId != null ?
+			 HexDumper.toHexString(info.sessionRefId) :
+			 "null"), 
+			info.eventTimestamp, info.expirationTimestamp);
+		}
+		membershipEventsQueue.poll();
+	    }
 	}
     }
 }

@@ -35,7 +35,6 @@ import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ManagedSerializable;
-import com.sun.sgs.app.util.ScalableDeque;
 import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.MembershipEventType;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
@@ -62,7 +61,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -139,10 +137,6 @@ final class ChannelImpl implements ManagedObject, Serializable {
     /** The saved messages map prefix. */
     static final String SAVED_MESSAGES_MAP_PREFIX = PKG_NAME + "message.";
 
-    /** The saved messages queue prefix. */
-    private static final String SAVED_MESSAGES_QUEUE_PREFIX =
-	PKG_NAME + "messageQueue.";
-    
     /** The empty channel membership set. */
     static final Set<BigInteger> EMPTY_CHANNEL_MEMBERSHIP =
 	Collections.emptySet();
@@ -922,32 +916,9 @@ final class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the queue of saved messages for this channel, for
-     * determining which messages have expired and can be removed.
-     */
-    @SuppressWarnings("unchecked")
-    private static Deque<ChannelMessageInfo>
-	getSavedMessagesQueue(BigInteger channelRefId, boolean createIfAbsent)
-    {
-	DataService dataService = getDataService();
-	ManagedObject messageQueue = null;
-	String key = SAVED_MESSAGES_QUEUE_PREFIX + channelRefId;
-	try {
-	    messageQueue = dataService.getServiceBinding(key);
-	} catch (NameNotBoundException e) {
-	    if (createIfAbsent) {
-		messageQueue = new ScalableDeque<ChannelMessageInfo>();
-		dataService.setServiceBinding(key, messageQueue);
-		SavedMessageReaper.scheduleNewTask(channelRefId, false);
-	    }
-	}
-	return (Deque<ChannelMessageInfo>) messageQueue;
-    }
-
-    /**
      * Saves the specified channel {@code message} with the specified
      * {@code timestamp}. Reliable messages are saved for a period of time
-     * (the length of time it takes to m ove a client session) so that
+     * (the length of time it takes to move a client session) so that
      * channel messages missed during relocation can be obtained and
      * delivered to a relocated client session.
      */
@@ -957,8 +928,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    getSavedMessagesMap(channelRefId);
 	ChannelMessageInfo messageInfo =
 	    new ChannelMessageInfo(message, timestamp);
-	savedMessagesMap.put(Long.toString(timestamp), messageInfo);
-	getSavedMessagesQueue(channelRefId, true).add(messageInfo);
+	savedMessagesMap.put(getTimestampEncoding(timestamp), messageInfo);
     }
 
     /**
@@ -979,13 +949,38 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		getSavedMessagesMap(channelRefId);
 	    for (long ts = fromTimestamp; ts <= toTimestamp; ts++) {
 		ChannelMessageInfo messageInfo =
-		    savedMessagesMap.get(Long.toString(ts));
+		    savedMessagesMap.get(getTimestampEncoding(ts));
 		if (messageInfo != null) {
 		    messages.add(messageInfo);
 		}
 	    }
 	}
 	return messages;
+    }
+
+    /**
+     * Returns an encoding for the specified {@code timestamp}
+     * that preserves ascending timestamp order with
+     * lexicographically-ordered keys.  The encoding consists
+     * of the following:
+     * 
+     * <ul>
+     * <li> a single hex digit whose value is one less than the number of
+     *      hex digits (leading zero digits are not included),
+     * <li> a hyphen,
+     * <li> the hex encoding of the timestamp with leading zero digits
+     *      stripped.
+     * </ul>
+     */
+    private static String getTimestampEncoding(long timestamp) {
+	String hexString = Long.toHexString(timestamp);
+	int numHexits =  hexString.length();
+	StringBuilder builder = new StringBuilder(2 + numHexits);
+	builder.
+	    append(Character.forDigit(numHexits - 1, 16)).
+	    append('-').
+	    append(hexString);
+	return builder.toString();
     }
     
     /**
@@ -1055,53 +1050,43 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	}
 	
 	/**
-	 * Iterates through the message queue, removing messages saved past
-	 * their expiration time.  The message is removed from the queue, as
-	 * well as the map of saved messages, keyed by message timestamp.
+	 * Iterates through the saved message map, removing messages
+	 * saved past their expiration time.  Iteration over a {@code
+	 * BindingKeyedMap} returns bindings in lexicographical oder.
+	 * Timestamps are encoded to preserve ascending timestamp order
+	 * with lexicographically-ordered keys, so the messages will be
+	 * returned in ascending timestamp order.
 	 */
 	public void run() {
-	    Deque<ChannelMessageInfo> messageQueue =
-		getSavedMessagesQueue(channelRefId, false);
-	    if (messageQueue == null) {
-		// Queue no longer exists, so "cancel" periodic task.
+	    BindingKeyedMap<ChannelMessageInfo> savedMessages =
+		getSavedMessagesMap(channelRefId);
+	    if (savedMessages.isEmpty()) {
+		// Saved messages no longer exist, so "cancel" periodic task.
 		return;
 	    } else {
 		// Remove messages saved past their expiration time.
 		DataService dataService = getDataService();
-		if (!messageQueue.isEmpty()) {
-		    TaskManager taskManager = AppContext.getTaskManager();
-		    Iterator<ChannelMessageInfo> iter = messageQueue.iterator();
-		    while (taskManager.shouldContinue() && iter.hasNext()) {
-			ChannelMessageInfo messageInfo = iter.next();
-			if (messageInfo.isExpired()) {
-			    if (logger.isLoggable(Level.FINEST)) {
-				logger.log(
-				    Level.FINEST,
-				    "Removing saved message, channel:{0} " +
-				    "timestamp:{1}",
-				    HexDumper.toHexString(channelRefId),
-				    messageInfo.timestamp);
-			    }
-			    iter.remove();
-			    getSavedMessagesMap(channelRefId).
-				remove(Long.toString(messageInfo.timestamp));
-			    dataService.removeObject(messageInfo);
-			} else {
-			    break;
+		TaskManager taskManager = AppContext.getTaskManager();
+		Iterator<ChannelMessageInfo> iter =
+		    savedMessages.values().iterator();
+		while (taskManager.shouldContinue() && iter.hasNext()) {
+		    ChannelMessageInfo messageInfo = iter.next();
+		    if (messageInfo.isExpired()) {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(
+				Level.FINEST,
+				"Removing saved message, channel:{0} " +
+				"timestamp:{1}",
+				HexDumper.toHexString(channelRefId),
+				messageInfo.timestamp);
 			}
+			iter.remove();
+			dataService.removeObject(messageInfo);
+		    } else {
+			break;
 		    }
 		}
-		if (messageQueue.isEmpty()) {
-		    if (logger.isLoggable(Level.FINEST)) {
-			logger.log(
-			    Level.FINEST,
-			    "Removing saved messages queue, channel:{0}",
-			    HexDumper.toHexString(channelRefId));
-		    }
-		    dataService.removeObject(messageQueue);
-		    dataService.removeServiceBinding(
-			SAVED_MESSAGES_QUEUE_PREFIX + channelRefId);
-		} else {
+		if (!savedMessages.isEmpty()) {
 		    scheduleTask();
 		}
 	    }
@@ -2059,17 +2044,16 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    throws IOException;
 
 	/**
-	 * Updates this task's {@code sessionNodeId} and returns {@code true}
-	 * if the session's node ID has changed, and returns {@code false} if
-	 * the session's node ID is unchanged or the session no longer exists.
-	 * If the session's node ID changes, a subclass may need to add the
-	 * updated node ID to the channel's set of server node IDs.  This
-	 * method is invoked outside of a transaction.
+	 * Returns {@code true} if when the session's node ID changes, it
+	 * should be added to the channel's set of node IDs, and returns
+	 * {@code false} otherwise.  This method is invoked inside of a
+	 * transaction.
 	 *
-	 * @return {@code true} if the session's node ID is updated, otherwise
-	 *	   {@code false}
+	 * @return {@code true} if  when the session's node ID changes, it
+	 *	   should be added to the channel's set of node IDs, and
+	 *	   {@code false} otherwise
 	 */
-	protected abstract boolean updateSessionNodeId();
+	protected abstract boolean addChangedSessionNodeId();
 	
 	/**
 	 * Returns the client session associated with this task, or null if
@@ -2084,14 +2068,16 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	 * Updates this task's {@code sessionNodeId} and returns {@code true}
 	 * if the session's node ID has changed, and returns {@code false} if
 	 * the session's node ID is unchanged or the session no longer
-	 * exists.  This method must be invoked within a transaction.
+	 * exists.  If the session's node ID has changed, this method invokes
+	 * the {@code addChangedSessionNodeId} method, and if that method
+	 * returns {@code true}, the session's new node ID is added to the
+	 * channel's set of node IDs.  This method must be invoked within a
+	 * transaction.
 	 *
-	 * @param addNodeId if {@code true}, adds the specified
-	 *	  {@code nodeId} to the channel's set of server node IDs
 	 * @return {@code true} if the session's node ID is updated, otherwise
 	 *	   {@code false}
 	 */
-	protected final boolean updateSessionNodeId(final boolean addNodeId) {
+	protected final boolean updateSessionNodeId() {
 	    
 	    final long oldSessionNodeId = sessionNodeId;
 	    try {
@@ -2104,7 +2090,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			    sessionNodeId = getNodeId(session);
 			}
 			boolean updated = sessionNodeId != oldSessionNodeId;
-			if (updated && addNodeId) {
+			if (updated && addChangedSessionNodeId()) {
 			    ChannelImpl channel = getChannel();
 			    if (channel != null) {
 				channel.addServerNodeId(sessionNodeId);
@@ -2191,11 +2177,11 @@ final class ChannelImpl implements ManagedObject, Serializable {
 
 	/** {@inheritDoc} <p>
 	 *
-	 * This implementation also adds the session's node ID
-	 * (if changed) to the channel's set of server node IDs.
+	 * A join event requires that a changed session's node ID be added to
+	 * the channel's set of server node IDs.
 	 */
-	protected boolean updateSessionNodeId() {
-	    return updateSessionNodeId(true);
+	protected boolean addChangedSessionNodeId() {
+	    return true;
 	}
 
 	/** {@inheritDoc} */
@@ -2289,9 +2275,13 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    return success;
 	}
 	
-	/** {@inheritDoc} */
-	protected boolean updateSessionNodeId() {
-	    return updateSessionNodeId(false);
+	/** {@inheritDoc} <p>
+	 *
+	 * A leave event should not have a changed session's node ID
+	 * added to the channel's set of server node IDs.
+	 */
+	protected boolean addChangedSessionNodeId() {
+	    return false;
 	}
 
 	/** {@inheritDoc} */
@@ -2374,7 +2364,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		    }
 
 		    if (!channelService.isChannelMember(
-			    channel, senderRefId,
+			    channel.channelRefId, senderRefId,
 			    isChannelMember, timestamp))
 		    {
 			if (logger.isLoggable(Level.FINEST)) {

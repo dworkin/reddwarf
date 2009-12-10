@@ -248,7 +248,7 @@ public class SimpleSgsRelocationProtocolImpl
      *		relocation request, or {@code null}
      */
     private void relocateFailure(String reason, Throwable ignore) {
-	// for now, override specified reason.
+	// the reason argument is overridden for security reasons
 	reason = DEFAULT_RELOCATE_FAILED_REASON;
         MessageBuffer buf =
 	    new MessageBuffer(1 + MessageBuffer.getSize(reason));
