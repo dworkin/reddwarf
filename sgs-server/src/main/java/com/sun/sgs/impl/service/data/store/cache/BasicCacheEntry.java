@@ -232,6 +232,22 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
+     * Sets this entry's state to {@link State#FETCHING_READ} temporarily for
+     * when a transaction that created a binding entry aborts while the entry
+     * is marked pending previous for an ongoing server request.  Notifies the
+     * lock, which must be held.
+     *
+     * @param	lock the associated lock
+     * @throws	IllegalStateException if the entry is not in state {@link
+     *		State#CACHED_WRITE}
+     */
+    void setReadingTemporarily(Object lock) {
+	verifyState(State.CACHED_WRITE);
+	state = State.FETCHING_READ;
+	lock.notifyAll();
+    }
+
+    /**
      * Waits for this entry to become readable.  Returns {@code true} if the
      * entry is readable, else {@code false} if the entry has become decached.
      *

@@ -425,7 +425,8 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      */
     void setPendingPrevious() {
 	if (pendingPrevious) {
-	    throw new IllegalStateException("Already pending previous");
+	    throw new IllegalStateException(
+		"Already pending previous: " + this);
 	}
 	assert !getUpgrading() && !getDowngrading() && !getDecaching()
 	    : "Setting binding entry pending previous while busy: " + this;

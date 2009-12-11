@@ -735,9 +735,19 @@ class TxnContext {
 			entry.setPreviousKey(
 			    restorePreviousKey, restorePreviousKeyUnbound);
 			if (restoreValue == -1) {
-			    /* Roll back new binding */
-			    entry.setEvictedImmediate(lock);
-			    cache.removeBindingEntry(key);
+			    if (entry.getPendingPrevious()) {
+				/*
+				 * Mark the entry as fetching so that the
+				 * pending server request will know that it
+				 * should remove the entry if it ends up not
+				 * being used.
+				 */
+				entry.setReadingTemporarily(lock);
+			    } else {
+				/* Roll back new binding */
+				entry.setEvictedImmediate(lock);
+				cache.removeBindingEntry(key);
+			    }
 			}
 		    }
 		}
