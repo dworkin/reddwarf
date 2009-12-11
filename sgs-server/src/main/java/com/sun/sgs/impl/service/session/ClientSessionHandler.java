@@ -1402,7 +1402,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    public void run() {
 			try {
 			    ((SessionRelocationProtocol) protocol).relocate(
- 				newNode, descriptors, ByteBuffer.wrap(key),
+ 				descriptors, ByteBuffer.wrap(key),
 				new RelocateCompletionHandler());
 			} catch (Exception e) {
 			    if (logger.isLoggable(Level.WARNING)) {

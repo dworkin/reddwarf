@@ -34,7 +34,6 @@ import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.SessionRelocationProtocol;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.Node;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Set;
@@ -197,8 +196,7 @@ public class SimpleSgsRelocationProtocolImpl
     }
 
     /** {@inheritDoc} */
-    public void relocate(Node newNode,
-			 Set<ProtocolDescriptor> descriptors,
+    public void relocate(Set<ProtocolDescriptor> descriptors,
 			 ByteBuffer relocationKey,
 			 RequestCompletionHandler<Void> completionHandler)
     {

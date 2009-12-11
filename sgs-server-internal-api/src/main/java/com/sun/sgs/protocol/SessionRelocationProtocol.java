@@ -23,7 +23,6 @@
 
 package com.sun.sgs.protocol;
 
-import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Set;
@@ -70,7 +69,8 @@ public interface SessionRelocationProtocol extends SessionProtocol {
     
     /**
      * Notifies the associated client to relocate its session to the node
-     * specified by the {@code descriptors} using the given relocation key.<p>
+     * specified by the {@code descriptors} using the given {@code
+     * relocationKey}.<p>
      *
      * The associated client session can be reestablished on the new node
      * by notifying the {@link ProtocolListener} of this protocol's
@@ -84,7 +84,6 @@ public interface SessionRelocationProtocol extends SessionProtocol {
      * Additionally, the client should close any underlying local
      * connection(s) in a timely fashion.
      *
-     * @param	newNode the new node to establish a connection with
      * @param	descriptors protocol descriptors for {@code newNode}
      * @param	relocationKey the key to be supplied to the new node
      * @param	completionHandler a completion handler
@@ -92,8 +91,7 @@ public interface SessionRelocationProtocol extends SessionProtocol {
      *		suspended or is already relocating 
      * @throws	IOException if an I/O error occurs
      */
-    void relocate(Node newNode,
-		  Set<ProtocolDescriptor> descriptors,
+    void relocate(Set<ProtocolDescriptor> descriptors,
 		  ByteBuffer relocationKey,
 		  RequestCompletionHandler<Void> completionHandler)
 	throws IOException;
