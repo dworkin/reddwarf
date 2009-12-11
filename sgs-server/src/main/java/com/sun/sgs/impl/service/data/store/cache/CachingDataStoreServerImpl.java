@@ -974,8 +974,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		       byte[][] oidValues,
 		       int newOids,
 		       String[] names,
-		       long[] nameValues,
-		       int newNames)
+		       long[] nameValues)
 	throws CacheConsistencyException
     {
 	NodeInfo nodeInfo;
@@ -1005,15 +1004,11 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		throw new IllegalArgumentException(
 		    "The number of names and name values must be the same");
 	    }
-	    if (newNames < 0 || newNames > names.length) {
-		throw new IllegalArgumentException(
-		    "Illegal newNames: " + newNames);
-	    }
 	    for (int i = 0; true; i++) {
 		assert i < 1000 : "Too many retries";
 		try {
-		    commitInternal(nodeInfo, oids, oidValues, newOids, names,
-				   nameValues, newNames);
+		    commitInternal(
+			nodeInfo, oids, oidValues, newOids, names, nameValues);
 		    break;
 		} catch (RuntimeException e) {
 		    if (!isRetryableException(e)) {
@@ -1032,8 +1027,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 				byte[][] oidValues,
 				int newOids,
 				String[] names,
-				long[] nameValues,
-				int newNames)
+				long[] nameValues)
 	throws CacheConsistencyException
     {
 	DbTransaction txn = env.beginTransaction(txnTimeout);
@@ -1057,33 +1051,47 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    oidsDb.put(txn, encodeLong(oid), oidValues[i]);
 		}
 	    }
-	    for (int i = 0; i < names.length; i++) {
-		String name = names[i];
-		if (name == null) {
-		    throw new IllegalArgumentException(
-			"The names must not be null");
+	    DbCursor cursor = namesDb.openCursor(txn);
+	    try {
+		for (int i = 0; i < names.length; i++) {
+		    String name = names[i];
+		    if (name == null) {
+			throw new IllegalArgumentException(
+			    "The names must not be null");
+		    }
+		    long value = nameValues[i];
+		    if (value < -1) {
+			throw new IllegalArgumentException(
+			    "The name values must not be less than -1");
+		    }
+		    String nextName = cursor.findNext(encodeString(name))
+			? decodeString(cursor.getKey()) : null;
+		    BindingKey nextKey = BindingKey.getAllowLast(nextName);
+		    if (value != -1) {
+			/* Set -- next name must be write locked */
+			checkLocked(nodeInfo, nextKey, true);
+			if (!name.equals(nextName)) {
+			    lock(nodeInfo, BindingKey.get(name), true);
+			}
+			namesDb.put(
+			    txn, encodeString(name), encodeLong(value));
+		    } else if (!name.equals(nextName)) {
+			/* Already removed -- next name must be read locked */
+			checkLocked(nodeInfo, nextKey, false);
+		    } else {
+			/* Remove -- name and next name must be write locked */
+			checkLocked(nodeInfo, nextKey, true);
+			checkLocked(nodeInfo,
+				    BindingKey.getAllowLast(
+					cursor.findNext() ?
+					decodeString(cursor.getKey()) : null),
+				    true);
+			namesDb.delete(txn, encodeString(name));
+			releaseLock(nodeInfo, nextKey);
+		    }
 		}
-		BindingKey key = BindingKey.get(name);
-		if (i < newNames) {
-		    lock(nodeInfo, key, true);
-		} else {
-		    checkLocked(nodeInfo, key, true);
-		}
-		long value = nameValues[i];
-		if (value < -1) {
-		    throw new IllegalArgumentException(
-			"The name values must not be less than -1");
-		} else if (value == -1) {
-		    namesDb.delete(txn, encodeString(name));
-		    /*
-		     * Release the lock on the removed name since the node
-		     * does not maintain an entry for an unbound name.
-		     */
-		    releaseLock(nodeInfo, key);
-		} else {
-		    namesDb.put(
-			txn, encodeString(name), encodeLong(value));
-		}
+	    } finally {
+		cursor.close();
 	    }
 	    txnDone = true;
 	    txn.commit();

@@ -541,47 +541,28 @@ class TxnContext {
 	}
 	String[] names = new String[numNames];
 	long[] nameValues = new long[numNames];
-	int newNames = 0;
 	if (modifiedBindings != null) {
 	    int i = 0;
-	    /* Use two passes so new bindings are put first */
-	    for (int pass = 1; pass <= 2; pass++) {
-		boolean includeNew = (pass == 1);
-		for (Entry<BindingKey, SavedBindingValue> mapEntry :
-			 modifiedBindings.entrySet())
-		{
-		    SavedBindingValue saved = mapEntry.getValue();
-		    if (includeNew == saved.isNew()) {
-			BindingKey key = mapEntry.getKey();
-			String name = key.getNameAllowLast();
-			if (name != null) {
-			    if (saved.isNew()) {
-				newNames++;
-			    }
-			    names[i] = name;
-			}
-			Object lock = cache.getBindingLock(key);
-			synchronized (lock) {
-			    BindingCacheEntry entry =
-				cache.getBindingEntry(key);
-			    if (name != null) {
-				nameValues[i] =
-				    (entry == null) ? -1 : entry.getValue();
-			    }
-			    if (entry != null) {
-				entry.setNotModified(lock);
-			    }
-			}
-			if (name != null) {
-			    i++;
-			}
+	    for (BindingKey key : modifiedBindings.keySet()) {
+		String name = key.getNameAllowLast();
+		Object lock = cache.getBindingLock(key);
+		synchronized (lock) {
+		    BindingCacheEntry entry = cache.getBindingEntry(key);
+		    if (name != null) {
+			names[i] = name;
+			nameValues[i] =
+			    (entry == null) ? -1 : entry.getValue();
+			i++;
+		    }
+		    if (entry != null) {
+			entry.setNotModified(lock);
 		    }
 		}
 	    }
 	}
 	/* Commit updates to server */
 	store.getUpdateQueue().commit(
-	    contextId, oids, oidValues, newOids, names, nameValues, newNames);
+	    contextId, oids, oidValues, newOids, names, nameValues);
     }
 
     /**
@@ -697,15 +678,6 @@ class TxnContext {
 	    restoreValue = entry.getValue();
 	    restorePreviousKey = entry.getPreviousKey();
 	    restorePreviousKeyUnbound = entry.getPreviousKeyUnbound();
-	}
-
-	/**
-	 * Returns whether this name was newly bound in this transaction.
-	 *
-	 * @return	whether this name is newly bound
-	 */
-	boolean isNew() {
-	    return restoreValue == -1;
 	}
 
 	/**

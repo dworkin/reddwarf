@@ -179,9 +179,7 @@ class UpdateQueue {
      * parameter contains the names whose bindings have been changed.  For each
      * element of that array, the element of the {@code nameValues} array in
      * the same position contains the new value for the name binding, or {@code
-     * -1} if the name binding should be removed.  If any of the names are
-     * being newly bound, those names will be listed first and the {@code
-     * newNames} parameter specifies how many of them there are.
+     * -1} if the name binding should be removed.
      *
      * @param	contextId the transaction context ID
      * @param	oids the object IDs
@@ -189,28 +187,24 @@ class UpdateQueue {
      * @param	newOids the number of object IDs that are new
      * @param	names the names
      * @param	nameValues the associated name bindings
-     * @param	newNames the number of names that are newly bound
      * @throws	IllegalArgumentException if {@code oids} and {@code oidValues}
      *		are not the same length, if {@code oids} contains a negative
      *		value, if {@code newOids} is negative or greater than the
      *		length of {@code oids}, if {@code names} and {@code nameValues}
      *		are not the same length, if {@code nameValues} contains a
-     *		negative value, or if {@code newNames} is negative or greater
-     *		than the length of {@code names}
+     *		negative value
      */
     void commit(final long contextId,
 		long[] oids,
 		byte[][] oidValues,
 		int newOids,
 		String[] names,
-		long[] nameValues,
-		int newNames)
+		long[] nameValues)
     {
 	pendingAcknowledgeSet.add(contextId);
 	txnFinished(contextId);
 	queue.addRequest(
 	    new Commit(contextId, oids, oidValues, newOids, names, nameValues,
-		       newNames,
 		       new CompletionHandler() {
 			   @Override
 			   public void completed() {

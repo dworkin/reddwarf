@@ -84,7 +84,9 @@ public interface DbCursor {
     /**
      * Searches for the first key that is greater than or equal to the
      * specified key.  If the result is {@code true}, then sets the current key
-     * and value to the key found and its associated value.
+     * and value to the key found and its associated value.  Note that the key
+     * array may be modified, so callers should not reuse the array after
+     * calling this method.
      *
      * @param	key the key at which to start searching
      * @return	{@code true} if the next key was found, else {@code false}

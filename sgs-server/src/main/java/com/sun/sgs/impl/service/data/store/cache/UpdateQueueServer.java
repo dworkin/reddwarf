@@ -34,9 +34,7 @@ public interface UpdateQueueServer {
      * bindings have been changed.  For each element of that array, the element
      * of the {@code nameValues} array in the same position contains the new
      * value for the name binding, or {@code -1} if the name binding should be
-     * removed.  If any of the names are being newly bound, those names will be
-     * listed first and the {@code newNames} parameter specifies how many of
-     * them there are.
+     * removed.
      *
      * @param	nodeId the node ID
      * @param	oids the object IDs
@@ -44,7 +42,6 @@ public interface UpdateQueueServer {
      * @param	newOids the number of object IDs that are new
      * @param	names the names
      * @param	nameValues the associated name bindings
-     * @param	newNames the number of names that are newly bound
      * @throws	CacheConsistencyException if the node does not have the
      *		appropriate access to the objects or bindings being committed
      * @throws	IllegalArgumentException if {@code nodeId} has not been
@@ -53,16 +50,14 @@ public interface UpdateQueueServer {
      *		{@code newOids} is negative or greater than the length of
      *		{@code oids}, if {@code names} and {@code nameValues} are not
      *		the same length, if {@code nameValues} contains a negative
-     *		value, or if {@code newNames} is negative or greater than the
-     *		length of {@code names}
+     *		value
      */
     void commit(long nodeId,
 		long[] oids,
 		byte[][] oidValues,
 		int newOids,
 		String[] names,
-		long[] nameValues,
-		int newNames)
+		long[] nameValues)
 	throws CacheConsistencyException;
 
     /**
