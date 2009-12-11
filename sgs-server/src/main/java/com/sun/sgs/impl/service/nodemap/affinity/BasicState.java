@@ -108,7 +108,7 @@ public class BasicState {
     /**
      * Throws an IllegalStateException if we are in the {@code SHUTDOWN}
      * state.
-     * @throws IllegalStateException if we are stut down
+     * @throws IllegalStateException if we are shut down
      */
     protected void checkForShutdownState() {
         if (state == State.SHUTDOWN) {

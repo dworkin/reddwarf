@@ -351,8 +351,10 @@ public class NodeMappingServiceImpl
         relocationHandlers =
             new ConcurrentHashMap<Identity, Queue<SimpleCompletionHandler>>();
 
-    /** Affinity Group finder (TEMP) */
-    private final AffinityGroupFinder finder;
+    /** Affinity group subsystem is managed by the server, unless this is an
+     *  appNode, in which case the service manages it.
+     */
+    private final LPADriver driver;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -415,6 +417,9 @@ public class NodeMappingServiceImpl
                 // Use the port actually used by our server instance
                 host = localHost;
                 port = serverImpl.getPort();
+                
+                // The affinity group subsystem is managed by the server
+                driver = null;
             } else {
                 serverImpl = null;
                 host = 
@@ -428,7 +433,10 @@ public class NodeMappingServiceImpl
                 }
                 port = wrappedProps.getIntProperty(
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
-                        NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);   
+                        NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);
+
+                // Create our affinity group finder subsystem.
+                driver = new LPADriver(properties, systemRegistry, txnProxy);
             }          
           
             // TODO This code assumes that the server has already been started.
@@ -479,11 +487,9 @@ public class NodeMappingServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
 
-            // Create and start our affinity group finder subsystem.
-            // TEMP -- this code to move to coordinator
-            finder = new LPADriver(properties, systemRegistry, txnProxy);
-            finder.enable();
-
+            if (driver != null) {
+                driver.enable();
+            }
             logger.log(Level.CONFIG,
                        "Created NodeMappingServiceImpl with properties:" +
                        "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
@@ -529,7 +535,9 @@ public class NodeMappingServiceImpl
     
     /** {@inheritDoc} */
     protected void doShutdown() {
-        finder.shutdown();
+        if (driver != null) {
+            driver.shutdown();
+        }
         try {
             exporter.unexport();
             if (dataService != null) {

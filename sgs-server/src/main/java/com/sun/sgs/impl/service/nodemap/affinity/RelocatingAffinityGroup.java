@@ -22,30 +22,38 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 /**
- * Stub, to be replaced by Keith's version (used for testing until we merge).
- * <p>
- * An affinity group which can relocate its member identities to other nodes.
- * Key ideas swiped from Keith's branch to help us with merging.
+ * An affinity group which includes node information to aid in collocating its
+ * member Identities, and in moving Identities as a group.
  * <p>
  * These affinity groups can span multiple nodes and will eventually
  * relocate their members to a single node.  There probably needs to be
  * some external control of the relocation in case we merge affinity groups
  * or find that an algorithm run returns a single group.
  */
-public class RelocatingAffinityGroup implements AffinityGroup {
+public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     // The group id
     private final long agid;
     // Map Identity -> nodeId
     private final Map<Identity, Long> identities;
-    // The node id that most Identities seem to be on
-    private final long targetNodeId;
+
+    // The target node id that the Identities should be on. Initially set to
+    // the node that most Identites seem to be on. A -1 indicates that target
+    // node is not known and has not yet been set.
+    private long targetNodeId;
+
     // Generation number
     private final long generation;
+
+    // The weight of this group. Currently this is simplily the size of the
+    // group.
+    private final int weight;
+
     /**
      * Creates a new affinity group containing node information.
      * @param agid the group id
@@ -63,7 +71,8 @@ public class RelocatingAffinityGroup implements AffinityGroup {
         this.agid = agid;
         this.identities = identities;
         this.generation = generation;
-        targetNodeId = calcMostUsedNode();
+        setTargetNode(calcMostUsedNode());
+        weight = identities.size();
     }
 
     /**
@@ -94,6 +103,46 @@ public class RelocatingAffinityGroup implements AffinityGroup {
         return retNode;
     }
 
+    /**
+     * Set the target node id for this group.
+     *
+     * @param nodeId a node id
+     * @param server the node mapping server
+     */
+    public void setTargetNode(long nodeId) {
+        targetNodeId = nodeId;
+    }
+
+    /**
+     * Get the target node id for this group.
+     *
+     * @return the target node if known, otherwise -1
+     */
+    public long getTargetNode() {
+        return targetNodeId;
+    }
+
+    /**
+     * Return the set of Identities that are not on the target node.
+     *
+     * @return the set of Identities that are not on the target node
+     */
+    public Set<Identity> findStragglers() {
+
+        // If target node is unknown, then everyone is lost
+        if (targetNodeId < 0) {
+            return getIdentities();
+        }
+        Set<Identity> stragglers = new HashSet<Identity>();
+        for (Map.Entry<Identity, Long> entry : identities.entrySet()) {
+            if (entry.getValue() != targetNodeId) {
+                stragglers.add(entry.getKey());
+                entry.setValue(targetNodeId);
+            }
+        }
+        return stragglers;
+    }
+
     /** {@inheritDoc} */
     @Override
     public String toString() {
@@ -114,5 +163,15 @@ public class RelocatingAffinityGroup implements AffinityGroup {
     /** {@inheritDoc} */
     public long getGeneration() {
         return generation;
+    }
+
+    @Override
+    public int compareTo(Object obj) {
+        if (obj == null) {
+            throw new NullPointerException();
+        }
+        if (this.equals(obj)) return 0;
+
+        return weight < ((RelocatingAffinityGroup)obj).weight ? -1 : 1;
     }
 }

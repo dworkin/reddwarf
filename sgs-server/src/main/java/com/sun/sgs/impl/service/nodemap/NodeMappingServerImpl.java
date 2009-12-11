@@ -92,20 +92,6 @@ import java.util.logging.Logger;
  *      <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.coordinator.class
- *	</b></code> <br>
- *	<i>Default:</i>
- *	<code>com.sun.sgs.impl.service.nodemap.coordinator.simple.SimpleCoordinator</code>
- *
- * <dd style="padding-top: .5em">
- *      The name of the class that implements {@link
- *	GroupCoordinator}, used for coordinating groups of identities. The class
- *      must be public, not abstract, and must provide a public constructor
- *      with {@link Properties}, {@link NodeMappingServerImpl},
- *      {@link ComponentRegistry}, and {@link TransactionProxy} parameters.
- *      <p>
- *
- * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.remove.expire.time
  *	</b></code> <br>
  *      <i>Default:</i> {@code 5000} 
@@ -187,17 +173,6 @@ public final class NodeMappingServerImpl
     /** The default node assign policy class name. */
     private static final String DEFAULT_ASSIGN_POLICY_CLASS =
             "com.sun.sgs.impl.service.nodemap.policy.RoundRobinPolicy";
-
-    /**
-     * The property that specifies the name of the class that implements
-     * {@link GroupCoordinator}.
-     */
-    private static final String GROUP_COORDINATOR_CLASS_PROPERTY =
-            PKG_NAME + ".coordinator.class";
-
-    /** The default group coordinator class name. */
-    private static final String DEFAULT_GROUP_COORDINATOR_CLASS =
-        "com.sun.sgs.impl.service.nodemap.coordinator.simple.SimpleCoordinator";
 
     /** The property name for the amount of time to wait before removing an
      * identity from the node map.
@@ -335,18 +310,10 @@ public final class NodeMappingServerImpl
                                             NodeAssignPolicy.class,
                                             new Class[] { Properties.class },
                                             properties);
-
-        String defaultCoordinatorClass = DEFAULT_GROUP_COORDINATOR_CLASS;
-        coordinator = wrappedProps.getClassInstanceProperty(
-                                    GROUP_COORDINATOR_CLASS_PROPERTY,
-                                    defaultCoordinatorClass,
-                                    GroupCoordinator.class,
-                                    new Class[] { Properties.class,
-                                                  NodeMappingServerImpl.class,
-                                                  ComponentRegistry.class,
-                                                  TransactionProxy.class },
-                                    properties, this, systemRegistry, txnProxy);
-
+        
+        coordinator = new GroupCoordinator(properties, this,
+                                           systemRegistry, txnProxy);
+        
         /// Don't allow offloading below every half second
         offloadDelay = wrappedProps.getLongProperty(OFFLOAD_DELAY_PROPERTY,
                                                     DEFAULT_OFFLOAD_DELAY,
@@ -398,8 +365,6 @@ public final class NodeMappingServerImpl
                    "Created NodeMappingServerImpl with properties:" +
                    "\n  " + ASSIGN_POLICY_CLASS_PROPERTY + "=" +
                    assignPolicy.getClass().getName() +
-                   "\n  " + GROUP_COORDINATOR_CLASS_PROPERTY + "=" +
-                   coordinator.getClass().getName() +
                    "\n  " + RELOCATION_EXPIRE_PROPERTY + "=" +
                    relocationExpireTime +
                    "\n  " + REMOVE_EXPIRE_PROPERTY + "=" + removeExpireTime +
@@ -824,6 +789,17 @@ public final class NodeMappingServerImpl
      */
     public void runTransactionally(KernelRunnable task) throws Exception {
         transactionScheduler.runTask(task, taskOwner);
+    }
+
+    /**
+     * Choose a node based on the assignment policy.
+     *
+     * @return a node id
+     *
+     * @throws com.sun.sgs.impl.service.nodemap.NoNodesAvailableException
+     */
+    public long chooseNode() throws NoNodesAvailableException {
+        return assignPolicy.chooseNode(NodeAssignPolicy.SERVER_NODE);
     }
 
     /**

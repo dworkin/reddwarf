@@ -19,17 +19,13 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
-import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.Properties;
@@ -43,7 +39,7 @@ import java.util.logging.Logger;
  * <p>
  * A driver must be instantiated on each node of the Darkstar cluster.
  * <p>
- * The following properties are supported:
+ * The following property is supported:
  * <p>
  * <dl style="margin-left: 1em">
  *
@@ -58,15 +54,6 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The graph builder to use.  Set to
  *   {@code None} if no affinity group finding is required, which is
  *   useful for testing. <p>
- *
- * <dt>	<i>Property:</i> <code><b>
- *   com.sun.sgs.impl.service.nodemap.affinity.update.period
- *	</b></code><br>
- *	<i>Default:</i> {@code 60} (one minute)}
- * <br>
- *
- * <dd style="padding-top: .5em">The frequency that we find affinity groups,
- *  in seconds.  The value must be between {@code 5} and {@code 65535}.<p>
  * </dl>
  */
 public class LPADriver extends BasicState implements AffinityGroupFinder {
@@ -76,13 +63,6 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
     /** The property for specifying the graph builder class. */
     public static final String GRAPH_CLASS_PROPERTY =
         PROP_NAME + ".graphbuilder.class";
-
-    /** The property name for the update frequency. */
-    public static final String UPDATE_FREQ_PROPERTY =
-        PROP_NAME + ".update.freq";
-
-    /** The default value of the update frequency, in seconds. */
-    static final int DEFAULT_UPDATE_FREQ = 60;
 
     /**
      * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
@@ -101,11 +81,6 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
     /** The affinity graph builder, null if there is none. */
     private final AffinityGraphBuilder graphBuilder;
 
-    private final TaskScheduler taskScheduler;
-    private final Identity taskOwner;
-    private final long updatePeriod;
-    private RecurringTaskHandle updateTask = null;
-
     /**
      * Constructs an instance of this class with the specified properties.
      * <p>
@@ -121,12 +96,7 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
         throws Exception
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        int updateSeconds = wrappedProps.getIntProperty(UPDATE_FREQ_PROPERTY,
-                                               DEFAULT_UPDATE_FREQ, 5, 65535);
-        updatePeriod = updateSeconds * 1000L;
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-        taskOwner = txnProxy.getCurrentOwner();
-
+        
         NodeType type =
             NodeType.valueOf(
                 properties.getProperty(StandardProperties.NODE_TYPE));
@@ -173,10 +143,9 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
             graphListener = null;
         }
         logger.log(Level.CONFIG,
-                       "Created LPADriver with listener: " + graphListener +
-                       ", builder: " + graphBuilder + ", and properties:" +
-                       "\n  " + GRAPH_CLASS_PROPERTY + "=" + builderName +
-                       "\n  " + UPDATE_FREQ_PROPERTY + "=" + updateSeconds);
+                   "Created LPADriver with listener: " + graphListener +
+                   ", builder: " + graphBuilder + ", and properties:" +
+                   "\n  " + GRAPH_CLASS_PROPERTY + "=" + builderName);
     }
 
     /** {@inheritDoc} */
@@ -186,10 +155,6 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
             logger.log(Level.FINE, "LPA driver disabled");
             if (graphBuilder != null) {
                 graphBuilder.disable();
-            }
-            if (updateTask != null) {
-                updateTask.cancel();
-                updateTask = null;
             }
         }
     }
@@ -201,17 +166,6 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
             logger.log(Level.FINE, "LPA driver enabled");
             if (graphBuilder != null) {
                 graphBuilder.enable();
-                if (graphBuilder.getAffinityGroupFinder() != null) {
-                    updateTask = taskScheduler.scheduleRecurringTask(
-                                    new AbstractKernelRunnable("UpdateTask") {
-                                            public void run() {
-                                                findGroups();
-                                            } },
-                                    taskOwner,
-                                    System.currentTimeMillis() + updatePeriod,
-                                    updatePeriod);
-                    updateTask.start();
-                }
             }
         }
     }
@@ -221,9 +175,7 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
     public void shutdown() {
         if (setShutdownState()) {
             logger.log(Level.FINE, "LPA driver shut down");
-            if (updateTask != null) {
-                updateTask.cancel();
-            }
+            
             if (graphListener != null) {
                 graphListener.shutdown();
             }
@@ -249,19 +201,5 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
      */
     public GraphListener getGraphListener() {
         return graphListener;
-    }
-
-    /**
-     * Try to gather a new set of groups, pushing the results if successful.
-     */
-    private void findGroups() {
-        try {
-            // TODO:  Dead store until integrated with coordinator
-            // Set<AffinityGroup> groups =
-                    graphBuilder.getAffinityGroupFinder().findAffinityGroups();
-            // tell the coordinator about the found groups
-        } catch (AffinityGroupFinderFailedException e) {
-            logger.logThrow(Level.INFO, e, "Affinity group finder failed");
-        }
     }
 }
