@@ -3434,7 +3434,7 @@ public class TestDataServiceImpl extends Assert {
 		}		    
                 while (taskService.shouldContinue()) {
                     last.value = service.nextObjectId(last.value);
-		    if (last.value == task.dummy2Id) {
+		    if (task.dummy2Id.equals(last.value)) {
 			foundId2 = true;
 		    } else if (last.value == null) {
 			service.removeObject(last);
@@ -5316,7 +5316,7 @@ public class TestDataServiceImpl extends Assert {
 		new RandomWorkTask(bindings, repeat, done, failure),
 		taskOwner);
 	}
-	done.await(wait, TimeUnit.SECONDS);
+	assertTrue("Tasks not completed", done.await(wait, TimeUnit.SECONDS));
 	if (failure.get() != null) {
 	    throw new RuntimeException(
 		"Unexpected exception: " + failure.get().getMessage(),
@@ -6215,7 +6215,7 @@ public class TestDataServiceImpl extends Assert {
 	/** Runs this task and waits until it is done. */
 	void runAwaitDone() throws InterruptedException {
 	    txnScheduler.scheduleTask(this, taskOwner);
-	    done.await(1, TimeUnit.SECONDS);
+	    assertTrue("Task not done", done.await(1, TimeUnit.SECONDS));
 	}
 
 	/** Runs the task chunks, rescheduling this task until it is done. */

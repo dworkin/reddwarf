@@ -637,15 +637,14 @@ abstract class BasicCacheEntry<K, V> {
     /**
      * Sets this entry's state to {@link State#DECACHED} directly from {@link
      * State#FETCHING_READ} or {@link State#FETCHING_WRITE} when abandoning the
-     * last binding entry if no information about the last binding was actually
-     * obtained, and notifies the lock, which should be held.
+     * a temprary binding entry if no information about the binding was
+     * actually obtained, and notifies the lock, which should be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry's current state is not
      *		{@link State#FETCHING_READ} or {@link State#FETCHING_WRITE}
      */
     void setEvictedAbandonFetching(Object lock) {
-	assert key == BindingKey.LAST;
 	verifyState(State.FETCHING_READ, State.FETCHING_WRITE);
 	state = State.DECACHED;
 	lock.notifyAll();

@@ -996,14 +996,8 @@ public final class CachingDataStore extends AbstractDataStore
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
-	    BindingKey entryKey = (entry != null) ? entry.key : LAST;
-	    /*
-	     * Obtain read access to the next cache entry to insure that it is
-	     * not a newly created entry that could disappear if the
-	     * transaction creating it aborts.
-	     */
-	    reportNameAccess(txn, entryKey.getNameAllowLast(), READ);
-	    Object lock = cache.getBindingLock(entryKey);
+	    Object lock =
+		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    /* Reserve space for last entry, and requested or next name */
 	    ReserveCache reserve = new ReserveCache(cache, 2);
 	    try {
@@ -1128,7 +1122,6 @@ public final class CachingDataStore extends AbstractDataStore
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    final BindingKey entryKey = (entry != null) ? entry.key : LAST;
-	    reportNameAccess(txn, entryKey.getNameAllowLast(), READ);
 	    final Object lock = cache.getBindingLock(entryKey);
 	    /* Reserve space for last entry, and requested or next name */
 	    ReserveCache reserve = new ReserveCache(cache, 2);
@@ -1237,6 +1230,13 @@ public final class CachingDataStore extends AbstractDataStore
 	    synchronized (lock) {
 		entry = cache.getBindingEntry(entryKey);
 		assert entry != null : "No entry for " + entryKey;
+		/*
+		 * It's important that we clear the pending previous field on
+		 * the entry after setting it above.  Currently, none of the
+		 * intervening calls can fail, but need to make certain this
+		 * stays true, or else put unwind logic in place.
+		 * -tjb@sun.com (12/14/2009)
+		 */
 		entry.setNotPendingPrevious(lock);
 		context.noteModifiedBinding(entry, entry.getValue());
 		entry.updatePreviousKey(nameKey, BOUND);
@@ -1322,16 +1322,19 @@ public final class CachingDataStore extends AbstractDataStore
 	     * is no need to retry once we confirm that the entry is cached.
 	     */
 	    entry.awaitNotPendingPrevious(lock, stop);
-	    if (!entry.getWritable()) {
-		/* Upgrade */
+	    if (entry.getWritable()) {
+		/* Writable */
+		return true;
+	    } else if (entry.getReadable()) {
+		/* Initiate upgrade */
 		entry.setPendingPrevious();
 		scheduleFetch(
 		    new GetBindingForUpdateUpgradeRunnable(
 			context, entry.key));
 		return false;
 	    } else {
-		/* Writable */
-		return true;
+		/* Decached. */
+		return false;
 	    }
 	case WRITABLE:
 	    /* Already writable */
@@ -1506,9 +1509,8 @@ public final class CachingDataStore extends AbstractDataStore
 	    assert i < 1000 : "Too many retries";
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
-	    BindingKey entryKey = (entry != null) ? entry.key : LAST;
-	    reportNameAccess(txn, entryKey.getNameAllowLast(), READ);
-	    Object lock = cache.getBindingLock(entryKey);
+	    Object lock =
+		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    boolean nameWritable;
 	    /* Reserve space for last entry, requested name, and next name */
 	    ReserveCache reserve = new ReserveCache(cache, 3);
@@ -1682,7 +1684,6 @@ public final class CachingDataStore extends AbstractDataStore
 	long stop = context.getStopTime();
 	BindingCacheEntry entry = cache.getHigherBindingEntry(nameKey);
 	final BindingKey nextKey = (entry != null) ? entry.key : LAST;
-	reportNameAccess(context.txn, nextKey.getNameAllowLast(), READ);
 	final Object lock = cache.getBindingLock(nextKey);
 	/* Reserve space for last entry, requested name, and next name */
 	ReserveCache reserve = new ReserveCache(cache, 3);
@@ -1747,12 +1748,28 @@ public final class CachingDataStore extends AbstractDataStore
 	BindingKey previousKey;
 	boolean previousKeyUnbound;
 	Object nameLock = cache.getBindingLock(nameKey);
-	synchronized (nameLock) {
-	    entry = cache.getBindingEntry(nameKey);
-	    entry.awaitNotPendingPrevious(nameLock, stop);
-	    previousKey = entry.getPreviousKey();
-	    previousKeyUnbound = entry.getPreviousKeyUnbound();
-	    context.noteModifiedBinding(entry, -1);
+	boolean nameEntryOk = false;
+	try {
+	    synchronized (nameLock) {
+		entry = cache.getBindingEntry(nameKey);
+		entry.awaitNotPendingPrevious(nameLock, stop);
+		nameEntryOk = true;
+		previousKey = entry.getPreviousKey();
+		previousKeyUnbound = entry.getPreviousKeyUnbound();
+		context.noteModifiedBinding(entry, -1);
+	    }
+	} finally {
+	    if (!nameEntryOk) {
+		/*
+		 * If we fail waiting for the name entry to not be pending
+		 * previous, then back out the pending previous for the next
+		 * entry.
+		 */
+		synchronized (lock) {
+		    entry = cache.getBindingEntry(nextKey);
+		    entry.setNotPendingPrevious(lock);
+		}
+	    }
 	}
 	/* Update the next entry */
 	synchronized (lock) {
@@ -1782,9 +1799,8 @@ public final class CachingDataStore extends AbstractDataStore
 	    assert i < 1000 : "Too many retries";
 	    /* Find next entry */
 	    BindingCacheEntry entry = cache.getHigherBindingEntry(nameKey);
-	    BindingKey entryKey = (entry != null) ? entry.key : LAST;
-	    reportNameAccess(context.txn, entryKey.getNameAllowLast(), READ);
-	    Object lock = cache.getBindingLock(entryKey);
+	    Object lock =
+		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    /* Reserve space for last entry and next name */
 	    ReserveCache reserve = new ReserveCache(cache, 2);
 	    try {
