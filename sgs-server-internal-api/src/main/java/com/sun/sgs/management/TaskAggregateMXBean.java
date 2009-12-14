@@ -127,7 +127,7 @@ public interface TaskAggregateMXBean {
     
     /**
      * Returns the time of the last call to {@link #clear}, or the time
-     * this MBean was created {@code clear} has never been called.  The
+     * this MBean was created if {@code clear} has never been called.  The
      * time is the difference, measured in milliseconds, between the time at 
      * which this was last cleared and midnight, January 1, 1970 UTC.
      * 

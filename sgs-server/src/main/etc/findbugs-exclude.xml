@@ -254,6 +254,7 @@
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$3"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$4"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$5"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
@@ -286,7 +287,7 @@
 
   <!-- OK to ignore return value. -->
   <Match>
-    <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl"/>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$Coordinator"/>
     <Or>
       <Method name="removeExpiredMembershipEvents"/>
       <Method name="cacheMembershipEvent"/>
@@ -387,6 +388,15 @@
       <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$2"/>
       <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$3"/>
       <Class name="com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl$4"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.nodemap.affinity.dlpa -->
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer$1"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
   </Match>

@@ -445,7 +445,7 @@ class Kernel {
         }
 
         // start the service creation 
-        IdentityImpl owner = new IdentityImpl("app:" + appName);
+        IdentityImpl owner = new SystemIdentity("app:" + appName);
         createServices(appName, owner);
         startApplication(appName, owner);
     }
