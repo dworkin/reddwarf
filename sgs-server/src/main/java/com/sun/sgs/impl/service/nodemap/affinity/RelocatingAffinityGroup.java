@@ -37,7 +37,7 @@ import java.util.Set;
  * some external control of the relocation in case we merge affinity groups
  * or find that an algorithm run returns a single group.
  */
-public class RelocatingAffinityGroup implements AffinityGroup {
+public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     // The group id
     private final long agid;
     // Map Identity -> nodeId
@@ -92,6 +92,30 @@ public class RelocatingAffinityGroup implements AffinityGroup {
             }         
         }
         return retNode;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Sorts based on the number of identities in the groups.
+     */
+
+    @Override
+    public int compareTo(Object obj) {
+        if (obj == null) {
+            throw new NullPointerException();
+        }
+        if (this.equals(obj)) return 0;
+
+        int mySize = identities.size();
+        int otherSize = ((RelocatingAffinityGroup) obj).identities.size();
+        if (mySize == otherSize) {
+            return 0;
+        } else if (mySize < otherSize) {
+            return -1;
+        } else {
+            return 1;
+        }
     }
 
     /** {@inheritDoc} */
