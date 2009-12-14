@@ -1387,12 +1387,12 @@ public final class ChannelServiceImpl
      * Adds the specified {@code ioTask} (in a wrapper that runs the task by
      * invoking {@link AbstractService#runIoTask runIoTask} with the {@code
      * ioTask} and {@code nodeId}) to the task list of the given {@code
-     * channelRefId}.
+     * channelRefId} (when the current transaction commits).
      */
-    void addChannelTask(
+    void addChannelTaskOnCommit(
 	BigInteger channelRefId, final IoRunnable ioTask, final long nodeId)
     {
-	addChannelTask(
+	addChannelTaskOnCommit(
 	    channelRefId,
 	    new AbstractKernelRunnable("RunIoTask") {
 		public void run() {
@@ -1401,24 +1401,26 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Adds the specified non-transactional {@code task} to the task list
-     * of the given {@code channelRefId}.
+     * Adds the specified non-transactional {@code task} to the task list 
+     * of the given {@code channelRefId} (when the current transaction
+     * commits). 
      *
      * @param	channelRefId a channel ID
      * @param	task a non-transactional task
      */
-    void addChannelTask(BigInteger channelRefId, KernelRunnable task) {
+    void addChannelTaskOnCommit(BigInteger channelRefId, KernelRunnable task) {
 	Context context = contextFactory.joinTransaction();
 	context.addTask(channelRefId, task);
     }
 
     /**
      * Adds the specified {@code channelRefId} to the list of
-     * locally-coordinated channels that need servicing.
+     * locally-coordinated channels that need servicing after the current
+     * transaction commits.
      *
      * @param	channelRefId a channel ID for a locally-coordinated channel
      */
-    void addChannelToService(BigInteger channelRefId) {
+    void addServiceEventQueueTaskOnCommit(BigInteger channelRefId) {
 	Context context = contextFactory.joinTransaction();
 	context.addChannelToService(channelRefId);
     }
@@ -1429,7 +1431,7 @@ public final class ChannelServiceImpl
      * This transaction context maintains a per-channel list of
      * non-transactional tasks to perform when the transaction commits. A
      * task is added to the context by a {@code ChannelImpl} via the {@code
-     * addChannelTask} method.  Such non-transactional tasks include
+     * addChannelTaskOnCommit} method.  Such non-transactional tasks include
      * sending a notification to a channel server to modify the channel
      * membership list, or forwarding a send request to a set of channel
      * servers.
@@ -2163,17 +2165,19 @@ public final class ChannelServiceImpl
 	 */
 	public void cleanupIfNoLocalChannelMembership() {
 	    if (isCompleted) {
-	      synchronized (localChannelMembersMap) {
-		// Check if there are no more channel members on this
-		// node and, if so, remove the node from the channel's
-		// server list.
-		LocalChannelInfo channelInfo = lockChannel(channelRefId);
-		if (channelInfo != null) {
+		synchronized (localChannelMembersMap) {
+		    // Check if there are no more channel members on this
+		    // node and, if so, remove the node from the channel's
+		    // server list.
+		    LocalChannelInfo channelInfo = lockChannel(channelRefId);
+		    if (channelInfo == null) {
+			return;
+		    }
 		    try {
 			if (channelInfo.members.isEmpty()) {
 			    try {
-				runTransactionalTask(
-				  new AbstractKernelRunnable(
+			      runTransactionalTask(
+			          new AbstractKernelRunnable(
 				      "removeNodeIdFromChannel") {
 				    public void run() {
 					ChannelImpl channel = (ChannelImpl)
@@ -2193,7 +2197,6 @@ public final class ChannelServiceImpl
 			unlockChannel(channelInfo);
 		    }
 		}
-	      }
 	    }
 	}
     }

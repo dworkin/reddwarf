@@ -634,8 +634,8 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    throw e;
 	}
     }
-
-    /** Implements {@link Channel#send}.
+    
+    /** Implements {@link Channel#send(ClientSession,ByteBuffer)}.
      *
      * Enqueues a send event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
@@ -1052,7 +1052,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/**
 	 * Iterates through the saved message map, removing messages
 	 * saved past their expiration time.  Iteration over a {@code
-	 * BindingKeyedMap} returns bindings in lexicographical oder.
+	 * BindingKeyedMap} returns bindings in lexicographical order.
 	 * Timestamps are encoded to preserve ascending timestamp order
 	 * with lexicographically-ordered keys, so the messages will be
 	 * returned in ascending timestamp order.
@@ -1676,7 +1676,8 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    } while (completed && --eventsPerTxn > 0);
 
 	    if (eventQueue.peek() != null) {
-		channelService.addChannelToService(channel.channelRefId);
+		channelService.
+		    addServiceEventQueueTaskOnCommit(channel.channelRefId);
 	    }
 	}
 
@@ -1843,7 +1844,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 
 	    JoinNotifyTask task =
 		new JoinNotifyTask(channel, this, session, sessionRefId);
-	    ChannelServiceImpl.getInstance().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
 		    channel.channelRefId, task);
 	    return isCompleted();
 	}
@@ -2049,7 +2050,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	 * {@code false} otherwise.  This method is invoked inside of a
 	 * transaction.
 	 *
-	 * @return {@code true} if  when the session's node ID changes, it
+	 * @return {@code true} if when the session's node ID changes, it
 	 *	   should be added to the channel's set of node IDs, and
 	 *	   {@code false} otherwise
 	 */
@@ -2071,8 +2072,8 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	 * exists.  If the session's node ID has changed, this method invokes
 	 * the {@code addChangedSessionNodeId} method, and if that method
 	 * returns {@code true}, the session's new node ID is added to the
-	 * channel's set of node IDs.  This method must be invoked within a
-	 * transaction.
+	 * channel's set of node IDs.  This method may be invoked outside of a
+	 * transaction. 
 	 *
 	 * @return {@code true} if the session's node ID is updated, otherwise
 	 *	   {@code false}
@@ -2109,7 +2110,8 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Returns the event queue's latest timestamp.
+	 * Returns the event queue's latest timestamp.  This method may be
+	 * invoked outside of a transaction.
 	 */
 	protected long getEventQueueTimestamp() {
 	    
@@ -2227,7 +2229,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	
 	    LeaveNotifyTask task =
 		new LeaveNotifyTask(channel, this, session, sessionRefId);
-	    ChannelServiceImpl.getInstance().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
 		channel.channelRefId, task);
 	    return isCompleted();
 	}
@@ -2386,7 +2388,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	     * channel's servers for delivery.
 	     */
 	    SendNotifyTask task = new SendNotifyTask(channel, this);
-	    ChannelServiceImpl.getInstance().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
 		channel.channelRefId, task);
 
 	    /*
@@ -2514,7 +2516,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    assert isProcessing() && !isCompleted();
 	    CloseNotifyTask task =
 		new CloseNotifyTask(channel, removeName);
-	    ChannelServiceImpl.getInstance().addChannelTask(
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
 		    channel.channelRefId, task);
 	    return false;
 	}
