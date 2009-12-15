@@ -56,7 +56,7 @@ import java.util.logging.Logger;
  *   useful for testing. <p>
  * </dl>
  */
-public class LPADriver extends BasicState implements AffinityGroupFinder {
+public class LPADriver extends BasicState {
     /** The base name for properties. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
@@ -142,14 +142,13 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
         } else {
             graphListener = null;
         }
+        setDisabledState();
         logger.log(Level.CONFIG,
                    "Created LPADriver with listener: " + graphListener +
                    ", builder: " + graphBuilder + ", and properties:" +
                    "\n  " + GRAPH_CLASS_PROPERTY + "=" + builderName);
     }
 
-    /** {@inheritDoc} */
-    @Override
     public void disable() {
         if (setDisabledState()) {
             logger.log(Level.FINE, "LPA driver disabled");
@@ -159,8 +158,6 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
         }
     }
 
-    /** {@inheritDoc} */
-    @Override
     public void enable() {
         if (setEnabledState()) {
             logger.log(Level.FINE, "LPA driver enabled");
@@ -170,8 +167,6 @@ public class LPADriver extends BasicState implements AffinityGroupFinder {
         }
     }
 
-    /** {@inheritDoc} */
-    @Override
     public void shutdown() {
         if (setShutdownState()) {
             logger.log(Level.FINE, "LPA driver shut down");

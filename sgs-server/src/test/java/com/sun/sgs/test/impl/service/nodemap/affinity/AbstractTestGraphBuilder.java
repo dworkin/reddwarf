@@ -20,7 +20,7 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
@@ -79,7 +79,7 @@ public class AbstractTestGraphBuilder implements AffinityGraphBuilder {
     }
 
     /** {@inheritDoc} */
-    public LPAAffinityGroupFinder getAffinityGroupFinder() {
+    public AffinityGroupFinder getAffinityGroupFinder() {
         return null;
     }
 }

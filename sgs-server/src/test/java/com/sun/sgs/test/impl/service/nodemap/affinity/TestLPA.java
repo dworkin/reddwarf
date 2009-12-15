@@ -20,9 +20,9 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
-import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAServer;
@@ -92,7 +92,8 @@ public class TestLPA {
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads", "1");
-        props.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        props.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY,
+                          "3600"); // one hour
         collector =
             serverNode.getSystemRegistry().getComponent(ProfileCollector.class);
         wdog = serverNode.getWatchdogService();

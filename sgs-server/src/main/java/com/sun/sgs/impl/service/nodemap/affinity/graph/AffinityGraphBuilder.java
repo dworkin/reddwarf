@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import edu.uci.ics.jung.graph.UndirectedGraph;
 
@@ -117,5 +117,5 @@ public interface AffinityGraphBuilder {
      *
      * @return the affinity group finder or {@code null}
      */
-    LPAAffinityGroupFinder getAffinityGroupFinder();
+    AffinityGroupFinder getAffinityGroupFinder();
 }

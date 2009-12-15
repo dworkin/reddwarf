@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -72,7 +72,7 @@ import javax.management.JMException;
  */
 public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
     implements DistGraphBuilderServer, AffinityGraphBuilder,
-               LPAAffinityGroupFinder
+               AffinityGroupFinder
 {
     /** The property name for the server port. */
     public static final String SERVER_PORT_PROPERTY =
@@ -207,7 +207,7 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
     }
 
     /** {@inheritDoc} */
-    public LPAAffinityGroupFinder getAffinityGroupFinder() {
+    public AffinityGroupFinder getAffinityGroupFinder() {
         return this;
     }
 

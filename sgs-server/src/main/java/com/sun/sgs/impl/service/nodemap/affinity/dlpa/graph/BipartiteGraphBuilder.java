@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import
@@ -382,7 +382,7 @@ public class BipartiteGraphBuilder extends AbstractAffinityGraphBuilder
     }
 
     /** {@inheritDoc} */
-    public LPAAffinityGroupFinder getAffinityGroupFinder() {
+    public AffinityGroupFinder getAffinityGroupFinder() {
         return lpaServer;
     }
 

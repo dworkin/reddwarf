@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.single;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AbstractLPA;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -49,7 +49,7 @@ import javax.management.JMException;
  * networks" Raghavan, Albert and Kumara 2007.
  */
 public class SingleLabelPropagation extends AbstractLPA 
-        implements LPAAffinityGroupFinder
+        implements AffinityGroupFinder
 {
     /** Our graph builder. */
     private final AffinityGraphBuilder builder;

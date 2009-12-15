@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
+import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
@@ -81,7 +82,7 @@ public class GraphBuilderTests {
                 UtilReflection.getMethod(profileReportImplClass,
                     "setAccessedObjectsDetail", AccessedObjectsDetail.class);
             finderField =
-                UtilReflection.getField(NodeMappingServiceImpl.class, "finder");
+                UtilReflection.getField(NodeMappingServiceImpl.class, "driver");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -149,7 +150,7 @@ public class GraphBuilderTests {
         }
         p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
-        p.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        p.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "3600");// one hour
         if (addProps != null) {
             for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
                 p.put(entry.getKey(), entry.getValue());
@@ -797,16 +798,17 @@ public class GraphBuilderTests {
         Assert.assertEquals(3, graph.getVertexCount());
     }
 
-    @Test(expected=IllegalArgumentException.class)
-    public void testDriverBadValue() throws Exception {
-        Properties addProps = new Properties();
-        addProps.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "1");
-        try {
-            startNewNode(addProps);
-        } catch (InvocationTargetException e) {
-            unwrapException(e);
-        }
-    }
+    // TODO - move to a GroupCoordinator test
+//    @Test(expected=IllegalArgumentException.class)
+//    public void testDriverBadValue() throws Exception {
+//        Properties addProps = new Properties();
+//        addProps.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "1");
+//        try {
+//            startNewNode(addProps);
+//        } catch (InvocationTargetException e) {
+//            unwrapException(e);
+//        }
+//    }
 
     @Test
     public void testDriverSmallValueNoData() throws Exception {
@@ -814,7 +816,7 @@ public class GraphBuilderTests {
 
         Properties addProps = new Properties();
         // Add in a small update freq, 5 seconds
-        addProps.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "5");
+        addProps.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "5");
         beforeEachTest(addProps);
 
         ProfileCollector col;

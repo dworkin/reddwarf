@@ -51,7 +51,7 @@ public class AffinityGroupFinderStats extends StandardMBean
     private final int stopIteration;
 
     /** The affinity group finder. */
-    private final LPAAffinityGroupFinder finder;
+    private final AffinityGroupFinder finder;
 
     /** The number of groups found in the last algorithm run. */
     protected int numGroups;
@@ -82,7 +82,7 @@ public class AffinityGroupFinderStats extends StandardMBean
      * @param collector the profile collector
      * @param stopIter the maximum iterations a run will perform
      */
-    public AffinityGroupFinderStats(LPAAffinityGroupFinder finder,
+    public AffinityGroupFinderStats(AffinityGroupFinder finder,
                                     ProfileCollector collector, int stopIter)
     {
         super(AffinityGroupFinderMXBean.class, true);

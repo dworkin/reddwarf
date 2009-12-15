@@ -21,7 +21,7 @@ package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -62,7 +62,7 @@ import javax.management.JMException;
  * each node when finished.
  */
 public class LabelPropagationServer extends BasicState
-        implements LPAAffinityGroupFinder, LPAServer
+        implements AffinityGroupFinder, LPAServer
 {
     /** Our property base name. */
     private static final String PROP_NAME =

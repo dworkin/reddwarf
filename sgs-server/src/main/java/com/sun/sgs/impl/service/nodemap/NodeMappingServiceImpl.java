@@ -409,17 +409,19 @@ public class NodeMappingServiceImpl
             
             String host;
             int port;
-            
+
+            // Create our affinity group finder subsystem.
+            driver = new LPADriver(properties, systemRegistry, txnProxy);
+
             if (instantiateServer) {
                 serverImpl = 
                     new NodeMappingServerImpl(properties, 
-                                              systemRegistry, txnProxy);
+                                              systemRegistry, txnProxy,
+                                              driver.getGraphBuilder());
                 // Use the port actually used by our server instance
                 host = localHost;
                 port = serverImpl.getPort();
-                
-                // The affinity group subsystem is managed by the server
-                driver = null;
+               
             } else {
                 serverImpl = null;
                 host = 
@@ -435,8 +437,6 @@ public class NodeMappingServiceImpl
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
                         NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);
 
-                // Create our affinity group finder subsystem.
-                driver = new LPADriver(properties, systemRegistry, txnProxy);
             }          
           
             // TODO This code assumes that the server has already been started.
@@ -487,9 +487,6 @@ public class NodeMappingServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
 
-            if (driver != null) {
-                driver.enable();
-            }
             logger.log(Level.CONFIG,
                        "Created NodeMappingServiceImpl with properties:" +
                        "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
@@ -535,9 +532,6 @@ public class NodeMappingServiceImpl
     
     /** {@inheritDoc} */
     protected void doShutdown() {
-        if (driver != null) {
-            driver.shutdown();
-        }
         try {
             exporter.unexport();
             if (dataService != null) {
@@ -555,6 +549,8 @@ public class NodeMappingServiceImpl
         if (serverImpl != null) {
             serverImpl.shutdown();
         }
+        // The server may be interacting with the finder so shut it down last
+        driver.shutdown();
     }
     
     /**

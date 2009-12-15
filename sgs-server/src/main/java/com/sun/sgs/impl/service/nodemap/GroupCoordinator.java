@@ -22,11 +22,11 @@ package com.sun.sgs.impl.service.nodemap;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.BasicState;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
-import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -36,7 +36,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -65,8 +64,11 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The frequency that we find affinity groups,
  *  in seconds.  The value must be between {@code 5} and {@code 65535}.<p>
  * </dl>
+ *
+ * TODO - This class is public only because tests need to get at
+ * UPDATE_FREQ_PROPERTY.  Grrr.
  */
-class GroupCoordinator extends BasicState {
+public class GroupCoordinator extends BasicState {
 
     /** Package name for this class. */
     private static final String PKG_NAME =
@@ -88,18 +90,18 @@ class GroupCoordinator extends BasicState {
     // Data service
     private final DataService dataService;
 
-    // Group driver
-    private final LPADriver driver;
+    // Graph builder
+    private final AffinityGraphBuilder builder;
 
     // Group finder or null if the group subsystem is not configured.
-    private final LPAAffinityGroupFinder finder;
+    private final AffinityGroupFinder finder;
 
     private final TaskScheduler taskScheduler;
     private final Identity taskOwner;
     private final long updatePeriod;
 
     private RecurringTaskHandle updateTask = null;
-    private RecurringTaskHandle colocateTask = null;
+    private RecurringTaskHandle collocateTask = null;
 
     // Map of per-node groups. This map is filled-in only when necessary due
     // to a request to offload a node.
@@ -107,7 +109,7 @@ class GroupCoordinator extends BasicState {
     private final Map<Long, NavigableSet<RelocatingAffinityGroup>> nodeSets;
 
     // Sorted set of all the groups
-    private final NavigableSet<RelocatingAffinityGroup> groups;
+    private NavigableSet<RelocatingAffinityGroup> groups = null;
 
     /**
      * Public constructor.
@@ -118,17 +120,17 @@ class GroupCoordinator extends BasicState {
      * @param txnProxy transaction proxy
      */
     GroupCoordinator(Properties properties,
-                     NodeMappingServerImpl server,
                      ComponentRegistry systemRegistry,
-                     TransactionProxy txnProxy)
+                     TransactionProxy txnProxy,
+                     NodeMappingServerImpl server,
+                     AffinityGraphBuilder builder)
         throws Exception
     {
-        this.server = server;
         dataService = txnProxy.getService(DataService.class);
-        driver = new LPADriver(properties, systemRegistry, txnProxy);
+        this.server = server;
+        this.builder = builder;
 
-        finder = driver.getGraphBuilder() != null ?
-                       driver.getGraphBuilder().getAffinityGroupFinder() : null;
+        finder = builder != null ? builder.getAffinityGroupFinder() : null;
 
         if (finder != null) {
             PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -140,19 +142,22 @@ class GroupCoordinator extends BasicState {
             taskOwner = txnProxy.getCurrentOwner();
             nodeSets =
                     new HashMap<Long, NavigableSet<RelocatingAffinityGroup>>();
-            groups = new TreeSet<RelocatingAffinityGroup>();
             logger.log(Level.CONFIG,
-                       "Created GroupCoordinator with properties:" +
+                       "Created GroupCoordinator with finder: "
+                       + finder.getClass().getName() +
+                       " with properties:" +
                        "\n  " + UPDATE_FREQ_PROPERTY + "=" +
                        updateSeconds + " (seconds)");
         } else {
+            assert builder == null;
             updatePeriod = 0;
             taskScheduler = null;
             taskOwner = null;
             nodeSets = null;
-            groups = null;
+            logger.log(Level.CONFIG,
+                       "Created GroupCoordinator with null finder");
         }
-        logger.log(Level.CONFIG, "GroupCoordinator using finder: " + finder);
+        setDisabledState();
     }
 
     /**
@@ -161,7 +166,7 @@ class GroupCoordinator extends BasicState {
      */
     public void enable() {
         if (setEnabledState()) {
-            driver.enable();
+            builder.enable();
             if ((finder != null) && (updateTask == null)) {   // TODO .. sync?
                 updateTask = taskScheduler.scheduleRecurringTask(
                                     new AbstractKernelRunnable("UpdateTask") {
@@ -179,6 +184,9 @@ class GroupCoordinator extends BasicState {
     /**
      * Disable coordination. If the coordinator is disabled, calling this method
      * will have no effect.
+     *
+     * TODO - should the groups be cleared out? they will be useful for some
+     * time but will eventually become stale
      */
     public void disable() {
         if (setDisabledState()) {
@@ -186,7 +194,7 @@ class GroupCoordinator extends BasicState {
                 updateTask.cancel();
                 updateTask = null;
             }
-            driver.enable();
+            builder.disable();
         }
     }
 
@@ -201,16 +209,18 @@ class GroupCoordinator extends BasicState {
                 updateTask.cancel();
                 updateTask = null;
             }
-            driver.shutdown();
+            // Note that the builder is shutdown by the service
         }
     }
 
     /**
      * Move one or more identities off of a node. If the old node is alive
-     * a group of identities will be selected to move. How the group
-     * is selected is implementation dependent. If the node is not alive,
-     * all identities on that node will be moved. Note that is this method does
-     * not guarantee that any identities are be moved.
+     * a group of identities will be selected to move. The group is
+     * selected is based on how the groups are sorted in the node set. If
+     * there are no groups to move, a single identity is moved.
+     * If the node is not alive, all identities on that node will be moved.
+     * Note that is this method does not guarantee that any identities are
+     * be moved.
      *
      * @param node the node to offload identities
      *
@@ -246,7 +256,7 @@ class GroupCoordinator extends BasicState {
             // Re-target the group, note that we do not re-insert the group into
             // the new node's node set (even if there is one).
             group.setTargetNode(newNodeId);
-            colocateGroup(group);
+            collocateGroup(group);
 
             // If the node is alive, then just move off one group
             if (node.isAlive()) {
@@ -261,14 +271,15 @@ class GroupCoordinator extends BasicState {
     }
 
     /**
-     * Colocate the identities of a group onto the group's target node. If the
+     * Collocate the identities of a group onto the group's target node. If the
      * target node is unknown, then just pick one.
      *
      * @param group the group to collocate
+     * @return true if the group has had any identities moved, otherwise false
      * @throws NoNodesAvailableException if the target node is unavailable, or
      *         if the target node is unknown and a new one is not available
      */
-    private void colocateGroup(RelocatingAffinityGroup group)
+    private boolean collocateGroup(RelocatingAffinityGroup group)
             throws NoNodesAvailableException
     {
         long targetNodeId = group.getTargetNode();
@@ -278,14 +289,20 @@ class GroupCoordinator extends BasicState {
             group.setTargetNode(targetNodeId);
         }
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE,"colocating members of group {0} to node {1}",
-                       group, targetNodeId);
-        }
+        Set<Identity> identities = group.findStragglers();
 
-        for (Identity identity : group.findStragglers()) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER,
+                       "collocating {0} members of group {1} to node {2}",
+                       identities.size(), group, targetNodeId);
+        }
+        for (Identity identity : identities) {
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST, "collocating id {0}", identity);
+            }
             server.moveIdentity(identity, null, targetNodeId);
         }
+        return !identities.isEmpty();
     }
 
     /**
@@ -293,47 +310,60 @@ class GroupCoordinator extends BasicState {
      */
     private void findGroups() {
         checkForDisabledOrShutdownState();
+        
+        // TODO - Better to leave old groups around until new are found?
+        if (collocateTask != null) {
+            collocateTask.cancel();
+            collocateTask = null;
+        }
+        nodeSets.clear();
+
         try {
             Set<AffinityGroup> newGroups = finder.findAffinityGroups();
-            if (colocateTask != null) {
-                colocateTask.cancel();
-                colocateTask = null;
-            }
-            nodeSets.clear();
-            groups.clear();
+            groups = new TreeSet<RelocatingAffinityGroup>();
+
             for (AffinityGroup group : newGroups) {
                 if (group instanceof RelocatingAffinityGroup) {
                     groups.add((RelocatingAffinityGroup)group);
                 }
             }
-            colocateTask = taskScheduler.scheduleRecurringTask(
-                                new ColocateTask(),
-                                taskOwner,
-                                System.currentTimeMillis() + updatePeriod,
-                                updatePeriod);
+
+            if (logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER,
+                           "findAffinityGroups returned {0} groups, " +
+                           "{1} are relocatable",
+                           newGroups.size(), groups.size());
+            }
+
+            if (!groups.isEmpty()) {
+                collocateTask = taskScheduler.scheduleRecurringTask(
+                                    new CollocateTask(groups),
+                                    taskOwner,
+                                    System.currentTimeMillis() + updatePeriod,
+                                    updatePeriod);
+            }
         } catch (AffinityGroupFinderFailedException e) {
             logger.logThrow(Level.INFO, e, "Affinity group finder failed");
         }
     }
 
-    private class ColocateTask extends AbstractKernelRunnable {
+    /**
+     * Task to move the collocate the identities the current set of groups.
+     * Groups selected in ascending order from {@code groups}.
+     */
+    private class CollocateTask extends AbstractKernelRunnable {
 
         private final Iterator<RelocatingAffinityGroup> iter;
 
-        ColocateTask() {
-            super("ColocateTask");
+        CollocateTask(Set<RelocatingAffinityGroup> groups) {
+            super("CollocateTask");
             iter = groups.iterator();
         }
 
         @Override
         public void run() throws Exception {
-            try {
-                if (iter.hasNext()) {
-                    colocateGroup(iter.next());
-                }
-            } catch (ConcurrentModificationException ignore) {
-                // can happen if findGroups is called while executing
-            }
+            // Run through the list until there was a successful move
+            while (iter.hasNext() && !collocateGroup(iter.next())) {}
         }
     }
 
@@ -347,15 +377,28 @@ class GroupCoordinator extends BasicState {
         NavigableSet<RelocatingAffinityGroup> groupSet =
                 new TreeSet<RelocatingAffinityGroup>();
 
-        for (RelocatingAffinityGroup group : groups) {
-            if (group.getTargetNode() == nodeId) {
-                groupSet.add(group);
+        Set<RelocatingAffinityGroup> currentGroups = groups;
+        if (currentGroups != null) {
+            for (RelocatingAffinityGroup group : currentGroups) {
+                if (group.getTargetNode() == nodeId) {
+                    groupSet.add(group);
+                }
             }
         }
         return groupSet;
     }
 
-        private void offloadSingles(Node node) throws NoNodesAvailableException {
+    /**
+     * Move one or more identities off of a node. If the old node is alive
+     * an identity will be selected to move. If the node is not alive,
+     * all identities on that node will be moved. Note that is this method does
+     * not guarantee that any identities are be moved.
+     *
+     * @param node the node to offload identities
+     *
+     * @throws NoNodesAvailableException if no nodes are available
+     */
+    private void offloadSingles(Node node) throws NoNodesAvailableException {
         final long nodeId = node.getId();
 
         // Look up each identity on the old node and move it

@@ -23,6 +23,7 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -286,13 +287,15 @@ public final class NodeMappingServerImpl
      * <p>
      * @param properties service properties
      * @param systemRegistry system registry
-     * @param	txnProxy the transaction proxy
+     * @param txnProxy the transaction proxy
+     * @param builder the graph builder installed, or null
      *
      * @throws Exception if an error occurs during creation
      */
     public NodeMappingServerImpl(Properties properties, 
                                  ComponentRegistry systemRegistry,
-                                 TransactionProxy txnProxy)  
+                                 TransactionProxy txnProxy,
+                                 AffinityGraphBuilder builder)
          throws Exception 
     {     
         super(properties, systemRegistry, txnProxy, logger);
@@ -311,8 +314,8 @@ public final class NodeMappingServerImpl
                                             new Class[] { Properties.class },
                                             properties);
         
-        coordinator = new GroupCoordinator(properties, this,
-                                           systemRegistry, txnProxy);
+        coordinator = new GroupCoordinator(properties, systemRegistry, txnProxy,
+                                           this, builder);
         
         /// Don't allow offloading below every half second
         offloadDelay = wrappedProps.getLongProperty(OFFLOAD_DELAY_PROPERTY,

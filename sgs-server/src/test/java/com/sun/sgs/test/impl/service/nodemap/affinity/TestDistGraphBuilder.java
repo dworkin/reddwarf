@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
@@ -112,7 +113,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
                 String.valueOf(serverPort));
         p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY,
                       DistGraphBuilder.class.getName());
-        p.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        p.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "3600");// one hour
         if (addProps != null) {
             for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
                 p.put(entry.getKey(), entry.getValue());

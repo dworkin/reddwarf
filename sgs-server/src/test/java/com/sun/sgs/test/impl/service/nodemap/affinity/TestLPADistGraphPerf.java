@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -79,7 +80,7 @@ public class TestLPADistGraphPerf {
     static {
         try {
             finderField =
-                UtilReflection.getField(NodeMappingServiceImpl.class, "finder");
+                UtilReflection.getField(NodeMappingServiceImpl.class, "driver");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -115,7 +116,7 @@ public class TestLPADistGraphPerf {
                       DistGraphBuilder.class.getName());
         p.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
-        p.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        p.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "3600");// one hour
         return p;
     }
 

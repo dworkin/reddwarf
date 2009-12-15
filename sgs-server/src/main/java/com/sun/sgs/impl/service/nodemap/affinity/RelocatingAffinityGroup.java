@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 /**
@@ -76,11 +75,15 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     }
 
     /**
-     * Calculate the node that the most number of identities is on.
-     * @return the node id of the most used node
+     * Calculate the node that the most number of identities is on. If none of
+     * the nodes are known, -1 is returned.
+     *
+     * @return the node id of the most used node or -1
      */
     private long calcMostUsedNode() {
-        Map<Long, Integer> nodeCountMap = new HashMap<Long, Integer>();
+        long retNode = -1;
+        int highestCount = -1;
+        final Map<Long, Integer> nodeCountMap = new HashMap<Long, Integer>();
         for (Long nodeId : identities.values()) {
             if (nodeId == -1) {
                 // Node id was unknown, so don't count it
@@ -90,15 +93,10 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
             int val = (count == null) ? 0 : count.intValue();
             val++;
             nodeCountMap.put(nodeId, Integer.valueOf(val));
-        }
-        long retNode = -1;
-        int highestCount = -1;
-        for (Entry<Long, Integer> entry : nodeCountMap.entrySet()) {
-            int count = entry.getValue();
-            if (highestCount < count) {
-                highestCount = count;
-                retNode = entry.getKey();
-            }         
+            if (highestCount < val) {
+                highestCount = val;
+                retNode = nodeId;
+            }
         }
         return retNode;
     }
@@ -107,7 +105,6 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      * Set the target node id for this group.
      *
      * @param nodeId a node id
-     * @param server the node mapping server
      */
     public void setTargetNode(long nodeId) {
         targetNodeId = nodeId;

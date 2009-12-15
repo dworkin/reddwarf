@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.nodemap.affinity.single;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import
    com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import
@@ -273,7 +273,7 @@ public class SingleGraphBuilder extends AbstractAffinityGraphBuilder
     }
 
     /** {@inheritDoc} */
-    public LPAAffinityGroupFinder getAffinityGroupFinder() {
+    public AffinityGroupFinder getAffinityGroupFinder() {
         return lpa;
     }
 

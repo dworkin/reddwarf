@@ -21,7 +21,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.LPAAffinityGroupFinder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
@@ -113,7 +113,7 @@ public class TestLPAPerf {
         Properties props = SgsTestNode.getDefaultProperties("TestLPA", null, null);
         props.put("com.sun.sgs.impl.kernel.profile.level",
                    ProfileLevel.MAX.name());
-        props.setProperty(LPADriver.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        //TODO ? props.setProperty(GroupController.UPDATE_FREQ_PROPERTY, "3600"); // one hour
         // We are creating this SgsTestNode so we can get at its watchdog
         // and profile collector only - the LPAServer we are testing is
         // created outside this framework so we could easily extend the type.
@@ -801,7 +801,7 @@ public class TestLPAPerf {
         }
 
         /** {@inheritDoc} */
-        public LPAAffinityGroupFinder getAffinityGroupFinder() {
+        public AffinityGroupFinder getAffinityGroupFinder() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
