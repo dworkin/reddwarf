@@ -49,11 +49,11 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
 import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.TreeSet;
 import java.util.logging.Level;
 import javax.management.JMException;
 
@@ -107,9 +107,6 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
      * in {@code lpa}.
      */
     private final AffinityGraphBuilderStats builderStats;
-
-    /** Generation number for our returned groups. */
-    private final AtomicLong generation = new AtomicLong();
 
     /**
      * Creates a distributed graph builder server.
@@ -249,17 +246,20 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
      * this would be some work, it might be worthwhile to implement if we
      * find this LPA implementation is useful in deployed systems.
      */
-    public Set<AffinityGroup> findAffinityGroups() 
+    public NavigableSet<RelocatingAffinityGroup> findAffinityGroups()
             throws AffinityGroupFinderFailedException
     {
         checkForDisabledOrShutdownState();
 
-        long gen = generation.incrementAndGet();
-        Set<AffinityGroup> groups = lpa.findAffinityGroups();
+        Set<RelocatingAffinityGroup> groups = lpa.findAffinityGroups();
         // Need to translate each group into a relocating affinity group
-        // Create our final return values
-        Set<AffinityGroup> retVal = new HashSet<AffinityGroup>();
+        // Create our final return values.  This is much like what the
+        // single group finder needed to do, but we ask the node mapping
+        // service for the real node assignments.
+        NavigableSet<RelocatingAffinityGroup> retVal =
+                new TreeSet<RelocatingAffinityGroup>();
         for (AffinityGroup ag : groups) {
+            long gen = ag.getGeneration();
             Map<Identity, Long> idMap = new HashMap<Identity, Long>();
             for (Identity id : ag.getIdentities()) {
                 try {

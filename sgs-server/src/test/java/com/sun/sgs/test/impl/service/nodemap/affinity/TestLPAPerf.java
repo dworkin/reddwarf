@@ -26,6 +26,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
+import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
@@ -34,6 +35,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
@@ -167,7 +169,8 @@ public class TestLPAPerf {
         double maxMod = 0.0;
         double minMod = 1.0;
         for (int i = 0; i < RUNS; i++) {
-            Set<AffinityGroup> groups = lpa.findAffinityGroups();
+            Set<AffinityGroup> groups = 
+                    Objects.uncheckedCast(lpa.findAffinityGroups());
             double mod =
                 AffinityGroupGoodness.calcModularity(
                                 new ZachBuilder().getAffinityGraph(), groups);
@@ -219,7 +222,7 @@ public class TestLPAPerf {
         }
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            Set<AffinityGroup> groups = server.findAffinityGroups();
+            Set<RelocatingAffinityGroup> groups = server.findAffinityGroups();
         }
         if (server != null) {
             server.shutdown();
@@ -264,7 +267,8 @@ public class TestLPAPerf {
         double maxMod = 0.0;
         double minMod = 1.0;
         for (int i = 0; i < RUNS; i++) {
-            Set<AffinityGroup> groups = server.findAffinityGroups();
+            Set<AffinityGroup> groups = 
+                    Objects.uncheckedCast(server.findAffinityGroups());
             double mod =
                 AffinityGroupGoodness.calcModularity(
                                 new ZachBuilder().getAffinityGraph(), groups);

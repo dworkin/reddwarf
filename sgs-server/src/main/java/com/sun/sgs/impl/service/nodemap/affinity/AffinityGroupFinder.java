@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
-import java.util.Set;
+import java.util.NavigableSet;
 
 /**
  *  The affinity group finder finds affinity groups within a
@@ -37,7 +37,7 @@ public interface AffinityGroupFinder {
      * @throws IllegalStateException if the finder is disabled or shut down
      * @return the affinity groups, or an empty set if none are found
      */
-    Set<AffinityGroup> findAffinityGroups()
+    NavigableSet<RelocatingAffinityGroup> findAffinityGroups()
             throws AffinityGroupFinderFailedException;
 
     /** Enables the finder. */

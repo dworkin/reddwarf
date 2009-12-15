@@ -27,16 +27,20 @@ import
    com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
+import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -172,7 +176,7 @@ public class SingleLabelPropagation extends AbstractLPA
      *
      * @return the affinity groups
      */
-    public Set<AffinityGroup> findAffinityGroups() 
+    public NavigableSet<RelocatingAffinityGroup> findAffinityGroups()
             throws AffinityGroupFinderFailedException
     {
         checkForDisabledOrShutdownState();
@@ -297,6 +301,18 @@ public class SingleLabelPropagation extends AbstractLPA
             }
             logger.log(Level.FINE, sb.toString());
         }
-        return groups;
+        
+        // Need to translate the groups into relocating groups.
+        // We do not know the group number, so just use -1.
+        NavigableSet<RelocatingAffinityGroup> retVal =
+                new TreeSet<RelocatingAffinityGroup>();
+        for (AffinityGroup ag : groups) {
+            Map<Identity, Long> idMap = new HashMap<Identity, Long>();
+            for (Identity id : ag.getIdentities()) {
+                idMap.put(id, -1L);
+            }
+            retVal.add(new RelocatingAffinityGroup(ag.getId(), idMap, gen));
+        }
+        return retVal;
     }
 }

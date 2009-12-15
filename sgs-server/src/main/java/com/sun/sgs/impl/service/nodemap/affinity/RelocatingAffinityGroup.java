@@ -49,9 +49,12 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     // Generation number
     private final long generation;
 
-    // The weight of this group. Currently this is simplily the size of the
+    // The weight of this group. Currently this is simply the size of the
     // group.
     private final int weight;
+
+    // hashcode, lazily computed
+    private volatile int hashcode;
 
     /**
      * Creates a new affinity group containing node information.
@@ -141,13 +144,6 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     }
 
     /** {@inheritDoc} */
-    @Override
-    public String toString() {
-        return "AffinityGroup: " + agid + " targetNodeId: " + targetNodeId +
-               " #identities: " + identities.size();
-    }
-
-    /** {@inheritDoc} */
     public long getId() {
         return agid;
     }
@@ -162,13 +158,62 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
         return generation;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Sorts based on the number of identities in the groups.
+     */
     @Override
     public int compareTo(Object obj) {
         if (obj == null) {
             throw new NullPointerException();
         }
-        if (this.equals(obj)) return 0;
+        if (this.equals(obj)) {
+            return 0;
+        }
 
-        return weight < ((RelocatingAffinityGroup)obj).weight ? -1 : 1;
+        int otherWeight = ((RelocatingAffinityGroup) obj).weight;
+        if (weight == otherWeight) {
+            return 0;
+        } else if (weight < otherWeight) {
+            return -1;
+        } else {
+            return 1;
+        }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof RelocatingAffinityGroup)) {
+            return false;
+        }
+        RelocatingAffinityGroup other = (RelocatingAffinityGroup) obj;
+        return (agid == other.agid) &&
+               (generation == other.generation) &&
+               (identities.equals(other.identities));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+        if (hashcode == 0) {
+            int result = 17;
+            result = result * 37 + (int) (agid  ^ agid >>> 32);
+            result = result * 37 + (int) (generation ^ generation >>> 32);
+            result = result * 37 + identities.hashCode();
+            hashcode = result;
+        }
+        return hashcode;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return "AffinityGroup: " + agid + " targetNodeId: " + targetNodeId +
+               " #identities: " + identities.size();
     }
 }

@@ -21,7 +21,6 @@ package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.BasicState;
@@ -311,28 +310,22 @@ public class GroupCoordinator extends BasicState {
     private void findGroups() {
         checkForDisabledOrShutdownState();
         
-        // TODO - Better to leave old groups around until new are found?
         if (collocateTask != null) {
             collocateTask.cancel();
             collocateTask = null;
         }
+        // TODO - Better to leave old groups around until new are found?
+//        groups = null;
         nodeSets.clear();
 
         try {
-            Set<AffinityGroup> newGroups = finder.findAffinityGroups();
-            groups = new TreeSet<RelocatingAffinityGroup>();
-
-            for (AffinityGroup group : newGroups) {
-                if (group instanceof RelocatingAffinityGroup) {
-                    groups.add((RelocatingAffinityGroup)group);
-                }
-            }
+            groups = finder.findAffinityGroups();
 
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER,
                            "findAffinityGroups returned {0} groups, " +
                            "{1} are relocatable",
-                           newGroups.size(), groups.size());
+                           groups.size(), groups.size());
             }
 
             if (!groups.isEmpty()) {
