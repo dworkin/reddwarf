@@ -46,6 +46,9 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     private final long targetNodeId;
     // Generation number
     private final long generation;
+
+    // hashcode, lazily computed
+    private volatile int hashcode;
     /**
      * Creates a new affinity group containing node information.
      * @param agid the group id
@@ -105,7 +108,9 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
         if (obj == null) {
             throw new NullPointerException();
         }
-        if (this.equals(obj)) return 0;
+        if (this.equals(obj)) {
+            return 0;
+        }
 
         int mySize = identities.size();
         int otherSize = ((RelocatingAffinityGroup) obj).identities.size();
@@ -116,6 +121,34 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
         } else {
             return 1;
         }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof RelocatingAffinityGroup)) {
+            return false;
+        }
+        RelocatingAffinityGroup other = (RelocatingAffinityGroup) obj;
+        return (agid == other.agid) &&
+               (generation == other.generation) &&
+               (identities.equals(other.identities));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+        if (hashcode == 0) {
+            int result = 17;
+            result = result * 37 + (int) (agid  ^ agid >>> 32);
+            result = result * 37 + (int) (generation ^ generation >>> 32);
+            result = result * 37 + identities.hashCode();
+            hashcode = result;
+        }
+        return hashcode;
     }
 
     /** {@inheritDoc} */
