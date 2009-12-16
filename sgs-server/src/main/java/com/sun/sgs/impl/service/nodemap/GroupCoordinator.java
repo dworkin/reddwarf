@@ -232,6 +232,10 @@ public class GroupCoordinator extends BasicState {
         if (node == null) {
             throw new NullPointerException("node can not be null");
         }
+
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "Request to offload {0}", node);
+        }
         final long nodeId = node.getId();
         NavigableSet<RelocatingAffinityGroup> groupSet= nodeSets.get(nodeId);
 
@@ -281,6 +285,9 @@ public class GroupCoordinator extends BasicState {
     private boolean collocateGroup(RelocatingAffinityGroup group)
             throws NoNodesAvailableException
     {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "Request to collocate {0}", group);
+        }
         long targetNodeId = group.getTargetNode();
 
         if (targetNodeId < 0) {
@@ -292,12 +299,12 @@ public class GroupCoordinator extends BasicState {
 
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER,
-                       "collocating {0} members of group {1} to node {2}",
-                       identities.size(), group, targetNodeId);
+                       "Collocating {0} members of group {1} to node {2}",
+                       identities.size(), group.getId(), targetNodeId);
         }
         for (Identity identity : identities) {
             if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST, "collocating id {0}", identity);
+                logger.log(Level.FINEST, "Collocating id {0}", identity);
             }
             server.moveIdentity(identity, null, targetNodeId);
         }
@@ -323,9 +330,8 @@ public class GroupCoordinator extends BasicState {
 
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER,
-                           "findAffinityGroups returned {0} groups, " +
-                           "{1} are relocatable",
-                           groups.size(), groups.size());
+                           "findAffinityGroups returned {0} groups",
+                           groups.size());
             }
 
             if (!groups.isEmpty()) {
