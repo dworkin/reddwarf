@@ -32,6 +32,7 @@
 
 package com.sun.sgs.impl.sharedutil;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 /**
@@ -141,6 +142,16 @@ public final class HexDumper {
             buf.append(String.format("%02x", b));
         }
         return buf.toString();
+    }
+
+    /**
+     * Returns the specified {@code bigInt} as a hex-formatted string.
+     *
+     * @param	bigInt a big integer to format
+     * @return	the specified {@code bigInt} as a hex-formatted string
+     */
+    public static String toHexString(BigInteger bigInt) {
+	return toHexString(bigInt.toByteArray());
     }
 
     /**
