@@ -67,6 +67,8 @@ public interface ServerSession {
      *
      * @throws IOException if this session is disconnected or an IO error
      *         occurs
+     * @throws IllegalStateException if the client is not in an appropriate
+     *	       state (suspended, for example) to send a message
      */
     void send(ByteBuffer message) throws IOException;
 

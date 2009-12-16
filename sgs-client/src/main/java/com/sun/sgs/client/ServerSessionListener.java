@@ -84,21 +84,31 @@ public interface ServerSessionListener {
     void receivedMessage(ByteBuffer message);
 
     /**
-     * Notifies this listener that its associated server session is in the
-     * process of reconnecting with the server.
-     * <p>
-     * If a connection can be re-established with the server in a timely
-     * manner, this listener's {@link #reconnected reconnected} method will
-     * be invoked. Otherwise, if a connection cannot be re-established, this
-     * listener's {@code disconnected} method will be invoked with
-     * {@code false} indicating that the associated session is
-     * disconnected from the server and the client must log in again.
+     * Notifies this listener that requests to the server must be
+     * suspended.  The associated server session may be reconnecting with
+     * the same server or another server, or its requests may be
+     * temporarily suspended.
+     *
+     * <p>Once this method returns, the associated server session should
+     * not send any messages to the server until this listener's {@code
+     * reconnected} method is invoked. Any messages sent during message
+     * suspension and/or server reconnection are not guaranteed to be
+     * received and/or processed by the server.
+     * 
+     * <p>If the associated server session is reconnecting and a connection
+     * can be re-established with the server in a timely manner, this
+     * listener's {@link #reconnected reconnected} method will be
+     * invoked. Otherwise, if a connection cannot be re-established, this
+     * listener's {@code disconnected} method will be invoked with {@code
+     * false} indicating that the associated session is disconnected from
+     * the server and the client must log in again.
      */
     void reconnecting();
 
     /**
-     * Notifies this listener whether the associated server session is
-     * successfully reconnected.
+     * Notifies this listener when the associated server session is
+     * successfully reconnected.  After this method is invoked, the
+     * associated session can resume sending messages to the server.
      */
     void reconnected();
 

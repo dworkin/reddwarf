@@ -79,9 +79,13 @@ public class SimpleClient implements ServerSession {
 
     /**
      * The current {@code ClientConnection}, if connected, or
-     * {@code} null if disconnected.
+     * {@code null} if disconnected.
      */
     private volatile ClientConnection clientConnection = null;
+
+    /** A lock for accessing the {@code isSuspended} field and for sending
+     * messages. */ 
+    private final Object lock = new Object();
 
     /**
      * Indicates that either a connection or disconnection attempt
@@ -91,6 +95,9 @@ public class SimpleClient implements ServerSession {
 
     /** Indicates whether this client is logged in. */
     private volatile boolean loggedIn = false;
+
+    /** Indicates whether this client is temporarily suspended. */
+    private boolean isSuspended = false;
 
     /** Reconnection key.  TODO reconnect not implemented */
     @SuppressWarnings("unused")
@@ -212,7 +219,7 @@ public class SimpleClient implements ServerSession {
         if (force) {
             try {
                 loggedIn = false;
-                clientConnection.disconnect();
+                disconnectClientConnection();
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "During forced logout:");
                 // ignore
@@ -227,7 +234,7 @@ public class SimpleClient implements ServerSession {
                 logger.logThrow(Level.FINE, e, "During graceful logout:");
                 try {
                     loggedIn = false;
-                    clientConnection.disconnect();
+                    disconnectClientConnection();
                 } catch (IOException e2) {
                     logger.logThrow(Level.FINE, e2, "During forced logout:");
                     // ignore
@@ -247,22 +254,33 @@ public class SimpleClient implements ServerSession {
      * is invoked, may be dropped by the server.
      */
     public void send(ByteBuffer message) throws IOException {
-        checkConnected();
-        ByteBuffer msg = ByteBuffer.allocate(1 + message.remaining());
-        msg.put(SimpleSgsProtocol.SESSION_MESSAGE)
-           .put(message)
-           .flip();
-        sendRaw(msg);
+	synchronized (lock) {
+	    checkConnected();
+	    if (isSuspended) {
+		throw new IllegalStateException("client suspended");
+	    }
+	    ByteBuffer msg = ByteBuffer.allocate(1 + message.remaining());
+	    msg.put(SimpleSgsProtocol.SESSION_MESSAGE)
+	       .put(message)
+	       .flip();
+	    sendRaw(msg);
+	}
     }
 
     /**
-     * Sends raw data to the underlying connection.
+     * Sends raw data to the underlying connection without checking whether
+     * the client is logged in or suspended.
      * 
      * @param buf the data to send
      * @throws IOException if an IO problem occurs
      */
     private void sendRaw(ByteBuffer buf) throws IOException {
-        clientConnection.sendMessage(buf);
+	ClientConnection conn = clientConnection;
+	if (conn != null) {
+	    conn.sendMessage(buf);
+	} else {
+	    throw new IOException("client disconnected or reconnecting");
+	}
     }
 
     /**
@@ -294,6 +312,27 @@ public class SimpleClient implements ServerSession {
     }
 
     /**
+     * Disconnects the underlying client connection.
+     */
+    private void disconnectClientConnection() throws IOException {
+	ClientConnection conn = clientConnection;
+	if (conn != null) {
+	    conn.disconnect();
+	}
+    }
+
+    /**
+     * Marks this client as no longer suspended, and invokes the {@code
+     * reconnected} method on the associated {@code SimpleClientListener}.
+     */
+    private void notifyReconnected() {
+	synchronized (lock) {
+	    isSuspended = false;
+	    clientListener.reconnected();
+	}
+    }
+
+    /**
      * Receives callbacks on the associated {@code ClientConnection}.
      */
     final class SimpleClientConnectionListener
@@ -317,19 +356,23 @@ public class SimpleClient implements ServerSession {
          *  want to tell the client listener.  We'll accept no messages
          *  when we're in this state.
          */
-        private volatile boolean redirect = false;
-
+        private volatile boolean redirectedOrRelocated = false;
+	
         /**
          * Store the login failure message sent by the server. This will be
          * held until the disconnection from the server is confirmed by a call
          * to disconnected, at which point the application's loginFailure
          * callback will be called with this string as the reason.
          */
-         private volatile String loginFailureMsg;
+	private volatile String loginFailureMsg;
+
+	/** The relocation key, or null, if the client is not relocating. */
+	private final byte[] relocateKey;
 
 
 	/** Constructs an instance. */
 	SimpleClientConnectionListener() {
+	    relocateKey = null;
 	}
 
 	/**
@@ -340,9 +383,21 @@ public class SimpleClient implements ServerSession {
 	 */
 	SimpleClientConnectionListener(PasswordAuthentication authentication) {
 	    this.authentication = authentication;
+	    relocateKey = null;
+	}
+
+	/**
+	 * Constructs an instance with the specified {@code relocateKey}.
+	 * This constructor is used when the client is relocating its
+	 * connection to a new node.
+	 *
+	 */
+	SimpleClientConnectionListener(byte[] relocateKey) {
+	    this.relocateKey = relocateKey;
 	}
         
         /* -- Implement ClientConnectionListener -- */
+	
         /**
          * {@inheritDoc}
          */
@@ -353,7 +408,20 @@ public class SimpleClient implements ServerSession {
                 connectionStateChanging = false;
                 clientConnection = connection;
             }
+	    
+	    if (relocateKey != null) {
+		sendRelocateRequest();
+	    } else {
+		sendLoginRequest();
+	    }
+        }
 
+	/**
+	 * Sends a login request, obtaining a password authentication if
+	 * one was not provided upon construction.
+	 */
+	private void sendLoginRequest() {
+	    assert relocateKey == null;
             // First time through, we haven't authenticated yet.
             // We don't want to have to reauthenticate for each login
             // redirect.
@@ -383,13 +451,31 @@ public class SimpleClient implements ServerSession {
                 logger.logThrow(Level.FINE, e, "During login request:");
                 logout(true);
             }
-        }
+	}
+
+	/**
+	 * Sends a relocate request.
+	 */
+	private void sendRelocateRequest() {
+	    assert relocateKey != null;
+	    ByteBuffer buf = ByteBuffer.allocate(2 + relocateKey.length);
+	    buf.put(SimpleSgsProtocol.RELOCATE_REQUEST).
+		put(SimpleSgsProtocol.VERSION).
+		put(relocateKey).
+		flip();
+	    try {
+		sendRaw(buf.asReadOnlyBuffer());
+	    } catch (IOException e) {
+		logger.logThrow(Level.FINE, e, "During relocate request:");
+		logout(true);
+	    }
+	}
 
         /**
          * {@inheritDoc}
          */
         public void disconnected(boolean graceful, byte[] message) {
-            if (redirect) {
+            if (redirectedOrRelocated) {
                 // This listener has been redirected, and this callback 
                 // should be ignored.  In particular, we don't want to
                 // change the clientConnection state (this could be a 
@@ -406,6 +492,7 @@ public class SimpleClient implements ServerSession {
                 }
                 clientConnection = null;
                 connectionStateChanging = false;
+		isSuspended = false;
             }
             String reason = null;
             if (message != null) {
@@ -456,7 +543,7 @@ public class SimpleClient implements ServerSession {
                 logger.logThrow(Level.FINER, e, e.getMessage());
                 if (isConnected()) {
                     try {
-                        clientConnection.disconnect();
+                        disconnectClientConnection();
                     } catch (IOException e2) {
                         logger.logThrow(Level.FINEST, e2,
                             "Disconnect failed after {0}", e.getMessage());
@@ -488,6 +575,26 @@ public class SimpleClient implements ServerSession {
             case SimpleSgsProtocol.LOGIN_REDIRECT:
                 handleLoginRedirect(msg);
                 break;
+
+	    case SimpleSgsProtocol.SUSPEND_MESSAGES:
+		handleSuspendMessages(msg);
+		break;
+
+	    case SimpleSgsProtocol.RESUME_MESSAGES:
+		handleResumeMessages(msg);
+		break;
+
+	    case SimpleSgsProtocol.RELOCATE_NOTIFICATION:
+		handleRelocateNotification(msg);
+		break;
+		
+	    case SimpleSgsProtocol.RELOCATE_SUCCESS:
+		handleRelocateSuccess(msg);
+		break;
+		
+	    case SimpleSgsProtocol.RELOCATE_FAILURE:
+		handleRelocateFailure(msg);
+		break;
 
             case SimpleSgsProtocol.SESSION_MESSAGE:
                 handleSessionMessage(msg);
@@ -527,7 +634,6 @@ public class SimpleClient implements ServerSession {
          * Process a login success message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleLoginSuccess(MessageBuffer msg) {
             logger.log(Level.FINER, "Logged in");
@@ -540,14 +646,13 @@ public class SimpleClient implements ServerSession {
          * Process a login failure message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleLoginFailure(MessageBuffer msg) {
             String reason = msg.getString();
             logger.log(Level.FINER, "Login failed: {0}", reason);
             loginFailed = true;
             try {
-                clientConnection.disconnect();
+                disconnectClientConnection();
             } catch (IOException e) {
                 // ignore
                 if (logger.isLoggable(Level.FINE)) {
@@ -565,11 +670,102 @@ public class SimpleClient implements ServerSession {
          * @throws IOException if an IO problem occurs
          */
         private void handleLoginRedirect(MessageBuffer msg) 
-                throws IOException {
+	    throws IOException
+	{
             String host = msg.getString();
             int port = msg.getInt();
             logger.log(Level.FINER, "Login redirect: {0}:{1}", host, port);
 
+	    redirectOrRelocateToNewNode(
+		host, port, new SimpleClientConnectionListener(authentication));
+        }
+
+	/**
+	 * Process a suspend messages request.
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+	private void handleSuspendMessages(MessageBuffer msg)
+	    throws IOException
+	{
+	    logger.log(Level.FINER, "Suspend messages");
+	    checkLoggedIn();
+	    synchronized (lock) {
+		clientListener.reconnecting();
+		isSuspended = true;
+	    }
+	    ByteBuffer ack = ByteBuffer.allocate(1);
+	    ack.put(SimpleSgsProtocol.SUSPEND_MESSAGES_COMPLETE)
+	       .flip();
+	    sendRaw(ack);
+	}
+
+	/**
+	 * Process a resume messages request.
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+	private void handleResumeMessages(MessageBuffer msg) {
+	    logger.log(Level.FINER, "Resume messages");
+	    checkLoggedIn();
+	    notifyReconnected();
+	}
+
+	/**
+	 * Processes a relocate notification message.
+	 *
+	 * @param msg the message to process
+	 * @throws IOException if an I/O problem occurs
+	 */
+	private void handleRelocateNotification(MessageBuffer msg)
+	    throws IOException
+	{
+	    String host = msg.getString();
+	    int port = msg.getInt();
+	    byte[] relocateKey =
+		msg.getBytes(msg.limit() - msg.position());
+	    logger.log(Level.FINER, "Relocate notification: {0}:{1}",
+		       host, port);
+	    checkLoggedIn();
+	    synchronized (lock) {
+		if (!isSuspended) {
+		    // Client messages weren't suspended first, so
+		    // disconnect client.
+		    try {
+			disconnectClientConnection();
+		    } catch (IOException e) {
+			// ignore
+			if (logger.isLoggable(Level.FINE)) {
+			    logger.logThrow(
+				Level.FINE, e, "Disconnecting (because " +
+				"relocate notification received before " +
+				"suspend) throws");
+			}
+		    }
+		    throw new IllegalStateException("client not suspended");
+		}
+	    }
+		    
+	    redirectOrRelocateToNewNode(
+ 		host, port, new SimpleClientConnectionListener(relocateKey));
+	}
+
+	/**
+	 * Disconnects the existing connection and creates a new connection
+	 * with the specified connection {@code listener} to the node with
+	 * the specified {@code host} and {@code port}.
+	 *
+	 * @param host the host to connect to
+	 * @param port the port to connect to
+	 * @param listener the connection listener for the new connection
+	 * @throws IOException if an I/O problem occurs
+	 */
+	private void redirectOrRelocateToNewNode(
+	    String host, int port, ClientConnectionListener listener)
+	    throws IOException
+	{
             // Disconnect our current connection, and connect to the
             // new host and port
             ClientConnection oldConnection = clientConnection;
@@ -587,21 +783,53 @@ public class SimpleClient implements ServerSession {
                                     "throws");
                 }
             }
-            redirect = true;
+            redirectedOrRelocated = true;
             Properties props = new Properties();
             props.setProperty("host", host);
             props.setProperty("port", String.valueOf(port));
             ClientConnector connector = ClientConnector.create(props);
             // This eventually causes connected to be called
-            connector.connect(
-		new SimpleClientConnectionListener(authentication));
-        }
-        
+            connector.connect(listener);
+	}
+
+	/**
+	 * Processes a relocate success message.
+	 *
+         * @param msg the message to process
+	 */
+	private void handleRelocateSuccess(MessageBuffer msg) {
+            logger.log(Level.FINER, "Relocate successful");
+            reconnectKey = msg.getBytes(msg.limit() - msg.position());
+            loggedIn = true;
+	    notifyReconnected();
+	}
+	
+	/**
+	 * Processes a relocate failure message.
+	 *
+         * @param msg the message to process
+	 */
+	private void handleRelocateFailure(MessageBuffer msg) {
+	    // TBD: would be nice to supply msg to the client's
+	    // disconnected callback.
+            String reason = msg.getString();
+            logger.log(Level.FINER, "Relocate failed: {0}", reason);
+            try {
+                disconnectClientConnection();
+            } catch (IOException e) {
+                // ignore
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(
+			Level.FINE, e,
+			"Disconnecting after relocate failure throws");
+                }
+            }
+	}
+	
         /**
          * Process a session message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleSessionMessage(MessageBuffer msg) {
             logger.log(Level.FINEST, "Direct receive");
@@ -624,26 +852,24 @@ public class SimpleClient implements ServerSession {
          * Process a reconnect success message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleReconnectSuccess(MessageBuffer msg) {
             logger.log(Level.FINER, "Reconnected");
             loggedIn = true;
             reconnectKey = msg.getBytes(msg.limit() - msg.position());
-            clientListener.reconnected();
+	    notifyReconnected();
         }
         
         /**
          * Process a reconnect failure message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleReconnectFailure(MessageBuffer msg) {
             try {
                 String reason = msg.getString();
                 logger.log(Level.FINER, "Reconnect failed: {0}", reason);
-                clientConnection.disconnect();
+                disconnectClientConnection();
             } catch (IOException e) {
                 // ignore
                 if (logger.isLoggable(Level.FINE)) {
@@ -657,14 +883,13 @@ public class SimpleClient implements ServerSession {
          * Process a logout success message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleLogoutSuccess(MessageBuffer msg) {
             logger.log(Level.FINER, "Logged out gracefully");
             expectingDisconnect = true;
             loggedIn = false;
             try {
-                clientConnection.disconnect();
+                disconnectClientConnection();
             } catch (IOException e) {
                 // ignore
                 if (logger.isLoggable(Level.FINE)) {
@@ -679,7 +904,6 @@ public class SimpleClient implements ServerSession {
          * Process a channel join message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleChannelJoin(MessageBuffer msg) {
             logger.log(Level.FINER, "Channel join");
@@ -703,7 +927,6 @@ public class SimpleClient implements ServerSession {
          * Process a channel leave message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleChannelLeave(MessageBuffer msg) {
             logger.log(Level.FINER, "Channel leave");
@@ -725,7 +948,6 @@ public class SimpleClient implements ServerSession {
          * Process a channel message message
          * 
          * @param msg the message to process
-         * @throws IOException if an IO problem occurs
          */
         private void handleChannelMessage(MessageBuffer msg) {
             logger.log(Level.FINEST, "Channel recv");
@@ -812,20 +1034,26 @@ public class SimpleClient implements ServerSession {
          * {@inheritDoc}
          */
         public void send(ByteBuffer message) throws IOException {
-            if (!isJoined.get()) {
-                throw new IllegalStateException(
-                    "Cannot send on unjoined channel " + channelName);
-            }
-	    byte[] idBytes = channelId.toByteArray();
-	    ByteBuffer msg =
-		ByteBuffer.allocate(3 + idBytes.length + message.remaining());
-	    msg.put(SimpleSgsProtocol.CHANNEL_MESSAGE)
-	       .putShort((short) idBytes.length)
-	       .put(idBytes)
-	       .put(message)
-	       .flip();
-            sendRaw(msg);
-        }
+	    synchronized (lock) {
+		if (isSuspended) {
+		    throw new IllegalStateException("client suspended");
+		}
+		if (!isJoined.get()) {
+		    throw new IllegalStateException(
+                        "Cannot send on unjoined channel " + channelName);
+		}
+		byte[] idBytes = channelId.toByteArray();
+		ByteBuffer msg =
+		    ByteBuffer.allocate(3 + idBytes.length +
+					message.remaining());
+		msg.put(SimpleSgsProtocol.CHANNEL_MESSAGE)
+		   .putShort((short) idBytes.length)
+		   .put(idBytes)
+		   .put(message)
+		   .flip();
+		sendRaw(msg);
+	    }
+	}
 
         // Implementation details
 

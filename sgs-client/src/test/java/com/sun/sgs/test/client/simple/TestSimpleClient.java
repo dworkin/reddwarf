@@ -36,6 +36,7 @@ import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
@@ -361,6 +362,46 @@ public class TestSimpleClient extends TestCase {
             server.shutdown();
         }
     }
+
+    public void testRelocate() throws Exception {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+		new PasswordAuthentication("guest", password));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	int newPort = 5384;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	SimpleServer newServer = new SimpleServer(newPort);
+	try {
+	    server.start();
+	    newServer.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loggedIn);
+	    assertFalse(listener.reconnecting);
+	    assertFalse(listener.reconnected);
+	    MessageBuffer msg =
+		new MessageBuffer(MessageBuffer.getSize("Relocate") + 4);
+	    msg.putString("Relocate").putInt(newPort);
+	    client.send(ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer());
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.reconnecting);
+	    assertTrue(listener.reconnected);
+		
+	} finally {
+	    server.shutdown();
+	}
+    }
     
     private class DummySimpleClientListener implements SimpleClientListener {
 
@@ -373,6 +414,8 @@ public class TestSimpleClient extends TestCase {
 	private volatile boolean loggedIn = false;
 	private volatile int loggedInCount = 0;
 	private volatile PasswordAuthentication auth;
+	private volatile boolean reconnecting = false;
+	private volatile boolean reconnected = false;
 
 	DummySimpleClientListener() {
 	    this(null);
@@ -414,9 +457,11 @@ public class TestSimpleClient extends TestCase {
 	}
 
 	public void reconnecting() {
+	    reconnecting = true;
 	}
 	
 	public void reconnected() {
+	    reconnected = true;
 	}
 	
 	public void disconnected(boolean graceful, String reason){
@@ -431,9 +476,10 @@ public class TestSimpleClient extends TestCase {
 	}
 
         /**
-         * Set a new authentication credential for this client listener. This will allow the
-         * same listener to attempt to log in using different login name/
-         * password combinations
+         * Set a new authentication credential for this client listener.
+         * This will allow the same listener to attempt to log in using
+         * different login name/password combinations.
+	 *
          * @param newAuthentication an authentication object that will be used
          * for login
          */
