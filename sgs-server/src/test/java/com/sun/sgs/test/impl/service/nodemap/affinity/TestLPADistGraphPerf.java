@@ -25,12 +25,14 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
+import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.NodeType;
@@ -136,7 +138,7 @@ public class TestLPADistGraphPerf {
             LPADriver driver = (LPADriver)
                 finderField.get(
                             serverNode.getNodeMappingService());
-            Set<AffinityGroup> groups =
+            Set<RelocatingAffinityGroup> groups =
                 driver.getGraphBuilder().
                     getAffinityGroupFinder().findAffinityGroups();
         }
@@ -410,9 +412,10 @@ public class TestLPADistGraphPerf {
             double avgMod = 0.0;
             double maxMod = 0.0;
             double minMod = 1.0;
-            for (int i = 0; i < RUNS; i++) {                
+            for (int i = 0; i < RUNS; i++) {
                 Set<AffinityGroup> groups =
-                    builder.getAffinityGroupFinder().findAffinityGroups();
+                    Objects.uncheckedCast(
+                        builder.getAffinityGroupFinder().findAffinityGroups());    
                 double mod =
                     AffinityGroupGoodness.calcModularity(graphModel, groups);
 
