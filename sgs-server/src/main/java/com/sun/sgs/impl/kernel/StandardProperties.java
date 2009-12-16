@@ -305,4 +305,16 @@ public final class StandardProperties {
      */
     public static final String SYSTEM_JMX_REMOTE_PORT =
         "com.sun.management.jmxremote.port";
+
+    /**
+     * The property for specifying the maximum length of time, in
+     * milliseconds, for a client session to relocate to a new node.
+     */
+    public static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
+	"com.sun.sgs.impl.service.session.relocation.timeout";
+
+    /**
+     * The default session relocation timeout, in milliseconds.
+     */
+    public static final long DEFAULT_SESSION_RELOCATION_TIMEOUT = 10000;
 }

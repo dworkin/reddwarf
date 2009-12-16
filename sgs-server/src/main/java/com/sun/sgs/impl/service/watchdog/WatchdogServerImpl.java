@@ -624,8 +624,9 @@ public final class WatchdogServerImpl
                                  String component, int maxNumberOfAttempts)
     {
         if (!isLocal) {
-            // Try to report the failure to the watchdog so that the node can 
-            // be shutdown. Try a few times if we run into an IOException.
+            // Try to report the failure to the remote failed node so that
+            // the node can be shutdown itself. Try a few times if we run
+            // into an IOException.
             int retries = maxNumberOfAttempts;
             while (retries-- > 0) {
                 try {
@@ -633,14 +634,20 @@ public final class WatchdogServerImpl
                     break;
                 } catch (IOException ioe) {
                     if (retries == 0) {
-                        logger.log(Level.WARNING, "Could not retrieve " +
-                                "watchdog client given " +
-                                maxNumberOfAttempts + " attempt(s)");
+                        logger.logThrow(
+			    Level.WARNING, ioe, "Reporting failure " +
+			    "to node:{0} from node:{1}, className:{2} after " +
+			    "{3} attempt(s), throws", node.getId(), localNodeId,
+			    component, maxNumberOfAttempts);
                     }
                 }
             }
         }
         processNodeFailures(Arrays.asList(node));
+	statusChangedNodes.add(node);
+	synchronized (notifyClientsLock) {
+	    notifyClientsLock.notifyAll();
+	}
     }
 
     /**
@@ -1045,10 +1052,12 @@ public final class WatchdogServerImpl
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the
 		// client may have failed too.
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "Notifying {0} of node status changes failed:",
-		    notifyNode.getId());
+		if (!shuttingDown()) {
+		    logger.logThrow(
+		    	Level.WARNING, e,
+			"Notifying {0} of node status changes failed:",
+			notifyNode.getId());
+		}
 	    }
 	}
     }

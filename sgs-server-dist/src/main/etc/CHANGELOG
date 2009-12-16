@@ -1,4 +1,6 @@
 Version 0.9.12
+- Added support for client session relocation to client session
+  and channel services (issue #12)
 - Added affinity graph builders and group finders, for load balancing
   multi-node clusters (required for issue #54)
 - Fix issues #201
