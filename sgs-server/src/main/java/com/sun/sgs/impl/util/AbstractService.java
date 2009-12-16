@@ -23,7 +23,6 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -450,7 +449,7 @@ public abstract class AbstractService implements Service {
      *
      * @return	{@code true} if this service is shutting down
      */
-    protected boolean shuttingDown() {
+    public boolean shuttingDown() {
 	synchronized (lock) {
 	    return
 		state == State.SHUTTING_DOWN ||
@@ -527,18 +526,20 @@ public abstract class AbstractService implements Service {
      * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
      *
-     * @param ioTask a task with IO-related operations
-     * @param nodeId the node that is the target of the IO operations
-     * @throws IllegalStateException if this method is invoked within a
-     * transactional context
+     * @param	ioTask a task with IO-related operations
+     * @param	nodeId the node that is the target of the IO operations
+     * @return	{@code true} if the task was successfully executed and
+     * 		{@code false} if the specified node is no longer alive
+     * @throws	IllegalStateException if this method is invoked within a
+     *		transactional context
      */
-    public void runIoTask(IoRunnable ioTask, long nodeId) {
+    public boolean runIoTask(IoRunnable ioTask, long nodeId) {
         int maxAttempts = maxIoAttempts;
         checkNonTransactionalContext();
         do {
             try {
                 ioTask.run();
-                return;
+                return true;
             } catch (IOException e) {
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.logThrow(Level.FINEST, e,
@@ -546,7 +547,7 @@ public abstract class AbstractService implements Service {
                 }
                 if (maxAttempts-- == 0) {
                     logger.logThrow(Level.WARNING, e,
-                            "A communication error occured while running an" +
+                            "A communication error occured while running an " +
                             "IO task. Reporting node {0} as failed.", nodeId);
 
                     // Report failure of remote node since are
@@ -563,21 +564,18 @@ public abstract class AbstractService implements Service {
                 }
             }
         } while (isAlive(nodeId));
+	return false;
     }
     
     /**
-     * Returns the data service relevant to the current context.
+     * Returns the data service.
      *
-     * @return the data service relevant to the current context
+     * @return the data service
      */
-    public static synchronized DataService getDataService() {
-	if (txnProxy == null) {
-	    throw new IllegalStateException("Service not initialized");
-	} else {
-	    return txnProxy.getService(DataService.class);
-	}
+    public DataService getDataService() {
+	return dataService;
     }
-
+    
     /**
      * Returns {@code true} if the specified exception is retryable, and
      * {@code false} otherwise.  A retryable exception is one that
@@ -593,7 +591,7 @@ public abstract class AbstractService implements Service {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
     }
-
+    
     /**
      * An immutable class to hold the current version of the keys
      * and data persisted by a service.
@@ -684,7 +682,7 @@ public abstract class AbstractService implements Service {
      * and throws {@code IllegalStateException} if the thread is in a
      * transactional context.
      */
-    protected void checkNonTransactionalContext() {
+    public void checkNonTransactionalContext() {
         if (txnProxy.inTransaction()) {
 	    throw new IllegalStateException(
 		"operation not allowed from a transactional context");

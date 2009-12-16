@@ -33,6 +33,9 @@ import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.DisconnectAction;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.MoveAction;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.SendMessageAction;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -40,6 +43,7 @@ import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -51,7 +55,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implements a client session.
+ * Implements a client session.  The non-static, non-transient fields of an
+ * instance of this class are the persistent state of a client session and
+ * are only accessed transactionally.
  */
 public class ClientSessionImpl
     implements ClientSession, NodeAssignment, Serializable
@@ -98,17 +104,21 @@ public class ClientSessionImpl
     /** The set of delivery requirements for this session. */
     private final Set<Delivery> deliveries;
 
-    /** The node ID for this session (final because sessions can't move yet). */
-    private final long nodeId;
+    /** The node ID for this session. */
+    private long nodeId;
 
     /** Indicates whether this session is connected. */
-    private volatile boolean connected = true;
+    private boolean connected = true;
 
     /** Maximum message length for session messages. */
     private final int maxMessageLength;
     
     /** The capacity of the write buffer, in bytes. */
     private final int writeBufferCapacity;
+
+    /** If the value is not {@code -1}, indicates the node ID that this
+     * session is relocating to. */
+    private long relocatingToNode = -1;
 
     /*
      * TBD: Should a managed reference to the ClientSessionListener be
@@ -157,6 +167,8 @@ public class ClientSessionImpl
 	this.wrappedSessionRef =
 	    dataService.createReference(new ClientSessionWrapper(sessionRef));
 	idBytes = id.toByteArray();
+	// TBD: these service bindings could be stored in a BindingKeyedMap
+	// instead.
 	dataService.setServiceBinding(getSessionKey(), this);
 	dataService.setServiceBinding(getSessionNodeKey(), this);
 	dataService.setServiceBinding(getEventQueueKey(), new EventQueue(this));
@@ -296,6 +308,95 @@ public class ClientSessionImpl
     }
 
     /**
+     * Initiates a relocation of this client session from the current node
+     * to {@code newNodeId}.  If the client session is no longer connected
+     * or the session is already relocating then this request is ignored.
+     *
+     * @param	newNodeId the ID of the node this session is relocating to
+     */
+    void addMoveEvent(long newNodeId) {
+	if (isConnected() && !isRelocating()) {
+	    addEvent(new MoveEvent(newNodeId));
+	}
+    }
+
+    /**
+     * Sets the {@code relocatingToNode} field to the specified node ID.
+     * This method is invoked when a move event is processed on the
+     * original node to flag this client session as one that is
+     * relocating.  When relocation is complete, the {@link
+     * #relocationComplete} method should be invoked on the client
+     * session's new node to mark the client session as having moved.
+     *
+     * @param	newNodeId the new node that client session is relocating to
+     * @throws	IllegalStateException if this method is invoked from a node
+     *		other than the session's local node
+     */
+    private void setRelocatingToNode(long newNodeId) {
+	if (!isLocalSession()) {
+	    throw new IllegalStateException(
+		"'setRelocating' can only be invoked on the local node:" +
+		nodeId + " for this session: " + toString());
+	}
+
+	sessionService.getDataService().markForUpdate(this);
+	relocatingToNode = newNodeId;
+    }
+
+    /**
+     * Marks this client session as having completed relocation, and then
+     * services this session's event queue.  This method is invoked when
+     * the associated client connects to the new node to re-establish the
+     * client session.
+     *
+     * @throws	IllegalStateException if this method is invoked from a node
+     *		other than the session's local node
+     */
+    void relocationComplete() {
+	if (relocatingToNode != sessionService.getLocalNodeId()) {
+	    throw new IllegalStateException(
+		"'relocationComplete' can only be invoked on the local node:" +
+		nodeId + " for this session: " + toString());
+	}
+	sessionService.getDataService().markForUpdate(this);
+	relocatingToNode = -1;
+	getEventQueue().serviceEvent();
+    }
+
+    /**
+     * Returns {@code true} if the session is relocating, and {@code
+     * false} otherwise.
+     *
+     * @return	{@code true} if the session is relocating, and {@code
+     *		false} otherwise
+     */
+    public boolean isRelocating() {
+	return relocatingToNode != -1;
+    }
+    
+    /**
+     * Updates this client session's node ID and bindings to the client
+     * session to reflect its reassignment to {@code newNodeId}.
+     *
+     * @param	newNodeId the node this session is relocating to
+     * @throws	IllegalArgumentException if {@code newNodeId} does not match
+     *		the local node ID
+     */
+    void move(long newNodeId) {
+	if (newNodeId != sessionService.getLocalNodeId()) {
+	    throw new IllegalArgumentException(
+		"newNodeId:" + newNodeId + " must match the local node ID:" +
+		sessionService.getLocalNodeId());
+	}
+	DataService dataService = sessionService.getDataService();
+	dataService.markForUpdate(this);
+	dataService.removeServiceBinding(getSessionNodeKey());
+	nodeId = newNodeId;
+	// TBD: this could use a BindingKeyedMap.
+	dataService.setServiceBinding(getSessionNodeKey(), this);
+    }
+
+    /**
      * If the session is connected, enqueues a disconnect event to this
      * client session's event queue, and marks this session as disconnected.
      */
@@ -313,6 +414,11 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     public long getNodeId() {
 	return nodeId;
+    }
+
+    /** {@inheritDoc} */
+    public long getRelocatingToNodeId() {
+	return relocatingToNode;
     }
 
     /* -- Implement Object -- */
@@ -627,6 +733,7 @@ public class ClientSessionImpl
 	    (ManagedObject) listener :
 	    new ListenerWrapper(listener);
 	String listenerKey = getListenerKey();
+	// TBD: this could use a BindingKeyedMap.
 	dataService.setServiceBinding(listenerKey, managedObject);
     }
 
@@ -675,7 +782,8 @@ public class ClientSessionImpl
      * data service.
      */
     private static EventQueue getEventQueue(byte[] sessionId) {
-	DataService dataService = ClientSessionServiceImpl.getDataService();
+	DataService dataService =
+	    ClientSessionServiceImpl.getInstance().getDataService();
 	String eventQueueKey = getEventQueueKey(sessionId);
 	try {
 	    return (EventQueue) dataService.getServiceBinding(eventQueueKey);
@@ -693,6 +801,15 @@ public class ClientSessionImpl
     }
 
     /**
+     * Returns {@code true} if session is on local node and is not
+     * relocating, and returns {@code false} otherwise.
+     */
+    private boolean isLocalSession() {
+	return nodeId == sessionService.getLocalNodeId() &&
+	    relocatingToNode == -1;
+    }
+
+    /**
      * Adds the specified session {@code event} to this session's event
      * queue and notifies the client session service on the session's node
      * that there is an event to service.
@@ -706,50 +823,63 @@ public class ClientSessionImpl
 		"event queue removed; session is disconnected");
 	}
 
-	boolean isLocalSession = nodeId == sessionService.getLocalNodeId();
+	boolean isLocalSession = isLocalSession();
 
 	/*
-	 * If this session is connected to the local node and the event
-	 * queue is empty, service the event immediately; otherwise, add
-	 * the event to the event queue.  If the session is connected
-	 * locally, service the head of the event queue; otherwise schedule
-	 * a task to send a request to this session's client session server
-	 * to service this session's event queue.
+	 * If this session is connected to the local node, the event queue
+	 * is empty, and the session is not relocating, then service the
+	 * event immediately without adding it to the event queue.
+	 *
+	 * Otherwise, add the event to the event queue.  If the session is
+	 * not relocating, then if the session is connected locally service
+	 * the head of the event queue, otherwise schedule a task to send a
+	 * request to this session's client session server to service this
+	 * session's event queue.
+	 *
+	 * If the session is relocating, then the servicing of events will
+	 * resume when the client connects to the new node to re-establish
+	 * the client session.
 	 */
-	if (isLocalSession && eventQueue.isEmpty()) {
-	    event.serviceEvent(eventQueue);
+	if (isLocalSession && eventQueue.isEmpty() && !isRelocating()) {
+	    logger.log(Level.FINEST, "immediately processing event:{0}", event);
+	    event.serviceEvent(
+ 		eventQueue,
+		sessionService,
+		sessionService.getHandler(eventQueue.getSessionRefId()));
 
 	} else if (!eventQueue.offer(event)) {
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add client session event");
 
-	} else if (isLocalSession) {
-	    eventQueue.serviceEvent();
+	} else if (!isRelocating()) {
+	    if (isLocalSession) {
+		eventQueue.serviceEvent();
+	    } else {
 
-	} else {
-
-	    final ClientSessionServer sessionServer = getClientSessionServer();
-	    if (sessionServer == null) {
-		/*
-		 * If the ClientSessionServer for this session has been
-		 * removed, then this session's node has failed and the
-		 * session has been disconnected.  The event queue will be
-		 * cleaned up eventually, so there is no need to flag an
-		 * error here.
-		 */
-		return;
+		final ClientSessionServer sessionServer =
+		    getClientSessionServer();
+		if (sessionServer == null) {
+		    /*
+		     * If the ClientSessionServer for this session has been
+		     * removed, then this session's node has failed and the
+		     * session has been disconnected.  The event queue will be
+		     * cleaned up eventually, so there is no need to flag an
+		     * error here.
+		     */
+		    return;
+		}
+		sessionService.getTaskScheduler().scheduleTask(
+		    new AbstractKernelRunnable("ServiceEventQueue") {
+			public void run() {
+			    sessionService.runIoTask(
+				new IoRunnable() {
+				    public void run() throws IOException {
+				      sessionServer.serviceEventQueue(idBytes);
+				    } },
+				nodeId);
+			}
+		    }, identity);
 	    }
-	    sessionService.scheduleNonTransactionalTask(
-	        new AbstractKernelRunnable("ServiceEventQueue") {
-		    public void run() {
-			sessionService.runIoTask(
-			    new IoRunnable() {
-				public void run() throws IOException {
-				    sessionServer.serviceEventQueue(idBytes);
-				} },
-			    nodeId);
-		    }
-		}, identity);
 	}
     }
 
@@ -787,11 +917,16 @@ public class ClientSessionImpl
 	 * Services this event, taken from the head of the given {@code
 	 * eventQueue}.
 	 */
-	abstract void serviceEvent(EventQueue eventQueue);
+	abstract void serviceEvent(EventQueue eventQueue,
+				   ClientSessionServiceImpl sessionService,
+				   ClientSessionHandler handler);
 
 	/**
-	 * Returns the cost of this event, which the {@code EventQueue}
-	 * may use to reject events when the total cost is too large.
+	 * Returns the cost of this event, which the {@code EventQueue} may
+	 * use to reject events when the total cost is too large.  The cost
+	 * of the event is the size (in bytes) of a message generated as a
+	 * result of processing the event. <p>
+	 *
 	 * The default implementation returns a cost of zero.
 	 *
 	 * @return the cost of this event
@@ -801,6 +936,12 @@ public class ClientSessionImpl
 	}
     }
 
+    /**
+     * A client session 'send' event, enqueued by a {@code
+     * ClientSession.send} invocation.  When this event commits, a task is
+     * scheduled to deliver the message, specified during construction, to
+     * the client session.
+     */
     static class SendEvent extends SessionEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -817,10 +958,21 @@ public class ClientSessionImpl
 	}
 
 	/** {@inheritDoc} */
-	void serviceEvent(EventQueue eventQueue) {
-	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.
-		addSessionMessage(sessionImpl, this);
+	void serviceEvent(EventQueue eventQueue,
+			  ClientSessionServiceImpl sessionService,
+			  ClientSessionHandler handler)
+	{
+	    if (eventQueue == null) {
+		throw new NullPointerException("null eventQueue");
+	    } else if (sessionService == null) {
+		throw new NullPointerException("null sessionService");
+	    } else if (handler == null) {
+		throw new NullPointerException("null handler");
+	    }
+	    sessionService.checkContext().addCommitAction(
+ 		eventQueue.getSessionRefId(),
+		handler.new SendMessageAction(this),
+		false);
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -836,6 +988,77 @@ public class ClientSessionImpl
 	}
     }
 
+    /**
+     * A client session 'move' event.  This event is processed on the
+     * client session's old node to mark the session as relocating.  Once
+     * the session is marked for relocation, the associated session's event
+     * processing is suspended until the session is relocated to the new
+     * node. <p>
+     * 
+     * When this event commits, a task is scheduled to commence preparation
+     * for the client session to relocate.  The first action is to obtain a
+     * relocation key from the new node and notify interested parties to
+     * prepare for relocation. See {@link ClientSessionHandler#MoveAction}
+     * for details.
+     */
+    private static class MoveEvent extends SessionEvent {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private final long newNodeId;
+
+	/** Constructs a move event. */
+	MoveEvent(long newNodeId) {
+	    this.newNodeId = newNodeId;
+	}
+
+	/** {@inheritDoc} */
+	void serviceEvent(EventQueue eventQueue,
+			  ClientSessionServiceImpl sessionService,
+			  ClientSessionHandler handler)
+	{
+	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
+	    sessionImpl.setRelocatingToNode(newNodeId);
+
+	    Node newNode = sessionService.watchdogService.getNode(newNodeId);
+	    if (newNode == null) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE,
+			       "Session:{0} unable to relocate from node:{1} " +
+			       "to FAILED node:{2}", this,
+			       sessionService.getLocalNodeId(), newNodeId);
+		}
+	    } else if (handler == null) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE,
+			       "DISCONNECTED Session:{0} unable to relocate " +
+			       "from node:{1} to node:{2}", this,
+			       sessionService.getLocalNodeId(), newNodeId);
+		}
+	    } else {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE,
+			       "Session:{0} to relocate " +
+			       "from node:{1} to node:{2}", this,
+			       sessionService.getLocalNodeId(), newNodeId);
+		}
+		sessionService.checkContext().addCommitAction(
+		    eventQueue.getSessionRefId(),
+		    handler.new MoveAction(newNode), false);
+	    }
+	}
+    }
+
+    /**
+     * A client session 'disconnect' event, enqueued when the session's
+     * associated {@code ClientSessionWrapper} is removed, or if there is a
+     * problem during client login, after the client session has been
+     * persisted. <p>
+     *
+     * When this event commits, a task is scheduled to disconnect the
+     * client session, cleanup its persistent data, and notify the client
+     * session's listener of the disconnection.
+     */
     private static class DisconnectEvent extends SessionEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -844,9 +1067,13 @@ public class ClientSessionImpl
 	DisconnectEvent() { }
 
 	/** {@inheritDoc} */
-	void serviceEvent(EventQueue eventQueue) {
-	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
+	void serviceEvent(EventQueue eventQueue,
+			  ClientSessionServiceImpl sessionService,
+			  ClientSessionHandler handler)
+	{
+	    sessionService.checkContext().addCommitAction(
+		eventQueue.getSessionRefId(),
+ 		handler.new DisconnectAction(), false);
 	}
 
 	/** {@inheritDoc} */
@@ -878,7 +1105,8 @@ public class ClientSessionImpl
 	 * Constructs an event queue for the specified {@code sessionImpl}.
 	 */
 	EventQueue(ClientSessionImpl sessionImpl) {
-	    DataService dataService = ClientSessionServiceImpl.getDataService();
+	    DataService dataService =
+		sessionImpl.sessionService.getDataService();
 	    sessionRef = dataService.createReference(sessionImpl);
 	    queueRef = dataService.createReference(
 		new ManagedQueue<SessionEvent>());
@@ -901,9 +1129,17 @@ public class ClientSessionImpl
 	            "Not enough queue space: " + writeBufferAvailable +
 		    " bytes available, " + cost + " requested");
 	    }
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+ 		    Level.FINEST,
+		    "Adding event:{0} to event queue, localNodeId:{1}", event,
+		    ClientSessionServiceImpl.getInstance().getLocalNodeId());
+	    }
+
 	    boolean success = getQueue().offer(event);
 	    if (success && cost > 0) {
-		ClientSessionServiceImpl.getDataService().markForUpdate(this);
+		ClientSessionServiceImpl.getInstance().
+		    getDataService().markForUpdate(this);
                 writeBufferAvailable -= cost;
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(Level.FINEST,
@@ -958,21 +1194,53 @@ public class ClientSessionImpl
 
 	    ClientSessionServiceImpl sessionService =
 		ClientSessionServiceImpl.getInstance();
+	    ClientSessionHandler handler =
+		sessionService.getHandler(getSessionRefId());
+	    ClientSessionImpl sessionImpl = getClientSession();
+
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "Servicing event queue, node:{0} session:{1}",
+			   sessionService.getLocalNodeId(),
+			   getSessionRefId());
+	    }
+	    if (handler == null || !sessionImpl.isLocalSession() ||
+		sessionImpl.isRelocating())
+	    {
+		// Only service events on the session's local node, so return.
+		// The session may be moving, and this might be a left over
+		// serviceEventQueue request
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Attempt to service event queue, localNodeId:{0} " +
+			"session:{1} handler:{2} sessionNodeId:{3} " +
+			"relocatingToNodeId:{4}",
+			sessionService.getLocalNodeId(), getSessionRefId(),
+			handler, sessionImpl.nodeId,
+			sessionImpl.relocatingToNode);
+		}
+		return;
+	    }
+
 	    ManagedQueue<SessionEvent> eventQueue = getQueue();
 	    DataService dataService =
-		ClientSessionServiceImpl.getDataService();
-
+		ClientSessionServiceImpl.getInstance().getDataService();
+	    
 	    for (int i = 0; i < sessionService.eventsPerTxn; i++) {
 		SessionEvent event = eventQueue.poll();
 		if (event == null) {
 		    // no more events
-		    break;
+		    // TBD: should the session's task queue for servicing
+		    // events be cleared?
+		    return;
 		}
 
 		logger.log(Level.FINEST, "processing event:{0}", event);
 
                 int cost = event.getCost();
 		if (cost > 0) {
+		    // TBD: this update is costly.
 		    dataService.markForUpdate(this);
 		    writeBufferAvailable += cost;
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -983,7 +1251,12 @@ public class ClientSessionImpl
 		    }
 		}
 
-		event.serviceEvent(this);
+		event.serviceEvent(this, sessionService, handler);
+	    }
+
+	    // Make sure the next event gets serviced.
+	    if (eventQueue.peek() != null) {
+		sessionService.addServiceEventQueueTask(sessionImpl.idBytes);
 	    }
 	}
 
@@ -993,7 +1266,7 @@ public class ClientSessionImpl
 	public void removingObject() {
 	    try {
 		DataService dataService =
-		    ClientSessionServiceImpl.getDataService();
+		    ClientSessionServiceImpl.getInstance().getDataService();
 		dataService.removeObject(queueRef.get());
 	    } catch (ObjectNotFoundException e) {
 		// already removed.
@@ -1034,7 +1307,8 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	public void run() {
 	    DataService dataService =
-		ClientSessionServiceImpl.getDataService();
+		ClientSessionServiceImpl.getInstance().getDataService();
+	    // TBD: this could use a BindingKeyedMap.
 	    String key = dataService.nextServiceBoundName(lastKey);
 	    if (key != null && key.startsWith(nodePrefix)) {
 		TaskService taskService =
@@ -1073,7 +1347,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	public void run() {
 	    DataService dataService =
-		ClientSessionServiceImpl.getDataService();
+		ClientSessionServiceImpl.getInstance().getDataService();
 	    ClientSessionImpl sessionImpl =
 		(ClientSessionImpl) dataService.getServiceBinding(key);
 	    sessionImpl.notifyListenerAndRemoveSession(

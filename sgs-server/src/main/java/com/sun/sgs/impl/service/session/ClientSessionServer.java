@@ -20,6 +20,8 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.protocol.ProtocolListener;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -53,5 +55,27 @@ public interface ClientSessionServer extends Remote {
      * 		invoking this method
      */
     void send(byte[] sessionId, byte[] message, byte deliveryOrdinal)
+	throws IOException;
+
+    /**
+     * Notifies this server that the client session with the specified
+     * {@code identity} and {@code sessionId} is relocating to this
+     * server's node from the old node (specified by {@code oldNodeId}).
+     *
+     * <p>This method returns a relocation key to be used to re-establish
+     * the session on this node.  The returned relocation key should be
+     * supplied to the {@link ProtocolListener#relocatedSession
+     * relocatedSession} method of the appropriate {@link
+     * ProtocolListener} to reestablish the client session.
+     *
+     * @param	identity an identity
+     * @param	sessionId a session ID
+     * @param	oldNodeId the ID of the node the session is relocating from
+     * @return	a relocation key 
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
+    byte[] relocatingSession(
+	Identity identity, byte[] sessionId, long oldNodeId)
 	throws IOException;
 }

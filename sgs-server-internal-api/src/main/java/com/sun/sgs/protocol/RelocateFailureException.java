@@ -24,24 +24,23 @@
 package com.sun.sgs.protocol;
 
 /**
- * An exception that indicates a login request failed.  The {@link
+ * An exception that indicates a relocation request failed.  The {@link
  * Throwable#getMessage getMessage} method returns a detail message
  * containing an explanation for the failure, the {@link #getReason
  * getReason} method returns the failure reason, and if the failure reason
  * is {@link FailureReason#OTHER}, the {@link Throwable#getCause getCause}
  * method returns the possibly-{@code null} cause of the failure.
  */
-public class LoginFailureException extends Exception {
+public class RelocateFailureException extends Exception {
 
     /**
-     * Reasons why a login fails.
+     * Reasons why a relocation fails.
      */
     public enum FailureReason {
-	/** The server rejects a duplicate login. */
+	/** A duplicate login with the same identity already exists. */
 	DUPLICATE_LOGIN,
-	/** The application rejects the login. */
-	REJECTED_LOGIN,
-	/** The server is temporarily unavailable. */
+	/** Other operational failure (see exception {@link
+	 * Throwable#getCause cause} for detail). */ 
 	SERVER_UNAVAILABLE,
 	/** Other operational failure (see exception {@link
 	 * Throwable#getCause cause} for detail). */
@@ -61,7 +60,7 @@ public class LoginFailureException extends Exception {
      * @param	message a detail message, or {@code null}
      * @param	reason a failure reason
      */
-    public LoginFailureException(String message, FailureReason reason) {
+    public RelocateFailureException(String message, FailureReason reason) {
 	super(message);
 	if (reason == null) {
 	    throw new NullPointerException("null reason");
@@ -76,7 +75,7 @@ public class LoginFailureException extends Exception {
      * @param	message a detail message, or {@code null}
      * @param	cause the cause of this exception, or {@code null}
      */
-    public LoginFailureException(String message, Throwable cause)
+    public RelocateFailureException(String message, Throwable cause)
     {
 	super(message, cause);
 	this.reason = FailureReason.OTHER;

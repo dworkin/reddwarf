@@ -24,6 +24,7 @@
 package com.sun.sgs.management;
 
 import com.sun.sgs.service.ClientSessionService;
+
 /**
  * The management interface for the client session service.
  * <p>
@@ -46,13 +47,13 @@ public interface ClientSessionServiceMXBean {
     
     /**
      * Returns the number of times {@link 
-     * ClientSessionService#registerSessionDisconnectListener 
-     * registerSessionDisconnectListener} has been called.
+     * ClientSessionService#addSessionStatusListener
+     * addSessionStatusListener} has been called.
      * 
-     * @return the number of times {@code registerSessionDisconnectListener} 
+     * @return the number of times {@code addSessionStatusListener} 
      *         has been called
      */
-    long getRegisterSessionDisconnectListenerCalls();
+    long getAddSessionStatusListenerCalls();
     
     /**
      * Returns the number of times {@link 
@@ -63,4 +64,14 @@ public interface ClientSessionServiceMXBean {
      *         has been called
      */
     long getGetSessionProtocolCalls();
+
+    /**
+     * Returns the number of times {@link
+     * ClientSessionService#isRelocatingToLocalNode
+     * isRelocatingToLocalNode} has been called.
+     * 
+     * @return the number of times {@code isRelocatingToLocalNode} 
+     *         has been called
+     */
+    long getIsRelocatingToLocalNodeCalls();
 }

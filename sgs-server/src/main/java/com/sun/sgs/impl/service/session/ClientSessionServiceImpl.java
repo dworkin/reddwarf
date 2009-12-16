@@ -28,11 +28,12 @@ import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.ConfigManager;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.
+    SetupCompletionFuture;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
-import com.sun.sgs.impl.service.session.ClientSessionImpl.
-    SendEvent;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
@@ -45,19 +46,22 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.LoginFailureException;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RelocateFailureException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.service.ClientSessionDisconnectListener;
+import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.SimpleCompletionHandler;
@@ -69,12 +73,12 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
+import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;   
 import java.util.Properties;
 import java.util.Queue;
@@ -143,6 +147,23 @@ import javax.management.JMException;
  * specify the fully qualified name of a non-abstract class that implements
  * {@link ProtocolAcceptor}.<p>
  * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #RELOCATION_KEY_LENGTH_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_RELOCATION_KEY_LENGTH}
+ *
+ * <dd style="padding-top: .5em">Specifies the length, in bytes, of a
+ *	relocation key.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value com.sun.sgs.impl.kernel.StandardProperties#SESSION_RELOCATION_TIMEOUT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i>
+ *	{@value com.sun.sgs.impl.kernel.StandardProperties#DEFAULT_SESSION_RELOCATION_TIMEOUT}
+ *
+ * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
+ *	for client session relocation.<p>
+ * 
  * </dl> <p>
  */
 public final class ClientSessionServiceImpl
@@ -206,6 +227,16 @@ public final class ClientSessionServiceImpl
     static final String DEFAULT_PROTOCOL_ACCEPTOR =
 	"com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor";
 
+    /** The relocation key length property. */
+    static final String RELOCATION_KEY_LENGTH_PROPERTY =
+	PKG_NAME + ".relocation.key.length";
+    
+    /** The default length of a relocation key, in bytes. */
+    static final int DEFAULT_RELOCATION_KEY_LENGTH = 16;
+
+    /** A random number generator for relocation keys. */
+    private static final SecureRandom random = new SecureRandom();
+    
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
 
@@ -213,10 +244,10 @@ public final class ClientSessionServiceImpl
     private final long localNodeId;
 
     /** The registered session disconnect listeners. */
-    private final Set<ClientSessionDisconnectListener>
-	sessionDisconnectListeners =
+    private final Set<ClientSessionStatusListener>
+	sessionStatusListeners =
 	    Collections.synchronizedSet(
-		new HashSet<ClientSessionDisconnectListener>());
+		new HashSet<ClientSessionStatusListener>());
 
     /** A map of local session handlers, keyed by session ID . */
     private final Map<BigInteger, ClientSessionHandler> handlers =
@@ -274,6 +305,29 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
+    /** Information for preparing a session to relocate from this node,
+     * keyed by session ID. 
+     */
+    private final ConcurrentHashMap<BigInteger, PrepareRelocationInfo>
+	prepareRelocationMap =
+	    new ConcurrentHashMap <BigInteger, PrepareRelocationInfo>();
+
+    /** The map of relocation information for sessions relocating to
+     * this node, keyed by relocation key. */
+    private final ConcurrentHashMap<BigInteger, RelocationInfo>
+	incomingSessionRelocationKeys =
+	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
+
+    /** The map of relocation information for sessions relocating to this
+     * node, keyed by session ID. */
+    private final ConcurrentHashMap<BigInteger, RelocationInfo>
+	incomingSessionRelocationInfo =
+	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
+    
+    /** The set of identities that are relocating to this node. */
+    private final Set<Identity> incomingRelocatingIdentities =
+	Collections.synchronizedSet(new HashSet<Identity>());
+    
     /** The maximum number of session events to service per transaction. */
     final int eventsPerTxn;
 
@@ -283,6 +337,12 @@ public final class ClientSessionServiceImpl
      * false}, then if the same user logs in, the new login will be denied.
      */
     final boolean allowNewLogin;
+
+    /** The session relocation key length. */
+    final int relocationKeyLength;
+
+    /** The session relocation timeout. */
+    final long relocationTimeout;
 
     /** Our JMX exposed statistics. */
     final ClientSessionServiceStats serviceStats;
@@ -316,6 +376,13 @@ public final class ClientSessionServiceImpl
 		1, Integer.MAX_VALUE);
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
+	    relocationKeyLength = wrappedProps.getIntProperty(
+ 		RELOCATION_KEY_LENGTH_PROPERTY, DEFAULT_RELOCATION_KEY_LENGTH,
+		16, Integer.MAX_VALUE);
+	    relocationTimeout = wrappedProps.getLongProperty(
+		StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY,
+		StandardProperties.DEFAULT_SESSION_RELOCATION_TIMEOUT,
+		1000L, Long.MAX_VALUE);
 
             /* Export the ClientSessionServer. */
 	    int serverPort = wrappedProps.getIntProperty(
@@ -359,12 +426,19 @@ public final class ClientSessionServiceImpl
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreClientSessionServiceProxy") {
 		    public void run() {
+			// TBD: this could use a BindingKeyedMap.
 			dataService.setServiceBinding(
 			    getClientSessionServerKey(localNodeId),
 			    new ManagedSerializable<ClientSessionServer>(
 				serverProxy));
 		    } },
 		taskOwner);
+
+	    /* Register the identity relocation and node mapping listeners. */
+	    nodeMapService.addIdentityRelocationListener(
+		new IdentityRelocationListenerImpl());
+	    nodeMapService.addNodeMappingListener(
+		new NodeMappingListenerImpl());
 
 	    /*
 	     * Create the protocol listener and acceptor.
@@ -410,6 +484,11 @@ public final class ClientSessionServiceImpl
                        "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" +
                        writeBufferSize +
                        "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
+		       "\n  " + RELOCATION_KEY_LENGTH_PROPERTY + "=" +
+		       relocationKeyLength +
+		       "\n  " +
+		       StandardProperties.SESSION_RELOCATION_TIMEOUT_PROPERTY +
+		       "=" + relocationTimeout +
                        "\n  " + PROTOCOL_ACCEPTOR_PROPERTY + "=" +
                        protocolAcceptor.getClass().getName() +
                        "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort);
@@ -479,7 +558,7 @@ public final class ClientSessionServiceImpl
 		exporter.unexport();
 		logger.log(Level.FINEST, "client session server unexported");
 	    } catch (RuntimeException e) {
-		logger.logThrow(Level.FINEST, e, "unexport server throws");
+		logger.logThrow(Level.FINE, e, "unexport server throws");
 		// swallow exception
 	    }
 	}
@@ -521,31 +600,195 @@ public final class ClientSessionServiceImpl
     /* -- Implement ClientSessionService -- */
 
     /** {@inheritDoc} */
-    public void registerSessionDisconnectListener(
-        ClientSessionDisconnectListener listener)
+    public void addSessionStatusListener(
+        ClientSessionStatusListener listener)
     {
-        if (listener == null) {
-            throw new NullPointerException("null listener");
-        }
+	Objects.checkNull("listener", listener);
 	checkNonTransactionalContext();
-        serviceStats.registerSessionDisconnectListenerOp.report();
-        sessionDisconnectListeners.add(listener);
+        serviceStats.addSessionStatusListenerOp.report();
+        sessionStatusListeners.add(listener);
     }
     
     /** {@inheritDoc} */
     public SessionProtocol getSessionProtocol(BigInteger sessionRefId) {
-	if (sessionRefId == null) {
-	    throw new NullPointerException("null sessionRefId");
-	}
-	checkNonTransactionalContext();
+	Objects.checkNull("sessionRefId", sessionRefId);
+	// This operation is used within a transaction by ChannelService.
+	//checkNonTransactionalContext();
         serviceStats.getSessionProtocolOp.report();
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	
 	return handler != null ? handler.getSessionProtocol() : null;
     }
 
+    /** {@inheritDoc} */
+    public boolean isRelocatingToLocalNode(BigInteger sessionRefId) {
+	Objects.checkNull("sessionRefId", sessionRefId);
+	checkNonTransactionalContext();
+        serviceStats.isRelocatingToLocalNodeOp.report();
+	return incomingSessionRelocationInfo.containsKey(sessionRefId);
+    }
+
+    /* -- Implement IdentityRelocationListener -- */
+
+    /**
+     * This listener receives notifications of identities that are going
+     * to be relocated from this node to give services a chance to
+     * prepare for the relocation. <p>
+     *
+     * Before an identity is relocated from this node the {@link
+     * #prepareToRelocate} method is invoked on this listener.  If the
+     * identity corresponds to a local client session, then this service
+     * starts to prepare the client session for relocation.  First, it adds
+     * a {@code MoveEvent} to the client session's event queue so that the
+     * client session can be marked as relocating.
+     */
+    private class IdentityRelocationListenerImpl
+	implements IdentityRelocationListener
+    {
+	/** {@inheritDoc} */
+	public void prepareToRelocate(Identity id, final long newNodeId,
+				      SimpleCompletionHandler handler)
+	{
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "identity:{0} localNode:{1} newNodeId:{2}",
+			   id, localNodeId, newNodeId);
+	    }
+	    
+	    final ClientSessionHandler sessionHandler =
+		loggedInIdentityMap.get(id);
+	    
+	    if (sessionHandler != null) {
+		if (!sessionHandler.supportsRelocation()) {
+		    // Ignore request if client session does not suppport
+		    // relocation.  If request is ignored, then identity
+		    // mapping will not be modified.
+		    logger.log(
+			Level.SEVERE,
+			"Attempt to relocate client:{0} that does not " +
+			"support relocation", id);
+		    return;
+		}
+		// The specified identity corresponds to a local client session,
+		// so prepare to move it.
+		final BigInteger sessionRefId = sessionHandler.sessionRefId;
+		PrepareRelocationInfo prepareInfo =
+		    new PrepareRelocationInfo(sessionRefId, newNodeId, handler);
+		PrepareRelocationInfo oldPrepareInfo =
+		    prepareRelocationMap.putIfAbsent(sessionRefId, prepareInfo);
+		if (oldPrepareInfo == null) {
+		    if (sessionHandler.isRelocating() ||
+			!sessionHandler.isConnected())
+		    {
+			// Request to prepare identity for relocation is
+			// received after preparation has already been completed
+			// and session is in the process of relocating.
+			prepareRelocationMap.remove(sessionRefId);
+			handler.completed();
+			return;
+		    }
+			    
+		    transactionScheduler.scheduleTask(
+		      new AbstractKernelRunnable("AddMoveEvent") {
+			public void run() {
+			    ClientSessionImpl session =
+				ClientSessionImpl.getSession(
+				    dataService, sessionHandler.sessionRefId);
+			    if (session != null) {
+				session.addMoveEvent(newNodeId);
+			    }
+			} },
+		      id);
+
+		    // Add a task to monitor preparation and relocation and
+		    // disconnect client session if preparation and
+		    // relocation has not completed in time.
+		    taskScheduler.scheduleTask(
+ 			new MonitorSessionRelocatingFromLocalNodeTask(
+			    sessionRefId),
+			id, System.currentTimeMillis() + relocationTimeout);
+		    
+		} else {
+		    // Duplicate request to prepare for relocation;  add
+		    // completion handler to be notified
+		    oldPrepareInfo.addNmsCompletionHandler(handler);
+		}
+		
+	    } else {
+		// The specified identity does not correspond to a local
+		// client session.
+		handler.completed();
+	    }
+	}
+    }
+
+    /* -- Implement NodeMappingListener -- */
+
+    /**
+     * The client session service's {@code NodeMappingListener}
+     * implementation is interested in mappings that have been removed from
+     * the local node that correspond to client sessions that are
+     * relocating from this node.  When the node mapping service removes
+     * the identity mapping of a relocating session from this node, that
+     * means relocation preparation is complete and the client session
+     * corresponding to the identity can be notified to relocate its
+     * connection to the new node.
+     */
+    private class NodeMappingListenerImpl implements NodeMappingListener {
+
+	/** {@inheritDoc} */
+	public void mappingAdded(Identity id, Node oldNode) {
+	}
+    
+	/** {@inheritDoc} */
+	public void mappingRemoved(Identity id, Node newNode) {
+
+	    ClientSessionHandler sessionHandler = loggedInIdentityMap.get(id);
+	    
+	    if (sessionHandler != null) {
+		// The specified identity corresponds to a local client session,
+		// which should have already been prepared to move
+		BigInteger sessionRefId = sessionHandler.sessionRefId;
+	    
+		// Remove session from table of relocation preparers.
+		if (prepareRelocationMap.remove(sessionRefId) != null) {
+		    // Notify client to start relocating its connection.
+		    sessionHandler.setRelocatePreparationComplete();
+		    
+		} else {
+		    if (newNode != null) {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+			        Level.WARNING,
+				"Disconnecting unprepared session:{0} whose " +
+				"identity:{1} was remapped from " +
+				"localNodeId:{2} to node:{3}",
+				HexDumper.toHexString(sessionRefId),
+				id, localNodeId, newNode.getId());
+			}
+		    } else {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+				Level.WARNING,
+				"Disconnecting session:{0} whose " +
+				"identity:{1} was removed prematurely " +
+				"from localNodeId:{2} ",
+				HexDumper.toHexString(sessionRefId),
+				id, localNodeId);
+			}
+		    }
+		    sessionHandler.handleDisconnect(false, false);
+		}
+	    }
+	}
+    }
+
     /* -- Implement ProtocolListener -- */
 
+    /**
+     * This {@code ProtocolListener} implementation handles new and
+     * relocated client sessions.
+     */
     private class ProtocolListenerImpl implements ProtocolListener {
 
 	/** {@inheritDoc} */
@@ -557,86 +800,38 @@ public final class ClientSessionServiceImpl
 		ClientSessionServiceImpl.this, dataService, protocol,
 		identity, completionHandler);
 	}
-	
+
+	/** {@inheritDoc} */
+	public void relocatedSession(
+	    BigInteger relocationKey, SessionProtocol protocol,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
+	{
+	    RelocationInfo info =
+		incomingSessionRelocationKeys.remove(relocationKey);
+	    if (info == null) {
+		// No information for specified relocation key.
+		// Session is already relocated, or it's a possible
+		// DOS attack, so notify completion handler of failure.
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Attempt to relocate to node:{0} with " +
+			"invalid relocation key:{1}", localNodeId,
+			HexDumper.toHexString(relocationKey));
+		}
+		(new SetupCompletionFuture(null, completionHandler)).
+		    setException(
+			new RelocateFailureException(
+ 			    ClientSessionHandler.RELOCATE_REFUSED_REASON,
+			    RelocateFailureException.FailureReason.OTHER));
+		return;
+	    }
+	    new ClientSessionHandler(
+		ClientSessionServiceImpl.this, dataService, protocol,
+		info.identity, completionHandler, info.sessionRefId);
+	}
     }
     
-    /* -- Package access methods for adding commit actions -- */
-    
-    /**
-     * Enqueues the specified send event (containing a session {@code
-     * message}) in the current context for delivery to the specified
-     * client {@code session} when the context commits.  This method must
-     * be called within a transaction.
-     *
-     * @param	session	a client session
-     * @param	sendEvent a send event containing a message and delivery
-     *		guarantee 
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void addSessionMessage(
-	ClientSessionImpl session, SendEvent sendEvent)
-    {
-	checkContext().addMessage(session, sendEvent);
-    }
-
-    /**
-     *
-     * Records the login result in the current context, so that the specified
-     * client {@code session} can be notified when the context commits.  If
-     * {@code success} is {@code false}, the specified {@code exception} will be
-     * used as the cause of the {@code ExecutionException} in the {@code Future}
-     * passed to the {@link RequestCompletionHandler} for the login request, and
-     * no subsequent session messages will be forwarded to the session, even if
-     * they have been enqueued during the current transaction.  If success is
-     * {@code true}, then the {@code Future} passed to the {@code
-     * RequestCompletionHandler} for the login request will contain this {@link
-     * SessionProtocolHandler}.
-     *
-     * <p>When the transaction commits, the session's associated {@code
-     * ClientSessionHandler} is notified of the login result, and if {@code
-     * success} is {@code true}, all enqueued messages will be delivered to
-     * the client session.
-     *
-     * @param	session	a client session
-     * @param	success if {@code true}, login was successful
-     * @param	exception a login failure exception, or {@code null} (only valid
-     *		if {@code success} is {@code false}
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void addLoginResult(ClientSessionImpl session,
-			boolean success,
-			LoginFailureException exception)
-    {
-	checkContext().addLoginResult(session, success, exception);
-    }
-
-    /**
-     * Adds a request to disconnect the specified client {@code session} when
-     * the current context commits.  This method must be invoked within a
-     * transaction.
-     *
-     * @param	session a client session
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void addDisconnectRequest(ClientSessionImpl session) {
-	checkContext().requestDisconnect(session);
-    }
-
-    /**
-     * Returns the size of the write buffer to use for new connections.
-     * 
-     * @return the size of the write buffer to use for new connections
-     */
-    int getWriteBufferSize() {
-        return writeBufferSize;
-    }
-
     /* -- Implement TransactionContextFactory -- */
 
     private class ContextFactory extends TransactionContextFactory<Context> {
@@ -654,10 +849,10 @@ public final class ClientSessionServiceImpl
     
     final class Context extends TransactionContext {
 
-	/** Map of client sessions to an object containing a list of
-	 * actions to make upon transaction commit. */
-        private final Map<ClientSessionImpl, CommitActions> commitActions =
-	    new HashMap<ClientSessionImpl, CommitActions>();
+	/** Map of client session IDs to an object containing a list of
+	 * actions to perform upon transaction commit. */
+        private final Map<BigInteger, CommitActions> commitActions =
+	    new HashMap<BigInteger, CommitActions>();
 
 	/**
 	 * Constructs a context with the specified transaction.
@@ -667,102 +862,42 @@ public final class ClientSessionServiceImpl
 	}
 
 	/**
-	 * Adds the specified login result be sent to the specified
-	 * session after this transaction commits.  If {@code success} is
-	 * {@code false}, no other messages are sent to the session after
-	 * the login acknowledgment.
+	 * Adds an action for the specified session to be performed when
+	 * the associated transaction commits.  If {@code first} is
+	 * {@code true}, then the action is added as the first commit
+	 * action for the specified session.
 	 */
-	void addLoginResult(
-	    ClientSessionImpl session, boolean success,
-	    LoginFailureException ex)
+	void addCommitAction(
+	    BigInteger sessionRefId, Action action, boolean first)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addLoginResult success:{0} session:{1}",
-			success, session);
+			"Context.addCommitAction session:{0} action:{1}",
+			sessionRefId, action);
 		}
 		checkPrepared();
 
-		getCommitActions(session).addLoginResult(success, ex);
-
+		CommitActions sessionActions = commitActions.get(sessionRefId);
+		if (sessionActions == null) {
+		    sessionActions = new CommitActions();
+		    commitActions.put(sessionRefId, sessionActions);
+		}
+		if (first) {
+		    sessionActions.addFirst(action);
+		} else {
+		    sessionActions.add(action);
+		}
 	    
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
 			Level.FINE, e,
-			"Context.addMessage exception");
+			"Context.addCommitAction exception");
                 }
                 throw e;
             }
-	}
-
-	/**
-	 * Enqueues a message to be sent to the specified session after
-	 * this transaction commits.
-	 */
-	private void addMessage(
-	    ClientSessionImpl session, SendEvent sendEvent)
-    	{
-	    try {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST,
-			"Context.addMessage session:{0}, message:{1}",
-			session, sendEvent.message);
-		}
-		checkPrepared();
-
-		getCommitActions(session).addMessage(sendEvent);
-	    
-	    } catch (RuntimeException e) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.logThrow(
-			Level.FINE, e,
-			"Context.addMessage exception");
-                }
-                throw e;
-            }
-	}
-
-	/**
-	 * Requests that the specified session be disconnected when
-	 * this transaction commits, but only after all session
-	 * messages are sent.
-	 */
-	void requestDisconnect(ClientSessionImpl session) {
-	    try {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST,
-			"Context.setDisconnect session:{0}", session);
-		}
-		checkPrepared();
-
-		getCommitActions(session).setDisconnect();
-		
-	    } catch (RuntimeException e) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.logThrow(
-			Level.FINE, e,
-			"Context.setDisconnect throws");
-                }
-                throw e;
-            }
-	}
-
-	/**
-	 * Returns the commit actions for the given {@code session}.
-	 */
-	private CommitActions getCommitActions(ClientSessionImpl session) {
-
-	    CommitActions actions = commitActions.get(session);
-	    if (actions == null) {
-		actions = new CommitActions(session);
-		commitActions.put(session, actions);
-	    }
-	    return actions;
 	}
 	
 	/**
@@ -844,105 +979,35 @@ public final class ClientSessionServiceImpl
 	    }
 	}
     }
-    
+
+    /**
+     * An action to perform during commit.
+     */
+    interface Action {
+	
+	/**
+	 * Performs the commit action and returns {@code true} if
+	 * further actions should be processed after this one, and
+	 * returns {@code false} otherwise. A {@code false} value would
+	 * be returned, for example, if an action disconnects the client
+	 * session or notifies the client of login failure.
+	 */
+	boolean flush();
+    }
+
     /**
      * Contains pending changes for a given client session.
      */
-    private class CommitActions {
+    private static class CommitActions extends LinkedList<Action> {
 
-	/** The client session ID as a BigInteger. */
-	private final BigInteger sessionRefId;
-
-	/** Indicates whether a login result should be sent. */
-	private boolean sendLoginResult = false;
-	
-	/** The login result. */
-	private boolean loginSuccess = false;
-
-	/** The login exception. */
-	private LoginFailureException loginException;
-	
-	/** List of messages to send on commit. */
-	private List<SendEvent> messages = new ArrayList<SendEvent>();
-
-	/** If true, disconnect after sending messages. */
-	private boolean disconnect = false;
-
-	CommitActions(ClientSessionImpl sessionImpl) {
-	    if (sessionImpl == null) {
-		throw new NullPointerException("null sessionImpl");
-	    } 
-	    this.sessionRefId = sessionImpl.getId();
-	}
-
-	void addMessage(SendEvent sendEvent) {
-	    messages.add(sendEvent);
-	}
-
-	void addLoginResult(boolean success, LoginFailureException ex) {
-	    sendLoginResult = true;
-	    loginSuccess = success;
-	    loginException = ex;
-	}
-	
-	void setDisconnect() {
-	    disconnect = true;
-	}
-
+	/**
+	 * Flushes all actions enqueued with this instance.
+	 */
 	void flush() {
-	    sendSessionMessages();
-	    if (disconnect) {
-		ClientSessionHandler handler = handlers.get(sessionRefId);
-		/*
-		 * If session is local, disconnect session; otherwise, log
-		 * error message. 
-		 */
-		if (handler != null) {
-		    handler.handleDisconnect(false, true);
-		} else {
-		    logger.log(
-		        Level.FINE,
-			"discarding request to disconnect unknown session:{0}",
-			sessionRefId);
+	    for (Action action : this) {
+		if (!action.flush()) {
+		    break;
 		}
-	    }
-	}
-
-	void sendSessionMessages() {
-
-	    ClientSessionHandler handler = handlers.get(sessionRefId);
-	    /*
-	     * If a local handler exists, forward messages to local
-	     * handler to send to client session; otherwise log
-	     * error message.
-	     */
-	    if (handler != null && handler.isConnected()) {
-		if (sendLoginResult) {
-		    if (loginSuccess) {
-			handler.loginSuccess();
-		    } else {
-			handler.loginFailure(loginException);
-			return;
-		    }
-		}
-		SessionProtocol protocol = handler.getSessionProtocol();
-		if (protocol != null) {
-		    for (SendEvent sendEvent : messages) {
-                        try {
-                            protocol.sessionMessage(
-				ByteBuffer.wrap(sendEvent.message),
-				sendEvent.delivery);
-                        } catch (Exception e) {
-                            logger.logThrow(Level.WARNING, e,
-                                            "sessionMessage throws");
-                        }
-		    }
-		}
-	    } else {
-		logger.log(
-		    Level.FINE,
-		    "Discarding messages for disconnected session:{0}",
-		    handler);
 	    }
 	}
     }
@@ -988,6 +1053,9 @@ public final class ClientSessionServiceImpl
 			try {
 			    flushContextsLock.wait();
 			} catch (InterruptedException e) {
+			    logger.log(Level.SEVERE,
+				       "FlushContextsThread interrupted, " +
+				       "node:{0}", localNodeId);
 			    return;
 			}
 		    }
@@ -1029,34 +1097,78 @@ public final class ClientSessionServiceImpl
     private class SessionServerImpl implements ClientSessionServer {
 
 	/** {@inheritDoc} */
-	public void serviceEventQueue(final byte[] sessionId) {
+	public void serviceEventQueue(byte[] sessionId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "serviceEventQueue sessionId:{0}",
 			       HexDumper.toHexString(sessionId));
 		}
-
-		BigInteger sessionRefId = new BigInteger(1, sessionId);
-		TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
-		if (taskQueue == null) {
-		    TaskQueue newTaskQueue =
-			transactionScheduler.createTaskQueue();
-		    taskQueue = sessionTaskQueues.
-			putIfAbsent(sessionRefId, newTaskQueue);
-		    if (taskQueue == null) {
-			taskQueue = newTaskQueue;
-		    }
-		}
-		taskQueue.addTask(
-		  new AbstractKernelRunnable("ServiceEventQueue") {
-		    public void run() {
-			ClientSessionImpl.serviceEventQueue(sessionId);
-		    } }, taskOwner);
+		addServiceEventQueueTask(sessionId);
 	    } finally {
 		callFinished();
 	    }
 	    
+	}
+
+	/** {@inheritDoc} */
+	public byte[] relocatingSession(
+	    Identity identity, byte[] sessionId, long oldNodeId)
+	{
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "sessionId:{0} oldNodeId:{1}",
+			       HexDumper.toHexString(sessionId), oldNodeId);
+		}
+		
+		// Cache relocation information.
+		byte[] relocationKey = getNextRelocationKey();
+		final BigInteger sessionRefId = new BigInteger(1, sessionId);
+		RelocationInfo info =
+		    new RelocationInfo(identity, sessionRefId);
+		BigInteger key = new BigInteger(1, relocationKey);
+		incomingSessionRelocationKeys.put(key, info);
+		incomingSessionRelocationInfo.put(sessionRefId, info);
+		incomingRelocatingIdentities.add(identity);
+
+		// Modify ClientSession's state to indicate that it has been
+		// relocated to the local node.
+		try {
+		    transactionScheduler.runTask(
+			new AbstractKernelRunnable(
+			    "RelocateSessionToLocalNode")
+			{
+			    public void run() {
+				ClientSessionImpl session =
+				    ClientSessionImpl.getSession(
+				        dataService, sessionRefId);
+				session.move(localNodeId);
+			    } },
+			taskOwner);
+		} catch (Exception e) {
+		    // This exception probably means that the client
+		    // session is gone, so throw an exception.  This will
+		    // cause the requester to disconnect the client session
+		    // because it can't assign the new node ID to the
+		    // session.
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Assigning new node ID:{0} to session:{1} throws",
+			localNodeId, HexDumper.toHexString(sessionId));
+		    throw new RuntimeException(e);
+		}
+		
+		// Schedule task to monitor relocation.
+		taskScheduler.scheduleTask(
+		    new MonitorSessionRelocatingToLocalNodeTask(key, info),
+		    identity, System.currentTimeMillis() + relocationTimeout);
+				      
+		return relocationKey;
+
+	    } finally {
+		callFinished();
+	    }
 	}
 
 	/** {@inheritDoc} */
@@ -1074,11 +1186,14 @@ public final class ClientSessionServiceImpl
 		SessionProtocol sessionProtocol =
 		    getSessionProtocol(new BigInteger(1, sessionId));
 		if (sessionProtocol != null) {
+		    Delivery delivery = Delivery.values()[deliveryOrdinal];
+
 		    try {
 			sessionProtocol.sessionMessage(
-			    ByteBuffer.wrap(message),
-			    Delivery.values()[deliveryOrdinal]);
+			    ByteBuffer.wrap(message), delivery);
 		    } catch (IOException e) {
+			// TBD: should we disconnect the session because
+			// messages can't be delivered?
 			if (logger.isLoggable(Level.FINE)) {
 			    logger.logThrow(
 				Level.FINE, e,
@@ -1088,6 +1203,17 @@ public final class ClientSessionServiceImpl
 				HexDumper.toHexString(message));
 					    
 			}
+		    } catch (RuntimeException e) {
+			// i.e., IllegalStateException
+			// This shouldn't happen because client session
+			// events are not processed while a session is
+			// relocating.
+			logger.logThrow(
+			    Level.SEVERE, e,
+			    "Attempted send to session:{0} during " +
+			    "relocation, message:{1}",
+			    HexDumper.toHexString(sessionId),
+			    HexDumper.toHexString(message));
 		    }
 		} else {
 		    if (logger.isLoggable(Level.FINE)) {
@@ -1107,6 +1233,9 @@ public final class ClientSessionServiceImpl
     
     /* -- Other methods -- */
 
+    /**
+     * Returns the transaction proxy.
+     */
     TransactionProxy getTransactionProxy() {
 	return txnProxy;
     }
@@ -1119,6 +1248,36 @@ public final class ClientSessionServiceImpl
 	return localNodeId;
     }
     
+    /**
+     * Returns the size of the write buffer to use for new connections.
+     * 
+     * @return the size of the write buffer to use for new connections
+     */
+    int getWriteBufferSize() {
+        return writeBufferSize;
+    }
+
+    /**
+     * Returns the {@code ClientSessionHandler} for the specified client
+     * session ID.
+     * @param	sessionRefId a client session ID
+     * @return	the handler
+     */
+    ClientSessionHandler getHandler(BigInteger sessionRefId) {
+	return handlers.get(sessionRefId);
+    }
+
+    /**
+     * Returns the next relocation key.
+     *
+     * @return the next relocation key
+     */
+    private byte[] getNextRelocationKey() {
+	byte[] key = new byte[relocationKeyLength];
+	random.nextBytes(key);
+	return key;
+    }
+
     /**
      * Returns the key for accessing the {@code ClientSessionServer}
      * instance (which is wrapped in a {@code ManagedSerializable})
@@ -1177,7 +1336,8 @@ public final class ClientSessionServiceImpl
      * if one of the following conditions holds:
      *
      * <ul>
-     * <li>the {@code identity} is not currently logged in, or
+     * <li>the {@code identity} is not currently logged in and is not
+     * relocating to the current node, or
      * <li>the {@code identity} is logged in, and the {@code
      * com.sun.sgs.impl.service.session.allow.new.login} property is
      * set to {@code true}.
@@ -1191,10 +1351,18 @@ public final class ClientSessionServiceImpl
      *
      * @param	identity the user identity
      * @param	handler the client session handler
+     * @param	loggingIn if {@code true} session with specified
+     *		identity is loggingIn; otherwise it is relocating
      * @return	{@code true} if the user is allowed to log in with the
      * specified {@code identity}, otherwise returns {@code false}
      */
-    boolean validateUserLogin(Identity identity, ClientSessionHandler handler) {
+    boolean validateUserLogin(Identity identity, ClientSessionHandler handler,
+			      boolean loggingIn)
+    {
+	if (loggingIn && incomingRelocatingIdentities.contains(identity)) {
+	    return false;
+	}
+		
 	ClientSessionHandler previousHandler =
 	    loggedInIdentityMap.putIfAbsent(identity, handler);
 	if (previousHandler == null) {
@@ -1234,31 +1402,155 @@ public final class ClientSessionServiceImpl
     
     /**
      * Adds the handler for the specified session to the internal
-     * session handler map.  This method is invoked by the handler once the
-     * client has successfully logged in.
+     * session handler map.  This method is invoked by the handler
+     * once the client has successfully logged in or has
+     * successfully relocated.  If the client has relocated, the
+     * {@code identity} should be non-null, otherwise, the identity
+     * should be {@code null}.
+     *
+     * @param	sessionRefId the session ID, as a {@code BigInteger}
+     * @param	handler the client session handler to cache
+     * @param	identity if the session has been relocated, a non-null
+     *		identity to be removed from the
+     *		{@code incomingRelocatingIdentities} cache
      */
-    void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
+    void addHandler(BigInteger sessionRefId,
+		    ClientSessionHandler handler,
+		    Identity identity)
+    {
         assert handler != null;
 	handlers.put(sessionRefId, handler);
+	incomingSessionRelocationInfo.remove(sessionRefId);
+	if (identity != null) {
+	    incomingRelocatingIdentities.remove(identity);
+	    //  Notify status listeners that the specified client session
+	    //  has completed relocating to this node.
+	    for (ClientSessionStatusListener statusListener :
+		     sessionStatusListeners)
+	    {
+		try {
+		    statusListener.relocated(sessionRefId);
+		} catch (Exception e) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.logThrow(
+			    Level.FINE, e, "Invoking 'relocated' method " +
+			    "on listener:{0} throws", statusListener);
+		    }
+		}
+	    }
+	}
     }
     
     /**
-     * Removes the specified session from the internal session  handler
-     * map.  This method is invoked by the handler when the session becomes
-     * disconnected.
+     * Removes the specified session from the internal session handler map,
+     * cleans up other session-related transient data, and if {@code
+     * isDisconnecting} is {@code true} notifies all {@link
+     * ClientSessionStatusListener}s of the session's disconnection.  This
+     * method is invoked by the handler (in order to clean up the session's
+     * transient data structures) when the session is disconnecting
+     * its connection due to session termination or session relocation.  If
+     * a session is disconnecting because the session relocating to another
+     * node, then {@code isDisconnecting} will be {@code false}.
      */
-    void removeHandler(BigInteger sessionRefId) {
+    void removeHandler(BigInteger sessionRefId, boolean isRelocating) {
 	if (shuttingDown()) {
 	    return;
 	}
 	// Notify session listeners of disconnection
-	for (ClientSessionDisconnectListener disconnectListener :
-		 sessionDisconnectListeners)
-	{
-	    disconnectListener.disconnected(sessionRefId);
-	}
+	notifyStatusListenersOfDisconnection(sessionRefId, isRelocating);
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
+	prepareRelocationMap.remove(sessionRefId); // just in case...
+    }
+
+    /**
+     * Notifies all registered {@code ClientSessionStatusListener}s that
+     * the session with the specified {@code sessionRefId} has disconnected.
+     */
+    private void notifyStatusListenersOfDisconnection(
+	BigInteger sessionRefId, boolean isRelocating)
+    {
+	for (ClientSessionStatusListener statusListener :
+		 sessionStatusListeners)
+	{
+	    try {
+		statusListener.disconnected(sessionRefId, isRelocating);
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e, "notifying listener:{0} of " +
+			"disconnected session:{1} throws", statusListener,
+			HexDumper.toHexString(sessionRefId));
+		}
+	    }
+	}
+    }
+    
+    /**
+     * Schedules a transactional task to service the event queue for the
+     * session with the specified {@code sessionId}.  If there is no
+     * locally-connected session with the specified {@code sessionId}, then
+     * no action is taken.  <p>
+     *
+     * This method should be invoked outside of a transaction.
+     *
+     * @param	sessionId a session ID
+     */
+    void addServiceEventQueueTask(final byte[] sessionId) {
+	final BigInteger sessionRefId = new BigInteger(1, sessionId);
+	if (!handlers.containsKey(sessionRefId)) {
+	    // The session is not local or is disconnected, so this node
+	    // should not service the event queue.
+	    return;
+	}
+
+	TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
+	if (taskQueue == null) {
+	    TaskQueue newTaskQueue =
+		transactionScheduler.createTaskQueue();
+	    taskQueue = sessionTaskQueues.
+		putIfAbsent(sessionRefId, newTaskQueue);
+	    if (taskQueue == null) {
+		taskQueue = newTaskQueue;
+	    }
+	}
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("ServiceEventQueue") {
+		public void run() {
+		    if (getHandler(sessionRefId) != null) {
+			ClientSessionImpl.serviceEventQueue(sessionId);
+		    }
+		} }, taskOwner);
+    }
+
+    /**
+     * Notifies each registered {@link ClientSessionStatusListener} that
+     * the session with the specified {@code sessionRefId} is moving to a
+     * new node (specified by {@code newNodeId}).  The specified completion
+     * {@code handler} should be notified (via its {@code completed}
+     * method), when all listeners are finished preparing for relocation.
+     *
+     * @param	sessionRefId the ID for the relocating client session
+     * @param	newNodeId the ID of the new node for the client session
+     */
+    void notifyPrepareToRelocate(final BigInteger sessionRefId,
+				 final long newNodeId)
+    {
+	if (logger.isLoggable(Level.INFO)) {
+	    logger.log(Level.INFO,
+		       "Preparing session:{0} to relocate to node:{1}",
+		       sessionRefId, newNodeId);
+	}
+
+	PrepareRelocationInfo info = prepareRelocationMap.get(sessionRefId);
+	if (info != null) {
+	    info.prepareToRelocate();
+	} else {
+	    logger.log(Level.WARNING,
+		       "Ignoring request for session:{0} whichi is not " +
+		       "relocating from local node:{1}",
+		       sessionRefId, localNodeId);
+	}
     }
 
     /**
@@ -1266,24 +1558,8 @@ public final class ClientSessionServiceImpl
      * {@code Identity} as the owner.
      */
     void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
-	if (ownerIdentity == null) {
-	    throw new NullPointerException("Owner identity cannot be null");
-	}
+	Objects.checkNull("ownerIdentity", ownerIdentity);
         transactionScheduler.scheduleTask(task, ownerIdentity);
-    }
-
-    /**
-     * Schedules a non-durable, non-transactional task using the given
-     * {@code Identity} as the owner.
-     */
-    void scheduleNonTransactionalTask(
-	KernelRunnable task, Identity ownerIdentity)
-    {
-	// TBD: this check is done because there are known cases where the
-	// identity can be null, but when the Handler code changes to ensure
-	// that the identity is always valid, this check can be removed
-	Identity owner = (ownerIdentity == null ? taskOwner : ownerIdentity);
-        taskScheduler.scheduleTask(task, owner);
     }
 
     /**
@@ -1299,9 +1575,7 @@ public final class ClientSessionServiceImpl
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	if (ownerIdentity == null) {
-	    throw new NullPointerException("Owner identity cannot be null");
-	}
+	Objects.checkNull("ownerIdentity", ownerIdentity);
 	transactionScheduler.runTask(task, ownerIdentity);
     }
     
@@ -1310,6 +1584,14 @@ public final class ClientSessionServiceImpl
      */
     static TaskService getTaskService() {
 	return txnProxy.getService(TaskService.class);
+    }
+
+    /**
+     * Returns the task scheduler.
+     * @return	the task scheduler
+     */
+    TaskScheduler getTaskScheduler() {
+	return taskScheduler;
     }
 
     /**
@@ -1403,7 +1685,7 @@ public final class ClientSessionServiceImpl
 	 */
 	public void run() {
 	    String sessionServerKey = getClientSessionServerKey(nodeId);
-	    DataService dataService = getDataService();
+	    DataService dataService = getInstance().getDataService();
 	    try {
 		dataService.removeObject(
 		    dataService.getServiceBinding(sessionServerKey));
@@ -1466,7 +1748,7 @@ public final class ClientSessionServiceImpl
     private static Map<Long, Set<ProtocolDescriptor>>
 	getProtocolDescriptorsMap()
     {
-	DataService dataService = getDataService();
+	DataService dataService = getInstance().getDataService();
 	Map<Long, Set<ProtocolDescriptor>> protocolDescriptorsMap;
 	try {
 	    protocolDescriptorsMap = Objects.uncheckedCast(
@@ -1479,5 +1761,299 @@ public final class ClientSessionServiceImpl
 	}
 	return protocolDescriptorsMap;
     }
-}
 
+    /**
+     * Contains information about a client session relocating to the
+     * local node.
+     */
+    private static class RelocationInfo {
+	final Identity identity;
+	final BigInteger sessionRefId;
+
+	RelocationInfo(Identity identity, BigInteger sessionRefId) {
+	    this.identity = identity;
+	    this.sessionRefId = sessionRefId;
+	}
+    }
+
+    /**
+     * A task (run after a delay) that checks to see if a client session
+     * with the {@code sessionRefId} specified during construction has
+     * relocated from the local node. If not, the associated client session
+     * is cleaned up.
+     */
+    private class MonitorSessionRelocatingFromLocalNodeTask
+	extends AbstractKernelRunnable
+    {
+	final BigInteger sessionRefId;
+
+	/**
+	 * Constructs an instance with the specified {@code sessionRefId}.
+	 * @param	sessionRefId a session ID
+	 */
+	MonitorSessionRelocatingFromLocalNodeTask(BigInteger sessionRefId) {
+	    super(null);
+	    this.sessionRefId = sessionRefId;
+	}
+
+	/**
+	 * If the associated client hasn't finished preparing to relocate
+	 * before this task runs, then clean up the client session.  Either
+	 * the original server failed to inform the client that it should
+	 * relocate or the client session has failed.  In either case, the
+	 * client session needs to be removed.
+	 */
+	public void run() {
+
+	    ClientSessionHandler sessionHandler = handlers.get(sessionRefId);
+	    if (sessionHandler != null) {
+		prepareRelocationMap.remove(sessionRefId);
+		logger.log(
+		    Level.WARNING, "Disconnecting session:{0} that timed out " +
+		    "relocating from node:{1}", sessionHandler.identity,
+		    localNodeId);
+		sessionHandler.handleDisconnect(false, true);
+	    }
+	}
+    }
+    
+    /**
+     * A task (run after a delay) that checks to see if a client session
+     * with the associated relocation key has finished relocating to this
+     * node.  If not, the associated client session is cleaned up and all
+     * client session status listeners are notified that the client session
+     * has been disconnected.
+     */
+    private class MonitorSessionRelocatingToLocalNodeTask
+	extends AbstractKernelRunnable
+    {
+	final BigInteger relocationKey;
+	final RelocationInfo info;
+
+	/**
+	 * Constructs an instance with the specified relocation info.
+	 * @param	relocationKey a relocation key
+	 * @param	info a client session's relocation info
+	 */
+	MonitorSessionRelocatingToLocalNodeTask(
+	    BigInteger relocationKey, RelocationInfo info)
+	{
+	    super(null);
+	    this.relocationKey = relocationKey;
+	    this.info = info;
+	}
+
+	/**
+	 * If the associated client doesn't attempt reestablish the
+	 * client session before this task runs, then clean up the
+	 * client session.  Either the original server failed to
+	 * inform the client that it should relocate or the client
+	 * session has failed.  In either case, the client session
+	 * needs to be removed.
+	 */
+	public void run() {
+	    if (incomingSessionRelocationKeys.remove(relocationKey) != null) {
+		logger.log(
+		    Level.FINE, "Scheduling clean up of session:{0} that " +
+		    "failed to relocate to local node:{1}",
+		    info.identity, localNodeId);
+		transactionScheduler.scheduleTask(
+ 		    new AbstractKernelRunnable("RemoveNonrelocatedSession") {
+			public void run() {
+			    ClientSessionImpl sessionImpl =
+				ClientSessionImpl.getSession(
+				    dataService, info.sessionRefId);
+			    if (sessionImpl != null) {
+				sessionImpl.notifyListenerAndRemoveSession(
+				    dataService, false, true);
+			    }
+			} }, info.identity);
+		incomingSessionRelocationInfo.remove(info.sessionRefId);
+		incomingRelocatingIdentities.remove(info.identity);
+		notifyStatusListenersOfDisconnection(info.sessionRefId, false);
+	    }
+	}
+    }
+
+    /**
+     * An abstraction to keep track of the progress of session's
+     * relocation preparation and notify all NodeMappingService's
+     * completion handlers when relocation preparation is complete.
+     *
+     *
+     * An instance of this class is constructed when the
+     * ClientSessionService's IdentityRelocationListener is notified to
+     * prepare to relocate (via the {@link
+     * IdentityRelocationListener#prepareToRelocate prepareToRelocate}
+     * method.
+     */
+    private final class PrepareRelocationInfo {
+	
+	/** The session that is relocating. */
+	private final BigInteger sessionRefId;
+
+	/** The ID of the session's new node. */
+	private final long newNodeId;
+	
+	/** Completion handlers for the node mapping service. */
+	private final Set<SimpleCompletionHandler> nmsCompletionHandlers =
+	    new HashSet<SimpleCompletionHandler>();
+	
+	/** Completion handlers for {@code ClientSessionStatusListener}s
+	 * that need to prepare before the node mapping service completion
+	 * handler(s) are notified.
+	 */
+	private final Set<PrepareCompletionHandler> preparers =
+	    new HashSet<PrepareCompletionHandler>();
+
+	/** Indicates whether the {@code ClientSessionStatusListener}s have
+	 * been notified to prepare for relocation. */
+	private boolean isPreparing = false;
+
+	/**
+	 * Constructs an instance with the specified {@code sessionRefId},
+	 * {@code newNodeId}, and completion {@code handler} from the node
+	 * mapping service. <p>
+	 *
+	 * This constructor takes a snapshot of all registered {@code
+	 * ClientSessionStatusListener}s that need to be notified to
+	 * prepare to relocate after the client session service has
+	 * finished preparing the client session for relocation.  Once the
+	 * client session has been prepared to relocate, the client
+	 * session service invokes this instance's {@link
+	 * #prepareToRelocate} method so that it can notify each {@code
+	 * ClientSessionStatusListener} to prepare to relocate. <p>
+	 *
+	 * When all {@code ClientSessionStatusListener}s have finished
+	 * preparing, this instance notifies all node mapping service
+	 * completion handlers that relocation preparation has been
+	 * completed for the session.  There may be more than one
+	 * completion handler from the node mapping service because the
+	 * node mapping service may notify the client session service more
+	 * than once to prepare to relocate a given client session.
+	 */
+	PrepareRelocationInfo(BigInteger sessionRefId, long newNodeId,
+			      SimpleCompletionHandler handler)
+	{
+	    this.sessionRefId = sessionRefId;
+	    this.newNodeId = newNodeId;
+	    nmsCompletionHandlers.add(handler);
+	    for (ClientSessionStatusListener listener :
+		     sessionStatusListeners)
+	    {
+		preparers.add(new PrepareCompletionHandler(listener));
+	    }
+	}
+
+	/**
+	 * Notifies all {@code ClientSessionStatusListener}s to prepare for
+	 * the client session (specified at construction) to relocate.  If
+	 * preparing the {@code ClientSessionStatusListener}s is or has
+	 * already taken place, this method takes no action.
+	 */
+	synchronized void prepareToRelocate() {
+	    if (isPreparing) {
+		return;
+	    }
+	    isPreparing = true;
+	    for (final PrepareCompletionHandler handler : preparers) {
+		taskScheduler.scheduleTask(
+		  new AbstractKernelRunnable("PrepareToRelocateSession") {
+		    public void run() {
+			try {
+			    handler.listener.prepareToRelocate(
+				sessionRefId, newNodeId, handler);
+			} catch (Exception e) {
+			    logger.logThrow(
+			        Level.WARNING, e,
+				"Notifying listener:{0} to prepare " +
+				"session:{1} to relocate to node:{2} throws",
+				handler.listener, sessionRefId, newNodeId);
+			}
+		    }
+		  }, taskOwner);
+	    }
+	}
+
+	/**
+	 * Adds the specified completion {@code handler} from the {@code
+	 * NodeMappingService} to the set of completion handlers that need
+	 * to be notified when all {@code ClientSessionStatusListener}s are
+	 * finished preparing for relocation.
+	 */
+	synchronized void addNmsCompletionHandler(
+	    SimpleCompletionHandler handler)
+	{
+	    if (preparers.isEmpty()) {
+		handler.completed();
+	    } else {
+		nmsCompletionHandlers.add(handler);
+	    }
+	}
+
+	/**
+	 * Notifies this instance that the {@code
+	 * ClientSessionStatusListener} for the specified {@code
+	 * listenerCompletionhandler} has completed preparing for
+	 * relocation.  If all listeners have completed preparation, then
+	 * all {@code NodeMappingService} completion handlers are notified
+	 * that preparation is complete.  Once the node mapping service has
+	 * removed the mapping (and subsequently invoked this client session
+	 * service's {@code NodeMappingListener.mappingRemoved} method),
+	 * the client can be informed that it can start relocating its
+	 * connection.
+	 */
+	synchronized void preparationCompleted(
+	    PrepareCompletionHandler listenerCompletionHandler)
+	{
+	    preparers.remove(listenerCompletionHandler);
+	    if (preparers.isEmpty()) {
+		// Notify NodeMappingService completion handlers that
+		// preparation is complete.
+		for (SimpleCompletionHandler nmsCompletionHandler :
+			 nmsCompletionHandlers)
+		{
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "Notifying NMS relocate preparation complete, " +
+			    "session:{0} localNodeId:{1} newNodeId:{2}",
+			    sessionRefId, getLocalNodeId(), newNodeId);
+		    }
+		    nmsCompletionHandler.completed();
+		}
+	    }
+	}
+
+	/**
+	 * A completion handler for a {@code ClientSessionStatusListener}
+	 * preparing for relocation, specified as an argument to the {@link
+	 * ClientSessionStatusListener#prepareToRelocate prepareToRelocate}
+	 * method. 
+	 */
+	private final class PrepareCompletionHandler
+	    implements SimpleCompletionHandler
+	{
+	    private final ClientSessionStatusListener listener;
+	    /** Indicates whether preparation is completed. */
+	    private boolean completed = false;
+
+	    /** Constructs an instance. */
+	    PrepareCompletionHandler(ClientSessionStatusListener listener) {
+		this.listener = listener;
+	    }
+
+	    /** {@inheritDoc} */
+	    public void completed() {
+		synchronized (this) {
+		    if (completed) {
+			return;
+		    }
+		    completed = true;
+		}
+
+		PrepareRelocationInfo.this.preparationCompleted(this);
+	    }
+	}
+    }
+}

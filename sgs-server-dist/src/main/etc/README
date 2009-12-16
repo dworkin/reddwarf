@@ -118,6 +118,21 @@ conf directory for additional details.
 
 RELEASE COMPATIBILITY
 
+Release 0.9.12:
+
+- The persistent data stored by the ChannelService is incompatible with
+  the previous releases.  The ChannelService's persistent data created
+  using releases prior to 0.9.12 will not be automatically upgraded to the
+  current release format.
+
+- The ClientSessionService implementation can be configured to support
+  clients of the latest SimpleSgsProtocol version (5), and by default
+  supports clients of the previous version (4).  All clients connecting to
+  the server must be the same version (either 4 or 5).  The protocol
+  version can be specified with the following property (which defaults to 4):
+
+  com.sun.sgs.impl.protocol.simple.protocol.version
+
 Release 0.9.10:
 
 - The persistent data stored by the ChannelService is incompatible with
