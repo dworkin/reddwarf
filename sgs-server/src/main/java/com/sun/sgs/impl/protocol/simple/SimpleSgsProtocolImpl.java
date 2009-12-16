@@ -34,6 +34,8 @@ import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RequestFailureException;
+import com.sun.sgs.protocol.RequestFailureException.FailureReason;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -61,7 +63,11 @@ import java.util.logging.Logger;
  * enforces a fixed buffer size when reading.
  */
 public class SimpleSgsProtocolImpl implements SessionProtocol {
-    /** The number of bytes used to represent the message length. */
+
+    /** The protocol version for this implementation. */
+    private static final byte PROTOCOL4 = 0x04;
+    
+   /** The number of bytes used to represent the message length. */
     private static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
@@ -78,7 +84,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** A random number generator for reconnect keys. */
     private static final SecureRandom random = new SecureRandom();
-    
+
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...).
@@ -92,10 +98,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     protected final SimpleSgsProtocolAcceptor acceptor;
 
     /** The logger for this instance. */
-    private final LoggerWrapper logger;
+    protected final LoggerWrapper logger;
     
    /** The protocol listener. */
-    private final ProtocolListener listener;
+    protected final ProtocolListener listener;
 
     /** The identity. */
     private volatile Identity identity;
@@ -110,7 +116,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
     /** A lock for {@code loginHandled} and {@code messageQueue} fields. */
-    private Object lock = new Object();
+    private final Object lock = new Object();
 
     /** Indicates whether the client's login ack has been sent. */
     private boolean loginHandled = false;
@@ -120,7 +126,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** The set of supported delivery requirements. */
     protected final Set<Delivery> deliverySet = new HashSet<Delivery>();
-
 
     /**
      * Creates a new instance of this class.
@@ -141,13 +146,13 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	 * for the buffers, so they don't go into hysteresis when they get
 	 * full. -JM
 	 */
-	scheduleReadOnReadHandler();
+	scheduleRead();
     }
     
     /**
-     *
-     * The subclass should invoke {@link #scheduleReadOnReadHandler} after
-     * constructing the instance to commence reading.
+     * Constructs a new instance of this class.  The subclass should invoke
+     * {@code scheduleRead} after constructing the instance to commence
+     * reading.
      *
      * @param	listener a protocol listener
      * @param	acceptor the {@code SimpleSgsProtocol} acceptor
@@ -171,6 +176,27 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	this.reconnectKey = getNextReconnectKey();
 	deliverySet.add(Delivery.RELIABLE);
     }
+
+    /**
+     * Returns the {@code SimpleSgsProtocol} version supported by this
+     * implementation.
+     *
+     * @return the {@code SimpleSgsProtocol} version supported by this
+     * implementation
+     */
+    protected byte getProtocolVersion() {
+	return PROTOCOL4;
+    }
+
+    /**
+     * Returns the associated identity, or {@code null} if the client has
+     * not yet authenticated.
+     *
+     * @return the associated identity, or {@code null}
+     */
+    protected Identity getIdentity() {
+	return identity;
+    }
     
     /* -- Implement SessionProtocol -- */
 
@@ -191,7 +217,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     
     /** {@inheritDoc} */
     public void sessionMessage(ByteBuffer message, Delivery delivery) {
-        final int messageLength = 1 + message.remaining();
+	int messageLength = 1 + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf = ByteBuffer.wrap(new byte[messageLength]);
 	buf.put(SimpleSgsProtocol.SESSION_MESSAGE).
@@ -202,8 +228,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     
     /** {@inheritDoc} */
     public void channelJoin(
-	String name, BigInteger channelId, Delivery delivery)
-    {
+	String name, BigInteger channelId, Delivery delivery) {
 	byte[] channelIdBytes = channelId.toByteArray();
 	MessageBuffer buf =
 	    new MessageBuffer(1 + MessageBuffer.getSize(name) +
@@ -211,7 +236,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	buf.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
 	    putString(name).
 	    putBytes(channelIdBytes);
-	writeOrEnqueueIfLoginNotHandled(ByteBuffer.wrap(buf.getBuffer()));
+	write(ByteBuffer.wrap(buf.getBuffer()));
     }
 
     /** {@inheritDoc} */
@@ -222,7 +247,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	buf.put(SimpleSgsProtocol.CHANNEL_LEAVE).
 	    put(channelIdBytes).
 	    flip();
-	writeOrEnqueueIfLoginNotHandled(buf);
+	write(buf);
     }
 
     /***
@@ -240,8 +265,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                                Delivery delivery)
     {
 	byte[] channelIdBytes = channelId.toByteArray();
-        final int messageLength = 3 + channelIdBytes.length +
-                                  message.remaining();
+	int messageLength = 3 + channelIdBytes.length + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf =
 	    ByteBuffer.allocate(messageLength);
@@ -251,24 +275,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    put(message).
 	    flip();
 	writeBuffer(buf, delivery);
-    }
-
-    /**
-     * Writes the specified buffer, satisfying the specified delivery
-     * requirement.
-     *
-     * <p>This implementation writes the buffer reliably, because this
-     * protocol only supports reliable delivery.
-     *
-     * <p>A subclass can override the {@code writeBuffer} method if it
-     * supports other delivery guarantees and can make use of alternate
-     * transports for those other delivery requirements.
-     *
-     * @param	buf a byte buffer containing a protocol message
-     * @param	delivery a delivery requirement
-     */
-    protected void writeBuffer(ByteBuffer buf, Delivery delivery) {
-	writeOrEnqueueIfLoginNotHandled(buf);
     }
 
     /** {@inheritDoc} */
@@ -289,8 +295,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	MessageBuffer buf = new MessageBuffer(1 + reconnectKey.length);
 	buf.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 	    putBytes(reconnectKey);
-	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
-	flushMessageQueue();
+	writeNow(ByteBuffer.wrap(buf.getBuffer()), true);
     }
 
     /**
@@ -314,9 +319,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    new MessageBuffer(1 + redirectionData.length);
 		buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
 		    putBytes(redirectionData);
-		writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
-		flushMessageQueue();
-		acceptor.monitorDisconnection(this);
+		writeNow(ByteBuffer.wrap(buf.getBuffer()), true);
+		monitorDisconnection();
                 return;
             }
         }
@@ -345,9 +349,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    new MessageBuffer(1 + MessageBuffer.getSize(reason));
         buf.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
             putString(reason);
-        writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
-	flushMessageQueue();
-	acceptor.monitorDisconnection(this);
+        writeNow(ByteBuffer.wrap(buf.getBuffer()), true);
+	monitorDisconnection();
     }
     
     /**
@@ -357,8 +360,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	ByteBuffer buf = ByteBuffer.allocate(1);
 	buf.put(SimpleSgsProtocol.LOGOUT_SUCCESS).
 	    flip();
-	writeToWriteHandler(buf);
-	acceptor.monitorDisconnection(this);
+	writeNow(buf, false);
+	monitorDisconnection();
     }
 
     /* -- Implement Channel -- */
@@ -369,10 +372,32 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void close() throws IOException {
-        asyncMsgChannel.close();
+    public void close() {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "closing channel, protocol:{0}", this);
+	}
+	if (isOpen()) {
+	    try {
+		asyncMsgChannel.close();
+	    } catch (IOException e) {
+	    }
+	}
 	readHandler = new ClosedReadHandler();
         writeHandler = new ClosedWriteHandler();
+	if (protocolHandler != null) {
+	    SessionProtocolHandler handler = protocolHandler;
+	    protocolHandler = null;
+	    handler.disconnect(new RequestHandler());
+	}
+    }
+
+    /* -- Object method overrides -- */
+    
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+	return getClass().getName() + "[" +
+	    (identity != null ? identity : "<unknown>") + "]";
     }
 
     /* -- Methods for reading and writing -- */
@@ -380,41 +405,55 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /**
      * Schedules an asynchronous task to resume reading.
      */
-    protected void scheduleReadOnReadHandler() {
+    protected final void scheduleRead() {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "scheduling read, protocol:{0}", this);
+	}
 	acceptor.scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
 		public void run() {
 		    logger.log(
 			Level.FINER, "resuming reads protocol:{0}", this);
-		    if (isOpen()) {
-			readHandler.read();
-		    }
+		    readNow();
 		} });
     }
 
     /**
-     * Writes a message to the write handler if login has been handled,
+     * Resumes reading from the underlying connection.
+     */
+    protected final void readNow() {
+	if (isOpen()) {
+	    readHandler.read();
+	} else {
+	    close();
+	}
+    }
+
+    /**
+     * Writes a message to the underlying connection if login has been handled,
      * otherwise enqueues the message to be sent when the login has not yet been
      * handled.
      *
      * @param	buf a buffer containing a complete protocol message
      */
-    private void writeOrEnqueueIfLoginNotHandled(ByteBuffer buf) {
+    protected final void write(ByteBuffer buf) {
 	synchronized (lock) {
 	    if (!loginHandled) {
 		messageQueue.add(buf);
 	    } else {
-		writeToWriteHandler(buf);
+		writeNow(buf, false);
 	    }
 	}
     }
     
     /**
-     * Writes a message to the write handler.
+     * Writes a message to the underlying connection.
      *
-     * @param	buf a buffer containing a complete protocol message
+     * @param	message a buffer containing a complete protocol message
+     * @param	flush if {@code true}, then set the {@code loginHandled}
+     *		flag to {@code true} and flush the message queue
      */
-    private void writeToWriteHandler(ByteBuffer message) {
+    protected final void writeNow(ByteBuffer message, boolean flush) {
 	try {
 	    writeHandler.write(message);
 		    
@@ -422,38 +461,45 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "writeToWriteHandler protocol:{0} throws", this);
+		    "writeNow protocol:{0} throws", this);
+	    }
+	}
+
+	if (flush) {
+	    synchronized (lock) {
+		loginHandled = true;
+		for (ByteBuffer nextMessage : messageQueue) {
+		    try {
+			writeHandler.write(nextMessage);
+		    } catch (RuntimeException e) {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.logThrow(
+				Level.WARNING, e,
+				"writeNow protocol:{0} throws", this);
+			}
+		    }
+		}
+		messageQueue.clear();
 	    }
 	}
     }
 
     /**
-     * Writes all enqueued messages to the write handler.
+     * Writes the specified buffer, satisfying the specified delivery
+     * requirement.
+     *
+     * <p>This implementation writes the buffer reliably, because this
+     * protocol only supports reliable delivery.
+     *
+     * <p>A subclass can override the {@code writeBuffer} method if it
+     * supports other delivery guarantees and can make use of alternate
+     * transports for those other delivery requirements.
+     *
+     * @param	buf a byte buffer containing a protocol message
+     * @param	delivery a delivery requirement
      */
-    private void flushMessageQueue() {
-	synchronized (lock) {
-	    loginHandled = true;
-	    for (ByteBuffer nextMessage : messageQueue) {
-		writeToWriteHandler(nextMessage);
-	    }
-	    messageQueue.clear();
-	}
-    }
-
-    /**
-     * Method to disconnect the connection.
-     */
-    private void disconnect() {
-        // If there is a handler it is up to them to close
-        // the connection
-	if (protocolHandler != null) {
-	    protocolHandler.disconnect(new RequestHandler());
-	} else {
-            try {
-                close();
-            } catch (IOException ignore) {
-	    }
-        }
+    protected void writeBuffer(ByteBuffer buf, Delivery delivery) {
+	write(buf);
     }
     
     /**
@@ -557,6 +603,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    "processQueue protocol:{0} size:{1,number,#} head={2}",
 		    SimpleSgsProtocolImpl.this, pendingWrites.size(),
 		    HexDumper.format(message, 0x50));
+		message.mark();
             }
             try {
                 asyncMsgChannel.write(message, this);
@@ -602,7 +649,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		synchronized (writeLock) {
 		    pendingWrites.clear();
 		}
-		disconnect();
+		close();
             }
         }
     }
@@ -665,7 +712,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-		    disconnect();
+		    close();
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
@@ -680,7 +727,18 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                 message.get(payload);
 
                 // Dispatch
-                bytesReceived(payload);
+		MessageBuffer msg = new MessageBuffer(payload);
+		byte opcode = msg.getByte();
+		
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"processing opcode 0x{0}",
+			Integer.toHexString(opcode));
+		}
+		
+		handleMessageReceived(opcode, msg);
+		
 
             } catch (Exception e) {
 
@@ -694,40 +752,42 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                         Level.FINE, e,
                         "Read completion exception {0}", asyncMsgChannel);
                 }
-                disconnect();
+                close();
             }
         }
+    }
 
-	/** Processes the received message. */
-        private void bytesReceived(byte[] buffer) {
-
-	    MessageBuffer msg = new MessageBuffer(buffer);
-	    byte opcode = msg.getByte();
-
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
- 		    Level.FINEST,
-		    "processing opcode 0x{0}",
-		    Integer.toHexString(opcode));
-	    }
-	    
-	    switch (opcode) {
+    /**
+     * Processes the received message.  This implementation processes
+     * opcodes for {@code SimpleSgsProtocol} version {@code 0x04}.  A
+     * subclass can override this implementation to process additional
+     * opcodes, and then delegate to this implementation to process the
+     * version {@code 0x04} opcodes.
+     *
+     * @param	opcode the message opcode
+     * @param	msg a message buffer containing the entire message, but
+     *		with the position advanced to the payload (just after the
+     *		opcode)
+     */
+    protected void handleMessageReceived(byte opcode, MessageBuffer msg) {
+		
+	switch (opcode) {
 		
 	    case SimpleSgsProtocol.LOGIN_REQUEST:
 
-	        byte version = msg.getByte();
-	        if (version != SimpleSgsProtocol.VERSION) {
+		byte version = msg.getByte();
+	        if (version != getProtocolVersion()) {
 	            if (logger.isLoggable(Level.SEVERE)) {
 	                logger.log(Level.SEVERE,
 	                    "got protocol version:{0}, " +
-	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
+			    "expected {1}", version, getProtocolVersion());
 	            }
-		    disconnect();
+		    close();
 	            break;
 	        }
 
-		final String name = msg.getString();
-		final String password = msg.getString();
+		String name = msg.getString();
+		String password = msg.getString();
 
 		try {
 		    identity = acceptor.authenticate(name, password);
@@ -744,10 +804,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
  		    identity, SimpleSgsProtocolImpl.this, new LoginHandler());
 		
                 // Resume reading immediately
-		read();
+		readNow();
 
 		break;
-		
+
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		ByteBuffer clientMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
@@ -792,19 +852,15 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    channelRefId, channelMessage, new RequestHandler());
 		break;
 
-
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		if (protocolHandler == null) {
-		    try {
-			close();
-		    } catch (IOException ignore) {
-		    }
+		    close();
 		    return;
 		}
 		protocolHandler.logoutRequest(new LogoutHandler());
 
 		// Resume reading immediately
-                read();
+                readNow();
 
 		break;
 		
@@ -815,12 +871,20 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 			"unknown opcode 0x{0}",
 			Integer.toHexString(opcode));
 		}
-		disconnect();
+		close();
 		break;
-	    }
 	}
     }
 
+    /**
+     * Monitors the client's disconnection and closes this instance's
+     * underlying connection if the client hasn't closed the connection in
+     * a timely fashion.
+     */
+    protected void monitorDisconnection() {
+	acceptor.monitorDisconnection(this);	
+    }
+    
     /**
      * A completion handler that is notified when the associated login
      * request has completed processing. 
@@ -892,13 +956,32 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	public void completed(Future<Void> future) {
 	    try {
 		future.get();
+	    } catch (ExecutionException e) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.logThrow(
+			Level.FINE, e, "Obtaining request result throws ");
+		}
+
+		Throwable cause = e.getCause();
+		if (cause instanceof RequestFailureException) {
+		    FailureReason reason =
+			((RequestFailureException) cause).getReason();
+		    if (reason.equals(FailureReason.DISCONNECT_PENDING)) {
+			// Don't read any more from client because session
+			// is disconnecting.
+			return;
+		    }
+		    // Assume other failures are transient.
+		}
+
 	    } catch (Exception e) {
+		// TBD: Unknown exception: disconnect?
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e, "Obtaining request result throws ");
 		}
 	    }
-	    scheduleReadOnReadHandler();
+	    scheduleRead();
 	}
     }
     

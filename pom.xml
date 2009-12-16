@@ -437,7 +437,7 @@
 
   <properties>
     <sgs.version>${version}</sgs.version>
-    <sgs-shared.version>1.9</sgs-shared.version>
+    <sgs-shared.version>1.10</sgs-shared.version>
     <sgs-client.version>0.9.10</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>

@@ -63,6 +63,20 @@ import javax.security.auth.login.LoginException;
  *      specified transport must support {@link Delivery#RELIABLE}.<p>
  *
  * <dt> <i>Property:</i> <code><b>
+ *	{@value #PROTOCOL_VERSION_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_PROTOCOL_VERSION}
+ *
+ * <dd style="padding-top: .5em">Specifies the <code>SimpleSgsProtocol</code>
+ *	version for this acceptor's connections. Valid values for the protocol
+ *	version are <b><code>0x05</code></b> which supports client session
+ *	relocation, and <b><code>0x04</code></b> (the default), which does not
+ *	support client session relocation but is compatible with clients
+ *	using the older protocol version.  Protocol version
+ *	<b><code>0x05</code></b> is incompatible with clients using
+ *	protocol version <b><code>0x04</code></b>.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
  *	{@value #READ_BUFFER_SIZE_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_READ_BUFFER_SIZE}<br>
@@ -106,6 +120,12 @@ public class SimpleSgsProtocolAcceptor
     public static final String READ_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".read.buffer.size";
 
+    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE}. */
+    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
+    
+    /** The minimum read buffer size value. */
+    public static final int MIN_READ_BUFFER_SIZE = 8192;
+    
     /**
      * The transport property. The specified transport must support
      * RELIABLE delivery.
@@ -116,13 +136,17 @@ public class SimpleSgsProtocolAcceptor
     /** The default transport. */
     public static final String DEFAULT_TRANSPORT =
         "com.sun.sgs.impl.transport.tcp.TcpTransport";
+
+    /** The protocol version property.  Valid values are 4 and 5. */
+    public static final String PROTOCOL_VERSION_PROPERTY =
+	PKG_NAME + ".protocol.version";
+
+    /** The protocol version 4. */
+    public static final int PROTOCOL4 = 4;
+
+    /** The default protocol version: {@value #DEFAULT_PROTOCOL_VERSION}. */
+    public static final int DEFAULT_PROTOCOL_VERSION = PROTOCOL4;
             
-    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE}. */
-    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
-    
-    /** The minimum read buffer size value. */
-    public static final int MIN_READ_BUFFER_SIZE = 8192;
-    
     /** The name of the disconnect delay property. */
     public static final String DISCONNECT_DELAY_PROPERTY =
 	PKG_NAME + ".disconnect.delay";
@@ -146,6 +170,9 @@ public class SimpleSgsProtocolAcceptor
     
     /** The disconnect delay (in milliseconds) for disconnecting sessions. */
     private final long disconnectDelay;
+
+    /** The {@code SimpleSgsProtocol} version for the protocol impl. */
+    private final int protocolVersion;
 
     /** The protocol descriptor. */
     private ProtocolDescriptor protocolDesc;
@@ -214,7 +241,12 @@ public class SimpleSgsProtocolAcceptor
                 wrappedProps.getClassInstanceProperty(
 		    TRANSPORT_PROPERTY, DEFAULT_TRANSPORT, Transport.class,
 		    new Class[] {Properties.class}, properties);
-            
+
+	    protocolVersion =
+		wrappedProps.getIntProperty(
+		PROTOCOL_VERSION_PROPERTY, DEFAULT_PROTOCOL_VERSION,
+		PROTOCOL4, SimpleSgsProtocol.VERSION);
+
             if (!transport.getDelivery().equals(Delivery.RELIABLE)) {
                 transport.shutdown();
                 throw new IllegalArgumentException(
@@ -242,6 +274,8 @@ public class SimpleSgsProtocolAcceptor
 
             logger.log(Level.CONFIG,
                        "Created SimpleSgsProtocolAcceptor with properties:" +
+		       "\n  " + PROTOCOL_VERSION_PROPERTY + "=" +
+		       protocolVersion +
                        "\n  " + DISCONNECT_DELAY_PROPERTY + "=" +
                        disconnectDelay +
                        "\n  " + READ_BUFFER_SIZE_PROPERTY + "=" +
@@ -249,7 +283,7 @@ public class SimpleSgsProtocolAcceptor
                        "\n  " + TRANSPORT_PROPERTY + "=" +
                        transport.getClass().getName());
 	    
-	} catch (Exception e) {
+	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
 		    Level.CONFIG, e,
@@ -320,10 +354,15 @@ public class SimpleSgsProtocolAcceptor
         public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
-            new SimpleSgsProtocolImpl(protocolListener,
-                                      SimpleSgsProtocolAcceptor.this,
-                                      byteChannel,
-                                      readBufferSize);
+	    if (protocolVersion == PROTOCOL4) {
+		new SimpleSgsProtocolImpl(
+		    protocolListener, SimpleSgsProtocolAcceptor.this,
+		    byteChannel, readBufferSize);
+	    } else /* latest SimpleSgsProtocol version */ {
+		new SimpleSgsRelocationProtocolImpl(
+		    protocolListener, SimpleSgsProtocolAcceptor.this,
+		    byteChannel, readBufferSize);
+	    }
         }
 
         /** {@inheritDoc} */

@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
@@ -32,19 +33,21 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.impl.service.channel.ChannelServer.MembershipStatus;
+import com.sun.sgs.impl.service.channel.ChannelServiceImpl.MembershipEventType;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
-import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BindingKeyedCollections;
 import com.sun.sgs.impl.util.BindingKeyedMap;
-import com.sun.sgs.impl.util.BindingKeyedSet;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.impl.util.KernelCallable;
 import com.sun.sgs.impl.util.ManagedQueue;
+import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
@@ -56,14 +59,19 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import static com.sun.sgs.impl.service.channel.ChannelServiceImpl.
+    getObjectForId;
 
 /**
  * Channel implementation for use within a single transaction.
@@ -93,25 +101,27 @@ import java.util.logging.Logger;
  * 	determine which channels are coordinated on a failed node so that
  * 	each channel can be reassigned a new coordinator.<p>
  *
- * <dt> <i>Set:</i> <b><code>sessionSet</code></b><br>
+ * <dt> <i>Map:</i> <b><code>savedMessagesMap</code></b> <br>
  *	<i>Prefix:</i> <code>{@value
- *	#SESSION_SET_PREFIX}<i>channelId.nodeId.</i></code> <br>
- *	<i>Element:</i> <i>{@code sessionId}</i> (as {@code BigInteger})
+ *	#SAVED_MESSAGES_MAP_PREFIX}<i>channelId.</i></code> <br>
+ *	<i>Key:</i> <i>{@code timestamp}</i> (as string form of
+ *	{@code Long})<br>
+ *	<i>Value:</i> <b>{@code ChannelMessageInfo}</b>
  *
- * <dd style="padding-top: .5em">Set containing the IDs of a channel's
- *	member sessions connected to a given node.  All members of a given
- * 	channel can be accessed using a set with the prefix {@value
- * 	#SESSION_SET_PREFIX}<i>{@code channelId.}</i><p>
- *
+ * <dd style="padding-top: .5em">Map for accessing saved messages for a
+ *	given channel by timestamp.  The map is used when a client
+ *	session relocates to a new node and the channel service discovers
+ *	that the session missed one or more channel messages during
+ *	relocation.<p> 
  * </dl> <p>
  */
-abstract class ChannelImpl implements ManagedObject, Serializable {
+final class ChannelImpl implements ManagedObject, Serializable {
 
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
     /** The logger for this class. */
-    protected static final LoggerWrapper logger =
+    private static final LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
 
@@ -124,8 +134,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** An event queue map prefix. */
     static final String EVENT_QUEUE_MAP_PREFIX = PKG_NAME + "eventQueue.";
 
-    /** A prefix for a channel's session set. */
-    static final String SESSION_SET_PREFIX = PKG_NAME + "session.";
+    /** The saved messages map prefix. */
+    static final String SAVED_MESSAGES_MAP_PREFIX = PKG_NAME + "message.";
+
+    /** The empty channel membership set. */
+    static final Set<BigInteger> EMPTY_CHANNEL_MEMBERSHIP =
+	Collections.emptySet();
 
     /** The random number generator for choosing a new coordinator. */
     private static final Random random = new Random();
@@ -134,10 +148,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static BindingKeyedMap<ChannelImpl> channelsMap = null;
 
     /** The channel name. */
-    protected final String name;
+    private final String name;
 
     /** The ID from a managed reference to this instance. */
-    protected final BigInteger channelRefId;
+    final BigInteger channelRefId;
 
     /** The wrapped channel instance. */
     private final ManagedReference<ChannelWrapper> wrappedChannelRef;
@@ -146,7 +160,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private final ManagedReference<ChannelListener> listenerRef;
 
     /** The delivery requirement for messages sent on this channel. */
-    protected final Delivery delivery;
+    private final Delivery delivery;
 
     /** The node IDs of ChannelServers that have locally connected
      * members of this channel. */
@@ -160,6 +174,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * members.
      */
     private long coordNodeId;
+
+    /** Indicates whether this coordinator is reassigned so that some
+     *  actions can be performed by the new coordinator. */
+    private boolean isCoordinatorReassigned;
 
     /** The transaction. */
     private transient Transaction txn;
@@ -184,16 +202,19 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Constructs an instance of this class with the specified
-     * {@code name}, {@code listener}, {@code delivery} guarantee.
-     * and write buffer capacity.
+     * {@code name}, {@code listener}, {@code delivery} guarantee,
+     * write buffer capacity, and channel wrapper.
      *
      * @param name a channel name
      * @param listener a channel listener
      * @param delivery a delivery guarantee
      * @param writeBufferCapacity the capacity of the write buffer, in bytes
+     * @param channelWrapper the previous channel wrapper, or {@code null} if
+     *	      the channel is being created for the first time
      */
-    protected ChannelImpl(String name, ChannelListener listener,
-			  Delivery delivery, int writeBufferCapacity)
+    private ChannelImpl(String name, ChannelListener listener,
+			  Delivery delivery, int writeBufferCapacity,
+			  ChannelWrapper channelWrapper)
     {
 	if (name == null) {
 	    throw new NullPointerException("null name");
@@ -214,24 +235,28 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	this.writeBufferCapacity = writeBufferCapacity;
 	this.txn = ChannelServiceImpl.getTransaction();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
-	this.wrappedChannelRef =
-	    dataService.createReference(new ChannelWrapper(ref));
+	if (channelWrapper == null) {
+	    channelWrapper = new ChannelWrapper(ref);
+	} else {
+	    channelWrapper.setChannelRef(ref);
+	}
+	this.wrappedChannelRef = dataService.createReference(channelWrapper);
 	this.channelRefId = ref.getId();
 	this.coordNodeId = getLocalNodeId();
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "Created ChannelImpl:{0}",
-		       HexDumper.toHexString(channelRefId.toByteArray()));
+		       HexDumper.toHexString(channelRefId));
 	}
-	getChannelsMap().put(name, this);
+	getChannelsMap().putOverride(name, this);
 	EventQueue eventQueue = new EventQueue(this);
 	eventQueueRef = dataService.createReference(eventQueue);
 	getEventQueuesMap(coordNodeId).
 	    put(channelRefId.toString(), eventQueue);
     }
-
+    
     /** Returns the data service. */
     private static DataService getDataService() {
-	return ChannelServiceImpl.getDataService();
+	return ChannelServiceImpl.getInstance().getDataService();
     }
 
     /**
@@ -268,15 +293,28 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			       Delivery delivery,
                                int writeBufferCapacity)
     {
+	return newInstance(name, listener, delivery, writeBufferCapacity, null);
+    }
+    
+    /**
+     * Constructs a new {@code Channel} with the given {@code name}, {@code
+     * listener}, {@code delivery} guarantee, write-buffer capacity and
+     * {@code channelWrapper}.  If the {@code channelWrapper} is null,
+     * then this is a newly-created channel.  Otherwise, the channel is
+     * being "recreated" due to a "leaveAll" event.
+     */
+    private static Channel newInstance(String name,
+				       ChannelListener listener,
+				       Delivery delivery,
+				       int writeBufferCapacity,
+				       ChannelWrapper channelWrapper)
+    {
 	ChannelImpl channel =
-	    delivery.equals(Delivery.UNRELIABLE) ?
-	    new UnreliableChannel(name, listener, delivery,
-				  writeBufferCapacity) :
-	    new OrderedChannel(name, listener, delivery,
-				writeBufferCapacity);
+	    new ChannelImpl(name, listener, delivery,
+			    writeBufferCapacity, channelWrapper);
 	return channel.getWrappedChannel();
     }
-
+    
     /**
      * Returns a channel with the given {@code name}.
      */
@@ -319,7 +357,20 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** Implements {@link Channel#getSessions}. */
     Iterator<ClientSession> getSessions() {
 	checkClosed();
-	return new ClientSessionIterator(channelRefId);
+
+	Set<BigInteger> channelMembers = null;
+	
+	if (!servers.isEmpty()) {
+	    channelMembers =
+		ChannelServiceImpl.getInstance().collectChannelMembership(
+		    txn, channelRefId, servers);
+	}
+
+	return
+	    new ClientSessionIterator(
+		channelMembers != null ?
+		channelMembers :
+		EMPTY_CHANNEL_MEMBERSHIP);
     }
 
     /** Implements {@link Channel#join(ClientSession)}. */
@@ -335,12 +386,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue join request with underlying (unwrapped) client
 	     * session object.
 	     */
-	    addEvent(new JoinEvent(unwrapSession(session)));
+	    updateMaxMessageLength(session);
+	    addEvent(
+		new JoinEvent(unwrapSession(session), eventQueueRef.get()));
 
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "join throws");
+	    logger.logThrow(Level.FINE, e, "join throws");
 	    throw e;
 	}
     }
@@ -372,17 +425,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    /*
 	     * Enqueue join requests, each with underlying (unwrapped)
 	     * client session object.
-	     *
-	     * TBD: (optimization) add a single event instead of one for
-	     * each session.
 	     */
+	    EventQueue eventQueue = eventQueueRef.get();
 	    for (ClientSession session : sessions) {
-		addEvent(new JoinEvent(unwrapSession(session)));
+		updateMaxMessageLength(session);
+		addEvent(new JoinEvent(unwrapSession(session), eventQueue));
 	    }
 	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "join throws");
+	    logger.logThrow(Level.FINE, e, "join throws");
 	    throw e;
 	}
     }
@@ -406,7 +458,33 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    " does not support delivery guarantee",
 	    delivery);
     }
-    
+
+    /**
+     * Sets the channel's maximum message length to the client session's
+     * maximum message length if the session's maximum is lower than the
+     * existing maximum for the channel.
+     *
+     * @param	session a client session joining the channel
+     */
+    private void updateMaxMessageLength(ClientSession session) {
+	int sessionMaxMessageLength = session.getMaxMessageLength();
+	if (maxMessageLength > sessionMaxMessageLength) {
+	    getDataService().markForUpdate(this);
+	    maxMessageLength = sessionMaxMessageLength;
+	}
+    }
+
+    /**
+     * Returns the message timestamp of the last message processed by
+     * this channel.
+     *
+     * @return the current message timestamp processed by this
+     * channel's event queue
+     */
+    long getCurrentMessageTimestamp() {
+	return eventQueueRef.get().currentTimestamp;
+    }
+
     /**
      * Returns the underlying {@code ClientSession} for the specified
      * {@code session}.  Note: The client session service wraps each client
@@ -427,20 +505,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Adds the specified channel {@code event} to this channel's event queue
      * and notifies the coordinator that there is an event to service.  As
      * an optimization, if the local node is the coordinator for this channel
-     * and the event queue is empty, then service the event immediately
-     * without adding it to the event queue.
+     * and the event queue is empty, then service the event immediately.
      */
-    protected void addEvent(ChannelEvent event) {
+    private void addEvent(ChannelEvent event) {
 
 	EventQueue eventQueue = eventQueueRef.get();
 
-	if (isCoordinator() && eventQueue.isEmpty()) {
-	    // TBD: This invocation circumvents the write buffer capacity
-	    // check in the EventQueue.offer method.  Is this OK?
-	    event.serviceEvent(this);
-	} else if (eventQueue.offer(event)) {
-	    notifyServiceEventQueue(eventQueue);
-	} else {
+	if (!eventQueue.offer(event, this)) {
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add channel event");
 	}
@@ -456,7 +527,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private void notifyServiceEventQueue(EventQueue eventQueue) {
 
 	if (isCoordinator()) {
-	    eventQueue.serviceEvent();
+	    eventQueue.serviceEventQueue();
 
 	} else {
 
@@ -473,8 +544,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    final long coord = coordNodeId;
 	    final ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
-	    final BigInteger channelRefId = eventQueue.getChannelRefId();
+		ChannelServiceImpl.getInstance();
 	    channelService.getTaskService().scheduleNonDurableTask(
 	        new AbstractKernelRunnable("SendServiceEventQueue") {
 		  public void run() {
@@ -504,11 +574,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue leave request with underlying (unwrapped) client
 	     * session object.
 	     */
-	    addEvent(new LeaveEvent(unwrapSession(session)));
+	    addEvent(
+		new LeaveEvent(unwrapSession(session), eventQueueRef.get()));
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "leave throws");
+	    logger.logThrow(Level.FINE, e, "leave throws");
 	    throw e;
 	}
     }
@@ -528,43 +599,43 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    /*
 	     * Enqueue leave requests, each with underlying (unwrapped)
 	     * client session object.
-	     *
-	     * TBD: (optimization) add a single event instead of one for
-	     * each session.
 	     */
 	    for (ClientSession session : sessions) {
-		addEvent(new LeaveEvent(unwrapSession(session)));
+		addEvent(new LeaveEvent(unwrapSession(session),
+					eventQueueRef.get()));
 	    }
 	    logger.log(Level.FINEST, "leave sessions:{0} returns", sessions);
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "leave throws");
+	    logger.logThrow(Level.FINE, e, "leave throws");
 	    throw e;
 	}
     }
 
     /** Implements {@link Channel#leaveAll}.
      *
-     * Enqueues a leaveAll event to this channel's event queue and notifies
-     * this channel's coordinator to service the event.
+     * Closes the current channel, and creates a new channel (with a new
+     * channel ID) that uses the existing channel's wrapper.  Since the
+     * application still uses the same channel wrapper for this channel,
+     * the application is not effected.
      */
     void leaveAll() {
 	try {
 	    checkClosed();
-
-	    /*
-	     * Enqueue leaveAll request.
-	     */
-	    addEvent(new LeaveAllEvent());
+	    close(false);
+	    ChannelListener listener =
+		listenerRef != null ? listenerRef.get() : null;
+	    newInstance(name, listener, delivery, writeBufferCapacity,
+			getWrappedChannel());
 	    logger.log(Level.FINEST, "leaveAll returns");
-
+	
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "leave throws");
+	    logger.logThrow(Level.FINE, e, "leaveAll throws");
 	    throw e;
 	}
     }
-
-    /** Implements {@link Channel#send}.
+    
+    /** Implements {@link Channel#send(ClientSession,ByteBuffer)}.
      *
      * Enqueues a send event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
@@ -591,7 +662,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		sender != null ?
 		getSessionRefId(unwrapSession(sender)) :
 		null;
-	    handleSendEvent(new SendEvent(senderRefId, msgBytes));
+	    boolean isChannelMember =
+		senderRefId != null ?
+		ChannelServiceImpl.getInstance().
+		    isLocalChannelMember(channelRefId, senderRefId) :
+		true;
+	    addEvent(
+		new SendEvent(senderRefId, msgBytes, eventQueueRef.get(),
+			      isChannelMember));
+
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
@@ -599,24 +678,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
+	    if (logger.isLoggable(Level.FINE)) {
 		logger.logThrow(
-		    Level.FINEST, e, "send channel:{0} message:{1} throws",
+		    Level.FINE, e, "send channel:{0} message:{1} throws",
 		    this, HexDumper.format(message, 0x50));
 	    }
 	    throw e;
 	}
     }
-
-    /**
-     * Handles a send event containing a message and a sender (which may be
-     * {@code null}.  A subclass should handle the send event according to
-     * the channel's delivery guarantee.
-     *
-     * @param	sendEvent a send event
-     */
-    protected abstract void handleSendEvent(SendEvent sendEvent);
-
+    
     /**
      * If this channel has a null {@code ChannelListener}, forwards the
      * specified {@code message} to the channel by invoking this channel's
@@ -632,7 +702,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	if (listenerRef == null) {
 	    send(sender, message);
 	} else {
-	    // TBD: exception handling?
 	    listenerRef.get().receivedMessage(
 		getWrappedChannel(), sender, message.asReadOnlyBuffer());
 	}
@@ -640,18 +709,25 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Enqueues a close event to this channel's event queue and notifies
-     * this channel's coordinator to service the event.  This method
-     * is invoked by this channel's {@code ChannelWrapper} when the
-     * application removes the wrapper object.
+     * this channel's coordinator to service the event.  This method is
+     * invoked with {@code true} by this channel's {@code ChannelWrapper}
+     * when the application removes the wrapper object, and is invoked with
+     * {@code false} by this channel when the application invokes the
+     * {@link #leaveAll} method.
+     *
+     * @param	removeName if {@code true}, the channel's name binding
+     *		is removed when the channel's persistent structures
+     *		are cleaned up, otherwise, the channel's name binding is
+     *		not removed
      */
-    void close() {
+    void close(boolean removeName) {
 	checkContext();
 	getDataService().markForUpdate(this);
 	if (!isClosed) {
 	    /*
 	     * Enqueue close event.
 	     */
-	    addEvent(new CloseEvent());
+	    addEvent(new CloseEvent(removeName, eventQueueRef.get()));
 	    isClosed = true;
 	}
     }
@@ -679,7 +755,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     @Override
     public String toString() {
 	return getClass().getName() +
-	    "[" + HexDumper.toHexString(channelRefId.toByteArray()) + "]";
+	    "[" + HexDumper.toHexString(channelRefId) + "]";
     }
 
     /* -- Serialization methods -- */
@@ -698,6 +774,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /* -- Other methods -- */
 
     /**
+     * Returns the write buffer capacity for this channel.
+     *
+     * @return the write buffer capacity
+     */
+    private int getWriteBufferCapacity() {
+        return writeBufferCapacity;
+    }
+
+    /**
      * Returns the ID for the specified {@code session}.
      */
     private static BigInteger getSessionRefId(ClientSession session) {
@@ -705,22 +790,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the node ID for the specified  {@code session}.
+     * Returns the node ID for the specified {@code session}.  If the
+     * session is relocating, this method returns the node ID that
+     * the session is relocating to.
      */
-    private static long getNodeId(ClientSession session) {
-	if (session instanceof NodeAssignment) {
-	    return ((NodeAssignment) session).getNodeId();
-	} else {
-	    throw new IllegalArgumentException(
-		"session does not implement NodeAssignment: " +
-		session.getClass());
-	}
+    private static long getNodeId(ClientSessionImpl session) {
+	return
+	    session.isRelocating() ?
+	    session.getRelocatingToNodeId() :
+	    session.getNodeId();
     }
 
     /**
      * Returns the wrapped channel for this instance.
      */
-    protected ChannelWrapper getWrappedChannel() {
+    private ChannelWrapper getWrappedChannel() {
 	return wrappedChannelRef.get();
     }
 
@@ -730,6 +814,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private void checkContext() {
 	ChannelServiceImpl.checkTransaction(txn);
+    }
+
+    /**
+     * Returns {@code true} if the channel is closed, and {@code false}
+     * otherwise.
+     */
+    boolean isClosed() {
+	return isClosed;
     }
 
     /**
@@ -748,21 +840,31 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns {@code true} if this node is the coordinator for this
      * channel, otherwise returns {@code false}.
      */
-    private boolean isCoordinator() {
+    boolean isCoordinator() {
 	return coordNodeId == getLocalNodeId();
     }
 
     /**
-     * Returns a new {@code BindingKeyedSet} with the specified {@code
-     * keyPrefix}.
-     *
-     * @param	<V> the value type
-     * @param	keyPrefix a key prefix for the set's service bindings
-     * @return	a new {@code BindingKeyedSet}
+     * Returns {@code true} if the local node is the coordinator for this
+     * channel, and returns {@code false} otherwise.  If the coordinator
+     * was just reassigned to this node (i.e., the {@code
+     * isCoordinatorReassigned} field is {@code true}) and this channel
+     * supports reliable message delivery, then schedule a new task to reap
+     * saved messages.
      */
-    private static <V> BindingKeyedSet<V> newSet(String keyPrefix) {
-	return ChannelServiceImpl.getCollectionsFactory().
-	    newSet(keyPrefix);
+    private boolean checkCoordinator() {
+	if (!isCoordinator()) {
+	    return false;
+	} else {
+	    if (isCoordinatorReassigned) {
+	        getDataService().markForUpdate(this);
+		if (isReliable()) {
+		    SavedMessageReaper.scheduleNewTask(channelRefId, false);
+		}
+		isCoordinatorReassigned = false;
+	    }
+	    return true;
+	}
     }
 
     /**
@@ -777,82 +879,244 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	return ChannelServiceImpl.getCollectionsFactory().
 	    newMap(keyPrefix);
     }
+
     /**
-     * Returns the sessions set for the specified {@code nodeId}, creating
-     * one if not already present.
+     * Adds the specified {@code nodeId} to the set of server nodes for
+     * this channel.
+     *
+     * @param	nodeId a server node's ID
      */
-    private Set<BigInteger> getOrCreateSessionSet(long nodeId) {
+    void addServerNodeId(long nodeId) {
+	checkClosed();
 	if (servers.add(nodeId)) {
 	    getDataService().markForUpdate(this);
 	}
-	return getSessionSet(nodeId);
     }
     
     /**
-     * Returns the sessions set for the specified {@code nodeId}.
-     */
-    private Set<BigInteger> getSessionSet(long nodeId) {
-	return
-	    newSet(
-		SESSION_SET_PREFIX +
-		channelRefId.toString() + "." +
-		Long.toString(nodeId) + ".");
-    }
-
-    /**
-     * Removes the sessions set for the specified {@code nodeId}.
-     */
-    private void removeSessionSet(long nodeId) {
-	getSessionSet(nodeId).clear();
-	getDataService().markForUpdate(this);
-	servers.remove(nodeId);
-    }
-
-    /**
-     * If the specified {@code session} is not already a member of
-     * this channel, adds the session to this channel and
-     * returns {@code true}; otherwise if the specified {@code
-     * session} is already a member of this channel, returns {@code
-     * false}.
+     * Removes the specified {@code nodeId} from the set of server nodes
+     * for this channel.
      *
-     * @return	{@code true} if the session was added to the channel,
-     *		and {@code false} if the session is already a member
+     * @param	nodeId a server node's ID
      */
-    private boolean addSession(ClientSession session) {
-	boolean sessionAdded = 
-	    getOrCreateSessionSet(getNodeId(session)).
-	        add(getSessionRefId(session));
-        if (sessionAdded && session.getMaxMessageLength() < maxMessageLength) {
-            maxMessageLength = session.getMaxMessageLength();
-        }
-	return sessionAdded;
+    void removeServerNodeId(long nodeId) {
+	if (servers.remove(nodeId)) {
+	    getDataService().markForUpdate(this);
+	}
     }
 
     /**
-     * Removes from this channel the member session with the specified
-     * {@code sessionRefId} that is connected to the node with the
-     * specified {@code nodeId}, notifies the session's server that the
-     * session left the channel, and returns {@code true} if the
-     * session was a member of this channel when this method was
-     * invoked.  If the session is not a member of this channel, then no
-     * action is taken and {@code false} is returned.
+     * Returns the map of saved messages for this channel, for looking up
+     * messages by timestamp.
      */
-    private boolean removeSession(
-	final long nodeId, final BigInteger sessionRefId)
+    private static BindingKeyedMap<ChannelMessageInfo>
+	getSavedMessagesMap(BigInteger channelRefId)
     {
-	Set<BigInteger> sessionSet = getSessionSet(nodeId);
-	if (sessionSet != null) {
-	    if (sessionSet.remove(sessionRefId)) {
-		sendLeaveNotification(nodeId, sessionRefId);
-		if (sessionSet.isEmpty()) {
-		    removeSessionSet(nodeId);
+	return newMap(SAVED_MESSAGES_MAP_PREFIX + channelRefId + ".");
+    }
+
+    /**
+     * Saves the specified channel {@code message} with the specified
+     * {@code timestamp}. Reliable messages are saved for a period of time
+     * (the length of time it takes to move a client session) so that
+     * channel messages missed during relocation can be obtained and
+     * delivered to a relocated client session.
+     */
+    private void saveMessage(byte[] message, long timestamp) {
+	assert isReliable();
+	BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
+	    getSavedMessagesMap(channelRefId);
+	ChannelMessageInfo messageInfo =
+	    new ChannelMessageInfo(message, timestamp);
+	savedMessagesMap.put(getTimestampEncoding(timestamp), messageInfo);
+    }
+
+    /**
+     * Returns a list containing saved channel messages (if any) with
+     * timestamps between {@code fromTimestamp} and {@code toTimestamp}
+     * inclusive.  If {@code fromTimestamp} is greater than {@code
+     * toTimestamp} this method returns {@code null}.
+     */
+    List<ChannelMessageInfo> getChannelMessages(
+	long fromTimestamp, long toTimestamp)
+    {
+	assert isReliable();
+	List<ChannelMessageInfo> messages = null;
+	if (fromTimestamp <= toTimestamp) {
+	    messages = new ArrayList<ChannelMessageInfo>(
+			    (int) (toTimestamp - fromTimestamp + 1));
+	    BindingKeyedMap<ChannelMessageInfo> savedMessagesMap =
+		getSavedMessagesMap(channelRefId);
+	    for (long ts = fromTimestamp; ts <= toTimestamp; ts++) {
+		ChannelMessageInfo messageInfo =
+		    savedMessagesMap.get(getTimestampEncoding(ts));
+		if (messageInfo != null) {
+		    messages.add(messageInfo);
 		}
-		return true;
 	    }
 	}
-	return false;
+	return messages;
     }
 
+    /**
+     * Returns an encoding for the specified {@code timestamp}
+     * that preserves ascending timestamp order with
+     * lexicographically-ordered keys.  The encoding consists
+     * of the following:
+     * 
+     * <ul>
+     * <li> a single hex digit whose value is one less than the number of
+     *      hex digits (leading zero digits are not included),
+     * <li> a hyphen,
+     * <li> the hex encoding of the timestamp with leading zero digits
+     *      stripped.
+     * </ul>
+     */
+    private static String getTimestampEncoding(long timestamp) {
+	String hexString = Long.toHexString(timestamp);
+	int numHexits =  hexString.length();
+	StringBuilder builder = new StringBuilder(2 + numHexits);
+	builder.
+	    append(Character.forDigit(numHexits - 1, 16)).
+	    append('-').
+	    append(hexString);
+	return builder.toString();
+    }
+    
+    /**
+     * Contains a saved channel message with its associated timestamp
+     * and expiration time.
+     */
+    static class ChannelMessageInfo
+	implements ManagedObject, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+	/** The channel message. */
+	final byte[] message;
+	/** The message timestamp. */
+	final long timestamp;
+	/** The message's expiration time. */
+	private final long expiration;
+
+	/**
+	 * Constructs an instance with the specified {@code message}
+	 * and {@code timestamp}.
+	 */
+	ChannelMessageInfo(byte[] message, long timestamp) {
+	    this.message = message;
+	    this.timestamp = timestamp;
+	    this.expiration =
+		System.currentTimeMillis() +
+		ChannelServiceImpl.getInstance().sessionRelocationTimeout;
+	}
+
+	/**
+	 * Returns {@code true} if the channel message has expired
+	 * (that is, its expiration time has passed).
+	 */
+	boolean isExpired() {
+	    return expiration <= System.currentTimeMillis();
+	}
+    }
+
+    /**
+     * A (periodic) task to reap messages saved past their expiration time.
+     */
+    private static final class SavedMessageReaper
+	implements KernelRunnable, Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+	
+	/** The channel's ID. */
+	private final BigInteger channelRefId;
+	/** Indicates whether this task is durable. */
+	private final boolean isDurable;
+
+	/**
+	 * Constructs an instance with the specified {@code channelRefId}.
+	 * Use the {@code scheduleNewTask} method to construct an instance and
+	 * schedule the instance as a periodic task.
+	 */
+	private SavedMessageReaper(BigInteger channelRefId, boolean isDurable) {
+	    this.channelRefId = channelRefId;
+	    this.isDurable = isDurable;
+	}
+
+	/** {@inheritDoc} */
+	public String getBaseTaskType() {
+	    return getClass().getName();
+	}
+	
+	/**
+	 * Iterates through the saved message map, removing messages
+	 * saved past their expiration time.  Iteration over a {@code
+	 * BindingKeyedMap} returns bindings in lexicographical order.
+	 * Timestamps are encoded to preserve ascending timestamp order
+	 * with lexicographically-ordered keys, so the messages will be
+	 * returned in ascending timestamp order.
+	 */
+	public void run() {
+	    BindingKeyedMap<ChannelMessageInfo> savedMessages =
+		getSavedMessagesMap(channelRefId);
+	    if (savedMessages.isEmpty()) {
+		// Saved messages no longer exist, so "cancel" periodic task.
+		return;
+	    } else {
+		// Remove messages saved past their expiration time.
+		DataService dataService = getDataService();
+		TaskManager taskManager = AppContext.getTaskManager();
+		Iterator<ChannelMessageInfo> iter =
+		    savedMessages.values().iterator();
+		while (taskManager.shouldContinue() && iter.hasNext()) {
+		    ChannelMessageInfo messageInfo = iter.next();
+		    if (messageInfo.isExpired()) {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(
+				Level.FINEST,
+				"Removing saved message, channel:{0} " +
+				"timestamp:{1}",
+				HexDumper.toHexString(channelRefId),
+				messageInfo.timestamp);
+			}
+			iter.remove();
+			dataService.removeObject(messageInfo);
+		    } else {
+			break;
+		    }
+		}
+		if (!savedMessages.isEmpty()) {
+		    scheduleTask();
+		}
+	    }
+	}
+
+	private void scheduleTask() {
+	    TaskService taskService = 
+		ChannelServiceImpl.getTaskService();
+	    if (isDurable) {
+		taskService.scheduleTask(this, 1000L);
+	    } else {
+		taskService.scheduleNonDurableTask(this, 1000L, true);
+	    }
+	}
+
+	/**
+	 * Creates a new message reaper and schedules it to run.
+	 *
+	 * @param channelRefId a channel ID
+	 * @param isDurable if {@code true} the task should be
+	 *	  scheduled as a durable task, otherwise it should be
+	 *	  scheduled as a non-durable task
+	 */
+	static void scheduleNewTask(
+	    BigInteger channelRefId, boolean isDurable)
+	{
+	    (new SavedMessageReaper(channelRefId, isDurable)).scheduleTask();
+	}
+    }
+    
     /**
      * Reassigns the channel coordinator as follows:
      *
@@ -861,17 +1125,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * channel members), or the local node (if there are no channel
      * members) and rebinds the event queue to the new coordinator's key.
      *
-     * 2) Marks the event queue to indicate that a refresh request for this
-     * channel must be sent this channel's channel servers to notify each
-     * server to reread this channel's membership list (for the given
-     * channel server's local node) before servicing any more events.
-     *
-     * 3} Finally, sends out a 'serviceEventQueue' request to the new
+     * 2) Sends out a 'serviceEventQueue' request to the new
      * coordinator to restart this channel's event processing.
      */
     private void reassignCoordinator(long failedCoordNodeId) {
 	DataService dataService = getDataService();
-	dataService.markForUpdate(this);
 	if (coordNodeId != failedCoordNodeId) {
 	    logger.log(
 		Level.SEVERE,
@@ -880,33 +1138,30 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		coordNodeId, failedCoordNodeId, this);
 	    return;
 	}
-	
-	removeSessionSet(failedCoordNodeId);
 
 	/*
 	 * Assign a new coordinator, and store event queue in new
 	 * coordinator's event queue map.
 	 */
+	dataService.markForUpdate(this);
 	coordNodeId = chooseCoordinatorNode();
-	if (logger.isLoggable(Level.FINE)) {
+	isCoordinatorReassigned = true;
+	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(
-		Level.FINE,
+		Level.FINER,
 		"channel:{0} reassigning coordinator from:{1} to:{2}",
-		HexDumper.toHexString(channelRefId.toByteArray()),
+		HexDumper.toHexString(channelRefId),
 		failedCoordNodeId,
 		coordNodeId);
 	}
 	EventQueue eventQueue = eventQueueRef.get();
 	getEventQueuesMap(coordNodeId).
 	    put(channelRefId.toString(), eventQueue);
+	eventQueue.coordinatorReassigned();
 
 	/*
-	 * Mark the event queue to indicate that a refresh must be sent to
-	 * all channel servers for this channel before servicing any events
-	 * in the queue, and then send a 'serviceEventQueue' notification
-	 * to the new coordinator.
+	 * Send a 'serviceEventQueue' notification to the new coordinator.
 	 */
-	eventQueue.setSendRefresh();
 	notifyServiceEventQueue(eventQueue);
     }
 
@@ -940,32 +1195,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Removes the client session with the specified {@code sessionRefId}
-     * from the channel with the specified {@code channelRefId}.  This
-     * method is invoked when a session is disconnected from this node
-     * (with the specified {@code nodeId}) gracefully or otherwise, or if
-     * this node is recovering for a failed node whose sessions all became
-     * disconnected.  The {@code nodeId} specifies the node that the
-     * session was previously connected to, which is not necessarily
-     * the local node's ID.
-     *
-     * This method should be called within a transaction.
-     */
-    static void removeSessionFromChannel(
-	long nodeId, BigInteger sessionRefId, BigInteger channelRefId)
-    {
-	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
-	if (channel != null) {
-	    channel.removeSession(nodeId, sessionRefId);
-	} else {
-	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINE, "channel already removed:{0}",
-		    HexDumper.toHexString(channelRefId.toByteArray()));
-	    }
-	}
-    }
-
-    /**
      * Returns the local node's ID.
      */
     private static long getLocalNodeId() {
@@ -976,88 +1205,32 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns the channel server for the specified {@code nodeId}.
      */
     private static ChannelServer getChannelServer(long nodeId) {
-	return ChannelServiceImpl.getChannelService().getChannelServer(nodeId);
-    }
-
-    /**
-     * Returns the managed object with the specified {@code refId}, or {@code
-     * null} if there is no object with the specified {@code refId}.
-     *
-     * @param	refId the object's identifier as obtained by
-     *		{@link ManagedReference#getId ManagedReference.getId}
-     *
-     * @throws	TransactionException if the operation failed because of a
-     *		problem with the current transaction
-     */
-    private static Object getObjectForId(BigInteger refId) {
-	try {
-	    return getDataService().createReferenceForId(refId).get();
-	} catch (ObjectNotFoundException e) {
-	    return null;
-	}
+	return ChannelServiceImpl.getInstance().getChannelServer(nodeId);
     }
 
     /**
      * Returns a set containing the node IDs of the channel servers for
      * this channel. 
      */
-    private Set<Long> getMemberNodeIds() {
+    private Set<Long> getServerNodeIds() {
 	return new HashSet<Long>(servers);
     }
     
     /**
-     * Removes all sessions from this channel and clears the list of
-     * channel servers for this channel.  This method should be called
-     * when all sessions leave the channel.
-     */
-    private void removeAllSessions() {
-
-	for (long nodeId : getMemberNodeIds()) {
-	    for (BigInteger sessionRefId : getSessionSet(nodeId)) {
-		sendLeaveNotification(nodeId, sessionRefId);
-	    }
-	    removeSessionSet(nodeId);
-	}
-    }
-
-    /**
-     * Sends a leave notification for the session with the specified {@code
-     * sessionRefId} to the channel server with the specified {@code
-     * nodeId}.
-     */
-    private void sendLeaveNotification(long nodeId,
-				       final BigInteger sessionRefId)
-    {
-	final ChannelServer server = getChannelServer(nodeId);
-	/*
-	 * If there is no channel server for the session's node,
-	 * then the session's node has failed and the session is
-	 * now disconnected.  There is no need to send a 'leave'
-	 * notification (to update the channel membership cache) to
-	 * the failed server.
-	 */
-	if (server != null) {
-	    ChannelServiceImpl.getChannelService().addChannelTask(
-		channelRefId,
-		new IoRunnable() {
-		    public void run() throws IOException {
-			server.leave(channelRefId, sessionRefId);
-		    } },
-		nodeId);
-	}
-    }
-
-    /**
-     * Removes all sessions from this channel, removes the channel
-     * object and its binding, the channel listener wrapper (if we
+     * Removes the channel object, the channel listener wrapper (if we
      * created a wrapper for it), and the event queue and associated
-     * binding from the data store.  This method should be called when
-     * the channel is closed.
+     * binding from the data store.  If {@code removeName} is {@code
+     * true}, the channel's name binding is also removed.  This method
+     * is called when {@code leaveAll} is invoked on the channel (in
+     * which case the channel's name binding is not removed) and is
+     * called when the channel is closed (in which case the channel's
+     * name binding is removed).
      */
-    private void removeChannel() {
+    private void removeChannel(boolean removeName) {
 	DataService dataService = getDataService();
-	removeAllSessions();
-	getChannelsMap().removeOverride(name);
+	if (removeName) {
+	    getChannelsMap().removeOverride(name);
+	}
 	dataService.removeObject(this);
 	if (listenerRef != null) {
 	    ChannelListener maybeWrappedListener = listenerRef.get();
@@ -1070,17 +1243,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	eventQueuesMap.removeOverride(channelRefId.toString());
 	EventQueue eventQueue = eventQueueRef.get();
 	dataService.removeObject(eventQueue);
+	if (isReliable()) {
+	    SavedMessageReaper.scheduleNewTask(channelRefId, true);
+	}
     }
 
     /**
-     * Returns {@code true} if the specified client {@code session} is
-     * a member of this channel.
+     * Returns {@code true} if this channel supports reliable message
+     * delivery, otherwise returns {@code false}.
      */
-    private boolean hasSession(long nodeId, BigInteger sessionRefId) {
-	Set<BigInteger> sessionSet = getSessionSet(nodeId);
-	return sessionSet != null && sessionSet.contains(sessionRefId);
+    private boolean isReliable() {
+	return
+	    delivery.equals(Delivery.RELIABLE) ||
+	    delivery.equals(Delivery.UNORDERED_RELIABLE);
     }
-
+    
     /* -- Other classes -- */
 
     /**
@@ -1099,10 +1276,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance of this class with the specified
 	 * {@code channelRefId}.
 	 */
-	ClientSessionIterator(BigInteger channelRefId) {
-	    Set<BigInteger> sessionSet =
-		newSet(SESSION_SET_PREFIX + channelRefId.toString() + ".");
-	    iterator = sessionSet.iterator();
+	ClientSessionIterator(Set<BigInteger> channelMembers) {
+	    iterator = channelMembers.iterator();
 	}
 
 	/** {@inheritDoc} */
@@ -1166,7 +1341,26 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * The channel's event queue.
+     * The channel's event queue.<p>
+     *
+     * Each channel event (join, leave, send, close) is assigned a
+     * <i>timestamp</i> when the event is added to the channel's event
+     * queue.  The current timestamp records the timestamp of the latest
+     * send event that the queue has started to process. The initial event
+     * timestamp is <code>1</code>.  A send event increments the next
+     * timestamp, so all future join and leave events will have a later
+     * timestamp.  Any join and leave events that are immediately prior to
+     * the latest send event will share the send event's timestamp. <p>
+     *
+     * In order to implement reliable join, leave, send, and close events,
+     * the event queue doesn't process one event until it has completed the
+     * processing of all previous events, which means sucessfully
+     * delivering those events to all nodes that need to be notified (for
+     * example, in the case of a send event, that would be notifying all
+     * nodes with sessions joined to the channel). When the event queue
+     * assigns a timestamp to the next send event, the event queue has
+     * already processed all previous join and leave events, up to and
+     * including ones with that send event's timestamp.
      */
     private static class EventQueue
 	implements ManagedObjectRemoval, Serializable
@@ -1178,12 +1372,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private final ManagedReference<ChannelImpl> channelRef;
 	/** The managed reference to the managed queue. */
 	private final ManagedReference<ManagedQueue<ChannelEvent>> queueRef;
-	/** The sequence number for events on this channel. */
-	private long seq = 0;
-	/** If {@code true}, a refresh should be sent to all channel's
-	 * servers before servicing the next event.
-	 */
-	private boolean sendRefresh = false;
+	/** The next timestamp to assign to an event. */
+	private long nextTimestamp = 1;
+	/** The timestamp beyond which membership does not have to be
+	 * verified with the node to which a session is connected. */
+	private long coordinatorAssignmentTimestamp = 0;
+	/** The timestamp for the last event processed. */
+	private long currentTimestamp = 0;
 
 	/**
 	 * The number of bytes of the write buffer that are currently
@@ -1203,21 +1398,74 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
+	 * Notifies this event queue that its channel's coordinator has
+	 * been reassigned and is considered to be recovering.  This event
+	 * queue notes the "next timestamp" (to be assigned to an event) so
+	 * that the event queue can perform specific recovery actions for
+	 * events until it processes all events (if any) with timestamps
+	 * less than the timestamp at the moment the coordinator was
+	 * reassigned.
+	 */
+	void coordinatorReassigned() {
+	    getDataService().markForUpdate(this);
+	    coordinatorAssignmentTimestamp =
+		isEmpty() ? 0 : nextTimestamp;
+	}
+
+	/**
+	 * Returns {@code true} if the coordinator is considered recovering
+	 * for the specified {@code timestamp}, and returns {@code false}
+	 * otherwise.
+	 *
+	 * @param timestamp an event timestamp
+	 * @return {@code true} if the coordinator is considered recovering
+	 * for the specified {@code timestamp}
+	 */
+	boolean isCoordinatorRecovering(long timestamp) {
+	    return timestamp < coordinatorAssignmentTimestamp;
+	}
+
+	/**
 	 * Attempts to enqueue the specified {@code event}, and returns
-	 * {@code true} if successful, and {@code false} otherwise.
+	 * {@code true} if successful, and {@code false} otherwise.  If
+	 * this node coordinates the channel and the channel's event queue
+	 * is empty, then start processing the event immediately.  If the
+	 * event is successfully added to the queue, then sent a
+	 * notification to the channel's coordinator to service the event
+	 * queue.
 	 *
 	 * @param event the event
+	 * @param channel the channel instance
 	 * @return {@code true} if successful, and {@code false} otherwise
 	 * @throws MessageRejectedException if the cost of the event
 	 *         exceeds the available buffer space in the queue
 	 */
-	boolean offer(ChannelEvent event) {
+	boolean offer(ChannelEvent event, ChannelImpl channel) {
+
+	    boolean notifyServiceEventQueue = true;
+	    
 	    int cost = event.getCost();
 	    if (cost > writeBufferAvailable) {
 	        throw new MessageRejectedException(
 	            "Not enough queue space: " + writeBufferAvailable +
 		    " bytes available, " + cost + " requested");
 	    }
+	    
+	    if (channel.isCoordinator() && isEmpty()) {
+		// The event queue is empty, and this node is the
+		// coordinator for the channel's event queue, so process
+		// the event now.
+		if (startProcessingEvent(channel, event)) {
+		    // Event completed processing, so return success.
+		    return true;
+		}
+		// The event needs to be added to the head of the queue
+		// (below) because it is not yet complete.  There is no
+		// need to notify the event queue because it will be
+		// notified when the event has completed processing.
+		notifyServiceEventQueue = false;
+	    }
+	   
 	    boolean success = getQueue().offer(event);
 	    if (success && (cost > 0)) {
 		getDataService().markForUpdate(this);
@@ -1227,6 +1475,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
                         "{0} reserved {1,number,#} leaving {2,number,#}",
                         this, cost, writeBufferAvailable);
                 }
+	    }
+	    if (notifyServiceEventQueue) {
+		channel.notifyServiceEventQueue(this);
 	    }
 	    return success;
 	}
@@ -1258,116 +1509,191 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	boolean isEmpty() {
 	    return getQueue().isEmpty();
 	}
-
-	/**
-	 * Throws a retryable exception if the event queue is not in a
-	 * state to process the next event (e.g., it hasn't received
-	 * an expected acknowledgment that all channel servers have
-	 * received a specified 'send' request).
-	 */
-	void checkState() {
-	    // FIXME: This needs to be implemented in order to support
-	    // reliable messages in the face of channel coordinator crash.
+	
+	/** Returns the timestamp to assign to the next event. */
+	long getNextTimestamp() {
+	    return nextTimestamp;
 	}
 
 	/**
-	 * Marks this queue to indicate that a 'refresh' notification needs
-	 * to be sent to the associated channel's servers before servicing
-	 * any more events.  This action is taken when the associated
-	 * channel's coordinator is reassigned during the previous channel
-	 * coordinator's recovery.
+	 * Returns the timestamp to assign to the next event,
+	 * then increments it.
 	 */
-	void setSendRefresh() {
+	long getNextTimestampAndIncrement() {
 	    getDataService().markForUpdate(this);
-	    sendRefresh = true;
+	    return nextTimestamp++;
+	}
+
+	long getCurrentTimestamp() {
+	    return currentTimestamp;
 	}
 
 	/**
-	 * Processes (at least) the first event in the queue.
+	 * Services the channel event queue.  The coordinator processes
+	 * events as follows: <ul>
+	 *
+	 * <li> If the event at the head of the queue has not started
+	 * processing, then it marks the event's state as 'processing' by
+	 * invoking the event's {@code processing} method, and then
+	 * initiates processing by invoking the event's {@code
+	 * serviceEvent} method passing the channel instance.
+	 *
+	 * <li> If the event at the head of the queue has completed
+	 * processing (its {@code serviceEvent} method or {@code
+	 * isCompleted} method returns {@code true}), the event is removed
+	 * from the queue, and the next event can be serviced.
+	 * </ul>
+	 * 
+	 * An event remains in the queue until it has completed processing.
+	 * Reliable events (such as join, leave, and reliable send events)
+	 * require a delivery acknowledgment in order to be reliable in the
+	 * face of coordinator crash.  Therefore the event at the head of
+	 * the queue starts processing inside a transaction, performing any
+	 * necessary persistent updates, then performs non-transactional
+	 * actions after the transaction commits (such as delivering a
+	 * notification), and then marks the event itself as 'completed'
+	 * once the non-transactional actions have completed (such as a
+	 * notification being acknowledged). At this point, the event can
+	 * be removed from the queue, and the next event can be
+	 * serviced. <p>
+	 *
+	 * If the channel coordinator's node crashes while the event at the
+	 * head of the queue is being processed, the channel's new
+	 * coordinator restarts event processing.
 	 */
-	void serviceEvent() {
-	    checkState();
+	void serviceEventQueue() {
 	    ChannelImpl channel = getChannel();
-	    if (!channel.isCoordinator()) {
-		// TBD: should a serviceEventQueue request be forwarded to
-		// the true channel coordinator?
+	    if (!channel.checkCoordinator()) {
 		logger.log(
 		    Level.WARNING,
 		    "Attempt at node:{0} channel:{1} to service events; " +
 		    "instead of current coordinator:{2}",
 		    getLocalNodeId(),
-		    HexDumper.toHexString(channel.channelRefId.toByteArray()),
+		    HexDumper.toHexString(channel.channelRefId),
 		    channel.coordNodeId);
 		return;
 	    }
-	    ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
-	    DataService dataService = getDataService();
-	    
-	    /*
-	     * If a new coordinator has taken over (i.e., 'sendRefresh' is
-	     * true), then all pending events should to be serviced, since
-	     * a 'serviceEventQueue' request may have been missed when the
-	     * former channel coordinator failed and was in the process of
-	     * being reassigned.  So, assign the 'serviceAllEvents' flag
-	     * to indicate whether or not all pending events should be
-	     * processed below.
-	     */
-	    boolean serviceAllEvents = sendRefresh;
-	    if (sendRefresh) {
-		final BigInteger channelRefId = getChannelRefId();
-		final String channelName = channel.name;
-		final Delivery channelDelivery = channel.delivery;
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST, "sending refresh, channel:{0}",
-			HexDumper.toHexString(channelRefId.toByteArray()));
-		}
-		for (final long nodeId : channel.servers) {
-		    channelService.addChannelTask(
-		    	channelRefId,
-			new IoRunnable() {
-			    public void run() throws IOException {
-				ChannelServer server = getChannelServer(nodeId);
-				if (server != null) {
-				    server.refresh(channelName, channelRefId,
-						   channelDelivery);
-				}
-			    } },
-			nodeId);
-		}
-		dataService.markForUpdate(this);
-		sendRefresh = false;
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "coordinator:{0} channelId:{1}",
+			   getLocalNodeId(),
+			   HexDumper.toHexString(channel.channelRefId));
 	    }
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getInstance();
+	    DataService dataService = getDataService();
 
 	    /*
-	     * Process channel events.  If the 'serviceAllEvents' flag is
-	     * true, then service all pending events.
+	     * Process channel events
 	     */
-	    int eventsToService = channelService.eventsPerTxn;
+	    int eventsPerTxn = channelService.eventsPerTxn;
 	    ManagedQueue<ChannelEvent> eventQueue = getQueue();
+	    
+	    boolean completed = false;
 	    do {
-		ChannelEvent event = eventQueue.poll();
+		ChannelEvent event = eventQueue.peek();
 		if (event == null) {
+		    //  No more events to process, so return.
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "no more events",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(channel.channelRefId));
+		    }
 		    return;
-		}
+		} else if (event.isCompleted()) {
+		    // Remove completed event and get next event to
+		    // process. Return if there are no more events.
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "removing completed event:{2}",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(channel.channelRefId),
+				   event);
+		    }
+		    eventQueue.poll();
+		    event = eventQueue.peek();
+		    if (event == null) {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(Level.FINEST,
+				       "coordinator:{0} channelId:{1} " +
+				       "no more events",
+				       getLocalNodeId(),
+				       HexDumper.toHexString(
+					   channel.channelRefId));
+			}
+			return;
+		    }
+		} else if (event.isProcessing()) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "event:{2} is already processing",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(channel.channelRefId),
+				   event);
+		    }
+		    return;
+		} 
 
-                logger.log(Level.FINEST, "processing event:{0}", event);
-                int cost = event.getCost();
+		int cost = event.getCost();
 		if (cost > 0) {
 		    dataService.markForUpdate(this);
 		    writeBufferAvailable += cost;
-
+		    
 		    if (logger.isLoggable(Level.FINEST)) {
-		        logger.log(Level.FINEST,
-				   "{0} cleared reservation of " +
-				   "{1,number,#} bytes, leaving {2,number,#}",
-				   this, cost, writeBufferAvailable);
+			logger.log(
+			    Level.FINEST,
+			    "{0} cleared reservation of {1,number,#} bytes, " +
+			    "leaving {2,number,#}",
+			    this, cost, writeBufferAvailable);
 		    }
 		}
-		event.serviceEvent(getChannel());
+		
+		// Mark event as "processing", and then service event.
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST,
+			       "coordinator:{0} channelId:{1} " +
+			       "service event:{2}",
+			       getLocalNodeId(),
+			       HexDumper.toHexString(channel.channelRefId),
+			       event);
+		}
+		completed = startProcessingEvent(getChannel(), event);
+		if (completed) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "coordinator:{0} channelId:{1} " +
+				   "remove completed event:{2}",
+				   getLocalNodeId(),
+				   HexDumper.toHexString(channel.channelRefId),
+				   event);
+		    }
+		    eventQueue.poll();
+		}
 
-	    } while (serviceAllEvents || --eventsToService > 0);
+	    } while (completed && --eventsPerTxn > 0);
+
+	    if (eventQueue.peek() != null) {
+		channelService.
+		    addServiceEventQueueTaskOnCommit(channel.channelRefId);
+	    }
+	}
+
+	/**
+	 * Starts processing the specified {@code event}, updating the
+	 * current message timestamp if the event is a channel "send" event.
+	 */
+	private boolean startProcessingEvent(ChannelImpl channel,
+					     ChannelEvent event)
+	{
+	    event.processing();
+	    if (event instanceof SendEvent) {
+		getDataService().markForUpdate(this);
+		currentTimestamp = event.timestamp;
+	    }
+	    return event.serviceEvent(channel);
 	}
 
 	/* -- Implement ManagedObjectRemoval -- */
@@ -1388,15 +1714,36 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     abstract static class ChannelEvent
 	implements ManagedObject, Serializable
     {
-
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
+	/** This event's timestamp. */
+	protected final long timestamp;
+	
 	/**
-	 * Services this event, taken from the head of the event queue
-	 * whose reference is specified during construction.
+	 * The event's completed status, indicating whether this event has
+	 * been completely processed and it is safe to service the next
+	 * event in the queue.
 	 */
-	abstract void serviceEvent(ChannelImpl channel);
+	private boolean completed = false;
+
+	/** The ID of the coordinator node on which this event is being
+	 * processed. -1 indicates that event hasn't ever started
+	 * processing. */
+	protected long processingOnNodeId = -1;
+
+	/** Constructs an instance with the specified {@code timestamp} */
+	ChannelEvent(long timestamp) {
+	    this.timestamp = timestamp;
+	}
+
+	/**
+	 * Services this event (taken from the head of the event queue) for
+	 * the specified {@code channel}, and returns {@code true} if the
+	 * event has completed processing and can be removed from the event
+	 * queue.
+	 */
+	abstract boolean serviceEvent(ChannelImpl channel);
 
 	/**
 	 * Returns the cost of this event, which the {@code EventQueue}
@@ -1408,6 +1755,60 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	int getCost() {
 	    return 0;
 	}
+
+	/**
+	 * Marks this event as completed.
+	 */
+	boolean completed() {
+	    logger.log(Level.FINEST, "completed event:{0}", this);
+	    try {
+		getDataService().markForUpdate(this);
+	    } catch (ObjectNotFoundException e) {
+		// markForUpdate can throw ONFE if this event has been
+		// removed.
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Marking event:{0} completed throws", this);
+		}
+	    }
+	    completed = true;
+	    return completed;
+	}
+
+	/**
+	 * Marks this event as being processed on the local node.
+	 */
+	void processing() {
+	    logger.log(Level.FINEST, "processing event:{0}", this);
+	    getDataService().markForUpdate(this);
+	    processingOnNodeId = getLocalNodeId();
+	}
+	
+	/**
+	 * Returns {@code true} if this event is completed and it is safe
+	 * to service the next event in the queue, otherwise returns {@code
+	 * false}.
+	 */
+	boolean isCompleted() {
+	    return completed;
+	}
+
+	/**
+	 * Returns {@code true} if this event is being processed on this
+	 * node, and {@code false} otherwise.  Events are marked as
+	 * processing on a given node.  Therefore, if this event is marked
+	 * as processing on a given coordinator node, and the channel's
+	 * coordinator is reassigned to another node and the coordinator
+	 * subsequently invokes this method on this event, the method will
+	 * return {@code false}.  This indicates that the event has not yet
+	 * started processing on the new coordinator's node, and the
+	 * coordinator should (re)start this event's processing on the new
+	 * node. 
+	 */
+	boolean isProcessing() {
+	    return processingOnNodeId == getLocalNodeId();
+	}
     }
 
     /**
@@ -1417,59 +1818,383 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
+	/** The session ID for the session to join the channel. */
 	private final BigInteger sessionRefId;
 
 	/**
 	 * Constructs a join event with the specified {@code session}.
 	 */
-	JoinEvent(ClientSession session) {
+	JoinEvent(ClientSession session, EventQueue eventQueue) {
+	    super(eventQueue.getNextTimestamp());
 	    sessionRefId = getSessionRefId(session);
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(final ChannelImpl channel) {
-
-	    ClientSession session =
-		(ClientSession) getObjectForId(sessionRefId);
+	public boolean serviceEvent(final ChannelImpl channel) {
+	    assert isProcessing() && !isCompleted();
+	    ClientSessionImpl session =
+		(ClientSessionImpl) getObjectForId(sessionRefId);
 	    if (session == null) {
 		logger.log(
 		    Level.FINE,
 		    "unable to obtain client session for ID:{0}", this);
-		return;
+		return completed();
 	    }
-	    if (!channel.addSession(session)) {
-		return;
-	    }
-	    long nodeId = getNodeId(session);
-	    final ChannelServer server = getChannelServer(nodeId);
-	    if (server == null) {
-		/*
-		 * If there is no channel server for the session's node,
-		 * then the session's node has failed and the session is
-		 * now disconnected.  There is no need to send a 'join'
-		 * notification (to update the channel membership cache) to
-		 * the failed server.
-		 */
-		return;
-	    }
-	    final String channelName = channel.name;
-	    final BigInteger channelRefId = channel.channelRefId;
-	    final Delivery channelDelivery = channel.delivery;
-	    ChannelServiceImpl.getChannelService().addChannelTask(
-		channelRefId,
-		new IoRunnable() {
-		    public void run() throws IOException {
-			server.join(channelName, channelRefId,
-				    channelDelivery, sessionRefId);
-		    } },
-		nodeId);
+	    channel.addServerNodeId(getNodeId(session));
+
+	    JoinNotifyTask task =
+		new JoinNotifyTask(channel, this, session, sessionRefId);
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
+		    channel.channelRefId, task);
+	    return isCompleted();
 	}
 
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
 	    return getClass().getName() + ": " +
-		HexDumper.toHexString(sessionRefId.toByteArray());
+		HexDumper.toHexString(sessionRefId);
+	}
+    }
+
+    private abstract static class NotifyTask extends AbstractKernelRunnable {
+	
+	protected final ChannelServiceImpl channelService;
+	protected final BigInteger channelRefId;
+	protected final long timestamp;
+	private final BigInteger eventRefId;
+	
+	/**
+	 * Constructs an instance.  This constructor must be called within a
+	 * transaction.
+	 */
+	NotifyTask(ChannelImpl channel, ChannelEvent channelEvent) {
+	    super(null);
+	    this.channelService = ChannelServiceImpl.getInstance();
+	    this.channelRefId = channel.channelRefId;
+	    this.eventRefId =
+		getDataService().createReference(channelEvent).getId();
+	    this.timestamp = channelEvent.timestamp;
+	}
+	
+	/**
+	 * Returns the channel associated with this task, or null if the channel
+	 * no longer exists. This method must be invoked within a transaction.
+	 */
+	protected ChannelImpl getChannel() {
+	    return (ChannelImpl) getObjectForId(channelRefId);
+	}
+
+	/**
+	 * Marks the associated event complete and adds a task to
+	 * resume servicing the channel's event queue.  This must be
+	 * called outside of a transaction.
+	 */
+	protected void completed() {
+	    
+	    try {
+	      channelService.runTransactionalTask(
+		new AbstractKernelRunnable("MarkChannelEventCompleted") {
+		    public void run() {
+			ChannelEvent event = (ChannelEvent)
+			    getObjectForId(eventRefId);
+			if (event != null) {
+			    event.completed();
+			} else {
+			    // This shouldn't happen
+			    logger.log(
+				Level.SEVERE,
+				"channel:{0}: event removed before completed",
+				HexDumper.toHexString(channelRefId));
+			}
+		    }
+		}); 
+	    } catch (Exception e) {
+		// Transaction schedule will print out warning.
+	    } finally {
+		channelService.addServiceEventQueueTask(channelRefId);
+	    }
+	}
+
+	/**
+	 * Removes the specified {@code nodeId} from the associated
+	 * channel.
+	 *
+	 * @param nodeId a node ID
+	 */
+	protected void removeNodeIdFromChannel(final long nodeId) {
+	    
+	    try {
+		channelService.runTransactionalTask(
+ 		  new AbstractKernelRunnable("removeNodeIdFromChannel") {
+		    public void run() {
+			ChannelImpl channel = getChannel();
+			if (channel != null) {
+			    channel.removeServerNodeId(nodeId);
+			}
+		    }
+		  });
+		
+	    } catch (Exception e) {
+		// Transaction scheduler will print out warning.
+	    }
+	}
+    }
+
+    /**
+     * A non-transactional task to send a notification to a session's
+     * node, allowing for the possibility of the session relocating while
+     * the notification is in transit.
+     */
+    private abstract static class SessionNotifyTask extends NotifyTask {
+	
+	protected final String name;
+	protected final Delivery delivery;
+	protected final BigInteger sessionRefId;
+	private final BigInteger eventQueueRefId;
+
+	/** The session's node ID.  Initialized during construction
+	 * and modified by calls to {@code removeMembershipIfNodeUnchanged}
+	 * and {@code remapMembershipIfRelocating} methods.
+	 */
+	protected volatile long sessionNodeId;
+
+	/**
+	 * Constructs an instance.  This constructor must be called within a
+	 * transaction.
+	 */
+	SessionNotifyTask(ChannelImpl channel,
+			  ChannelEvent channelEvent,
+			  ClientSessionImpl session,
+			  BigInteger sessionRefId)
+	{
+	    super(channel, channelEvent);
+	    this.name = channel.name;
+	    this.delivery = channel.delivery;
+	    this.eventQueueRefId = channel.eventQueueRef.getId();
+	    this.sessionRefId = sessionRefId;
+	    this.sessionNodeId = getNodeId(session);
+	}
+
+	/**
+	 * This must be called outside of a transaction.
+	 */
+	public void run() {
+	    channelService.checkNonTransactionalContext();
+	    while (!channelService.shuttingDown()) {
+		ChannelServer server = getChannelServer(sessionNodeId);
+		if (server == null) {
+		    // If session's node hasn't changed, then it is
+		    // disconnected because its channel server is gone.
+		    if (updateSessionNodeId()) {
+			continue; // relocating
+		    } else {
+			break;	// disconnected
+		    }
+		}
+		try {
+		    if (sendNotification(server)) {
+			// Notification was successful
+			break;
+		    } else {
+			// If session's node hasn't changed, then it is
+			// disconnected because it wasn't connected to the
+			// node.
+			if (updateSessionNodeId()) {
+			    continue; // relocating
+			} else {
+			    break; // disconnected
+			}
+		    }
+		    
+		} catch (IOException e) {
+		    if (!channelService.isAlive(sessionNodeId)) {
+			// If the session's node hasn't changed, then it is
+			// disconnected because its node crashed.
+			removeNodeIdFromChannel(sessionNodeId);
+			if (updateSessionNodeId()) {
+			    continue; // relocating
+			} else {
+			    break; // disconnected
+			}
+		    }
+		    // Wait for transient situation to resolve.
+		    try {
+			// TBD: make sleep time configurable?
+			Thread.sleep(200);
+		    } catch (InterruptedException ie) {
+		    }
+		}
+	    }
+
+	    // Mark event as completed and add task to resume
+	    // servicing the event queue.
+	    completed();
+	}
+
+	/**
+	 * Sends a notification message to the specified channel {@code
+	 * server} and returns the result of the notification.  This method is
+	 * invoked outside of a transaction.
+	 *
+	 * @return the result of the notification
+	 * @throws IOException if a communication problem occurs while sending
+	 * 	   the notification
+	 */
+	protected abstract boolean sendNotification(ChannelServer server)
+	    throws IOException;
+
+	/**
+	 * Returns {@code true} if when the session's node ID changes, it
+	 * should be added to the channel's set of node IDs, and returns
+	 * {@code false} otherwise.  This method is invoked inside of a
+	 * transaction.
+	 *
+	 * @return {@code true} if when the session's node ID changes, it
+	 *	   should be added to the channel's set of node IDs, and
+	 *	   {@code false} otherwise
+	 */
+	protected abstract boolean addChangedSessionNodeId();
+	
+	/**
+	 * Returns the client session associated with this task, or null if
+	 * the session no longer exists.  This method must be invoked
+	 * within a transaction.
+	 */
+	protected ClientSessionImpl getSession() {
+	    return (ClientSessionImpl) getObjectForId(sessionRefId);
+	}
+
+	/**
+	 * Updates this task's {@code sessionNodeId} and returns {@code true}
+	 * if the session's node ID has changed, and returns {@code false} if
+	 * the session's node ID is unchanged or the session no longer
+	 * exists.  If the session's node ID has changed, this method invokes
+	 * the {@code addChangedSessionNodeId} method, and if that method
+	 * returns {@code true}, the session's new node ID is added to the
+	 * channel's set of node IDs.  This method may be invoked outside of a
+	 * transaction. 
+	 *
+	 * @return {@code true} if the session's node ID is updated, otherwise
+	 *	   {@code false}
+	 */
+	protected final boolean updateSessionNodeId() {
+	    
+	    final long oldSessionNodeId = sessionNodeId;
+	    try {
+		
+	      return channelService.runTransactionalCallable(
+ 		new KernelCallable<Boolean>("updateSessionNodeId") {
+		    public Boolean call() {
+			ClientSessionImpl session = getSession();
+			if (session != null) {
+			    sessionNodeId = getNodeId(session);
+			}
+			boolean updated = sessionNodeId != oldSessionNodeId;
+			if (updated && addChangedSessionNodeId()) {
+			    ChannelImpl channel = getChannel();
+			    if (channel != null) {
+				channel.addServerNodeId(sessionNodeId);
+			    } else {
+				updated = false;
+			    }
+			}
+			return updated;
+		    }
+		});
+	    
+	    } catch (Exception e) {
+		// Transaction scheduler will print out warning.
+		return false;
+	    }
+	}
+
+	/**
+	 * Returns the event queue's latest timestamp.  This method may be
+	 * invoked outside of a transaction.
+	 */
+	protected long getEventQueueTimestamp() {
+	    
+	    try {
+		return channelService.runTransactionalCallable(
+ 		  new KernelCallable<Long>("getEventQueueTimestamp") {
+		      public Long call() {
+			  EventQueue eventQueue = (EventQueue)
+			      getObjectForId(eventQueueRefId);
+			  if (eventQueue != null) {
+			      return eventQueue.getNextTimestamp();
+			  } else {
+			      return -1L;
+			  }
+		    }
+		});
+	    } catch (Exception e) {
+		return -1L;
+	    }
+	}
+    }
+
+    /**
+     * A non-transactional task to send a join notification to a session's
+     * node, allowing for the possibility of the session relocating while
+     * the join message is in transit.
+     */
+    private static class JoinNotifyTask extends SessionNotifyTask {
+
+	/**
+	 * Constructs an instance.  This constructor must be called within a
+	 * transaction.
+	 */
+	JoinNotifyTask(ChannelImpl channel, JoinEvent joinEvent,
+		       ClientSessionImpl session, BigInteger sessionRefId)
+	{
+	    super(channel, joinEvent, session, sessionRefId);
+	}
+
+	/** {@inheritDoc} <p> Sends a join notification. */
+	protected boolean sendNotification(ChannelServer server)
+	    throws IOException
+	{
+	    /*
+	     * Send "join" notification to session's server with a
+	     * timestamp of the last message sent on the channel (which may
+	     * be zero if no messages have been sent on the channel).  The
+	     * timestamp of the last message sent on the channel is one
+	     * less than the event's timestamp.
+	     */
+	    boolean success =
+		server.join(name, channelRefId, (byte) delivery.ordinal(),
+			    timestamp - 1, sessionRefId);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "Sent join, name:{0} channel:{1} session:{2} " +
+		    "coordinator:{3} returned {4}", name,
+		    HexDumper.toHexString(channelRefId),
+		    HexDumper.toHexString(sessionRefId),
+		    getLocalNodeId(), success);
+	    }
+	    return success;
+	}
+
+	/** {@inheritDoc} <p>
+	 *
+	 * A join event requires that a changed session's node ID be added to
+	 * the channel's set of server node IDs.
+	 */
+	protected boolean addChangedSessionNodeId() {
+	    return true;
+	}
+
+	/** {@inheritDoc} */
+	protected void completed() {
+	    long eventQueueTimestamp = getEventQueueTimestamp();
+	    if (eventQueueTimestamp > timestamp) {
+		channelService.cacheMembershipEvent(
+		    MembershipEventType.JOIN, channelRefId, sessionRefId,
+		    timestamp, eventQueueTimestamp);
+	    }
+	    super.completed();
 	}
     }
 
@@ -1485,73 +2210,91 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/**
 	 * Constructs a leave event with the specified {@code session}.
 	 */
-	LeaveEvent(ClientSession session) {
+	LeaveEvent(ClientSession session, EventQueue eventQueue) {
+	    super(eventQueue.getNextTimestamp());
 	    sessionRefId = getSessionRefId(session);
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(ChannelImpl channel) {
-
-	    ClientSession session =
-		(ClientSession) getObjectForId(sessionRefId);
+	public boolean serviceEvent(ChannelImpl channel) {
+	    assert isProcessing() && !isCompleted();
+	    ClientSessionImpl session =
+		(ClientSessionImpl) getObjectForId(sessionRefId);
 	    if (session == null) {
 		logger.log(
 		    Level.FINE,
 		    "unable to obtain client session for ID:{0}", this);
-		return;
+		return completed();
 	    }
-	    if (!channel.removeSession(getNodeId(session), sessionRefId)) {
-		return;
-	    }
+	
+	    LeaveNotifyTask task =
+		new LeaveNotifyTask(channel, this, session, sessionRefId);
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
+		channel.channelRefId, task);
+	    return isCompleted();
 	}
 
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
 	    return getClass().getName() + ": " +
-		HexDumper.toHexString(sessionRefId.toByteArray());
+		HexDumper.toHexString(sessionRefId);
 	}
     }
 
     /**
-     * A channel leaveAll event.
+     * A non-transactional task to send a join notification to a session's
+     * node, allowing for the possibility of the session relocating while
+     * the join message is in transit.
      */
-    private static class LeaveAllEvent extends ChannelEvent {
-	/** The serialVersionUID for this class. */
-	private static final long serialVersionUID = 1L;
+    private static class LeaveNotifyTask extends SessionNotifyTask {
 
 	/**
-	 * Constructs a leaveAll event.
+	 * Constructs an instance.  This constructor must be called within a
+	 * transaction.
 	 */
-	LeaveAllEvent() {
+	LeaveNotifyTask(ChannelImpl channel, LeaveEvent leaveEvent,
+			ClientSessionImpl session, BigInteger sessionRefId)
+	{
+	    super(channel, leaveEvent, session, sessionRefId);
 	}
 
-	/** {@inheritDoc} */
-	public void serviceEvent(ChannelImpl channel) {
-
-	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
-	    channel.removeAllSessions();
-	    ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
-	    final BigInteger channelRefId = channel.channelRefId;
-	    for (final long nodeId : serverNodeIds) {
-		channelService.addChannelTask(
-		    channelRefId,					      
-		    new IoRunnable() {
-			public void run() throws IOException {
-			    ChannelServer server = getChannelServer(nodeId);
-			    if (server != null) {
-				server.leaveAll(channelRefId);
-			    }
-			} },
-		    nodeId);
+	/** {@inheritDoc} <p> Sends a leave notification. */
+	protected boolean sendNotification(ChannelServer server)
+	    throws IOException
+	{
+	    boolean success =
+		server.leave(channelRefId, timestamp, sessionRefId);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "Sent leave, channel:{0} session:{1} " +
+		    "coordinator:{2} returned {3}",
+		    HexDumper.toHexString(channelRefId),
+		    HexDumper.toHexString(sessionRefId),
+		    getLocalNodeId(), success);
 	    }
+	    return success;
+	}
+	
+	/** {@inheritDoc} <p>
+	 *
+	 * A leave event should not have a changed session's node ID
+	 * added to the channel's set of server node IDs.
+	 */
+	protected boolean addChangedSessionNodeId() {
+	    return false;
 	}
 
 	/** {@inheritDoc} */
-        @Override
-	public String toString() {
-	    return getClass().getName();
+	protected void completed() {
+	    long eventQueueTimestamp = getEventQueueTimestamp();
+	    if (eventQueueTimestamp > timestamp) {
+		channelService.cacheMembershipEvent(
+		    MembershipEventType.LEAVE, channelRefId, sessionRefId,
+		    timestamp, eventQueueTimestamp);
+	    }
+	    super.completed();
 	}
     }
 
@@ -1561,10 +2304,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     static class SendEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
-
+	/** The channel message. */
 	private final byte[] message;
 	/** The sender's session ID, or null. */
 	private final BigInteger senderRefId;
+	/** Indicates whether the sender is known to be a channel member
+	 * when this event was constructed. */
+	private boolean isChannelMember;
 
 	/**
 	 * Constructs a send event with the given {@code senderRefId} and
@@ -1572,67 +2318,103 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 *
 	 * @param senderRefId a sender's session ID, or {@code null}
 	 * @param message a message
+	 * @param eventQueue the channel's event queue
+	 * @param isChannelMember {@code true} if the sender is currently
+	 *	  known to be a member of the associated channel
 	 */
-	SendEvent(BigInteger senderRefId, byte[] message) {
+	SendEvent(
+	    BigInteger senderRefId, byte[] message, EventQueue eventQueue,
+	    boolean isChannelMember)
+	{
+	    super(eventQueue.getNextTimestampAndIncrement());
 	    this.senderRefId = senderRefId;
 	    this.message = message;
+	    this.isChannelMember = isChannelMember;
 	}
 
-	/** {@inheritDoc}
-	 *
-	 * TBD: (optimization) this should handle sending
-	 * multiple messages to a given channel.  Here, we
-	 * could peek at the next event in the queue, and if
-	 * it is a send, that event could be batched with this
-	 * send event.  This could be repeated for multiple
-	 * send events appearing in the queue.
-	 */
-	public void serviceEvent(ChannelImpl channel) {
-
-	    /*
-	     * Verfiy that the sending session (if any) is a member of this
-	     * channel.
-	     */
+	/** {@inheritDoc} */
+	public boolean serviceEvent(ChannelImpl channel) {
+	    assert isProcessing() && !isCompleted();
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getInstance();
 	    if (senderRefId != null) {
-		ClientSession sender =
-		    (ClientSession) getObjectForId(senderRefId);
-		if (sender == null ||
-		    !channel.hasSession(getNodeId(sender), senderRefId))
-		{
-		    return;
-		}
+		/*
+		 * Sender is a client, so verify that the sending session
+		 * is a member of the channel.
+		 */
+		ClientSessionImpl sender =
+		    (ClientSessionImpl) getObjectForId(senderRefId);
+		if (sender == null) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "send attempt by disconnected session:{0} " +
+			    "to channel:{1}",
+			    HexDumper.toHexString(senderRefId),
+			    channel);
+		    }
+		    return completed();
+		    
+		} else {
+		    EventQueue queue = channel.eventQueueRef.get();
+		    if (queue.isCoordinatorRecovering(timestamp)) {
+			getDataService().markForUpdate(this);
+			isChannelMember =
+			    isChannelMemberRemoteCheck(
+ 				channel.channelRefId, senderRefId,
+				getNodeId(sender), timestamp);
+		    }
+
+		    if (!channelService.isChannelMember(
+			    channel.channelRefId, senderRefId,
+			    isChannelMember, timestamp))
+		    {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(
+				Level.FINEST,
+				"send attempt by non-member session:{0} " +
+				"to channel:{1}",
+				HexDumper.toHexString(
+				    senderRefId),
+				channel);
+			}
+			return completed();
+		    }
+		} 
 	    }
+
 	    /*
 	     * Enqueue a channel task to forward the message to the
 	     * channel's servers for delivery.
 	     */
-	    ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
-	    final BigInteger channelRefId = channel.channelRefId;
-	    final byte deliveryOrdinal = (byte) channel.delivery.ordinal();
-	    for (final long nodeId : channel.servers) {
-		channelService.addChannelTask(
-		    channelRefId,
-		    new IoRunnable() {
-			public void run() throws IOException {
-			    ChannelServer server = getChannelServer(nodeId);
-			    if (server != null) {
-				server.send(channelRefId, message,
-					    deliveryOrdinal);
-			    }
-			} },
-		    nodeId);
-	    }
+	    SendNotifyTask task = new SendNotifyTask(channel, this);
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
+		channel.channelRefId, task);
 
-	    // TBD: need to add a task to update queue that all
-	    // channel servers have been notified of
-	    // the 'send'.
+	    /*
+	     * If the message is reliable, store message for a period of
+	     * time so that relocating client sessions belonging to this
+	     * channel can obtain messages sent while those sessions are
+	     * relocating, otherwise, mark this event as completed.
+	     */
+	    if (channel.isReliable()) {
+		channel.saveMessage(message, timestamp);
+	    } else {
+		completed();
+	    }
+	    
+	    return isCompleted();
 	}
 
-	/** Use the message length as the cost for sending messages. */
+	/** Use the message length as the cost for sending messages.
+	 * 
+	 * Only return a non-zero cost if the message hasn't started
+	 * processing yet so that the cost calculation can be
+	 * idempotent.
+	 */
 	@Override
 	int getCost() {
-	    return message.length;
+	    return processingOnNodeId == -1 ? message.length : 0;
 	}
 
 	/** {@inheritDoc} */
@@ -1643,54 +2425,100 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the write buffer capacity for this channel.
-     *
-     * @return the write buffer capacity
+     * A non-transactional task to transmit a "send" notification to
+     * each of the channel's server nodes so that each server node
+     * can deliver a channel message to the channel's respective
+     * members.  When all the appropriate channel servers have been
+     * notified, this task marks the associated ChannelEvent complete
+     * (within a transaction).
      */
-    int getWriteBufferCapacity() {
-        return writeBufferCapacity;
-    }
+    private static class SendNotifyTask extends NotifyTask {
 
+	private final Set<Long> serverNodeIds;
+	private final byte[] message;
+
+	/**
+	 * Constructs an instance with the specified {@code channel}
+	 * and {@code sendEvent}.
+	 */
+	SendNotifyTask(ChannelImpl channel, SendEvent sendEvent) {
+	    super(channel, sendEvent);
+	    this.serverNodeIds = channel.servers;
+	    this.message = sendEvent.message;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    try {
+		/*
+		 * Send "send" notification to channel's servers.
+		 */ 
+		for (final long nodeId : serverNodeIds) {
+		    boolean success = channelService.runIoTask(
+		      new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.send(channelRefId, message, timestamp);
+			    }
+			} },
+		      nodeId);
+		    if (!success) {
+			// Server node has failed, so remove it from
+			// channel's server list.
+			removeNodeIdFromChannel(nodeId);
+		    }
+		}
+	    } finally {
+		completed();
+	    }
+	}
+    }
+    
     /**
-     * A channel close event.
+     * A channel close event, used for closing a channel or removing
+     * all members from the channel (as a result of a "leaveAll"
+     * request).  If a channel is being closed permanently, its name
+     * binding is removed from the data service.  If the channel is
+     * being cleared of its membership (as a result of "leaveAll"),
+     * then its name binding is being used to refer to a
+     * ChannelWrapper with a new channel instance, so the name
+     * binding is retained.
      */
     private static class CloseEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
+	/** A flag to indicate whether the channel's name binding
+	 * should be removed. */
+	private final boolean removeName;
+	
 	/**
-	 * Constructs a close event.
+	 * Constructs a close event.  If {@code removeName} is {@code true},
+	 * the channel is truly being closed, and its channel name
+	 * binding will be removed.  If {@code removeName} is {@code
+	 * false}, then {@code leaveAll} was invoked on the channel, so
+	 * the channel's old persistent structures will be removed, but the
+	 * channel's name binding will remain, still referring to the
+	 * original {@code ChannelWrapper} whose underlying reference
+	 * was modified to refer to a newly created channel.
+	 *
+	 * @param removeName {@code true} if the channel's name binding
+	 *	  should be removed when the channel is closed
 	 */
-	CloseEvent() {
+	CloseEvent(boolean removeName, EventQueue eventQueue) {
+	    super(eventQueue.getNextTimestamp());
+	    this.removeName = removeName;
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(ChannelImpl channel) {
-
-	    final BigInteger channelRefId = channel.channelRefId;
-	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
-	    channel.removeChannel();
-	    final ChannelServiceImpl channelService =
-		ChannelServiceImpl.getChannelService();
-	    for (final long nodeId : serverNodeIds) {
-		channelService.addChannelTask(
-		    channelRefId,
-		    new IoRunnable() {
-			public void run() throws IOException {
-			    ChannelServer server = getChannelServer(nodeId);
-			    if (server != null) {
-				server.close(channelRefId);
-			    }
-			} },
-		    nodeId);
-	    }
-	    
-	    channelService.addChannelTask(
-		channelRefId,
-		new AbstractKernelRunnable("NotifyChannelClosed") {
-		    public void run() {
-			channelService.closedChannel(channelRefId);
-		    } });
+	public boolean serviceEvent(ChannelImpl channel) {
+	    assert isProcessing() && !isCompleted();
+	    CloseNotifyTask task =
+		new CloseNotifyTask(channel, removeName);
+	    ChannelServiceImpl.getInstance().addChannelTaskOnCommit(
+		    channel.channelRefId, task);
+	    return false;
 	}
 
 	/** {@inheritDoc} */
@@ -1700,6 +2528,88 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
+    /**
+     * A non-transactional task (with transactional components) to send a
+     * "close" notification to each of the channel's server nodes so that
+     * each server node can send the channel's respective members a
+     * leave notification.  This task also removes the channel's
+     * persistent data when the notifications have been delivered.  If
+     * {@code removeName}, specified during construction, is {@code true}
+     * the channel's name binding is removed along with the channel's
+     * persistent data, otherwise the channel's name binding is not
+     * removed. 
+     */
+    private static class CloseNotifyTask extends AbstractKernelRunnable {
+
+	private final BigInteger channelRefId;
+	private final Set<Long> serverNodeIds;
+	private final boolean removeName;
+	// FIXME: This is a kludge for now.
+	private static final long timestamp = Long.MAX_VALUE;
+
+	/**
+	 * Constructs an instance with the specified {@code channel}.  If
+	 * {@code removeName} is {@code true}, the channel's name binding
+	 * is removed along with its persistent data.
+	 */
+	CloseNotifyTask(ChannelImpl channel, boolean removeName) {
+	    super(null);
+	    this.channelRefId = channel.channelRefId;
+	    this.serverNodeIds = channel.servers;
+	    this.removeName = removeName;
+	}
+
+	public void run() {
+	    final ChannelServiceImpl channelService =
+		ChannelServiceImpl.getInstance();
+	    /*
+	     * Send "close" notification to channel's servers.
+	     */ 
+	    for (final long nodeId : serverNodeIds) {
+		channelService.runIoTask(
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.close(channelRefId, timestamp);
+			    }
+			} },
+		    nodeId);
+	    }
+
+	    /*
+	     * Notify local channel service to clean up this channel's
+	     * coordinator's transient data.
+	     */
+	    channelService.closedChannel(channelRefId);
+
+	    /*
+	     * Remove channel's persistent data and, optionally, the
+	     * channel's name binding.
+	     */
+	    try {
+		channelService.runTransactionalTask(
+		  new AbstractKernelRunnable("RemoveClosedChannel") {
+		    public void run() {
+			ChannelImpl channel = (ChannelImpl)
+			    getObjectForId(channelRefId);
+			if (channel != null) {
+			    channel.removeChannel(removeName);
+			} else {
+			    // This shouldn't happen
+			    logger.log(
+				Level.SEVERE,
+				"channel:{0} removed before closed",
+				HexDumper.toHexString(channelRefId));
+			}
+		    }
+		});
+	    } catch (Exception e) {
+		// Transaction scheduler will print out warning.
+	    }
+	}
+    }
+    
     /**
      * Returns the event queue for the channel that has the specified
      * {@code channelRefId} and coordinator {@code nodeId}.
@@ -1713,7 +2623,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(
 		Level.WARNING,
 		"Event queue for channel:{0} does not exist",
-		HexDumper.toHexString(channelRefId.toByteArray()));
+		HexDumper.toHexString(channelRefId));
 	}
 	return eventQueue;
     }
@@ -1721,28 +2631,28 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /* -- Static method invoked by ChannelServiceImpl -- */
 
     /**
-     * Handles a channel {@code message} that the specified {@code session}
+     * Handles a channel {@code message} that the specified {@code sender}
      * is sending on the channel with the specified {@code channelRefId}.
      *
      * @param	channelRefId the channel ID, as a {@code BigInteger}
-     * @param	session the client session sending the channel message
+     * @param	sender the client session sending the channel message
      * @param	message the channel message
      */
     static void handleChannelMessage(
-	BigInteger channelRefId, ClientSession session, ByteBuffer message)
+	BigInteger channelRefId, ClientSession sender, ByteBuffer message)
     {
-	assert session instanceof ClientSessionWrapper;
+	assert sender instanceof ClientSessionWrapper;
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
-	    channel.receivedMessage(session, message);
+	    channel.receivedMessage(sender, message);
 	} else {
 	    // Ignore message received for unknown channel.
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(
  		    Level.FINE,
 		    "Dropping message:{0}: from:{1} for unknown channel: {2}",
-		    HexDumper.format(message), session,
-		    HexDumper.toHexString(channelRefId.toByteArray()));
+		    HexDumper.format(message), sender,
+		    HexDumper.toHexString(channelRefId));
 	    }
 	}
     }
@@ -1754,7 +2664,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     static void serviceEventQueue(BigInteger channelRefId) {
 	EventQueue eventQueue = getEventQueue(getLocalNodeId(), channelRefId);
 	if (eventQueue != null) {
-	    eventQueue.serviceEvent();
+	    eventQueue.serviceEventQueue();
 	}
     }
 
@@ -1779,10 +2689,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	/** The node ID of the failed node. */
+	/**
+	 * The node ID of the failed node.
+	 * @serial
+	 */
 	private final long failedNodeId;
 
-	/** The iterator for channels on the failed node. */
+	/**
+	 * The iterator for channels on the failed node.
+	 * @serial
+	 */
 	private final Iterator<String> channelIter;
 
 	/**
@@ -1797,8 +2713,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/**
 	 * Reassigns the next coordinator for the {@code failedNodeId} to
 	 * another node with member sessions (or the local node if there
-	 * are no member sessions), schedules a task to remove failed
-	 * sessions for the channel, and then reschedules this task to
+	 * are no member sessions), and then reschedules this task to
 	 * reassign the next coordinator.  If there are no more
 	 * coordinators for the specified {@code failedNodeId}, then no
 	 * action is taken.
@@ -1818,16 +2733,17 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		channel.reassignCoordinator(failedNodeId);
 		
 		/*
-		 * If other channel servers have failed, remove their sessions
-		 * from the channel too.  This covers the case where a channel
-		 * coordinator (informed of a node failure) fails before it has
-		 * a chance to schedule a task to remove member sessions for
-		 * another failed node (cascading failure during recovery).
+		 * If other channel servers have failed, remove the failed
+		 * server node ID from the channel too.  This covers the
+		 * case where a channel coordinator (informed of a node
+		 * failure) fails before it has a chance to schedule a task
+		 * to remove the server node ID for another failed node
+		 * (cascading failure during recovery).
 		 */
-		for (long serverNodeId : channel.getMemberNodeIds()) {
+		for (long serverNodeId : channel.getServerNodeIds()) {
 		    Node serverNode = watchdogService.getNode(serverNodeId);
 		    if (serverNode == null || !serverNode.isAlive()) {
-			channel.removeSessionSet(serverNodeId);
+			channel.removeServerNodeId(serverNodeId);
 		    }
 		}
 	    }
@@ -1844,12 +2760,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * A persistent task to remove sessions, connected to a failed node,
-     * from locally coordinated channels.  This task handles a single
-     * locally-coordinated channel, and then schedules another task to
-     * handle the next one.
+     * A persistent task to remove a failed node, from locally coordinated
+     * channels.  This task handles a single locally-coordinated channel,
+     * and then schedules another task to handle the next one.
      */
-    static class RemoveFailedSessionsFromLocalChannelsTask
+    static class RemoveFailedNodeFromLocalChannelsTask
 	implements Task, Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -1865,7 +2780,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance with the specified {@code localNodeId}
 	 * and {@code failedNodeId}.
 	 */
-	RemoveFailedSessionsFromLocalChannelsTask(
+	RemoveFailedNodeFromLocalChannelsTask(
 	    long localNodeId, long failedNodeId)
 	{
 	    this.failedNodeId = failedNodeId;
@@ -1873,11 +2788,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Finds the next locally-coordinated channel and schedules a
-	 * task to remove the failed sessions from that channel, and
-	 * reschedules this task to handle the next locally-coordinated
-	 * channel. If there are no more locally-coordinated channels,
-	 * then this task takes no action.
+	 * Gets the next locally-coordinated channel, removes the failed
+	 * node from that channel, and reschedules this task to handle the
+	 * next locally-coordinated channel. If there are no more
+	 * locally-coordinated channels, then this task takes no action.
 	 */
 	public void run() {
 	    if (iter == null || !iter.hasNext()) {
@@ -1885,59 +2799,64 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    
 	    BigInteger channelRefId = new BigInteger(iter.next());
-	    TaskService taskService = ChannelServiceImpl.getTaskService();
-	    taskService.scheduleTask(
-		new RemoveFailedSessionsFromChannelTask(
-		    failedNodeId, channelRefId));
-		    
-	    // Schedule a task to remove failed sessions from next
+	    ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
+	    if (channel != null) {
+		channel.removeServerNodeId(failedNodeId);
+	    }
+	    // Schedule a task to remove failed node from next
 	    // locally coordinated channel.
 	    if (iter.hasNext()) {
-		taskService.scheduleTask(this);
+		ChannelServiceImpl.getTaskService().scheduleTask(this);
 	    }
 	}
     }
 
     /**
-     * A persistent task to remove all failed sessions on a given node
-     * for a channel.
+     * Checks with the {@code ChannelServer} on the node with the specified
+     * {@code nodeId} whether the session with the specified {@code
+     * sessionRefId} is a member of the channel with the specified {@code
+     * channelRefId}, and returns {@code true} if the session is a member
+     * and returns {@code false} otherwise.
+     *
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
+     * @param	nodeId the session's node ID
+     * @param	timestamp the requesting event's timestamp
      */
-    private static class RemoveFailedSessionsFromChannelTask
-	implements Task, Serializable
+    private static boolean isChannelMemberRemoteCheck(
+	BigInteger channelRefId, BigInteger sessionRefId,
+	long nodeId, long timestamp)
     {
-	/** The serialVersionUID for this class. */
-	private static final long serialVersionUID = 1L;
-	
-	private final BigInteger channelRefId;
-	private final long failedNodeId;
-	
-	/** Constructs an instance. */
-	RemoveFailedSessionsFromChannelTask(
- 	    long failedNodeId, BigInteger channelRefId)
-	{
-	    this.channelRefId = channelRefId;
-	    this.failedNodeId = failedNodeId;
-	}
+	try {
+	    ChannelServer server = getChannelServer(nodeId);
+	    MembershipStatus status =
+		server.isMember(channelRefId, sessionRefId);
+	    switch (status) {
+		
+	    case MEMBER:
+		return true;
+		
+	    case NON_MEMBER:
+		
+	    case UNKNOWN:
+		// The return value for UNKNOWN is correct only if the
+		// session is obtained in a transaction while this
+		// method is invoked (which would mean the session's
+		// node can't change due to relocation).  Otherwise, we
+		// would need to resample the session's node ID to see
+		// if it changed.  If it hasn't changed, then it is
+		// disconnected, otherwise, need to check membership
+		// with the new session's new node.
+		return false;
 
-	/** {@inheritDoc} */
-	public void run() {
-	    ChannelImpl channel =
-		(ChannelImpl) getObjectForId(channelRefId);
-	    channel.removeSessionSet(failedNodeId);
+	    default:
+		throw new AssertionError();
+		
+	    }
+	} catch (IOException e) {
+	    // The session's node can't be contacted, so the session
+	    // must be disconnected.
 	}
-    }
-
-    /**
-     * Returns a set containing session identifiers (as obtained by
-     * {@link ManagedReference#getId ManagedReference.getId}) for all
-     * sessions that are a member of the channel with the specified
-     * {@code channelRefId} and are last known to have been connected
-     * to node {@code nodeId}.
-     */
-    static Set<BigInteger> getSessionRefIdsForNode(
-	BigInteger channelRefId, long nodeId)
-    {
-	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
-	return channel.getSessionSet(nodeId);
+	return false;
     }
 }

@@ -24,30 +24,17 @@
 package com.sun.sgs.protocol;
 
 /**
- * An exception that indicates a login request failed.  The {@link
+ * An exception indicating that processing a request has failed, and
+ * therefore that request has been dropped.  The {@link
  * Throwable#getMessage getMessage} method returns a detail message
- * containing an explanation for the failure, the {@link #getReason
- * getReason} method returns the failure reason, and if the failure reason
- * is {@link FailureReason#OTHER}, the {@link Throwable#getCause getCause}
+ * containing an explanation for the failure (possibly {@code
+ * null}), the {@link #getReason getReason} method returns the
+ * failure reason, and if the failure reason is {@link
+ * FailureReason#OTHER}, the {@link Throwable#getCause getCause}
  * method returns the possibly-{@code null} cause of the failure.
  */
-public class LoginFailureException extends Exception {
-
-    /**
-     * Reasons why a login fails.
-     */
-    public enum FailureReason {
-	/** The server rejects a duplicate login. */
-	DUPLICATE_LOGIN,
-	/** The application rejects the login. */
-	REJECTED_LOGIN,
-	/** The server is temporarily unavailable. */
-	SERVER_UNAVAILABLE,
-	/** Other operational failure (see exception {@link
-	 * Throwable#getCause cause} for detail). */
-	OTHER
-    };
-
+public class RequestFailureException extends Exception {
+    
     /** The serial version for this class. */
     private static final long serialVersionUID = 1L;
 
@@ -55,13 +42,28 @@ public class LoginFailureException extends Exception {
     private final FailureReason reason;
 
     /**
+     * Reasons why a request fails.
+     */
+    public enum FailureReason {
+	/** The associated client session has not completed login. */
+	LOGIN_PENDING,
+	/** The client session is relocating to another node. */
+	RELOCATE_PENDING,
+	/** The client session is disconnecting from the local node. */
+	DISCONNECT_PENDING,
+	/** Other operational failure (see exception {@link
+	 * Throwable#getCause cause} for detail). */ 
+	OTHER
+    };
+    
+    /**
      * Constructs an instance with the specified detail {@code message}
      * and {@code reason}.
      *
      * @param	message a detail message, or {@code null}
-     * @param	reason a failure reason
+     * @param	reason a reason why the request failed
      */
-    public LoginFailureException(String message, FailureReason reason) {
+    public RequestFailureException(String message, FailureReason reason) {
 	super(message);
 	if (reason == null) {
 	    throw new NullPointerException("null reason");
@@ -76,7 +78,7 @@ public class LoginFailureException extends Exception {
      * @param	message a detail message, or {@code null}
      * @param	cause the cause of this exception, or {@code null}
      */
-    public LoginFailureException(String message, Throwable cause)
+    public RequestFailureException(String message, Throwable cause)
     {
 	super(message, cause);
 	this.reason = FailureReason.OTHER;

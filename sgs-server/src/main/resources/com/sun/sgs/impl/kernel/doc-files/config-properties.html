@@ -371,6 +371,33 @@ that implements
 	
 </dl>
 
+<a name="ProtocolAcceptor"></a>
+<h3>ProtocolAcceptor Properties</h3>
+These properties control the implementation of the default
+<a href="../../../protocol/ProtocolAcceptor.html">
+  <code>ProtocolAcceptor</code></a> used by the
+  <code>ClientSessionService</code>.
+See the <a href="../../../impl/protocol/simple/SimpleSgsProtocolAcceptor.html">
+  <code>SimpleSgsProtocolAcceptor</code></a> class
+for a complete description and further configuration options.
+<dl>
+
+<dt>com.sun.sgs.impl.protocol.simple.protocol.version
+<span class="default">0x04</span>
+
+<dd>The <code>SimpleSgsProtocol</code> version used by clients
+connecting to the server.  The default value for the protocol
+version is an earlier version of the protocol, <code>0x04</code>.
+The default protocol supports older clients that have not yet
+been upgraded to support the newer version of the protocol which
+supports client session relocation (introduced in protocol version
+<code>0x05</code>).  The server will reject a connection from a
+client that uses a protocol version other than the value
+specified by the property.
+		
+</dl>
+    
+
 <a name="System"></a>
 <h3>System Properties</h3>
 

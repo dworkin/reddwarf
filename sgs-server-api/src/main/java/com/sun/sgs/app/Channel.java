@@ -120,13 +120,14 @@ public interface Channel extends ManagedObject {
      * this channel.  The returned iterator may only be used in the task
      * that this method was invoked from.
      *
-     * <p>The returned iterator may not reflect changes to the membership
-     * that occurred in the current transaction.  Such membership changes
-     * may be handled asynchronously, after the task making the changes
-     * completes.  Therefore, the iterator <i>may not</i> include sessions
-     * that have been recently joined to the channel, or <i>may</i> include
-     * sessions that have recently left the channel (by being explicitly
-     * removed from the channel, or by being disconnected).
+     * <p>The returned iterator may not reflect recent changes (in the
+     * current transaction or another recent transaction) to the channel's
+     * membership.  Membership changes may be handled asynchronously, after
+     * the task making the changes completes.  Therefore, the iterator
+     * <i>may not</i> include sessions that have been recently joined to
+     * the channel, or <i>may</i> include sessions that have recently left
+     * the channel (by being explicitly removed from the channel, or by
+     * being disconnected).
      *
      * <p>Note: This operation may be expensive, so it should be used
      * judiciously.
@@ -223,17 +224,11 @@ public interface Channel extends ManagedObject {
     Channel leaveAll();
 
     /**
-     * Sends the message contained in the specified buffer to all
-     * client sessions joined to this channel.  If no sessions are
-     * joined to this channel, then no action is taken. The message starts
-     * at the buffer's current position and ends at the buffer's limit.
-     * The buffer's position is not modified by this operation.
+     * Sends the message contained in the specified buffer to all client
+     * sessions joined to this channel. The message starts at the buffer's
+     * current position and ends at the buffer's limit.  The buffer's
+     * position is not modified by this operation.
      *
-     * <p>If the specified {@code sender} is non-{@code null} and that
-     * sender is not a member of this channel when the message is processed
-     * to be sent, then the message will not be forwarded to the channel
-     * for delivery.
-     * 
      * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
      * have no effect on the message sent to the channel by this invocation.
@@ -241,6 +236,56 @@ public interface Channel extends ManagedObject {
      * <p>The maximum length of a message that can be sent over the channel is
      * dependent on the maximum message length supported by all joined client
      * sessions. (See: {@link ClientSession#getMaxMessageLength})
+     *
+     * @param	message a message
+     *
+     * @return	this channel
+     *
+     * @throws	IllegalStateException if this channel is closed
+     * @throws  IllegalArgumentException if the channel would be unable
+     *          to send the specified message because it exceeds a size limit 
+     * @throws	MessageRejectedException if there are not enough resources
+     *		to send the specified message
+     * @throws	TransactionException if the operation failed because of
+     *		a problem with the current transaction
+     */
+    Channel send(ByteBuffer message);
+    
+    /**
+     * Sends the message contained in the specified buffer to all client
+     * sessions joined to this channel. The message starts at the buffer's
+     * current position and ends at the buffer's limit.  The buffer's
+     * position is not modified by this operation.
+     *
+     * <p>This {@code send} method, which has a {@code sender} argument, is
+     * used to forward a message to a channel from the channel's {@link
+     * ChannelListener}.  When the channel's listener receives a message
+     * via its {@link ChannelListener#receivedMessage receivedMessage}
+     * method, the listener can perform access control operations on the
+     * sender, alter the message content, and/or perform other operations
+     * before (optionally) using this method, specifying the given {@code
+     * sender}, to forward the message to the channel.
+     *
+     * <p>If {@code sender} specified to this method is non-{@code null},
+     * it must be the {@code sender} supplied to the {@code
+     * ChannelListener}'s {@code receivedMessage} method.  If that sender
+     * is not a member of this channel when the message is processed to be
+     * sent, then the message will not be forwarded to the channel for
+     * delivery.  If the {@code sender} specified to this method is
+     * non-{@code null} and is not the {@code sender} supplied to the
+     * {@code ChannelListener}, then the channel message may not get
+     * delivered to the channel.
+     *
+     * <p>If the {@code sender} is {@code null}, the message will be
+     * forwarded to the channel.
+     * 
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message sent to the channel by this invocation.
+     * 
+     * <p>The maximum length of a message that can be sent over the channel is
+     * dependent on the maximum message length supported by all joined client
+     * sessions. See {@link ClientSession#getMaxMessageLength}.
      *
      * @param	sender the sending client session, or {@code null}
      * @param	message a message

@@ -25,6 +25,7 @@ package com.sun.sgs.protocol;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**
@@ -37,6 +38,31 @@ import java.util.concurrent.Future;
  * messages (for example only resuming reading when the handler completes
  * processing a request), and/or can control the number of clients connected
  * at any given time.
+ *
+ * <p>When a {@code SessionProtocolHandler} instance finishes processing a
+ * request (corresponding to one of its methods), it invokes the {@link
+ * RequestCompletionHandler#completed completed} method (on {@code
+ * completionHandler} specified in the request) with a {@code Future} that
+ * contains the result of the request.  This {@code Future} can be
+ * checked (by invoking the {@code Future.get} method) to see if processing
+ * the request failed.
+ *
+ * <p>If the request failed, then invoking the {@code get} method on the
+ * supplied {@code Future} will throw {@link ExecutionException} with a
+ * cause of {@link RequestFailureException}.  The reason for the failure
+ * can be obtained by invoking the {@link RequestFailureException#getReason
+ * getReason} method on the {@code RequestFailureException}.  The request
+ * may fail for one of the following {@linkplain RequestFailureException
+ * reasons}: 
+ * <ul>
+ * <li>{@code LOGIN_PENDING}: the client session has not completed login
+ * <li>{@code RELOCATION_PENDING}: the client session is relocating to
+ * another node 
+ * <li>{@code DISCONNECT_PENDING}: the client session is disconnecting
+ * <li>{@code OTHER}: some other failure occurred, and invoking {@link
+ * Throwable#getCause getCause} on the {@code RequestFailureException}
+ * returns the exception that caused the failure
+ * </ul>
  */
 public interface SessionProtocolHandler {
 

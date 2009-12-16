@@ -102,6 +102,8 @@ public interface SessionProtocol extends Channel {
      * 
      * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
@@ -118,12 +120,15 @@ public interface SessionProtocol extends Channel {
      * @param	channelId the channel's ID
      * @param	delivery the channel's delivery guarantee
      *
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
      */
     void channelJoin(String name, BigInteger channelId, Delivery delivery)
-            throws IOException;
+	throws IOException;
 
     /**
      * Notifies the associated client that it is no longer a member of
@@ -132,9 +137,13 @@ public interface SessionProtocol extends Channel {
      *
      * @param	channelId a channel ID
      * 
-     * @throws IOException if an I/O error occurs
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
+     * @throws	IOException if an I/O error occurs
      */
-    void channelLeave(BigInteger channelId) throws IOException;
+    void channelLeave(BigInteger channelId)
+	throws IOException;
 
     /**
      * Sends the associated client the specified channel {@code message}
@@ -159,16 +168,18 @@ public interface SessionProtocol extends Channel {
      * @param	message a channel message
      * @param	delivery the channel's delivery guarantee
      *
-     * @throws	DeliveryNotSupportedException if the specified {@code
-     *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
+     * @throws	IllegalStateException if the associated session was
+     *		requested to suspend messages (explicitly or due to
+     *		relocation) 
+     * @throws	DeliveryNotSupportedException if the specified {@code
+     *		delivery} guarantee cannot be satisfied by this protocol
      * @throws	IOException if an I/O error occurs
      */
     void channelMessage(
 	BigInteger channelId, ByteBuffer message, Delivery delivery)
         throws IOException;
-
 
     /**
      * Disconnects the associated session for the specified {@code reason}.
@@ -176,10 +187,11 @@ public interface SessionProtocol extends Channel {
      * the reason for the disconnection, or the protocol may close the
      * connection immediately.  Any underlying connection(s) should be
      * closed in a timely fashion.
-     
+     *
      * @param	reason	the reason for disconnection
      * 
-     * @throws IOException if an I/O error occurs
+     * @throws	IOException if an I/O error occurs
      */
-    void disconnect(DisconnectReason reason) throws IOException;
+    void disconnect(DisconnectReason reason)
+	throws IOException;
 }
