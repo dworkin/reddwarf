@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -718,7 +719,7 @@ public final class CachingDataStore extends AbstractDataStore
 		assert i < 1000 : "Too many retries";
 		ObjectCacheEntry entry = cache.getObjectEntry(oid);
 		assert entry != null :
-		    "markForUpdate called for object not in cache";
+		    "markForUpdate called for object not in cache: " + oid;
 		switch (entry.awaitWritable(lock, stop)) {
 		case DECACHED:
 		    /* Entry was decached -- try again */
@@ -1047,6 +1048,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    }
 		    /* Get information from server and try again */
 		    entry.setPendingPrevious();
+		    context.noteAccess(entry);
 		    scheduleFetch(
 			new GetBindingRunnable(
 			    context, nameKey, entry.key, reserve));
@@ -1178,10 +1180,12 @@ public final class CachingDataStore extends AbstractDataStore
 			     * to be unbound -- fall through to create entry
 			     * for the new binding
 			     */
+			    context.noteAccess(entry);
 			}
 		    } else {
 			/* Get information from server and try again */
 			entry.setPendingPrevious();
+			context.noteAccess(entry);
 			scheduleFetch(
 			    new GetBindingForUpdateRunnable(
 				context, nameKey, entry.key, reserve));
@@ -1321,19 +1325,19 @@ public final class CachingDataStore extends AbstractDataStore
 	     * there can't be any evictions initiated.	For that reason, there
 	     * is no need to retry once we confirm that the entry is cached.
 	     */
-	    entry.awaitNotPendingPrevious(lock, stop);
-	    if (entry.getWritable()) {
+	    if (!entry.awaitNotPendingPrevious(lock, stop)) {
+		/* Decached */
+		return false;
+	    } else if (entry.getWritable()) {
 		/* Writable */
 		return true;
-	    } else if (entry.getReadable()) {
+	    } else {
 		/* Initiate upgrade */
 		entry.setPendingPrevious();
+		context.noteAccess(entry);
 		scheduleFetch(
 		    new GetBindingForUpdateUpgradeRunnable(
 			context, entry.key));
-		return false;
-	    } else {
-		/* Decached. */
 		return false;
 	    }
 	case WRITABLE:
@@ -1418,13 +1422,16 @@ public final class CachingDataStore extends AbstractDataStore
 	    /* Entry not in cache -- try again */
 	    return false;
 	case READABLE:
-	    entry.awaitNotPendingPrevious(lock, stop);
-	    if (!entry.getKnownUnbound(nameKey)) {
+	    if (!entry.awaitNotPendingPrevious(lock, stop)) {
+		/* Decached */
+		return false;
+	    } else if (!entry.getKnownUnbound(nameKey)) {
 		/* Operation on previous key changed things */
 		return false;
 	    } else if (!entry.getWritable()) {
 		/* Upgrade */
 		entry.setPendingPrevious();
+		context.noteAccess(entry);
 		scheduleFetch(
 		    new GetBindingForUpdateUpgradeNextRunnable(
 			context, nameKey.getName(), entry.key));
@@ -1543,6 +1550,7 @@ public final class CachingDataStore extends AbstractDataStore
 			} else {
 			    /* Entry is in cache */
 			    nameWritable = entry.getWritable();
+			    context.noteAccess(entry);
 			    /* Fall through to work on next entry */
 			}
 		    } else if (!assureNextEntry(entry, nameKey, true, lock,
@@ -1559,6 +1567,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    } else {
 			/* Get information from the server and try again */
 			entry.setPendingPrevious();
+			context.noteAccess(entry);
 			scheduleFetch(
 			    new GetBindingForRemoveRunnable(
 				context, nameKey, entry.key, reserve));
@@ -1650,12 +1659,11 @@ public final class CachingDataStore extends AbstractDataStore
 	    /* Not in cache -- try again */
 	    return false;
 	case READABLE:
-	    entry.awaitNotPendingPrevious(lock, stop);
 	    /*
 	     * Return true if readable -- caller will upgrade.  Otherwise not
 	     * in the cache -- try again.
 	     */
-	    return entry.getReadable();
+	    return entry.awaitNotPendingPrevious(lock, stop);
 	case WRITABLE:
 	    /* Already writable */
 	    return true;
@@ -1714,6 +1722,7 @@ public final class CachingDataStore extends AbstractDataStore
 			   entry.getWritable())
 		{
 		    /* Both name and next name were writable -- fall through */
+		    context.noteAccess(entry);
 		} else if (!assureNextEntry(entry, nameKey, false, lock, stop))
 		{
 		    /* Don't have the next entry -- try again */
@@ -1721,6 +1730,7 @@ public final class CachingDataStore extends AbstractDataStore
 		} else {
 		    /* Get information from server and try again */
 		    entry.setPendingPrevious();
+		    context.noteAccess(entry);
 		    scheduleFetch(
 			new GetBindingForRemoveRunnable(
 			    context, nameKey, entry.key, reserve));
@@ -1752,7 +1762,9 @@ public final class CachingDataStore extends AbstractDataStore
 	try {
 	    synchronized (nameLock) {
 		entry = cache.getBindingEntry(nameKey);
-		entry.awaitNotPendingPrevious(nameLock, stop);
+		if (!entry.awaitNotPendingPrevious(nameLock, stop)) {
+		    return null;
+		}
 		nameEntryOk = true;
 		previousKey = entry.getPreviousKey();
 		previousKeyUnbound = entry.getPreviousKeyUnbound();
@@ -2321,7 +2333,10 @@ public final class CachingDataStore extends AbstractDataStore
 		Object lock = cache.getBindingLock(entry.key);
 		synchronized (lock) {
 		    if (nameKey.equals(entry.key)) {
-			entry.awaitNotPendingPrevious(lock, stop);
+			if (!entry.awaitNotPendingPrevious(lock, stop)) {
+			    /* Decached */
+			    continue;
+			}
 		    } else if (!assureNextEntry(entry, nameKey, true, lock,
 						stop))
 		    {
@@ -2334,8 +2349,14 @@ public final class CachingDataStore extends AbstractDataStore
 			 */
 			return;
 		    }
-		    if (entry.getDecaching() || entry.getDowngrading()) {
-			/* Already being evicted or downgraded */
+		    if (entry.getDecaching() ||
+			entry.getDowngrading() ||
+			!entry.getWritable())
+		    {
+			/*
+			 * Already being evicted or downgraded, or already
+			 * downgraded
+			 */
 			return;
 		    }
 		    assert !entry.getPendingPrevious();
@@ -2473,9 +2494,8 @@ public final class CachingDataStore extends AbstractDataStore
 		Object lock = cache.getBindingLock(entry.key);
 		synchronized (lock) {
 		    if (nameKey.equals(entry.key)) {
-			entry.awaitNotPendingPrevious(lock, stop);
-			if (entry.getDecaching()) {
-			    /* Already being evicted */
+			if (!entry.awaitNotPendingPrevious(lock, stop)) {
+			    /* Decached */
 			    return;
 			}
 		    } else if (!assureNextEntry(entry, nameKey, true, lock,
@@ -2536,7 +2556,8 @@ public final class CachingDataStore extends AbstractDataStore
 	    Object lock = cache.getBindingLock(entryKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(entryKey);
-		assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+		assert nameKey.compareTo(entry.getPreviousKey()) > 0
+		    : "nameKey:" + nameKey + ", entry:" + entry;
 		entry.setPreviousKey(nameKey, false);
 		entry.setNotPendingPrevious(lock);
 	    }
@@ -2777,7 +2798,8 @@ public final class CachingDataStore extends AbstractDataStore
     /**
      * Make sure that the entry is not the next entry for a pending operation,
      * that it is indeed the next entry in the cache higher than, and possibly
-     * including, the specified key, and wait for it to be readable.
+     * including, the specified key, and wait for it to be readable and not
+     * downgrading.
      *
      * @param	entry the entry
      * @param	previousKey the key for which {@code entry} should be the next
@@ -2797,21 +2819,13 @@ public final class CachingDataStore extends AbstractDataStore
 				    Object lock,
 				    long stop)
     {
-	assert Thread.holdsLock(lock);
-	entry.awaitNotPendingPrevious(lock, stop);
+	if (!entry.awaitNotPendingPrevious(lock, stop)) {
+	    return false;
+	}
 	BindingCacheEntry check =
 	    includeEquals ? cache.getCeilingBindingEntry(previousKey)
 	    : cache.getHigherBindingEntry(previousKey);
-	if (check != entry) {
-	    /*
-	     * Another entry was inserted in the time between when we got this
-	     * entry and when we locked it -- try again
-	     */
-	    return false;
-	} else {
-	    /* Wait for the entry to be readable */
-	    return entry.awaitReadable(lock, stop);
-	}
+	return check == entry;
     }
 
     /* -- Utility classes -- */

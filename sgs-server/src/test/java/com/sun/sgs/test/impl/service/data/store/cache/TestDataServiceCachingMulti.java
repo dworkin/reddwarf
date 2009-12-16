@@ -19,6 +19,9 @@
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import static com.sun.sgs.impl.kernel.StandardProperties.NODE_TYPE;
@@ -38,16 +41,22 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.impl.service.data.BasicDataServiceMultiTest;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -439,6 +448,136 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	} }.runTask();
     }
 
+    /** Test random concurrent name binding accesses. */
+    @Test
+    public void testConcurrentBindings() throws Exception {
+	final int bindings = Integer.getInteger("test.bindings", 50);
+	int threads = Integer.getInteger("test.threads", 1);
+	int nodes = Integer.getInteger("test.nodes", 2);
+	int repeat = Integer.getInteger("test.repeat", 10);
+	int wait = Integer.getInteger("test.wait", 60);
+	System.err.println("Testing with bindings:" + bindings +
+			   ", threads:" + threads +
+			   ", nodes:" + nodes +
+			   ", repeat:" + repeat +
+			   ", wait:" + wait);
+	if (nodes > appNodes.size()) {
+	    setUp(nodes);
+	}
+	long start = System.currentTimeMillis();
+	/* Set half the bindings */
+	new RunChunkedTask(serverNode) { boolean runChunk() {
+	    ManagedInteger remaining;
+	    DummyManagedObject dummy;
+	    try {
+		remaining =
+		    (ManagedInteger) dataService.getBinding("remaining");
+		dummy = (DummyManagedObject) dataService.getBinding("dummy");
+	    } catch (NameNotBoundException e) {
+		remaining = new ManagedInteger(bindings / 2);
+		dataService.setBinding("remaining", remaining);
+		dummy = new DummyManagedObject();
+		dataService.setBinding("dummy", dummy);
+	    }
+	    if (remaining.value == 0) {
+		dataService.removeBinding("remaining");
+		return true;
+	    } else {
+		dataService.markForUpdate(remaining);
+		while (remaining.value > 0 && taskService.shouldContinue()) {
+		    dataService.setBinding(
+			String.valueOf(--remaining.value), dummy);
+		}
+		return false;
+	    } } }.runTask();
+	/* Random work */
+	AwaitDone done = new AwaitDone(nodes * threads);
+	for (int i = 0; i < nodes; i++) {
+	    SgsTestNode node = appNodes.get(i);
+	    for (int j = 0; j < threads; j++) {
+		new RandomWorkTask(
+		    node, done, bindings, repeat).scheduleTask();
+	    }
+	}
+	done.await(wait, SECONDS);
+	/* Remove all bindings */
+	new RunChunkedTask(serverNode) { boolean runChunk() {
+	    ManagedInteger remaining;
+	    try {
+		remaining =
+		    (ManagedInteger) dataService.getBinding("remaining");
+	    } catch (NameNotBoundException e) {
+		remaining = new ManagedInteger(bindings);
+		dataService.setBinding("remaining", remaining);
+	    }
+	    if (remaining.value == 0) {
+		dataService.removeBinding("remaining");
+		return true;
+	    } else {
+		dataService.markForUpdate(remaining);
+		while (remaining.value > 0 && taskService.shouldContinue()) {
+		    try {
+			dataService.removeBinding(
+			    String.valueOf(--remaining.value));
+		    } catch (NameNotBoundException e) {
+		    }
+		}
+		return false;
+	    } } }.runTask();
+	long time = System.currentTimeMillis() - start;
+	System.err.println("Test finished in " + (time / 1000) + " seconds");
+    }
+
+    /** Get, set, and remove random bindings */
+    private class RandomWorkTask extends RunChunkedTask {
+	private final int bindings;
+	private final AtomicInteger remaining;
+	private final Random rand = new Random();
+	RandomWorkTask(SgsTestNode node, AwaitDone done, int bindings,
+		       int repeat)
+	{
+	    super(node, done);
+	    this.bindings = bindings;
+	    remaining = new AtomicInteger(repeat);
+	}
+	void scheduleTask() {
+	    txnScheduler.scheduleTask(this, taskOwner);
+	}
+	boolean runChunk() {
+	    if (remaining.get() == 0) {
+		return true;
+	    }
+	    List<Character> ops = Arrays.asList('r', 'r', 'w', 'x');
+	    Collections.shuffle(ops);
+	    for (char op : ops) {
+		String name = String.valueOf(rand.nextInt(bindings));
+		System.err.println(nodeId + " " + op + " a." + name);
+		switch (op) {
+		case 'r':
+		    try {
+			dataService.getBinding(name);
+		    } catch (NameNotBoundException e) {
+		    }
+		    break;
+		case 'w':
+		    dataService.setBinding(
+			name, dataService.getBinding("dummy"));
+		    break;
+		case 'x':
+		    try {
+			dataService.removeBinding(name);
+		    } catch (NameNotBoundException e) {
+		    }
+		    break;
+		default:
+		    throw new AssertionError();
+		}
+	    }
+	    remaining.getAndDecrement();
+	    return false;
+	}
+    }
+
     /* -- Other classes and methods -- */
 
     /** Define a convenience class for scheduling tasks. */
@@ -449,6 +588,7 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	final TransactionProxy txnProxy;
 	final TransactionScheduler txnScheduler;
 	final DataService dataService;
+	final TaskService taskService;
 	final Identity taskOwner;
 	RunTask(SgsTestNode node) {
 	    this.node = node;
@@ -458,10 +598,147 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	    txnScheduler =
 		systemRegistry.getComponent(TransactionScheduler.class);
 	    dataService = node.getDataService();
+	    taskService = node.getTaskService();
 	    taskOwner = txnProxy.getCurrentOwner();
 	}
 	void runTask() throws Exception {
 	    txnScheduler.runTask(this, taskOwner);
+	}
+    }
+
+    /**
+     * Define an object to use for waiting for the completion of a set of
+     * tasks.
+     */
+    private static class AwaitDone {
+
+	/** The number of tasks that have not completed. */
+	private final CountDownLatch done;
+
+	/** The exception from a failed task, or null. */
+	private final AtomicReference<Throwable> failure =
+	    new AtomicReference<Throwable>();
+
+	/**
+	 * Creates an instance that waits for the specified number of tasks.
+	 */
+	AwaitDone(int count) {
+	    done = new CountDownLatch(count);
+	}
+
+	/** Notes that a task completed successfully. */
+	void taskSucceeded() {
+	    done.countDown();
+	}
+
+	/** Notes that a task failed with the specified exception. */
+	void taskFailed(Throwable exception) {
+	    failure.set(exception);
+	    while (done.getCount() > 0) {
+		done.countDown();
+	    }
+	}
+
+	/** Returns whether all tasks are done. */
+	boolean getDone() {
+	    return done.getCount() == 0;
+	}
+
+	/**
+	 * Waits for the tasks to complete, throwing an exception if any task
+	 * fails or does not complete in the specified amount of time.
+	 */
+	void await(long timeout, TimeUnit unit) throws InterruptedException {
+	    if (!done.await(timeout, unit)) {
+		taskFailed(new RuntimeException("Tasks did not complete"));
+	    }
+	    Throwable exception = failure.get();
+	    if (exception instanceof RuntimeException) {
+		throw (RuntimeException) exception;
+	    } else if (exception instanceof Error) {
+		throw (Error) exception;
+	    } else if (exception != null) {
+		throw new RuntimeException(
+		    "Unexpected exception", exception);
+	    }
+	}
+    }
+
+    /**
+     * Define a convenience class for scheduling tasks that are broken into
+     * separate transactions.
+     */
+    private abstract class RunChunkedTask extends RunTask {
+
+	/** The object to use to wait for task completion. */
+	private final AwaitDone done;
+
+	/** Creates an instance of this class. */
+	RunChunkedTask(SgsTestNode node) {
+	    this(node, new AwaitDone(1));
+	}
+
+	/**
+	 * Creates an instance of this class using the specified count down
+	 * latch and failure reference.
+	 */
+	RunChunkedTask(SgsTestNode node, AwaitDone done) {
+	    super(node);
+	    this.done = done;
+	}
+
+	/**
+	 * Runs a portion of the task, returning true if the entire task is
+	 * done.
+	 *
+	 * @return	whether the task is done
+	 */
+	abstract boolean runChunk();
+
+	/** Runs this task and 1 second for it to be done. */
+	void runTask() throws InterruptedException {
+	    txnScheduler.scheduleTask(this, taskOwner);
+	    done.await(1, SECONDS);
+	}
+
+	/** Runs the task chunks, rescheduling this task until it is done. */
+	public final void run() {
+	    if (!done.getDone()) {
+		try {
+		    if (runChunk()) {
+			done.taskSucceeded();
+		    } else {
+			txnScheduler.scheduleTask(this, taskOwner);
+		    }
+		} catch (RuntimeException e) {
+		    if (isRetryable(e)) {
+			throw e;
+		    }
+		    done.taskFailed(e);
+		} catch (Error e) {
+		    done.taskFailed(e);
+		}
+	    }
+	}
+    }
+
+    /**
+     * Returns true if the given {@code Throwable} will be retried
+     * @param t the throwable to test
+     * @return true if {@code t} will be retried
+     */
+    private static boolean isRetryable(Throwable t) {
+	return
+	    t instanceof ExceptionRetryStatus &&
+	    ((ExceptionRetryStatus) t).shouldRetry();
+    }
+
+    /** A managed object that contains an integer, which may be null. */
+    static class ManagedInteger implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1;
+	int value;
+	ManagedInteger(int value) {
+	    this.value = value;
 	}
     }
 }

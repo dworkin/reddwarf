@@ -276,8 +276,11 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		}
 	    }
 	    try {
-		awaitNotPendingPrevious(
-		    lock, System.currentTimeMillis() + lockTimeout);
+		if (!awaitNotPendingPrevious(
+			lock, System.currentTimeMillis() + lockTimeout))
+		{
+		    return;
+		}
 	    } catch (TransactionTimeoutException e) {
 		if (logger.isLoggable(WARNING)) {
 		    logger.log(WARNING,
@@ -371,31 +374,33 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
      * Waits for the pending operation, if any, for an entry immediately
-     * previous to this entry in the cache to complete.
+     * previous to this entry in the cache to complete.  Also waits for the
+     * entry to not be downgrading, and assures that it is in the cache.
      *
      * @param	lock the associated lock, which should be held
      * @param	stop the time in milliseconds when waiting should fail
-     * @throws	IllegalStateException if there is no pending operation for a
-     *		previous entry
+     * @param	whether the entry is readable in the cache
      * @throws	TransactionTimeoutException if the operation does not succeed
      *		before the specified stop time
      */
-    void awaitNotPendingPrevious(Object lock, long stop) {
+    boolean awaitNotPendingPrevious(Object lock, long stop) {
 	assert Thread.holdsLock(lock);
-	if (!pendingPrevious) {
-	    return;
+	if (getReadable() && !pendingPrevious && !getDowngrading()) {
+	    return true;
 	}
 	long start = System.currentTimeMillis();
 	long now = start;
 	while (now < stop) {
+	    if (!awaitReadable(lock, stop)) {
+		return false;
+	    } else if (!pendingPrevious && !getDowngrading()) {
+		return true;
+	    }
 	    try {
 		lock.wait(stop - now);
 	    } catch (InterruptedException e) {
 		throw new TransactionInterruptedException(
 		    "Interrupt while waiting for lock: " + this, e);
-	    }
-	    if (!pendingPrevious) {
-		return;
 	    }
 	    now = System.currentTimeMillis();
 	}

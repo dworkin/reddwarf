@@ -458,16 +458,22 @@ public class LockManager<K> {
 			}
 			boolean isOwner;
 			boolean timedOut = false;
+			boolean upgradeFailed = false;
 			assert Lock.noteSync(this, key);
 			try {
 			    synchronized (keyMap) {
-				isOwner = lock.isOwner(result.request);
+				LockRequest<K> owner = lock.getOwner(locker);
+				boolean upgrade = result.request.getUpgrade();
+				isOwner = (owner != null) &&
+				    (!upgrade || owner.getUpgrade());
 				if (!isOwner) {
 				    if (conflict != null) {
 					lock.flushWaiter(locker);
 				    } else if (now >= stop) {
 					timedOut = true;
 					lock.flushWaiter(locker);
+				    } else if (upgrade && owner == null) {
+					upgradeFailed = true;
 				    }
 				}
 			    }
@@ -499,6 +505,9 @@ public class LockManager<K> {
 			    conflict = new LockConflict<K>(
 				LockConflictType.TIMEOUT, result.conflict);
 			    break;
+			} else if (upgradeFailed) {
+			    conflict = new LockConflict<K>(
+				LockConflictType.DENIED, result.conflict);
 			} else if (conflict != null) {
 			    break;
 			}
@@ -554,7 +563,7 @@ public class LockManager<K> {
      */
     void releaseLockInternal(Locker<K> locker, K key, boolean downgrade) {
 	checkLockManager(locker);
-	List<Locker<K>> newOwners = Collections.emptyList();
+	List<Locker<K>> lockersToNotify = Collections.emptyList();
 	Map<K, Lock<K>> keyMap = getKeyMap(key);
 	assert Lock.noteSync(this, key);
 	try {
@@ -562,7 +571,7 @@ public class LockManager<K> {
 		/* Don't create the lock if it isn't present */
 		Lock<K> lock = keyMap.get(key);
 		if (lock != null) {
-		    newOwners = lock.release(locker, downgrade);
+		    lockersToNotify = lock.release(locker, downgrade);
 		    if (!lock.inUse(this)) {
 			keyMap.remove(key);
 		    }
@@ -571,7 +580,7 @@ public class LockManager<K> {
 	} finally {
 	    assert Lock.noteUnsync(this, key);
 	}
-	for (Locker<K> newOwner : newOwners) {
+	for (Locker<K> newOwner : lockersToNotify) {
 	    logger.log(FINEST, "notify new owner {0}", newOwner);
 	    assert newOwner.noteSync();
 	    try {

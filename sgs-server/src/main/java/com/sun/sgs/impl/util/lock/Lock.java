@@ -121,7 +121,9 @@ final class Lock<K> {
 	    {
 		LockRequest<K> waiterRequest = i.next();
 		if (locker == waiterRequest.getLocker()) {
-		    assert forWrite == waiterRequest.getForWrite();
+		    assert forWrite == waiterRequest.getForWrite()
+			: "forWrite:" + forWrite +
+			  ", waiterRequest:" + waiterRequest;
 		    request = waiterRequest;
 		    if (conflict == null) {
 			i.remove();
@@ -183,15 +185,17 @@ final class Lock<K> {
     }
 
     /**
-     * Releases the ownership of this lock by the locker.  Attempts to
-     * acquire locks for current waiters, removing the ones that acquire
-     * the lock from the waiters list, adding them to the owners, and
-     * returning them.
+     * Releases the ownership of this lock by the locker.  Attempts to acquire
+     * locks for current waiters, removing the ones that acquire the lock from
+     * the waiters list.  Also removes the current locker from the waiters list
+     * if it was waiting to upgrade -- only happens in the multi-locker case.
+     * Returns a list of lockers that should be notified, including the new
+     * owners and the current locker if it was upgrading.
      *
      * @param	locker the locker whose ownership will be released
      * @param	downgrade whether to downgrade ownership from write to read
      *		rather than releasing all ownership
-     * @return	the newly added owners
+     * @return	the lockers that should be notified
      */
     List<Locker<K>> release(Locker<K> locker, boolean downgrade) {
 	assert checkSync(locker.lockManager);
@@ -215,37 +219,52 @@ final class Lock<K> {
 		break;
 	    }
 	}
-	List<Locker<K>> lockersToNotify = Collections.emptyList();
+	List<Locker<K>> lockersToNotify = null;
 	if (owned && !waiters.isEmpty()) {
-	    boolean found = false;
+	    boolean conflict = false;
 	    for (int i = 0; i < waiters.size(); i++) {
 		LockRequest<K> waiter = waiters.get(i);
-		LockAttemptResult<K> result =
-		    lock(waiter.getLocker(), waiter.getForWrite(), true);
-		if (logger.isLoggable(FINEST)) {
-		    logger.log(FINEST,
-			       "attempt to lock waiter {0} returns {1}",
-			       waiter, result);
+		if (waiter.getLocker() == locker) {
+		    /*
+		     * The owner was also waiting to upgrade -- only happens in
+		     * for a multi-locker where waiting and releasing can
+		     * happen concurrently.
+		     */
+		    assert waiter.getUpgrade();
+		    waiters.remove(i);
+		    i--;
+		    if (lockersToNotify == null) {
+			lockersToNotify = new ArrayList<Locker<K> >();
+		    }
+		    lockersToNotify.add(locker);
+		} else if (!conflict) {
+		    LockAttemptResult<K> result =
+			lock(waiter.getLocker(), waiter.getForWrite(), true);
+		    if (logger.isLoggable(FINEST)) {
+			logger.log(FINEST,
+				   "attempt to lock waiter {0} returns {1}",
+				   waiter, result);
+		    }
+		    /*
+		     * Stop granting locks when the first conflict is detected.
+		     */
+		    if (result != null && result.conflict != null) {
+			conflict = true;
+		    } else {
+			/* Back up because this waiter was removed */
+			i--;
+			if (lockersToNotify == null) {
+			    lockersToNotify = new ArrayList<Locker<K>>();
+			}
+			lockersToNotify.add(waiter.getLocker());
+		    }
 		}
-		/*
-		 * Stop when the first conflict is detected.  This
-		 * implementation always services waiters in order, so
-		 * there is no reason to look further after we've found a
-		 * waiter that is still blocked.
-		 */
-		if (result != null && result.conflict != null) {
-		    break;
-		}
-		/* Back up because this waiter was removed */
-		i--;
-		if (!found) {
-		    found = true;
-		    lockersToNotify = new ArrayList<Locker<K>>();
-		}
-		lockersToNotify.add(waiter.getLocker());
 	    }
 	}
 	assert !inUse(locker.lockManager) || validateInUse();
+	if (lockersToNotify == null) {
+	    lockersToNotify = Collections.emptyList();
+	}
 	return lockersToNotify;
     }
 
@@ -359,10 +378,7 @@ final class Lock<K> {
 	}
     }
 
-    /**
-     * Removes a locker from the list of waiters for this lock.  The locker
-     * must be present in the list.
-     */
+    /** Removes a locker from the list of waiters for this lock, if present. */
     void flushWaiter(Locker<K> locker) {
 	assert checkSync(locker.lockManager);
 	for (Iterator<LockRequest<K>> iter = waiters.iterator();
@@ -374,21 +390,23 @@ final class Lock<K> {
 		return;
 	    }
 	}
-	throw new AssertionError("Waiter was not found: " + locker);
     }
 
     /**
-     * Checks if the lock is already owned in a way the satisfies the
-     * specified request.
+     * Returns the request with the specified locker that owns the lock, or
+     * {@code null} if none is found.
+     *
+     * @param	locker the locker
+     * @return	the owner with the specified locker, or {@code null}
      */
-    boolean isOwner(LockRequest<K> request) {
-	assert checkSync(request.getLocker().lockManager);
+    LockRequest<K> getOwner(Locker<K> locker) {
+	assert checkSync(locker.lockManager);
 	for (LockRequest<K> owner : owners) {
-	    if (request.getLocker() == owner.getLocker()) {
-		return !request.getForWrite() || owner.getForWrite();
+	    if (locker == owner.getLocker()) {
+		return owner;
 	    }
 	}
-	return false;
+	return null;
     }
 
     /**
