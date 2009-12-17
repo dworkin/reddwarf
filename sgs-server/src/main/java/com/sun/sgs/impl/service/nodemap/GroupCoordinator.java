@@ -35,6 +35,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -164,7 +165,7 @@ public class GroupCoordinator extends BasicState {
      * will have no effect.
      */
     public void enable() {
-        if (setEnabledState()) {
+        if (setEnabledState() && (builder != null)) {
             builder.enable();
             if ((finder != null) && (updateTask == null)) {   // TODO .. sync?
                 updateTask = taskScheduler.scheduleRecurringTask(
@@ -188,7 +189,7 @@ public class GroupCoordinator extends BasicState {
      * time but will eventually become stale
      */
     public void disable() {
-        if (setDisabledState()) {
+        if (setDisabledState() && (builder != null)) {
             if (updateTask != null) {   // TODO... sync?
                 updateTask.cancel();
                 updateTask = null;
@@ -236,13 +237,9 @@ public class GroupCoordinator extends BasicState {
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Request to offload {0}", node);
         }
-        final long nodeId = node.getId();
-        NavigableSet<RelocatingAffinityGroup> groupSet= nodeSets.get(nodeId);
 
-        if (groupSet == null) {
-            groupSet = getGroups(nodeId);
-        }
-        Iterator<RelocatingAffinityGroup> iter = groupSet.iterator();
+        final long nodeId = node.getId();
+        Iterator<RelocatingAffinityGroup> iter = getNodeSet(nodeId).iterator();
 
         while (iter.hasNext()) {
             checkForShutdownState();
@@ -266,11 +263,46 @@ public class GroupCoordinator extends BasicState {
                 return;
             }
         }
-        // Either no groups were found, in which case the call to super will
-        // move an individual identity, or we were moving everyone off, and the
-        // call to super will move any remaining identities that were not in a
-        // group.
+        // If we are here either 1) the group sub-system is not running or it is
+        // running and no groups were found, in either case offloadSingles()
+        // will move an individual identity, or 2) we were moving everyone off,
+        // and offloadSingles() will move any remaining identities that were not
+        // in a group.
         offloadSingles(node);
+    }
+
+    /**
+     * Get the groups on the specified node.
+     *
+     * @param nodeId a node id
+     * @return a set of groups, the set may be empty
+     */
+    private Set<RelocatingAffinityGroup> getNodeSet(long nodeId) {
+
+        // if the group subsystem is not running, just return an empty set
+        if (nodeSets == null) {
+            return Collections.emptySet();
+        }
+
+        synchronized (nodeSets) {
+            NavigableSet<RelocatingAffinityGroup> nodeSet =nodeSets.get(nodeId);
+
+            if (nodeSet == null) {
+                // The group order is defined by RelocatingAffinityGroup
+                nodeSet = new TreeSet<RelocatingAffinityGroup>();
+
+                Set<RelocatingAffinityGroup> currentGroups = groups;
+                if (currentGroups != null) {
+                    for (RelocatingAffinityGroup group : currentGroups) {
+                        if (group.getTargetNode() == nodeId) {
+                            nodeSet.add(group);
+                        }
+                    }
+                }
+                nodeSets.put(nodeId, nodeSet);
+            }
+            return nodeSet;
+        }
     }
 
     /**
@@ -323,7 +355,9 @@ public class GroupCoordinator extends BasicState {
         }
         // TODO - Better to leave old groups around until new are found?
 //        groups = null;
-        nodeSets.clear();
+        synchronized (nodeSets) {
+            nodeSets.clear();
+        }
 
         try {
             groups = finder.findAffinityGroups();
@@ -364,27 +398,6 @@ public class GroupCoordinator extends BasicState {
             // Run through the list until there was a successful move
             while (iter.hasNext() && !collocateGroup(iter.next())) {}
         }
-    }
-
-    /**
-     * Get the groups on the specified node
-     *
-     * @param nodeId a node id
-     * @return a set of groups, the set may be empty
-     */
-    private NavigableSet<RelocatingAffinityGroup> getGroups(long nodeId) {
-        NavigableSet<RelocatingAffinityGroup> groupSet =
-                new TreeSet<RelocatingAffinityGroup>();
-
-        Set<RelocatingAffinityGroup> currentGroups = groups;
-        if (currentGroups != null) {
-            for (RelocatingAffinityGroup group : currentGroups) {
-                if (group.getTargetNode() == nodeId) {
-                    groupSet.add(group);
-                }
-            }
-        }
-        return groupSet;
     }
 
     /**
