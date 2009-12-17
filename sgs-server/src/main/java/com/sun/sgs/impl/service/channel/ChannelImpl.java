@@ -2474,9 +2474,9 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    } finally {
 		if (isReliable) {
 		    // Only a reliable send event need to be marked
-		    // completed because an unreliable send is marked
-		    // completed when is processed (before its
-		    // corresponding SendNotifyEvent is processed).
+		    // completed. An unreliable send is marked completed
+		    // when it is processed by the event queue (before its
+		    // corresponding SendNotifyEvent is run).
 		    completed();
 		}
 	    }
