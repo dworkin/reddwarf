@@ -44,16 +44,15 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt>	<i>Property:</i> <code><b>
- *   com.sun.sgs.impl.service.nodemap.affinity.graphbuilder.class
+ *   {@value #GRAPH_CLASS_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i>
- *    {@code
- *    com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder}
+ *	<i>Default:</i> When configured for multi-node:
+ *      {@value #DEFAULT_GRAPH_CLASS}, otherwise {@value #GRAPH_CLASS_NONE}
  * <br>
  *
  * <dd style="padding-top: .5em">The graph builder to use.  Set to
- *   {@code None} if no affinity group finding is required, which is
- *   useful for testing. <p>
+ *   {@value #GRAPH_CLASS_NONE} if no affinity group finding is required, which
+ *   is useful for testing. <p>
  * </dl>
  */
 public class LPADriver extends BasicState {
@@ -63,6 +62,10 @@ public class LPADriver extends BasicState {
     /** The property for specifying the graph builder class. */
     public static final String GRAPH_CLASS_PROPERTY =
         PROP_NAME + ".graphbuilder.class";
+
+    /** The default graph builder class. */
+    static final String DEFAULT_GRAPH_CLASS =
+    "com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder";
 
     /**
      * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
@@ -100,37 +103,29 @@ public class LPADriver extends BasicState {
         NodeType type =
             NodeType.valueOf(
                 properties.getProperty(StandardProperties.NODE_TYPE));
-        String builderName = wrappedProps.getProperty(GRAPH_CLASS_PROPERTY);
+
+        // The default for single node is NONE
+        String builderName = GRAPH_CLASS_NONE;  // TEMP
+//                wrappedProps.getProperty(GRAPH_CLASS_PROPERTY,
+//                                         type == NodeType.singleNode ?
+//                                                 GRAPH_CLASS_NONE :
+//                                                 DEFAULT_GRAPH_CLASS);
+
         if (GRAPH_CLASS_NONE.equals(builderName)) {
             // do not instantiate anything
             graphBuilder = null;
             graphListener = null;
             return;
         }
-        if (builderName != null) {
-            graphBuilder = wrappedProps.getClassInstanceProperty(
-                    GRAPH_CLASS_PROPERTY, AffinityGraphBuilder.class,
+            
+        // A builrder was specified or we are running multi-node
+        graphBuilder = wrappedProps.getClassInstanceProperty(
+                    GRAPH_CLASS_PROPERTY, DEFAULT_GRAPH_CLASS,
+                    AffinityGraphBuilder.class,
                     new Class[] { Properties.class,
                                   ComponentRegistry.class,
                                   TransactionProxy.class },
                     properties, systemRegistry, txnProxy);
-        // TODO: The following code is commented out while our default is none,
-        // mostly to keep findbugs quiet.  In the future, we expect the
-        // WeightedGraphBuilder to be the default if we're not in single node
-        // mode.
-//        } else if (type != NodeType.singleNode) {
-//            // Default is currently NONE, might become the distributed LPA/
-//            // weighted graph listener in the future.
-//            builder = null;
-        } else {
-            // Either we're in multi-node, but the current default is
-            // no action, or we're in single node and no builder was requested.
-            //
-            // If we're in single node, and no builder was requested,
-            // don't bother creating anything.  Affinity groups will make
-            // no sense.
-            graphBuilder = null;
-        }
 
         // Add the self as listener if there is a builder and we are
         // not a core server node.

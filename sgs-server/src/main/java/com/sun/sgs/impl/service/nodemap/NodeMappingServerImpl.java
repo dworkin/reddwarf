@@ -1149,6 +1149,7 @@ public final class NodeMappingServerImpl
             }
 
             // enable/disable group coordination based on overall cluster health
+            // TODO - disable if OUR health is bad?
             if (assignPolicy.nodesAvailable()) {
                 coordinator.enable();
             } else {

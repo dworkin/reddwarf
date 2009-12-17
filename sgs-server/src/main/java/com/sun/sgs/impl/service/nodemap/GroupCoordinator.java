@@ -53,17 +53,19 @@ import java.util.logging.Logger;
  *
  * A newly constructed coordinator will be in the disabled state.<p>
  *
- * The following property is supported:
- * <p>
+ * The following property is supported:<p>
+ * 
+ * <dl style="margin-left: 1em">
+ * 
  * <dt>	<i>Property:</i> <code><b>
- *   com.sun.sgs.impl.service.nodemap.affinity.update.period
+ *   {@value #UPDATE_FREQ_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> {@code 60} (one minute)}
+ *	<i>Default:</i> {@value DEFAULT_UPDATE_FREQ} (one minute)}
  * <br>
  *
  * <dd style="padding-top: .5em">The frequency that we find affinity groups,
  *  in seconds.  The value must be between {@code 5} and {@code 65535}.<p>
- * </dl>
+ * </dl><p>
  *
  * TODO - This class is public only because tests need to get at
  * UPDATE_FREQ_PROPERTY.  Grrr.
