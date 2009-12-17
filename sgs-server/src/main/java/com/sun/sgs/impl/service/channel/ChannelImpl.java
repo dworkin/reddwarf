@@ -2436,6 +2436,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 
 	private final Set<Long> serverNodeIds;
 	private final byte[] message;
+	private final boolean isReliable;
 
 	/**
 	 * Constructs an instance with the specified {@code channel}
@@ -2445,6 +2446,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    super(channel, sendEvent);
 	    this.serverNodeIds = channel.servers;
 	    this.message = sendEvent.message;
+	    this.isReliable = channel.isReliable();
 	}
 
 	/** {@inheritDoc} */
@@ -2470,7 +2472,13 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		    }
 		}
 	    } finally {
-		completed();
+		if (isReliable) {
+		    // Only a reliable send event need to be marked
+		    // completed. An unreliable send is marked completed
+		    // when it is processed by the event queue (before its
+		    // corresponding SendNotifyEvent is run).
+		    completed();
+		}
 	    }
 	}
     }
