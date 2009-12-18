@@ -65,7 +65,7 @@ public class LPADriver extends BasicState {
 
     /** The default graph builder class. */
     static final String DEFAULT_GRAPH_CLASS =
-    "com.sun.sgs.impl.service.nodemap.affinity.graph.dlpa.WeightedGraphBuilder";
+    "com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder";
 
     /**
      * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
@@ -105,11 +105,11 @@ public class LPADriver extends BasicState {
                 properties.getProperty(StandardProperties.NODE_TYPE));
 
         // The default for single node is NONE
-        String builderName = GRAPH_CLASS_NONE;  // TEMP
-//                wrappedProps.getProperty(GRAPH_CLASS_PROPERTY,
-//                                         type == NodeType.singleNode ?
-//                                                 GRAPH_CLASS_NONE :
-//                                                 DEFAULT_GRAPH_CLASS);
+        String builderName =
+                wrappedProps.getProperty(GRAPH_CLASS_PROPERTY,
+                                         type == NodeType.singleNode ?
+                                                 GRAPH_CLASS_NONE :
+                                                 DEFAULT_GRAPH_CLASS);
 
         if (GRAPH_CLASS_NONE.equals(builderName)) {
             // do not instantiate anything

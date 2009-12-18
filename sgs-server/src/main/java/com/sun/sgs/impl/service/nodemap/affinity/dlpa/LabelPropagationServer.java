@@ -350,9 +350,9 @@ public class LabelPropagationServer extends BasicState
             sb.append(" LPA found " +  retVal.size() + " groups ");
 
             for (AffinityGroup group : retVal) {
-                sb.append(" id: " + group.getId() + ": members ");
+                sb.append(" id: " + group.getId() + ", members: ");
                 for (Identity id : group.getIdentities()) {
-                    sb.append(id + " ");
+                    sb.append("\n" + id);
                 }
             }
             logger.log(Level.FINE, sb.toString());
@@ -711,19 +711,19 @@ public class LabelPropagationServer extends BasicState
         {
             Long nodeId = e.getKey();
             for (AffinityGroup ag : e.getValue()) {
-                long id = ag.getId();
-                Map<Identity, Long> idNodeMap = groupMap.get(id);
+                long gid = ag.getId();
+                Map<Identity, Long> idNodeMap = groupMap.get(gid);
                 if (idNodeMap == null) {
                     idNodeMap = new HashMap<Identity, Long>();
-                    groupMap.put(id, idNodeMap);
+                    groupMap.put(gid, idNodeMap);
                 }
-                for (Identity gid : ag.getIdentities()) {
-                    if (idSet.add(gid)) {
+                for (Identity id : ag.getIdentities()) {
+                    if (idSet.add(id)) {
                         // Only add if this is the first time we've seen
                         // the identity.  The group selected is the first
                         // one seen, as added to the returnedGroups from
                         // the proxy calls.
-                        idNodeMap.put(gid, nodeId);
+                        idNodeMap.put(id, nodeId);
                     }
                 }
             }
@@ -733,9 +733,12 @@ public class LabelPropagationServer extends BasicState
         NavigableSet<RelocatingAffinityGroup> retVal =
                 new TreeSet<RelocatingAffinityGroup>();
         for (Map.Entry<Long, Map<Identity, Long>> e : groupMap.entrySet()) {
-            retVal.add(new RelocatingAffinityGroup(e.getKey(), 
-                                                   e.getValue(),
-                                                   runNum));
+            Map<Identity, Long> idMap = e.getValue();
+            if (!idMap.isEmpty()) {
+                retVal.add(new RelocatingAffinityGroup(e.getKey(),
+                                                       idMap,
+                                                       runNum));
+            }
         }
 
         return retVal;

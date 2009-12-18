@@ -74,7 +74,7 @@ public class GroupCoordinator extends BasicState {
 
     /** Package name for this class. */
     private static final String PKG_NAME =
-                    "com.sun.sgs.impl.service.nodemap.foo";
+                    "com.sun.sgs.impl.service.nodemap";
 
     /** The property name for the update frequency. */
     public static final String UPDATE_FREQ_PROPERTY =
@@ -317,7 +317,7 @@ public class GroupCoordinator extends BasicState {
      *         if the target node is unknown and a new one is not available
      */
     private boolean collocateGroup(RelocatingAffinityGroup group)
-            throws NoNodesAvailableException
+        throws NoNodesAvailableException
     {
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Request to collocate {0}", group);
@@ -340,7 +340,13 @@ public class GroupCoordinator extends BasicState {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST, "Collocating id {0}", identity);
             }
-            server.moveIdentity(identity, null, targetNodeId);
+            try {
+                Node node = server.getNode(server.getNodeForIdentity(identity));
+                server.moveIdentity(identity, node, targetNodeId);
+            } catch (Exception e) {
+                logger.logThrow(Level.FINE, e,
+                                "Exception getting node for id {0}", identity);
+            }
         }
         return !identities.isEmpty();
     }

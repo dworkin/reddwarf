@@ -822,9 +822,16 @@ public final class NodeMappingServerImpl
         try {
             // If we're already trying to move the identity,
             // but the old node failed before preparations are
-            // complete, just make the move now.
+            // complete, just make the move now. If the old node is alive,
+            // ignore this request.  TODO - should this case be reported back to
+            // the caller?
             MoveIdTask moveTask = moveMap.remove(id);
             if (moveTask != null) {
+                if (node.isAlive()) {
+                    // TODO - remove (or make a log message?)
+                    System.out.println("IDENTITY ALREADY MOVING AND NODE IS ALIVE: " + id);
+                    return;
+                }
                 moveIdAndNotifyListeners(moveTask);
             } else {
                 mapToNewNode(id, null, node, targetNodeId,
@@ -950,11 +957,9 @@ public final class NodeMappingServerImpl
         final long newNodeId = moveTask.newNodeId;
         try {
             runTransactionally(moveTask); 
-            GetNodeTask atask = new GetNodeTask(newNodeId);
-            runTransactionally(atask);
 
             // Tell our listeners
-            notifyListeners(oldNode, atask.getNode(), id);
+            notifyListeners(oldNode, getNode(newNodeId), id);
         } catch (Exception e) {
             // We can get an IllegalStateException if this server shuts
             // down while we're moving identities from failed nodes.
@@ -1066,6 +1071,19 @@ public final class NodeMappingServerImpl
         }
     }
     
+    /**
+     * Get the Node for the specified node ID.
+     * 
+     * @param nodeId a node ID
+     * @return the Node object
+     * @throws java.lang.Exception
+     */
+    Node getNode(long nodeId) throws Exception {
+        final GetNodeTask atask = new GetNodeTask(nodeId);
+        runTransactionally(atask);
+        return atask.getNode();
+    }
+
     private class GetNodeTask extends AbstractKernelRunnable {
         /** Return value, the new node.  Must be obtained under transaction. */
         private Node node = null;
@@ -1215,10 +1233,7 @@ public final class NodeMappingServerImpl
                 return;
             }
             try {
-                final GetNodeTask atask = new GetNodeTask(nodeId);
-                runTransactionally(atask);
-
-                final Node node = atask.getNode();
+                final Node node = getNode(nodeId);
 
                 // If the node is still around, check if need to offload
                 if (node != null) {

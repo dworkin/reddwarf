@@ -144,7 +144,7 @@ import javax.management.JMException;
  *
  * <dd style="padding-top: .5em">Specifies the login high water. When the
  * number of logins reaches the high water, the service's health is set
- * to {@code YELLOW}. If the number of logins reaches 10% above the high water
+ * to {@code YELLOW}. If the number of logins exceeds 10% above the high water
  * the service's health is set to {@code ORANGE}. Legal values are between 0 and
  * {@code Integer.MAX_VALUE}.<p>
  *
@@ -1329,7 +1329,7 @@ public final class ClientSessionServiceImpl
      * so, sets this service's health accordingly.
      */
     private synchronized void checkHighWater() {
-        if (handlers.size() >= loginHighWater * 1.1) {
+        if (handlers.size() > loginHighWater * 1.1) {
             setHealth(Health.ORANGE);
         } else if(handlers.size() >= loginHighWater) {
             setHealth(Health.YELLOW);
