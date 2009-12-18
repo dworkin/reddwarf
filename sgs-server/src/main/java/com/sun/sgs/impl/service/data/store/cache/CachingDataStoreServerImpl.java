@@ -183,6 +183,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     private static final String CLASSNAME =
 	CachingDataStoreServerImpl.class.getName();
 
+    /** The property for specifying debugging output. */
+    public static final String DEBUG_OUTPUT_PROPERTY = PKG + ".debug";
+
     /**
      * The property that specifies the directory in which to store database
      * files.
@@ -291,6 +294,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
 
+    /** Whether to print debugging output. */
+    private final boolean debug;
+
     /**
      * The lock manager, for managing contended access to name bindings and
      * objects.
@@ -394,6 +400,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	String dbEnvClass = wrappedProps.getProperty(
 	    ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS);
+	debug = wrappedProps.getBooleanProperty(DEBUG_OUTPUT_PROPERTY, false);
 	String directory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
 	if (directory == null) {
 	    String rootDir = properties.getProperty(APP_ROOT);
@@ -436,6 +443,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		CONFIG,
 		"Creating CachingDataStoreServerImpl with properties:" +
 		"\n  " + ENVIRONMENT_CLASS_PROPERTY + "=" + dbEnvClass +
+		"\n  " + DEBUG_OUTPUT_PROPERTY + "=" + debug +
 		"\n  " + DIRECTORY_PROPERTY + "=" + directory +
 		"\n  " + LOCK_TIMEOUT_PROPERTY + "=" + lockTimeout +
 		"\n  " + MAX_RETRY_PROPERTY + "=" + maxRetry +
@@ -588,7 +596,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkOid(oid);
-	    lock(nodeInfo, oid, false);
+	    lock(nodeInfo, oid, false, "getObject");
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    boolean txnDone = false;
 	    try {
@@ -620,7 +628,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkOid(oid);
-	    lock(nodeInfo, oid, true);
+	    lock(nodeInfo, oid, true, "getObjectForUpdate");
 	    DbTransaction txn = env.beginTransaction(txnTimeout);
 	    boolean txnDone = false;
 	    try {
@@ -659,7 +667,11 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		if (nodeInfo == owner.getLocker()) {
 		    found = true;
 		    if (!owner.getForWrite()) {
-			lock(nodeInfo, oid, true);
+			/*
+			 * FIXME: Why should the node forget that it has a
+			 * write lock?  -tjb@sun.com (12/16/2009)
+			 */
+			lock(nodeInfo, oid, true, "upgradeObject");
 		    }
 		    break;
 		}
@@ -723,7 +735,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		}
 	    }
 	    if (result != null) {
-		lock(nodeInfo, result.oid, false);
+		lock(nodeInfo, result.oid, false, "nextObjectId");
 	    }
 	    return result;
 	} finally {
@@ -764,7 +776,8 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		}
 	    }
 	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    lock(nodeInfo, nextNameKey, false);
+	    lock(nodeInfo, nextNameKey, false, "getBinding",
+		 !found ? name : null);
 	    return new GetBindingResults(
 		found, found ? null : nextName, oid,
 		getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
@@ -809,9 +822,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    }
 	    BindingKey nameKey = BindingKey.get(name);
 	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    lock(nodeInfo, nameKey, true);
+	    lock(nodeInfo, nameKey, true, "getBindingUpdate");
 	    if (!found) {
-		lock(nodeInfo, nextNameKey, true);
+		lock(nodeInfo, nextNameKey, true, "getBindingUpdate", name);
 	    }
 	    GetWaitingResult waiting =
 		getWaiting(found ? nameKey : nextNameKey);
@@ -870,9 +883,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
 	    boolean found = (oid != -1);
 	    if (found) {
-		lock(nodeInfo, nameKey, true);
+		lock(nodeInfo, nameKey, true, "getBindingRemove");
 	    }
-	    lock(nodeInfo, nextNameKey, found);
+	    lock(nodeInfo, nextNameKey, found, "getBindingRemove", name);
 	    GetWaitingResult waitingName = getWaiting(nameKey);
 	    GetWaitingResult waitingNextName = getWaiting(nextNameKey);
 	    return new GetBindingForRemoveResults(
@@ -923,7 +936,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		}
 	    }
 	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    lock(nodeInfo, nextNameKey, false);
+	    lock(nodeInfo, nextNameKey, false, "nextBoundName", name);
 	    return new NextBoundNameResults(
 		nextName, oid,
 		getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
@@ -1040,7 +1053,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 			"The object IDs must not be negative");
 		}
 		if (i < newOids) {
-		    lock(nodeInfo, oid, true);
+		    lock(nodeInfo, oid, true, "commit");
 		} else {
 		    checkLocked(nodeInfo, oid, true);
 		}
@@ -1071,7 +1084,8 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 			/* Set -- next name must be write locked */
 			checkLocked(nodeInfo, nextKey, true);
 			if (!name.equals(nextName)) {
-			    lock(nodeInfo, BindingKey.get(name), true);
+			    lock(nodeInfo, BindingKey.get(name), true,
+				 "commit");
 			}
 			namesDb.put(
 			    txn, encodeString(name), encodeLong(value));
@@ -1087,7 +1101,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 					decodeString(cursor.getKey()) : null),
 				    true);
 			namesDb.delete(txn, encodeString(name));
-			releaseLock(nodeInfo, nextKey);
+			releaseLock(nodeInfo, nextKey, "commit");
 		    }
 		}
 	    } finally {
@@ -1124,7 +1138,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    checkOid(oid);
 	    checkLocked(nodeInfo, oid, false);
-	    releaseLock(nodeInfo, oid);
+	    releaseLock(nodeInfo, oid, "evict");
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -1152,7 +1166,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    checkOid(oid);
 	    checkLocked(nodeInfo, oid, true);
-	    lockManager.downgradeLock(nodeInfo, oid);
+	    downgradeLock(nodeInfo, oid, "downgrade");
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -1180,7 +1194,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    BindingKey nameKey = BindingKey.getAllowLast(name);
 	    checkLocked(nodeInfo, nameKey, false);
-	    releaseLock(nodeInfo, nameKey);
+	    releaseLock(nodeInfo, nameKey, "evict");
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -1208,7 +1222,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    BindingKey nameKey = BindingKey.getAllowLast(name);
 	    checkLocked(nodeInfo, nameKey, true);
-	    lockManager.downgradeLock(nodeInfo, nameKey);
+	    downgradeLock(nodeInfo, nameKey, "downgrade");
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -1358,14 +1372,46 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     /**
      * Obtains a lock on behalf of the node with the specified ID.  Use this
      * method rather than calling the lock manager to make sure that callbacks
-     * and lock tracking are performed correctly.
+     * and lock tracking are performed correctly, and debugging output is
+     * printed.
      *
      * @param	nodeInfo the information for the node
      * @param	key the key of the item to be locked
      * @param	forWrite whether the item should be locked for write
+     * @param	operation a string representation of the operation that
+     *		requested the lock, for debug output
      */
-    private void lock(NodeInfo nodeInfo, Object key, boolean forWrite) {
+    private void lock(
+	NodeInfo nodeInfo, Object key, boolean forWrite, String operation)
+    {
+	lock(nodeInfo, key, forWrite, operation, null);
+    }
+
+    /**
+     * Obtains a lock on behalf of the node with the specified ID, providing
+     * additional argument to identify the operation.  Use this method rather
+     * than calling the lock manager to make sure that callbacks and lock
+     * tracking are performed correctly, and debugging output is printed.
+     *
+     * @param	nodeInfo the information for the node
+     * @param	key the key of the item to be locked
+     * @param	forWrite whether the item should be locked for write
+     * @param	operation a string representation of the operation that
+     *		requested the lock, for debug output
+     * @param	operationArg an expression representing the argument provided
+     *		for the operation, or {@code null} if there is no argument.
+     */
+    private void lock(NodeInfo nodeInfo,
+		      Object key,
+		      boolean forWrite,
+		      String operation,
+		      Object operationArg)
+    {
 	assert key instanceof Long || key instanceof BindingKey;
+	if (debug) {
+	    debugOutput(nodeInfo, forWrite ? "+w" : "+r", key,
+			operation, operationArg);
+	}
 	synchronized (nodeInfo) {
 	    LockConflict<Object> conflict =
 		lockManager.lockNoWait(nodeInfo, key, forWrite);
@@ -1407,15 +1453,76 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     /**
      * Releases a lock owned by a node.  Use this method rather than calling
      * the lock manager directly to make sure that locking tracking is
-     * performed correctly.
+     * performed correctly, and debugging output is printed.
      *
      * @param	nodeInfo the information for the node
      * @param	key the key of the item whose lock should be released
+     * @param	operation a string representation of the operation that
+     *		requested the lock, for debug output
      */
-    private void releaseLock(NodeInfo nodeInfo, Object key) {
+    private void releaseLock(NodeInfo nodeInfo, Object key, String operation) {
 	assert key instanceof Long || key instanceof BindingKey;
+	if (debug) {
+	    debugOutput(nodeInfo, "-r", key, operation, null);
+	}
 	lockManager.releaseLock(nodeInfo, key);
 	nodeInfo.noteUnlocked(key);
+    }
+
+    /**
+     * Downgrades a lock owned by a node.  Use this method rather than calling
+     * the lock manager directly to make sure that debugging output is printed.
+     *
+     * @param	nodeInfo the information for the node
+     * @param	key the key of the item whose lock should be downgraded
+     * @param	operation a string representation of the operation that
+     *		requested the lock, for debug output
+     */
+    private void downgradeLock(
+	NodeInfo nodeInfo, Object key, String operation)
+    {
+	assert key instanceof Long || key instanceof BindingKey;
+	if (debug) {
+	    debugOutput(nodeInfo, "-w", key, operation, null);
+	}
+	lockManager.downgradeLock(nodeInfo, key);
+    }
+
+    /**
+     * Prints debugging output for a locking operation.
+     *
+     * @param	nodeId the node info for the node performing the operation
+     * @param	lockOp the locking operation
+     * @param	key the name of the binding or the object ID
+     * @param	operation a string representation of the operation
+     * @param	operationArg an expression representing the argument provided
+     *		for the operation, or {@code null} if there is no argument.
+     */
+    private static void debugOutput(NodeInfo nodeInfo,
+				    String lockOp,
+				    Object key,
+				    String operation,
+				    Object operationArg)
+    {
+	StringBuilder sb = new StringBuilder();
+	sb.append("nid:").append(nodeInfo.nodeId);
+	sb.append(' ').append(lockOp);
+	if (key instanceof BindingKey) {
+	    sb.append(" name:");
+	    if (key == BindingKey.LAST) {
+		sb.append("LAST");
+	    } else {
+		sb.append('"').append(((BindingKey) key).getName());
+		sb.append('"');
+	    }
+	} else {
+	    sb.append(" oid:").append(key);
+	}
+	sb.append(' ').append(operation);
+	if (operationArg != null) {
+	    sb.append(' ').append(operationArg);
+	}
+	System.err.println(sb);	
     }
 
     /**
@@ -1668,9 +1775,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		runIoTask(task, ownerNodeInfo.nodeId);
 		if (task.released) {
 		    if (downgrade) {
-			lockManager.downgradeLock(ownerNodeInfo, key);
+			downgradeLock(ownerNodeInfo, key, "callback");
 		    } else {
-			releaseLock(ownerNodeInfo, key);
+			releaseLock(ownerNodeInfo, key, "callback");
 		    }
 		}
 	    }
