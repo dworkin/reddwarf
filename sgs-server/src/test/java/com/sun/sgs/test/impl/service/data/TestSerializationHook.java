@@ -30,6 +30,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
@@ -38,23 +40,50 @@ import org.junit.runner.RunWith;
 @RunWith(FilteredNameRunner.class)
 public class TestSerializationHook extends Assert {
 
+    private static final SimpleClassSerialization CLASS_SERIAL = new SimpleClassSerialization();
+
     @After
     public void resetHooks() {
         HookLocator.setSerializationHook(null);
     }
 
     @Test
-    public void the_top_level_object_is_provided_during_serialization() {
-        final MyObject objectBeingSerialized = new MyObject("foo");
-
+    public void all_objects_in_the_object_graph_are_passed_to_the_hook_during_serialization() {
+        final List<Object> all = new ArrayList<Object>();
+        
         HookLocator.setSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
-                assertSame(objectBeingSerialized, topLevelObject);
+                all.add(object);
                 return object;
             }
         });
 
-        SerialUtil.serialize(objectBeingSerialized, new SimpleClassSerialization());
+        MyObject original = new MyObject("foo");
+        SerialUtil.serialize(original, CLASS_SERIAL);
+
+        assertTrue(all.contains(original));
+        assertTrue(all.contains("foo"));
+        assertEquals(2, all.size());
+    }
+
+    @Test
+    public void all_objects_in_the_object_graph_are_passed_to_the_hook_during_deserialization() {
+        final List<Object> all = new ArrayList<Object>();
+
+        HookLocator.setSerializationHook(new NullSerializationHook() {
+            public Object resolveObject(Object object) {
+                all.add(object);
+                return object;
+            }
+        });
+
+        MyObject original = new MyObject("foo");
+        byte[] data = SerialUtil.serialize(original, CLASS_SERIAL);
+        MyObject result = (MyObject) SerialUtil.deserialize(data, CLASS_SERIAL);
+
+        assertTrue(all.contains(result));
+        assertTrue(all.contains("foo"));
+        assertEquals(2, all.size());
     }
 
     @Test
@@ -69,8 +98,9 @@ public class TestSerializationHook extends Assert {
         });
 
         MyObject original = new MyObject("foo");
-        byte[] data = SerialUtil.serialize(original, new SimpleClassSerialization());
-        MyObject result = (MyObject) SerialUtil.deserialize(data, new SimpleClassSerialization());
+        byte[] data = SerialUtil.serialize(original, CLASS_SERIAL);
+        MyObject result = (MyObject) SerialUtil.deserialize(data, CLASS_SERIAL);
+
         assertEquals("bar", result.getName());
     }
 
@@ -86,9 +116,24 @@ public class TestSerializationHook extends Assert {
         });
 
         MyObject original = new MyObject("foo");
-        byte[] data = SerialUtil.serialize(original, new SimpleClassSerialization());
-        MyObject result = (MyObject) SerialUtil.deserialize(data, new SimpleClassSerialization());
+        byte[] data = SerialUtil.serialize(original, CLASS_SERIAL);
+        MyObject result = (MyObject) SerialUtil.deserialize(data, CLASS_SERIAL);
+        
         assertEquals("bar", result.getName());
+    }
+
+    @Test
+    public void the_top_level_object_is_provided_during_serialization() {
+        final MyObject objectBeingSerialized = new MyObject("foo");
+
+        HookLocator.setSerializationHook(new NullSerializationHook() {
+            public Object replaceObject(Object topLevelObject, Object object) {
+                assertSame(objectBeingSerialized, topLevelObject);
+                return object;
+            }
+        });
+
+        SerialUtil.serialize(objectBeingSerialized, CLASS_SERIAL);
     }
 
 
