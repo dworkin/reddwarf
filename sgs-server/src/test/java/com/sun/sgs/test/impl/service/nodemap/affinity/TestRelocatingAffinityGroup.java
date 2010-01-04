@@ -61,7 +61,7 @@ public class TestRelocatingAffinityGroup {
         map.put(new DummyIdentity("four"), 42L);
         RelocatingAffinityGroup group =new RelocatingAffinityGroup(0L, map, 0L);
         assert group.getTargetNode() == 42L;
-        assert group.findStragglers().isEmpty();
+        assert group.getStragglers().isEmpty();
     }
     
     @Test
@@ -73,7 +73,7 @@ public class TestRelocatingAffinityGroup {
         map.put(new DummyIdentity("four"), 1L);
         RelocatingAffinityGroup group =new RelocatingAffinityGroup(0L, map, 0L);
         assert group.getTargetNode() == 42L;
-        assert group.findStragglers().size() == 1;
+        assert group.getStragglers().size() == 1;
     }
 
     @Test
@@ -85,7 +85,7 @@ public class TestRelocatingAffinityGroup {
         map.put(new DummyIdentity("four"), 2L);
         RelocatingAffinityGroup group =new RelocatingAffinityGroup(0L, map, 0L);
         assert group.getTargetNode() == 42L;
-        assert group.findStragglers().size() == 2;
+        assert group.getStragglers().size() == 2;
     }
 
     @Test
@@ -97,7 +97,7 @@ public class TestRelocatingAffinityGroup {
         map.put(new DummyIdentity("four"), 1L);
         RelocatingAffinityGroup group =new RelocatingAffinityGroup(0L, map, 0L);
         assert (group.getTargetNode() == 42L) || (group.getTargetNode() == 1L);
-        assert group.findStragglers().size() == 2;
+        assert group.getStragglers().size() == 2;
     }
 
     @Test
@@ -109,7 +109,7 @@ public class TestRelocatingAffinityGroup {
         map.put(new DummyIdentity("four"), -1L);
         RelocatingAffinityGroup group =new RelocatingAffinityGroup(0L, map, 0L);
         assert group.getTargetNode() == 42L;
-        assert group.findStragglers().size() == 1;
+        assert group.getStragglers().size() == 1;
     }
 
     @Test
@@ -121,7 +121,7 @@ public class TestRelocatingAffinityGroup {
         map.put(new DummyIdentity("four"), -1L);
         RelocatingAffinityGroup group =new RelocatingAffinityGroup(0L, map, 0L);
         assert group.getTargetNode() == -1;
-        assert group.findStragglers().size() == 4;
+        assert group.getStragglers().size() == 4;
     }
 
     @Test

@@ -68,6 +68,7 @@ public interface NodeAssignPolicy {
      * Inform the policy that a node is now available.
      *
      * @param nodeId the node ID
+     * @throws IllegalArgumentException if nodeID <= 0
      */
     void nodeAvailable(long nodeId);
     
@@ -75,11 +76,12 @@ public interface NodeAssignPolicy {
      * Inform the policy that a node is no longer available.
      *
      * @param nodeId  the node ID
+     * @throws IllegalArgumentException if nodeID <= 0
      */
     void nodeUnavailable(long nodeId);
 
     /**
-     * Returns {@code true} of the specified node is available for assignment.
+     * Returns {@code true} if the specified node is available for assignment.
      *
      * @param nodeId a node ID
      *

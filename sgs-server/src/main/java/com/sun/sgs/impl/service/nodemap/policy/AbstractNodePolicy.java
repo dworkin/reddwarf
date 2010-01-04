@@ -59,6 +59,9 @@ public abstract class AbstractNodePolicy implements NodeAssignPolicy {
 
     /** {@inheritDoc} */
     public synchronized void nodeAvailable(long nodeId) {
+        if (nodeId <= 0) {
+            throw new IllegalArgumentException("nodeID can not be <= 0");
+        }
         if (!availableNodes.contains(nodeId)) {
             availableNodes.add(nodeId);
         }
@@ -66,6 +69,9 @@ public abstract class AbstractNodePolicy implements NodeAssignPolicy {
 
     /** {@inheritDoc} */
     public synchronized void nodeUnavailable(long nodeId) {
+        if (nodeId <= 0) {
+            throw new IllegalArgumentException("nodeID can not be <= 0");
+        }
         availableNodes.remove(nodeId);
     }
 

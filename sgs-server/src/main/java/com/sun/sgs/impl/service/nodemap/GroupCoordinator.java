@@ -103,14 +103,21 @@ public class GroupCoordinator extends BasicState {
     private final long updatePeriod;
 
     private RecurringTaskHandle updateTask = null;
-    private RecurringTaskHandle collocateTask = null;
+
+    // Task to scan the list of newly found affinity groups looking for
+    // identities to collocate. == null if the affinity group sub-system is
+    // not running. There is a new task for each set of groups.
+    private volatile CollocateTask collocateTask = null;
+    private final long collocateDelay = 1000;
 
     // Map of per-node groups. This map is filled-in only when necessary due
     // to a request to offload a node.
     // The maping is targetNodeID -> groupSet where groupSet is groupId -> group
     private final Map<Long, NavigableSet<RelocatingAffinityGroup>> nodeSets;
 
-    // Sorted set of all the groups
+    // Sorted set of all the groups. Access to this set must be synchronized
+    // by nodeSet. If a group in this set is nofified for any reason (offloading
+    // or collocation) that group should be removed from the set.
     private NavigableSet<RelocatingAffinityGroup> groups = null;
 
     /**
@@ -166,10 +173,11 @@ public class GroupCoordinator extends BasicState {
      * Enable coordination. If the coordinator is enabled, calling this method
      * will have no effect.
      */
-    public void enable() {
+    public synchronized void enable() {
         if (setEnabledState() && (builder != null)) {
             builder.enable();
-            if ((finder != null) && (updateTask == null)) {   // TODO .. sync?
+            if (finder != null) {
+                assert updateTask == null;
                 updateTask = taskScheduler.scheduleRecurringTask(
                                     new AbstractKernelRunnable("UpdateTask") {
                                             public void run() {
@@ -190,11 +198,17 @@ public class GroupCoordinator extends BasicState {
      * TODO - should the groups be cleared out? they will be useful for some
      * time but will eventually become stale
      */
-    public void disable() {
+    public synchronized void disable() {
         if (setDisabledState() && (builder != null)) {
-            if (updateTask != null) {   // TODO... sync?
+            if (updateTask != null) {
                 updateTask.cancel();
                 updateTask = null;
+            }
+            synchronized (nodeSets) {
+                if (collocateTask != null) {
+                    collocateTask.stop();
+                    collocateTask = null;
+                }
             }
             builder.disable();
         }
@@ -205,9 +219,9 @@ public class GroupCoordinator extends BasicState {
      * all resources released. Any further method calls made on the coordinator
      * will result in a {@code IllegalStateException} being thrown.
      */
-    public void shutdown() {
+    public synchronized void shutdown() {
         if (setShutdownState()) {
-            if (updateTask != null) {   // TODO... sync?
+            if (updateTask != null) {
                 updateTask.cancel();
                 updateTask = null;
             }
@@ -222,8 +236,12 @@ public class GroupCoordinator extends BasicState {
      * there are no groups to move, a single identity is moved.
      * If the node is not alive, all identities on that node will be moved.
      * Note that is this method does not guarantee that any identities are
-     * be moved.
-     *
+     * be moved.<p>
+     * 
+     * Note that there should only be one active call to offload for a
+     * given node, however there is no check. Failing this will likely result
+     * in a ConcurrentModificationException.
+     * 
      * @param node the node to offload identities
      *
      * @throws NullPointerException if {@code node} is {@code null}
@@ -274,34 +292,44 @@ public class GroupCoordinator extends BasicState {
     }
 
     /**
-     * Get the groups on the specified node.
+     * Get the set of groups on the specified node.
      *
-     * @param nodeId a node id
+     * @param nodeId a node ID
      * @return a set of groups, the set may be empty
      */
     private Set<RelocatingAffinityGroup> getNodeSet(long nodeId) {
-
         // if the group subsystem is not running, just return an empty set
         if (nodeSets == null) {
             return Collections.emptySet();
         }
 
         synchronized (nodeSets) {
-            NavigableSet<RelocatingAffinityGroup> nodeSet =nodeSets.get(nodeId);
-
+            NavigableSet<RelocatingAffinityGroup> nodeSet =
+                                            nodeSets.get(nodeId);
+            
+            // If there is no set for this node, scan the groups list and
+            // remove all groups which have a target node == nodeId
             if (nodeSet == null) {
                 // The group order is defined by RelocatingAffinityGroup
                 nodeSet = new TreeSet<RelocatingAffinityGroup>();
+                nodeSets.put(nodeId, nodeSet);
 
-                Set<RelocatingAffinityGroup> currentGroups = groups;
-                if (currentGroups != null) {
-                    for (RelocatingAffinityGroup group : currentGroups) {
-                        if (group.getTargetNode() == nodeId) {
-                            nodeSet.add(group);
-                        }
+                Iterator<RelocatingAffinityGroup> iter = groups.iterator();
+
+                while (iter.hasNext()) {
+                    RelocatingAffinityGroup group = iter.next();
+
+                    if (group.getTargetNode() == nodeId) {
+                        nodeSet.add(group);
+                        iter.remove();
                     }
                 }
-                nodeSets.put(nodeId, nodeSet);
+                
+                // If the set isn't empty we have modified the groups list,
+                // so need to reset the collocate task.
+                if (!nodeSet.isEmpty() && (collocateTask != null)) {
+                    collocateTask.reset();
+                }
             }
             return nodeSet;
         }
@@ -309,46 +337,58 @@ public class GroupCoordinator extends BasicState {
 
     /**
      * Collocate the identities of a group onto the group's target node. If the
-     * target node is unknown, then just pick one.
+     * target node is unknown or no longer available, then pick a new target.
      *
      * @param group the group to collocate
      * @return true if the group has had any identities moved, otherwise false
      * @throws NoNodesAvailableException if the target node is unavailable, or
      *         if the target node is unknown and a new one is not available
      */
-    private boolean collocateGroup(RelocatingAffinityGroup group)
+    private boolean collocateGroup(final RelocatingAffinityGroup group)
         throws NoNodesAvailableException
     {
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Request to collocate {0}", group);
         }
-        long targetNodeId = group.getTargetNode();
 
-        if (targetNodeId < 0) {
-            targetNodeId = server.chooseNode();
-            group.setTargetNode(targetNodeId);
+        if (server.isNodeAvailable(group.getTargetNode())) {
+            group.setTargetNode(server.chooseNode());
         }
+        final Set<Identity> identities = group.getStragglers();
 
-        Set<Identity> identities = group.findStragglers();
+        if (identities.isEmpty()) {
+            return false;
+        }
+        taskScheduler.scheduleTask(
+                new AbstractKernelRunnable("MoveTask") {
+                    public void run() {
+                        final long targetNodeId = group.getTargetNode();
 
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER,
-                       "Collocating {0} members of group {1} to node {2}",
-                       identities.size(), group.getId(), targetNodeId);
-        }
-        for (Identity identity : identities) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST, "Collocating id {0}", identity);
-            }
-            try {
-                Node node = server.getNode(server.getNodeForIdentity(identity));
-                server.moveIdentity(identity, node, targetNodeId);
-            } catch (Exception e) {
-                logger.logThrow(Level.FINE, e,
-                                "Exception getting node for id {0}", identity);
-            }
-        }
-        return !identities.isEmpty();
+                        if (logger.isLoggable(Level.FINER)) {
+                            logger.log(Level.FINER,
+                                  "moving {0} members of group {1} to node {2}",
+                                   identities.size(), group.getId(),
+                                   targetNodeId);
+                        }
+                        for (Identity identity : identities) {
+                            if (logger.isLoggable(Level.FINEST)) {
+                                logger.log(Level.FINEST,
+                                           "moving id {0}", identity);
+                            }
+                            try {
+                                Node node = server.getNode(
+                                           server.getNodeForIdentity(identity));
+                                server.moveIdentity(identity, node,
+                                                    targetNodeId);
+                            } catch (Exception e) {
+                                logger.logThrow(Level.FINE, e,
+                                                "Exception moving id {0}",
+                                                identity);
+                            }
+                        } } },
+                taskOwner);
+
+        return true;
     }
 
     /**
@@ -356,32 +396,34 @@ public class GroupCoordinator extends BasicState {
      */
     private void findGroups() {
         checkForDisabledOrShutdownState();
-        
-        if (collocateTask != null) {
-            collocateTask.cancel();
-            collocateTask = null;
-        }
-        // TODO - Better to leave old groups around until new are found?
-//        groups = null;
+
+        // Cause the current CollocateTask to exit if it hasn't already?? TODO
+        // Offloading of groups can continue until after a new set of groups
+        // are found.
         synchronized (nodeSets) {
-            nodeSets.clear();
+            if (collocateTask != null) {
+                collocateTask.stop();
+            }
         }
 
         try {
-            groups = finder.findAffinityGroups();
+            NavigableSet<RelocatingAffinityGroup> newGroups =
+                                                finder.findAffinityGroups();
 
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER,
                            "findAffinityGroups returned {0} groups",
                            groups.size());
             }
-
-            if (!groups.isEmpty()) {
-                collocateTask = taskScheduler.scheduleRecurringTask(
-                                    new CollocateTask(groups),
-                                    taskOwner,
-                                    System.currentTimeMillis() + updatePeriod,
-                                    updatePeriod);
+            synchronized (nodeSets) {
+                groups = newGroups;
+                nodeSets.clear();
+                if (groups.isEmpty()) {
+                    collocateTask = null;
+                } else {
+                    collocateTask = new CollocateTask(newGroups);
+                    taskScheduler.scheduleTask(collocateTask, taskOwner);
+                }
             }
         } catch (AffinityGroupFinderFailedException e) {
             logger.logThrow(Level.INFO, e, "Affinity group finder failed");
@@ -389,22 +431,62 @@ public class GroupCoordinator extends BasicState {
     }
 
     /**
-     * Task to move the collocate the identities the current set of groups.
-     * Groups selected in ascending order from {@code groups}.
+     * Task to collocate the identities in a set of groups. The
+     * groups selected in ascending order from {@code newGroups}. If the
+     * set is modified externally, {@code reset()} should be invoked. The task
+     * will exit when {@code newGroups} becomes empty or {@code stop()} is
+     * invoked.
      */
     private class CollocateTask extends AbstractKernelRunnable {
+        final NavigableSet<RelocatingAffinityGroup> myGroups;
+        volatile Iterator<RelocatingAffinityGroup> iter;
+        volatile boolean stop = false;
 
-        private final Iterator<RelocatingAffinityGroup> iter;
-
-        CollocateTask(Set<RelocatingAffinityGroup> groups) {
+        CollocateTask(NavigableSet<RelocatingAffinityGroup> newGroups) {
             super("CollocateTask");
-            iter = groups.iterator();
+            myGroups = newGroups;
+            reset(); // assert Thread.holdsLock(nodeSets);
         }
 
         @Override
-        public void run() throws Exception {
-            // Run through the list until there was a successful move
-            while (iter.hasNext() && !collocateGroup(iter.next())) {}
+        public void run() throws NoNodesAvailableException {
+
+            while (true) {
+                synchronized (nodeSets) {
+                    if (!stop && iter.hasNext()) {
+
+                        // collocateGroup() will throw NNAE if the group's
+                        // target node is no longer alive (or is unknown: -1)
+                        // and there are no other nodes to move to. Therefore
+                        // since all nodes are unavailable, this task will just
+                        // exit and not be rescheduled.
+                        if (collocateGroup(iter.next())) {
+                            iter.remove();
+                            taskScheduler.scheduleTask(this, taskOwner,
+                                   System.currentTimeMillis() + collocateDelay);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Cause the task to reset to the beginning of the groups list. This
+         * should be called whenever the groups list is changed external to
+         * this task.
+         */
+        void reset() {
+            assert Thread.holdsLock(nodeSets);
+            iter = myGroups.iterator();
+        }
+
+        /**
+         * Cause this task to exit.
+         */
+        void stop() {
+            assert Thread.holdsLock(nodeSets);
+            stop = true;
         }
     }
 

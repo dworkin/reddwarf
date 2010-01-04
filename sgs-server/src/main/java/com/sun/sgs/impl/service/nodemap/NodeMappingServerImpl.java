@@ -801,8 +801,20 @@ public final class NodeMappingServerImpl
      *
      * @throws com.sun.sgs.impl.service.nodemap.NoNodesAvailableException
      */
-    public long chooseNode() throws NoNodesAvailableException {
+    long chooseNode() throws NoNodesAvailableException {
         return assignPolicy.chooseNode(NodeAssignPolicy.SERVER_NODE);
+    }
+
+    /**
+     * Returns {@code true} if the specified node is available for assignment.
+     *
+     * @param nodeId a node ID
+     *
+     * @return {@code true} of the specified node is available for assignment,
+     *         otherwise {@code false}
+     */
+    boolean isNodeAvailable(long nodeId) {
+        return assignPolicy.isNodeAvailable(nodeId);
     }
 
     /**
@@ -1168,6 +1180,8 @@ public final class NodeMappingServerImpl
 
             // enable/disable group coordination based on overall cluster health
             // TODO - disable if OUR health is bad?
+            // TODO - disable if a % of nodes are bad?
+            // TODO - disable if only one node is available?
             if (assignPolicy.nodesAvailable()) {
                 coordinator.enable();
             } else {
@@ -1235,7 +1249,8 @@ public final class NodeMappingServerImpl
             try {
                 final Node node = getNode(nodeId);
 
-                // If the node is still around, check if need to offload
+                // If the node is still around, check if it still needs to
+                // be offloaded
                 if (node != null) {
 
                     // Offload if ORANGE or RED, note that if RED everything
@@ -1249,9 +1264,9 @@ public final class NodeMappingServerImpl
                     }
                 }
                 // Dropping out here will cause the task to be canceled. Note
-                // that we can't cancel due to improved health, since health
-                // may have gotten worse since GetNodeTask ran. We can cancel
-                // if RED since offload() moves everyone in that case and
+                // that we can't cancel due to improved health, because health
+                // may have gotten worse since GetNodeTask last ran. We can
+                // cancel if RED since offload() moves everyone in that case and
                 // a node can never improve once there.
             } catch (Exception e) {
                 if ((e instanceof ExceptionRetryStatus) &&

@@ -46,6 +46,9 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     // node is not known and has not yet been set.
     private long targetNodeId;
 
+    // List of identities not on the target node, or null
+    private Set<Identity> stragglers;
+
     // Generation number
     private final long generation;
 
@@ -73,35 +76,40 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
         this.agid = agid;
         this.identities = identities;
         this.generation = generation;
-        setTargetNode(calcMostUsedNode());
-        weight = identities.size();
+        setTargetNode();    // will also init stragglers
+        weight = identities.size(); // if this changes, fix equals() etc...
     }
 
     /**
-     * Calculate the node that the most number of identities is on. If none of
-     * the nodes are known, -1 is returned.
-     *
-     * @return the node id of the most used node or -1
+     * Set the target node id for this group to the node that the most number of
+     * identities is on. If none of the nodes are known, the target node id is
+     * set to -1.
      */
-    private long calcMostUsedNode() {
+    private void setTargetNode() {
         long retNode = -1;
         int highestCount = -1;
         final Map<Long, Integer> nodeCountMap = new HashMap<Long, Integer>();
         for (Long nodeId : identities.values()) {
-            if (nodeId == -1) {
-                // Node id was unknown, so don't count it
-                continue;
-            }
             Integer count = nodeCountMap.get(nodeId);
             int val = (count == null) ? 0 : count.intValue();
             val++;
             nodeCountMap.put(nodeId, Integer.valueOf(val));
-            if (highestCount < val) {
+            // If node id was unknown, don't use it as a target
+            // (unless they all are)
+            if ((highestCount < val) && (nodeId != -1)) {
                 highestCount = val;
                 retNode = nodeId;
             }
         }
-        return retNode;
+        targetNodeId = retNode;
+
+        // Optimization if we know everyone is on the same node, otherwise
+        // set to null which will postpone the calculation until asked for
+        if ((targetNodeId != -1) && nodeCountMap.isEmpty()) {
+            stragglers = Collections.emptySet();
+        } else {
+            stragglers = null;
+        }
     }
 
     /**
@@ -109,8 +117,9 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      *
      * @param nodeId a node id
      */
-    public void setTargetNode(long nodeId) {
+    public synchronized void setTargetNode(long nodeId) {
         targetNodeId = nodeId;
+        stragglers = null;  // will force recalc of list
     }
 
     /**
@@ -118,7 +127,7 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      *
      * @return the target node if known, otherwise -1
      */
-    public long getTargetNode() {
+    public synchronized long getTargetNode() {
         return targetNodeId;
     }
 
@@ -127,21 +136,26 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      *
      * @return the set of Identities that are not on the target node
      */
-    public Set<Identity> findStragglers() {
-
-        // If target node is unknown, then everyone is lost
-        if (targetNodeId < 0) {
-            return getIdentities();
-        }
-        Set<Identity> stragglers = new HashSet<Identity>();
-        for (Map.Entry<Identity, Long> entry : identities.entrySet()) {
-            if (entry.getValue() != targetNodeId) {
-                stragglers.add(entry.getKey());
-                entry.setValue(targetNodeId);
+    public synchronized Set<Identity> getStragglers() {
+        if (stragglers == null) {
+            // If target node is unknown, then everyone is lost
+            if (targetNodeId < 0) {
+                stragglers = getIdentities();
+            } else {
+                final Set<Identity> ids = new HashSet<Identity>();
+                for (Map.Entry<Identity, Long> entry : identities.entrySet()) {
+                    if (entry.getValue() != targetNodeId) {
+                        ids.add(entry.getKey());
+                        entry.setValue(targetNodeId);
+                    }
+                }
+                stragglers = Collections.unmodifiableSet(ids);
             }
         }
         return stragglers;
     }
+
+    /* --- Implement AffinityGroup --- */
 
     /** {@inheritDoc} */
     public long getId() {
@@ -157,6 +171,8 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     public long getGeneration() {
         return generation;
     }
+
+    /* --- Implement Comparable --- */
 
     /**
      * {@inheritDoc}
