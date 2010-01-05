@@ -25,6 +25,9 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.NullSerializationHook;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.data.ManagedReferenceFactory;
+import com.sun.sgs.service.data.SerializationHook;
+import com.sun.sgs.service.data.SerializationHookFactory;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -44,6 +47,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
     private TransactionScheduler txnScheduler;
     private DataServiceImpl dataService;
     private Identity taskOwner;
+    private ManagedReferenceFactory referenceFactory;
 
     @Before
     public void setUp() throws Exception {
@@ -58,14 +62,24 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
         serverNode.shutdown(true);
     }
 
+    private void useSerializationHook(final SerializationHook hook) {
+        dataService.setSerializationHookFactory(new SerializationHookFactory() {
+            @Override
+            public SerializationHook create(ManagedReferenceFactory factory) {
+                referenceFactory = factory;
+                return hook;
+            }
+        });
+    }
+
     @Test
     public void managed_references_to_known_objects_can_be_created_during_serialization() throws Exception {
         final AtomicBoolean referenceWasCreated = new AtomicBoolean(false);
 
-        dataService.setSerializationHook(new NullSerializationHook() {
+        useSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (isMyObjectIdentifiedBy(object, "known")) {
-                    ManagedReference<?> ref = dataService.createReference(object);
+                    ManagedReference<?> ref = referenceFactory.createReference(object);
                     referenceWasCreated.set(ref != null);
                 }
                 return object;
@@ -85,11 +99,11 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
     public void managed_references_to_new_objects_can_be_created_during_serialization() throws Exception {
         final AtomicBoolean referenceWasCreated = new AtomicBoolean(false);
 
-        dataService.setSerializationHook(new NullSerializationHook() {
+        useSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (isMyObjectIdentifiedBy(object, "known")) {
                     MyObject newObject = new MyObject("new");
-                    ManagedReference<?> ref = dataService.createReference(newObject);
+                    ManagedReference<?> ref = referenceFactory.createReference(newObject);
                     referenceWasCreated.set(ref != null);
                 }
                 return object;
@@ -109,7 +123,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
     public void cyclic_managed_object_graphs_can_be_created_during_serialization_without_causing_infinite_recursion() throws Exception {
         final AtomicInteger numberOfReferencesCreated = new AtomicInteger(0);
 
-        dataService.setSerializationHook(new NullSerializationHook() {
+        useSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (object instanceof MyObject) {
                     wrapOtherToManagedReference((MyObject) object);
@@ -118,7 +132,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
             }
 
             private void wrapOtherToManagedReference(MyObject object) {
-                ManagedReference<?> otherRef = dataService.createReference(object.getOther());
+                ManagedReference<?> otherRef = referenceFactory.createReference(object.getOther());
                 object.setOther(otherRef);
                 numberOfReferencesCreated.incrementAndGet();
             }

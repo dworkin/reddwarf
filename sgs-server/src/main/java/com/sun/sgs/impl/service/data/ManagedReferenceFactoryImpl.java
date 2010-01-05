@@ -19,32 +19,19 @@
 
 package com.sun.sgs.impl.service.data;
 
-/**
- * Makes it possible to flush the modified objects from outside this package.
- *
- * <p>TODO: Refactor the system so that this class will not be needed.
- */
-public final class ReferenceTableUtil {
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.service.data.ManagedReferenceFactory;
 
-    private ReferenceTableUtil() {
+public class ManagedReferenceFactoryImpl implements ManagedReferenceFactory {
+
+    private Context context;
+
+    public void setContext(Context context) {
+        this.context = context;
     }
 
-    /**
-     * Flushes the modified objects.
-     */
-    public static void flushModifiedObjects() {
-        Context context = getActiveContext();
-        if (context != null) {
-            context.refs.flushModifiedObjects();
-        }
-    }
-
-    private static Context getActiveContext() {
-        try {
-            return DataServiceImpl.getContextNoJoin();
-        } catch (RuntimeException e) {
-            // no active context, possibly because we are in a non-durable task
-            return null;
-        }
+    @Override public <T> ManagedReference<T> createReference(T object) {
+        DataServiceImpl.checkManagedObject(object);
+        return context.getReference(object);
     }
 }

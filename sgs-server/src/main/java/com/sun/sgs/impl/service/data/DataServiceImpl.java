@@ -42,7 +42,7 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.data.SerializationHook;
+import com.sun.sgs.service.data.SerializationHookFactory;
 import com.sun.sgs.service.store.DataStore;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -262,10 +262,12 @@ public final class DataServiceImpl implements DataService {
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
     
-    private SerializationHook serializationHook = new NullSerializationHook();
+    private SerializationHookFactory serializationHookFactory = 
+            new NullSerializationHookFactory();
 
-    public void setSerializationHook(SerializationHook serializationHook) {
-        this.serializationHook = serializationHook;
+    public void setSerializationHookFactory(
+            SerializationHookFactory serializationHookFactory) {
+        this.serializationHookFactory = serializationHookFactory;
     }
 
     /**
@@ -315,10 +317,14 @@ public final class DataServiceImpl implements DataService {
 			"Service is shutting down");
 		}
 	    }
-            return new Context(
+            ManagedReferenceFactoryImpl referenceFactory =
+                    new ManagedReferenceFactoryImpl();
+            Context context = new Context(
                     DataServiceImpl.this, store, txn, debugCheckInterval,
                     detectModifications, classesTable, trackStaleObjects,
-                    serializationHook);
+                    serializationHookFactory.create(referenceFactory));
+            referenceFactory.setContext(context);
+            return context;
         }
     }
 
@@ -1076,7 +1082,7 @@ public final class DataServiceImpl implements DataService {
      * Checks that the argument is a legal managed object: non-null,
      * serializable, and implements ManagedObject.
      */
-    private static void checkManagedObject(Object object) {
+    static void checkManagedObject(Object object) {
 	if (object == null) {
 	    throw new NullPointerException("The object must not be null");
 	} else if (!(object instanceof Serializable)) {
