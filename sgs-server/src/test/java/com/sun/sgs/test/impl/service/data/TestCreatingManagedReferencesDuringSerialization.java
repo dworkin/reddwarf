@@ -22,10 +22,9 @@ package com.sun.sgs.test.impl.service.data;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.hook.HookLocator;
+import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.NullSerializationHook;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -43,31 +42,27 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
 
     private SgsTestNode serverNode;
     private TransactionScheduler txnScheduler;
-    private DataService dataService;
+    private DataServiceImpl dataService;
     private Identity taskOwner;
 
     @Before
     public void setUp() throws Exception {
         serverNode = new SgsTestNode("TestCreatingManagedReferencesDuringSerialization", null, null);
         txnScheduler = serverNode.getSystemRegistry().getComponent(TransactionScheduler.class);
-        dataService = serverNode.getDataService();
+        dataService = (DataServiceImpl) serverNode.getDataService();
         taskOwner = serverNode.getProxy().getCurrentOwner();
     }
 
     @After
     public void tearDown() throws Exception {
-        try {
-            serverNode.shutdown(true);
-        } finally {
-            HookLocator.setSerializationHook(null);
-        }
+        serverNode.shutdown(true);
     }
 
     @Test
     public void managed_references_to_known_objects_can_be_created_during_serialization() throws Exception {
         final AtomicBoolean referenceWasCreated = new AtomicBoolean(false);
 
-        HookLocator.setSerializationHook(new NullSerializationHook() {
+        dataService.setSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (isMyObjectIdentifiedBy(object, "known")) {
                     ManagedReference<?> ref = dataService.createReference(object);
@@ -90,7 +85,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
     public void managed_references_to_new_objects_can_be_created_during_serialization() throws Exception {
         final AtomicBoolean referenceWasCreated = new AtomicBoolean(false);
 
-        HookLocator.setSerializationHook(new NullSerializationHook() {
+        dataService.setSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (isMyObjectIdentifiedBy(object, "known")) {
                     MyObject newObject = new MyObject("new");
@@ -114,7 +109,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
     public void cyclic_managed_object_graphs_can_be_created_during_serialization_without_causing_infinite_recursion() throws Exception {
         final AtomicInteger numberOfReferencesCreated = new AtomicInteger(0);
 
-        HookLocator.setSerializationHook(new NullSerializationHook() {
+        dataService.setSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (object instanceof MyObject) {
                     wrapOtherToManagedReference((MyObject) object);

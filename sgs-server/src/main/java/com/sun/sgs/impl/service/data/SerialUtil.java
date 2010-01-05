@@ -23,7 +23,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.hook.HookLocator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.service.data.SerializationHook;
@@ -73,26 +72,29 @@ public final class SerialUtil {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(SerialUtil.class.getName()));
 
-    /** This class cannot be instantiated. */
-    private SerialUtil() {
-	throw new AssertionError();
+    private final ClassSerialization classSerial;
+    
+    private final SerializationHook serializationHook;
+
+    public SerialUtil(ClassSerialization classSerial,
+                      SerializationHook serializationHook) {
+        this.classSerial = classSerial;
+        this.serializationHook = serializationHook;
     }
 
     /**
      * Converts serialized data into an object.
      *
      * @param	data the serialized data
-     * @param	classSerial controls reading of class descriptors
      * @return	the object
      * @throws	ObjectIOException if a problem occurs deserializing the object
      */
-    public static Object deserialize(byte[] data,
-                                     ClassSerialization classSerial) {
-	ObjectInputStream in = null;
+    public Object deserialize(byte[] data) {
+        ObjectInputStream in = null;
 	try {
-	    in = new CustomClassDescriptorObjectInputStream(
-		new CompressByteArrayInputStream(data), classSerial,
-                HookLocator.getSerializationHook());
+            in = new CustomClassDescriptorObjectInputStream(
+                    new CompressByteArrayInputStream(data), classSerial,
+                    serializationHook);
 	    return in.readObject();
 	} catch (ClassNotFoundException e) {
 	    throw new ObjectIOException(
@@ -178,20 +180,17 @@ public final class SerialUtil {
      * Converts an managed object into serialized data.
      *
      * @param	object the object
-     * @param	classSerial controls writing of class descriptors
      * @return	the serialized data
      * @throws	ObjectIOException if a problem occurs serializing the object
      *		and, in particular, if a <code>ManagedObject</code> is
      *		referenced without an intervening <code>ManagedReference</code>
      */
-    public static byte[] serialize(ManagedObject object,
-			    ClassSerialization classSerial)
-    {
+    public byte[] serialize(ManagedObject object) {
 	ObjectOutputStream out = null;
 	try {
 	    ByteArrayOutputStream baos = new CompressByteArrayOutputStream();
-	    out = new CheckReferencesObjectOutputStream(
-		baos, object, classSerial, HookLocator.getSerializationHook());
+            out = new CheckReferencesObjectOutputStream(
+                    baos, object, classSerial, serializationHook);
 	    out.writeObject(object);
 	    out.flush();
 	    return baos.toByteArray();

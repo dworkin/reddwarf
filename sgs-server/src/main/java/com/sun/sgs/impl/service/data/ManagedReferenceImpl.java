@@ -353,8 +353,7 @@ final class ManagedReferenceImpl<T>
 		ManagedObject tempObject = deserialize(
 		    context.store.getObject(context.txn, oid, false));
 		if (context.detectModifications) {
-		    unmodifiedBytes = SerialUtil.serialize(
-			tempObject, context.classSerial);
+		    unmodifiedBytes = context.serialUtil.serialize(tempObject);
 		    state = State.MAYBE_MODIFIED;
 		} else {
 		    state = State.NOT_MODIFIED;
@@ -663,12 +662,12 @@ final class ManagedReferenceImpl<T>
 	    break;
 	case NEW:
 	case MODIFIED:
-	    result = SerialUtil.serialize(object, context.classSerial);
+	    result = context.serialUtil.serialize(object);
 	    context.refs.unregisterObject(object);
 	    break;
 	case MAYBE_MODIFIED:
 	    byte[] modified =
-		SerialUtil.serialize(object, context.classSerial);
+		context.serialUtil.serialize(object);
 	    if (!Arrays.equals(modified, unmodifiedBytes)) {
 		result = modified;
 		if (debugDetectLogger.isLoggable(Level.FINEST)) {
@@ -730,7 +729,7 @@ final class ManagedReferenceImpl<T>
      * the return value is not null.
      */
     private ManagedObject deserialize(byte[] data) {
-	Object obj = SerialUtil.deserialize(data, context.classSerial);
+	Object obj = context.serialUtil.deserialize(data);
 	if (obj == null) {
 	    throw new ObjectIOException(
 		"Managed object must not deserialize to null", false);

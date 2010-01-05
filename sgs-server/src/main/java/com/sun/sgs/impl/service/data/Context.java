@@ -25,6 +25,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
+import com.sun.sgs.service.data.SerializationHook;
 import com.sun.sgs.service.store.DataStore;
 import java.math.BigInteger;
 import java.util.IdentityHashMap;
@@ -59,6 +60,8 @@ final class Context extends TransactionContext implements TransactionListener {
     /** Controls serializing classes. */
     final ClassSerialization classSerial;
 
+    final SerialUtil serialUtil;
+    
     /**
      * The number of operations performed -- used to determine when to make
      * checks on the reference table.
@@ -81,12 +84,13 @@ final class Context extends TransactionContext implements TransactionListener {
 
     /** Creates an instance of this class. */
     Context(DataServiceImpl service,
-	    DataStore store,
-	    Transaction txn,
-	    int debugCheckInterval,
-	    boolean detectModifications,
-	    ClassesTable classesTable,
-	    boolean trackStaleObjects)
+            DataStore store,
+            Transaction txn,
+            int debugCheckInterval,
+            boolean detectModifications,
+            ClassesTable classesTable,
+            boolean trackStaleObjects,
+            SerializationHook serializationHook)
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
@@ -98,6 +102,7 @@ final class Context extends TransactionContext implements TransactionListener {
 	this.detectModifications = detectModifications;
 	refs = new ReferenceTable(trackStaleObjects);
 	classSerial = classesTable.createClassSerialization(this.txn);
+        serialUtil = new SerialUtil(classSerial, serializationHook);
 	txn.registerListener(this);
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",
