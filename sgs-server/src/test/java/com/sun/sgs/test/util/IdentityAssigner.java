@@ -53,7 +53,7 @@ public class IdentityAssigner {
 	    mapToNewNode = nodemapServer.getClass().getDeclaredMethod(
  		"mapToNewNode",
 		new Class[] { Identity.class, String.class,
-			      Node.class, long.class });
+			      Node.class, long.class, long.class });
 	    mapToNewNode.setAccessible(true);
 	} catch (Exception e) {
 	    System.err.println("exception initializing IdentityAssigner");
@@ -79,6 +79,6 @@ public class IdentityAssigner {
 	    nodemapServer,
 	    new Object[] {
 		new SimpleTestIdentityAuthenticator.DummyIdentity(name),
-		this.getClass().getName(), oldNode, newNodeId });
+		this.getClass().getName(), oldNode, -1, newNodeId });
     }
 }
