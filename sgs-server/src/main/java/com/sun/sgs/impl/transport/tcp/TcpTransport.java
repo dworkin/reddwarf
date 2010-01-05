@@ -27,6 +27,7 @@ import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.StandardSocketOption;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
@@ -76,7 +77,18 @@ import java.util.logging.Logger;
  *      argument to the
  *      {@link AsynchronousServerSocketChannel#bind(SocketAddress,int)
  *      AsynchronousServerSocketChannel.bind} method.
- * </dl> <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #SOCKET_TIMEOUT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> 0 (no timeout set)<br>
+ *
+ * <dd style="padding-top: .5em">
+ *      Specifies the client socket timeout, in milliseconds. If this property
+ *      is not specified or its value is 0, no timeout is set. The value must
+ *      be between 0 and <code>Integer.MAX_VALUE</code>.<p>
+ * </dl>
+ * <p>
  */
 public class TcpTransport implements Transport {
  
@@ -112,7 +124,14 @@ public class TcpTransport implements Transport {
 
     /** The acceptor backlog. */
     private final int acceptorBacklog;
-    
+
+    /** The name of the client socket timeout property. */
+    public static final String SOCKET_TIMEOUT_PROPERTY =
+        PKG_NAME + ".socket.timeout";
+
+    /** The client socket timeout */
+    private final Integer socketTimeout;
+
     /** The async channel group for this service. */
     private final AsynchronousChannelGroup asyncChannelGroup;
 
@@ -148,6 +167,8 @@ public class TcpTransport implements Transport {
         int port = wrappedProps.getIntProperty(LISTEN_PORT_PROPERTY,
                                                DEFAULT_PORT, 1, 65535);
 
+        socketTimeout = wrappedProps.getIntProperty(SOCKET_TIMEOUT_PROPERTY,
+                                                    0, 0, Integer.MAX_VALUE);
         try {
             // If no host address is supplied, default to listen on all
             // interfaces on the local host.
@@ -195,7 +216,8 @@ public class TcpTransport implements Transport {
                        "\n  " + ACCEPTOR_BACKLOG_PROPERTY + "=" +
                        acceptorBacklog +
                        "\n  " + LISTEN_HOST_PROPERTY + "=" + host +
-                       "\n  " + LISTEN_PORT_PROPERTY + "=" + port);
+                       "\n  " + LISTEN_PORT_PROPERTY + "=" + port +
+                       "\n  " + SOCKET_TIMEOUT_PROPERTY + "=" + socketTimeout);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -333,6 +355,10 @@ public class TcpTransport implements Transport {
                     AsynchronousSocketChannel newChannel = result.getNow();
                     logger.log(Level.FINER, "Accepted {0}", newChannel);
 
+                    if (socketTimeout != 0) {
+                        newChannel.setOption(StandardSocketOption.SO_TIMEOUT,
+                                             socketTimeout);
+                    }
                     connectionHandler.newConnection(newChannel);
 
                     // Resume accepting connections

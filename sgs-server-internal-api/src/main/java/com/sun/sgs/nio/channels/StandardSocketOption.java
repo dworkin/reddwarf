@@ -37,6 +37,11 @@ import java.nio.channels.SelectableChannel;
 public enum StandardSocketOption implements SocketOption {
 
     /**
+     * Set a timeout on Socket operations.
+     */
+    SO_TIMEOUT(Integer.class),
+
+    /**
      * Allow transmission of broadcast datagrams.
      * <p>
      * The value of this socket option is a {@code Boolean} that represents

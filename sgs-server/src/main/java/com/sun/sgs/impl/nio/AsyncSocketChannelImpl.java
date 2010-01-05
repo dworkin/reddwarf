@@ -50,6 +50,8 @@ import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ShutdownType;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * An implementation of {@link AsynchronousSocketChannel}.
@@ -63,6 +65,7 @@ class AsyncSocketChannelImpl
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
+            StandardSocketOption.SO_TIMEOUT,
             StandardSocketOption.SO_SNDBUF,
             StandardSocketOption.SO_RCVBUF,
             StandardSocketOption.SO_KEEPALIVE,
@@ -76,6 +79,9 @@ class AsyncSocketChannelImpl
 
     /** The {@code AsyncKey} for the underlying channel. */
     final AsyncKey key;
+
+    /** Socket timeout */
+    int socketTimeout = 0;
 
     /**
      * Creates a new instance registered with the given channel group.
@@ -189,6 +195,12 @@ class AsyncSocketChannelImpl
         
         try {
             switch (stdOpt) {
+            case SO_TIMEOUT:
+                // Timeout is not supported by SocketChannel, so we need to
+                // implement it outside.
+                socketTimeout = ((Integer)value).intValue();
+                break;
+                
             case SO_SNDBUF:
                 socket.setSendBufferSize(((Integer) value).intValue());
                 break;
@@ -381,6 +393,10 @@ class AsyncSocketChannelImpl
             A attachment,
             CompletionHandler<Integer, ? super A> handler)
     {
+        if (timeout == 0) {
+            timeout = socketTimeout;
+            unit = TimeUnit.MILLISECONDS;
+        }
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
@@ -413,6 +429,10 @@ class AsyncSocketChannelImpl
             throw new IllegalArgumentException("length out of range");
         }
 
+        if (timeout == 0) {
+            timeout = socketTimeout;
+            unit = TimeUnit.MILLISECONDS;
+        }
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Long>() {
                 public Long call() throws IOException {
