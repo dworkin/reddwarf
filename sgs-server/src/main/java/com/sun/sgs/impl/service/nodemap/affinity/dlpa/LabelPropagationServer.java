@@ -525,9 +525,7 @@ public class LabelPropagationServer extends BasicState
      * @param nodeId the Id of the failed node
      */
     private void removeNode(long nodeId) {
-        synchronized (clientProxyMap) {
-            clientProxyMap.remove(nodeId);
-        }
+        clientProxyMap.remove(nodeId);
     }
 
     /**

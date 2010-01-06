@@ -49,7 +49,9 @@ import java.util.logging.LogManager;
  * application namespace.  All loggers under this root will be have
  * transactional-semantics.  If this property is left unset the system will use
  * the namespace specified in the {@code com.sun.sgs.app.listener} property
- * value. <p></dd></dl>
+ * value. <p>
+ *
+ * </dl>
  *
  * In order to load this class as the default {@code LogManager}, applications
  * must set the {@code java.util.logging.manager} system property to {@code
@@ -169,7 +171,7 @@ public final class TransactionAwareLogManager extends LogManager {
 		lgr.config("This logger now has transactional semantics");
 	    }
 	}
-	unconfiguredLoggers.clear();	
+	unconfiguredLoggers.clear();
     }
 
     /**

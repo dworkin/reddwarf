@@ -19,6 +19,6 @@
 
 /**
  * Implements asynchronous IO as specified by
- * {@link com.sun.sgs.nio.channels}.*
+ * the package {@link com.sun.sgs.nio.channels}.
  */
 package com.sun.sgs.impl.nio;

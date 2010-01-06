@@ -118,7 +118,7 @@ import java.util.Stack;
  * <p>
  *
  * Note that, unlike most collections, the {@code size} and {@code isEmpty}
- * methods for this class are <u>not</u> constant-time operations.  Because of
+ * methods for this class are <em>not</em> constant-time operations.  Because of
  * the asynchronous nature of the map, these operations may require accessing
  * all of the entries in the map.
  *

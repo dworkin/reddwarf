@@ -120,10 +120,12 @@ import javax.management.JMException;
  *      capacity per channel.<p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	{@value com.sun.sgs.impl.kernel.StandardProperties#SESSION_RELOCATION_TIMEOUT_PROPERTY}
+ *	{@value
+ * com.sun.sgs.impl.kernel.StandardProperties#SESSION_RELOCATION_TIMEOUT_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i>
- *	{@value com.sun.sgs.impl.kernel.StandardProperties#DEFAULT_SESSION_RELOCATION_TIMEOUT}
+ *	{@value
+ * com.sun.sgs.impl.kernel.StandardProperties#DEFAULT_SESSION_RELOCATION_TIMEOUT}
  *
  * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
  *	for client session relocation. This also specifies the amount of

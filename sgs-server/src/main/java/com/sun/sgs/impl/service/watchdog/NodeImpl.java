@@ -196,7 +196,7 @@ class NodeImpl
     /** {@inheritDoc} */
     public boolean equals(Object obj) {
 	if (obj == null) {
-	    throw new NullPointerException("obj is null");
+	    return false;
 	} else if (this == obj) {
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {

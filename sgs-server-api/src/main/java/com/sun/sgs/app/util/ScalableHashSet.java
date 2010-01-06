@@ -95,7 +95,7 @@ import java.util.Iterator;
  *
  * This class offers constant-time implementations of the {@code add}, {@code
  * remove} and {@code contains} methods.  Note that, unlike most collections,
- * the {@code size} and {@code isEmpty} methods for this class are <u>not</u>
+ * the {@code size} and {@code isEmpty} methods for this class are <em>not</em>
  * constant-time operations.  Because of the asynchronous nature of the set,
  * these operations may require accessing all of the entries in the set.
  *

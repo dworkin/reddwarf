@@ -60,12 +60,17 @@ public final class PasswordFileEditor
             digest(args[2].getBytes("UTF-8"));
         byte [] encodedPass = NamePasswordAuthenticator.encodeBytes(pass);
 
-        // open the file and append the new entry
-        FileOutputStream out = new FileOutputStream(args[0], true);
-        out.write(args[1].getBytes("UTF-8"));
-        out.write("\t".getBytes("UTF-8"));
-        out.write(encodedPass);
-        out.write("\n".getBytes("UTF-8"));
+        FileOutputStream out = null;
+        try {
+            // open the file and append the new entry
+            out = new FileOutputStream(args[0], true);
+            out.write(args[1].getBytes("UTF-8"));
+            out.write("\t".getBytes("UTF-8"));
+            out.write(encodedPass);
+            out.write("\n".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
     }
 
 }

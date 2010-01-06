@@ -900,11 +900,8 @@ public final class WatchdogServerImpl
             // Copy of the alive nodes
             NodeImpl[] values;
             final int numAliveNodes;
-	    synchronized (aliveNodes) {
-		numAliveNodes = aliveNodes.size();
-                values =
-		    aliveNodes.values().toArray(new NodeImpl[numAliveNodes]);
-            }
+            numAliveNodes = aliveNodes.size();
+            values = aliveNodes.values().toArray(new NodeImpl[numAliveNodes]);
 	    int random = numAliveNodes > 0
 		? backupChooser.nextInt(numAliveNodes) : 0;
 	    for (int i = 0; i < numAliveNodes; i++) {

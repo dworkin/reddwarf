@@ -672,6 +672,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	return currentState;
     }
 
+    // CHECKSTYLE: MethodLengthCheck OFF
     /**
      * If {@code loggingIn} is {@code true} handles a login request to
      * establish a client session); otherwise handles a relocate request
@@ -832,6 +833,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    } });
 	}
     }
+    // CHECKSTYLE: MethodLengthCheck ON
 
     /**
      * Notifies the "setup" future that login has been redirected to the
