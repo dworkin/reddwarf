@@ -63,15 +63,16 @@ public class LPADriver extends BasicState {
     public static final String GRAPH_CLASS_PROPERTY =
         PROP_NAME + ".graphbuilder.class";
 
-    /** The default graph builder class. */
-    static final String DEFAULT_GRAPH_CLASS =
-    "com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder";
-
     /**
      * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
      * affinity group finding should be instantiated (useful for testing).
      */
     public static final String GRAPH_CLASS_NONE = "None";
+
+    /** The default graph builder class. */
+    static final String DEFAULT_GRAPH_CLASS = GRAPH_CLASS_NONE;
+//    "com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder";
+
 
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PROP_NAME));
@@ -118,7 +119,7 @@ public class LPADriver extends BasicState {
             return;
         }
             
-        // A builrder was specified or we are running multi-node
+        // A builder was specified or we are running multi-node
         graphBuilder = wrappedProps.getClassInstanceProperty(
                     GRAPH_CLASS_PROPERTY, DEFAULT_GRAPH_CLASS,
                     AffinityGraphBuilder.class,
