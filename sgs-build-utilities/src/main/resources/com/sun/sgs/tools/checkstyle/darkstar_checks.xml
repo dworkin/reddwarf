@@ -43,12 +43,9 @@
 
 <module name="Checker">
 
-    <!-- Checks that a package.html file exists for each package.     -->
-    <!-- See http://checkstyle.sf.net/config_javadoc.html#PackageHtml -->
-    <!-- DARKSTAR: Use the added PackageDoc instead of PackageHtml to
-	 take the Java 5 package-info.java file into account -->
-    <!-- <module name="PackageHtml"/> -->
-    <module name="PackageDoc"/>
+    <!-- Checks that a package-info.java file exists for each package.     -->
+    <!-- See http://checkstyle.sf.net/config_javadoc.html#JavadocPackage -->
+    <module name="JavadocPackage"/>
 
     <!-- Checks whether files end with a new line.                        -->
     <!-- See http://checkstyle.sf.net/config_misc.html#NewlineAtEndOfFile -->
@@ -57,7 +54,6 @@
     <!-- Checks that property files contain the same keys.         -->
     <!-- See http://checkstyle.sf.net/config_misc.html#Translation -->
     <module name="Translation"/>
-
 
     <module name="TreeWalker">
 
@@ -120,24 +116,6 @@
         <module name="ParameterName"/>
         <module name="StaticVariableName"/>
         <module name="TypeName"/>
-
-
-        <!-- Checks for Headers                                -->
-        <!-- See http://checkstyle.sf.net/config_header.html   -->
-        <!-- <module name="Header">                            -->
-            <!-- The follow property value demonstrates the ability     -->
-            <!-- to have access to ANT properties. In this case it uses -->
-            <!-- the ${basedir} property to allow Checkstyle to be run  -->
-            <!-- from any directory within a project. See property      -->
-            <!-- expansion,                                             -->
-            <!-- http://checkstyle.sf.net/config.html#properties        -->
-            <!-- <property                                              -->
-            <!--     name="headerFile"                                  -->
-            <!--     value="${basedir}/java.header"/>                   -->
-        <!-- </module> -->
-
-        <!-- Following interprets the header file as regular expressions. -->
-        <!-- <module name="RegexpHeader"/>                                -->
 
 
         <!-- Checks for imports                              -->
@@ -211,12 +189,12 @@
 			     MINUS, MOD, NOT_EQUAL, SL, SR,
 			     STAR"/>
 	</module>
-        <module name="OperatorWrap">
-	    <!-- DARKSTAR: Require the 'new' operator to appear at
-		 the beginning, not the end, of a line (requires patched
-		 version of OperatorWrap) -->
-	    <property name="option" value="nl"/>
-	    <property name="tokens" value="LITERAL_NEW"/>
+	<!-- DARKSTAR: Require the 'new' operator to never appear at the end
+	     of a line -->
+	<module name="RegexpSinglelineJava">
+	  <property name="format" value="new\s*$"/>
+	  <property name="ignoreComments" value="true"/>
+	  <property name="message" value="new operator should not appear at end of line"/>
 	</module>
 
         <module name="ParenPad"/>
@@ -335,6 +313,34 @@
         <!-- <module name="TodoComment"/> -->
         <module name="UpperEll"/>
 
+	<!-- DARKSTAR: Configured to enable suppression filters below -->
+	<module name="FileContentsHolder"/>
+
+    </module>
+
+    <!-- DARKSTAR: Enable the default multiline in-file suppression comments.
+	 Checkstyle audits will be disabled between comment lines containing
+	 the phrases CHECKSTYLE: OFF and CHECKSTYLE: ON respectively -->
+    <module name="SuppressionCommentFilter">
+      <property name="offCommentFormat" value="CHECKSTYLE\: OFF"/>
+      <property name="onCommentFormat" value="CHECKSTYLE\: ON"/>
+      <property name="checkFormat" value=".*"/>
+    </module>
+
+    <!-- DARKSTAR: Enable multiline in-file suppression comments to disable
+	 a set of Checkstyle audit types. -->
+    <module name="SuppressionCommentFilter">
+      <property name="offCommentFormat" value="CHECKSTYLE\: ([\w\|]+)+ OFF"/>
+      <property name="onCommentFormat" value="CHECKSTYLE\: ([\w\|]+)+ ON"/>
+      <property name="checkFormat" value="$1"/>
+    </module>
+
+    <!-- DARKSTAR: Enable single line in-file suppression comments to
+	 disable all audits -->
+    <module name="SuppressWithNearbyCommentFilter">
+      <property name="commentFormat" value="CHECKSTYLE IGNORE NEXT LINE"/>
+      <property name="checkFormat" value=".*"/>
+      <property name="influenceFormat" value="1"/>
     </module>
 
 </module>

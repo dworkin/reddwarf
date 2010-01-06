@@ -1,5 +1,9 @@
 Copyright #if ($project.inceptionYear)${project.inceptionYear}-${projectYear}#else${projectYear}#end Sun Microsystems, Inc.
+#if ($externalCopyrights)
 
+$externalCopyrights
+
+#end
 This file is part of #if ($projectName)$projectName#else${project.name}#end.
 
 #if ($projectName)$projectName#else${project.name}#end is free software: you can redistribute it
