@@ -78,16 +78,7 @@ public class TestSingleNodeBuilder extends GraphBuilderTests {
     @Override
     protected void startNewNode(Properties addProps) throws Exception {
         super.afterEachTest();
-        props = getProps(null);
-        for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
-            props.put(entry.getKey(), entry.getValue());
-        }
-        node =  new SgsTestNode(appName, null, props);
-        graphDriver = (LPADriver)
-                finderField.get(node.getNodeMappingService());
-        groupDriver = graphDriver;
-        listener = graphDriver.getGraphListener();
-        builder = graphDriver.getGraphBuilder();
+        beforeEachTest(addProps);
     }
 
     @Test(expected=IllegalArgumentException.class)

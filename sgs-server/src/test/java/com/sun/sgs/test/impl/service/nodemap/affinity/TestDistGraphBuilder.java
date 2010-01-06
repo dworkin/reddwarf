@@ -59,19 +59,10 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
 
     @Override
     public void beforeEachTest(Properties addProps) throws Exception {
-        props = getProps(null, addProps);
-        serverNode = new SgsTestNode(appName, null, props);
-        // Create a new app node
-        props = getProps(serverNode, addProps);
-        node = new SgsTestNode(serverNode, null, props);
         // The listener we care about is the one that is given reports
-        graphDriver = (LPADriver)
-            finderField.get(node.getNodeMappingService());
-        listener = graphDriver.getGraphListener();
         // The builder, though, is the one that has access to the graphs
         // For this combo, that lives on the server
-        groupDriver = (LPADriver)
-            finderField.get(serverNode.getNodeMappingService());
+        super.beforeEachTest(addProps);
         builder = (AffinityGraphBuilder)
             serverImplField.get(groupDriver.getGraphBuilder());
     }
@@ -81,21 +72,7 @@ public class TestDistGraphBuilder extends GraphBuilderTests {
         // Our "node" is really the core server node, so we need to stop
         // and start it.
         super.afterEachTest();
-        props = getProps(null);
-        for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
-            props.put(entry.getKey(), entry.getValue());
-        }
-        serverNode = new SgsTestNode(appName, null, props);
-        super.startNewNode(addProps);
-        graphDriver = (LPADriver)
-            finderField.get(node.getNodeMappingService());
-        listener = graphDriver.getGraphListener();
-        // The builder, though, is the one that has access to the graphs
-        // For this combo, that lives on the server
-        groupDriver = (LPADriver)
-            finderField.get(serverNode.getNodeMappingService());
-        builder = (AffinityGraphBuilder)
-            serverImplField.get(groupDriver.getGraphBuilder());
+        beforeEachTest(addProps);
     }
 
     @Override

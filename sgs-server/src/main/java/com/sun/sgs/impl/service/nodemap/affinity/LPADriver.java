@@ -34,8 +34,7 @@ import java.util.logging.Logger;
 
 /**
  * A driver for the Label Propagation Algorithm affinity group finders.
- * The driver is responsible for instantiating the affinity group system,
- * managing its life cycle, and invoking the group finder as necessary.
+ * The driver is responsible for instantiating the affinity group system.
  * <p>
  * A driver must be instantiated on each node of the Darkstar cluster.
  * <p>
@@ -55,7 +54,7 @@ import java.util.logging.Logger;
  *   is useful for testing. <p>
  * </dl>
  */
-public class LPADriver extends BasicState {
+public class LPADriver {
     /** The base name for properties. */
     private static final String PROP_NAME =
             "com.sun.sgs.impl.service.nodemap.affinity";
@@ -84,6 +83,9 @@ public class LPADriver extends BasicState {
     
     /** The affinity graph builder, null if there is none. */
     private final AffinityGraphBuilder graphBuilder;
+
+    /** Are we shutdown? */
+    private boolean shutdown = false;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -138,34 +140,18 @@ public class LPADriver extends BasicState {
         } else {
             graphListener = null;
         }
-        setDisabledState();
         logger.log(Level.CONFIG,
                    "Created LPADriver with listener: " + graphListener +
                    ", builder: " + graphBuilder + ", and properties:" +
                    "\n  " + GRAPH_CLASS_PROPERTY + "=" + builderName);
     }
 
-    public void disable() {
-        if (setDisabledState()) {
-            logger.log(Level.FINE, "LPA driver disabled");
-            if (graphBuilder != null) {
-                graphBuilder.disable();
-            }
-        }
-    }
-
-    public void enable() {
-        if (setEnabledState()) {
-            logger.log(Level.FINE, "LPA driver enabled");
-            if (graphBuilder != null) {
-                graphBuilder.enable();
-            }
-        }
-    }
-
-    public void shutdown() {
-        if (setShutdownState()) {
-            logger.log(Level.FINE, "LPA driver shut down");
+    /**
+     * Shuts down all resources created by this driver.
+     */
+    public synchronized void shutdown() {
+        if (!shutdown) {
+            logger.log(Level.FINE, "BuilderFactory shut down");
             
             if (graphListener != null) {
                 graphListener.shutdown();
@@ -173,6 +159,7 @@ public class LPADriver extends BasicState {
             if (graphBuilder != null) {
                 graphBuilder.shutdown();
             }
+            shutdown = true;
         }
     }
 

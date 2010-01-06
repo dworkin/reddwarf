@@ -165,10 +165,7 @@ public class GraphBuilderTests {
             node = null;
             Thread.sleep(100);
         }
-        props = getProps(serverNode);
-        for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
-            props.put(entry.getKey(), entry.getValue());
-        }
+        props = getProps(serverNode, addProps);
         node =  new SgsTestNode(serverNode, null, props);
         graphDriver = (LPADriver)
                 finderField.get(node.getNodeMappingService());
@@ -711,34 +708,36 @@ public class GraphBuilderTests {
         }
     }
 
+    // Builders are responsible for the life-cycle of their finders;
+    // they instantiate them and change their state.
     @Test
     public void testShutdownTwice() {
-        graphDriver.shutdown();
-        graphDriver.shutdown();
+        builder.shutdown();
+        builder.shutdown();
     }
 
     @Test
     public void testEnableTwice() {
-        graphDriver.enable();
-        graphDriver.enable();
+        builder.enable();
+        builder.enable();
     }
 
     @Test
     public void testDisableTwice() {
-        graphDriver.disable();
-        graphDriver.disable();
+        builder.disable();
+        builder.disable();
     }
 
     @Test(expected=IllegalStateException.class)
     public void testShutdownDisable() {
-        graphDriver.shutdown();
-        graphDriver.disable();
+        builder.shutdown();
+        builder.disable();
     }
 
     @Test(expected=IllegalStateException.class)
     public void testShutdownEnable() {
-        graphDriver.shutdown();
-        graphDriver.enable();
+        builder.shutdown();
+        builder.enable();
     }
 
     @Test(expected=IllegalStateException.class)
@@ -777,7 +776,7 @@ public class GraphBuilderTests {
         Assert.assertEquals(2, graph.getVertexCount());
 
         // Now, disable
-        graphDriver.disable();
+        builder.disable();
 
         // And add more stuff
         report = makeReport(new IdentityImpl("somethingDifferent"));
@@ -791,7 +790,7 @@ public class GraphBuilderTests {
         Assert.assertEquals(2, graph.getVertexCount());
 
         // Renable
-        graphDriver.enable();
+        builder.enable();
         listener.report(report);
         graph = builder.getAffinityGraph();
         Assert.assertEquals(3, graph.getEdgeCount());
@@ -831,7 +830,7 @@ public class GraphBuilderTests {
         // profiling in this test
         col.getConsumer(AffinityGroupFinderStats.CONS_NAME).
                 setProfileLevel(ProfileLevel.MAX);
-        graphDriver.enable();
+        builder.enable();
         Thread.sleep(5500);
        
         AffinityGroupFinderStats stats = (AffinityGroupFinderStats)
