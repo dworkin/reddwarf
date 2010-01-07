@@ -216,6 +216,36 @@ public abstract class AsynchronousChannelProvider {
         throws IOException;
 
     /**
+     * Opens an asynchronous SSL server-socket channel.
+     *
+     * @param group the group to which the channel is bound, or {@code null}
+     *              to bind to the default group
+     * @return the new channel
+     * @throws IllegalArgumentException if the provider that created the
+     *         group differs from this provider
+     * @throws ShutdownChannelGroupException if the group is shutdown
+     * @throws IOException if an I/O error occurs
+     */
+    public abstract AsynchronousServerSocketChannel
+    openAsyncSSLServerSocketChannel(AsynchronousChannelGroup group)
+            throws IOException;
+
+    /**
+     * Opens an asynchronous SSL socket channel.
+     *
+     * @param group the group to which the channel is bound, or {@code null}
+     *              to bind to the default group
+     * @return the new channel
+     * @throws IllegalArgumentException if the provider that created the
+     *         group differs from this provider
+     * @throws ShutdownChannelGroupException if the group is shutdown
+     * @throws IOException if an I/O error occurs
+     */
+    public abstract AsynchronousSocketChannel
+    openAsyncSSLSocketChannel(AsynchronousChannelGroup group)
+            throws IOException;
+
+    /**
      * Opens an asynchronous datagram channel.
      * 
      * @param pf the protocol family, or {@code null} for the default protocol
