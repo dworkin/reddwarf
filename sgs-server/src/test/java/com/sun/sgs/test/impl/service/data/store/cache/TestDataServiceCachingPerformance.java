@@ -27,11 +27,11 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.CHECK_BINDINGS_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStore.DEFAULT_SERVER_PORT;
-import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_HOST_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_PORT_PROPERTY;
+import static com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServerImpl.DEFAULT_SERVER_PORT;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.DIRECTORY_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;

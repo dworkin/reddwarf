@@ -32,14 +32,9 @@ import java.util.Properties;
 
 /**
  * An abstract implementation of a service, with support for checking service
- * versions.  It manages state transitions (i.e., initialized, ready, shutting
- * down, shutdown), in progress call tracking for services with embedded remote
- * servers, and shutdown support.
+ * versions in addition to the facilities provided by {@link
+ * AbstractBasicService}. <p>
  *
- * <p>The {@link #getName getName} method invokes the instance's {@code
- * toString} method, so a concrete subclass of {@code AbstractService}
- * should provide an implementation of the {@code toString} method.
- * 
  * An {@link #AbstractService} supports the following properties: <p>
  *
  * <dl style="margin-left: 1em">

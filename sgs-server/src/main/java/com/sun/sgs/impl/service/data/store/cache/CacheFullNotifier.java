@@ -19,15 +19,10 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
-/** An interface for handling reports of failure of the local node. */
-public interface FailureReporter {
+/** An interface for receiving notifications that the cache is full. */
+public interface CacheFullNotifier {
 
-    /**
-     * Reports that the local node has failed and that the failure was caused
-     * by the specified exception.  The implementation should arrange to
-     * shutdown the local node.
-     *
-     * @param	exception the exception that caused the failure
-     */
-    void reportFailure(Throwable exception);
+    /** Provides notification that the cache is full. */
+    void cacheIsFull();
 }
+

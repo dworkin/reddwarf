@@ -28,9 +28,11 @@ import static java.util.logging.Level.WARNING;
 import java.util.logging.Logger;
 
 /**
- * A cache entry for a name binding.  Only the {@link #key} field may be
- * accessed without holding the associated lock.  For all other fields and
- * methods, the lock should be held. <p>
+ * A cache entry for a name binding.  Entries only appear in the cache for
+ * bound names; information about unbound names is represented using the {@link
+ * #previousKey} and {@link #previousKeyUnbound} fields.  Only the {@link #key}
+ * field may be accessed without holding the associated lock.  For all other
+ * fields and methods, the lock should be held. <p>
  *
  * In addition to the value associated with a name, binding cache entries store
  * information about name bindings in the range between this name and an
@@ -51,12 +53,16 @@ import java.util.logging.Logger;
  * next entry present in the cache after the one for a requested name is used
  * to represent the pending operation, and is marked "pending previous" when in
  * use.  It is this pending previous state that is used to mark binding entries
- * as in use for server requests.  The only exception to this rule occurs when
- * there is no next entry in the cache when a server request needs to be made.
- * In that case, a last binding entry is added to the cache, and is also marked
- * <tt>FETCHING_READ</tt> as a way of noting that the entry should be removed
- * from the cache if the server request returns an actual next entry that is
- * lower than the last entry. <p>
+ * as in use for server requests.  In particular, the <tt>FETCHING_UPGRADE</tt>
+ * and <tt>FETCHING_WRITE</tt> states should not be used.  The only exception
+ * to this rule occurs when there is no next entry in the cache to represent a
+ * request being made to the server.  This situation can occur either when a
+ * request is made for an entry beyond the last entry currently in the cache,
+ * or when the next entry in the cache is one that was created for a
+ * transaction that aborts while the operation using the entry is in progress.
+ * In these cases, the binding entry is marked <tt>FETCHING_READ</tt> as a way
+ * of noting that the entry should be removed from the cache if the server
+ * request does not return an entry with that same key. <p>
  *
  * This class is part of the implementation of {@link CachingDataStore}.
  *
@@ -150,42 +156,45 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     }
 
     /**
-     * Updates information about previous names that are known to be unbound
-     * given the status of a particular name and that it is known that all
-     * names between that name and the one for this entry are unbound.
+     * Updates the information stored in this entry about previous names that
+     * are known to be unbound.  The {@code newPreviousKey} represents a name
+     * for which all names between that name and this entry's name are known to
+     * be unbound.  The {@code newPreviousKeyState} specifies what is known
+     * about the binding of {@code newPreviousKey} itself.
      *
      * @param	newPreviousKey the new previous key
-     * @param	newPreviousKeyBound the binding state of the new previous key
+     * @param	newPreviousKeyState the binding state of the new previous key
      * @throws	IllegalArgumentException if {@code newPreviousKey} is greater
      *		than or equal to the key for this entry
      */
     void updatePreviousKey(BindingKey newPreviousKey,
-			   BindingState newPreviousKeyBound)
+			   BindingState newPreviousKeyState)
     {
-	assert newPreviousKeyBound != null;
+	assert newPreviousKeyState != null;
 	if (newPreviousKey.compareTo(key) >= 0) {
 	    throw new IllegalArgumentException(
 		"New previous key is too large");
 	} else if (previousKey == null) {
 	    /* No previous key was known */
 	    previousKey = newPreviousKey;
-	    previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
+	    previousKeyUnbound = (newPreviousKeyState == UNBOUND);
+	    return;
 	}
 	int compareTo = newPreviousKey.compareTo(previousKey);
 	if (compareTo < 0) {
 	    /* New previous key is earlier than previous one */
 	    previousKey = newPreviousKey;
-	    previousKeyUnbound = (newPreviousKeyBound == UNBOUND);
+	    previousKeyUnbound = (newPreviousKeyState == UNBOUND);
 	} else if (compareTo == 0) {
 	    /* Same previous key */
-	    if (!previousKeyUnbound && newPreviousKeyBound == UNBOUND) {
+	    if (!previousKeyUnbound && newPreviousKeyState == UNBOUND) {
 		/* Now know previous key is unbound */
 		previousKeyUnbound = true;
-	    } else if (previousKeyUnbound && newPreviousKeyBound == BOUND) {
+	    } else if (previousKeyUnbound && newPreviousKeyState == BOUND) {
 		/* No longer know that previous key is unbound */
 		previousKeyUnbound = false;
 	    }
-	} else if (newPreviousKeyBound == BOUND) {
+	} else if (newPreviousKeyState == BOUND) {
 	    /* Move up to the new, higher previous key */
 	    previousKey = newPreviousKey;
 	    previousKeyUnbound = false;
@@ -215,7 +224,9 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
      * Checks whether this entry is consistent, throwing an assertion error if
-     * an inconsistency is found.
+     * an inconsistency is found.  This method should only be called for
+     * entries that are present in the cache.  This method is intended to be
+     * used for testing only.
      *
      * @param	cache the data store cache
      * @param	lockTimeout the lock timeout for waiting for the entry to not
@@ -225,60 +236,64 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	Object lock = cache.getEntryLock(this);
 	synchronized (lock) {
 	    if (getDecached()) {
-		if (cache.getBindingLock(key) != null) {
-		    throw new AssertionError(
-			"Decached binding entry found: " + this);
-		}
-		return;
+		throw new AssertionError(
+		    "Decached binding entry found: " + this);
 	    }
 	    if (key == BindingKey.FIRST) {
 		throw new AssertionError(
-		    "Binding entry for first key: " + this);
+		    "No binding entry should be present for first key: "
+		    + this);
 	    } else if (key == BindingKey.LAST) {
 		if (getValue() != LAST_KEY_VALUE) {
 		    throw new AssertionError(
-			"Binding entry for last key has wrong value: " + this);
+			"Binding entry for last key should have value " +
+			LAST_KEY_VALUE + ": " + this);
 		}
 	    } else if (getValue() == -1) {
 		throw new AssertionError(
-		    "Binding entry for removed binding: " + this);
+		    "No binding entry should be found for removed binding: " +
+		    this);
 	    }
 	    /*
 	     * Check for permitting fetching, evicting, and pending previous
 	     * states
 	     */
 	    if (getState() == State.FETCHING_READ) {
-		if (key != BindingKey.LAST) {
+		if (!pendingPrevious) {
 		    throw new AssertionError(
-			"Fetching non-last binding entry for read: " + this);
-		} else if (!pendingPrevious) {
-		    throw new AssertionError(
-			"Fetching last binding entry for read without" +
-			"pending previous: " + this);
+			"Binding entry that is FETCHING_READ should also be" +
+			" pending previous: " + this);
 		}
 	    } else if (getState() == State.FETCHING_UPGRADE) {
 		throw new AssertionError(
-		    "Upgrading binding entry: " + this);
+		    "Binding entries should not be FETCHING_UPGRADE: " + this);
 	    } else if (getState() == State.FETCHING_WRITE) {
 		throw new AssertionError(
-		    "Fetching binding entry for write: " + this);
+		    "Binding entries should not be FETCHING_WRITE: " + this);
 	    } else if (getDecaching()) {
 		if (pendingPrevious) {
 		    throw new AssertionError(
-			"Evicting binding entry that is pending previous: " +
-			this);
+			"Binding entries that are being evicted should not" +
+			" be pending previous: " + this);
 		}
 	    } else if (getDowngrading()) {
 		if (pendingPrevious) {
 		    throw new AssertionError(
-			"Downgrading binding entry that is" +
-			" pending previous: " + this);
+			"Binding entries that are being downgraded should" +
+			" not be pending previous: " + this);
 		}
 	    }
 	    try {
 		if (!awaitNotPendingPrevious(
 			lock, System.currentTimeMillis() + lockTimeout))
 		{
+		    /*
+		     * We can't check the state of this entry because it
+		     * remained pending previous for too long.  Since the cache
+		     * state is changing all of the time, though, checking the
+		     * entire cache is already somewhat approximate, so its OK
+		     * to abandon checking this entry and move on to the next.
+		     */
 		    return;
 		}
 	    } catch (TransactionTimeoutException e) {
@@ -298,18 +313,18 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		int compareTo = previousEntryKey.compareTo(previousKey);
 		if (compareTo > 0) {
 		    throw new AssertionError(
-			"Binding entry previous key is lower than previous" +
-			" entry key: " + this +
+			"Binding entry's previous key should not be lower" +
+			" than previous entry's key: " + this +
 			", previous entry key: " + previousEntryKey);
 		} else if (compareTo == 0 && previousKeyUnbound) {
 		    throw new AssertionError(
-			"Binding entry notes previous key entry is unbound," +
-			" but key is bound: " + this +
-			", previous entry key: " + previousEntryKey);
+			"Binding entry should not record that the previous " +
+			" key entry is unbound when that key is bound: " +
+			this + ", previous entry key: " + previousEntryKey);
 		}
 	    } else if (previousEntryKey.compareTo(key) >= 0) {
 		throw new AssertionError(
-		    "Binding entry key is not greater than the previous" +
+		    "Binding entry's key should be greater than the previous" +
 		    " entry's key: " + this +
 		    ", previous entry key: " + previousEntryKey);
 	    }
@@ -379,7 +394,6 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      *
      * @param	lock the associated lock, which should be held
      * @param	stop the time in milliseconds when waiting should fail
-     * @param	whether the entry is readable in the cache
      * @throws	TransactionTimeoutException if the operation does not succeed
      *		before the specified stop time
      */

@@ -1239,7 +1239,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	}
 	handleException(null, Level.FINE, exception,
 			"getNextTxnId count:" + count);
-	return 0;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**

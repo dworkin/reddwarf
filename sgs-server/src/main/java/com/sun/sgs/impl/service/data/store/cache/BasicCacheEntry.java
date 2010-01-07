@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.service.TransactionInterruptedException;
 
@@ -30,6 +31,11 @@ import com.sun.sgs.service.TransactionInterruptedException;
  * Only the {@link #key} field may be accessed without holding the associated
  * lock (see {@link Cache#getBindingLock} and {@link Cache#getObjectLock}.  For
  * all other fields and methods, the lock must be held. <p>
+ *
+ * A given entry maintains information for the associated object or binding
+ * only so long as that item remains in the cache.  Once an item is removed
+ * from the cache, a new entry will be created to represent that item the next
+ * time that it enters the cache. <p>
  *
  * This class is part of the implementation of {@link CachingDataStore}.
  *
@@ -51,7 +57,7 @@ abstract class BasicCacheEntry<K, V> {
     /** The entry is writable. */
     private static final int WRITABLE			= 0x08;
 
-    /** The entry is modified. */
+    /** The entry contains data modified by a single transaction. */
     private static final int MODIFIED			= 0x10;
 
     /** The entry is being made not writable. */
@@ -68,8 +74,11 @@ abstract class BasicCacheEntry<K, V> {
      *
      * Here are the permitted transitions: <ul>
      *
-     * <li>Fetching for read, then upgrading to write: <ul>
+     * <li>Fetching for read: <ul>
      * <li>{@code FETCHING_READ} => {@code CACHED_READ}
+     * </ul>
+     *
+     * <li>Upgrading to write: <ul>
      * <li>{@code CACHED_READ} => {@code FETCHING_UPGRADE}
      * <li>{@code FETCHING_UPGRADE} => {@code CACHED_WRITE}
      * </ul>
@@ -86,9 +95,12 @@ abstract class BasicCacheEntry<K, V> {
      * <li>{@code CACHED_DIRTY} => {@code CACHED_WRITE}
      * </ul>
      *
-     * <li>Downgrading, then evicting read: <ul>
+     * <li>Downgrading: <ul>
      * <li>{@code CACHED_WRITE} => {@code EVICTING_DOWNGRADE}
      * <li>{@code EVICTING_DOWNGRADE} => {@code CACHED_READ}
+     * </ul>
+     *
+     * <li>Evicting read: <ul>
      * <li>{@code CACHED_READ} => {@code EVICTING_READ}
      * <li>{@code EVICTING_READ} => {@code NOT_CACHED}
      * </ul>
@@ -139,7 +151,8 @@ abstract class BasicCacheEntry<K, V> {
 	CACHED_WRITE(READABLE | WRITABLE),
 
 	/**
-	 * The entry is available for read and write, and has been modified.
+	 * The entry is available for read and write, and contains data that
+	 * has been modified by a single transaction.
 	 */
 	CACHED_DIRTY(READABLE | WRITABLE | MODIFIED),
 
@@ -248,8 +261,9 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
-     * Waits for this entry to become readable.  Returns {@code true} if the
-     * entry is readable, else {@code false} if the entry has become decached.
+     * Waits for this entry to become readable, also waiting if it is in the
+     * process of being evicted.  Returns {@code true} if the entry is
+     * readable, else {@code false} if the entry has become decached.
      *
      * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
@@ -388,7 +402,8 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
-     * Waits for this entry to become available for write.  Returns {@link
+     * Waits for this entry to become writable, also waiting if it is in the
+     * process of being downgraded or evicted.  Returns {@link
      * AwaitWritableResult#WRITABLE} if the entry is writable, {@link
      * AwaitWritableResult#READABLE} if the entry is readable but not writable,
      * and else {@link AwaitWritableResult#DECACHED} if the entry has become
@@ -397,13 +412,17 @@ abstract class BasicCacheEntry<K, V> {
      * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
      * @return	the status of the entry
+     * @throws	ResourceUnavailableException if the operation does not succeed
+     *		in the standard number of cache retries
      * @throws	TransactionTimeoutException if the operation does not succeed
      *		before the specified stop time
      */
     AwaitWritableResult awaitWritable(Object lock, long stop) {
 	assert Thread.holdsLock(lock);
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= CachingDataStore.MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    if (checkStateValue(WRITABLE)) {
 		/* Already cached for write */
 		return AwaitWritableResult.WRITABLE;
@@ -465,9 +484,8 @@ abstract class BasicCacheEntry<K, V> {
 
     /**
      * Sets this entry's state to {@link State#CACHED_WRITE} when it was
-     * upgraded because it was the next binding after an entry being
-     * successfully removed, and notifies the associated lock, which must be
-     * held.
+     * upgraded after receiving information about a binding, and notifies the
+     * associated lock, which must be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the entry's current state is not
@@ -480,9 +498,9 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
-     * Sets this entry's state to {@link State#CACHED_WRITE} when it was
-     * modified, for use at the end of a transaction, and notifies the lock,
-     * which must be held.
+     * Sets this entry's state to {@link State#CACHED_WRITE} after it was
+     * modified during a transaction which is now ending, and notifies the
+     * lock, which must be held.
      *
      * @param	lock the associated lock
      * @throws	IllegalStateException if the current state is not {@link
@@ -753,6 +771,8 @@ abstract class BasicCacheEntry<K, V> {
      * @param	value the value to check
      * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
+     * @throws	TransactionInterruptedException if the current thread is
+     *		interrupted while waiting
      * @throws	TransactionTimeoutException if desired state value does not
      *		appear before the specified stop time
      */
@@ -787,6 +807,8 @@ abstract class BasicCacheEntry<K, V> {
      * @param	value the value to check
      * @param	lock the associated lock, which should be held
      * @param	stop the time in milliseconds when waiting should fail
+     * @throws	TransactionInterruptedException if the current thread is
+     *		interrupted while waiting
      * @throws	TransactionTimeoutException if desired state value does not
      *		appear before the specified stop time
      */

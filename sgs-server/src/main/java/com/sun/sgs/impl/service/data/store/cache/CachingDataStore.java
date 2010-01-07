@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
@@ -175,7 +176,8 @@ import java.util.logging.Logger;
  *
  * <dt> <i>Property:</i> <code><b>{@value #SERVER_PORT_PROPERTY}</b></code>
  *	<br>
- *	<i>Default:</i>	<code>{@value #DEFAULT_SERVER_PORT}</code>
+ *	<i>Default:</i>	<code>
+ *	{@value com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl#DEFAULT_SERVER_PORT}</code>
  *
  * <dd style="padding-top: .5em">The network port used to make server requests.
  *	The value should be a non-negative number less than <code>65536</code>.
@@ -279,9 +281,6 @@ public final class CachingDataStore extends AbstractDataStore
     /** The property for specifying the server port. */
     public static final String SERVER_PORT_PROPERTY = PKG + ".server.port";
 
-    /** The default server port. */
-    public static final int DEFAULT_SERVER_PORT = 44540;
-
     /** The property for specifying the cache size. */
     public static final String CACHE_SIZE_PROPERTY = PKG + ".size";
 
@@ -316,6 +315,13 @@ public final class CachingDataStore extends AbstractDataStore
 
     /** The new object ID allocation batch size. */
     public static final int OBJECT_ID_BATCH_SIZE = 1000;
+
+    /**
+     * The number of times to retry locking cache entries in the face of
+     * evictions or other concurrent activity before throwing a resource
+     * exception.
+     */
+    static final int MAX_CACHE_RETRIES = 100;
 
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -517,7 +523,9 @@ public final class CachingDataStore extends AbstractDataStore
 		"A server host must be specified");
 	}
 	int serverPort = wrappedProps.getIntProperty(
-	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, startServer ? 0 : 1,
+	    SERVER_PORT_PROPERTY,
+	    CachingDataStoreServerImpl.DEFAULT_SERVER_PORT,
+	    startServer ? 0 : 1,
 	    65535);
 	int updateQueueSize = wrappedProps.getIntProperty(
 	    UPDATE_QUEUE_SIZE_PROPERTY, DEFAULT_UPDATE_QUEUE_SIZE,
@@ -546,14 +554,14 @@ public final class CachingDataStore extends AbstractDataStore
 		 ? "\n  " + CHECK_BINDINGS_PROPERTY + "=" + checkBindings
 		 : ""));
 	}
+	if (serverHost == null && startServer) {
+	    serverHost = InetAddress.getLocalHost().getHostName();
+	}
+	this.txnProxy = txnProxy;
+	taskOwner = txnProxy.getCurrentOwner();
+	txnScheduler =
+	    systemRegistry.getComponent(TransactionScheduler.class);
 	try {
-	    if (serverHost == null && startServer) {
-		serverHost = InetAddress.getLocalHost().getHostName();
-	    }
-	    this.txnProxy = txnProxy;
-	    taskOwner = txnProxy.getCurrentOwner();
-	    txnScheduler =
-		systemRegistry.getComponent(TransactionScheduler.class);
 	    if (startServer) {
 		try {
 		    localServer = new CachingDataStoreServerImpl(
@@ -690,10 +698,10 @@ public final class CachingDataStore extends AbstractDataStore
     protected long createObjectInternal(Transaction txn) {
 	TxnContext context = contextMap.join(txn);
 	long oid = newObjectIdCache.getNewObjectId();
-	ReserveCache reserve = new ReserveCache(cache);
+	Cache.Reservation reserve = cache.getReservation(1);
 	try {
 	    synchronized (cache.getObjectLock(oid)) {
-		context.noteNewObject(oid, reserve);
+		context.createNewObjectEntry(oid, reserve);
 	    }
 	} finally {
 	    reserve.done();
@@ -713,17 +721,24 @@ public final class CachingDataStore extends AbstractDataStore
 	    for (int i = 0; true; i++) {
 		/*
 		 * We might need to retry several times if concurrent activity
-		 * causes the entry to be evicted, but if that happens too many
-		 * times it is probably a bug.
+		 * causes the entry to be evicted, but in the very unlikely
+		 * case that it happens too many times, throw a resource
+		 * exception.
 		 */
-		assert i < 1000 : "Too many retries";
+		if (i >= MAX_CACHE_RETRIES) {
+		    throw new ResourceUnavailableException("Too many retries");
+		}
 		ObjectCacheEntry entry = cache.getObjectEntry(oid);
 		assert entry != null :
 		    "markForUpdate called for object not in cache: " + oid;
 		switch (entry.awaitWritable(lock, stop)) {
 		case DECACHED:
-		    /* Entry was decached -- try again */
-		    continue;
+		    /*
+		     * Entry was decached, but that shouldn't be because an
+		     * upgrade means this transaction already read locked it
+		     */
+		    throw new AssertionError(
+			"markForUpdate found decached entry: " + entry);
 		case READABLE:
 		    /* Upgrade */
 		    context.noteAccess(entry);
@@ -731,6 +746,11 @@ public final class CachingDataStore extends AbstractDataStore
 		    scheduleFetch(new UpgradeObjectRunnable(context, oid));
 		    AwaitWritableResult result =
 			entry.awaitWritable(lock, stop);
+		    /*
+		     * As before, the entry should be decached, and
+		     * awaitWritable shouldn't return normally if it was unable
+		     * to upgrade it.
+		     */
 		    assert result == AwaitWritableResult.WRITABLE;
 		    return;
 		case WRITABLE:
@@ -792,13 +812,15 @@ public final class CachingDataStore extends AbstractDataStore
 	Object lock = cache.getObjectLock(oid);
 	byte[] value;
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
-	    ReserveCache reserve = new ReserveCache(cache);
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
+	    Cache.Reservation reserve = cache.getReservation(1);
 	    try {
 		synchronized (lock) {
 		    ObjectCacheEntry entry = cache.getObjectEntry(oid);
 		    if (entry == null) {
-			entry = context.noteFetchingObject(
+			entry = context.createFetchingObjectEntry(
 			    oid, forUpdate, reserve);
 			scheduleFetch(
 			    forUpdate
@@ -821,6 +843,12 @@ public final class CachingDataStore extends AbstractDataStore
 				new UpgradeObjectRunnable(context, oid));
 			    AwaitWritableResult result =
 				entry.awaitWritable(lock, stop);
+			    /*
+			     * The entry was already read cached, so it
+			     * shouldn't become decached, and awaitWritable
+			     * shouldn't return normally if it was unable to
+			     * upgrade it.
+			     */
 			    assert result == AwaitWritableResult.WRITABLE;
 			    break;
 			case WRITABLE:
@@ -919,14 +947,18 @@ public final class CachingDataStore extends AbstractDataStore
 	long stop = context.getStopTime();
 	Object lock = cache.getObjectLock(oid);
 	for (int i = 0; true; i++) {
-	    ReserveCache reserve = new ReserveCache(cache);
+	    Cache.Reservation reserve = cache.getReservation(1);
 	    try {
 		synchronized (lock) {
-		    assert i < 1000 : "Too many retries";
+		    if (i >= MAX_CACHE_RETRIES) {
+			throw new ResourceUnavailableException(
+			    "Too many retries");
+		    }
 		    ObjectCacheEntry entry = cache.getObjectEntry(oid);
 		    if (entry == null) {
 			/* Fetch for write */
-			entry = context.noteFetchingObject(oid, true, reserve);
+			entry = context.createFetchingObjectEntry(
+			    oid, true, reserve);
 			scheduleFetch(
 			    new GetObjectForUpdateRunnable(context, oid));
 		    }
@@ -941,6 +973,11 @@ public final class CachingDataStore extends AbstractDataStore
 			scheduleFetch(new UpgradeObjectRunnable(context, oid));
 			AwaitWritableResult result =
 			    entry.awaitWritable(lock, stop);
+			/*
+			 * The entry was already read cached, so it shouldn't
+			 * become decached, and awaitWritable shouldn't return
+			 * normally if it was unable to upgrade it.
+			 */
 			assert result == AwaitWritableResult.WRITABLE;
 			break;
 		    case WRITABLE:
@@ -971,6 +1008,12 @@ public final class CachingDataStore extends AbstractDataStore
     protected void setObjectsInternal(
 	Transaction txn, long[] oids, byte[][] dataArray)
     {
+	/*
+	 * TBD: Since the data service uses this method to make all changes to
+	 * objects, it would be worth seeing if there is a way to batch up the
+	 * operations, in particular to reduce the number of network round
+	 * trips.  -tjb@sun.com (01/06/2010)
+	 */
 	for (int i = 0; i < oids.length; i++) {
 	    setObjectInternal(txn, oids[i], dataArray[i]);
 	}
@@ -994,13 +1037,15 @@ public final class CachingDataStore extends AbstractDataStore
 	BindingKey nameKey = BindingKey.get(name);
 	BindingValue result;
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    Object lock =
 		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    /* Reserve space for last entry, and requested or next name */
-	    ReserveCache reserve = new ReserveCache(cache, 2);
+	    Cache.Reservation reserve = cache.getReservation(2);
 	    try {
 		/*
 		 * We're locking the key associated with the entry only after
@@ -1017,7 +1062,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    }
 		    if (entry == null) {
 			/* No next entry -- create last entry */
-			entry = context.noteLastBinding(reserve);
+			entry = context.createLastBindingEntry(reserve);
 			if (entry == null) {
 			    /* Last entry already present -- try again */
 			    continue;
@@ -1077,7 +1122,7 @@ public final class CachingDataStore extends AbstractDataStore
 	GetBindingRunnable(TxnContext context,
 			   BindingKey nameKey,
 			   BindingKey cachedNextNameKey,
-			   ReserveCache reserve)
+			   Cache.Reservation reserve)
 	{
 	    super(context, nameKey, cachedNextNameKey, reserve);
 	}
@@ -1120,13 +1165,15 @@ public final class CachingDataStore extends AbstractDataStore
 	BindingKey nameKey = BindingKey.get(name);
 	BindingValue result;
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    final BindingKey entryKey = (entry != null) ? entry.key : LAST;
 	    final Object lock = cache.getBindingLock(entryKey);
 	    /* Reserve space for last entry, and requested or next name */
-	    ReserveCache reserve = new ReserveCache(cache, 2);
+	    Cache.Reservation reserve = cache.getReservation(2);
 	    try {
 		synchronized (lock) {
 		    if (logger.isLoggable(FINEST)) {
@@ -1136,7 +1183,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    }
 		    if (entry == null) {
 			/* No next entry -- create last entry */
-			entry = context.noteLastBinding(reserve);
+			entry = context.createLastBindingEntry(reserve);
 			if (entry == null) {
 			    /* Last entry already present -- try again */
 			    continue;
@@ -1214,11 +1261,12 @@ public final class CachingDataStore extends AbstractDataStore
 		entryPreviousKeyUnbound = entry.getPreviousKeyUnbound();
 	    }
 	    /* Create a new entry for the requested name */
-	    reserve = new ReserveCache(cache);
+	    reserve = cache.getReservation(1);
 	    try {
 		synchronized (cache.getBindingLock(nameKey)) {
 		    BindingCacheEntry nameEntry =
-			context.noteCachedBinding(nameKey, -1, true, reserve);
+			context.createCachedBindingEntry(
+			    nameKey, -1, true, reserve);
 		    context.noteModifiedBinding(nameEntry, oid);
 		    if (entryPreviousKey != null &&
 			entryPreviousKey.compareTo(nameKey) < 0)
@@ -1268,7 +1316,7 @@ public final class CachingDataStore extends AbstractDataStore
 	GetBindingForUpdateRunnable(TxnContext context,
 				    BindingKey nameKey,
 				    BindingKey cachedNextNameKey,
-				    ReserveCache reserve)
+				    Cache.Reservation reserve)
 	{
 	    super(context, nameKey, cachedNextNameKey, reserve);
 	}
@@ -1513,14 +1561,16 @@ public final class CachingDataStore extends AbstractDataStore
 	BindingKey nameKey = BindingKey.get(name);
 	BindingValue result;
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    Object lock =
 		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    boolean nameWritable;
 	    /* Reserve space for last entry, requested name, and next name */
-	    ReserveCache reserve = new ReserveCache(cache, 3);
+	    Cache.Reservation reserve = cache.getReservation(3);
 	    try {
 		synchronized (lock) {
 		    if (logger.isLoggable(FINEST)) {
@@ -1530,7 +1580,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    }
 		    if (entry == null) {
 			/* No next entry -- create last entry */
-			entry = context.noteLastBinding(reserve);
+			entry = context.createLastBindingEntry(reserve);
 			if (entry == null) {
 			    /* Last entry already present -- try again */
 			    continue;
@@ -1603,7 +1653,7 @@ public final class CachingDataStore extends AbstractDataStore
 	GetBindingForRemoveRunnable(TxnContext context,
 				    BindingKey nameKey,
 				    BindingKey cachedNextNameKey,
-				    ReserveCache reserve)
+				    Cache.Reservation reserve)
 	{
 	    super(context, nameKey, cachedNextNameKey, reserve, 2);
 	}
@@ -1694,7 +1744,7 @@ public final class CachingDataStore extends AbstractDataStore
 	final BindingKey nextKey = (entry != null) ? entry.key : LAST;
 	final Object lock = cache.getBindingLock(nextKey);
 	/* Reserve space for last entry, requested name, and next name */
-	ReserveCache reserve = new ReserveCache(cache, 3);
+	Cache.Reservation reserve = cache.getReservation(3);
 	try {
 	    synchronized (lock) {
 		if (logger.isLoggable(FINEST)) {
@@ -1705,7 +1755,7 @@ public final class CachingDataStore extends AbstractDataStore
 		}
 		if (entry == null) {
 		    /* No next entry -- create last entry */
-		    entry = context.noteLastBinding(reserve);
+		    entry = context.createLastBindingEntry(reserve);
 		    if (entry == null) {
 			/* Last entry already present -- try again */
 			return null;
@@ -1808,13 +1858,15 @@ public final class CachingDataStore extends AbstractDataStore
 	BindingKey nameKey = BindingKey.getAllowFirst(name);
 	String result;
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    /* Find next entry */
 	    BindingCacheEntry entry = cache.getHigherBindingEntry(nameKey);
 	    Object lock =
 		cache.getBindingLock((entry != null) ? entry.key : LAST);
 	    /* Reserve space for last entry and next name */
-	    ReserveCache reserve = new ReserveCache(cache, 2);
+	    Cache.Reservation reserve = cache.getReservation(2);
 	    try {
 		synchronized (lock) {
 		    if (logger.isLoggable(FINEST)) {
@@ -1824,7 +1876,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    }
 		    if (entry == null) {
 			/* No next entry -- create last entry */
-			entry = context.noteLastBinding(reserve);
+			entry = context.createLastBindingEntry(reserve);
 			if (entry == null) {
 			    /* Last entry already present -- try again */
 			    continue;
@@ -1873,7 +1925,7 @@ public final class CachingDataStore extends AbstractDataStore
 	NextBoundNameRunnable(TxnContext context,
 			      BindingKey nameKey,
 			      BindingKey cachedNextNameKey,
-			      ReserveCache reserve)
+			      Cache.Reservation reserve)
 	{
 	    super(context, nameKey, cachedNextNameKey, reserve);
 	}
@@ -2016,7 +2068,9 @@ public final class CachingDataStore extends AbstractDataStore
 	long nextNew = context.nextNewObjectId(oid);
 	long last = oid;
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    NextObjectResults results;
 	    try {
 		results = server.nextObjectId(nodeId, last);
@@ -2033,13 +2087,13 @@ public final class CachingDataStore extends AbstractDataStore
 		 */
 		return nextNew;
 	    }
-	    ReserveCache reserve = new ReserveCache(cache);
+	    Cache.Reservation reserve = cache.getReservation(1);
 	    try {
 		synchronized (cache.getObjectLock(results.oid)) {
 		    ObjectCacheEntry entry = cache.getObjectEntry(results.oid);
 		    if (entry == null) {
 			/* No entry -- create it */
-			context.noteCachedImmediateObject(
+			context.createCachedImmediateObjectEntry(
 			    results.oid, results.data, reserve);
 			return results.oid;
 		    } else if (entry.getValue() != null) {
@@ -2248,7 +2302,9 @@ public final class CachingDataStore extends AbstractDataStore
 	assert added;
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    if (entry == null) {
@@ -2322,7 +2378,9 @@ public final class CachingDataStore extends AbstractDataStore
 	    long stop =
 		addCheckOverflow(System.currentTimeMillis(), lockTimeout);
 	    for (int i = 0; true; i++) {
-		assert i < 1000 : "Too many retries";
+		if (i >= MAX_CACHE_RETRIES) {
+		    throw new ResourceUnavailableException("Too many retries");
+		}
 		/* Find cache entry for name or next higher name */
 		BindingCacheEntry entry =
 		    cache.getCeilingBindingEntry(nameKey);
@@ -2413,7 +2471,9 @@ public final class CachingDataStore extends AbstractDataStore
 	assert added;
 	BindingKey nameKey = BindingKey.getAllowLast(name);
 	for (int i = 0; true; i++) {
-	    assert i < 1000 : "Too many retries";
+	    if (i >= MAX_CACHE_RETRIES) {
+		throw new ResourceUnavailableException("Too many retries");
+	    }
 	    /* Find cache entry for name or next higher name */
 	    BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 	    if (entry == null) {
@@ -2484,7 +2544,9 @@ public final class CachingDataStore extends AbstractDataStore
 	    long stop =
 		addCheckOverflow(System.currentTimeMillis(), lockTimeout);
 	    for (int i = 0; true; i++) {
-		assert i < 1000 : "Too many retries";
+		if (i >= MAX_CACHE_RETRIES) {
+		    throw new ResourceUnavailableException("Too many retries");
+		}
 		/* Find cache entry for name or next higher name */
 		BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
 		if (entry == null) {
@@ -2562,6 +2624,30 @@ public final class CachingDataStore extends AbstractDataStore
 		entry.setNotPendingPrevious(lock);
 	    }
 	}
+    }
+
+    /* -- Other AbstractDataStore methods -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation reports a node failure if a method throws an {@link
+     * AssertionError}, {@link UnsupportedOperationException}, or {@link
+     * IllegalStateException}, all of which represent unexpected failures.
+     */
+    @Override
+    protected void handleException(Transaction txn,
+				   Level level,
+				   Throwable e,
+				   String operation)
+    {
+	if (e instanceof AssertionError ||
+	    e instanceof UnsupportedOperationException ||
+	    e instanceof IllegalStateException)
+	{
+	    reportFailure(e);
+	}
+	super.handleException(txn, level, e, operation);
     }
 
     /* -- Implement FailureReporter -- */
@@ -2834,7 +2920,7 @@ public final class CachingDataStore extends AbstractDataStore
      * A {@code Thread} that chooses least recently used entries to evict from
      * the cache as needed to make space for new entries.
      */
-    private class EvictionThread extends Thread implements Cache.FullNotifier {
+    private class EvictionThread extends Thread implements CacheFullNotifier {
 
 	/**
 	 * Whether the cache is full.  Synchronize on the thread when accessing
@@ -2850,7 +2936,7 @@ public final class CachingDataStore extends AbstractDataStore
 	    super(CLASSNAME + ".eviction");
 	}
 
-	/* -- Implement Cache.FullNotifier -- */
+	/* -- Implement CacheFullNotifier -- */
 
 	@Override
 	public synchronized void cacheIsFull() {
@@ -3027,6 +3113,10 @@ public final class CachingDataStore extends AbstractDataStore
 	 * and if they were last used by an older transaction.
 	 */
 	boolean preferTo(EntryInfo other) {
+	    /*
+	     * TBD: Consider preferring to evict entries for removed objects.
+	     * -tjb@sun.com (01/06/2010)
+	     */
 	    if (inUse != other.inUse) {
 		return !inUse;
 	    } else if (cachedForWrite != other.cachedForWrite) {
@@ -3171,7 +3261,7 @@ public final class CachingDataStore extends AbstractDataStore
 	BasicBindingRunnable(TxnContext context,
 			     BindingKey nameKey,
 			     BindingKey cachedNextNameKey,
-			     ReserveCache reserve)
+			     Cache.Reservation reserve)
 	{
 	    this(context, nameKey, cachedNextNameKey, reserve, 1);
 	}
@@ -3191,7 +3281,7 @@ public final class CachingDataStore extends AbstractDataStore
 	BasicBindingRunnable(TxnContext context,
 			     BindingKey nameKey,
 			     BindingKey cachedNextNameKey,
-			     ReserveCache reserve,
+			     Cache.Reservation reserve,
 			     int numCacheEntries)
 	{
 	    super(reserve, numCacheEntries);
@@ -3256,7 +3346,7 @@ public final class CachingDataStore extends AbstractDataStore
 		synchronized (lock) {
 		    BindingCacheEntry entry = cache.getBindingEntry(nameKey);
 		    if (entry == null) {
-			context.noteCachedBinding(
+			context.createCachedBindingEntry(
 			    nameKey, nameOid, nameForWrite, reserve);
 		    } else {
 			context.noteAccess(entry);
@@ -3330,7 +3420,7 @@ public final class CachingDataStore extends AbstractDataStore
 			 * cached one, or if the cached entry is a temporary
 			 * one.
 			 */
-			entry = context.noteCachedBinding(
+			entry = context.createCachedBindingEntry(
 			    serverNextNameKey, serverNextNameOid,
 			    serverNextNameForWrite, reserve);
 			if (compareServer < 0) {
@@ -3403,14 +3493,14 @@ public final class CachingDataStore extends AbstractDataStore
 	extends RetryIoRunnable<V>
     {
 	/** Tracks cache space. */
-	final ReserveCache reserve;
+	final Cache.Reservation reserve;
 
 	/**
 	 * Creates an instance that uses one cache entry.
 	 *
 	 * @param	reserve for tracking cache reservations
 	 */
-	ReserveCacheRetryIoRunnable(ReserveCache reserve) {
+	ReserveCacheRetryIoRunnable(Cache.Reservation reserve) {
 	    this(reserve, 1);
 	}
 
@@ -3423,10 +3513,10 @@ public final class CachingDataStore extends AbstractDataStore
 	 *		less than {@code 1}
 	 */
 	ReserveCacheRetryIoRunnable(
-	    ReserveCache reserve, int numCacheEntries)
+	    Cache.Reservation reserve, int numCacheEntries)
 	{
 	    super(CachingDataStore.this);
-	    this.reserve = new ReserveCache(reserve, numCacheEntries);
+	    this.reserve = cache.getReservation(reserve, numCacheEntries);
 	}
 
 	/**

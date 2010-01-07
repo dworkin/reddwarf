@@ -73,7 +73,11 @@ import static java.util.logging.Level.FINEST;
  * objects does mean that services, which can access objects by ID, need to
  * make sure not to ask questions about objects that they don't have other
  * reasons to believe exist.  In particular, it means that object iteration may
- * return inconsistent results.
+ * return inconsistent results. <p>
+ *
+ * Subclasses should provide implementations of the {@link
+ * #addDataConflictListenerInternal} method if they want to report data
+ * conflicts.
  */
 public abstract class AbstractDataStore
     implements DataStore, TransactionParticipant
@@ -155,7 +159,7 @@ public abstract class AbstractDataStore
 	    exception = e;
 	}
 	handleException(null, FINEST, exception, "getLocalNodeId");
-	return 0;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -194,7 +198,7 @@ public abstract class AbstractDataStore
 	}
 	handleException(txn, FINEST, exception,
 			"createObject nodeId:" + nodeId + ", txn:" + txn);
-	return 0;	/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -288,7 +292,7 @@ public abstract class AbstractDataStore
 	handleException(txn, FINEST, exception,
 			"getObject nodeId:" + nodeId + ", txn:" + txn +
 			", oid:" + oid + ", forUpdate:" + forUpdate);
-	return null;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -516,7 +520,7 @@ public abstract class AbstractDataStore
 	handleException(txn, FINEST, exception,
 			"getBinding nodeId:" + nodeId + ", txn:" + txn +
 			", name:" + name);
-	return 0;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -711,7 +715,7 @@ public abstract class AbstractDataStore
 	handleException(txn, FINEST, exception,
 			"nextBoundName nodeId:" + nodeId + ", txn:" + txn +
 			", name:" + name);
-	return null;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -787,7 +791,7 @@ public abstract class AbstractDataStore
 	}
 	handleException(txn, FINER, exception,
 			"getClassId nodeId:" + nodeId + ", txn:" + txn);
-	return 0;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -841,7 +845,7 @@ public abstract class AbstractDataStore
 	handleException(txn, FINER, exception,
 			"getClassInfo nodeId:" + nodeId + ", txn:" + txn +
 			", classId:" + classId);
-	return null;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -898,7 +902,7 @@ public abstract class AbstractDataStore
 	handleException(txn, FINEST, exception,
 			"nextObjectId nodeId:" + nodeId + ", txn:" + txn +
 			", oid:" + oid);
-	return 0;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**
@@ -1021,7 +1025,7 @@ public abstract class AbstractDataStore
 	}
 	handleException(txn, FINER, exception,
 			"prepare nodeId:" + nodeId + ", txn:" + txn);
-	return false;		/* not reached */
+	throw new AssertionError();	/* not reached */
     }
 
     /**

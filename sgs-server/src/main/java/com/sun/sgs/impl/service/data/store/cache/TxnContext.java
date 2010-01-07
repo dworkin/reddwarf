@@ -77,6 +77,9 @@ class TxnContext {
     /** Whether the transaction has been prepared. */
     private boolean prepared;
 
+    /** Whether the transaction has been committed or aborted. */
+    private boolean finished;
+
     /**
      * Creates an instance of this class.
      *
@@ -117,8 +120,12 @@ class TxnContext {
 	if (prepared) {
 	    throw new IllegalStateException(
 		"Transaction has already been prepared: " + txn);
+	} else if (finished) {
+	    throw new IllegalStateException(
+		"Transaction has already finished: " + txn);
 	} else if (!getModified()) {
 	    store.getUpdateQueue().abort(contextId, false);
+	    finished = true;
 	    return true;
 	} else {
 	    store.getUpdateQueue().prepare(
@@ -135,7 +142,10 @@ class TxnContext {
      *		transaction
      */
     void prepareAndCommit() {
-	if (!prepare()) {
+	if (finished) {
+	    throw new IllegalStateException(
+		"Transaction has already finished: " + txn);
+	} else if (!prepare()) {
 	    commitInternal();
 	}
     }
@@ -150,6 +160,9 @@ class TxnContext {
 	if (!prepared) {
 	    throw new IllegalStateException(
 		"Transaction has not been prepared: " + txn);
+	} else if (finished) {
+	    throw new IllegalStateException(
+		"Transaction has already finished: " + txn);
 	} else if (getModified()) {
 	    commitInternal();
 	}
@@ -172,6 +185,7 @@ class TxnContext {
 		saved.abort(cache, contextId);
 	    }
 	}
+	finished = true;
     }
 
     /**
@@ -196,8 +210,9 @@ class TxnContext {
 
     /**
      * Returns the next object ID of an object newly created by this
-     * transaction, or {@code -1} if none is found.  Does not return IDs for
-     * removed objects.  Specifying {@code -1} requests the first such ID.
+     * transaction, which must be active, or {@code -1} if none is found.  Does
+     * not return IDs for removed objects.  Specifying {@code -1} requests the
+     * first such ID.
      *
      * @param	oid the identifier of the object to search after, or
      *		{@code -1} to request the first object
@@ -206,6 +221,7 @@ class TxnContext {
      *		no more objects
      */
     long nextNewObjectId(long oid) {
+	assert !finished;
 	long result = -1;
 	if (modifiedObjects != null) {
 	    Cache cache = store.getCache();
@@ -230,8 +246,8 @@ class TxnContext {
     /* -- Entry methods -- */
 
     /**
-     * Notes that an entry has been accessed by the associated transaction.
-     * The associated lock must be held.
+     * Notes that an entry has been accessed by the associated transaction,
+     * which does not need to be active.  The associated lock must be held.
      *
      * @param	entry the cache entry
      */
@@ -241,13 +257,15 @@ class TxnContext {
     }
 
     /**
-     * Adds an entry to the cache for a newly allocated object.  The associated
-     * lock must be held, and the caller must have reserved space in the cache.
+     * Adds an entry to the cache for a newly allocated object on behalf of the
+     * associated transaction, which must be active.  The associated lock must
+     * be held, and the caller must have reserved space in the cache.
      *
      * @param	oid the object ID of the new object
      * @param	reserve for tracking cache reservations
      */
-    void noteNewObject(long oid, ReserveCache reserve) {
+    void createNewObjectEntry(long oid, Cache.Reservation reserve) {
+	assert !finished;
 	Cache cache = store.getCache();
 	assert Thread.holdsLock(cache.getObjectLock(oid));
 	ObjectCacheEntry entry = ObjectCacheEntry.createNew(oid, contextId);
@@ -261,7 +279,8 @@ class TxnContext {
 
     /**
      * Adds an entry to the cache for an object that is being fetched from the
-     * server.  The associated lock must be held, and the caller must have
+     * server on behalf of the associated transaction, which does not need to
+     * be active.  The associated lock must be held, and the caller must have
      * reserved space in the cache.
      *
      * @param	oid the object ID of the object
@@ -269,8 +288,8 @@ class TxnContext {
      * @param	reserve for tracking cache reservations
      * @return	the new object entry
      */
-    ObjectCacheEntry noteFetchingObject(
-	long oid, boolean forUpdate, ReserveCache reserve)
+    ObjectCacheEntry createFetchingObjectEntry(
+	long oid, boolean forUpdate, Cache.Reservation reserve)
     {
 	Cache cache = store.getCache();
 	assert Thread.holdsLock(cache.getObjectLock(oid));
@@ -282,17 +301,19 @@ class TxnContext {
 
     /**
      * Adds an entry to the cache for an object that is being cached for read
-     * after being fetched from the server, but for which there is no entry
-     * already present.  This situation occurs when requesting the next object
-     * since the ID of that object is not known in advance.  The associated
-     * lock must be held, and the caller must have reserved space in the cache.
+     * on behalf of the associated transaction, which does not need to be
+     * active, after being fetched from the server, but for which there is no
+     * entry already present.  This situation occurs when requesting the next
+     * object since the ID of that object is not known in advance.  The
+     * associated lock must be held, and the caller must have reserved space in
+     * the cache.
      *
      * @param	oid the object ID of the object
      * @param	data the data for the object
      * @param	reserve for tracking cache reservations
      */
-    void noteCachedImmediateObject(
-	long oid, byte[] data, ReserveCache reserve)
+    void createCachedImmediateObjectEntry(
+	long oid, byte[] data, Cache.Reservation reserve)
     {
 	Cache cache = store.getCache();
 	assert Thread.holdsLock(cache.getObjectLock(oid));
@@ -303,8 +324,8 @@ class TxnContext {
 
     /**
      * Notes that an object entry has been cached after fetching from the
-     * server on behalf of the associated transaction.  The associated lock
-     * must be held.
+     * server on behalf of the associated transaction, which does not need to
+     * be active.  The associated lock must be held.
      *
      * @param	entry the cache entry
      * @param	data the newly retrieved data
@@ -325,13 +346,14 @@ class TxnContext {
     }
 
     /**
-     * Notes that an object has been modified by this transaction.  The
-     * associated lock must be held.
+     * Notes that an object has been modified by the associated transaction,
+     * which must be active.  The associated lock must be held.
      *
      * @param	entry the cache entry
      * @param	data the new data value
      */
     void noteModifiedObject(ObjectCacheEntry entry, byte[] data) {
+	assert !finished;
 	Object lock = store.getCache().getObjectLock(entry.key);
 	assert Thread.holdsLock(lock);
 	if (!entry.getModified()) {
@@ -353,8 +375,10 @@ class TxnContext {
     }
 
     /**
-     * Adds an entry to the cache for a name binding.  The associated lock must
-     * be held, and the caller must have reserved space in the cache.
+     * Adds an entry to the cache for a name binding on behalf of the
+     * associated transaction, which does not need to be active.  The
+     * associated lock must be held, and the caller must have reserved space in
+     * the cache.
      *
      * @param	key the key for the binding
      * @param	value the value of the binding
@@ -362,24 +386,27 @@ class TxnContext {
      * @param	reserve for tracking cache reservations
      * @return	the new entry
      */
-    BindingCacheEntry noteCachedBinding(
-	BindingKey key, long value, boolean forUpdate, ReserveCache reserve)
+    BindingCacheEntry createCachedBindingEntry(BindingKey key,
+					       long value,
+					       boolean forUpdate,
+					       Cache.Reservation reserve)
     {
-	return noteCachedBinding(
+	return createCachedBindingEntry(
 	    store.getCache(), contextId, key, value, forUpdate, reserve);
     }
 
     /**
      * Adds an entry to the cache that represents the last bound name in the
-     * cache and returns the new entry, or else returns {@code null} and making
-     * no modification if a last entry is already present.  The newly created
-     * entry will be marked as being fetched.  The associated lock must be
-     * held, and the caller must have reserved space in the cache.
+     * cache on behalf of the associated transaction, which does not need to be
+     * active, and returns the new entry, or else returns {@code null} and
+     * making no modification if a last entry is already present.  The newly
+     * created entry will be marked as being fetched.  The associated lock must
+     * be held, and the caller must have reserved space in the cache.
      *
      * @param	reserve for tracking cache reservations
      * @return	the new cache entry or {@code null}
      */
-    BindingCacheEntry noteLastBinding(ReserveCache reserve) {
+    BindingCacheEntry createLastBindingEntry(Cache.Reservation reserve) {
 	Cache cache = store.getCache();
 	assert Thread.holdsLock(cache.getBindingLock(BindingKey.LAST));
 	if (cache.getBindingEntry(BindingKey.LAST) != null) {
@@ -391,13 +418,14 @@ class TxnContext {
     }
 
     /**
-     * Notes that a binding has been modified by this transaction.  The
-     * associated lock must be held.
+     * Notes that a binding has been modified by the associated transaction,
+     * which must be active.  The associated lock must be held.
      *
      * @param	entry the binding entry
      * @param	oid the new object ID
      */
     void noteModifiedBinding(BindingCacheEntry entry, long oid) {
+	assert !finished;
 	Cache cache = store.getCache();
 	Object lock = cache.getBindingLock(entry.key);
 	assert Thread.holdsLock(lock);
@@ -479,12 +507,13 @@ class TxnContext {
      * @param	reserve for tracking cache reservations
      * @return	the new entry
      */
-    private static BindingCacheEntry noteCachedBinding(Cache cache,
-						       long contextId,
-						       BindingKey key,
-						       long value,
-						       boolean forUpdate,
-						       ReserveCache reserve)
+    private static BindingCacheEntry createCachedBindingEntry(
+	Cache cache,
+	long contextId,
+	BindingKey key,
+	long value,
+	boolean forUpdate,
+	Cache.Reservation reserve)
     {
 	assert Thread.holdsLock(cache.getBindingLock(key));
 	BindingCacheEntry entry =
@@ -563,6 +592,7 @@ class TxnContext {
 	/* Commit updates to server */
 	store.getUpdateQueue().commit(
 	    contextId, oids, oidValues, newOids, names, nameValues);
+	finished = true;
     }
 
     /**
@@ -688,7 +718,7 @@ class TxnContext {
 	 */
 	void abort(Cache cache, long contextId) {
 	    Object lock = cache.getBindingLock(key);
-	    ReserveCache reserve = new ReserveCache(cache);
+	    Cache.Reservation reserve = cache.getReservation(1);
 	    try {
 		synchronized (lock) {
 		    BindingCacheEntry entry = cache.getBindingEntry(key);
@@ -698,8 +728,9 @@ class TxnContext {
 			 * this transaction.
 			 */
 			if (restoreValue != -1) {
-			    noteCachedBinding(cache, contextId, key,
-					      restoreValue, true, reserve);
+			    createCachedBindingEntry(
+				cache, contextId, key, restoreValue, true,
+				reserve);
 			}
 		    } else {
 			entry.setValue(restoreValue);

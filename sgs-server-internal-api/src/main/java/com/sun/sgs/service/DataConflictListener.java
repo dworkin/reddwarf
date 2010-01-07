@@ -40,10 +40,12 @@ public interface DataConflictListener {
    * either a {@link BigInteger} that represents the object ID of an object, or
    * by a {@link String} that represents a bound name. <p>
    *
-   * The string used to identify name bindings will not match the value
-   * specified when creating the name binding in the {@link DataService}
-   * because value needs to represent both application and service
-   * bindings. <p>
+   * Note that the strings used to identify name bindings will typically differ
+   * from the names specified when the bindings were created in the {@link
+   * DataService} because the identifiers need to represent both application
+   * and service bindings.  Implementations may chose to add different prefixes
+   * to the original names, or use some other encoding, to produce unique
+   * identifiers for both types of bindings. <p>
    *
    * Callers of this method are permitted to make calls to multiple listeners
    * from a single thread, so implementations of this method should make sure

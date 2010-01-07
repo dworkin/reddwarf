@@ -45,6 +45,30 @@ import java.util.concurrent.atomic.AtomicInteger;
  * determined by the key, it can be used to lock access to the entry for a
  * particular key even if the entry is not currently present in the cache. <p>
  *
+ * Note that operations to add a cache entry are performed with the lock
+ * associated with the entry already held.  To avoid deadlock, the callers of
+ * these operations need to reserve space in the cache before the lock is
+ * acquired. <p>
+ *
+ * If this approach were not used, consider the following situation, which
+ * would in deadlock:
+ *
+ * <ul>
+ * <li> Task:
+ *   <ol>
+ *   <li> Grab lock A for key X
+ *   <li> Attempt to reserve space in cache in order to create an entry for X
+ *     and find that cache is full
+ *   <li> Wait for space to become available
+ *   </ol>
+ * <li> Eviction thread:
+ *   <ol>
+ *   <li> Attempt to grab lock A to determine if some cache entry protected by
+ *     that lock is available for eviction
+ *   <li> Wait for lock to become available
+ *   </ol>
+ * </ul> <p>
+ *
  * This class is part of the implementation of {@link CachingDataStore}.
  */
 class Cache {
@@ -62,7 +86,7 @@ class Cache {
     private final Object[] locks;
 
     /** The object to notify when the cache becomes full. */
-    private final FullNotifier cacheFullNotify;
+    private final CacheFullNotifier cacheFullNotify;
 
     /** Maps object IDs to object cache entries. */
     private final ConcurrentMap<Long, ObjectCacheEntry> objectMap =
@@ -91,7 +115,7 @@ class Cache {
     Cache(CachingDataStore store,
 	  int cacheSize,
 	  int numLocks,
-	  FullNotifier cacheFullNotify)
+	  CacheFullNotifier cacheFullNotify)
     {
 	this.store = store;
 	this.cacheSize = cacheSize;
@@ -102,13 +126,6 @@ class Cache {
 	    locks[i] = new Object();
 	}
 	this.cacheFullNotify = cacheFullNotify;
-    }
-
-    /** An interface for receiving notifications that the cache is full. */
-    public interface FullNotifier {
-
-	/** Provides notification that the cache is full. */
-	void cacheIsFull();
     }
 
     /**
@@ -219,41 +236,144 @@ class Cache {
     }
 
     /**
-     * Adds an entry for a previously uncached object.  The caller should have
-     * already reserved space in the cache.
+     * Returns a new cache reservation that can be passed in calls to {@link
+     * #addObjectEntry} or {@link #addBindingEntry} to add new entries to the
+     * cache.  Callers should call {@link Reservation#done} to release any
+     * unused space after they are done using the reservation.  Callers should
+     * make sure that they are not holding locks on the cache when calling this
+     * method to avoid deadlocks with eviction.
+     *
+     * @param	numCacheEntries the number of cache entries to reserve
+     * @return	the cache reservation
+     * @throws	IllegalArgumentException if the argument is less than {@code 1}
+     */
+    Reservation getReservation(int numCacheEntries) {
+	return new Reservation(numCacheEntries);
+    }
+
+    /**
+     * Returns a cache reservation that transfers its reservations from another
+     * instance, and that can be passed in calls to {@link #addObjectEntry} or
+     * {@link #addBindingEntry} to add new entries to the cache.  Callers
+     * should call {@link Reservation#done} to release any unused space after
+     * they are done using the reservation.  Callers should make sure that they
+     * are not holding locks on the cache when calling this method to avoid
+     * deadlocks with eviction.
+     *
+     * @param	otherReserve the existing reservation
+     * @param	numCacheEntries the number of cache entries to transfer
+     * @return	the cache reservation
+     * @throws	IllegalArgumentException if the argument is less than {@code 1}
+     *		or if it is larger than the number of entries reserved by
+     *		{@code otherReserve}
+     */
+    Reservation getReservation(Reservation otherReserve, int numCacheEntries) {
+	return new Reservation(otherReserve, numCacheEntries);
+    }
+
+    /** Keeps track of reserving and releasing space in the cache. */
+    final class Reservation {
+
+	/** The number of reserved cache entries that have not been used. */
+	private int unusedCacheEntries;
+
+	/**
+	 * Creates an instance that reserves the specified number of cache
+	 * entries.
+	 *
+	 * @param	numCacheEntries the number of cache entries to reserve
+	 * @throws	IllegalArgumentException if the argument is less than 
+	 *		{@code 1}
+	 */
+	private Reservation(int numCacheEntries) {
+	    if (numCacheEntries < 1) {
+		throw new IllegalArgumentException(
+		    "The number of cache entries must be at least 1");
+	    }
+	    unusedCacheEntries = numCacheEntries;
+	    reserve(numCacheEntries);
+	}
+
+	/**
+	 * Creates an instance that transfers its reservations from another
+	 * instance.
+	 *
+	 * @param	otherReserve the existing reserve
+	 * @param	numCacheEntries the number of cache entries to transfer
+	 * @throws	IllegalArgumentException if the argument is less than
+	 *		{@code 1} or if it is larger than the number of entries
+	 *		reserved by {@code otherReserve}
+	 */
+	private Reservation(Reservation otherReserve, int numCacheEntries) {
+	    if (numCacheEntries < 1) {
+		throw new IllegalArgumentException(
+		    "The number of cache entries must be at least 1");
+	    } else if (numCacheEntries > otherReserve.unusedCacheEntries) {
+		throw new IllegalArgumentException(
+		    "Other reserve doesn't have enough entries");
+	    }
+	    unusedCacheEntries = numCacheEntries;
+	    otherReserve.unusedCacheEntries -= numCacheEntries;
+	}
+
+	/** Releases any unused cache entries. */
+	void done() {
+	    if (unusedCacheEntries > 0) {
+		release(unusedCacheEntries);
+	    }
+	}
+
+	/**
+	 * Notes that the specified number of cache entries have been used.
+	 *
+	 * @param	numCacheEntries the number of entries used
+	 * @throws	IllegalStateException if there are not enough unused
+	 *		entries
+	 */
+	private void used(int numCacheEntries) {
+	    if (unusedCacheEntries < numCacheEntries) {
+		throw new IllegalStateException("Not enough unused entries");
+	    }
+	    unusedCacheEntries -= numCacheEntries;
+	}
+    }
+
+    /**
+     * Adds an entry for a previously uncached object, using space that the
+     * caller has already reserved in the cache.
      *
      * @param	entry the new cache entry
-     * @param	reserve for tracking cache reservations
+     * @param	reserve for tracking space reserved in the cache
      * @throws	IllegalArgumentException if an entry with the same key is
      *		already present
      */
-    void addObjectEntry(ObjectCacheEntry entry, ReserveCache reserve) {
+    void addObjectEntry(ObjectCacheEntry entry, Reservation reserve) {
 	ObjectCacheEntry existing = objectMap.putIfAbsent(entry.key, entry);
 	if (existing != null) {
 	    throw new IllegalArgumentException(
 		"Entry is already present: " + existing);
 	}
 	objectCount.incrementAndGet();
-	reserve.used();
+	reserve.used(1);
     }
 
     /**
-     * Adds an entry for a previously uncached binding.  The caller should have
-     * already reserved space in the cache.
+     * Adds an entry for a previously uncached binding, using space that the
+     * caller has already reserved in the cache.
      *
      * @param	entry the new cache entry
-     * @param	reserve for tracking cache reservations
+     * @param	reserve for tracking space reserved in the cache
      * @throws	IllegalArgumentException if an entry with the same key is
      *		already present
      */
-    void addBindingEntry(BindingCacheEntry entry, ReserveCache reserve) {
+    void addBindingEntry(BindingCacheEntry entry, Reservation reserve) {
 	BindingCacheEntry existing = bindingMap.putIfAbsent(entry.key, entry);
 	if (existing != null) {
 	    throw new IllegalArgumentException(
 		"Entry is already present: " + existing);
 	}
 	bindingCount.incrementAndGet();
-	reserve.used();
+	reserve.used(1);
     }
 
     /**
@@ -463,7 +583,8 @@ class Cache {
 
     /**
      * Checks the consistency of fields in bindings, throwing an assertion
-     * error if an inconsistency is found.
+     * error if an inconsistency is found.  This method should be used for
+     * testing only, and may be quite expensive to call.
      */
     void checkBindings() {
 	long lockTimeout = store.getLockTimeout();
