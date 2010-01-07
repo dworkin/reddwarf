@@ -154,6 +154,8 @@ public class TxnLocker<K> extends BasicLocker<K> {
      * be denied, and notifies waiters.
      *
      * @param	conflict the conflicting request
+     * @throws	IllegalStateException if a conflicting request has already been
+     *		specified
      */
     protected void setConflict(LockConflict<K> conflict) {
 	assert checkAllowSync();
