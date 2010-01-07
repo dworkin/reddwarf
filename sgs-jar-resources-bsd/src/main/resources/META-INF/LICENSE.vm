@@ -1,9 +1,5 @@
 Copyright (c) #if ($project.inceptionYear)${project.inceptionYear}-${projectYear}#else${projectYear}#end, Sun Microsystems, Inc.
-+#if ($externalCopyrights)
- 
-+$externalCopyrights
-+
-+#end
+
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
