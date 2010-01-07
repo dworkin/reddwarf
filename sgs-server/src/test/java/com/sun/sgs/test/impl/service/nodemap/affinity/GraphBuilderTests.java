@@ -125,6 +125,8 @@ public class GraphBuilderTests {
         serverNode = new SgsTestNode(appName, null, props);
         groupDriver = (LPADriver)
             finderField.get(serverNode.getNodeMappingService());
+        groupDriver.getGraphBuilder().enable();
+        
         // Create a new app node
         props = getProps(serverNode, addProps);
         node = new SgsTestNode(serverNode, null, props);
@@ -132,6 +134,7 @@ public class GraphBuilderTests {
                 finderField.get(node.getNodeMappingService());
         listener = graphDriver.getGraphListener();
         builder = graphDriver.getGraphBuilder();
+        builder.enable();
     }
 
     protected Properties getProps(SgsTestNode serverNode) throws Exception {
@@ -171,6 +174,7 @@ public class GraphBuilderTests {
                 finderField.get(node.getNodeMappingService());
         listener = graphDriver.getGraphListener();
         builder = graphDriver.getGraphBuilder();
+        builder.enable();
     }
 
     @After

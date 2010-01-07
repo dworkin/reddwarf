@@ -24,22 +24,21 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 /**
  * A class to encapsulate the basic states required for
  * {@link AffinityGroupFinder} and {@link AffinityGraphBuilder}.
+ * The state at construction is {@code DISABLED}.
  */
 public class BasicState {
     /** Valid states. */
     protected static enum State {
-        /** Newly constructed (no state). */
-        NONE,
-        /** Enabled, fully functional.  Can be disabled or shutdown. */
+        /** Enabled, fully functional. Can be disabled or shutdown. */
 	ENABLED,
-        /** Disabled, can be enabled again or shutdown. */
+        /** Disabled, can be enabled or shutdown. */
         DISABLED,
         /** Disabled, and cannot be enabled again. */
         SHUTDOWN
     }
 
-    /** The state. */
-    protected volatile State state = State.NONE;
+    /** The state. Initialized to {@code DISABLED} */
+    protected volatile State state = State.DISABLED;
 
     /**
      * Disable this component.  Multiple calls to disable are allowed.
@@ -49,7 +48,6 @@ public class BasicState {
      */
     protected boolean setDisabledState() {
         switch (state) {
-            case NONE:
             case ENABLED:
                 state = State.DISABLED;
                 return true;
@@ -73,7 +71,6 @@ public class BasicState {
             case ENABLED:
                 // quietly return false
                 return false;
-            case NONE:
             case DISABLED:
                 state = State.ENABLED;
                 return true;
@@ -91,7 +88,6 @@ public class BasicState {
      */
     protected boolean setShutdownState() {
         switch (state) {
-            case NONE:
             case ENABLED:
             case DISABLED:
                 state = State.SHUTDOWN;
@@ -127,7 +123,6 @@ public class BasicState {
                 throw new IllegalStateException("In disabled state");
             case SHUTDOWN:
                 throw new IllegalStateException("In shutdown state");
-            case NONE:
             case ENABLED:
                 // All is OK
                 break;

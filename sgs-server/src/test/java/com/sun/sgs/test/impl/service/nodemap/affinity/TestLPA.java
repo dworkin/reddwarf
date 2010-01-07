@@ -99,6 +99,7 @@ public class TestLPA {
             serverNode.getSystemRegistry().getComponent(ProfileCollector.class);
         wdog = serverNode.getWatchdogService();
         server = new TestLPAServer(collector, wdog, props);
+        server.enable();
     }
 
     @After

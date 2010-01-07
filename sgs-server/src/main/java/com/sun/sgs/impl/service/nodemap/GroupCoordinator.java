@@ -166,7 +166,6 @@ public class GroupCoordinator extends BasicState {
             logger.log(Level.CONFIG,
                        "Created GroupCoordinator with null finder");
         }
-        setDisabledState();
     }
 
     /**
