@@ -151,18 +151,19 @@ public class TxnLocker<K> extends BasicLocker<K> {
 
     /**
      * Specifies a conflict that should cause this locker's current request to
-     * be denied, and notifies waiters.  Does nothing if the locker already has
-     * a conflict.
+     * be denied, and notifies waiters.
      *
      * @param	conflict the conflicting request
      */
     protected void setConflict(LockConflict<K> conflict) {
 	assert checkAllowSync();
 	synchronized (this) {
-	    if (this.conflict == null) {
+            if (this.conflict != null) {
+                throw new IllegalStateException(
+		    "This locker already has a conflict");
+	    }
 	    this.conflict = conflict;
 	    notifyAll();
 	}
     }
-}
 }
