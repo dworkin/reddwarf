@@ -17,14 +17,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 
 /**
- * A class to encapsulate the basic states required for
- * {@link AffinityGroupFinder} and {@link AffinityGraphBuilder}.
- * The state at construction is {@code DISABLED}.
+ * A class to encapsulate the basic states required for group activities.
+ * The state at construction is {@link State#DISABLED}.
+ *
+ * @see GroupCoordinator
+ * @see AffinityGraphBuilder
+ * @see AffinityGroupFinder
  */
 public class BasicState {
     /** Valid states. */

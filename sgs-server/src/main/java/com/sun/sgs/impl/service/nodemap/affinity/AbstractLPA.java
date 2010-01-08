@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
+import com.sun.sgs.impl.service.nodemap.BasicState;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;

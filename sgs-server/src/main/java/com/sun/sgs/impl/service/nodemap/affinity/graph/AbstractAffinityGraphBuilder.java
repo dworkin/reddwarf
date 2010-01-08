@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity.graph;
 
-import com.sun.sgs.impl.service.nodemap.affinity.BasicState;
+import com.sun.sgs.impl.service.nodemap.BasicState;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import java.util.Properties;
