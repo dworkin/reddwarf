@@ -26,7 +26,6 @@ import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
-import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
@@ -69,7 +68,8 @@ public class GraphBuilderTests {
     private static Class<?> profileReportImplClass;
     protected static Constructor<?> profileReportImplConstructor;
     protected static Method setAccessedObjectsDetailMethod;
-    protected static Field finderField;
+    protected static Field builderField;
+    protected static Field listenerField;
     static {
         try {
             profileReportImplClass =
@@ -81,8 +81,11 @@ public class GraphBuilderTests {
             setAccessedObjectsDetailMethod =
                 UtilReflection.getMethod(profileReportImplClass,
                     "setAccessedObjectsDetail", AccessedObjectsDetail.class);
-            finderField =
-                UtilReflection.getField(NodeMappingServiceImpl.class, "driver");
+            builderField = UtilReflection.getField(NodeMappingServiceImpl.class,
+                                                   "graphBuilder");
+            listenerField =
+                    UtilReflection.getField(NodeMappingServiceImpl.class,
+                                            "graphListener");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -102,8 +105,8 @@ public class GraphBuilderTests {
 
     // The LPA drivers, one for updating graphs, the other for finding groups.
     // These can be the same instance
-    protected LPADriver graphDriver;
-    protected LPADriver groupDriver;
+    protected AffinityGraphBuilder graphBuilder;
+    protected AffinityGraphBuilder groupBuilder;
 
     protected int serverPort;
     /**
@@ -123,17 +126,18 @@ public class GraphBuilderTests {
     protected void beforeEachTest(Properties addProps) throws Exception {
         props = getProps(null, addProps);
         serverNode = new SgsTestNode(appName, null, props);
-        groupDriver = (LPADriver)
-            finderField.get(serverNode.getNodeMappingService());
-        groupDriver.getGraphBuilder().enable();
+        groupBuilder = (AffinityGraphBuilder)
+            builderField.get(serverNode.getNodeMappingService());
+        groupBuilder.enable();
         
         // Create a new app node
         props = getProps(serverNode, addProps);
         node = new SgsTestNode(serverNode, null, props);
-        graphDriver = (LPADriver)
-                finderField.get(node.getNodeMappingService());
-        listener = graphDriver.getGraphListener();
-        builder = graphDriver.getGraphBuilder();
+        graphBuilder = (AffinityGraphBuilder)
+                builderField.get(node.getNodeMappingService());
+        listener = (GraphListener)
+                listenerField.get(node.getNodeMappingService());
+        builder = graphBuilder;
         builder.enable();
     }
 
@@ -170,10 +174,11 @@ public class GraphBuilderTests {
         }
         props = getProps(serverNode, addProps);
         node =  new SgsTestNode(serverNode, null, props);
-        graphDriver = (LPADriver)
-                finderField.get(node.getNodeMappingService());
-        listener = graphDriver.getGraphListener();
-        builder = graphDriver.getGraphBuilder();
+        graphBuilder = (AffinityGraphBuilder)
+                builderField.get(node.getNodeMappingService());
+        listener = (GraphListener)
+                listenerField.get(node.getNodeMappingService());
+        builder = graphBuilder;
         builder.enable();
     }
 
@@ -746,18 +751,16 @@ public class GraphBuilderTests {
 
     @Test(expected=IllegalStateException.class)
     public void testShutdownUpdateGraph() throws Exception {
-        graphDriver.shutdown();
+        graphBuilder.shutdown();
         AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
         detail.addAccess(new String("obj1"));
-        graphDriver.getGraphBuilder().
-                updateGraph(new IdentityImpl("something"), detail);
+        graphBuilder.updateGraph(new IdentityImpl("something"), detail);
     }
 
     @Test(expected=IllegalStateException.class)
     public void testShutdownFindGroups() throws Exception {
-        groupDriver.shutdown();
-        groupDriver.getGraphBuilder().
-                getAffinityGroupFinder().findAffinityGroups();
+        groupBuilder.shutdown();
+        groupBuilder.getAffinityGroupFinder().findAffinityGroups();
     }
 
     @Test

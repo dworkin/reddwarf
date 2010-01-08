@@ -25,7 +25,6 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
-import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
@@ -78,11 +77,15 @@ public class TestLPADistGraphPerf {
     private static final int WARMUP_RUNS = 100;
     private static final int RUNS = 500;
 
-    private static Field finderField;
+    private static Field builderField;
+    private static Field listenerField;
     static {
         try {
-            finderField =
-                UtilReflection.getField(NodeMappingServiceImpl.class, "driver");
+            builderField = UtilReflection.getField(NodeMappingServiceImpl.class,
+                                                   "graphBuilder");
+            listenerField =
+                    UtilReflection.getField(NodeMappingServiceImpl.class,
+                                            "graphListener");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -114,7 +117,7 @@ public class TestLPADistGraphPerf {
         }
         p.setProperty(DistGraphBuilderServerImpl.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
-        p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY,
+        p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
                       DistGraphBuilder.class.getName());
         p.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
@@ -136,12 +139,10 @@ public class TestLPADistGraphPerf {
     @Test
     public void warmupZach() throws Exception {
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            LPADriver driver = (LPADriver)
-                finderField.get(
-                            serverNode.getNodeMappingService());
+            AffinityGraphBuilder builder = (AffinityGraphBuilder)
+                        builderField.get(serverNode.getNodeMappingService());
             Set<RelocatingAffinityGroup> groups =
-                driver.getGraphBuilder().
-                    getAffinityGroupFinder().findAffinityGroups();
+                        builder.getAffinityGroupFinder().findAffinityGroups();
         }
 
         // There's no graph, so we expect an exception to be thrown
@@ -159,12 +160,12 @@ public class TestLPADistGraphPerf {
             node3 = createNode();
 
             // Send updates to each of the node's graph listeners
-            LPADriver driver1 = (LPADriver)
-                finderField.get(node1.getNodeMappingService());
-            LPADriver driver2 = (LPADriver)
-                finderField.get(node2.getNodeMappingService());
-            LPADriver driver3 = (LPADriver)
-                finderField.get(node3.getNodeMappingService());
+            AffinityGraphBuilder builder1 = (AffinityGraphBuilder)
+                builderField.get(node1.getNodeMappingService());
+            AffinityGraphBuilder builder2 = (AffinityGraphBuilder)
+                builderField.get(node2.getNodeMappingService());
+            AffinityGraphBuilder builder3 = (AffinityGraphBuilder)
+                builderField.get(node3.getNodeMappingService());
 
             DummyIdentity[] idents = new DummyIdentity[35];
             // Create identities for zach karate club
@@ -180,7 +181,6 @@ public class TestLPADistGraphPerf {
             }
             
             // Node 1 uses.
-            AffinityGraphBuilder builder1 = driver1.getGraphBuilder();
             AccessedObjectsDetailTest detail = new AccessedObjectsDetailTest();
             detail.addAccess(new String("o1"));
             detail.addAccess(new String("o2"));
@@ -258,7 +258,6 @@ public class TestLPADistGraphPerf {
             builder1.updateGraph(idents[34], detail);
 
             // Node 2
-            AffinityGraphBuilder builder2 = driver2.getGraphBuilder();
             detail = new AccessedObjectsDetailTest();
             detail.addAccess(new String("o1"));
             detail.addAccess(new String("o17"));
@@ -317,7 +316,6 @@ public class TestLPADistGraphPerf {
             builder2.updateGraph(idents[32], detail);
 
             // Node 3
-            AffinityGraphBuilder builder3 = driver3.getGraphBuilder();
             detail = new AccessedObjectsDetailTest();
             detail.addAccess(new String("o1"));
             detail.addAccess(new String("o6"));
@@ -383,10 +381,10 @@ public class TestLPADistGraphPerf {
             UndirectedGraph<LabelVertex, WeightedEdge> graphModel =
                     new ZachBuilder().getAffinityGraph();
             System.out.println("MODEL GRAPH IS " + graphModel);
-            LPADriver driver = (LPADriver)
-                finderField.get(serverNode.getNodeMappingService());
-            GraphListener serverListener = driver.getGraphListener();
-            AffinityGraphBuilder builder = driver.getGraphBuilder();
+            GraphListener serverListener = (GraphListener)
+                        listenerField.get(serverNode.getNodeMappingService());
+            AffinityGraphBuilder builder = (AffinityGraphBuilder)
+                        builderField.get(serverNode.getNodeMappingService());
             // The graph can only be found on the server side.  Let's make
             // sure it looks like the expected Zachary graph.
             // The core server graph listener builds a DistGraphBuilder,
@@ -456,7 +454,7 @@ public class TestLPADistGraphPerf {
                 SgsTestNode.getDefaultProperties("PerfTest", serverNode, null);
             p.setProperty(DistGraphBuilderServerImpl.SERVER_PORT_PROPERTY,
                     String.valueOf(serverPort));
-            p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY,
+            p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
                           DistGraphBuilder.class.getName());
             p.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                         String.valueOf(numThreads));

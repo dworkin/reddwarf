@@ -22,7 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
-import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
+import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
@@ -65,7 +65,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
     // Passed into each test run
     private final String builderName;
 
-    private DLPAGraphBuilder graphBuilder;
+    private DLPAGraphBuilder dlpaGraphBuilder;
     /**
      * Create this test class.
      * @param builderName the type of graph builder to use
@@ -84,7 +84,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
     @Override
     public void beforeEachTest(Properties addProps) throws Exception {
         super.beforeEachTest(addProps);
-        graphBuilder = (DLPAGraphBuilder) builder;
+        dlpaGraphBuilder = (DLPAGraphBuilder) builder;
     }
 
     protected Properties getProps(SgsTestNode serverNode, Properties addProps)
@@ -93,9 +93,10 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Properties p =
                 SgsTestNode.getDefaultProperties(APP_NAME, serverNode, null);
         if (builderName == null) {
-            p.remove(LPADriver.GRAPH_CLASS_PROPERTY);
+            p.remove(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY);
         } else {
-            p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY, builderName);
+            p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
+                          builderName);
         }
         if (serverNode == null) {
             serverPort = SgsTestNode.getNextUniquePort();
@@ -119,12 +120,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         SgsTestNode newNode = null;
         try {
             Properties p = getProps(serverNode);
-            p.remove(LPADriver.GRAPH_CLASS_PROPERTY);
+            p.remove(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY);
             newNode =  new SgsTestNode(serverNode, null, p);
-            LPADriver newDriver = (LPADriver)
-                finderField.get(newNode.getNodeMappingService());
-            Assert.assertNull(newDriver.getGraphBuilder());
-            Assert.assertNull(newDriver.getGraphListener());
+            Assert.assertNull(
+                    builderField.get(newNode.getNodeMappingService()));
+            Assert.assertNull(
+                    listenerField.get(newNode.getNodeMappingService()));
         } finally {
             if (newNode != null) {
                 newNode.shutdown(false);
@@ -137,13 +138,13 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         SgsTestNode newNode = null;
         try {
             Properties p = getProps(serverNode);
-            p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY,
-                          LPADriver.GRAPH_CLASS_NONE);
+            p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
+                          NodeMappingServiceImpl.GRAPH_CLASS_NONE);
             newNode =  new SgsTestNode(serverNode, null, p);
-            LPADriver newDriver = (LPADriver)
-                finderField.get(newNode.getNodeMappingService());
-            Assert.assertNull(newDriver.getGraphBuilder());
-            Assert.assertNull(newDriver.getGraphListener());
+            Assert.assertNull(
+                    builderField.get(newNode.getNodeMappingService()));
+            Assert.assertNull(
+                    listenerField.get(newNode.getNodeMappingService()));
         } finally {
             if (newNode != null) {
                 newNode.shutdown(false);
@@ -155,12 +156,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
     public void testConstructor1() {
         // empty obj use
         Map<Object, Map<Identity, Long>> objUse =
-                graphBuilder.getObjectUseMap();
+                dlpaGraphBuilder.getObjectUseMap();
         Assert.assertNotNull(objUse);
         Assert.assertEquals(0, objUse.size());
         // empty conflicts
         Map<Long, Map<Object, Long>> conflicts =
-                graphBuilder.getConflictMap();
+                dlpaGraphBuilder.getConflictMap();
         Assert.assertNotNull(conflicts);
         Assert.assertEquals(0, conflicts.size());
 
@@ -215,7 +216,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         long nodeId = 99L;
         meth.invoke(builder, obj, nodeId, false);
         Map<Long, Map<Object, Long>> conflictMap =
-                graphBuilder.getConflictMap();
+                dlpaGraphBuilder.getConflictMap();
         Assert.assertEquals(1, conflictMap.size());
         Map<Object, Long> objMap = conflictMap.get(nodeId);
         Assert.assertNotNull(objMap);
@@ -265,7 +266,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         meth.invoke(builder, obj1, badNodeId, false);
         meth.invoke(builder, obj1, badNodeId, true);
         Map<Long, Map<Object, Long>> conflictMap =
-                graphBuilder.getConflictMap();
+                dlpaGraphBuilder.getConflictMap();
         Assert.assertEquals(2, conflictMap.size());
         Map<Object, Long> objMap = conflictMap.get(nodeId);
         Assert.assertNotNull(objMap);
@@ -282,7 +283,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         Assert.assertEquals(2, val.intValue());
 
         // Now invalidate badNodeId
-        graphBuilder.removeNode(badNodeId);
+        dlpaGraphBuilder.removeNode(badNodeId);
         Assert.assertEquals(1, conflictMap.size());
         objMap = conflictMap.get(nodeId);
         Assert.assertNotNull(objMap);
@@ -295,12 +296,12 @@ public class TestDistLPABuilder extends GraphBuilderTests {
 
     @Test
     public void testRemoveNodeUnknownNodeId() {
-        graphBuilder.removeNode(22);
+        dlpaGraphBuilder.removeNode(22);
     }
 
     @Test
     public void testRemoveNodeTwice() {
-        graphBuilder.removeNode(35);
-        graphBuilder.removeNode(35);
+        dlpaGraphBuilder.removeNode(35);
+        dlpaGraphBuilder.removeNode(35);
     }
 }

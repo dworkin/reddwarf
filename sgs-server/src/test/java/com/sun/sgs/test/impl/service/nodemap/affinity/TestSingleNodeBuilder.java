@@ -21,8 +21,10 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
-import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
+import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleGraphBuilder;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -51,11 +53,12 @@ public class TestSingleNodeBuilder extends GraphBuilderTests {
         props = getProps(null, addProps);
         node = new SgsTestNode(appName, null, props);
 
-        graphDriver = (LPADriver)
-                finderField.get(node.getNodeMappingService());
-        groupDriver = graphDriver;
-        listener = graphDriver.getGraphListener();
-        builder = graphDriver.getGraphBuilder();
+        graphBuilder = (AffinityGraphBuilder)
+                builderField.get(node.getNodeMappingService());
+        groupBuilder = graphBuilder;
+        listener = (GraphListener)
+                listenerField.get(node.getNodeMappingService());
+        builder = graphBuilder;
     }
 
     @Override
@@ -64,7 +67,7 @@ public class TestSingleNodeBuilder extends GraphBuilderTests {
     {
         Properties p = super.getProps(null, addProps);
         p.setProperty(StandardProperties.NODE_TYPE, NodeType.singleNode.name());
-        p.setProperty(LPADriver.GRAPH_CLASS_PROPERTY,
+        p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
                       SingleGraphBuilder.class.getName());
         p.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "3600");// one hour
         if (addProps != null) {

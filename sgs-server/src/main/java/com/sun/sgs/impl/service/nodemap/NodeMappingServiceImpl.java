@@ -23,8 +23,8 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
-import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
+import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -109,6 +109,17 @@ import javax.management.JMException;
  *      receiving node mapping changes on this node from the 
  *      {@code NodeMapppingServer}. This value must be no less than {@code 0} 
  *      and no greater than {@code 65535}.   <p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *   {@value #GRAPH_CLASS_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> When configured for multi-node:
+ *      {@value #DEFAULT_GRAPH_CLASS}, otherwise {@value #GRAPH_CLASS_NONE}
+ * <br>
+ *
+ * <dd style="padding-top: .5em">The graph builder to use.  Set to
+ *   {@value #GRAPH_CLASS_NONE} if no affinity group finding is required, which
+ *   is useful for testing. <p>
  * </dl> 
  *
  * <p>
@@ -284,7 +295,21 @@ public class NodeMappingServiceImpl
     
     /** The default value of the server port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
-    
+
+    /** The property for specifying the graph builder class. */
+    public static final String GRAPH_CLASS_PROPERTY =
+            PKG_NAME + ".graphbuilder.class";
+
+    /**
+     * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
+     * affinity group finding should be instantiated (useful for testing).
+     */
+    public static final String GRAPH_CLASS_NONE = "None";
+
+    /** The default graph builder class. */
+    static final String DEFAULT_GRAPH_CLASS = GRAPH_CLASS_NONE;
+//    "com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder";
+
     /** The watchdog service. */
     private final WatchdogService watchdogService;
     
@@ -351,10 +376,18 @@ public class NodeMappingServiceImpl
         relocationHandlers =
             new ConcurrentHashMap<Identity, Queue<SimpleCompletionHandler>>();
 
-    /** Affinity group subsystem is managed by the server, unless this is an
-     *  appNode, in which case the service manages it.
+    /**
+     * The affinity graph builder, null if there is none. The affinity group
+     * subsystem is managed by the server, unless this is an appNode, in
+     * which case the service manages it.
      */
-    private final LPADriver driver;
+    private final AffinityGraphBuilder graphBuilder;
+
+    /**
+     * A graph listener, used for detecting affinity groups, or {@code null}
+     * if no graph listener is being used.
+     */
+    private final GraphListener graphListener;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -405,19 +438,49 @@ public class NodeMappingServiceImpl
                 wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
                                              NodeType.class, 
                                              NodeType.singleNode);
-            boolean instantiateServer = nodeType != NodeType.appNode;
             
+            // Create our affinity group finder subsystem.
+            // The default for single node is NONE
+            final String builderName =
+                wrappedProps.getProperty(GRAPH_CLASS_PROPERTY,
+                                         nodeType == NodeType.singleNode ?
+                                                 GRAPH_CLASS_NONE :
+                                                 DEFAULT_GRAPH_CLASS);
+            
+            if (GRAPH_CLASS_NONE.equals(builderName)) {
+                // do not instantiate anything
+                graphBuilder = null;
+            } else {
+
+                // A builder was specified or we are running multi-node
+                graphBuilder = wrappedProps.getClassInstanceProperty(
+                                    GRAPH_CLASS_PROPERTY, DEFAULT_GRAPH_CLASS,
+                                    AffinityGraphBuilder.class,
+                                    new Class[] { Properties.class,
+                                                  ComponentRegistry.class,
+                                                  TransactionProxy.class },
+                                    properties, systemRegistry, txnProxy);
+            }
+
+            // Add the self as listener if there is a builder and we are
+            // not a core server node.
+            if (graphBuilder != null && nodeType != NodeType.coreServerNode) {
+                ProfileCollector col =
+                    systemRegistry.getComponent(ProfileCollector.class);
+                graphListener = new GraphListener(graphBuilder);
+                col.addListener(graphListener, false);
+            } else {
+                graphListener = null;
+            }
+
             String host;
             int port;
 
-            // Create our affinity group finder subsystem.
-            driver = new LPADriver(properties, systemRegistry, txnProxy);
-
-            if (instantiateServer) {
-                serverImpl = 
-                    new NodeMappingServerImpl(properties, 
-                                              systemRegistry, txnProxy,
-                                              driver.getGraphBuilder());
+            // Instantiate server if core node or single node
+            if (nodeType != NodeType.appNode) {
+                serverImpl = new NodeMappingServerImpl(properties, 
+                                                       systemRegistry, txnProxy,
+                                                       graphBuilder);
                 // Use the port actually used by our server instance
                 host = localHost;
                 port = serverImpl.getPort();
@@ -489,6 +552,7 @@ public class NodeMappingServiceImpl
 
             logger.log(Level.CONFIG,
                        "Created NodeMappingServiceImpl with properties:" +
+                       "\n  " + GRAPH_CLASS_PROPERTY + "=" + builderName +
                        "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
                        "\n  " + SERVER_HOST_PROPERTY + "=" + host +
                        "\n  " + NodeMappingServerImpl.SERVER_PORT_PROPERTY +
@@ -549,8 +613,15 @@ public class NodeMappingServiceImpl
         if (serverImpl != null) {
             serverImpl.shutdown();
         }
+
         // The server may be interacting with the finder so shut it down last
-        driver.shutdown();
+        if (graphListener != null) {
+            graphListener.shutdown();
+
+            if (graphBuilder != null) {
+                graphBuilder.shutdown();
+            }
+        }
     }
     
     /**
