@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.watchdog;
@@ -899,9 +901,8 @@ public final class WatchdogServerImpl
 	    NodeImpl choice = null;
             // Copy of the alive nodes
             NodeImpl[] values;
-            final int numAliveNodes;
-            numAliveNodes = aliveNodes.size();
-            values = aliveNodes.values().toArray(new NodeImpl[numAliveNodes]);
+            values = aliveNodes.values().toArray(new NodeImpl[0]);
+            final int numAliveNodes = values.length;
 	    int random = numAliveNodes > 0
 		? backupChooser.nextInt(numAliveNodes) : 0;
 	    for (int i = 0; i < numAliveNodes; i++) {

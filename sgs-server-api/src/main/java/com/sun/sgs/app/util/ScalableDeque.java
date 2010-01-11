@@ -19,6 +19,8 @@
  * Sun designates this particular file as subject to the "Classpath"
  * exception as provided by Sun in the LICENSE file that accompanied
  * this code.
+ *
+ * --
  */
 package com.sun.sgs.app.util;
 

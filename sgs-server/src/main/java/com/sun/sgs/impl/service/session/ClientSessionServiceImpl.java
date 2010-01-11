@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.session;
@@ -312,7 +314,7 @@ public final class ClientSessionServiceImpl
      */
     private final ConcurrentHashMap<BigInteger, PrepareRelocationInfo>
 	prepareRelocationMap =
-	    new ConcurrentHashMap <BigInteger, PrepareRelocationInfo>();
+	    new ConcurrentHashMap<BigInteger, PrepareRelocationInfo>();
 
     /** The map of relocation information for sessions relocating to
      * this node, keyed by relocation key. */
