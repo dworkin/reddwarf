@@ -124,7 +124,7 @@
     <findbugs-exclude.filter>
       ${basedir}/src/main/etc/findbugs-exclude.xml
     </findbugs-exclude.filter>
-    <sgs-test-ext.version>1.0</sgs-test-ext.version>
+    <sgs-test-ext.version>1.1</sgs-test-ext.version>
   </properties>
 
 </project>
