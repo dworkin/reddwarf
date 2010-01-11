@@ -61,8 +61,26 @@ public class TestTxnLockManager extends TestLockManager {
 				      Transaction txn,
 				      long requestedStartTime)
     {
-	return new TxnLocker<String>(
+	return new StringTxnLocker(
 	    (TxnLockManager<String>) lockManager, txn, requestedStartTime);
+    }
+
+    /** A transaction-locker with a nice toString method. */
+    private static class StringTxnLocker extends TxnLocker<String> {
+	private static long nextId = 1;
+	private final long id;
+	StringTxnLocker(TxnLockManager<String> lockManager,
+			Transaction txn,
+			long requestedStartTime)
+	{
+	    super(lockManager, txn, requestedStartTime);
+	    synchronized (StringTxnLocker.class) {
+		id = nextId++;
+	    }
+	}
+	public String toString() {
+	    return "StringTxnLocker-" + id;
+	}
     }
 
     /* -- Test lock -- */

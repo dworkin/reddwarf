@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import static com.sun.sgs.impl.kernel.StandardProperties.APP_ROOT;
@@ -564,6 +565,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public long newObjectIds(int numIds) {
@@ -590,6 +592,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public GetObjectResults getObject(long nodeId, long oid) {
@@ -620,6 +623,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public GetObjectForUpdateResults getObjectForUpdate(
@@ -654,6 +658,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public UpgradeObjectResults upgradeObject(long nodeId, long oid)
@@ -667,10 +672,6 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		if (nodeInfo == owner.getLocker()) {
 		    found = true;
 		    if (!owner.getForWrite()) {
-			/*
-			 * FIXME: Why should the node forget that it has a
-			 * write lock?  -tjb@sun.com (12/16/2009)
-			 */
 			lock(nodeInfo, oid, true, "upgradeObject");
 		    }
 		    break;
@@ -685,6 +686,17 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    WARNING, exception, "Cache consistency failure");
 		throw exception;
 	    }
+	    DbTransaction txn = env.beginTransaction(txnTimeout);
+	    boolean txnDone = false;
+	    try {
+		oidsDb.markForUpdate(txn, encodeLong(oid));
+		txnDone = true;
+		txn.commit();
+	    } finally {
+		if (!txnDone) {
+		    txn.abort();
+		}
+	    }
 	    GetWaitingResult waiting = getWaiting(oid);
 	    return new UpgradeObjectResults(
 		waiting == GetWaitingResult.WRITERS,
@@ -698,6 +710,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public NextObjectResults nextObjectId(long nodeId, long oid) {
@@ -747,6 +760,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public GetBindingResults getBinding(long nodeId, String name) {
@@ -790,6 +804,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public GetBindingForUpdateResults getBindingForUpdate(
@@ -841,6 +856,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public GetBindingForRemoveResults getBindingForRemove(
@@ -904,6 +920,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public NextBoundNameResults nextBoundName(long nodeId, String name) {
@@ -945,7 +962,11 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	}
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     *
+     * @throws	TransactionAbortedException {@inheritDoc}
+     */
     @Override
     public int getClassId(byte[] classInfo) {
 	callStarted();
@@ -961,6 +982,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * {@inheritDoc}
      *
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public byte[] getClassInfo(int classId) {
@@ -1121,6 +1143,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      *
      * @throws	CacheConsistencyException {@inheritDoc}
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public void evictObject(long nodeId, long oid)
@@ -1149,6 +1172,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      *
      * @throws	CacheConsistencyException {@inheritDoc}
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public void downgradeObject(long nodeId, long oid)
@@ -1177,6 +1201,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      *
      * @throws	CacheConsistencyException {@inheritDoc}
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public void evictBinding(long nodeId, String name)
@@ -1205,6 +1230,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      *
      * @throws	CacheConsistencyException {@inheritDoc}
      * @throws	IllegalArgumentException {@inheritDoc}
+     * @throws	TransactionAbortedException {@inheritDoc}
      */
     @Override
     public void downgradeBinding(long nodeId, String name)

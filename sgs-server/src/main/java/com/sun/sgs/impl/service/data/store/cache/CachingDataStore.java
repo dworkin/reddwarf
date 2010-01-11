@@ -297,7 +297,7 @@ public final class CachingDataStore extends AbstractDataStore
     /** The default update queue size. */
     public static final int DEFAULT_UPDATE_QUEUE_SIZE = 100;
 
-    /** The property that controls checking bindings. */
+    /** The property that controls checking bindings -- for testing only. */
     public static final String CHECK_BINDINGS_PROPERTY =
 	PKG + ".check.bindings";
 
@@ -356,7 +356,7 @@ public final class CachingDataStore extends AbstractDataStore
     /** The retry wait for failed I/O operations. */
     private final long retryWait;
 
-    /** When to check the consistency of bindings. */
+    /** When to check the consistency of bindings -- for testing only. */
     private final CheckBindingsType checkBindings;
 
     /** The transaction proxy. */
@@ -2183,8 +2183,9 @@ public final class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@link KernelRunnable} that downgrades an object after accessing it
-     * for read.
+     * A {@link KernelRunnable} that downgrades an object.  Obtains read access
+     * to the object through the access coordinator to prevent write accesses,
+     * making it safe to perform the downgrade.
      */
     private class DowngradeObjectTask
 	implements CompletionHandler, KernelRunnable
@@ -2260,8 +2261,9 @@ public final class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@link KernelRunnable} that evicts an object after accessing it for
-     * write.
+     * A {@link KernelRunnable} that evicts an object.  Obtains write access to
+     * the object through the access coordinator to get exclusive access,
+     * making it safe to perform the eviction.
      */
     private class EvictObjectTask extends EvictObjectCompletionHandler
 	implements KernelRunnable
@@ -2364,8 +2366,9 @@ public final class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@link KernelRunnable} that downgrades a binding after accessing it
-     * for read.
+     * A {@link KernelRunnable} that downgrades a binding.  Obtains read access
+     * to the name through the access coordinator to prevent write accesses,
+     * making it safe to perform the downgrade.
      */
     private class DowngradeBindingTask implements KernelRunnable {
 	private final BindingKey nameKey;
@@ -2530,8 +2533,9 @@ public final class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * A {@link KernelRunnable} that evicts a binding after accessing it for
-     * write.
+     * A {@link KernelRunnable} that evicts a binding.  Obtains write access to
+     * the name through the access coordinator to get exclusive access, making
+     * it safe to perform the eviction.
      */
     private class EvictBindingTask implements KernelRunnable {
 	private final BindingKey nameKey;

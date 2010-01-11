@@ -120,7 +120,7 @@ public class TxnLocker<K> extends BasicLocker<K> {
      */
     @Override
     protected LockConflict<K> getConflict() {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
 	    return conflict;
 	}
@@ -135,7 +135,7 @@ public class TxnLocker<K> extends BasicLocker<K> {
      */
     @Override
     protected void clearConflict() {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
 	    if (conflict != null) {
 		if (conflict.type == LockConflictType.DEADLOCK) {
@@ -157,7 +157,7 @@ public class TxnLocker<K> extends BasicLocker<K> {
      * @param	conflict the conflicting request
      */
     protected void setConflict(LockConflict<K> conflict) {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
 	    if (this.conflict == null) {
 		this.conflict = conflict;

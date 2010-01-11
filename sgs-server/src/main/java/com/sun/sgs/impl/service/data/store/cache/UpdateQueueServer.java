@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.TransactionAbortedException;
+
 /** The interface for operations on the server's update queue. */
 public interface UpdateQueueServer {
 
@@ -70,6 +72,8 @@ public interface UpdateQueueServer {
      *		specified object cached
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered or if {@code oid} is negative
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     void evictObject(long nodeId, long oid)
 	throws CacheConsistencyException;
@@ -84,6 +88,8 @@ public interface UpdateQueueServer {
      *		specified object cached for write
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered or if {@code oid} is negative
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     void downgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException;
@@ -99,6 +105,8 @@ public interface UpdateQueueServer {
      *		specified binding cached
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     void evictBinding(long nodeId, String name)
 	throws CacheConsistencyException;
@@ -114,6 +122,8 @@ public interface UpdateQueueServer {
      *		specified binding cached for write
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     void downgradeBinding(long nodeId, String name)
 	throws CacheConsistencyException;

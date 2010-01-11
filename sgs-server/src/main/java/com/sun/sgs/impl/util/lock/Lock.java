@@ -79,10 +79,12 @@ final class Lock<K> {
      * waiting otherwise.  Adds the locker as an owner of the lock if the lock
      * was obtained, and removes the locker from the waiters list if it was
      * waiting.  Returns {@code null} if the locker already owned this lock.
-     * Otherwise, adds the locker to the waiters list, and returns a {@code
-     * LockAttemptResult} containing the {@link LockRequest}, with its {@code
-     * conflict} field set to {@code null} if the lock was acquired or a
-     * conflicting transaction if the lock could not be obtained.
+     * Otherwise, returns a {@code LockAttemptResult} containing the {@link
+     * LockRequest}, with its {@code conflict} field set to {@code null} if the
+     * lock was acquired or a conflicting transaction if the lock could not be
+     * obtained.  Adds the locker to the waiters list if the lock was not
+     * obtained and the conflict type was {@link LockConflictType#BLOCKED
+     * BLOCKED}.
      *
      * @param	locker the locker requesting the lock
      * @param	forWrite whether a write lock is requested
@@ -92,9 +94,10 @@ final class Lock<K> {
     LockAttemptResult<K> lock(
 	Locker<K> locker, boolean forWrite, boolean waiting)
     {
-	assert checkSync(locker.lockManager);
+	assert locker.lockManager.checkKeySync(key);
 	boolean upgrade = false;
 	Locker<K> conflict = null;
+	LockConflictType conflictType = null;
 	if (!owners.isEmpty()) {
 	    /* Check conflicting owners */
 	    for (LockRequest<K> ownerRequest : owners) {
@@ -110,6 +113,7 @@ final class Lock<K> {
 		} else if (forWrite || ownerRequest.getForWrite()) {
 		    /* Found conflict */
 		    conflict = ownerRequest.getLocker();
+		    conflictType = LockConflictType.BLOCKED;
 		}
 	    }
 	}
@@ -121,12 +125,25 @@ final class Lock<K> {
 	    {
 		LockRequest<K> waiterRequest = i.next();
 		if (locker == waiterRequest.getLocker()) {
-		    assert forWrite == waiterRequest.getForWrite()
-			: "forWrite:" + forWrite +
-			  ", waiterRequest:" + waiterRequest;
-		    request = waiterRequest;
-		    if (conflict == null) {
-			i.remove();
+		    if (forWrite != waiterRequest.getForWrite()) {
+			/*
+			 * Using the multi-lock manager, the locker has already
+			 * made a blocked request for the same lock, but one
+			 * request is for read and the other for write.  This
+			 * case probably only happens in practice due to
+			 * network failures since the caching data store does
+			 * not make such requests otherwise.  This case is
+			 * obscure enough that it is not worth supporting more
+			 * complex waiters cases -- just reject the new
+			 * request.
+			 */
+			conflict = locker;
+			conflictType = LockConflictType.DENIED;
+		    } else {
+			request = waiterRequest;
+			if (conflict == null) {
+			    i.remove();
+			}
 		    }
 		    break;
 		} else if (conflict == null &&
@@ -134,6 +151,7 @@ final class Lock<K> {
 		{
 		    /* Found a conflicting waiter */
 		    conflict = waiterRequest.getLocker();
+		    conflictType = LockConflictType.BLOCKED;
 		}
 	    }
 	}
@@ -150,10 +168,12 @@ final class Lock<K> {
 	    owners.add(request);
 	} else if (request == null) {
 	    request = locker.newLockRequest(key, forWrite, upgrade);
-	    addWaiter(request);
+	    if (conflictType == LockConflictType.BLOCKED) {
+		addWaiter(request);
+	    }
 	}
 	assert validateInUse();
-	return new LockAttemptResult<K>(request, conflict);
+	return new LockAttemptResult<K>(request, conflict, conflictType);
     }
 
     /**
@@ -198,7 +218,7 @@ final class Lock<K> {
      * @return	the lockers that should be notified
      */
     List<Locker<K>> release(Locker<K> locker, boolean downgrade) {
-	assert checkSync(locker.lockManager);
+	assert locker.lockManager.checkKeySync(key);
 	if (logger.isLoggable(FINEST)) {
 	    logger.log(FINEST, "release {0}, downgrade:{1}, {2}",
 		       locker, downgrade, this);
@@ -276,6 +296,7 @@ final class Lock<K> {
      * constraints:
      * <ul>
      * <li>at least one owner
+     * <li>if more than one owner, they are only read owners
      * <li>all upgrade waiters precede other waiters
      * <li>locker appears once in owners and waiters <em>except</em> that
      *     an upgrade request can be a waiter if a read request is an owner
@@ -285,12 +306,20 @@ final class Lock<K> {
      * @return	{@code true} if the state is valid, otherwise throws
      *		{@link AssertionError}
      */
-    /** {@inheritDoc} */
     private boolean validateInUse() {
 	int numWaiters = waiters.size();
 	int numOwners = owners.size();
 	if (numOwners == 0) {
 	    throw new AssertionError("No owners: " + this);
+	}
+	if (numOwners > 1) {
+	    for (LockRequest<K> owner : owners) {
+		if (owner.getForWrite()) {
+		    throw new AssertionError(
+			"Owned for write with more than one owner: " + this +
+			", owners:" + owners);
+		}
+	    }
 	}
 	boolean seenNonUpgrade = false;
 	for (int i = 0; i < numWaiters - 1; i++) {
@@ -343,7 +372,7 @@ final class Lock<K> {
      * they have any owners or waiters.
      */
     boolean inUse(LockManager<K> lockManager) {
-	assert checkSync(lockManager);
+	assert lockManager.checkKeySync(key);
 	return !owners.isEmpty() || !waiters.isEmpty();
     }
 
@@ -351,7 +380,7 @@ final class Lock<K> {
      * Returns a possibly read-only copy of the lock requests for the owners.
      */
     List<LockRequest<K>> copyOwners(LockManager<K> lockManager) {
-	assert checkSync(lockManager);
+	assert lockManager.checkKeySync(key);
 	return copyList(owners);
     }
 
@@ -360,7 +389,7 @@ final class Lock<K> {
      * waiters.
      */
     List<LockRequest<K>> copyWaiters(LockManager<K> lockManager) {
-	assert checkSync(lockManager);
+	assert lockManager.checkKeySync(key);
 	return copyList(waiters);
     }
 
@@ -380,7 +409,7 @@ final class Lock<K> {
 
     /** Removes a locker from the list of waiters for this lock, if present. */
     void flushWaiter(Locker<K> locker) {
-	assert checkSync(locker.lockManager);
+	assert locker.lockManager.checkKeySync(key);
 	for (Iterator<LockRequest<K>> iter = waiters.iterator();
 	     iter.hasNext(); )
 	{
@@ -400,80 +429,13 @@ final class Lock<K> {
      * @return	the owner with the specified locker, or {@code null}
      */
     LockRequest<K> getOwner(Locker<K> locker) {
-	assert checkSync(locker.lockManager);
+	assert locker.lockManager.checkKeySync(key);
 	for (LockRequest<K> owner : owners) {
 	    if (locker == owner.getLocker()) {
 		return owner;
 	    }
 	}
 	return null;
-    }
-
-    /**
-     * Notes the start of synchronization on the map associated with {@code
-     * key}.  Throws {@link AssertionError} if already synchronized on a
-     * key, otherwise returns {@code true}.
-     */
-    static <K> boolean noteSync(LockManager<K> lockManager, K key) {
-	K currentKey = lockManager.currentKeySync.get();
-	if (currentKey != null) {
-	    throw new AssertionError(
-		"Attempt to synchronize on map for key " + key +
-		", but already synchronized on " + currentKey);
-	}
-	lockManager.currentKeySync.set(key);
-	return true;
-    }
-
-    /**
-     * Notes the end of synchronization on the map associated with {@code
-     * key}.  Throws {@link AssertionError} if not already synchronized on
-     * {@code key}, otherwise returns {@code true}.
-     */
-    static <K> boolean noteUnsync(LockManager<K> lockManager, K key) {
-	K currentKey = lockManager.currentKeySync.get();
-	if (currentKey == null) {
-	    throw new AssertionError(
-		"Attempt to unsynchronize on map for key " + key +
-		", but not currently synchronized on a key");
-	} else if (!currentKey.equals(key)) {
-	    throw new AssertionError(
-		"Attempt to unsynchronize on map for key " + key +
-		", but currently synchronized on " + currentKey);
-	}
-	lockManager.currentKeySync.remove();
-	return true;
-    }
-
-    /**
-     * Checks that the current thread is not synchronized on the map
-     * associated with a key, throwing {@link AssertionError} if it is, and
-     * otherwise returning {@code true}.
-     */
-    static <K> boolean checkNoSync(LockManager<K> lockManager) {
-	K currentKey = lockManager.currentKeySync.get();
-	if (currentKey != null) {
-	    throw new AssertionError(
-		"Currently synchronized on key " + currentKey);
-	}
-	return true;
-    }
-
-    /**
-     * Checks that the current thread is synchronized on the map associated
-     * with this lock, throwing {@link AssertionError} if it is not, and
-     * otherwise returning {@code true}.
-     */
-    boolean checkSync(LockManager<K> lockManager) {
-	K currentKey = lockManager.currentKeySync.get();
-	if (currentKey == null) {
-	    throw new AssertionError("Currently not synchronized on a key");
-	} else if (!currentKey.equals(key)) {
-	    throw new AssertionError(
-		"Should be synchronized on " + key +
-		", but currently synchronized on " + currentKey);
-	}
-	return true;
     }
 
     /** Print fields, for debugging. */

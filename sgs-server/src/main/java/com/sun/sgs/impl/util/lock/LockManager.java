@@ -123,14 +123,14 @@ public class LockManager<K> {
      * When assertions are enabled, holds the {@code Locker} that the
      * current thread is synchronized on, if any.
      */
-    final ThreadLocal<Locker<K>> currentLockerSync =
+    private final ThreadLocal<Locker<K>> currentLockerSync =
 	new ThreadLocal<Locker<K>>();
 
     /**
      * When assertions are enabled, hold the {@code Key} whose associated
      * {@code Map} the current thread is synchronized on, if any.
      */
-    final ThreadLocal<K> currentKeySync = new ThreadLocal<K>();
+    private final ThreadLocal<K> currentKeySync = new ThreadLocal<K>();
 
     /* -- Constructor -- */
 
@@ -260,13 +260,13 @@ public class LockManager<K> {
      */
     public List<LockRequest<K>> getOwners(K key) {
 	Map<K, Lock<K>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
+	assert noteKeySync(key);
 	try {
 	    synchronized (keyMap) {
 		return getLock(key, keyMap).copyOwners(this);
 	    }
 	} finally {
-	    assert Lock.noteUnsync(this, key);
+	    assert noteKeyUnsync(key);
 	}
     }
 
@@ -279,13 +279,13 @@ public class LockManager<K> {
      */
     public List<LockRequest<K>> getWaiters(K key) {
 	Map<K, Lock<K>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
+	assert noteKeySync(key);
 	try {
 	    synchronized (keyMap) {
 		return getLock(key, keyMap).copyWaiters(this);
 	    }
 	} finally {
-	    assert Lock.noteUnsync(this, key);
+	    assert noteKeyUnsync(key);
 	}
     }
 
@@ -365,14 +365,14 @@ public class LockManager<K> {
 	    }
 	    LockAttemptResult<K> result;
 	    Map<K, Lock<K>> keyMap = getKeyMap(key);
-	    assert Lock.noteSync(this, key);
+	    assert noteKeySync(key);
 	    try {
 		synchronized (keyMap) {
 		    Lock<K> lock = getLock(key, keyMap);
 		    result = lock.lock(locker, forWrite, false);
 		}
 	    } finally {
-		assert Lock.noteUnsync(this, key);
+		assert noteKeyUnsync(key);
 	    }
 	    if (result == null) {
 		if (logger.isLoggable(FINER)) {
@@ -392,9 +392,11 @@ public class LockManager<K> {
 		}
 		return null;
 	    }
-	    locker.setWaitingFor(result);
+	    if (result.conflictType == LockConflictType.BLOCKED) {
+		locker.setWaitingFor(result);
+	    }
 	    conflict = new LockConflict<K>(
-		LockConflictType.BLOCKED, result.conflict);
+		result.conflictType, result.conflict);
 	    if (logger.isLoggable(FINER)) {
 		logger.log(FINER,
 			   "lock {0}, {1}, forWrite:{2}\n  returns {3}",
@@ -428,7 +430,7 @@ public class LockManager<K> {
     LockConflict<K> waitForLockInternal(Locker<K> locker) {
 	logger.log(FINEST, "wait for lock {0}", locker);
 	try {
-	    assert locker.noteSync();
+	    assert noteLockerSync(locker);
 	    try {
 		synchronized (locker) {
 		    LockAttemptResult<K> result = locker.getWaitingFor();
@@ -441,13 +443,13 @@ public class LockManager<K> {
 		    Lock<K> lock;
 		    K key = result.request.getKey();
 		    Map<K, Lock<K>> keyMap = getKeyMap(key);
-		    assert Lock.noteSync(this, key);
+		    assert noteKeySync(key);
 		    try {
 			synchronized (keyMap) {
 			    lock = getLock(key, keyMap);
 			}
 		    } finally {
-			assert Lock.noteUnsync(this, key);
+			assert noteKeyUnsync(key);
 		    }
 		    long now = System.currentTimeMillis();
 		    long stop = locker.getLockTimeoutTime(now, lockTimeout);
@@ -459,7 +461,7 @@ public class LockManager<K> {
 			boolean isOwner;
 			boolean timedOut = false;
 			boolean upgradeFailed = false;
-			assert Lock.noteSync(this, key);
+			assert noteKeySync(key);
 			try {
 			    synchronized (keyMap) {
 				LockRequest<K> owner = lock.getOwner(locker);
@@ -478,7 +480,7 @@ public class LockManager<K> {
 				}
 			    }
 			} finally {
-			    assert Lock.noteUnsync(this, key);
+			    assert noteKeyUnsync(key);
 			}
 			if (isOwner) {
 			    if (conflict != null &&
@@ -539,7 +541,7 @@ public class LockManager<K> {
 		    return conflict;
 		}
 	    } finally {
-		assert locker.noteUnsync();
+		assert noteLockerUnsync(locker);
 	    }
 	} catch (RuntimeException e) {
 	    logger.logThrow(FINER, e, "wait for lock {0} throws", locker);
@@ -565,7 +567,7 @@ public class LockManager<K> {
 	checkLockManager(locker);
 	List<Locker<K>> lockersToNotify = Collections.emptyList();
 	Map<K, Lock<K>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
+	assert noteKeySync(key);
 	try {
 	    synchronized (keyMap) {
 		/* Don't create the lock if it isn't present */
@@ -578,19 +580,158 @@ public class LockManager<K> {
 		}
 	    }
 	} finally {
-	    assert Lock.noteUnsync(this, key);
+	    assert noteKeyUnsync(key);
 	}
 	for (Locker<K> newOwner : lockersToNotify) {
 	    logger.log(FINEST, "notify new owner {0}", newOwner);
-	    assert newOwner.noteSync();
+	    assert noteLockerSync(newOwner);
 	    try {
 		synchronized (newOwner) {
 		    newOwner.notifyAll();
 		}
 	    } finally {
-		assert newOwner.noteUnsync();
+		assert noteLockerUnsync(newOwner);
 	    }
 	}
+    }
+
+    /**
+     * Notes the start of synchronization on the map associated with {@code
+     * key}.  Throws {@link AssertionError} if already synchronized on a key,
+     * otherwise returns {@code true}.
+     *
+     * @param	key the key
+     */
+    boolean noteKeySync(K key) {
+	assert key != null;
+	K currentKey = currentKeySync.get();
+	if (currentKey != null) {
+	    throw new AssertionError(
+		"Attempt to synchronize on map for key " + key +
+		", but already synchronized on " + currentKey);
+	}
+	currentKeySync.set(key);
+	return true;
+    }
+
+    /**
+     * Notes the end of synchronization on the map associated with {@code key}.
+     * Throws {@link AssertionError} if not already synchronized on {@code
+     * key}, otherwise returns {@code true}.
+     *
+     * @param	key the key
+     */
+    boolean noteKeyUnsync(K key) {
+	assert key != null;
+	K currentKey = currentKeySync.get();
+	if (currentKey == null) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on map for key " + key +
+		", but not currently synchronized on a key");
+	} else if (!currentKey.equals(key)) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on map for key " + key +
+		", but currently synchronized on " + currentKey);
+	}
+	currentKeySync.remove();
+	return true;
+    }
+
+    /**
+     * Checks that the current thread is synchronized on the map associated
+     * with {@code key}, throwing {@link AssertionError} if it is not, and
+     * otherwise returning {@code true}.
+     *
+     * @param	key the key
+     */
+    boolean checkKeySync(K key) {
+	assert key != null;
+	K currentKey = currentKeySync.get();
+	if (currentKey == null) {
+	    throw new AssertionError("Currently not synchronized on a key");
+	} else if (!currentKey.equals(key)) {
+	    throw new AssertionError(
+		"Should be synchronized on " + key +
+		", but currently synchronized on " + currentKey);
+	}
+	return true;
+    }
+
+    /**
+     * Checks that the current thread is not synchronized on the map associated
+     * with any key, throwing {@link AssertionError} if it is, and otherwise
+     * returning {@code true}.
+     */
+    boolean checkNoKeySync() {
+	K currentKey = currentKeySync.get();
+	if (currentKey != null) {
+	    throw new AssertionError(
+		"Currently synchronized on key " + currentKey);
+	}
+	return true;
+    }
+
+    /**
+     * Notes the start of synchronization on the specified locker.  Throws
+     * {@link AssertionError} if already synchronized on any locker or lock,
+     * otherwise returns {@code true}.
+     *
+     * @param	locker the locker
+     */
+    boolean noteLockerSync(Locker<K> locker) {
+	assert locker != null;
+	Locker<K> currentLocker = currentLockerSync.get();
+	if (currentLocker != null) {
+	    throw new AssertionError(
+		"Attempt to synchronize on locker " + this +
+		", but already synchronized on " + currentLocker);
+	}
+	checkNoKeySync();
+	currentLockerSync.set(locker);
+	return true;
+    }
+
+    /**
+     * Notes the end of synchronization on the specified locker.  Throws {@link
+     * AssertionError} if not already synchronized on the locker, otherwise
+     * returns {@code true}.
+     *
+     * @param	locker the locker     
+     */
+    boolean noteLockerUnsync(Locker<K> locker) {
+	assert locker != null;
+	Locker<K> currentLocker = currentLockerSync.get();
+	if (currentLocker == null) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on locker " + this +
+		", but not currently synchronized on a locker");
+	} else if (currentLocker != locker) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on locker " + locker +
+		", but currently synchronized on " + currentLocker);
+	}
+	currentLockerSync.remove();
+	return true;
+    }
+
+    /**
+     * Checks that the current thread is permitted to synchronize on the
+     * specified locker locker.  Throws an {@link AssertionError} if already
+     * synchronized on a locker other than this one or any lock, otherwise
+     * returns {@code true}.
+     *
+     * @param	locker the locker     
+     */
+    boolean checkAllowLockerSync(Locker<K> locker) {
+	assert locker != null;
+	Locker<K> currentLocker = currentLockerSync.get();
+	if (currentLocker != null && currentLocker != locker) {
+	    throw new AssertionError(
+		"Attempt to synchronize on locker " + locker +
+		", but already synchronized on " + currentLocker);
+	}
+	checkNoKeySync();
+	return true;
     }
 
     /* -- Private methods -- */

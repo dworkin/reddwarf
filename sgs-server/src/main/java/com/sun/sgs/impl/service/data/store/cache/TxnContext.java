@@ -358,7 +358,6 @@ class TxnContext {
 	assert Thread.holdsLock(lock);
 	if (!entry.getModified()) {
 	    if (!entry.getHasData()) {
-		entry.setHasData();
 		noDataObjects--;
 	    } else {
 		if (modifiedObjects == null) {

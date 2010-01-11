@@ -301,14 +301,14 @@ public final class TxnLockManager<K> extends LockManager<K> {
 		} else {
 		    K key = result.request.getKey();
 		    Map<K, Lock<K>> keyMap = getKeyMap(key);
-		    assert Lock.noteSync(TxnLockManager.this, key);
+		    assert TxnLockManager.this.noteKeySync(key);
 		    try {
 			synchronized (keyMap) {
 			    waitingFor = getLock(key, keyMap).copyOwners(
 				TxnLockManager.this);
 			}
 		    } finally {
-			assert Lock.noteUnsync(TxnLockManager.this, key);
+			assert TxnLockManager.this.noteKeyUnsync(key);
 		    }
 		}
 		waiterInfo = new WaiterInfo<K>(waitingFor);

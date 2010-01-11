@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import java.io.IOException;
 import java.io.ObjectStreamClass;
@@ -85,6 +86,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code numIds} is less than
      *		{@code 1}
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     long newObjectIds(int numIds) throws IOException;
 
@@ -100,6 +103,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered or if {@code oid} is negative
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     GetObjectResults getObject(long nodeId, long oid) throws IOException;
 
@@ -152,6 +157,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered or if {@code oid} is negative
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     GetObjectForUpdateResults getObjectForUpdate(long nodeId, long oid)
 	throws IOException;
@@ -205,6 +212,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered or if {@code oid} is negative
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     UpgradeObjectResults upgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException, IOException;
@@ -245,14 +254,14 @@ public interface CachingDataStoreServer extends Remote {
 
     /**
      * Returns information about the next object after the object with the
-     * specified ID.  If {@code objectId} is {@code -1}, then returns
-     * information about the first object.  The results returned by this method
-     * will not refer to objects that have already been removed, and may not
-     * refer to objects created after an iteration has begun.  It is not an
-     * error to specify the identifier for an object that has already been
-     * removed.  If the return value is not {@code null} and its {@code
-     * callbackEvict} field is {@code true}, then the caller should evict the
-     * next object after using it.
+     * specified ID, obtaining read access to the next object if it is found.
+     * If {@code objectId} is {@code -1}, then returns information about the
+     * first object.  The results returned by this method will not refer to
+     * objects that have already been removed, and may not refer to objects
+     * created after an iteration has begun.  It is not an error to specify the
+     * identifier for an object that has already been removed.  If the return
+     * value is not {@code null} and its {@code callbackEvict} field is {@code
+     * true}, then the caller should evict the next object after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the identifier of the object to search after, or
@@ -260,8 +269,10 @@ public interface CachingDataStoreServer extends Remote {
      * @return	information about the next object, or {@code null} if there are
      *		no more objects
      * @throws	IllegalArgumentException if {@code nodeId} has not been
-     *		registered or if {@code oid} is negative
+     *		registered or if {@code oid} is less than {@code -1}
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     NextObjectResults nextObjectId(long nodeId, long oid) throws IOException;
 
@@ -326,6 +337,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     GetBindingResults getBinding(long nodeId, String name) throws IOException;
 
@@ -415,6 +428,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     GetBindingForUpdateResults getBindingForUpdate(long nodeId, String name)
 	throws IOException;
@@ -481,6 +496,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     GetBindingForRemoveResults getBindingForRemove(long nodeId, String name)
 	throws IOException;
@@ -603,6 +620,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code nodeId} has not been
      *		registered
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     NextBoundNameResults nextBoundName(long nodeId, String name)
 	throws IOException;
@@ -675,6 +694,8 @@ public interface CachingDataStoreServer extends Remote {
      * @param	classInfo the class information
      * @return	the associated class ID
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     int getClassId(byte[] classInfo) throws IOException;
 
@@ -690,6 +711,8 @@ public interface CachingDataStoreServer extends Remote {
      * @throws	IllegalArgumentException if {@code classId} is not greater
      *		than {@code 0}
      * @throws	IOException if a network problem occurs
+     * @throws	TransactionAbortedException if the transaction performed by the
+     *		server was aborted due to a lock conflict or timeout
      */
     byte[] getClassInfo(int classId) throws IOException;
 }

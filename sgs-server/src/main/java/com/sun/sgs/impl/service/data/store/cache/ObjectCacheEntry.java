@@ -29,13 +29,13 @@ package com.sun.sgs.impl.service.data.store.cache;
 final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     /**
-     * Records whether the entry represents a newly created object which has
-     * not yet been provided with data.
+     * Records whether the entry has not been provided with the data associated
+     * with the object.
      */
     private boolean noData;
 
     /**
-     * Creates an object cache entry.
+     * Creates an object cache entry with no data.
      *
      * @param	oid the object ID
      * @param	contextId the context ID associated with the transaction on
@@ -44,6 +44,24 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      */
     private ObjectCacheEntry(long oid, long contextId, State state) {
 	super(oid, contextId, state);
+	noData = true;
+    }
+
+    /**
+     * Creates an object cache entry with data.
+     *
+     * @param	oid the object ID
+     * @param	contextId the context ID associated with the transaction on
+     *		whose behalf the entry was created
+     * @param	state the state
+     * @param	data the object data or {@code null} for a removed object
+     */
+    private ObjectCacheEntry(
+	long oid, long contextId, State state, byte[] data)
+    {
+	super(oid, contextId, state);
+	setValue(data);
+	noData = false;
     }
 
     /**
@@ -54,10 +72,7 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      * @return	the cache entry
      */
     static ObjectCacheEntry createNew(long oid, long contextId) {
-	ObjectCacheEntry result =
-	    new ObjectCacheEntry(oid, contextId, State.CACHED_WRITE);
-	result.noData = true;
-	return result;
+	return new ObjectCacheEntry(oid, contextId, State.CACHED_WRITE);
     }
 
     /**
@@ -90,10 +105,7 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
     static ObjectCacheEntry createCached(
 	long oid, long contextId, byte[] data)
     {
-	ObjectCacheEntry entry =
-	    new ObjectCacheEntry(oid, contextId, State.CACHED_READ);
-	entry.setValue(data);
-	return entry;
+	return new ObjectCacheEntry(oid, contextId, State.CACHED_READ, data);
     }
 
     @Override
@@ -101,10 +113,11 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 	byte[] data = getValue();
 	return "ObjectCacheEntry[" +
 	    "oid:" + key +
-	    ", data:" + (data == null ? "null" : "byte[" + data.length + "]") +
+	    ", data:" + (noData ? "NONE"
+			 : data == null ? "null"
+			 : "byte[" + data.length + "]") +
 	    ", contextId:" + getContextId() +
 	    ", state:" + getState() +
-	    (noData ? ", noData:true" : "") +
 	    "]";
     }
 
@@ -128,6 +141,17 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
     }
 
     /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation also sets the {@code noData} field to {@code false}.
+     */
+    @Override
+    void setValue(byte[] newValue) {
+	super.setValue(newValue);
+	noData = false;
+    }
+
+    /**
      * Returns whether the object associated with this entry has been provided
      * with data.
      *
@@ -135,13 +159,5 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      */
     boolean getHasData() {
 	return !noData;
-    }
-
-    /**
-     * Notes that the object associated with this entry has been provided with
-     * data.
-     */
-    void setHasData() {
-	noData = false;
     }
 }
