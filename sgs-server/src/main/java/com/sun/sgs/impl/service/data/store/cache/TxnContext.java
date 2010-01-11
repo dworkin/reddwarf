@@ -647,14 +647,16 @@ class TxnContext {
 	    Object lock = cache.getObjectLock(key);
 	    synchronized (lock) {
 		ObjectCacheEntry entry = cache.getObjectEntry(key);
-		entry.setValue(restoreValue);
-		if (entry.getHasData()) {
-		    entry.setNotModified(lock);
-		}
 		if (restoreValue == null) {
 		    /* Roll back object creation */
+		    if (entry.getHasData()) {
+			entry.setNotModified(lock);
+		    }
 		    entry.setEvictedImmediate(lock);
 		    cache.removeObjectEntry(key);
+		} else {
+		    entry.setValue(restoreValue);
+		    entry.setNotModified(lock);
 		}
 	    }
 	}

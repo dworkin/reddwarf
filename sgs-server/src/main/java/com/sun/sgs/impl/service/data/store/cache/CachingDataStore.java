@@ -2636,8 +2636,7 @@ public final class CachingDataStore extends AbstractDataStore
      * {@inheritDoc} <p>
      *
      * This implementation reports a node failure if a method throws an {@link
-     * AssertionError}, {@link UnsupportedOperationException}, or {@link
-     * IllegalStateException}, all of which represent unexpected failures.
+     * AssertionError}, which represents an unexpected failure.
      */
     @Override
     protected void handleException(Transaction txn,
@@ -2645,10 +2644,7 @@ public final class CachingDataStore extends AbstractDataStore
 				   Throwable e,
 				   String operation)
     {
-	if (e instanceof AssertionError ||
-	    e instanceof UnsupportedOperationException ||
-	    e instanceof IllegalStateException)
-	{
+	if (e instanceof AssertionError) {
 	    reportFailure(e);
 	}
 	super.handleException(txn, level, e, operation);
