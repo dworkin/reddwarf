@@ -128,6 +128,13 @@ public class TcpTransport implements Transport {
     /** The transport descriptor */
     private final TcpDescriptor descriptor;
 
+    // Determines whether the transport should be secure or not
+    private final boolean isSecure;
+
+    // The name of the issecure transport property
+    public static final String ISSECURE_TRANSPORT_PROPERTY =
+            PKG_NAME + ".secure";
+
     /**
      * Constructs an instance of this class with the specified properties.
      *
@@ -148,6 +155,9 @@ public class TcpTransport implements Transport {
         int port = wrappedProps.getIntProperty(LISTEN_PORT_PROPERTY,
                                                DEFAULT_PORT, 1, 65535);
 
+        isSecure = wrappedProps.getBooleanProperty(ISSECURE_TRANSPORT_PROPERTY,
+                                                    false);
+
         try {
             // If no host address is supplied, default to listen on all
             // interfaces on the local host.
@@ -167,7 +177,8 @@ public class TcpTransport implements Transport {
             asyncChannelGroup =
                 provider.openAsynchronousChannelGroup(
                     Executors.newCachedThreadPool());
-            acceptor =
+            acceptor = isSecure ?
+                provider.openAsyncSSLServerSocketChannel(asyncChannelGroup) :
                 provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
 	    try {
                 acceptor.bind(listenAddress, acceptorBacklog);
@@ -195,7 +206,8 @@ public class TcpTransport implements Transport {
                        "\n  " + ACCEPTOR_BACKLOG_PROPERTY + "=" +
                        acceptorBacklog +
                        "\n  " + LISTEN_HOST_PROPERTY + "=" + host +
-                       "\n  " + LISTEN_PORT_PROPERTY + "=" + port);
+                       "\n  " + LISTEN_PORT_PROPERTY + "=" + port +
+                       "\n  " + ISSECURE_TRANSPORT_PROPERTY + isSecure);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -303,7 +315,10 @@ public class TcpTransport implements Transport {
 	    logger.logThrow(Level.FINEST, ex,
 			    "exception closing acceptor during restart");
 	}
-	acceptor = AsynchronousChannelProvider.provider().
+	acceptor = isSecure ?
+            AsynchronousChannelProvider.provider().
+            openAsyncSSLServerSocketChannel(asyncChannelGroup) :
+                AsynchronousChannelProvider.provider().
 	    openAsynchronousServerSocketChannel(asyncChannelGroup);
 	
 	acceptor.bind(listenAddress, acceptorBacklog);

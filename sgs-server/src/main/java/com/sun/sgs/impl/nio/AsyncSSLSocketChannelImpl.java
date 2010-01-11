@@ -19,33 +19,24 @@
 
 package com.sun.sgs.impl.nio;
 
-import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.UnresolvedAddressException;
-import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.impl.net.ssl.SSLChannel;
-import com.sun.sgs.nio.channels.AlreadyBoundException;
-import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
-import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ShutdownType;
@@ -53,12 +44,12 @@ import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
 /**
- * An implementation of {@link AsynchronousSocketChannel}.
- * Most interesting methods are delegated to the {@link AsyncKey}
- * returned by this channel's channel group.
+ * An extension of {@link AsyncSocketChannelImpl}
+ * with SSL decryption/encryption in the read and
+ * write methods.
  */
-public class AsyncSSLSocketChannelImpl
-    extends AsynchronousSocketChannel
+class AsyncSSLSocketChannelImpl
+    extends AsyncSocketChannelImpl
 {
     /** The valid socket options for this channel. */
     private static final Set<SocketOption> socketOptions;
@@ -71,12 +62,6 @@ public class AsyncSSLSocketChannelImpl
             StandardSocketOption.TCP_NODELAY);
         socketOptions = Collections.unmodifiableSet(es);
     }
-
-    /** The underlying {@code SocketChannel}. */
-    final SocketChannel channel;
-
-    /** The {@code AsyncKey} for the underlying channel. */
-    final AsyncKey key;
 
     // The SSL/TLS secure channel
     final SSLChannel sslChannel;
@@ -96,7 +81,7 @@ public class AsyncSSLSocketChannelImpl
     /**
      * Creates a new instance registered with the given channel group, with
      * the given underlying {@link SocketChannel}. Used by an
-     * {@link AsyncServerSocketChannelImpl} when a new connection is
+     * {@link AsyncSSLServerSocketChannelImpl} when a new connection is
      * accepted.
      * 
      * @param group the channel group
@@ -107,170 +92,8 @@ public class AsyncSSLSocketChannelImpl
                            SocketChannel channel)
         throws IOException
     {
-        super(group.provider());
-        this.channel = channel;
+        super(group);
         sslChannel = new SSLChannel(channel);
-        key = group.register(channel);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public String toString() {
-        return super.toString() + ":" + key;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean isOpen() {
-        return channel.isOpen();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void close() throws IOException {
-        key.close();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public AsyncSSLSocketChannelImpl bind(SocketAddress local)
-        throws IOException
-    {
-        if ((local != null) && (!(local instanceof InetSocketAddress))) {
-            throw new UnsupportedAddressTypeException();
-        }
-
-        InetSocketAddress inetLocal = (InetSocketAddress) local;
-        if ((inetLocal != null) && inetLocal.isUnresolved()) {
-            throw new UnresolvedAddressException();
-        }
-
-        final Socket socket = channel.socket();
-        try {
-            socket.bind(inetLocal);
-        } catch (SocketException e) {
-            if (socket.isBound()) {
-                throw Util.initCause(new AlreadyBoundException(), e);
-            }
-            if (socket.isClosed()) {
-                throw Util.initCause(new ClosedChannelException(), e);
-            }
-            throw e;
-        }
-        return this;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public SocketAddress getLocalAddress() throws IOException {
-        return channel.socket().getLocalSocketAddress();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public AsyncSSLSocketChannelImpl setOption(SocketOption name, Object value)
-        throws IOException
-    {
-        if (!(name instanceof StandardSocketOption)) {
-            throw new IllegalArgumentException("Unsupported option " + name);
-        }
-
-        if (value == null || !name.type().isAssignableFrom(value.getClass())) {
-            throw new IllegalArgumentException("Bad parameter for " + name);
-        }
-
-        StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final Socket socket = channel.socket();
-        
-        try {
-            switch (stdOpt) {
-            case SO_SNDBUF:
-                socket.setSendBufferSize(((Integer) value).intValue());
-                break;
-
-            case SO_RCVBUF:
-                socket.setReceiveBufferSize(((Integer) value).intValue());
-                break;
-
-            case SO_KEEPALIVE:
-                socket.setKeepAlive(((Boolean) value).booleanValue());
-                break;
-
-            case SO_REUSEADDR:
-                socket.setReuseAddress(((Boolean) value).booleanValue());
-                break;
-
-            case TCP_NODELAY:
-                socket.setTcpNoDelay(((Boolean) value).booleanValue());
-                break;
-
-            default:
-                throw new IllegalArgumentException(
-                    "Unsupported option " + name);
-            }
-        } catch (SocketException e) {
-            if (socket.isClosed()) {
-                throw Util.initCause(new ClosedChannelException(), e);
-            }
-            throw e;
-        }
-        return this;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Object getOption(SocketOption name) throws IOException {
-        if (!(name instanceof StandardSocketOption)) {
-            throw new IllegalArgumentException("Unsupported option " + name);
-        }
-
-        StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final Socket socket = channel.socket();
-        try {
-            switch (stdOpt) {
-            case SO_SNDBUF:
-                return socket.getSendBufferSize();
-
-            case SO_RCVBUF:
-                return socket.getReceiveBufferSize();
-
-            case SO_KEEPALIVE:
-                return socket.getKeepAlive();
-
-            case SO_REUSEADDR:
-                return socket.getReuseAddress();
-
-            case TCP_NODELAY:
-                return socket.getTcpNoDelay();
-
-            default:
-                throw new IllegalArgumentException("Unsupported option " 
-                                                   + name);
-            }
-        } catch (SocketException e) {
-            if (socket.isClosed()) {
-                throw Util.initCause(new ClosedChannelException(), e);
-            }
-            throw e;
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Set<SocketOption> options() {
-        return socketOptions;
     }
 
     /**
@@ -306,75 +129,6 @@ public class AsyncSSLSocketChannelImpl
             throw e;
         }
         return this;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public SocketAddress getConnectedAddress() throws IOException {
-        return channel.socket().getRemoteSocketAddress();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean isConnectionPending() {
-        return channel.isConnectionPending();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean isReadPending() {
-        return key.isOpPending(OP_READ);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean isWritePending() {
-        return key.isOpPending(OP_WRITE);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public <A> IoFuture<Void, A> connect(
-        SocketAddress remote,
-        final A attachment,
-        final CompletionHandler<Void, ? super A> handler)
-    {
-        try {
-            if (channel.connect(remote)) {
-                Future<Void> result = Util.finishedFuture(null);
-                key.runCompletion(handler, attachment, result);
-                return AttachedFuture.wrap(result, attachment);
-            }
-        } catch (ClosedChannelException e) {
-            throw Util.initCause(new ClosedAsynchronousChannelException(), e);
-        } catch (IOException e) {
-            Future<Void> result = Util.failedFuture(e);
-            key.runCompletion(handler, attachment, result);
-            return AttachedFuture.wrap(result, attachment);
-        }
-
-        return key.execute(
-            OP_CONNECT, attachment, handler, 0, TimeUnit.MILLISECONDS,
-            new Callable<Void>() {
-                public Void call() throws IOException {
-                    try {
-                        channel.finishConnect();
-                        return null;
-                    } catch (ClosedChannelException e) {
-                        throw Util.initCause(
-                            new AsynchronousCloseException(), e);
-                    }
-                } });
     }
 
     /**

@@ -51,7 +51,7 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
  * Most interesting methods are delegated to the {@link AsyncKey}
  * returned by this channel's channel group.
  */
-final class AsyncServerSocketChannelImpl
+class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
 {
     /** The valid socket options for this channel. */
