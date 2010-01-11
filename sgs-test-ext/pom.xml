@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>12</version>
+    <version>16</version>
   </parent>
 
   <groupId>com.projectdarkstar.tools.test</groupId>
   <artifactId>sgs-test-ext</artifactId>
   <name>Project Darkstar Test Extension</name>
   <packaging>jar</packaging>
-  <version>1.0</version>
+  <version>1.1</version>
   <description>
     Build utilities used by the Project Darkstar build process.
     Includes custom classes used for filtering JUnit tests.
