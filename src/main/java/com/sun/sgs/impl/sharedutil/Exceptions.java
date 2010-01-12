@@ -76,4 +76,25 @@ public final class Exceptions {
 	}
 	return buf.toString();
     }
+
+    /**
+     * Throws an unchecked exception.  The argument must be a {@link
+     * RuntimeException} or an {@link Error}.  This method always throws an
+     * exception.
+     *
+     * @param	exception the exception to throw
+     */
+    public static void throwUnchecked(Throwable exception) {
+	if (exception instanceof RuntimeException) {
+	    throw (RuntimeException) exception;
+	} else if (exception instanceof Error) {
+	    throw (Error) exception;
+	} else if (exception == null) {
+	    throw new NullPointerException("The exception must not be null");
+	} else {
+	    throw initCause(
+		new AssertionError("Unexpected exception: " + exception),
+		exception);
+	}
+    }
 }
