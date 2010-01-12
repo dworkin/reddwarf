@@ -42,6 +42,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.sun.sgs.impl.net.ssl.SSLEngineFactory;
+
 /**
  * Implementation of a TCP {@link Transport}.
  * The {@link #TcpTransport constructor} supports the following
@@ -157,6 +159,9 @@ public class TcpTransport implements Transport {
 
         isSecure = wrappedProps.getBooleanProperty(ISSECURE_TRANSPORT_PROPERTY,
                                                     false);
+        if (isSecure) {
+            SSLEngineFactory.initialize(properties);
+        }
 
         try {
             // If no host address is supplied, default to listen on all

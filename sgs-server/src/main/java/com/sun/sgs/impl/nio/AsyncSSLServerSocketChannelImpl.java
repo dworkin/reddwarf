@@ -23,37 +23,23 @@ import java.io.IOException;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.SocketOption;
-import com.sun.sgs.nio.channels.StandardSocketOption;
 
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 
 /**
  * An extension of {@link AsyncServerSocketChannelImpl}.
- * It's accept method returns the SSL variant
+ * The accept method returns the SSL variant
  * {@link AsyncSSLSocketchannelImpl}.
  */
 class AsyncSSLServerSocketChannelImpl
     extends AsyncServerSocketChannelImpl
 {
-    /** The valid socket options for this channel. */
-    private static final Set<SocketOption> socketOptions;
-    static {
-        Set<? extends SocketOption> es = EnumSet.of(
-            StandardSocketOption.SO_RCVBUF,
-            StandardSocketOption.SO_REUSEADDR);
-        socketOptions = Collections.unmodifiableSet(es);
-    }
-
     /**
      * Creates a new instance registered with the given channel group.
      * 
