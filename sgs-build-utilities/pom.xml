@@ -11,7 +11,7 @@
   <version>1.2</version>
   <description>
     Build utilities used by the Project Darkstar build process.
-    Includes custom checkstyle classes and configuration files.
+    Includes custom checkstyle configuration files.
   </description>
 
   <repositories>

@@ -183,7 +183,7 @@
 
         <!-- Checks for Size Violations.                    -->
         <!-- See http://checkstyle.sf.net/config_sizes.html -->
-	<!-- DARKSTAR: Allow lines longer than 80 characters iff
+	<!-- DARKSTAR: Allow very long lines iff
 	     they are comment lines and consist of a single,
 	     unbroken word.  This allows the inclusion of long
 	     class or property names in javadoc comments without
@@ -235,7 +235,8 @@
 	<module name="RegexpSinglelineJava">
 	  <property name="format" value="new\s*$"/>
 	  <property name="ignoreComments" value="true"/>
-	  <property name="message" value="new operator should not appear at end of line"/>
+	  <property name="message" 
+		    value="new operator should not appear at end of line"/>
 	</module>
         <module name="ParenPad"/>
         <module name="TypecastParenPad"/>
