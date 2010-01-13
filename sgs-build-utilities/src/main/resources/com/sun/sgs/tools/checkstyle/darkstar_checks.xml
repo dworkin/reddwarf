@@ -183,12 +183,15 @@
 
         <!-- Checks for Size Violations.                    -->
         <!-- See http://checkstyle.sf.net/config_sizes.html -->
-	<!-- DARKSTAR: Allow very long lines iff
+	<!-- DARKSTAR: Allow 90 characters per line to ease cramped
+	     coding style.  Also, allow lines longer than 90
+	     characters if and only if
 	     they are comment lines and consist of a single,
 	     unbroken word.  This allows the inclusion of long
 	     class or property names in javadoc comments without
 	     tripping the LineLength alarm. -->
         <module name="LineLength">
+	  <property name="max" value="90"/>
 	  <property name="ignorePattern" value="^ \*\s*\S+$"/>
 	</module>
 	<!-- DARKSTAR: Don't enforce method length checks. -->
