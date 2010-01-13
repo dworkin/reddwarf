@@ -14,6 +14,19 @@
     Includes custom checkstyle configuration files.
   </description>
 
+  <build>
+    <!-- Include the wagon-svn extension so we can deploy
+	 to Maven2 repositories hosted in SVN repositories
+	 on java.net -->
+    <extensions>
+      <extension>
+        <groupId>org.jvnet.wagon-svn</groupId>
+        <artifactId>wagon-svn</artifactId>
+        <version>1.9</version>
+      </extension>
+    </extensions>
+  </build>
+
   <repositories>
     <repository>
       <id>java.net</id>
@@ -22,5 +35,14 @@
       <layout>default</layout>
     </repository>
   </repositories>
+
+  <!-- Deployment repository information -->
+  <distributionManagement>
+    <repository>
+      <id>java.net-maven2-repository</id>
+      <name>java.net Maven2 Repository</name>
+      <url>java-net:/maven2-repository/trunk/repository/</url>
+    </repository>
+  </distributionManagement>
 
 </project>
