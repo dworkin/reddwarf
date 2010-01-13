@@ -4,18 +4,11 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- Inherit from the global SGS super POM -->
-  <parent>
-    <groupId>com.projectdarkstar</groupId>
-    <artifactId>sgs</artifactId>
-    <version>14</version>
-  </parent>
-
   <groupId>com.projectdarkstar.tools.build</groupId>
   <artifactId>sgs-jar-resources-bsd</artifactId>
   <name>Project Darkstar BSD License Bundle</name>
   <packaging>jar</packaging>
-  <version>1.1</version>
+  <version>1.2</version>
   <description>
     Resource bundle of BSD License files for Project Darkstar.
     This package should be included using the remote-resources
