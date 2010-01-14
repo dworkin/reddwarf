@@ -1176,20 +1176,18 @@ public final class NodeMappingServerImpl
             }
             switch (node.getHealth()) {
                 case GREEN :
+                case YELLOW :
                     // only registered nodes can be assigned identities
                     if (notifyMap.containsKey(nodeId)) {
-                        assignPolicy.nodeAvailable(nodeId);
+                        assignPolicy.nodeUpdate(nodeId, node.getHealth());
                     }
                     cancelOffload(nodeId);
                     break;
 
-                case YELLOW :
-                    assignPolicy.nodeUnavailable(nodeId);
-                    cancelOffload(nodeId);
-                    break;
-
                 case ORANGE :
-                    assignPolicy.nodeUnavailable(nodeId);
+                    if (notifyMap.containsKey(nodeId)) {
+                        assignPolicy.nodeUpdate(nodeId, node.getHealth());
+                    }
                     scheduleOffload(nodeId);
                     break;
 

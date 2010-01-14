@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.service.Node;
 
 /**
  * Interface for node assignment. The actual policy to be used is configurable
@@ -65,12 +66,14 @@ public interface NodeAssignPolicy {
             throws NoNodesAvailableException;
     
     /**
-     * Inform the policy that a node is now available.
+     * Inform the policy about a possible candidate for assignment.
      *
      * @param nodeId the node ID
+     * @param health the node's health
      * @throws IllegalArgumentException if nodeID <= 0
+     * @throws NullPointerException if health is null
      */
-    void nodeAvailable(long nodeId);
+    void nodeUpdate(long nodeId, Node.Health health);
     
     /**
      * Inform the policy that a node is no longer available.

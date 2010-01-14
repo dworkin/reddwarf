@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.nodemap.policy;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.NoNodesAvailableException;
 import com.sun.sgs.impl.service.nodemap.NodeAssignPolicy;
+import com.sun.sgs.service.Node.Health;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,13 +58,26 @@ public abstract class AbstractNodePolicy implements NodeAssignPolicy {
         return chooseNode(requestingNode);
     }
 
-    /** {@inheritDoc} */
-    public synchronized void nodeAvailable(long nodeId) {
+    /**
+     * {@inheritDoc}
+     * This implementation only makes available nodes whose health
+     * is {@code GREEN}.
+     * Subclass should override this method to implement other policies
+     * for which nodes are made available for assignment.
+     */
+    public synchronized void nodeUpdate(long nodeId, Health health) {
         if (nodeId <= 0) {
             throw new IllegalArgumentException("nodeID can not be <= 0");
         }
-        if (!availableNodes.contains(nodeId)) {
-            availableNodes.add(nodeId);
+        if (health == null) {
+            throw new NullPointerException("health can not be null");
+        }
+        if (health.equals(Health.GREEN)) {
+            if (!availableNodes.contains(nodeId)) {
+                availableNodes.add(nodeId);
+            }
+        } else {
+            nodeUnavailable(nodeId);
         }
     }
 
