@@ -115,7 +115,8 @@ public class TestLPAPerf {
         Properties props = SgsTestNode.getDefaultProperties("TestLPA", null, null);
         props.put("com.sun.sgs.impl.kernel.profile.level",
                    ProfileLevel.MAX.name());
-        //TODO ? props.setProperty(GroupController.UPDATE_FREQ_PROPERTY, "3600"); // one hour
+        props.setProperty("com.sun.sgs.impl.service.nodemap.update.freq",
+                          "3600"); // one hour
         // We are creating this SgsTestNode so we can get at its watchdog
         // and profile collector only - the LPAServer we are testing is
         // created outside this framework so we could easily extend the type.

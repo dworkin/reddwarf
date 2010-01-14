@@ -65,19 +65,15 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The frequency that we find affinity groups,
  *  in seconds.  The value must be between {@code 5} and {@code 65535}.<p>
  * </dl><p>
- *
- * TODO - This class is public only because tests need to get at
- * UPDATE_FREQ_PROPERTY.  Grrr.
  */
-public class GroupCoordinator extends BasicState {
+class GroupCoordinator extends BasicState {
 
     /** Package name for this class. */
     private static final String PKG_NAME =
                     "com.sun.sgs.impl.service.nodemap";
 
     /** The property name for the update frequency. */
-    public static final String UPDATE_FREQ_PROPERTY =
-        PKG_NAME + ".update.freq";
+    private static final String UPDATE_FREQ_PROPERTY = PKG_NAME + ".update.freq";
 
     /** The default value of the update frequency, in seconds. */
     static final int DEFAULT_UPDATE_FREQ = 60;

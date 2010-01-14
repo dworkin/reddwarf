@@ -23,7 +23,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
-import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
@@ -157,7 +156,7 @@ public class GraphBuilderTests {
         }
         p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
-        p.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "3600");// one hour
+        p.setProperty("com.sun.sgs.impl.service.nodemap.update.freq", "3600");// one hour
         if (addProps != null) {
             for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
                 p.put(entry.getKey(), entry.getValue());
@@ -804,25 +803,13 @@ public class GraphBuilderTests {
         Assert.assertEquals(3, graph.getVertexCount());
     }
 
-    // TODO - move to a GroupCoordinator test
-//    @Test(expected=IllegalArgumentException.class)
-//    public void testDriverBadValue() throws Exception {
-//        Properties addProps = new Properties();
-//        addProps.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "1");
-//        try {
-//            startNewNode(addProps);
-//        } catch (InvocationTargetException e) {
-//            unwrapException(e);
-//        }
-//    }
-
     @Test
     public void testDriverSmallValueNoData() throws Exception {
         afterEachTest();
 
         Properties addProps = new Properties();
         // Add in a small update freq, 5 seconds
-        addProps.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "5");
+        addProps.setProperty("com.sun.sgs.impl.service.nodemap.update.freq", "5");
         beforeEachTest(addProps);
 
         ProfileCollector col;

@@ -20,7 +20,6 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
@@ -93,7 +92,7 @@ public class TestLPA {
         props.put("com.sun.sgs.impl.service.nodemap.affinity.server.port",
                    String.valueOf(serverPort));
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads", "1");
-        props.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY,
+        props.setProperty("com.sun.sgs.impl.service.nodemap.update.freq",
                           "3600"); // one hour
         collector =
             serverNode.getSystemRegistry().getComponent(ProfileCollector.class);

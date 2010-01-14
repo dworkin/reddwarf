@@ -21,7 +21,6 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.GroupCoordinator;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
@@ -105,7 +104,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         }
         p.setProperty(LabelPropagationServer.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
-        p.setProperty(GroupCoordinator.UPDATE_FREQ_PROPERTY, "3600");// one hour
+        p.setProperty("com.sun.sgs.impl.service.nodemap.update.freq", "3600");// one hour
         if (addProps != null) {
             for (Map.Entry<Object, Object> entry : addProps.entrySet()) {
                 p.put(entry.getKey(), entry.getValue());

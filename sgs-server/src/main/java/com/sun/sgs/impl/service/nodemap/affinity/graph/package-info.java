@@ -29,7 +29,7 @@
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener} which
  * consumes task information about how identities are associated.  One such
  * association could be identities accessing the same objects.
- * The graph listener creates an
+ * Each node also creates an
  * {@link com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder}
  * based on the property value {@value
  *com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl#GRAPH_CLASS_PROPERTY}.

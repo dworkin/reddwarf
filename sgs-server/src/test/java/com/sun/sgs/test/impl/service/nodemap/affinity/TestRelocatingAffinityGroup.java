@@ -50,6 +50,7 @@ public class TestRelocatingAffinityGroup {
         RelocatingAffinityGroup group =
                 new RelocatingAffinityGroup(0L, singletonMap, 0L);
         assert group.getTargetNode() == 42L;
+        assert group.getStragglers().isEmpty();
     }
 
     @Test
@@ -141,12 +142,12 @@ public class TestRelocatingAffinityGroup {
                                     3L, new HashMap<Identity, Long>(map), 0L));
         map.put(new DummyIdentity("four"), -1L);
         set.add(new RelocatingAffinityGroup(
-                                    3L, new HashMap<Identity, Long>(map), 0L));
+                                    4L, new HashMap<Identity, Long>(map), 0L));
         map.clear();
         map.put(new DummyIdentity("one"), -1L);
-        set.add(new RelocatingAffinityGroup(4L, map, 0L));
+        set.add(new RelocatingAffinityGroup(1L, map, 0L));
 
-        // note that this assimes the group will order by number of identities
+        // note that this assumes the group will order by number of identities
         // if the weighting changes, this test may need to be modified
         int size = 1;
         for (RelocatingAffinityGroup group : set) {
