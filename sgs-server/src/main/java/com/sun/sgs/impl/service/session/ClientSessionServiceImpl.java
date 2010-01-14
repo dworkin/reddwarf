@@ -144,8 +144,8 @@ import javax.management.JMException;
  *
  * <dd style="padding-top: .5em">Specifies the login high water. When the
  * number of logins reaches the high water, the service's health is set
- * to {@code YELLOW}. If the number of logins exceeds 10% above the high water
- * the service's health is set to {@code ORANGE}. Legal values are between 0 and
+ * to {@link Health#YELLOW}. If the number of logins exceeds 10% above the high water
+ * the service's health is set to {@link Health#ORANGE}. Legal values are between 0 and
  * {@code Integer.MAX_VALUE}.<p>
  *
  * <dt> <i>Property:</i> <code><b>

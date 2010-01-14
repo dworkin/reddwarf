@@ -85,7 +85,7 @@ public interface NodeAssignPolicy {
      *
      * @param nodeId a node ID
      *
-     * @return {@code true} of the specified node is available for assignment,
+     * @return {@code true} if the specified node is available for assignment,
      *         otherwise {@code false}
      */
     boolean isNodeAvailable(long nodeId);

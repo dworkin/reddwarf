@@ -59,7 +59,7 @@ import java.util.logging.Logger;
  * <dt>	<i>Property:</i> <code><b>
  *   {@value #UPDATE_FREQ_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> {@value DEFAULT_UPDATE_FREQ} (one minute)}
+ *	<i>Default:</i> {@value DEFAULT_UPDATE_FREQ} (one minute)
  * <br>
  *
  * <dd style="padding-top: .5em">The frequency that we find affinity groups,
@@ -81,6 +81,12 @@ public class GroupCoordinator extends BasicState {
 
     /** The default value of the update frequency, in seconds. */
     static final int DEFAULT_UPDATE_FREQ = 60;
+
+    /** The property name for the update frequency. */
+    public static final String COLLOCATE_DELAY_PROPERTY = PKG_NAME + ".collocate.delay";
+
+    /** The default value of the update frequency, in milliseconds. */
+    static final int DEFAULT_COLLOCATE_DELAY = 1000;
 
     private final LoggerWrapper logger =
                 new LoggerWrapper(Logger.getLogger(PKG_NAME + ".coordinator"));
@@ -107,25 +113,28 @@ public class GroupCoordinator extends BasicState {
     // identities to collocate. == null if the affinity group sub-system is
     // not running. There is a new task for each set of groups.
     private volatile CollocateTask collocateTask = null;
-    private final long collocateDelay = 1000;
+    private final long collocateDelay;
 
     // Map of per-node groups. This map is filled-in only when necessary due
-    // to a request to offload a node.
-    // The maping is targetNodeID -> groupSet where groupSet is groupId -> group
+    // to a request to offload a node. The sets contain candidates
+    // for movement, and once we start trying to offload a group, the group is
+    // removed from the Map.
+    // The mapping is targetNodeID -> groupSet where groupSet is groupId -> group
     private final Map<Long, NavigableSet<RelocatingAffinityGroup>> nodeSets;
 
     // Sorted set of all the groups. Access to this set must be synchronized
-    // by nodeSet. If a group in this set is nofified for any reason (offloading
+    // by nodeSets. If a group in this set is modified for any reason (offloading
     // or collocation) that group should be removed from the set.
     private NavigableSet<RelocatingAffinityGroup> groups = null;
 
     /**
-     * Public constructor.
+     * Constructor.
      *
      * @param properties server properties
-     * @param server node mapping server
      * @param systemRegistry system registry
      * @param txnProxy transaction proxy
+     * @param server node mapping server
+     * @param builder the graph builder
      */
     GroupCoordinator(Properties properties,
                      ComponentRegistry systemRegistry,
@@ -142,10 +151,13 @@ public class GroupCoordinator extends BasicState {
 
         if (finder != null) {
             PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-            int updateSeconds =wrappedProps.getIntProperty(UPDATE_FREQ_PROPERTY,
-                                                           DEFAULT_UPDATE_FREQ,
-                                                           5, 65535);
+            int updateSeconds = wrappedProps.getIntProperty(UPDATE_FREQ_PROPERTY,
+                                                            DEFAULT_UPDATE_FREQ,
+                                                            5, 65535);
             updatePeriod = updateSeconds * 1000L;
+            collocateDelay = wrappedProps.getLongProperty(COLLOCATE_DELAY_PROPERTY,
+                                                          DEFAULT_COLLOCATE_DELAY,
+                                                          100, Long.MAX_VALUE);
             taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
             taskOwner = txnProxy.getCurrentOwner();
             nodeSets =
@@ -155,10 +167,13 @@ public class GroupCoordinator extends BasicState {
                        + finder.getClass().getName() +
                        " with properties:" +
                        "\n  " + UPDATE_FREQ_PROPERTY + "=" +
-                       updateSeconds + " (seconds)");
+                       updateSeconds + " (seconds)" +
+                       "\n  " + COLLOCATE_DELAY_PROPERTY + "=" +
+                       collocateDelay + "(milliseconds)");
         } else {
             assert builder == null;
-            updatePeriod = 0;
+            updatePeriod = 0L;
+            collocateDelay = 0L;
             taskScheduler = null;
             taskOwner = null;
             nodeSets = null;
@@ -229,8 +244,8 @@ public class GroupCoordinator extends BasicState {
 
     /**
      * Move one or more identities off of a node. If the old node is alive
-     * a group of identities will be selected to move. The group is
-     * selected is based on how the groups are sorted in the node set. If
+     * a group of identities will be selected to move. The group selection is
+     * based on how the groups are sorted in the node set. If
      * there are no groups to move, a single identity is moved.
      * If the node is not alive, all identities on that node will be moved.
      * Note that is this method does not guarantee that any identities are
@@ -244,6 +259,7 @@ public class GroupCoordinator extends BasicState {
      *
      * @throws NullPointerException if {@code node} is {@code null}
      * @throws NoNodesAvailableException if no nodes are available
+     * @throws IllegalStateException if we are shut down
      */
     void offload(Node node) throws NoNodesAvailableException {
         checkForShutdownState();
@@ -349,7 +365,7 @@ public class GroupCoordinator extends BasicState {
             logger.log(Level.FINE, "Request to collocate {0}", group);
         }
 
-        if (server.isNodeAvailable(group.getTargetNode())) {
+        if (!server.isNodeAvailable(group.getTargetNode())) {
             group.setTargetNode(server.chooseNode());
         }
         final Set<Identity> identities = group.getStragglers();
@@ -374,10 +390,7 @@ public class GroupCoordinator extends BasicState {
                                            "moving id {0}", identity);
                             }
                             try {
-                                Node node = server.getNode(
-                                           server.getNodeForIdentity(identity));
-                                server.moveIdentity(identity, node,
-                                                    targetNodeId);
+                                server.moveIdentity(identity, targetNodeId);
                             } catch (Exception e) {
                                 logger.logThrow(Level.FINE, e,
                                                 "Exception moving id {0}",
@@ -391,13 +404,16 @@ public class GroupCoordinator extends BasicState {
 
     /**
      * Try to gather a new set of groups, pushing the results if successful.
+     *
+     * TODO - Need to weed out bad groups, i.e. monster groups, only one group, etc.
+     * May need to do that here and/or in CollocateTask.
      */
     private void findGroups() {
         checkForDisabledOrShutdownState();
 
-        // Cause the current CollocateTask to exit if it hasn't already?? TODO
-        // Offloading of groups can continue until after a new set of groups
-        // are found.
+        // Cause the current CollocateTask to exit if it hasn't already. This will
+        // put some time between collocate tasks, reducing the likelihood of moving
+        // a group already being moved.
         synchronized (nodeSets) {
             if (collocateTask != null) {
                 collocateTask.stop();
@@ -434,6 +450,9 @@ public class GroupCoordinator extends BasicState {
      * set is modified externally, {@code reset()} should be invoked. The task
      * will exit when {@code newGroups} becomes empty or {@code stop()} is
      * invoked.
+     *
+     * Groups collocation is serialized in that only one group is handled per
+     * task run.
      */
     private class CollocateTask extends AbstractKernelRunnable {
         final NavigableSet<RelocatingAffinityGroup> myGroups;
@@ -459,6 +478,10 @@ public class GroupCoordinator extends BasicState {
                         // since all nodes are unavailable, this task will just
                         // exit and not be rescheduled.
                         if (collocateGroup(iter.next())) {
+
+                            // TODO - It may be useful to return the group to the
+                            // original group list (or a new list) so that its
+                            // available for offloading
                             iter.remove();
                             taskScheduler.scheduleTask(this, taskOwner,
                                    System.currentTimeMillis() + collocateDelay);
@@ -497,6 +520,7 @@ public class GroupCoordinator extends BasicState {
      * @param node the node to offload identities
      *
      * @throws NoNodesAvailableException if no nodes are available
+     * @throws IllegalStateException if we are shut down
      */
     private void offloadSingles(Node node) throws NoNodesAvailableException {
         final long nodeId = node.getId();

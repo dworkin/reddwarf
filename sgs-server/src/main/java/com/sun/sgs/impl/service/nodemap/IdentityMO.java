@@ -55,7 +55,7 @@ public class IdentityMO implements ManagedObject, Serializable {
      * Returns the identity.
      * @return the identity
      */
-    public Identity getIdentity() {
+    Identity getIdentity() {
         return id;
     }
     

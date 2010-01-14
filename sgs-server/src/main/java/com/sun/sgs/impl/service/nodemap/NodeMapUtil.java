@@ -78,7 +78,7 @@ public final class NodeMapUtil {
      * Returns a node key for the given {@code nodeId};  used for 
      * iterating through a node for all identities assigned to it.
      */
-    public static String getPartialNodeKey(long nodeId) {
+    static String getPartialNodeKey(long nodeId) {
 	return buildNodeKey(nodeId).toString();
     }   
     

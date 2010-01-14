@@ -19,16 +19,9 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
-import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
-
 /**
  * A class to encapsulate the basic states required for group activities.
  * The state at construction is {@link State#DISABLED}.
- *
- * @see GroupCoordinator
- * @see AffinityGraphBuilder
- * @see AffinityGroupFinder
  */
 public class BasicState {
     /** Valid states. */

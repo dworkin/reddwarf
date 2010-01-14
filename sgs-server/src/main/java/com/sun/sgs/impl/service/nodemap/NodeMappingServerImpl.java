@@ -263,7 +263,7 @@ public final class NodeMappingServerImpl
     private final long relocationExpireTime;
 
     /** The set of identities that are in the process of moving. */
-    private final Map<Identity, MoveIdTask> moveMap =
+    private final ConcurrentHashMap<Identity, MoveIdTask> moveMap =
             new ConcurrentHashMap<Identity, MoveIdTask>();
 
     /** Time to wait between offloading identities, in milliseconds */
@@ -414,6 +414,7 @@ public final class NodeMappingServerImpl
         } catch (InterruptedException e) {
             // Do nothing
         }
+        coordinator.shutdown();
     }
 
     /**
@@ -566,6 +567,24 @@ public final class NodeMappingServerImpl
      * during our waiting time, marking the identity as active, during the
      * waiting time.  If it is still appropriate to remove the identity,
      * all traces of it are removed from the data store.
+     *
+     * TODO - We might want to link removing identities from the map with
+     * removing them from the affinity graphs (assuming we're in a multi-node
+     * and are using affinity graphs, I suppose!).
+     * Right now we have the services which use identities tell the node
+     * mapping service explicitly that they are using them, and explicitly
+     * when they are no longer using them.  This is just to allow us to
+     * remove identities from the node map when they are no longer needed.
+     * I wonder if we could get rid off all that mechanism and use the
+     * affinity graph to recognize when an identity has been removed from
+     * the graph (and, furthermore, is removed from the parts of the graphs
+     * on each node).  I'm not sure how to do that - but I think it'd be a
+     * big advantage because then services wouldn't have to get involved with
+     * this GC-of-the-nodemap business.   So, in effect, the method
+     * NodeMappingService.setStatus would go away. We'd have to figure out
+     * what to do for the single node case: if it turns out to not be
+     * expensive to maintain a stripped down graph which only has nodes, no
+     * edges, maybe that'd be an approach.
      */
     private class RemoveThread extends Thread {
         private final long expireTime;   // milliseconds
@@ -822,26 +841,41 @@ public final class NodeMappingServerImpl
      * the identity.
      *
      * @param id the identity to move
+     * @param targetNodeId target node to move to or -1
+     *
+     * @throws Exception
+     */
+    void moveIdentity(Identity id, long targetNodeId) throws Exception {
+        moveIdentity(id, getNode(getNodeForIdentity(id)), targetNodeId);
+    }
+
+    /**
+     * Move an identity. If {@code targetNodeId} is -1, choose a new node for
+     * the identity.
+     *
+     * @param id the identity to move
      * @param node the last node the identity was mapped to, or null if there
      *        was no prior mapping
      * @param targetNodeId target node to move to or -1
      *
      * @throws NoNodesAvailableException if there are no nodes to map to
      */
-    public void moveIdentity(Identity id, Node node, long targetNodeId)
+    void moveIdentity(Identity id, Node node, long targetNodeId)
         throws NoNodesAvailableException
     {
         try {
             // If we're already trying to move the identity,
             // but the old node failed before preparations are
             // complete, just make the move now. If the old node is alive,
-            // ignore this request.  TODO - should this case be reported back to
-            // the caller?
+            // ignore this request.
             MoveIdTask moveTask = moveMap.remove(id);
             if (moveTask != null) {
                 if (node.isAlive()) {
-                    // TODO - remove (or make a log message?)
-                    System.out.println("IDENTITY ALREADY MOVING AND NODE IS ALIVE: " + id);
+                    if (logger.isLoggable(Level.FINER)) {
+                        logger.log(Level.FINER,
+                                   "Identity {0} is already moving and node is alive",
+                                   id);
+                    }
                     return;
                 }
                 moveIdAndNotifyListeners(moveTask);
@@ -938,19 +972,21 @@ public final class NodeMappingServerImpl
         moveTask = new MoveIdTask(id, oldNode, newNodeId, serviceName);
         
         if (oldNode != null && oldNode.isAlive()) {
-            // Tell the id's old node, so it can tell the id relocation
+            // If the id is not already moving (in the moveMap) then
+            // tell the id's old node, so it can tell the id relocation
             // listeners.  We won't actually move the identity until the
             // listeners have all responded, can canMove is called.
-            moveMap.put(id, moveTask);
-            long oldId = oldNode.getId();
-            final NotifyClient oldClient = notifyMap.get(oldId);
-            if (oldClient != null) {
-                runIoTask(
-                    new IoRunnable() {
-                        public void run() throws IOException {
-                            oldClient.prepareRelocate(id, newNodeId);
-                        }
-                    }, oldId);
+            if (moveMap.putIfAbsent(id, moveTask) == null) {
+                long oldId = oldNode.getId();
+                final NotifyClient oldClient = notifyMap.get(oldId);
+                if (oldClient != null) {
+                    runIoTask(
+                        new IoRunnable() {
+                            public void run() throws IOException {
+                                oldClient.prepareRelocate(id, newNodeId);
+                            }
+                        }, oldId);
+                }
             }
         } else {
             // Go ahead and make the move now.
@@ -1090,7 +1126,7 @@ public final class NodeMappingServerImpl
      * @return the Node object
      * @throws java.lang.Exception
      */
-    Node getNode(long nodeId) throws Exception {
+    private Node getNode(long nodeId) throws Exception {
         final GetNodeTask atask = new GetNodeTask(nodeId);
         runTransactionally(atask);
         return atask.getNode();
@@ -1281,8 +1317,6 @@ public final class NodeMappingServerImpl
             cancelOffload(nodeId);
         }
     }
-
-    /* -- Methods to assist in testing and verification -- */
     
     /**
      * Get the node an identity is mapped to.
@@ -1293,7 +1327,7 @@ public final class NodeMappingServerImpl
      *
      * @throws Exception if any error occurs
      */
-    long getNodeForIdentity(Identity id) throws Exception {
+    private long getNodeForIdentity(Identity id) throws Exception {
         String idkey = NodeMapUtil.getIdentityKey(id);
         GetIdTask idtask = new GetIdTask(dataService, idkey);
         runTransactionally(idtask);
@@ -1307,7 +1341,7 @@ public final class NodeMappingServerImpl
      * will be thrown if the IdentityMO is not found or the name
      * binding doesn't exist.
      */
-    static class GetIdTask extends AbstractKernelRunnable {
+    private static class GetIdTask extends AbstractKernelRunnable {
         private IdentityMO idmo = null;
         private final DataService dataService;
         private final String idkey;
@@ -1343,21 +1377,6 @@ public final class NodeMappingServerImpl
         public IdentityMO getId() {
             return idmo;
         }
-    }
-
-    /**
-     * Return the data store keys found for a particular identity.
-     * Used for testing.
-     *
-     * @param identity the identity
-     * @return the set of service name bindings found for that identity
-     *
-     * @throws Exception if any error occurs
-     */
-    Set<String> reportFoundKeys(Identity identity) throws Exception {
-        AssertTask atask = new AssertTask(identity, dataService);
-        runTransactionally(atask);
-        return atask.found();    
     }
 
     /**

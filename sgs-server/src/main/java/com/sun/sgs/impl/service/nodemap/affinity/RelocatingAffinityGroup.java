@@ -105,7 +105,7 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
 
         // Optimization if we know everyone is on the same node, otherwise
         // set to null which will postpone the calculation until asked for
-        if ((targetNodeId != -1) && nodeCountMap.isEmpty()) {
+        if ((targetNodeId != -1) && (nodeCountMap.size() == 1)) {
             stragglers = Collections.emptySet();
         } else {
             stragglers = null;
@@ -146,7 +146,6 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
                 for (Map.Entry<Identity, Long> entry : identities.entrySet()) {
                     if (entry.getValue() != targetNodeId) {
                         ids.add(entry.getKey());
-                        entry.setValue(targetNodeId);
                     }
                 }
                 stragglers = Collections.unmodifiableSet(ids);
