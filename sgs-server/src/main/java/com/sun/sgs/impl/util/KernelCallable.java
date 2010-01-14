@@ -68,8 +68,7 @@ public abstract class KernelCallable<R>
      * {@inheritDoc} <p>
      *
      * This implementation invokes the {@code call} method of this
-     * instance, sets the result, and marks this {@code KernelCallable} as
-     * completed.
+     * instance and sets the result.
      *
      * @throws IllegalStateException if this method has already been
      *		invoked 
@@ -80,7 +79,20 @@ public abstract class KernelCallable<R>
 	    throw new IllegalStateException("already completed");
 	}
 	result = call();
-	done = true;
+    }
+
+    /**
+     * This method should be called to indicate that the {@code call} method
+     * has been invoked for this {@code KernelCallable} and the internal result
+     * is available for retrieval.  After this method has been invoked, further
+     * attempts to execute this task (either via the {@link
+     * #call(com.sun.sgs.impl.util.KernelCallable,
+     * com.sun.sgs.kernel.TransactionScheduler, com.sun.sgs.auth.Identity) call}
+     * method or through the {@code TransactionScheduler}) will throw
+     * {@code IllegalStateException}.
+     */
+    private synchronized void setDone() {
+        done = true;
     }
 
     /**
@@ -118,6 +130,7 @@ public abstract class KernelCallable<R>
 	throws Exception
     {
 	txnScheduler.runTask(callable, taskOwner);
+        callable.setDone();
 	return callable.getResult();
     }
 }
