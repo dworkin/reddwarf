@@ -92,11 +92,9 @@ public class SSLChannel {
     // and sets the ByteBuffer sizes
     private void startSSLEngine() {
         
-        sslEngine = SSLEngineFactory.getEngine();
+        sslEngine = SSLEngineFactory.getSSLEngine();
         sslEngine.setUseClientMode(false);
-        //sslEngine.setNeedClientAuth(true);
         sslSession = sslEngine.getSession();
-        //sslEngine.setEnabledCipherSuites(enabledCipherSuites);
 
         netBBsize = sslSession.getPacketBufferSize();
         inNetBB = ByteBuffer.allocate(netBBsize);

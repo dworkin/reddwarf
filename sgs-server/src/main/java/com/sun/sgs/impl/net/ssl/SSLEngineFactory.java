@@ -24,12 +24,13 @@
 package com.sun.sgs.impl.net.ssl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import java.security.KeyStore;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.Properties;
@@ -78,29 +79,29 @@ public class SSLEngineFactory {
     // The trustmanager provider property
     public static final String TRUSTMANAGER_PROVIDER_PROPERTY = 
             PKG_NAME + "trustmanager.provider";
-    
-    // The SSLContext
-    private static SSLContext sslContext = null;
 
+    // The client authorization property
+    public static final String CLIENT_AUTHORIZATION_PROPERTY =
+            PKG_NAME + "client.authorization";
+
+    // The enabled cipher suites property
+    public static final String ENABLED_CIPHER_SUITES_PROPERTY =
+            PKG_NAME + "enabled.cipher.suites";
+    
     // The SSLEngine
     private static SSLEngine sslEngine = null;
-
-    // SSLEngine properties
-    private static Properties properties = null;
 
     // The logger for this class
     private static final LoggerWrapper logger = new LoggerWrapper(
             Logger.getLogger(SSLEngineFactory.class.getName()));
     
     /* 
-     * Initializes/creates the SSLContext with key material
+     * Initializes and creates the SSLContext with key material
      */ 
-    public static SSLEngine getEngine() {
+    public static void initialize(Properties properties) {
 
-        if (properties == null) {
-            throw new NullPointerException("properties is null");
-        }
-        
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+
         String keyStore = properties.getProperty(KEYSTORE_LOCATION_PROPERTY);
         String trustStore = properties.getProperty(
                                                 TRUSTSTORE_LOCATION_PROPERTY);
@@ -115,7 +116,16 @@ public class SSLEngineFactory {
                                             TRUSTMANAGER_ALGORITHM_PROPERTY);
         String trustManagerProvider = properties.getProperty(
                                             TRUSTMANAGER_PROVIDER_PROPERTY);
-        
+
+        boolean needClientAuth = wrappedProps.getBooleanProperty(
+                                        CLIENT_AUTHORIZATION_PROPERTY, false);
+
+        List<String> enabledCipherSuites = wrappedProps.getListProperty(
+                ENABLED_CIPHER_SUITES_PROPERTY, String.class, "");
+
+        String[] cipherSuites = (String[])enabledCipherSuites.toArray(
+                new String[0]);
+
         try {
             char[] password = properties.getProperty(
                     KEYSTORE_PASSWORD_PROPERTY).toCharArray();
@@ -138,9 +148,12 @@ public class SSLEngineFactory {
                     trustManagerAlgorithm, trustManagerProvider);
             tmf.init(ksTrust);
 
-            sslContext = SSLContext.getInstance("TLS");
+            SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
             sslEngine = sslContext.createSSLEngine();
+
+            sslEngine.setNeedClientAuth(needClientAuth);
+            sslEngine.setEnabledCipherSuites(cipherSuites);
         }
         catch (KeyStoreException kse) {
             logger.logThrow(Level.WARNING, kse,
@@ -160,13 +173,17 @@ public class SSLEngineFactory {
                     "problem creating SSLContext {0}", e.getMessage());
         }
         
-        return sslEngine;
     }
 
     /*
-     * initializes properties
+     * Returns SSLEngine
      */
-    public static void initialize(Properties props) {
-        properties = props;
+    public static SSLEngine getSSLEngine() {
+
+        if (sslEngine == null) {
+            throw new AssertionError("SSLEngine not initialized");
+        }
+
+        return sslEngine;
     }
 }
