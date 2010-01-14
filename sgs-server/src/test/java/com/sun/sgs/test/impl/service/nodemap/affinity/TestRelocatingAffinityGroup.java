@@ -48,8 +48,10 @@ public class TestRelocatingAffinityGroup {
         Map<Identity, Long> singletonMap = new HashMap<Identity, Long>(1);
         singletonMap.put(new DummyIdentity(), 42L);
         RelocatingAffinityGroup group =
-                new RelocatingAffinityGroup(0L, singletonMap, 0L);
+                new RelocatingAffinityGroup(123L, singletonMap, 567L);
         assert group.getTargetNode() == 42L;
+        assert group.getId() == 123L;
+        assert group.getGeneration() == 567L;
         assert group.getStragglers().isEmpty();
     }
 
@@ -126,9 +128,46 @@ public class TestRelocatingAffinityGroup {
     }
 
     @Test
+    public void testChangeTargetNode() throws Exception {
+        Map<Identity, Long> map = new HashMap<Identity, Long>(4);
+        map.put(new DummyIdentity("one"), 42L);
+        map.put(new DummyIdentity("two"), 42L);
+        map.put(new DummyIdentity("three"), 33L);
+        map.put(new DummyIdentity("four"), -1L);
+        RelocatingAffinityGroup group = new RelocatingAffinityGroup(0L, map, 0L);
+        assert group.getTargetNode() == 42L;
+        assert group.getStragglers().size() == 2;
+        group.setTargetNode(33L);
+        assert group.getTargetNode() == 33L;
+        assert group.getStragglers().size() == 3;
+    }
+
+    @Test
+    public void testEquals() throws Exception {
+        Map<Identity, Long> map = new HashMap<Identity, Long>(1);
+        map.put(new DummyIdentity("one"), 42L);
+        RelocatingAffinityGroup group1 = new RelocatingAffinityGroup(123L, map, 567L);
+
+        // two equal groups
+        RelocatingAffinityGroup group2 = new RelocatingAffinityGroup(123L, map, 567L);
+        assert group1.equals(group2);
+
+        // generation numbers differ
+        RelocatingAffinityGroup group3 = new RelocatingAffinityGroup(123L, map, 890L);
+        assert !group1.equals(group3);
+
+        // different group map
+        Map<Identity, Long> map2 = new HashMap<Identity, Long>(1);
+        map2.put(new DummyIdentity("one"), 42L);
+        map2.put(new DummyIdentity("two"), 42L);
+        RelocatingAffinityGroup group4 = new RelocatingAffinityGroup(123L, map2, 567L);
+        assert !group1.equals(group4);
+    }
+
+    @Test
     public void testOrder() throws Exception {
         NavigableSet<RelocatingAffinityGroup> set =
-                                    new TreeSet<RelocatingAffinityGroup>();
+                new TreeSet<RelocatingAffinityGroup>();
 
         // Add four groups with 2, 3, 4, and 1 identity each.
         // Note that group ID == number of identities
