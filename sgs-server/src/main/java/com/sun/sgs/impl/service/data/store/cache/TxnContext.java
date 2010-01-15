@@ -233,7 +233,9 @@ class TxnContext {
 		    synchronized (cache.getObjectLock(saved.key)) {
 			ObjectCacheEntry entry =
 			    cache.getObjectEntry(saved.key);
-			if (entry.getValue() != null) {
+			if (entry.getHasData() &&
+			    entry.getValue() != null)
+			{
 			    result = saved.key;
 			}
 		    }
@@ -626,7 +628,7 @@ class TxnContext {
 	 */
 	SavedObjectValue(ObjectCacheEntry entry) {
 	    key = entry.key;
-	    restoreValue = entry.getValue();
+	    restoreValue = entry.getHasData() ? entry.getValue() : null;
 	}
 
 	/**

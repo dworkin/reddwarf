@@ -5239,7 +5239,7 @@ public class TestDataServiceImpl extends Assert {
     static class CreateBindingsTask extends RepeatingConcurrentTask {
 	private static final long serialVersionUID = 1;
 	CreateBindingsTask(int index) {
-	    super(taskService, index, 10, 100);
+	    super(txnProxy, index, 10, 100);
 	}
 	protected void runInternal() {
 	    String name = String.format("create-%04d", index);
@@ -5265,7 +5265,7 @@ public class TestDataServiceImpl extends Assert {
 	private static final long serialVersionUID = 1;
 	private boolean remove = false;
 	CreateRemoveBindingsTask(int index) {
-	    super(taskService, index, 10, 100);
+	    super(txnProxy, index, 10, 100);
 	}
 	protected void runInternal() {
 	    String name = String.format("create-remove-%04d", index);

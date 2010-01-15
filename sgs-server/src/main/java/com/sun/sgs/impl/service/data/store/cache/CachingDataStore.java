@@ -887,7 +887,7 @@ public final class CachingDataStore extends AbstractDataStore
 			    throw new AssertionError();
 			}
 		    }
-		    value = entry.getValue();
+		    value = entry.getHasData() ? entry.getValue() : null;
 		    break;
 		}
 	    } finally {
@@ -1017,7 +1017,10 @@ public final class CachingDataStore extends AbstractDataStore
 		    default:
 			throw new AssertionError();
 		    }
-		    if (data == null && entry.getValue() == null) {
+		    if (data == null &&
+			(!entry.getHasData() ||
+			 entry.getValue() == null))
+		    {
 			/* Attempting to remove an already removed object */
 			throw new ObjectNotFoundException(
 			    "Object oid:" + oid + " was not found");

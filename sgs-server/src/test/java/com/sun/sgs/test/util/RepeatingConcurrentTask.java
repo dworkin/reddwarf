@@ -22,6 +22,7 @@ package com.sun.sgs.test.util;
 import com.sun.sgs.app.Task;
 import static com.sun.sgs.impl.util.AbstractBasicService.isRetryableException;
 import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import static org.junit.Assert.assertTrue;
 
@@ -43,8 +44,8 @@ public abstract class RepeatingConcurrentTask implements Serializable, Task {
     /** Any exception thrown by any task, or null. */
     private static Throwable exception = null;
 
-    /** The task service. */
-    private final TaskService taskService;
+    /** The transaction proxy or null. */
+    private static TransactionProxy txnProxy;
 
     /** The index currently associated with this task. */
     protected int index;
@@ -58,20 +59,35 @@ public abstract class RepeatingConcurrentTask implements Serializable, Task {
     /**
      * Creates an instance of this class.
      *
+     * @param	txnProxy the transaction proxy
      * @param	index the first index for this class
      * @param	nextIndexOffset the increment for computing the next index
      * @param	maxIndex the index to reach for completion
      */
     public RepeatingConcurrentTask(
-	TaskService taskService, int index, int nextIndexOffset, int maxIndex)
+	TransactionProxy txnProxy, int index, int nextIndexOffset, int maxIndex)
     {
-	this.taskService = taskService;
+	maybeStoreTxnProxy(txnProxy);
 	this.index = index;
 	this.nextIndexOffset = nextIndexOffset;
 	this.maxIndex = maxIndex;
 	if (index < nextIndexOffset) {
 	    noteStart();
 	}		    
+    }
+
+    /** Updates the transaction proxy field, if needed. */
+    private static synchronized void maybeStoreTxnProxy(
+	TransactionProxy txnProxy)
+    {
+	if (RepeatingConcurrentTask.txnProxy == null) {
+	    RepeatingConcurrentTask.txnProxy = txnProxy;
+	}
+    }
+
+    /** Returns the task service. */
+    private static synchronized TaskService getTaskService() {
+	return txnProxy.getService(TaskService.class);
     }
 
     /**
@@ -82,7 +98,7 @@ public abstract class RepeatingConcurrentTask implements Serializable, Task {
 	if (!checkDone()) {
 	    try {
 		runInternal();
-		taskService.scheduleTask(this);
+		getTaskService().scheduleTask(this);
 	    } catch (RuntimeException e) {
 		if (isRetryableException(e)) {
 		    throw e;
