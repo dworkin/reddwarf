@@ -95,15 +95,14 @@ public class TestRetryIoRunnable extends Assert {
 		long now = System.currentTimeMillis();
 		if (lastCall != -1) {
 		    long delay = now - lastCall;
-		    assertTrue("Delay should be greater than 100 and less" +
-			       " than 120: " + delay,
-			       delay > 100 && delay < 120);
+		    assertTrue("Delay should be no less than 110 and less" +
+			       " than 130: " + delay,
+			       delay >= 110 && delay < 130);
 		}
 		lastCall = now;
 		throw new IOException();
 	    }
 	};
-	long start = System.currentTimeMillis();
 	retry.run();
 	assertEquals(3, retry.calls);
 	assertTrue("Should have reported IOException: " + retry.exception,
@@ -121,7 +120,6 @@ public class TestRetryIoRunnable extends Assert {
 		return "ok";
 	    }
 	};
-	long start = System.currentTimeMillis();
 	retry.run();
 	assertEquals(2, retry.calls);
 	assertEquals("ok", retry.result);
@@ -135,7 +133,6 @@ public class TestRetryIoRunnable extends Assert {
 		throw new IllegalStateException();
 	    }
 	};
-	long start = System.currentTimeMillis();
 	retry.run();
 	assertEquals(1, retry.calls);
 	assertTrue("Should have reported IllegalStateException: " +
@@ -154,7 +151,6 @@ public class TestRetryIoRunnable extends Assert {
 		return "ok";
 	    }
 	};
-	long start = System.currentTimeMillis();
 	retry.run();
 	assertEquals(2, retry.calls);
 	assertEquals("ok", retry.result);
