@@ -116,7 +116,8 @@ public class TestLPADistGraphPerf {
         }
         p.setProperty(DistGraphBuilderServerImpl.SERVER_PORT_PROPERTY,
                 String.valueOf(serverPort));
-        p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
+        p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups", "true");
+        p.setProperty("com.sun.sgs.impl.service.nodemap.graphbuilder.class",
                       DistGraphBuilder.class.getName());
         p.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
@@ -453,7 +454,8 @@ public class TestLPADistGraphPerf {
                 SgsTestNode.getDefaultProperties("PerfTest", serverNode, null);
             p.setProperty(DistGraphBuilderServerImpl.SERVER_PORT_PROPERTY,
                     String.valueOf(serverPort));
-            p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
+            p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups", "true");
+            p.setProperty("com.sun.sgs.impl.service.nodemap.graphbuilder.class",
                           DistGraphBuilder.class.getName());
             p.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                         String.valueOf(numThreads));

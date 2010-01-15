@@ -20,7 +20,6 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
@@ -66,7 +65,8 @@ public class TestSingleNodeBuilder extends GraphBuilderTests {
     {
         Properties p = super.getProps(null, addProps);
         p.setProperty(StandardProperties.NODE_TYPE, NodeType.singleNode.name());
-        p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
+        p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups", "true");
+        p.setProperty("com.sun.sgs.impl.service.nodemap.graphbuilder.class",
                       SingleGraphBuilder.class.getName());
         p.setProperty("com.sun.sgs.impl.service.nodemap.update.freq", "3600");// one hour
         if (addProps != null) {

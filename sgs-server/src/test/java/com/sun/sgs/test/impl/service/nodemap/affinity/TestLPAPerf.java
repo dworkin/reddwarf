@@ -20,7 +20,6 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
@@ -241,7 +240,8 @@ public class TestLPAPerf {
                 new LabelPropagationServer(collector, wdog, props);
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
-        props.put(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY, builderName);
+        props.put("com.sun.sgs.impl.service.nodemap.use.affinity.groups", "true");
+        props.put("com.sun.sgs.impl.service.nodemap.graphbuilder.class", builderName);
 
         LabelPropagation lp1 =
             new LabelPropagation(

@@ -111,15 +111,24 @@ import javax.management.JMException;
  *      and no greater than {@code 65535}.   <p>
  *
  * <dt>	<i>Property:</i> <code><b>
- *   {@value #GRAPH_CLASS_PROPERTY}
+ *   {@value #USE_AFFINITY_GROUPS_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> When configured for multi-node:
- *      {@value #DEFAULT_GRAPH_CLASS}, otherwise {@value #GRAPH_CLASS_NONE}
+ *      {@code true} (enabled), otherwise {@code false}
  * <br>
  *
- * <dd style="padding-top: .5em">The graph builder to use.  Set to
- *   {@value #GRAPH_CLASS_NONE} if no affinity group finding is required, which
- *   is useful for testing. <p>
+ * <dd style="padding-top: .5em">Specifies whether to enable or disable the
+ * affinity group sub-system. By default the group sub-system is enabled when
+ * configured in multi-node, and is disabled when in single-node mode.<p>
+ * </dl>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *   {@value #GRAPH_CLASS_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_GRAPH_CLASS}
+ * <br>
+ *
+ * <dd style="padding-top: .5em">The name of the graph builder class to use.<p>
  * </dl> 
  *
  * <p>
@@ -296,19 +305,17 @@ public class NodeMappingServiceImpl
     /** The default value of the server port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
 
+    /** The property to enable/disable affinity group use. */
+    private static final String USE_AFFINITY_GROUPS_PROPERTY =
+            PKG_NAME + ".use.affinity.groups";
+
     /** The property for specifying the graph builder class. */
-    public static final String GRAPH_CLASS_PROPERTY =
+    private static final String GRAPH_CLASS_PROPERTY =
             PKG_NAME + ".graphbuilder.class";
 
-    /**
-     * The value to be given to {@code GRAPH_CLASS_PROPERTY} if no
-     * affinity group finding should be instantiated (useful for testing).
-     */
-    public static final String GRAPH_CLASS_NONE = "None";
-
     /** The default graph builder class. */
-    static final String DEFAULT_GRAPH_CLASS = GRAPH_CLASS_NONE;
-//    "com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder";
+    private static final String DEFAULT_GRAPH_CLASS =
+        "com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder";
 
     /** The watchdog service. */
     private final WatchdogService watchdogService;
@@ -413,7 +420,7 @@ public class NodeMappingServiceImpl
         logger.log(Level.CONFIG, "Creating NodeMappingServiceImpl");
         
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        
+
 	try {
             watchdogService = txnProxy.getService(WatchdogService.class);
             
@@ -438,16 +445,12 @@ public class NodeMappingServiceImpl
                 wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
                                              NodeType.class, 
                                              NodeType.singleNode);
-            
-            // Create our affinity group finder subsystem.
-            // The default for single node is NONE
-            final String builderName =
-                wrappedProps.getProperty(GRAPH_CLASS_PROPERTY,
-                                         nodeType == NodeType.singleNode ?
-                                                 GRAPH_CLASS_NONE :
-                                                 DEFAULT_GRAPH_CLASS);
-            
-            if (GRAPH_CLASS_NONE.equals(builderName)) {
+
+            final boolean useAffinityGroups =
+                    wrappedProps.getBooleanProperty(USE_AFFINITY_GROUPS_PROPERTY,
+                                                    false);
+//                                                   nodeType != NodeType.singleNode);
+            if (!useAffinityGroups) {
                 // do not instantiate anything
                 graphBuilder = null;
             } else {
@@ -552,7 +555,10 @@ public class NodeMappingServiceImpl
 
             logger.log(Level.CONFIG,
                        "Created NodeMappingServiceImpl with properties:" +
-                       "\n  " + GRAPH_CLASS_PROPERTY + "=" + builderName +
+                       "\n  " + USE_AFFINITY_GROUPS_PROPERTY + "=" + useAffinityGroups +
+                       "\n  " + GRAPH_CLASS_PROPERTY + "=" +
+                       (graphBuilder == null ? "none" :
+                                               graphBuilder.getClass().getName()) +
                        "\n  " + CLIENT_PORT_PROPERTY + "=" + clientPort +
                        "\n  " + SERVER_HOST_PROPERTY + "=" + host +
                        "\n  " + NodeMappingServerImpl.SERVER_PORT_PROPERTY +

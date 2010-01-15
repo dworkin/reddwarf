@@ -479,8 +479,7 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.watchdog.server.renew.interval", "1500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
-            NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
-                NodeMappingServiceImpl.GRAPH_CLASS_NONE,
+            "com.sun.sgs.impl.service.nodemap.use.affinity.groups", "false",
             "com.sun.sgs.impl.service.nodemap.remove.expire.time", "1000",
             "com.sun.sgs.impl.service.task.continue.threshold", "10"
         );

@@ -21,7 +21,6 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
@@ -86,15 +85,19 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         dlpaGraphBuilder = (DLPAGraphBuilder) builder;
     }
 
+    @Override
     protected Properties getProps(SgsTestNode serverNode, Properties addProps)
             throws Exception
     {
         Properties p =
                 SgsTestNode.getDefaultProperties(APP_NAME, serverNode, null);
         if (builderName == null) {
-            p.remove(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY);
+            p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups",
+                          "false");
         } else {
-            p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
+            p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups",
+                          "true");
+            p.setProperty("com.sun.sgs.impl.service.nodemap.graphbuilder.class",
                           builderName);
         }
         if (serverNode == null) {
@@ -119,7 +122,7 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         SgsTestNode newNode = null;
         try {
             Properties p = getProps(serverNode);
-            p.remove(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY);
+            p.remove("com.sun.sgs.impl.service.nodemap.graphbuilder.class");
             newNode =  new SgsTestNode(serverNode, null, p);
             Assert.assertNull(
                     builderField.get(newNode.getNodeMappingService()));
@@ -137,8 +140,8 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         SgsTestNode newNode = null;
         try {
             Properties p = getProps(serverNode);
-            p.setProperty(NodeMappingServiceImpl.GRAPH_CLASS_PROPERTY,
-                          NodeMappingServiceImpl.GRAPH_CLASS_NONE);
+            p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups",
+                          "false");
             newNode =  new SgsTestNode(serverNode, null, p);
             Assert.assertNull(
                     builderField.get(newNode.getNodeMappingService()));
