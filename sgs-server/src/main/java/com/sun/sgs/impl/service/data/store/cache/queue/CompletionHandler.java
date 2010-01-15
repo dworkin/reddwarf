@@ -17,12 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.queue;
 
 /**
  * A handler to be notified when an operation on an {@link UpdateQueue} has
- * completed successfully.  This class is part of the implementation of {@link
- * CachingDataStore}.
+ * completed successfully.
  */
 public interface CompletionHandler {
 

@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.queue;
 
+import com.sun.sgs.impl.service.data.store.cache.CacheConsistencyException;
 import static com.sun.sgs.impl.util.DataStreamUtil.readByteArrays;
 import static com.sun.sgs.impl.util.DataStreamUtil.readLongs;
 import static com.sun.sgs.impl.util.DataStreamUtil.readString;
@@ -37,7 +38,7 @@ import java.util.Arrays;
  * The subclass of all requests used by {@link UpdateQueue}, with nested
  * classes that implement the specific requests.
  */
-abstract class UpdateQueueRequest implements Request {
+public abstract class UpdateQueueRequest implements Request {
 
     /** The identifier for {@link Commit} requests. */
     static final byte COMMIT = 1;
@@ -96,7 +97,7 @@ abstract class UpdateQueueRequest implements Request {
 	throws Exception;
 
     /** The request handler used to implement {@link UpdateQueue}. */
-    static class UpdateQueueRequestHandler
+    public static class UpdateQueueRequestHandler
 	implements Request.RequestHandler<UpdateQueueRequest>
     {
 	/** The underlying server that handles requests. */
@@ -111,7 +112,9 @@ abstract class UpdateQueueRequest implements Request {
 	 * @param	server the underlying server
 	 * @param	nodeId the node ID associated with this queue
 	 */
-	UpdateQueueRequestHandler(UpdateQueueServer server, long nodeId) {
+	public UpdateQueueRequestHandler(
+	    UpdateQueueServer server, long nodeId)
+	{
 	    this.server = server;
 	    this.nodeId = nodeId;
 	}

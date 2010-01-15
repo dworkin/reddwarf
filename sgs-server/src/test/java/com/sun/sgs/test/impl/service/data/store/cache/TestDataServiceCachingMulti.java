@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.test.impl.service.data.store.net;
+package com.sun.sgs.test.impl.service.data.store.cache;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
@@ -32,9 +32,9 @@ import static com.sun.sgs.impl.service.data.store.cache.
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_HOST_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStore.SERVER_PORT_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.DEFAULT_SERVER_PORT;
+import static com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServerImpl.SERVER_PORT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
@@ -44,6 +44,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.impl.service.data.BasicDataServiceMultiTest;
+import com.sun.sgs.test.util.AwaitDone;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
@@ -603,64 +604,6 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	}
 	void runTask() throws Exception {
 	    txnScheduler.runTask(this, taskOwner);
-	}
-    }
-
-    /**
-     * Define an object to use for waiting for the completion of a set of
-     * tasks.
-     */
-    private static class AwaitDone {
-
-	/** The number of tasks that have not completed. */
-	private final CountDownLatch done;
-
-	/** The exception from a failed task, or null. */
-	private final AtomicReference<Throwable> failure =
-	    new AtomicReference<Throwable>();
-
-	/**
-	 * Creates an instance that waits for the specified number of tasks.
-	 */
-	AwaitDone(int count) {
-	    done = new CountDownLatch(count);
-	}
-
-	/** Notes that a task completed successfully. */
-	void taskSucceeded() {
-	    done.countDown();
-	}
-
-	/** Notes that a task failed with the specified exception. */
-	void taskFailed(Throwable exception) {
-	    failure.set(exception);
-	    while (done.getCount() > 0) {
-		done.countDown();
-	    }
-	}
-
-	/** Returns whether all tasks are done. */
-	boolean getDone() {
-	    return done.getCount() == 0;
-	}
-
-	/**
-	 * Waits for the tasks to complete, throwing an exception if any task
-	 * fails or does not complete in the specified amount of time.
-	 */
-	void await(long timeout, TimeUnit unit) throws InterruptedException {
-	    if (!done.await(timeout, unit)) {
-		taskFailed(new RuntimeException("Tasks did not complete"));
-	    }
-	    Throwable exception = failure.get();
-	    if (exception instanceof RuntimeException) {
-		throw (RuntimeException) exception;
-	    } else if (exception instanceof Error) {
-		throw (Error) exception;
-	    } else if (exception != null) {
-		throw new RuntimeException(
-		    "Unexpected exception", exception);
-	    }
 	}
     }
 

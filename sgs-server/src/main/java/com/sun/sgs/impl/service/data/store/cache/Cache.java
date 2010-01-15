@@ -76,13 +76,20 @@ class Cache {
     /** The data store. */
     private final CachingDataStore store;
 
+    /*
+     * TODO: Support modifying the cache size on the fly.
+     * -tjb@sun.com (01/12/2010)
+     */
     /** The maximum number of entries that can be stored in the cache. */
     private final int cacheSize;
 
     /** The number of open slots available in the cache. */
     private final Semaphore available;
 
-    /** The locks for objects and bindings in the cache. */
+    /**
+     * The locks for objects and bindings in the cache -- the contents should
+     * not be modified.
+     */
     private final Object[] locks;
 
     /** The object to notify when the cache becomes full. */

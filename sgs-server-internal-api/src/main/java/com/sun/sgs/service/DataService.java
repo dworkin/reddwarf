@@ -205,9 +205,7 @@ public interface DataService extends DataManager, Service {
      * Registers a listener to be notified when the data service detects that
      * another node has made a conflicting access to an object or name binding
      * on this node.  Registered listeners are notified outside of a
-     * transaction. <p>
-     *
-     * This method must be invoked outside of a transaction.
+     * transaction.
      *
      * @param	listener a data conflict listener
      */

@@ -93,8 +93,8 @@ public interface CachingDataStoreServer extends Remote {
 
     /**
      * Obtains read access to an object.  If the return value is not {@code
-     * null} and it's {@code callbackEvict} field is {@code true}, then the
-     * caller should evict the requested object after using it.
+     * null} and its {@code callbackEvict} field is {@code true}, then the
+     * caller must evict the requested object after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the object ID
@@ -144,10 +144,10 @@ public interface CachingDataStoreServer extends Remote {
 
     /**
      * Obtains write access to an object.  If the return value is not {@code
-     * null} and it's {@code callbackEvict} field is {@code true}, then the
-     * caller should evict the requested object after using it.  If the return
-     * value is not {@code null} and it's {@code callbackDowngrade} field is
-     * {@code true}, then the caller should downgrade the requested object to
+     * null} and its {@code callbackEvict} field is {@code true}, then the
+     * caller must evict the requested object after using it.  If the return
+     * value is not {@code null} and its {@code callbackDowngrade} field is
+     * {@code true}, then the caller must downgrade the requested object to
      * read access after using it.
      *
      * @param	nodeId the ID of the requesting node
@@ -200,8 +200,8 @@ public interface CachingDataStoreServer extends Remote {
     /**
      * Upgrades access to an object from read to write access.  If the return
      * value's {@code callbackEvict} field is {@code true}, then the caller
-     * should evict the requested object after using it.  If the return value's
-     * {@code callbackDowngrade} field is {@code true}, then the caller should
+     * must evict the requested object after using it.  If the return value's
+     * {@code callbackDowngrade} field is {@code true}, then the caller must
      * downgrade the requested object to read access after using it.
      *
      * @param	nodeId the ID of the requesting node
@@ -255,13 +255,13 @@ public interface CachingDataStoreServer extends Remote {
     /**
      * Returns information about the next object after the object with the
      * specified ID, obtaining read access to the next object if it is found.
-     * If {@code objectId} is {@code -1}, then returns information about the
-     * first object.  The results returned by this method will not refer to
-     * objects that have already been removed, and may not refer to objects
-     * created after an iteration has begun.  It is not an error to specify the
+     * If {@code oid} is {@code -1}, then returns information about the first
+     * object.  The results returned by this method will not refer to objects
+     * that have already been removed, and may not refer to objects created
+     * after an iteration has begun.  It is not an error to specify the
      * identifier for an object that has already been removed.  If the return
      * value is not {@code null} and its {@code callbackEvict} field is {@code
-     * true}, then the caller should evict the next object after using it.
+     * true}, then the caller must evict the next object after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	oid the identifier of the object to search after, or
@@ -327,7 +327,7 @@ public interface CachingDataStoreServer extends Remote {
      * Obtains read access to a name binding.  If the name is not bound,
      * obtains read access to the next name binding instead.  If the return
      * value's {@code callbackEvict} field is {@code true}, then the caller
-     * should evict after using it either the requested name, if the return
+     * must evict after using it either the requested name, if the return
      * value's {@code found} field is {@code true}, or else the next name, if
      * the {@code found} field is {@code false}.
      *
@@ -414,10 +414,10 @@ public interface CachingDataStoreServer extends Remote {
      * Obtains write access to a name binding.  If the name is not bound,
      * obtains write access to the next name binding instead.  If the return
      * value's {@code callbackEvict} field is {@code true}, then the caller
-     * should evict after using it either the requested name, if the return
+     * must evict after using it either the requested name, if the return
      * value's {@code found} field is {@code true}, or else the next name, if
      * the {@code found} field is {@code false}.  If the return value's {@code
-     * callbackDowngrade} field is {@code true}, then the caller should
+     * callbackDowngrade} field is {@code true}, then the caller must
      * downgrade to read access after using it either the requested name, if
      * the return value's {@code found} field is {@code true}, or else the next
      * name, if the {@code found} field is {@code false}.
@@ -440,7 +440,7 @@ public interface CachingDataStoreServer extends Remote {
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
 
-	/** Whether the requested or next name should be downgraded. */
+	/** Whether the requested or next name must be downgraded. */
 	public final boolean callbackDowngrade;
 
 	/**
@@ -481,13 +481,13 @@ public interface CachingDataStoreServer extends Remote {
      * to the name binding if it is bound.  If the name is bound, obtains write
      * access to the next bound name; if it is not bound, obtains read access
      * to the next bound name.  If the return value's {@code callbackEvict}
-     * field is {@code true}, then the caller should evict the requested name
+     * field is {@code true}, then the caller must evict the requested name
      * after using it.  If the return value's {@code callbackDowngrade} field
-     * is {@code true}, then the caller should downgrade the requested name to
+     * is {@code true}, then the caller must downgrade the requested name to
      * read access after using it.  If the return value's {@code
-     * nextCallbackEvict} field is {@code true}, then the caller should evict
-     * the next name after using it.  If the return value's {@code
-     * nextCallbackDowngrade} field is {@code true}, then the caller should
+     * nextCallbackEvict} field is {@code true}, then the caller must evict the
+     * next name after using it.  If the return value's {@code
+     * nextCallbackDowngrade} field is {@code true}, then the caller must
      * downgrade the next name to read access after using it.
      *
      * @param	nodeId the ID of the requesting node
@@ -612,7 +612,7 @@ public interface CachingDataStoreServer extends Remote {
      * has a binding, or {@code null} if there are no more bound names.  If
      * {@code name} is {@code null}, then the search starts at the beginning.
      * If the return value's {@code callbackEvict} field is {@code true}, the
-     * caller should evict the next name after using it.
+     * caller must evict the next name after using it.
      *
      * @param	nodeId the ID of the requesting node
      * @param	name the name

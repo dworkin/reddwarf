@@ -27,8 +27,7 @@ import java.math.BigInteger;
 
 /**
  * A listener that can be registered to be notified when a data conflict is
- * detected between nodes.  Invocations to the {@link #nodeConflictDetected
- * nodeConflictDetected} method are made outside of a transaction.
+ * detected between nodes.
  *
  * @see	DataService#addDataConflictListener DataService.addDataConflictListener
  */
@@ -38,8 +37,9 @@ public interface DataConflictListener {
    * Notifies this listener that another node has made a conflicting access to
    * an object or name binding on this node.  The access is identified by
    * either a {@link BigInteger} that represents the object ID of an object, or
-   * by a {@link String} that represents a bound name. <p>
-   *
+   * by a {@link String} that represents a bound name.  This method will be
+   * called outside of a transaction. <p>
+
    * Note that the strings used to identify name bindings will typically differ
    * from the names specified when the bindings were created in the {@link
    * DataService} because the identifiers need to represent both application

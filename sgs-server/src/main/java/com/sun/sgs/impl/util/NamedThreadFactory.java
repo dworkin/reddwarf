@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.util;
 
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import java.util.concurrent.ThreadFactory;
@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A thread factory that creates daemon threads with names that use a prefix
  * followed by a instance number.
  */
-class NamedThreadFactory implements ThreadFactory {
+public class NamedThreadFactory implements ThreadFactory {
 
     /** The prefix for each name. */
     private final String namePrefix;
@@ -40,7 +40,7 @@ class NamedThreadFactory implements ThreadFactory {
      *
      * @param	namePrefix the prefix to use for names
      */
-    NamedThreadFactory(String namePrefix) {
+    public NamedThreadFactory(String namePrefix) {
 	checkNull("namePrefix", namePrefix);
 	this.namePrefix = namePrefix;
     }

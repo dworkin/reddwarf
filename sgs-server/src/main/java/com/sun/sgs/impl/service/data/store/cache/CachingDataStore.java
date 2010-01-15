@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
@@ -52,6 +53,8 @@ import static com.sun.sgs.impl.service.data.store.cache.BindingKey.LAST;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.BOUND;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNBOUND;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNKNOWN;
+import com.sun.sgs.impl.service.data.store.cache.queue.CompletionHandler;
+import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueue;
 import static com.sun.sgs.impl.service.transaction.
     TransactionCoordinator.TXN_TIMEOUT_PROPERTY;
 import static com.sun.sgs.impl.service.transaction.
@@ -60,7 +63,10 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 import static com.sun.sgs.impl.util.Numbers.addCheckOverflow;
+import com.sun.sgs.impl.util.RetryIoRunnable;
+import com.sun.sgs.impl.util.ShouldRetryIo;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.READ;
 import static com.sun.sgs.kernel.AccessReporter.AccessType.WRITE;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -117,7 +123,7 @@ import java.util.logging.Logger;
  *	<i>Default:</i> <code>{@value #DEFAULT_CALLBACK_PORT}</code>
  *
  * <dd style="padding-top: .5em">The network port used to accept callback
- *	requests.  The value should be a non-negative number less than
+ *	requests.  The value must be a non-negative number less than
  *	<code>65536</code>.  If the value specified is <code>0</code>, then an
  *	anonymous port will be chosen. <p>
  *
@@ -126,19 +132,21 @@ import java.util.logging.Logger;
  *	<i>Default:</i> <code>{@value #DEFAULT_EVICTION_BATCH_SIZE}</code>
  *
  * <dd style="padding-top: .5em">The number of entries to consider when
- *	selecting a single candidate for eviction. <p>
+ *	selecting a single candidate for eviction.  The value must be greater
+ *	than <code>0</code> and no larger than the cache size. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #EVICTION_RESERVE_SIZE_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i> <code>{@value #DEFAULT_EVICTION_RESERVE_SIZE}</code>
  *
  * <dd style="padding-top: .5em">The number of cache entries to hold in reserve
- *	for use while searching for eviction candidates. <p>
+ *	for use while searching for eviction candidates. The value must be
+ *	greater than <code>0</code> and no larger than the cache size. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #LOCK_TIMEOUT_PROPERTY}</b></code>
  *	<br>
- *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
- *	transaction timeout.
+ *	<i>Default:</i> <code>{@value #DEFAULT_LOCK_TIMEOUT_PROPORTION}</code>
+ *	times the transaction timeout.
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  *	that an attempt to obtain a lock will be allowed to continue before
@@ -174,13 +182,15 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The name of the host running the {@code
  *	CachingDataStoreServer}. <p>
  *
- * <dt> <i>Property:</i> <code><b>{@value #SERVER_PORT_PROPERTY}</b></code>
- *	<br>
- *	<i>Default:</i>	<code>
- *	{@value com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl#DEFAULT_SERVER_PORT}</code>
+ * <dt> <i>Property:</i> <code><b>{@value
+ *	com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl#SERVER_PORT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i>	<code> {@value
+ *	com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl#DEFAULT_SERVER_PORT}
+ *	</code>
  *
  * <dd style="padding-top: .5em">The network port used to make server requests.
- *	The value should be a non-negative number less than <code>65536</code>.
+ *	The value must be a non-negative number less than <code>65536</code>.
  *	The value <code>0</code> can only be specified if the <code>{@link
  *	StandardProperties#NODE_TYPE}</code> property is not
  *	<code>appNode</code> and means that an anonymous port will be chosen
@@ -191,17 +201,37 @@ import java.util.logging.Logger;
  *	<i>Default:</i>	<code>{@value #DEFAULT_CACHE_SIZE}</code>
  *
  * <dd style="padding-top: .5em">The maximum number of entries, including name
- *	bindings and objects, that can be stored in the cache. <p>
+ *	bindings and objects, that can be stored in the cache.  The value must
+ *	be no smaller than <code>{@value #MIN_CACHE_SIZE}</code>. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #UPDATE_QUEUE_SIZE_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i>	<code>{@value #DEFAULT_UPDATE_QUEUE_SIZE}</code>
  *
  * <dd style="padding-top: .5em">The maximum number of commit requests that can
- *	be queued waiting to send to the server.  The value must be no smaller
- *	than <code>{@value #MIN_CACHE_SIZE}</code>. <p>
+ *	be queued waiting to send to the server.  The value must be greater
+ *	than <code>0</code> and no more than <code>5000</code> <p>
  *
- * </dl>
+ * </dl> <p>
+ *
+ * This class uses the {@link Logger} named {@code
+ * com.sun.sgs.impl.service.data.store.cache.CachingDataStore} to log
+ * information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Initialization failures
+ * <li> {@link Level#CONFIG CONFIG} - Constructor properties, data store
+ *	headers
+ * <li> {@link Level#FINE FINE} - Allocating blocks of object IDs
+ * <li> {@link Level#FINER FINER} - Transaction operations, class info
+ *	operations, and node shutdown
+ * <li> {@link Level#FINEST FINEST} - Name and object operations
+ * </ul> <p>
+ *
+ * Operations that throw {@link TransactionAbortedException} will instead log
+ * the failure to the {@code Logger} named {@code
+ * com.sun.sgs.impl.service.data.store.cache.CachingDataStore.abort}, to make
+ * it easier to debug concurrency conflicts.
  */
 public final class CachingDataStore extends AbstractDataStore
     implements CallbackServer, FailureReporter
@@ -278,9 +308,6 @@ public final class CachingDataStore extends AbstractDataStore
     /** The property for specifying the server host. */
     public static final String SERVER_HOST_PROPERTY = PKG + ".server.host";
 
-    /** The property for specifying the server port. */
-    public static final String SERVER_PORT_PROPERTY = PKG + ".server.port";
-
     /** The property for specifying the cache size. */
     public static final String CACHE_SIZE_PROPERTY = PKG + ".size";
 
@@ -350,7 +377,7 @@ public final class CachingDataStore extends AbstractDataStore
     /** The lock timeout. */
     private final long lockTimeout;
 
-    /** The maximum retry for I/O operations. */
+    /** The maximum retry time for I/O operations. */
     private final long maxRetry;
 
     /** The retry wait for failed I/O operations. */
@@ -363,7 +390,7 @@ public final class CachingDataStore extends AbstractDataStore
     final TransactionProxy txnProxy;
 
     /** The owner for tasks run by the data store. */
-    final Identity taskOwner;
+    private final Identity taskOwner;
 
     /** The transaction scheduler. */
     private final TransactionScheduler txnScheduler;
@@ -459,8 +486,8 @@ public final class CachingDataStore extends AbstractDataStore
 	Collections.synchronizedList(new ArrayList<DataConflictListener>());
 
     /**
-     * A concurrent deque of conflicting data accesses waiting to be delivered
-     * to the data conflict listeners.
+     * A unlimited, concurrent deque of conflicting data accesses waiting to be
+     * delivered to the data conflict listeners.
      */
     private final BlockingDeque<DataConflict> dataConflicts =
 	new LinkedBlockingDeque<DataConflict>();
@@ -502,7 +529,7 @@ public final class CachingDataStore extends AbstractDataStore
 	    1, cacheSize);
 	evictionReserveSize = wrappedProps.getIntProperty(
 	    EVICTION_RESERVE_SIZE_PROPERTY, DEFAULT_EVICTION_RESERVE_SIZE,
-	    0, cacheSize);
+	    1, cacheSize);
 	long txnTimeout = wrappedProps.getLongProperty(
 	    TXN_TIMEOUT_PROPERTY, BOUNDED_TIMEOUT_DEFAULT);
 	long defaultLockTimeout =
@@ -523,7 +550,7 @@ public final class CachingDataStore extends AbstractDataStore
 		"A server host must be specified");
 	}
 	int serverPort = wrappedProps.getIntProperty(
-	    SERVER_PORT_PROPERTY,
+	    CachingDataStoreServerImpl.SERVER_PORT_PROPERTY,
 	    CachingDataStoreServerImpl.DEFAULT_SERVER_PORT,
 	    startServer ? 0 : 1,
 	    65535);
@@ -546,7 +573,8 @@ public final class CachingDataStore extends AbstractDataStore
 		"\n  " + MAX_RETRY_PROPERTY + "=" + maxRetry +
 		"\n  " + RETRY_WAIT_PROPERTY + "=" + retryWait +
 		"\n  " + SERVER_HOST_PROPERTY + "=" + serverHost +
-		"\n  " + SERVER_PORT_PROPERTY + "=" + serverPort +
+		"\n  " + CachingDataStoreServerImpl.SERVER_PORT_PROPERTY + "=" +
+		serverPort +
 		"\n  " + CACHE_SIZE_PROPERTY + "=" + cacheSize +
 		"\n  start server: " + startServer +
 		"\n  " + UPDATE_QUEUE_SIZE_PROPERTY + "=" + updateQueueSize +
@@ -591,8 +619,8 @@ public final class CachingDataStore extends AbstractDataStore
 	    nodeId = registerNodeResult.nodeId;
 	    callbackServer.setLocalNodeId(nodeId);
 	    updateQueue = new UpdateQueue(
-		this, serverHost, registerNodeResult.updateQueuePort,
-		updateQueueSize);
+		serverHost, registerNodeResult.updateQueuePort,
+		updateQueueSize, nodeId, maxRetry, retryWait, this);
 	    contextMap = new TxnContextMap(this);
 	    cache = new Cache(this, cacheSize, numLocks, evictionThread);
 	    newObjectIdCache =
@@ -732,7 +760,7 @@ public final class CachingDataStore extends AbstractDataStore
 		assert entry != null :
 		    "markForUpdate called for object not in cache: " + oid;
 		switch (entry.awaitWritable(lock, stop)) {
-		case DECACHED:
+		case NOT_CACHED:
 		    /*
 		     * Entry was decached, but that shouldn't be because an
 		     * upgrade means this transaction already read locked it
@@ -766,7 +794,7 @@ public final class CachingDataStore extends AbstractDataStore
 
     /** Upgrades an existing object. */
     private class UpgradeObjectRunnable
-	extends RetryIoRunnable<UpgradeObjectResults>
+	extends BasicRetryIoRunnable<UpgradeObjectResults>
     {
 	private final TxnContext context;
 	private final long oid;
@@ -780,12 +808,12 @@ public final class CachingDataStore extends AbstractDataStore
 	    return "UpgradeObjectRunnable[" +
 		"context:" + context + ", oid:" + oid + "]";
 	}
-	UpgradeObjectResults callOnce()
+	protected UpgradeObjectResults callOnce()
 	    throws CacheConsistencyException, IOException
 	{
 	    return server.upgradeObject(nodeId, oid);
 	}
-	void runWithResult(UpgradeObjectResults results) {
+	protected void runWithResult(UpgradeObjectResults results) {
 	    Object lock = cache.getObjectLock(oid);
 	    synchronized (lock) {
 		ObjectCacheEntry entry = cache.getObjectEntry(oid);
@@ -833,7 +861,7 @@ public final class CachingDataStore extends AbstractDataStore
 			}
 		    } else {
 			switch (entry.awaitWritable(lock, stop)) {
-			case DECACHED:
+			case NOT_CACHED:
 			    continue;
 			case READABLE:
 			    /* Upgrade */
@@ -873,7 +901,9 @@ public final class CachingDataStore extends AbstractDataStore
     }
 
     /** Gets an object for read. */
-    private class GetObjectRunnable extends RetryIoRunnable<GetObjectResults> {
+    private class GetObjectRunnable
+	extends BasicRetryIoRunnable<GetObjectResults>
+    {
 	private final TxnContext context;
 	private final long oid;
 	GetObjectRunnable(TxnContext context, long oid) {
@@ -886,10 +916,10 @@ public final class CachingDataStore extends AbstractDataStore
 	    return "GetObjectRunnable[" +
 		"context:" + context + ", oid:" + oid + "]";
 	}
-	GetObjectResults callOnce() throws IOException {
+	protected GetObjectResults callOnce() throws IOException {
 	    return server.getObject(nodeId, oid);
 	}
-	void runWithResult(GetObjectResults results) {
+	protected void runWithResult(GetObjectResults results) {
 	    synchronized (cache.getObjectLock(oid)) {
 		context.noteCachedObject(
 		    cache.getObjectEntry(oid),
@@ -904,7 +934,7 @@ public final class CachingDataStore extends AbstractDataStore
 
     /** Gets an object for write. */
     private class GetObjectForUpdateRunnable
-	extends RetryIoRunnable<GetObjectForUpdateResults>
+	extends BasicRetryIoRunnable<GetObjectForUpdateResults>
     {
 	private final TxnContext context;
 	private final long oid;
@@ -918,10 +948,10 @@ public final class CachingDataStore extends AbstractDataStore
 	    return "GetObjectForUpdateRunnable[" +
 		"context:" + context + ", oid:" + oid + "]";
 	}
-	GetObjectForUpdateResults callOnce() throws IOException {
+	protected GetObjectForUpdateResults callOnce() throws IOException {
 	    return server.getObjectForUpdate(nodeId, oid);
 	}
-	void runWithResult(GetObjectForUpdateResults results) {
+	protected void runWithResult(GetObjectForUpdateResults results) {
 	    synchronized (cache.getObjectLock(oid)) {
 		context.noteCachedObject(
 		    cache.getObjectEntry(oid),
@@ -963,7 +993,7 @@ public final class CachingDataStore extends AbstractDataStore
 			    new GetObjectForUpdateRunnable(context, oid));
 		    }
 		    switch (entry.awaitWritable(lock, stop)) {
-		    case DECACHED:
+		    case NOT_CACHED:
 			/* Not in cache -- try again */
 			continue;
 		    case READABLE:
@@ -1134,10 +1164,10 @@ public final class CachingDataStore extends AbstractDataStore
 		", cachedNextNameKey:" + cachedNextNameKey +
 		"]";
 	}
-	GetBindingResults callOnce() throws IOException {
+	protected GetBindingResults callOnce() throws IOException {
 	    return server.getBinding(nodeId, nameKey.getName());
 	}
-	void runWithResult(GetBindingResults results) {
+	protected void runWithResult(GetBindingResults results) {
 	    BindingKey serverNextNameKey = (results.found)
 		? null : BindingKey.getAllowLast(results.nextName);
 	    handleResults(results.found ? BOUND : UNBOUND, results.oid,
@@ -1328,10 +1358,10 @@ public final class CachingDataStore extends AbstractDataStore
 		", cachedNextNameKey:" + cachedNextNameKey +
 		"]";
 	}
-	GetBindingForUpdateResults callOnce() throws IOException {
+	protected GetBindingForUpdateResults callOnce() throws IOException {
 	    return server.getBindingForUpdate(nodeId, nameKey.getName());
 	}
-	void runWithResult(GetBindingForUpdateResults results) {
+	protected void runWithResult(GetBindingForUpdateResults results) {
 	    BindingKey serverNextNameKey = (results.found)
 		? null : BindingKey.getAllowLast(results.nextName);
 	    handleResults(results.found ? BOUND : UNBOUND, results.oid,
@@ -1364,7 +1394,7 @@ public final class CachingDataStore extends AbstractDataStore
 	assert Thread.holdsLock(lock);
 	long stop = context.getStopTime();
 	switch (entry.awaitWritable(lock, stop)) {
-	case DECACHED:
+	case NOT_CACHED:
 	    /* Entry not in cache -- try again */
 	    return false;
 	case READABLE:
@@ -1403,7 +1433,7 @@ public final class CachingDataStore extends AbstractDataStore
      * pending previous when the operation is complete.
      */
     private class GetBindingForUpdateUpgradeRunnable
-	extends RetryIoRunnable<GetBindingForUpdateResults>
+	extends BasicRetryIoRunnable<GetBindingForUpdateResults>
     {
 	private final TxnContext context;
 	private final BindingKey nameKey;
@@ -1421,10 +1451,10 @@ public final class CachingDataStore extends AbstractDataStore
 		", nameKey:" + nameKey +
 		"]";
 	}
-	GetBindingForUpdateResults callOnce() throws IOException {
+	protected GetBindingForUpdateResults callOnce() throws IOException {
 	    return server.getBindingForUpdate(nodeId, nameKey.getName());
 	}
-	void runWithResult(GetBindingForUpdateResults results) {
+	protected void runWithResult(GetBindingForUpdateResults results) {
 	    Object lock = cache.getBindingLock(nameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nameKey);
@@ -1466,7 +1496,7 @@ public final class CachingDataStore extends AbstractDataStore
 	assert Thread.holdsLock(lock);
 	long stop = context.getStopTime();
 	switch (entry.awaitWritable(lock, stop)) {
-	case DECACHED:
+	case NOT_CACHED:
 	    /* Entry not in cache -- try again */
 	    return false;
 	case READABLE:
@@ -1504,7 +1534,7 @@ public final class CachingDataStore extends AbstractDataStore
      * complete.
      */
     private class GetBindingForUpdateUpgradeNextRunnable
-	extends RetryIoRunnable<GetBindingForUpdateResults>
+	extends BasicRetryIoRunnable<GetBindingForUpdateResults>
     {
 	private final TxnContext context;
 	private final String name;
@@ -1525,10 +1555,10 @@ public final class CachingDataStore extends AbstractDataStore
 		", nextNameKey:" + nextNameKey +
 		"]";
 	}
-	GetBindingForUpdateResults callOnce() throws IOException {
+	protected GetBindingForUpdateResults callOnce() throws IOException {
 	    return server.getBindingForUpdate(nodeId, name);
 	}
-	void runWithResult(GetBindingForUpdateResults results) {
+	protected void runWithResult(GetBindingForUpdateResults results) {
 	    Object lock = cache.getBindingLock(nextNameKey);
 	    synchronized (lock) {
 		BindingCacheEntry entry = cache.getBindingEntry(nextNameKey);
@@ -1665,10 +1695,10 @@ public final class CachingDataStore extends AbstractDataStore
 		", cachedNextNameKey:" + cachedNextNameKey +
 		"]";
 	}
-	GetBindingForRemoveResults callOnce() throws IOException {
+	protected GetBindingForRemoveResults callOnce() throws IOException {
 	    return server.getBindingForRemove(nodeId, nameKey.getName());
 	}
-	void runWithResult(GetBindingForRemoveResults results) {
+	protected void runWithResult(GetBindingForRemoveResults results) {
 	    BindingKey serverNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
 	    handleResults(results.found ? BOUND : UNBOUND, results.oid,
@@ -1705,7 +1735,7 @@ public final class CachingDataStore extends AbstractDataStore
     {
 	assert Thread.holdsLock(lock);
 	switch (entry.awaitWritable(lock, stop)) {
-	case DECACHED:
+	case NOT_CACHED:
 	    /* Not in cache -- try again */
 	    return false;
 	case READABLE:
@@ -1914,7 +1944,7 @@ public final class CachingDataStore extends AbstractDataStore
      * information about the next bound name after a specified name when that
      * information was not in the cache.  The caller should have reserved 1
      * cache entry.  The entry for {@code cachedNextNameKey} should be marked
-     * pending previous.  If it is the last entry, it should also marked
+     * pending previous.  If it is the last entry, it should also be marked
      * fetching read if it was added to represent the next entry provisionally.
      * The entry will not be pending previous or fetching when the operation is
      * complete.
@@ -1937,10 +1967,10 @@ public final class CachingDataStore extends AbstractDataStore
 		", cachedNextNameKey:" + cachedNextNameKey +
 		"]";
 	}
-	NextBoundNameResults callOnce() throws IOException {
+	protected NextBoundNameResults callOnce() throws IOException {
 	    return server.nextBoundName(nodeId, nameKey.getNameAllowFirst());
 	}
-	void runWithResult(NextBoundNameResults results) {
+	protected void runWithResult(NextBoundNameResults results) {
 	    BindingKey serverNextNameKey =
 		BindingKey.getAllowLast(results.nextName);
 	    handleResults(/* nameBound */ BindingState.UNKNOWN, -1,
@@ -2793,15 +2823,6 @@ public final class CachingDataStore extends AbstractDataStore
     }
 
     /**
-     * Returns the associated node ID.
-     *
-     * @return	the node ID
-     */
-    long getNodeId() {
-	return nodeId;
-    }
-
-    /**
      * Returns the number of milliseconds to continue retrying I/O operations
      * before determining that the failure is permanent.
      *
@@ -3485,12 +3506,58 @@ public final class CachingDataStore extends AbstractDataStore
     }
 
     /**
+     * A {@code RetryIoRunnable} that uses the data store to check for
+     * shutdowns and report failures.
+     *
+     * @param	<V> the type of result of the I/O operation
+     */
+    abstract static class BasicRetryIoRunnable<V> extends RetryIoRunnable<V> {
+
+	/** The data store. */
+	private final CachingDataStore store;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	store the data store
+	 */
+	BasicRetryIoRunnable(CachingDataStore store) {
+	    super(store.nodeId, store.maxRetry, store.retryWait);
+	    this.store = store;
+	}
+
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation waits to report that a shutdown has been
+	 * requested until after transactions have completed to permit
+	 * operations needed to allow current transactions to complete.
+	 */
+	@Override
+	protected boolean shutdownRequested() {
+	    return store.getShutdownTxnsCompleted();
+	}
+
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation reports that the node has failed.
+	 */
+	@Override
+	protected void reportFailure(Throwable exception) {
+	    store.reportFailure(
+		new Exception("Operation " + this + " failed: " + exception,
+			      exception));
+	}
+    }
+
+    /**
      * A {@code RetryIoRunnable} that tracks space in the cache and releases
      * any space that it does not use.  Callers should have already allocated
      * the needed cache space.
      */
     private abstract class ReserveCacheRetryIoRunnable<V>
-	extends RetryIoRunnable<V>
+	extends BasicRetryIoRunnable<V>
     {
 	/** Tracks cache space. */
 	final Cache.Reservation reserve;

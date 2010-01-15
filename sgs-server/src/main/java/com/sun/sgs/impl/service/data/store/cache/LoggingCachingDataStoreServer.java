@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import static com.sun.sgs.impl.sharedutil.Exceptions.throwUnchecked;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
 import java.util.logging.Level;
@@ -55,63 +56,48 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     public RegisterNodeResult registerNode(CallbackServer callbackServer)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "registerNode callbackServer:" + callbackServer);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "registerNode callbackServer:" + callbackServer : null;
+	logger.log(FINEST, operation);
 	try {
 	    RegisterNodeResult result = server.registerNode(callbackServer);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "registerNode callbackServer:" + callbackServer +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(
-		    FINEST, e,
-		    "registerNode callbackServer:" + callbackServer +
-		    " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
 
     @Override
     public long newObjectIds(int numIds) throws IOException {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST, "newObjectIds numIds:" + numIds);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "newObjectIds numIds:" + numIds : null;
+	logger.log(FINEST, operation);
 	try {
 	    long result = server.newObjectIds(numIds);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "newObjectIds numIds:" + numIds +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"newObjectIds numIds:" + numIds + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -120,31 +106,24 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     public GetObjectResults getObject(long nodeId, long oid)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST, "getObject nodeId:" + nodeId + ", oid:" + oid);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "getObject nodeId:" + nodeId + ", oid:" + oid : null;
+	logger.log(FINEST, operation);
 	try {
 	    GetObjectResults result = server.getObject(nodeId, oid);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "getObject nodeId:" + nodeId + ", oid:" + oid +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getObject nodeId:" + nodeId + ", oid:" + oid +
-				" throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -153,33 +132,25 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     public GetObjectForUpdateResults getObjectForUpdate(long nodeId, long oid)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "getObjectForUpdate nodeId:" + nodeId + ", oid:" + oid);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "getObjectForUpdate nodeId:" + nodeId + ", oid:" + oid : null;
+	logger.log(FINEST, operation);
 	try {
 	    GetObjectForUpdateResults result =
 		server.getObjectForUpdate(nodeId, oid);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "getObjectForUpdate nodeId:" + nodeId +
-			   ", oid:" + oid + " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getObjectForUpdate nodeId:" + nodeId +
-				", oid:" + oid + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -188,34 +159,26 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     public UpgradeObjectResults upgradeObject(long nodeId, long oid)
 	throws CacheConsistencyException, IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "upgradeObject nodeId:" + nodeId + ", oid:" + oid);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "upgradeObject nodeId:" + nodeId + ", oid:" + oid : null;
+	logger.log(FINEST, operation);
 	try {
 	    UpgradeObjectResults result = server.upgradeObject(nodeId, oid);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "upgradeObject nodeId:" + nodeId +
-			   ", oid:" + oid + " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"upgradeObject nodeId:" + nodeId +
-				", oid:" + oid + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof CacheConsistencyException) {
 		throw (CacheConsistencyException) e;
 	    } else if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -224,32 +187,24 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     public NextObjectResults nextObjectId(long nodeId, long oid)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "nextObjectId nodeId:" + nodeId + ", oid:" + oid);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "nextObjectId nodeId:" + nodeId + ", oid:" + oid : null;
+	logger.log(FINEST, operation);
 	try {
 	    NextObjectResults result = server.nextObjectId(nodeId, oid);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "nextObjectId nodeId:" + nodeId +
-			   ", oid:" + oid + " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"nextObjectId nodeId:" + nodeId +
-				", oid:" + oid + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -258,32 +213,24 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     public GetBindingResults getBinding(long nodeId, String name)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "getBinding nodeId:" + nodeId + ", name:" + name);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "getBinding nodeId:" + nodeId + ", name:" + name : null;
+	logger.log(FINEST, operation);
 	try {
 	    GetBindingResults result = server.getBinding(nodeId, name);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "getBinding nodeId:" + nodeId +
-			   ", name:" + name + " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getBinding nodeId:" + nodeId +
-				", name:" + name + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -293,34 +240,25 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 	long nodeId, String name)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "getBindingForUpdate nodeId:" + nodeId +
-		       ", name:" + name);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "getBindingForUpdate nodeId:" + nodeId + ", name:" + name : null;
+	logger.log(FINEST, operation);
 	try {
 	    GetBindingForUpdateResults result =
 		server.getBindingForUpdate(nodeId, name);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "getBindingForUpdate nodeId:" + nodeId +
-			   ", name:" + name + " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getBindingForUpdate nodeId:" + nodeId +
-				", name:" + name + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -330,34 +268,25 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 	long nodeId, String name)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "getBindingForRemove nodeId:" + nodeId +
-		       ", name:" + name);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "getBindingForRemove nodeId:" + nodeId + ", name:" + name : null;
+	logger.log(FINEST, operation);
 	try {
 	    GetBindingForRemoveResults result =
 		server.getBindingForRemove(nodeId, name);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "getBindingForRemove nodeId:" + nodeId +
-			   ", name:" + name + " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getBindingForRemove nodeId:" + nodeId +
-				", name:" + name + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -366,101 +295,77 @@ class LoggingCachingDataStoreServer implements CachingDataStoreServer {
     public NextBoundNameResults nextBoundName(long nodeId, String name)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "nextBoundName nodeId:" + nodeId + ", name:" + name);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "nextBoundName nodeId:" + nodeId + ", name:" + name : null;
+	logger.log(FINEST, operation);
 	try {
 	    NextBoundNameResults result = server.nextBoundName(nodeId, name);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "nextBoundName nodeId:" + nodeId +
-			   ", name:" + name + " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"nextBoundName nodeId:" + nodeId +
-				", name:" + name + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
 
     @Override
     public int getClassId(byte[] classInfo) throws IOException {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "getClassId classInfo:" +
-		       (classInfo == null
-			? "null" : "byte[" + classInfo.length + "]"));
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? ("getClassId classInfo:" +
+	       (classInfo == null ? "null" : "byte[" + classInfo.length + "]"))
+	    : null;
+	logger.log(FINEST, operation);
 	try {
 	    int result = server.getClassId(classInfo);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "getClassId classInfo:" +
-			   (classInfo == null
-			    ? "null" : "byte[" + classInfo.length + "]") +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getClassId classInfo:" +
-				(classInfo == null
-				 ? "null" : "byte[" + classInfo.length + "]") +
-				" throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
 
     @Override
     public byte[] getClassInfo(int classId) throws IOException {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST, "getClassInfo classId:" + classId);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? "getClassInfo classId:" + classId : null;
+	logger.log(FINEST, operation);
 	try {
 	    byte[] result = server.getClassInfo(classId);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
-			   "getClassInfo classId:" + classId + " returns " +
+			   operation + " returns " +
 			   (result == null
 			    ? "null" : "byte[" + result.length + "]"));
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"getClassInfo classId:" + classId + " throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }

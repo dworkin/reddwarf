@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.data.store.cache;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.service.TransactionInterruptedException;
+import java.util.EnumSet;
 
 /**
  * The base class for all entries stored in a node's data store cache.  Each
@@ -45,29 +46,36 @@ import com.sun.sgs.service.TransactionInterruptedException;
  */
 abstract class BasicCacheEntry<K, V> {
 
-    /** The entry is being made readable. */
-    private static final int READING			= 0x01;
+    /**
+     * The various status values that can be associated with the state of a
+     * cache entry.
+     */
+    enum Status {
+    
+	/** The entry is being made readable. */
+	READING,
 
-    /** The entry is readable. */
-    private static final int READABLE			= 0x02;
+	/** The entry is readable. */
+	READABLE,
 
-    /** The entry is being made writable. */
-    private static final int UPGRADING			= 0x04;
+	/** The entry is being made writable. */
+	UPGRADING,
 
-    /** The entry is writable. */
-    private static final int WRITABLE			= 0x08;
+	/** The entry is writable. */
+	WRITABLE,
 
-    /** The entry contains data modified by a single transaction. */
-    private static final int MODIFIED			= 0x10;
+	/** The entry contains data modified by a single transaction. */
+	MODIFIED,
 
-    /** The entry is being made not writable. */
-    private static final int DOWNGRADING		= 0x20;
+	/** The entry is being made not writable. */
+	DOWNGRADING,
 
-    /** The entry is being removed from the cache. */
-    private static final int DECACHING			= 0x40;
+	/** The entry is being removed from the cache. */
+	DECACHING,
 
-    /** The entry is not cached. */
-    private static final int NOT_CACHED			= 0x80;
+	/** The entry is not cached. */
+	NOT_CACHED;
+    };
 
     /**
      * The possible entry states. <p>
@@ -118,7 +126,7 @@ abstract class BasicCacheEntry<K, V> {
      */
     /* Here's an ASCII diagram of the permitted state transitions:
      *
-     * |     READING         READABLE  UPGRADING    WRITABLE       MODIFYING
+     * |     READING         READABLE  UPGRADING    WRITABLE       MODIFIED
      * |
      * |>---------------FETCHING_WRITE------------->|
      * |                                            |
@@ -136,56 +144,52 @@ abstract class BasicCacheEntry<K, V> {
     enum State {
 
 	/** The entry is being fetched for read. */
-	FETCHING_READ(READING),
+	FETCHING_READ(Status.READING),
 
 	/** The entry is available for read. */
-	CACHED_READ(READABLE),
+	CACHED_READ(Status.READABLE),
 
 	/** The entry is available for read and is being upgraded to write. */
-	FETCHING_UPGRADE(READABLE | UPGRADING),
+	FETCHING_UPGRADE(Status.READABLE, Status.UPGRADING),
 
 	/** The entry value is being fetched for read and write. */
-	FETCHING_WRITE(READING | UPGRADING),
+	FETCHING_WRITE(Status.READING, Status.UPGRADING),
 
 	/** The entry is available for read and write. */
-	CACHED_WRITE(READABLE | WRITABLE),
+	CACHED_WRITE(Status.READABLE, Status.WRITABLE),
 
 	/**
 	 * The entry is available for read and write, and contains data that
 	 * has been modified by a single transaction.
 	 */
-	CACHED_DIRTY(READABLE | WRITABLE | MODIFIED),
+	CACHED_DIRTY(Status.READABLE, Status.WRITABLE, Status.MODIFIED),
 
 	/**
 	 * The entry is available for read and is being downgraded from write.
 	 */
-	EVICTING_DOWNGRADE(READABLE | DOWNGRADING),
+	EVICTING_DOWNGRADE(Status.READABLE, Status.DOWNGRADING),
 
 	/** The entry is being evicted after being readable. */
-	EVICTING_READ(DECACHING),
+	EVICTING_READ(Status.DECACHING),
 
 	/** The entry is being evicted after being writable. */
-	EVICTING_WRITE(DOWNGRADING | DECACHING),
+	EVICTING_WRITE(Status.DOWNGRADING, Status.DECACHING),
 
 	/** The entry has been removed from the cache. */
-	DECACHED(NOT_CACHED);
+	DECACHED(Status.NOT_CACHED);
 
 	/**
-	 * Creates an instance with the specified value.
+	 * Creates an instance with the specified status values.
 	 *
-	 * @param	value the value
+	 * @param	firstStatus the first status value
+	 * @param	moreStatus remaining status values
 	 */
-	private State(int value) {
-	    this.value = value;
+	private State(Status firstStatus, Status... moreStatus) {
+	    statusSet = EnumSet.of(firstStatus, moreStatus);
 	}
 
-	/**
-	 * The value of this state, a combination of the values of {@link
-	 * #NOT_CACHED}, {@link #READABLE}, {@link #WRITABLE}, {@link
-	 * #MODIFIED}, {@link #READING}, {@link #UPGRADING}, {@link
-	 * #DOWNGRADING}, and {@link #DECACHING}.
-	 */
-	final int value;
+	/** The status values for this state. */
+	final EnumSet<Status> statusSet;
     };
 
     /** The key for this entry. */
@@ -220,9 +224,9 @@ abstract class BasicCacheEntry<K, V> {
 	this.state = state;
     }
 
-    /* -- State methods -- */
+    /* -- State and Status methods -- */
 
-    /* READING */
+    /* Status.READING */
 
     /**
      * Returns whether this entry is being made readable.
@@ -230,10 +234,10 @@ abstract class BasicCacheEntry<K, V> {
      * @return	whether this entry is being made readable
      */
     boolean getReading() {
-	return checkStateValue(READING);
+	return checkStatus(Status.READING);
     }
 
-    /* READABLE */
+    /* Status.READABLE */
 
     /**
      * Returns whether this entry is readable.
@@ -241,7 +245,7 @@ abstract class BasicCacheEntry<K, V> {
      * @return	whether this entry is readable
      */
     boolean getReadable() {
-	return checkStateValue(READABLE);
+	return checkStatus(Status.READABLE);
     }
 
     /**
@@ -274,16 +278,16 @@ abstract class BasicCacheEntry<K, V> {
      */
     boolean awaitReadable(Object lock, long stop) {
 	assert Thread.holdsLock(lock);
-	if (checkStateValue(READABLE)) {
+	if (checkStatus(Status.READABLE)) {
 	    /* Already cached for read */
 	    return true;
-	} else if (checkStateValue(READING)) {
+	} else if (checkStatus(Status.READING)) {
 	    /* Already fetching for read */
-	    awaitNot(READING, lock, stop);
+	    awaitStatusNot(Status.READING, lock, stop);
 	    return getReadable();
-	} else if (checkStateValue(DECACHING)) {
+	} else if (checkStatus(Status.DECACHING)) {
 	    /* Evicting from cache -- wait until done, then retry */
-	    await(NOT_CACHED, lock, stop);
+	    awaitStatus(Status.NOT_CACHED, lock, stop);
 	    return false;
 	} else /* state == State.DECACHED */ {
 	    /* Entry is not in the cache */
@@ -336,7 +340,7 @@ abstract class BasicCacheEntry<K, V> {
 	lock.notifyAll();
     }
 
-    /* UPGRADING */
+    /* Status.UPGRADING */
 
     /**
      * Returns whether this entry is being made writable.
@@ -344,7 +348,7 @@ abstract class BasicCacheEntry<K, V> {
      * @return	whether this entry is being made writable
      */
     boolean getUpgrading() {
-	return checkStateValue(UPGRADING);
+	return checkStatus(Status.UPGRADING);
     }
 
     /**
@@ -357,8 +361,9 @@ abstract class BasicCacheEntry<K, V> {
      *		before the specified stop time
      */
     void awaitNotUpgrading(Object lock, long stop) {
+	assert Thread.holdsLock(lock);
 	verifyState(State.FETCHING_UPGRADE, State.FETCHING_WRITE);
-	awaitNot(UPGRADING, lock, stop);
+	awaitStatusNot(Status.UPGRADING, lock, stop);
     }
 
     /* State.FETCHING_UPGRADE */
@@ -377,7 +382,7 @@ abstract class BasicCacheEntry<K, V> {
 	lock.notifyAll();
     }
 
-    /* WRITABLE */
+    /* Status.WRITABLE */
 
     /**
      * Returns whether this entry is available for write.
@@ -385,14 +390,14 @@ abstract class BasicCacheEntry<K, V> {
      * @return	whether this entry is available for write
      */
     boolean getWritable() {
-	return checkStateValue(WRITABLE);
+	return checkStatus(Status.WRITABLE);
     }
 
     /** The possible results of calling {@link #awaitWritable}. */
     enum AwaitWritableResult {
 
-	/** The entry has been decached. */
-	DECACHED,
+	/** The entry is not cached. */
+	NOT_CACHED,
 
 	/** The entry is readable. */
 	READABLE,
@@ -406,7 +411,7 @@ abstract class BasicCacheEntry<K, V> {
      * process of being downgraded or evicted.  Returns {@link
      * AwaitWritableResult#WRITABLE} if the entry is writable, {@link
      * AwaitWritableResult#READABLE} if the entry is readable but not writable,
-     * and else {@link AwaitWritableResult#DECACHED} if the entry has become
+     * and else {@link AwaitWritableResult#NOT_CACHED} if the entry has become
      * decached.
      *
      * @param	lock the associated lock, which must be held
@@ -423,31 +428,34 @@ abstract class BasicCacheEntry<K, V> {
 	    if (i >= CachingDataStore.MAX_CACHE_RETRIES) {
 		throw new ResourceUnavailableException("Too many retries");
 	    }
-	    if (checkStateValue(WRITABLE)) {
+	    if (checkStatus(Status.WRITABLE)) {
 		/* Already cached for write */
 		return AwaitWritableResult.WRITABLE;
-	    } else if (checkStateValue(UPGRADING)) {
+	    } else if (checkStatus(Status.UPGRADING)) {
 		/* Wait for upgrading to complete, then retry */
-		awaitNot(UPGRADING, lock, stop);
+		awaitStatusNot(Status.UPGRADING, lock, stop);
 		continue;
-	    } else if (checkStateValue(DOWNGRADING)) {
+	    } else if (checkStatus(Status.DOWNGRADING)) {
 		/* Wait for downgrading to complete, then retry */
-		awaitNot(DOWNGRADING, lock, stop);
+		awaitStatusNot(Status.DOWNGRADING, lock, stop);
 		continue;
-	    } else if (state == State.CACHED_READ) {
+	    } else if (checkStatus(Status.READABLE)) {
 		/* Cached for read and not being upgraded. */
 		return AwaitWritableResult.READABLE;
-	    } else if (checkStateValue(READING)) {
+	    } else if (checkStatus(Status.READING)) {
 		/* Wait for reading to complete, then retry */
-		awaitNot(READING, lock, stop);
+		awaitStatusNot(Status.READING, lock, stop);
 		continue;
-	    } else if (checkStateValue(DECACHING)) {
-		/* Evicting from cache -- wait until done, then retry */
+	    } else if (checkStatus(Status.DECACHING)) {
+		/*
+		 * Evicting from cache -- wait until done, then caller should
+		 * retry.
+		 */
 		awaitDecached(lock, stop);
-		return AwaitWritableResult.DECACHED;
-	    } else /* state == State.DECACHED */ {
+		return AwaitWritableResult.NOT_CACHED;
+	    } else /* Status.NOT_CACHED */ {
 		/* Entry is not in the cache */
-		return AwaitWritableResult.DECACHED;
+		return AwaitWritableResult.NOT_CACHED;
 	    }
 	}
     }
@@ -512,7 +520,7 @@ abstract class BasicCacheEntry<K, V> {
 	lock.notifyAll();
     }
 
-    /* MODIFIED */
+    /* Status.MODIFIED */
 
     /**
      * Returns whether this entry is modified.
@@ -520,7 +528,7 @@ abstract class BasicCacheEntry<K, V> {
      * @return	whether this entry is modified
      */
     boolean getModified() {
-	return checkStateValue(MODIFIED);
+	return checkStatus(Status.MODIFIED);
     }
 
     /* State.CACHED_DIRTY */
@@ -539,7 +547,7 @@ abstract class BasicCacheEntry<K, V> {
 	lock.notifyAll();
     }
 
-    /* DOWNGRADING */
+    /* Status.DOWNGRADING */
 
     /**
      * Returns whether this entry is being downgraded
@@ -547,7 +555,7 @@ abstract class BasicCacheEntry<K, V> {
      * @return	whether this entry is being downgraded
      */
     boolean getDowngrading() {
-	return checkStateValue(DOWNGRADING);
+	return checkStatus(Status.DOWNGRADING);
     }
 
     /* State.EVICTING_DOWNGRADE */
@@ -566,7 +574,7 @@ abstract class BasicCacheEntry<K, V> {
 	lock.notifyAll();
     }
 
-    /* DECACHING */
+    /* Status.DECACHING */
 
     /**
      * Returns whether this entry is being decached.
@@ -574,7 +582,7 @@ abstract class BasicCacheEntry<K, V> {
      * @return	whether this entry is being decached
      */
     boolean getDecaching() {
-	return checkStateValue(DECACHING);
+	return checkStatus(Status.DECACHING);
     }
 
     /* State.EVICTING_READ */
@@ -611,7 +619,8 @@ abstract class BasicCacheEntry<K, V> {
      *
      * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
-     * @throws	IllegalStateException if the entry is not decaching or decached
+     * @throws	IllegalStateException if the entry's current state is not
+     *		{@link State#CACHED_READ} or {@link State#CACHED_WRITE}
      * @throws	TransactionTimeoutException if the operation does not succeed
      *		before the specified stop time
      */
@@ -619,7 +628,7 @@ abstract class BasicCacheEntry<K, V> {
 	assert Thread.holdsLock(lock);
 	if (!getDecached()) {
 	    verifyState(State.EVICTING_READ, State.EVICTING_WRITE);
-	    await(NOT_CACHED, lock, stop);
+	    awaitStatus(Status.NOT_CACHED, lock, stop);
 	}
     }
 
@@ -722,15 +731,13 @@ abstract class BasicCacheEntry<K, V> {
     /* -- Private methods -- */
 
     /**
-     * Checks if the one bits in the argument are set in this entry's state
-     * value.
+     * Checks this entry's status includes the specified status value.
      *
-     * @param	value the value to check
-     * @return	{@code true} if the one bits in the argument are set, else
-     *		{@code false}
+     * @param	status the status value to check
+     * @return	{@code true} if the status value is present, else {@code false}
      */
-    private boolean checkStateValue(int value) {
-	return (state.value & value) == value;
+    private boolean checkStatus(Status status) {
+	return state.statusSet.contains(status);
     }
 
     /**
@@ -765,10 +772,10 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
-     * Waits for this entry's state value to have all bits set that are set in
-     * {@code desiredStateValue}.
+     * Waits for this entry's state value to include the specified status
+     * value.
      *
-     * @param	value the value to check
+     * @param	status the status value to check
      * @param	lock the associated lock, which must be held
      * @param	stop the time in milliseconds when waiting should fail
      * @throws	TransactionInterruptedException if the current thread is
@@ -776,9 +783,8 @@ abstract class BasicCacheEntry<K, V> {
      * @throws	TransactionTimeoutException if desired state value does not
      *		appear before the specified stop time
      */
-    private void await(int desiredStateValue, Object lock, long stop) {
-	assert Thread.holdsLock(lock);
-	if (checkStateValue(desiredStateValue)) {
+    private void awaitStatus(Status status, Object lock, long stop) {
+	if (checkStatus(status)) {
 	    return;
 	}
 	long start = System.currentTimeMillis();
@@ -790,7 +796,7 @@ abstract class BasicCacheEntry<K, V> {
 		throw new TransactionInterruptedException(
 		    "Interrupt while waiting for entry " + this, e);
 	    }
-	    if (checkStateValue(desiredStateValue)) {
+	    if (checkStatus(status)) {
 		return;
 	    }
 	    now = System.currentTimeMillis();
@@ -801,10 +807,10 @@ abstract class BasicCacheEntry<K, V> {
     }
 
     /**
-     * Waits for this entry's state value to have all bits cleared that are set
-     * in {@code desiredStateValue}.
+     * Waits for this entry's state value to not include the specified status
+     * value.
      *
-     * @param	value the value to check
+     * @param	status the status value to check
      * @param	lock the associated lock, which should be held
      * @param	stop the time in milliseconds when waiting should fail
      * @throws	TransactionInterruptedException if the current thread is
@@ -812,9 +818,8 @@ abstract class BasicCacheEntry<K, V> {
      * @throws	TransactionTimeoutException if desired state value does not
      *		appear before the specified stop time
      */
-    private void awaitNot(int undesiredState, Object lock, long stop) {
-	assert Thread.holdsLock(lock);
-	if ((state.value & undesiredState) == 0) {
+    private void awaitStatusNot(Status status, Object lock, long stop) {
+	if (!state.statusSet.contains(status)) {
 	    return;
 	}
 	long start = System.currentTimeMillis();
@@ -826,7 +831,7 @@ abstract class BasicCacheEntry<K, V> {
 		throw new TransactionInterruptedException(
 		    "Interrupt while waiting for entry " + this, e);
 	    }
-	    if ((state.value & undesiredState) == 0) {
+	    if (!state.statusSet.contains(status)) {
 		return;
 	    }
 	    now = System.currentTimeMillis();

@@ -157,23 +157,25 @@ class NewObjectIdCache {
     /** Creates a thread for obtaining new object IDs. */
     private Thread createNewObjectsThread() {
 	return new Thread(
-	    new NewObjectsRunnable(store), CLASSNAME + ".newObjects");
+	    new NewObjectsRunnable(), CLASSNAME + ".newObjects");
     }
 
     /** A {@code Runnable} that obtains new object IDs. */
-    private class NewObjectsRunnable extends RetryIoRunnable<Long> {
-	NewObjectsRunnable(CachingDataStore store) {
+    private class NewObjectsRunnable
+	extends CachingDataStore.BasicRetryIoRunnable<Long>
+    {
+	NewObjectsRunnable() {
 	    super(store);
 	}
 	@Override
 	public String toString() {
 	    return "NewObjectsRunnable[]";
 	}
-	Long callOnce() throws IOException {
+	protected Long callOnce() throws IOException {
 	    logger.log(FINER, "Requesting new object IDs");
 	    return store.getServer().newObjectIds(batchSize);
 	}
-	void runWithResult(Long result) {
+	protected void runWithResult(Long result) {
 	    Range range = new Range(result, result + batchSize - 1);
 	    synchronized (NewObjectIdCache.this) {
 		if (currentRange == null) {

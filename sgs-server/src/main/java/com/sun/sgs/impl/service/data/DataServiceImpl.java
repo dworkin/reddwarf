@@ -727,7 +727,6 @@ public final class DataServiceImpl implements DataService {
 	serviceStats.addDataConflictListenerOp.report();
 	try {
 	    checkNull("listener", listener);
-	    checkNonTransactionalContext(txnProxy);
 	    checkState();
 	    store.addDataConflictListener(listener);
 	} catch (RuntimeException e) {

@@ -17,9 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.queue;
 
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.impl.service.data.store.cache.CacheConsistencyException;
 
 /** The interface for operations on the server's update queue. */
 public interface UpdateQueueServer {

@@ -33,7 +33,6 @@ import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
-import com.sun.sgs.service.store.DataStore;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.NotBoundException;
@@ -92,22 +91,33 @@ import java.util.logging.Logger;
  * </dl> <p>
  *
  * This class uses the {@link Logger} named {@code
- * com.sun.sgs.impl.service.data.store.net.client} to log information
- * at the following levels: <p>
+ * com.sun.sgs.impl.service.data.store.net.client.DataStoreClient} to log
+ * information at the following levels: <p>
  *
  * <ul>
  * <li> {@link Level#SEVERE SEVERE} - Problems starting the server
  * <li> {@link Level#INFO INFO} - Starting the server
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties
  * <li> {@link Level#FINE FINE} - Allocating object IDs
- * <li> {@link Level#FINEST FINEST} - Object operations
- * </ul>
+ * <li> {@link Level#FINER FINER} - Transaction operations, class info
+ *	operations, and node shutdown
+ * <li> {@link Level#FINEST FINEST} - Name and object operations
+ * </ul> <p>
+ *
+ * Operations that throw {@link TransactionAbortedException} will instead log
+ * the failure to the {@code Logger} named {@code
+ * com.sun.sgs.impl.service.data.store.net.client.DataStoreClient.abort}, to
+ * make it easier to debug concurrency conflicts.
  */
 public final class DataStoreClient extends AbstractDataStore {
 
     /** The package for this class. */
     private static final String PACKAGE =
 	"com.sun.sgs.impl.service.data.store.net";
+
+    /** The name of this class. */
+    private static final String CLASSNAME =
+	"com.sun.sgs.impl.service.data.store.net.DataStoreClient";
 
     /** The property that specifies the name of the server host. */
     private static final String SERVER_HOST_PROPERTY =
@@ -223,8 +233,8 @@ public final class DataStoreClient extends AbstractDataStore {
 	throws IOException, NotBoundException
     {
 	super(systemRegistry, txnProxy,
-	      new LoggerWrapper(Logger.getLogger(PACKAGE + ".client")),
-	      new LoggerWrapper(Logger.getLogger(PACKAGE + ".client.abort")));
+	      new LoggerWrapper(Logger.getLogger(CLASSNAME)),
+	      new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort")));
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);

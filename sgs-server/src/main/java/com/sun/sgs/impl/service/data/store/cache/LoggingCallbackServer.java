@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
-import static com.sun.sgs.impl.sharedutil.Exceptions.initCause;
+import static com.sun.sgs.impl.sharedutil.Exceptions.throwUnchecked;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
 import java.util.logging.Level;
@@ -67,39 +67,27 @@ class LoggingCallbackServer implements CallbackServer {
     public boolean requestDowngradeObject(long oid, long conflictNodeId)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "requestDowngradeObject nodeId:" + nodeId +
-		       ", oid:" + oid + ", conflictNodeId:" + conflictNodeId);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? ("requestDowngradeObject nodeId:" + nodeId +
+	       ", oid:" + oid + ", conflictNodeId:" + conflictNodeId)
+	    : null;
+	logger.log(FINEST, operation);
 	try {
 	    boolean result =
 		server.requestDowngradeObject(oid, conflictNodeId);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "requestDowngradeObject nodeId:" + nodeId +
-			   ", oid:" + oid +
-			   ", conflictNodeId:" + conflictNodeId +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"requestDowngradeObject nodeId:" + nodeId +
-				", oid:" + oid +
-				", conflictNodeId:" + conflictNodeId +
-				" throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw initCause(
-		    new AssertionError("Unexpected exception: " + e), e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -108,38 +96,26 @@ class LoggingCallbackServer implements CallbackServer {
     public boolean requestEvictObject(long oid, long conflictNodeId)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "requestEvictObject nodeId:" + nodeId + ", oid:" + oid +
-		       ", conflictNodeId:" + conflictNodeId);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? ("requestEvictObject nodeId:" + nodeId + ", oid:" + oid +
+	       ", conflictNodeId:" + conflictNodeId)
+	    : null;
+	logger.log(FINEST, operation);
 	try {
 	    boolean result = server.requestEvictObject(oid, conflictNodeId);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "requestEvictObject nodeId:" + nodeId +
-			   ", oid:" + oid +
-			   ", conflictNodeId:" + conflictNodeId +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"requestEvictObject nodeId:" + nodeId +
-				", oid:" + oid +
-				", conflictNodeId:" + conflictNodeId +
-				" throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw initCause(
-		    new AssertionError("Unexpected exception: " + e), e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -148,40 +124,27 @@ class LoggingCallbackServer implements CallbackServer {
     public boolean requestDowngradeBinding(String name, long conflictNodeId)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "requestDowngradeBinding nodeId:" + nodeId +
-		       ", name:" + name +
-		       ", conflictNodeId:" + conflictNodeId);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? ("requestDowngradeBinding nodeId:" + nodeId + ", name:" + name +
+	       ", conflictNodeId:" + conflictNodeId)
+	    : null;
+	logger.log(FINEST, operation);
 	try {
 	    boolean result =
 		server.requestDowngradeBinding(name, conflictNodeId);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "requestDowngradeBinding nodeId:" + nodeId +
-			   ", name:" + name +
-			   ", conflictNodeId:" + conflictNodeId +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"requestDowngradeBinding nodeId:" + nodeId +
-				", name:" + name +
-				", conflictNodeId:" + conflictNodeId +
-				" throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw initCause(
-		    new AssertionError("Unexpected exception: " + e), e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }
@@ -190,39 +153,26 @@ class LoggingCallbackServer implements CallbackServer {
     public boolean requestEvictBinding(String name, long conflictNodeId)
 	throws IOException
     {
-	if (logger.isLoggable(FINEST)) {
-	    logger.log(FINEST,
-		       "requestEvictBinding nodeId:" + nodeId +
-		       ", name:" + name +
-		       ", conflictNodeId:" + conflictNodeId);
-	}
+	String operation = logger.isLoggable(FINEST)
+	    ? ("requestEvictBinding nodeId:" + nodeId + ", name:" + name +
+	       ", conflictNodeId:" + conflictNodeId)
+	    : null;
+	logger.log(FINEST, operation);
 	try {
 	    boolean result = server.requestEvictBinding(name, conflictNodeId);
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "requestEvictBinding nodeId:" + nodeId +
-			   ", name:" + name +
-			   ", conflictNodeId:" + conflictNodeId +
-			   " returns " + result);
+		logger.log(FINEST, operation + " returns " + result);
 	    }
 	    return result;
 	} catch (Throwable e) {
 	    if (logger.isLoggable(FINEST)) {
-		logger.logThrow(FINEST, e,
-				"requestEvictBinding nodeId:" + nodeId +
-				", name:" + name +
-				", conflictNodeId:" + conflictNodeId +
-				" throws");
+		logger.logThrow(FINEST, e, operation + " throws");
 	    }
 	    if (e instanceof IOException) {
 		throw (IOException) e;
-	    } else if (e instanceof RuntimeException) {
-		throw (RuntimeException) e;
-	    } else if (e instanceof Error) {
-		throw (Error) e;
 	    } else {
-		throw initCause(
-		    new AssertionError("Unexpected exception: " + e), e);
+		throwUnchecked(e);
+		throw new AssertionError(); /* not reached */
 	    }
 	}
     }

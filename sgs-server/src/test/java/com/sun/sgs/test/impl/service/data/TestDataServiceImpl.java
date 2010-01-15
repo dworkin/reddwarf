@@ -27,7 +27,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
@@ -51,6 +50,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.store.DataStore;
+import com.sun.sgs.test.util.ChunkedTask;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.PackageReadResolve;
@@ -64,6 +64,7 @@ import com.sun.sgs.test.util.ProtectedWriteReplace;
 import com.sun.sgs.test.util.PublicConstructor;
 import com.sun.sgs.test.util.PublicReadResolve;
 import com.sun.sgs.test.util.PublicWriteReplace;
+import com.sun.sgs.test.util.RepeatingConcurrentTask;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
@@ -3335,8 +3336,8 @@ public class TestDataServiceImpl extends Assert {
 
     @Test 
     public void testNextObjectIdBoundaryIds() throws Exception {
-	new ChunkedTask() {
-	    boolean runChunk() {
+	new ChunkedTask(txnScheduler, taskOwner) {
+	    protected boolean runChunk() {
 		ManagedBigInteger last;
 		try {
 		    last = (ManagedBigInteger)
@@ -3365,7 +3366,7 @@ public class TestDataServiceImpl extends Assert {
                 }
 		return false;
 	    }
-	}.runAwaitDone();
+	}.runAwaitDone(1000);
     }
 
     @Test 
@@ -3373,7 +3374,10 @@ public class TestDataServiceImpl extends Assert {
         class TestTask extends ChunkedTask {
             BigInteger dummyId;
             BigInteger dummy2Id;
-            boolean runChunk() {
+	    TestTask() {
+		super(txnScheduler, taskOwner);
+	    }
+            protected boolean runChunk() {
 		ManagedBigInteger last;
 		try {
 		    last = (ManagedBigInteger)
@@ -3417,11 +3421,11 @@ public class TestDataServiceImpl extends Assert {
         }
 
         final TestTask task = new TestTask();
-        task.runAwaitDone();
+        task.runAwaitDone(1000);
 
-	new ChunkedTask() {
+	new ChunkedTask(txnScheduler, taskOwner) {
 	    private boolean foundId2;
-            boolean runChunk() {
+            protected boolean runChunk() {
 		ManagedBigInteger last;
 		try {
 		    last = (ManagedBigInteger)
@@ -3449,7 +3453,7 @@ public class TestDataServiceImpl extends Assert {
                 }
 		return false;
 	    }
-	}.runAwaitDone();
+	}.runAwaitDone(1000);
     }
 
     /**
@@ -3489,8 +3493,8 @@ public class TestDataServiceImpl extends Assert {
                 service.removeObject(dummy.getNext());
         }}, taskOwner);
 
-	new ChunkedTask() {
-            boolean runChunk() {
+	new ChunkedTask(txnScheduler, taskOwner) {
+            protected boolean runChunk() {
 		ManagedBigInteger last;
 		try {
 		    last = (ManagedBigInteger)
@@ -3512,7 +3516,7 @@ public class TestDataServiceImpl extends Assert {
                 }
 		return false;
 	    }
-	}.runAwaitDone();
+	}.runAwaitDone(1000);
     }
 
     /* -- Unusual states -- */
@@ -3565,13 +3569,25 @@ public class TestDataServiceImpl extends Assert {
 
     @Test
     public void testAddDataConflictListenerInTransaction() throws Exception {
+	final DataConflictListener listener = new DataConflictListener() {
+	    public void nodeConflictDetected(
+		Object accessId, long nodeId, boolean forUpdate)
+	    {
+	    }
+	};
+	service.addDataConflictListener(listener);
+    }
+
+    @Test
+    public void testAddDataConflictListenerOutsideTransaction()
+	throws Exception
+    {
 	final AtomicReference<Throwable> exception =
 	    new AtomicReference<Throwable>();
 	final DataConflictListener listener = new DataConflictListener() {
 	    public void nodeConflictDetected(
 		Object accessId, long nodeId, boolean forUpdate)
 	    {
-		exception.set(new Exception("Unexpected call"));
 	    }
 	};
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -3584,22 +3600,17 @@ public class TestDataServiceImpl extends Assert {
 	    }
 	}, taskOwner);
 	Throwable e = exception.get();
-	if (e instanceof IllegalStateException) {
-	    System.err.println(e);
-	} else {
-	    fail("Expected IllegalStateException, found " + e);
+	if (e != null) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
 	}
     }
 
     @Test
     public void testAddDataConflictListenerAfterShutdown() throws Exception {
-	final AtomicReference<Throwable> exception =
-	    new AtomicReference<Throwable>();
 	final DataConflictListener listener = new DataConflictListener() {
 	    public void nodeConflictDetected(
 		Object accessId, long nodeId, boolean forUpdate)
 	    {
-		exception.set(new Exception("Unexpected call"));
 	    }
 	};
         serverNode.shutdown(false);
@@ -5228,9 +5239,9 @@ public class TestDataServiceImpl extends Assert {
     static class CreateBindingsTask extends RepeatingConcurrentTask {
 	private static final long serialVersionUID = 1;
 	CreateBindingsTask(int index) {
-	    super(index, 10, 100);
+	    super(taskService, index, 10, 100);
 	}
-	void runInternal() {
+	protected void runInternal() {
 	    String name = String.format("create-%04d", index);
 	    System.err.println("Binding " + name);
 	    service.setBinding(name, new DummyManagedObject());
@@ -5254,9 +5265,9 @@ public class TestDataServiceImpl extends Assert {
 	private static final long serialVersionUID = 1;
 	private boolean remove = false;
 	CreateRemoveBindingsTask(int index) {
-	    super(index, 10, 100);
+	    super(taskService, index, 10, 100);
 	}
-	void runInternal() {
+	protected void runInternal() {
 	    String name = String.format("create-remove-%04d", index);
 	    if (!remove) {
 		System.err.println("Create binding " + name);
@@ -5284,30 +5295,34 @@ public class TestDataServiceImpl extends Assert {
 			   ", wait:" + wait);
 	long start = System.currentTimeMillis();
 	/* Set half the bindings */
-	new ChunkedTask() { boolean runChunk() {
-	    ManagedInteger remaining;
-	    DummyManagedObject dummy;
-	    try {
-		remaining =
-		    (ManagedInteger) service.getBinding("remaining");
-		dummy = (DummyManagedObject) service.getBinding("dummy");
-	    } catch (NameNotBoundException e) {
-		remaining = new ManagedInteger(bindings / 2);
-		service.setBinding("remaining", remaining);
-		dummy = new DummyManagedObject();
-		service.setBinding("dummy", dummy);
-	    }
-	    if (remaining.value == 0) {
-		service.removeBinding("remaining");
-		return true;
-	    } else {
-		service.markForUpdate(remaining);
-		while (remaining.value > 0 && taskService.shouldContinue()) {
-		    service.setBinding(
-			String.valueOf(--remaining.value), dummy);
+	new ChunkedTask(txnScheduler, taskOwner) {
+	    protected boolean runChunk() {
+		ManagedInteger remaining;
+		DummyManagedObject dummy;
+		try {
+		    remaining =
+			(ManagedInteger) service.getBinding("remaining");
+		    dummy = (DummyManagedObject) service.getBinding("dummy");
+		} catch (NameNotBoundException e) {
+		    remaining = new ManagedInteger(bindings / 2);
+		    service.setBinding("remaining", remaining);
+		    dummy = new DummyManagedObject();
+		    service.setBinding("dummy", dummy);
 		}
-		return false;
-	    } } }.runAwaitDone();
+		if (remaining.value == 0) {
+		    service.removeBinding("remaining");
+		    return true;
+		} else {
+		    service.markForUpdate(remaining);
+		    while (remaining.value > 0 &&
+			   taskService.shouldContinue())
+		    {
+			service.setBinding(
+			    String.valueOf(--remaining.value), dummy);
+		    }
+		    return false;
+		}
+	    } }.runAwaitDone(1000);
 	/* Random work */
 	CountDownLatch done = new CountDownLatch(threads);
 	AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
@@ -5323,28 +5338,30 @@ public class TestDataServiceImpl extends Assert {
 		failure.get());
 	}
 	/* Remove all bindings */
-	new ChunkedTask() { boolean runChunk() {
-	    ManagedInteger remaining;
-	    try {
-		remaining = (ManagedInteger) service.getBinding("remaining");
-	    } catch (NameNotBoundException e) {
-		remaining = new ManagedInteger(bindings);
-		service.setBinding("remaining", remaining);
-	    }
-	    if (remaining.value == 0) {
-		service.removeBinding("remaining");
-		return true;
-	    } else {
-		service.markForUpdate(remaining);
-		while (remaining.value > 0 && taskService.shouldContinue()) {
-		    try {
-			service.removeBinding(
-			    String.valueOf(--remaining.value));
-		    } catch (NameNotBoundException e) {
-		    }
+	new ChunkedTask(txnScheduler, taskOwner) {
+	    protected boolean runChunk() {
+		ManagedInteger remaining;
+		try {
+		    remaining = (ManagedInteger) service.getBinding("remaining");
+		} catch (NameNotBoundException e) {
+		    remaining = new ManagedInteger(bindings);
+		    service.setBinding("remaining", remaining);
 		}
-		return false;
-	    } } }.runAwaitDone();
+		if (remaining.value == 0) {
+		    service.removeBinding("remaining");
+		    return true;
+		} else {
+		    service.markForUpdate(remaining);
+		    while (remaining.value > 0 && taskService.shouldContinue()) {
+			try {
+			    service.removeBinding(
+				String.valueOf(--remaining.value));
+			} catch (NameNotBoundException e) {
+			}
+		    }
+		    return false;
+		}
+	    } }.runAwaitDone(1000);
 	long time = System.currentTimeMillis() - start;
 	System.err.println("Test finished in " + (time / 1000) + " seconds");
     }
@@ -6189,44 +6206,6 @@ public class TestDataServiceImpl extends Assert {
 	    ((ExceptionRetryStatus) t).shouldRetry();
     }
 
-    /**
-     * A kernel runnable for conveniently breaking a task into separate
-     * transactions.
-     */
-    abstract static class ChunkedTask extends TestAbstractKernelRunnable {
-
-	/**
-	 * A count down latch that is set to 1 while waiting to complete all
-	 * chunks of the task, and set to 0 when done waiting.
-	 */
-	private CountDownLatch done = new CountDownLatch(1);
-
-	/** Creates an instance of this class. */
-	ChunkedTask() { }
-
-	/**
-	 * Runs a portion of the task, returning true if the entire task is
-	 * done.
-	 *
-	 * @return	whether the task is done
-	 */
-	abstract boolean runChunk();
-
-	/** Runs this task and waits until it is done. */
-	void runAwaitDone() throws InterruptedException {
-	    txnScheduler.scheduleTask(this, taskOwner);
-	    assertTrue("Task not done", done.await(1, TimeUnit.SECONDS));
-	}
-
-	/** Runs the task chunks, rescheduling this task until it is done. */
-	public final void run() {
-	    if (runChunk()) {
-		done.countDown();
-	    } else {
-		txnScheduler.scheduleTask(this, taskOwner);
-	    }
-	}
-    }
 
     /** A managed object that contains a big integer, which may be null. */
     static class ManagedBigInteger implements ManagedObject, Serializable {
@@ -6243,129 +6222,6 @@ public class TestDataServiceImpl extends Assert {
 	int value;
 	ManagedInteger(int value) {
 	    this.value = value;
-	}
-    }
-
-    /**
-     * A task for tests that run several repeated tasks concurrently.  Note
-     * that only one set of these tasks can be run at a time because this class
-     * uses statics to track running tasks.
-     */
-    static abstract class RepeatingConcurrentTask
-	implements Serializable, Task
-    {
-	private static final long serialVersionUID = 1;
-
-	/** How many tasks are currently running. */
-	private static int tasksRunning = 0;
-
-	/** Any exception thrown by any task, or null. */
-	private static Throwable exception = null;
-
-	/** The index currently associated with this task. */
-	int index;
-
-	/** The offset for computing this task's next index. */
-	final int nextIndexOffset;
-
-	/** If index reaches or exceeds this value, then this task is done. */
-	private final int maxIndex;
-
-	/**
-	 * Creates an instance of this class.
-	 *
-	 * @param	index the first index for this class
-	 * @param	nextIndexOffset the increment for computing the next
-	 *		index
-	 * @param	maxIndex the index to reach for completion
-	 */
-	RepeatingConcurrentTask(int index, int nextIndexOffset, int maxIndex) {
-	    this.index = index;
-	    this.nextIndexOffset = nextIndexOffset;
-	    this.maxIndex = maxIndex;
-	    if (index < nextIndexOffset) {
-		noteStart();
-	    }		    
-	}
-
-	/**
-	 * Calls {@link #runInternal} and reschedules this task if the final
-	 * index has not been reached, handling any exceptions.
-	 */
-	public final void run() {
-	    if (!checkDone()) {
-		try {
-		    runInternal();
-		    taskService.scheduleTask(this);
-		} catch (RuntimeException e) {
-		    if ((e instanceof ExceptionRetryStatus) &&
-			((ExceptionRetryStatus) e).shouldRetry())
-		    {
-			throw e;
-		    } else {
-			unexpectedException(e);
-		    }
-		} catch (Error e) {
-		    unexpectedException(e);
-		}
-	    }
-	}
-	
-	/** Performs one iteration of this task. */
-	abstract void runInternal();
-
-	/**
-	 * Waits the specified number of milliseconds for all outstanding
-	 * instances of this task to complete, throwing an exception if the
-	 * tasks do not complete in time or if any of them fail.
-	 *
-	 * @param	maxWait the number of milliseconds to wait
-	 */
-	static synchronized void awaitDone(long maxWait) {
-	    long stop = System.currentTimeMillis() + maxWait;
-	    while (tasksRunning > 0) {
-		long wait = stop - System.currentTimeMillis();
-		assertTrue("Timed out", wait > 0);
-		try {
-		    RepeatingConcurrentTask.class.wait(wait);
-		} catch (InterruptedException e) {
-		}
-	    }
-	    if (exception != null) {
-		throw new RuntimeException(
-		    "Unexpected exception: " + exception, exception);
-	    }
-	}
-
-	/** Checks if the task should be run and rescheduled. */
-	private boolean checkDone() {
-	    synchronized (RepeatingConcurrentTask.class) {
-		if (exception != null || index >= maxIndex) {
-		    noteFinish();
-		    return true;
-		} else {
-		    return false;
-		}
-	    }
-	}
-
-	/** Notes an unexpected exception and marks the task as finished. */
-	private static synchronized void unexpectedException(Throwable e) {
-	    exception = e;
-	    noteFinish();
-	}
-
-	/** Notes that a task has started. */
-	private static synchronized void noteStart() {
-	    tasksRunning++;
-	}
-
-	/** Notes that a task has finished. */
-	private static synchronized void noteFinish() {
-	    tasksRunning--;
-	    if (tasksRunning == 0) {
-		RepeatingConcurrentTask.class.notifyAll();
-	    }
 	}
     }
 }

@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.queue;
 
+import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
 import static com.sun.sgs.impl.sharedutil.Exceptions.initCause;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
@@ -167,7 +168,8 @@ public final class RequestQueueClient extends Thread {
      *		waiting to be sent to or acknowledged by the server
      * @throws	IllegalArgumentException if {@code nodeId} is negative, or if
      *		{@code maxRetry}, {@code retryWait}, or {@code queueSize} is
-     *		less than {@code 1}
+     *		less than {@code 1}, or if {@code queueSize} greater than
+     *		{@link RequestQueueServer#MAX_OUTSTANDING}
      */
     public RequestQueueClient(long nodeId,
 			      SocketFactory socketFactory,
@@ -190,6 +192,11 @@ public final class RequestQueueClient extends Thread {
 	if (retryWait < 1) {
 	    throw new IllegalArgumentException(
 		"The retryWait must not be less than 1");
+	}
+	if (queueSize < 1 || queueSize > RequestQueueServer.MAX_OUTSTANDING) {
+	    throw new IllegalArgumentException(
+		"The queueSize must not be less than 1 or grater than " +
+		RequestQueueServer.MAX_OUTSTANDING);
 	}
 	this.nodeId = nodeId;
 	this.socketFactory = socketFactory;
@@ -224,7 +231,6 @@ public final class RequestQueueClient extends Thread {
 		       "RequestQueueClient nodeId:" + nodeId +
 		       " adding request request:" + request);
 	}
-	boolean done = false;
 	while (true) {
 	    synchronized (this) {
 		if (shutdown) {
@@ -232,12 +238,9 @@ public final class RequestQueueClient extends Thread {
 			"The client has begun to shut down");
 		}
 	    }
-	    if (done) {
-		break;
-	    }
 	    try {
 		requests.putLast(request);
-		done = true;
+		break;
 	    } catch (InterruptedException e) {
 	    }
 	}

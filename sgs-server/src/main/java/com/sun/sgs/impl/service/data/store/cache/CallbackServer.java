@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueue;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -30,12 +31,13 @@ public interface CallbackServer extends Remote {
 
     /**
      * Requests that the node downgrade access to an object from write access
-     * to read access.  If the method returns {@code true}, then the object has
-     * been downgraded as requested.  If the method returns false, then the
-     * node will arrange to call {@link UpdateQueue#downgradeObject} to notify
-     * the server that it has downgraded the object.  It is not an error for
-     * the node to already have the object cached for read or to have already
-     * evicted the object.
+     * to read access.  If the method returns {@code true}, then the cache no
+     * longer holds a write lock on the object.  If the method returns {@code
+     * false}, then the downgrade has been delayed, and the node will call
+     * {@link UpdateQueue#downgradeObject} to notify the server when it has
+     * downgraded the object.  This method returns {@code true} if the node
+     * already only had the object cached for read or if the object was not
+     * present in the cache.
      *
      * @param	oid the object ID
      * @param	conflictNodeId the ID of the node requesting the downgrade
@@ -48,11 +50,11 @@ public interface CallbackServer extends Remote {
 
     /**
      * Requests that the node give up access to an object.  If the method
-     * returns {@code true}, then the object has been evicted as requested.  If
-     * the method returns false, then the node will arrange to call {@link
-     * UpdateQueue#evictObject} to notify the server that it has evicted the
-     * object.  It is not an error for the node to have already evicted the
-     * object.
+     * returns {@code true}, then the object is no longer present in the cache.
+     * If the method returns {@code false}, then the eviction has been delayed,
+     * and the node will call {@link UpdateQueue#evictObject} to notify the
+     * server when it has evicted the object.  This method returns {@code true}
+     * if the object was already not present in the cache.
      *
      * @param	oid the object ID
      * @param	conflictNodeId the ID of the node requesting the eviction
@@ -66,12 +68,12 @@ public interface CallbackServer extends Remote {
     /**
      * Requests that the node downgrade write access to a name binding from
      * write access to read access.  If the method returns {@code true}, then
-     * the name binding has been downgraded as requested.  If the method
-     * returns false, then the node will arrange to call {@link
-     * UpdateQueue#downgradeBinding} to notify the server that it has
-     * downgraded the name binding.  It is not an error for the node to already
-     * have the name binding cached for read or to have already evicted the
-     * name binding.
+     * the cache no longer holds a write lock on the name binding.  If the
+     * method returns {@code false}, then the downgrade has been delayed, and
+     * the node will to call {@link UpdateQueue#downgradeBinding} to notify the
+     * server when it has downgraded the name binding.  This method returns
+     * {@code true} if the node already only had the name binding cached for
+     * read or if the name binding was not present in the cache.
      *
      * @param	name the name
      * @param	conflictNodeId the ID of the node requesting the downgrade
@@ -84,11 +86,11 @@ public interface CallbackServer extends Remote {
 
     /**
      * Requests that the node give up access to a name binding.  If the method
-     * returns {@code true}, then the name binding has been evicted from the
-     * node's cache as requested.  If the method returns false, then the node
-     * will arrange to call {@link UpdateQueue#downgradeBinding} to notify the
-     * server that it has evicted the name binding.  It is not an error for the
-     * node to have already evicted the name binding.
+     * returns {@code true}, then the name binding is no longer present in the
+     * cache.  If the method returns {@code false}, then the node will arrange
+     * to call {@link UpdateQueue#downgradeBinding} to notify the server when
+     * it has evicted the name binding.  This method returns {@code true} if
+     * the name binding was already not present in the cache.
      *
      * @param	name the name
      * @param	conflictNodeId the ID of the node requesting the eviction

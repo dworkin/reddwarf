@@ -31,6 +31,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.DataConflictListener;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
@@ -2042,6 +2043,24 @@ public class TestDataStoreImpl extends Assert {
     @Test
     public void testNextObjectIdShutdown() throws Exception {
 	testShutdown(nextObjectId);
+    }
+
+    /* -- Test addDataConflictListener -- */
+
+    @Test(expected=NullPointerException.class)
+    public void testAddDataConflictListenerNullListener() {
+	store.addDataConflictListener(null);
+    }
+
+    @Test
+    public void testAddDataConflictListener() throws Exception {
+	final DataConflictListener listener = new DataConflictListener() {
+	    public void nodeConflictDetected(
+		Object accessId, long nodeId, boolean forUpdate)
+	    {
+	    }
+	};
+	store.addDataConflictListener(listener);
     }
 
     /* -- Test deadlock -- */

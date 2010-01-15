@@ -34,8 +34,13 @@ import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeString;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
-import com.sun.sgs.impl.service.data.store.cache.
+import com.sun.sgs.impl.service.data.store.cache.queue.
     UpdateQueueRequest.UpdateQueueRequestHandler;
+import com.sun.sgs.impl.service.data.store.cache.queue.LoggingUpdateQueueServer;
+import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueListener;
+import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueServer;
+import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueueRequest;
+import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueueServer;
 import static com.sun.sgs.impl.service.transaction.
     TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -47,6 +52,7 @@ import com.sun.sgs.impl.util.AbstractBasicService;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 import com.sun.sgs.impl.util.lock.LockConflict;
 import static com.sun.sgs.impl.util.lock.LockConflictType.DEADLOCK;
 import static com.sun.sgs.impl.util.lock.LockConflictType.DENIED;
@@ -103,8 +109,8 @@ import java.util.logging.Logger;
  *
  * <dt> <i>Property:</i> <code><b>{@value #LOCK_TIMEOUT_PROPERTY}</b></code>
  *	<br>
- *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
- *	transaction timeout
+ *	<i>Default:</i> <code>{@value #DEFAULT_LOCK_TIMEOUT_PROPORTION}</code>
+ *	times the transaction timeout
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  *	that an attempt to obtain a lock will be allowed to continue before
@@ -1620,6 +1626,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	try {
 	    NodeInfo nodeInfo = getNodeInfo(nodeId);
 	    nodeInfo.nodeCallStarted();
+	    done = true;
 	    return nodeInfo;
 	} finally {
 	    if (!done) {

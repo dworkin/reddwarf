@@ -17,13 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.test.impl.service.data.store.cache;
+package com.sun.sgs.test.impl.service.data.store.cache.queue;
 
-import com.sun.sgs.impl.service.data.store.cache.Request;
-import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener;
-import com.sun.sgs.impl.service.data.store.cache.RequestQueueListener.
+import com.sun.sgs.impl.service.data.store.cache.queue.Request;
+import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueListener;
+import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueListener.
     ServerDispatcher;
-import com.sun.sgs.impl.service.data.store.cache.RequestQueueServer;
+import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueServer;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.DataOutputStream;
 import java.io.IOException;

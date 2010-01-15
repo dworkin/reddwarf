@@ -29,11 +29,11 @@ import static com.sun.sgs.impl.service.data.store.cache.
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_HOST_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStore.SERVER_PORT_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.DEFAULT_SERVER_PORT;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStoreServerImpl.DIRECTORY_PROPERTY;
+import static com.sun.sgs.impl.service.data.store.cache.
+    CachingDataStoreServerImpl.SERVER_PORT_PROPERTY;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.test.impl.service.data.TestDataServicePerformance;

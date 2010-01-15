@@ -31,8 +31,9 @@ import java.util.logging.Logger;
  * A cache entry for a name binding.  Entries only appear in the cache for
  * bound names; information about unbound names is represented using the {@link
  * #previousKey} and {@link #previousKeyUnbound} fields.  Only the {@link #key}
- * field may be accessed without holding the associated lock.  For all other
- * fields and methods, the lock should be held. <p>
+ * field may be accessed without holding the associated lock (see {@link
+ * Cache#getBindingLock} and {@link Cache#getObjectLock}.  For all other fields
+ * and methods, the lock must be held. <p>
  *
  * In addition to the value associated with a name, binding cache entries store
  * information about name bindings in the range between this name and an

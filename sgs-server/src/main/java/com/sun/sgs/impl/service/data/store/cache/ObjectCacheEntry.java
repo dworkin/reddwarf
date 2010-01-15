@@ -21,8 +21,9 @@ package com.sun.sgs.impl.service.data.store.cache;
 
 /**
  * A cache entry for an object.  Only the {@link #key} field may be accessed
- * without holding the associated lock.  For all other fields and methods, the
- * lock should be held. <p>
+ * without holding the associated lock (see {@link Cache#getBindingLock} and
+ * {@link Cache#getObjectLock}.  For all other fields and methods, the lock
+ * must be held. <p>
  *
  * This class is part of the implementation of {@link CachingDataStore}.
  */
@@ -110,7 +111,7 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     @Override
     public String toString() {
-	byte[] data = getValue();
+	byte[] data = super.getValue();
 	return "ObjectCacheEntry[" +
 	    "oid:" + key +
 	    ", data:" + (noData ? "NONE"
@@ -138,6 +139,20 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      */
     static int keyHashCode(long oid) {
 	return (int) (oid ^ (oid >>> 32));
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation checks that the {@code noData} field is {@code
+     * false}.
+     */
+    @Override
+    byte[] getValue() {
+	if (noData) {
+	    throw new IllegalStateException("Entry contains no data: " + this);
+	}
+	return super.getValue();
     }
 
     /**

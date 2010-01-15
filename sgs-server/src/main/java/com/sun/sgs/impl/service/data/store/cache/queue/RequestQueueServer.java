@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.queue;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
@@ -46,7 +46,7 @@ import java.util.logging.Logger;
  * Each request number is read as a {@code short} from the input stream, with
  * the stream then supplied to the request handler's {@link
  * Request.RequestHandler#readRequest} method to read any additional data and
- * return the request.  If the request number is newer than that of the last
+ * return the request.  If the request number is later than that of the last
  * request performed by the server, then the request handler's {@link
  * Request.RequestHandler#performRequest} method will be called to perform the
  * operation associated with the request.  If that method completes normally,
@@ -82,10 +82,13 @@ public class RequestQueueServer<R extends Request> {
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /** The maximum request number. */
-    private static final int MAX_REQUEST = Short.MAX_VALUE;
+    public static final int MAX_REQUEST = Short.MAX_VALUE;
 
-    /** The largest number of requests that can be outstanding. */
-    private static final int MAX_OUTSTANDING = 10000;
+    /**
+     * The largest number of requests that can be outstanding, which must be
+     * less than {@link #MAX_REQUEST}.
+     */
+    public static final int MAX_OUTSTANDING = 10000;
 
     /** The node ID for this server. */
     final long nodeId;
@@ -177,8 +180,8 @@ public class RequestQueueServer<R extends Request> {
      *
      * @param	x the first request to compare
      * @param	y the second request to compare
-     * @return	{@code true} if {@code request1} is earlier than {@code
-     *		request2}, else {@code false}
+     * @return	{@code true} if {@code x} is earlier than {@code y}, else
+     *		{@code false}
      * @throws	IllegalArgumentException if either argument is negative, if
      *		either argument is greater than the maximum request size, or if
      *		the values of the arguments imply that there are more than the
@@ -280,7 +283,7 @@ public class RequestQueueServer<R extends Request> {
 				   ", newRequest:" + newRequest);
 		    }
 		    /*
-		     * Only perform newer requests and only if the last request
+		     * Only perform later requests and only if the last request
 		     * did not fail.
 		     */
 		    if (newRequest && lastRequestException == null) {

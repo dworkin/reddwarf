@@ -25,7 +25,6 @@ import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.util.Properties;

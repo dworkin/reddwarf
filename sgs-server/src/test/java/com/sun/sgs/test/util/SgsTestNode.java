@@ -456,7 +456,7 @@ public class SgsTestNode {
 	    CachingDataStoreServerImpl.DIRECTORY_PROPERTY, dir + ".db",
 	    "com.sun.sgs.impl.service.data.store.net.server.port",
 		String.valueOf(requestedDataPort),
-	    CachingDataStore.SERVER_PORT_PROPERTY,
+	    CachingDataStoreServerImpl.SERVER_PORT_PROPERTY,
 		String.valueOf(requestedDataPort),
 	    DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
 		DataStoreClient.class.getName(),

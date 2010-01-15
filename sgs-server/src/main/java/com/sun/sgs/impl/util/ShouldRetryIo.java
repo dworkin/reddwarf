@@ -17,13 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.util;
 
 /**
- * Provides support for determining when and whether to retry I/O operations.
- * This class is part of the implementation of {@link CachingDataStore}.
+ * A utility method that provides support for determining when and whether to
+ * retry I/O operations.
  */
-class ShouldRetryIo {
+public class ShouldRetryIo {
 
     /** The maximum number of milliseconds to retry failing I/O operations. */
     private final long maxRetry;
@@ -43,8 +43,13 @@ class ShouldRetryIo {
      * @param	maxRetry the maximum number of milliseconds to retry failing
      *		I/O operations
      * @param	retryWait the number of milliseconds to wait between retries
+     * @throws	IllegalArgumentException if either argument is negative
      */
-    ShouldRetryIo(long maxRetry, long retryWait) {
+    public ShouldRetryIo(long maxRetry, long retryWait) {
+	if (maxRetry < 0 || retryWait < 0) {
+	    throw new IllegalArgumentException(
+		"The maxRetry and retryWait must not be negative");
+	}
 	this.maxRetry = maxRetry;
 	this.retryWait = retryWait;
     }
@@ -55,11 +60,11 @@ class ShouldRetryIo {
      *
      * @return	whether the I/O operation should be retried
      */
-    boolean shouldRetry() {
+    public boolean shouldRetry() {
 	long now = System.currentTimeMillis();
 	if (failureStarted == -1) {
 	    failureStarted = now;
-	} else if (now - failureStarted > maxRetry) {
+	} else if (now + retryWait - failureStarted > maxRetry) {
 	    return false;
 	}
 	try {
@@ -81,7 +86,7 @@ class ShouldRetryIo {
      * operation succeeds but retries are still needed, so that the timer for
      * failing I/O operations is reset.
      */
-    void ioSucceeded() {
+    public void ioSucceeded() {
 	failureStarted = -1;
     }
 }

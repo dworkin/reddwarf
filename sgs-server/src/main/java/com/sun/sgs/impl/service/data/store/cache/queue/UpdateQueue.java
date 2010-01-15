@@ -17,19 +17,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.queue;
 
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.impl.service.data.store.cache.
+import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
+import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
+import com.sun.sgs.impl.service.data.store.cache.queue.
+    UpdateQueueRequest.Commit;
+import com.sun.sgs.impl.service.data.store.cache.queue.
     UpdateQueueRequest.DowngradeBinding;
-import com.sun.sgs.impl.service.data.store.cache.
+import com.sun.sgs.impl.service.data.store.cache.queue.
     UpdateQueueRequest.DowngradeObject;
-import com.sun.sgs.impl.service.data.store.cache.
+import com.sun.sgs.impl.service.data.store.cache.queue.
     UpdateQueueRequest.EvictBinding;
-import com.sun.sgs.impl.service.data.store.cache.
+import com.sun.sgs.impl.service.data.store.cache.queue.
     UpdateQueueRequest.EvictObject;
-import com.sun.sgs.impl.service.data.store.cache.UpdateQueueRequest.Commit;
 import com.sun.sgs.service.TransactionInterruptedException;
 import java.io.IOException;
 import java.util.Collections;
@@ -47,7 +50,9 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 /**
  * The facility that data store nodes use to send updates to the data server.
  * The implementation uses a {@link RequestQueueClient} to communicate requests
- * to the server in order.  It limits the number of unacknowledged commit
+ * to the server in order.  It makes sure that transactions are committed in
+ * order, and that locks are not released until the transactions in which they
+ * were used have committed.  It limits the number of unacknowledged commit
  * requests that can appear in the queue to make sure that the node does not
  * outstrip the capacity of the server.  Eviction and downgrade requests are
  * not limited in the queue, though, since they represent a response to
@@ -55,7 +60,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
  *
  * This class is part of the implementation of {@link CachingDataStore}.
  */
-class UpdateQueue {
+public class UpdateQueue {
 
     /**
      * The ratio between the maximum number of commit requests permitted to be
@@ -63,9 +68,6 @@ class UpdateQueue {
      * which includes downgrades and evictions.
      */
     private static final int REQUEST_QUEUE_PROPORTION = 2;
-
-    /** The data store. */
-    private final CachingDataStore store;
 
     /** The queue for sending requests in order to the server. */
     private final RequestQueueClient queue;
@@ -103,29 +105,33 @@ class UpdateQueue {
     /**
      * Creates an instance of this class.
      *
-     * @param	store the data store
      * @param	host the server host name
      * @param	port the server port
      * @param	updateQueueSize the maximum number of commit requests
      *		permitted to be waiting in the queue
+     * @param	nodeId the local node ID
+     * @param	maxRetry the maximum retry time for I/O operations
+     * @param	retryWait the retry wait for failed I/O operations
+     * @param	failureReporter the failure reporter
      * @throws	IOException if there is an I/O failure
      */
-    UpdateQueue(final CachingDataStore store,
-		String host,
-		int port,
-		int updateQueueSize)
+    public UpdateQueue(String host,
+		       int port,
+		       int updateQueueSize,
+		       long nodeId,
+		       long maxRetry,
+		       long retryWait,
+		       FailureReporter failureReporter)
 	throws IOException
     {
-	this.store = store;
 	queue = new RequestQueueClient(
-	    store.getNodeId(),
-	    new RequestQueueClient.BasicSocketFactory(host, port),
-	    store, store.getMaxRetry(), store.getRetryWait(),
+	    nodeId, new RequestQueueClient.BasicSocketFactory(host, port),
+	    failureReporter, maxRetry, retryWait,
 	    REQUEST_QUEUE_PROPORTION * updateQueueSize);
 	commitAvailable = new Semaphore(updateQueueSize);
     }
 
-    /* -- Package access methods -- */
+    /* -- Public methods -- */
 
     /**
      * Notes the beginning of a new transaction and returns the transaction
@@ -133,7 +139,7 @@ class UpdateQueue {
      *
      * @return	the context ID for the new transaction
      */
-    long beginTxn() {
+    public long beginTxn() {
 	PendingTxnInfo info = new PendingTxnInfo();
 	long contextId;
 	synchronized (pendingSubmitMap) {
@@ -155,7 +161,7 @@ class UpdateQueue {
      *		while waiting for space in the update queue
      * @throws	TransactionTimeoutException if the transaction has timed out
      */
-    void prepare(long stop) {
+    public void prepare(long stop) {
 	try {
 	    long timeout = stop - System.currentTimeMillis();
 	    if (timeout < 0) {
@@ -194,12 +200,12 @@ class UpdateQueue {
      *		are not the same length, if {@code nameValues} contains a
      *		negative value
      */
-    void commit(final long contextId,
-		long[] oids,
-		byte[][] oidValues,
-		int newOids,
-		String[] names,
-		long[] nameValues)
+    public void commit(final long contextId,
+		       long[] oids,
+		       byte[][] oidValues,
+		       int newOids,
+		       String[] names,
+		       long[] nameValues)
     {
 	pendingAcknowledgeSet.add(contextId);
 	txnFinished(contextId);
@@ -221,13 +227,12 @@ class UpdateQueue {
      * @param	contextId the transaction context ID
      * @param	prepared whether the transaction had been prepared
      */
-    void abort(long contextId, boolean prepared) {
+    public void abort(long contextId, boolean prepared) {
 	if (prepared) {
 	    commitAvailable.release();
 	}
 	txnFinished(contextId);
     }
-
 
     /**
      * Evicts an object from the cache.  The {@link
@@ -240,7 +245,7 @@ class UpdateQueue {
      *		been completed
      * @throws	IllegalArgumentException if {@code oid} is negative
      */
-    void evictObject(
+    public void evictObject(
 	long contextId, long oid, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new EvictObject(oid, completionHandler));
@@ -257,7 +262,7 @@ class UpdateQueue {
      *		been completed
      * @throws	IllegalArgumentException if {@code oid} is negative
      */
-    void downgradeObject(
+    public void downgradeObject(
 	long contextId, long oid, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new DowngradeObject(oid, completionHandler));
@@ -273,7 +278,7 @@ class UpdateQueue {
      * @param	completionHandler the handler to notify when the eviction has
      *		been completed
      */
-    void evictBinding(
+    public void evictBinding(
 	long contextId, String name, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new EvictBinding(name, completionHandler));
@@ -289,14 +294,14 @@ class UpdateQueue {
      * @param	completionHandler the handler to notify when the downgrade has
      *		been completed
      */
-    void downgradeBinding(
+    public void downgradeBinding(
 	long contextId, String name, CompletionHandler completionHandler)
     {
 	addRequest(contextId, new DowngradeBinding(name, completionHandler));
     }
 
     /** Shuts down the queue. */
-    void shutdown() {
+    public void shutdown() {
 	queue.shutdown();
     }
 
@@ -304,11 +309,11 @@ class UpdateQueue {
      * Returns the context ID of the oldest transaction which has not finished,
      * or whose commit request has been sent to the server but not yet
      * acknowledged, or {@link Long#MAX_VALUE Long.MAX_VALUE} if there are no
-     * pending transactions
+     * pending transactions.
      *
      * @return	the lowest pending context ID or {@code Long.MAX_VALUE}
      */
-    long lowestPendingContextId() {
+    public long lowestPendingContextId() {
 	long result;
 	try {
 	    result = pendingAcknowledgeSet.first();
@@ -349,32 +354,61 @@ class UpdateQueue {
      */
     private void txnFinished(long contextId) {
 	PendingTxnInfo info = pendingSubmitMap.get(contextId);
+	/*
+	 * Information about the transaction should already be present from
+	 * when the transaction started.
+	 */
 	assert info != null;
 	info.setFinished();
 	try {
+	    /*
+	     * TBD: Rather than having a race for who will process the next
+	     * batch of transactions, it might be better to use a lock to make
+	     * sure only one thread does this.  -tjb@sun.com (01/12/2010)
+	     */
 	    if (contextId != pendingSubmitMap.firstKey()) {
+		/*
+		 * Earlier transactions are not yet finished, so let them
+		 * handle the processing.
+		 */
 		return;
 	    }
 	} catch (NoSuchElementException e) {
+	    /*
+	     * The entry must have been removed in the meantime by the
+	     * processing performed by an earlier transaction.
+	     */
 	    return;
 	}
+	/*
+	 * This transaction is the earliest pending transaction -- remove it
+	 * and process it now.
+	 */
 	pendingSubmitMap.remove(contextId);
 	List<Request> requests = info.getRequests();
-	if (requests == null) {
-	    return;
-	}
+	/*
+	 * The requests should not be null because we have already marked this
+	 * transaction as finished.
+	 */
+	assert requests != null;
+	/* Process any requests associated with this finished transaction */
 	for (Request request : requests) {
 	    queue.addRequest(request);
 	}
 	while (true) {
 	    Entry<Long, PendingTxnInfo> entry = pendingSubmitMap.firstEntry();
 	    if (entry == null) {
+		/* Queue is empty */
 		break;
 	    }
 	    requests = entry.getValue().getRequests();
 	    if (requests == null) {
+		/* The transaction is not finished */
 		break;
 	    }
+	    /*
+	     * Remove the transaction from the queue and process its requests
+	     */
 	    pendingSubmitMap.remove(entry.getKey());
 	    for (Request request : requests) {
 		queue.addRequest(request);

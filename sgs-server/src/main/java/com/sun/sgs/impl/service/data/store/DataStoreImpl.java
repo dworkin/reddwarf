@@ -97,14 +97,15 @@ import java.util.logging.Logger;
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties, data store
  *	headers
  * <li> {@link Level#FINE FINE} - Allocating blocks of object IDs
- * <li> {@link Level#FINER FINER} - Transaction operations
+ * <li> {@link Level#FINER FINER} - Transaction operations, class info
+ *	operations, and node shutdown
  * <li> {@link Level#FINEST FINEST} - Name and object operations
  * </ul> <p>
  *
- * In addition, name and object operations that throw {@link
- * TransactionAbortedException} will log the failure to the {@code Logger}
- * named {@code com.sun.sgs.impl.service.data.store.DataStoreImpl.abort}, to
- * make it easier to debug concurrency conflicts.
+ * Operations that throw {@link TransactionAbortedException} will instead log
+ * the failure to the {@code Logger} named {@code
+ * com.sun.sgs.impl.service.data.store.DataStoreImpl.abort}, to make it easier
+ * to debug concurrency conflicts.
  */
 public class DataStoreImpl extends AbstractDataStore {
 

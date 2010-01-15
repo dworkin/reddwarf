@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueServer;
+import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueueRequest;
 import com.sun.sgs.impl.util.lock.LockManager;
 import com.sun.sgs.impl.util.lock.LockRequest;
 import com.sun.sgs.impl.util.lock.Locker;
