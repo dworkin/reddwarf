@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,6 +19,8 @@
  * Sun designates this particular file as subject to the "Classpath"
  * exception as provided by Sun in the LICENSE file that accompanied
  * this code.
+ *
+ * --
  */
 
 /** Provides interfaces for the transport layer. */

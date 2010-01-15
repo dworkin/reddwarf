@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.auth;
@@ -60,12 +62,17 @@ public final class PasswordFileEditor
             digest(args[2].getBytes("UTF-8"));
         byte [] encodedPass = NamePasswordAuthenticator.encodeBytes(pass);
 
-        // open the file and append the new entry
-        FileOutputStream out = new FileOutputStream(args[0], true);
-        out.write(args[1].getBytes("UTF-8"));
-        out.write("\t".getBytes("UTF-8"));
-        out.write(encodedPass);
-        out.write("\n".getBytes("UTF-8"));
+        FileOutputStream out = null;
+        try {
+            // open the file and append the new entry
+            out = new FileOutputStream(args[0], true);
+            out.write(args[1].getBytes("UTF-8"));
+            out.write("\t".getBytes("UTF-8"));
+            out.write(encodedPass);
+            out.write("\n".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
     }
 
 }

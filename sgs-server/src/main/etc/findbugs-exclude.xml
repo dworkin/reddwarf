@@ -422,6 +422,13 @@
     <Bug pattern="DM_USELESS_THREAD"/>
   </Match>
 
+  <!-- Ok to use zero-length array to convert ConcurrentHashMap to array -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServerImpl"/>
+    <Method name="chooseBackup"/>
+    <Bug pattern="ITA_INEFFICIENT_TO_ARRAY"/>
+  </Match>
+
   <!-- OK to declare serializable field as non-serializable interface. -->
   <Match>
     <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
