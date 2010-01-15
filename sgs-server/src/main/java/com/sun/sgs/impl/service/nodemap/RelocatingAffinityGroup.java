@@ -17,9 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.nodemap.affinity;
+package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +36,7 @@ import java.util.Set;
  * some external control of the relocation in case we merge affinity groups
  * or find that an algorithm run returns a single group.
  */
-public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
+class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     // The group id
     private final long agid;
     // Map Identity -> nodeId
@@ -66,9 +67,9 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      * @param generation the generation number of this group
      * @throws IllegalArgumentException if {@code identities} is empty
      */
-    public RelocatingAffinityGroup(long agid,
-                                   Map<Identity, Long> identities,
-                                   long generation)
+    RelocatingAffinityGroup(long agid,
+                            Map<Identity, Long> identities,
+                            long generation)
     {
         if (identities.size() == 0) {
             throw new IllegalArgumentException("Identities must not be empty");
@@ -117,7 +118,7 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      *
      * @param nodeId a node id
      */
-    public synchronized void setTargetNode(long nodeId) {
+    synchronized void setTargetNode(long nodeId) {
         targetNodeId = nodeId;
         stragglers = null;  // will force recalc of list
     }
@@ -127,7 +128,7 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      *
      * @return the target node if known, otherwise -1
      */
-    public synchronized long getTargetNode() {
+    synchronized long getTargetNode() {
         return targetNodeId;
     }
 
@@ -136,7 +137,7 @@ public class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      *
      * @return the set of Identities that are not on the target node
      */
-    public synchronized Set<Identity> getStragglers() {
+    synchronized Set<Identity> getStragglers() {
         if (stragglers == null) {
             // If target node is unknown, then everyone is lost
             if (targetNodeId < 0) {

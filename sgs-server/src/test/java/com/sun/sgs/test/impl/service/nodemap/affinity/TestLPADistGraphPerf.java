@@ -21,17 +21,15 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
-import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
-import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.NodeType;
@@ -53,7 +51,6 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 import junit.framework.Assert;
 import org.junit.After;
 import org.junit.Before;
@@ -141,8 +138,7 @@ public class TestLPADistGraphPerf {
         for (int i = 0; i < WARMUP_RUNS; i++) {
             AffinityGraphBuilder builder = (AffinityGraphBuilder)
                         builderField.get(serverNode.getNodeMappingService());
-            Set<RelocatingAffinityGroup> groups =
-                        builder.getAffinityGroupFinder().findAffinityGroups();
+            builder.getAffinityGroupFinder().findAffinityGroups(new SimpleGroupSet());
         }
 
         // There's no graph, so we expect an exception to be thrown
@@ -412,11 +408,10 @@ public class TestLPADistGraphPerf {
             double maxMod = 0.0;
             double minMod = 1.0;
             for (int i = 0; i < RUNS; i++) {
-                Set<AffinityGroup> groups =
-                    Objects.uncheckedCast(
-                        builder.getAffinityGroupFinder().findAffinityGroups());    
-                double mod =
-                    AffinityGroupGoodness.calcModularity(graphModel, groups);
+                GroupSet groupSet = new SimpleGroupSet();
+                builder.getAffinityGroupFinder().findAffinityGroups(groupSet);
+                double mod = AffinityGroupGoodness.calcModularity(graphModel,
+                                                                  groupSet.getGroups());
 
                 avgMod = avgMod + mod;
                 maxMod = Math.max(maxMod, mod);

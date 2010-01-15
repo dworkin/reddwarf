@@ -22,11 +22,10 @@ package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
-import
-   com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.BasicState;
-import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
@@ -41,10 +40,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -253,7 +250,7 @@ public class LabelPropagationServer extends BasicState
     // ---- Implement LPAAffinityGroupFinder --- //
 
     /** {@inheritDoc} */
-    public NavigableSet<RelocatingAffinityGroup> findAffinityGroups()
+    public long findAffinityGroups(GroupSet groupSet)
             throws AffinityGroupFinderFailedException
     {
         checkForDisabledOrShutdownState();
@@ -336,20 +333,19 @@ public class LabelPropagationServer extends BasicState
         // return the information that we have.
         // Assuming a node has failed, we won't report the identities
         // on the failed node as being part of any group.
-        NavigableSet<RelocatingAffinityGroup> retVal =
-                gatherFinalGroups(clientProxyCopy);
+        gatherFinalGroups(clientProxyCopy, groupSet);
 
         long runTime = System.currentTimeMillis() - startTime;
         stats.runtimeSample(runTime);
         stats.iterationsSample(currentIteration);
-        stats.setNumGroups(retVal.size());
+        stats.setNumGroups(groupSet.size());
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Algorithm took {0} milliseconds and {1} " +
                     "iterations", runTime, currentIteration);
             StringBuilder sb = new StringBuilder();
-            sb.append(" LPA found " +  retVal.size() + " groups ");
+            sb.append(" LPA found " +  groupSet.size() + " groups ");
 
-            for (AffinityGroup group : retVal) {
+            for (AffinityGroup group : groupSet.getGroups()) {
                 sb.append(" id: " + group.getId() + ", members: ");
                 for (Identity id : group.getIdentities()) {
                     sb.append("\n" + id);
@@ -362,7 +358,7 @@ public class LabelPropagationServer extends BasicState
             running = false;
             runningLock.notifyAll();
         }
-        return retVal;
+        return runTime;
     }
 
     /**
@@ -656,10 +652,10 @@ public class LabelPropagationServer extends BasicState
      * groups are then merged, so the final groups can span nodes.
      *
      * @param clientProxies a map of node ids to LPAClient proxies
+     * @param groupSet the group set to populate
      * @return the merged affinity groups found on each LPAClient
      */
-    private NavigableSet<RelocatingAffinityGroup> gatherFinalGroups(
-                    Map<Long, LPAClient> clientProxies)
+    private void gatherFinalGroups(Map<Long, LPAClient> clientProxies, GroupSet groupSet)
     {
         // If, after this point, we cannot contact a node, simply
         // return the information that we have.
@@ -730,18 +726,12 @@ public class LabelPropagationServer extends BasicState
         }
 
         // Create our final return values
-        NavigableSet<RelocatingAffinityGroup> retVal =
-                new TreeSet<RelocatingAffinityGroup>();
         for (Map.Entry<Long, Map<Identity, Long>> e : groupMap.entrySet()) {
             Map<Identity, Long> idMap = e.getValue();
             if (!idMap.isEmpty()) {
-                retVal.add(new RelocatingAffinityGroup(e.getKey(),
-                                                       idMap,
-                                                       runNum));
+                groupSet.add(e.getKey(), idMap, runNum);
             }
         }
-
-        return retVal;
     }
 
     /**

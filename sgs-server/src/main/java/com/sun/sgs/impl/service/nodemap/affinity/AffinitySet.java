@@ -38,7 +38,7 @@ public class AffinitySet implements AffinityGroup, Serializable {
     /** The set of identities comprising the group. Note this needs
      *  to be declared a concrete class so we know it is serializable.
      */
-    private final HashSet<Identity> identities;
+    private final Set<Identity> identities;
     /** The generation of this affinity set. */
     private final long generation;
 
@@ -63,7 +63,7 @@ public class AffinitySet implements AffinityGroup, Serializable {
      * @param generation the generation number of this group
      * @param identitySet the initial set of identities to include
      */
-    public AffinitySet(long id, long generation, HashSet<Identity> identitySet)
+    public AffinitySet(long id, long generation, Set<Identity> identitySet)
     {
         this.id = id;
         this.generation = generation;

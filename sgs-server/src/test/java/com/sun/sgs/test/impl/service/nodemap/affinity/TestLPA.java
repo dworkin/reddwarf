@@ -22,7 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
-import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAServer;
@@ -166,14 +166,15 @@ public class TestLPA {
         server.register(30, client3);
 
         long now = System.currentTimeMillis();
-        Set<RelocatingAffinityGroup> groups = server.findAffinityGroups();
+        GroupSet groupSet = new SimpleGroupSet();
+        server.findAffinityGroups(groupSet);
         System.out.printf("finished in %d milliseconds %n",
                           System.currentTimeMillis() - now);
         for (TestLPAClient client : clients) {
             assertFalse(client.failed);
             assertTrue(client.currentIter >= client.convergeCount);
         }
-        for (AffinityGroup ag : groups) {
+        for (AffinityGroup ag : groupSet.getGroups()) {
             Set<Identity> ids = ag.getIdentities();
             if (ag.getId() == 1) {
                 assertEquals(5, ids.size());
@@ -214,8 +215,9 @@ public class TestLPA {
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
                     wdog, PartialToyBuilder.NODE3, props);
-        Set<RelocatingAffinityGroup> groups = server.findAffinityGroups();
-        assertTrue(groups.size() != 0);
+        GroupSet groupSet = new SimpleGroupSet();
+        server.findAffinityGroups(groupSet);
+        assertTrue(groupSet.size() != 0);
     }
 
     @Test
@@ -232,10 +234,12 @@ public class TestLPA {
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
                     wdog, PartialToyBuilder.NODE3, props);
-        Set<RelocatingAffinityGroup> groups = server.findAffinityGroups();
-        assertTrue(groups.size() != 0);
-        groups = server.findAffinityGroups();
-        assertTrue(groups.size() != 0);
+        GroupSet groupSet = new SimpleGroupSet();
+        server.findAffinityGroups(groupSet);
+        assertTrue(groupSet.size() != 0);
+        groupSet = new SimpleGroupSet();
+        server.findAffinityGroups(groupSet);
+        assertTrue(groupSet.size() != 0);
     }
 
     @Test
@@ -249,15 +253,17 @@ public class TestLPA {
         LabelPropagation lp3 =
             new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
                     wdog, PartialToyBuilder.NODE3, props);
-        Set<RelocatingAffinityGroup> groups = server.findAffinityGroups();
-        assertTrue(groups.size() != 0);
+        GroupSet groupSet = new SimpleGroupSet();
+        server.findAffinityGroups(groupSet);
+        assertTrue(groupSet.size() != 0);
     }
 
     @Test
     public void testLPAAlgorithmNoClient() throws Exception {
-        Set<RelocatingAffinityGroup> groups = server.findAffinityGroups();
+        GroupSet groupSet = new SimpleGroupSet();
+        server.findAffinityGroups(groupSet);
         // We expect no groups to be found
-        assertTrue(groups.isEmpty());
+        assertTrue(groupSet.isEmpty());
     }
 
     // Need to rework this test - we now log the error, should shut down

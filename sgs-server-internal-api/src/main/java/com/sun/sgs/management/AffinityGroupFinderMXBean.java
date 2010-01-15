@@ -113,13 +113,4 @@ public interface AffinityGroupFinderMXBean {
      * @return the time of the last call to {@code clear}
      */
     long getLastClearTime();
-
-    /**
-     * Finds affinity groups based on the current graph information.  This
-     * will start a new run of the affinity group finder, or wait for the
-     * current run to complete.
-     * <p>
-     * NOTE:  This method is useful for testing but may be removed.
-     */
-    void findAffinityGroups();
 }

@@ -20,12 +20,11 @@
 package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
-import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagation;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.BipartiteGraphBuilder;
@@ -34,7 +33,6 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.service.nodemap.affinity.single.SingleLabelPropagation;
-import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
@@ -51,7 +49,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
@@ -142,7 +139,7 @@ public class TestLPAPerf {
            new SingleLabelPropagation(new ZachBuilder(), collector, props);
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            lpa.findAffinityGroups();
+            lpa.findAffinityGroups(new SimpleGroupSet());
         }
         lpa.shutdown();
     }
@@ -169,11 +166,11 @@ public class TestLPAPerf {
         double maxMod = 0.0;
         double minMod = 1.0;
         for (int i = 0; i < RUNS; i++) {
-            Set<AffinityGroup> groups = 
-                    Objects.uncheckedCast(lpa.findAffinityGroups());
+            GroupSet groupSet = new SimpleGroupSet();
+            lpa.findAffinityGroups(groupSet);
             double mod =
-                AffinityGroupGoodness.calcModularity(
-                                new ZachBuilder().getAffinityGraph(), groups);
+                AffinityGroupGoodness.calcModularity(new ZachBuilder().getAffinityGraph(),
+                                                     groupSet.getGroups());
 
             avgMod = avgMod + mod;
             maxMod = Math.max(maxMod, mod);
@@ -222,7 +219,7 @@ public class TestLPAPerf {
         }
 
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            Set<RelocatingAffinityGroup> groups = server.findAffinityGroups();
+            server.findAffinityGroups(new SimpleGroupSet());
         }
         if (server != null) {
             server.shutdown();
@@ -268,11 +265,11 @@ public class TestLPAPerf {
         double maxMod = 0.0;
         double minMod = 1.0;
         for (int i = 0; i < RUNS; i++) {
-            Set<AffinityGroup> groups = 
-                    Objects.uncheckedCast(server.findAffinityGroups());
+            GroupSet groupSet = new SimpleGroupSet();
+            server.findAffinityGroups(groupSet);
             double mod =
-                AffinityGroupGoodness.calcModularity(
-                                new ZachBuilder().getAffinityGraph(), groups);
+                AffinityGroupGoodness.calcModularity(new ZachBuilder().getAffinityGraph(),
+                                                     groupSet.getGroups());
 
             avgMod = avgMod + mod;
             maxMod = Math.max(maxMod, mod);

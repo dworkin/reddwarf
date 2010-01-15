@@ -23,9 +23,11 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
-import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -49,6 +51,33 @@ import java.util.logging.Logger;
  * A group coordinator manages groups of identities. Since grouping activities
  * may generate load on the system, the coordinator may be disabled if
  * conditions merit.<p>
+ *
+ * The group coordinator has two main functions, offloading identities from
+ * nodes, and (if the affinity subsystem is configured) collocating identities
+ * in an affinity group.<p>
+ *
+ * When the node mapping server requests an offload, the coordinator will
+ * select identities from that node and move them to some other node. If the
+ * affinity group subsystem is configured, a group of identities is selected
+ * to move. If the sub-system is not configured or there are no groups on the
+ * node, then individual identities will be moved. If the node has failed,
+ * then all of the groups and identities are moved. Otherwise one group or
+ * identity is moved.<p>
+ *
+ * If the affinity group subsystem is configured, the coordinator will ask
+ * the group finder for the set of known groups. The set of affinity groups
+ * is refreshed periodically. With each new set the coordinator will iterate
+ * over them, looking for groups where not all of its member identities are
+ * on the target node for that group. (See RelocatableAffinityGroup for the
+ * definition of target node) If such a group is found, the identities in
+ * that group which are not on the target node are moved to that node.<p>
+ *
+ * For a given set of groups returned by the group finder, a group that has
+ * been collocated is removed from the set of groups that are eligible for
+ * offloading. Likewise, all of the groups on a node to be offloaded are not
+ * candidates for collocation. This is to reduce the possibility of moving
+ * the same group by both the offload and collocate operations at the same
+ * time.<p>
  *
  * A newly constructed coordinator will be in the disabled state.<p>
  *
@@ -79,7 +108,7 @@ class GroupCoordinator extends BasicState {
     static final int DEFAULT_UPDATE_FREQ = 60;
 
     /** The property name for the update frequency. */
-    public static final String COLLOCATE_DELAY_PROPERTY = PKG_NAME + ".collocate.delay";
+    static final String COLLOCATE_DELAY_PROPERTY = PKG_NAME + ".collocate.delay";
 
     /** The default value of the update frequency, in milliseconds. */
     static final int DEFAULT_COLLOCATE_DELAY = 1000;
@@ -417,8 +446,10 @@ class GroupCoordinator extends BasicState {
         }
 
         try {
-            NavigableSet<RelocatingAffinityGroup> newGroups =
-                                                finder.findAffinityGroups();
+            GroupSetImpl newGroups = new GroupSetImpl();
+
+            // TODO - use time to adjust delay between runs?
+            long time = finder.findAffinityGroups(newGroups);
 
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER,
@@ -437,6 +468,27 @@ class GroupCoordinator extends BasicState {
             }
         } catch (AffinityGroupFinderFailedException e) {
             logger.logThrow(Level.INFO, e, "Affinity group finder failed");
+        }
+    }
+
+    /**
+     * Group set that sorts its members.
+     */
+    private static class GroupSetImpl extends TreeSet<RelocatingAffinityGroup>
+                                      implements GroupSet
+    {
+        @Override
+        public void add(long groupId,
+                        Map<Identity, Long> members,
+                        long generation)
+        {
+            add(new RelocatingAffinityGroup(groupId, members, generation));
+        }
+
+        @Override
+        public Set<AffinityGroup> getGroups() {
+            Set<AffinityGroup> groups = Objects.uncheckedCast(this);
+            return Collections.unmodifiableSet(groups);
         }
     }
 

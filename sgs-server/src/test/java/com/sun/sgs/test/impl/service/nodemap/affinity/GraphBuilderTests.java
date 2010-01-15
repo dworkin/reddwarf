@@ -759,7 +759,7 @@ public class GraphBuilderTests {
     @Test(expected=IllegalStateException.class)
     public void testShutdownFindGroups() throws Exception {
         groupBuilder.shutdown();
-        groupBuilder.getAffinityGroupFinder().findAffinityGroups();
+        groupBuilder.getAffinityGroupFinder().findAffinityGroups(new SimpleGroupSet());
     }
 
     @Test

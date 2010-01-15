@@ -23,7 +23,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
-import com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
@@ -176,7 +176,7 @@ public class TestGroupCoordinator {
     private class DummyFinder implements AffinityGroupFinder {
 
         @Override
-        public NavigableSet<RelocatingAffinityGroup> findAffinityGroups()
+        public long findAffinityGroups(GroupSet groupSet)
                 throws AffinityGroupFinderFailedException
         {
             throw new UnsupportedOperationException("Not supported yet.");
