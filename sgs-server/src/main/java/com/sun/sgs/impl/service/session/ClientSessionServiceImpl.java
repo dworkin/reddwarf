@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.session;
@@ -156,10 +158,12 @@ import javax.management.JMException;
  *	relocation key.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
- *	{@value com.sun.sgs.impl.kernel.StandardProperties#SESSION_RELOCATION_TIMEOUT_PROPERTY}
+ *	{@value
+ * com.sun.sgs.impl.kernel.StandardProperties#SESSION_RELOCATION_TIMEOUT_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i>
- *	{@value com.sun.sgs.impl.kernel.StandardProperties#DEFAULT_SESSION_RELOCATION_TIMEOUT}
+ *	{@value
+ * com.sun.sgs.impl.kernel.StandardProperties#DEFAULT_SESSION_RELOCATION_TIMEOUT}
  *
  * <dd style="padding-top: .5em">Specifies the timeout, in milliseconds,
  *	for client session relocation.<p>
@@ -310,7 +314,7 @@ public final class ClientSessionServiceImpl
      */
     private final ConcurrentHashMap<BigInteger, PrepareRelocationInfo>
 	prepareRelocationMap =
-	    new ConcurrentHashMap <BigInteger, PrepareRelocationInfo>();
+	    new ConcurrentHashMap<BigInteger, PrepareRelocationInfo>();
 
     /** The map of relocation information for sessions relocating to
      * this node, keyed by relocation key. */
