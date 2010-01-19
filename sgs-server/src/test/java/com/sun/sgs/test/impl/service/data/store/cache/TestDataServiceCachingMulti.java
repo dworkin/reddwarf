@@ -449,6 +449,69 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	} }.runTask();
     }
 
+    /**
+     * Test that the server correctly accounts for newly created bindings with
+     * earlier names. <p>
+     *
+     * Here's the test: <ul>
+     * <li> Node 1: setBinding "b"
+     * <li> Node 1: commit
+     * <li> Node 1: setBinding "a" (write lock "b")
+     * <li> Node 2: setBinding "a" (write lock "b" blocks)
+     * <li> Node 1: commit (set "a")
+     * <li> Node 2: (write lock "b", write lock "a")
+     * <li> Node 2: (should see existing value of "a")
+     */
+    @Test
+    public void testConcurrentCreateEarlierBinding() throws Exception {
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.getBindingForUpdate("b");
+	} }.runTask();
+	final AwaitDone waitA = new AwaitDone(1);
+	final AwaitDone waitB = new AwaitDone(1);
+	final AwaitDone done = new AwaitDone(1);
+	/* Node 1 */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    if (done.getDone()) {
+		return;
+	    }
+	    try {
+		try {
+		    dataService.getBindingForUpdate("a");
+		    throw new RuntimeException("Expected a to be unbound");
+		} catch (NameNotBoundException e) {
+		    dataService.setBinding("a", new ManagedInteger(1));
+		}
+		waitA.taskSucceeded();
+		waitB.await(1, SECONDS);
+		Thread.sleep(1000);
+		done.taskSucceeded();
+	    } catch (Throwable e) {
+		done.taskFailed(e);
+	    }
+	} }.scheduleTask();
+	waitA.await(1, SECONDS);
+	/* Node 2 */
+	new RunTask(appNodes.get(1)) {
+	    private boolean ok;
+	    public void run() {
+		if (ok) {
+		    return;
+		}
+		waitB.taskSucceeded();
+		dataService.getBindingForUpdate("a");
+		dataService.setBinding("a", new ManagedInteger(2));
+		ok = true;
+	    }
+	}.runTask();
+	done.await(2, SECONDS);
+	/* Clean up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.removeBinding("a");
+	    dataService.removeBinding("b");
+	} }.runTask();
+    }
+
     /** Test random concurrent name binding accesses. */
     @Test
     public void testConcurrentBindings() throws Exception {
@@ -604,6 +667,9 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	}
 	void runTask() throws Exception {
 	    txnScheduler.runTask(this, taskOwner);
+	}
+	void scheduleTask() throws Exception {
+	    txnScheduler.scheduleTask(this, taskOwner);
 	}
     }
 

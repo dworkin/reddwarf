@@ -1440,18 +1440,32 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		      Object operationArg)
     {
 	assert key instanceof Long || key instanceof BindingKey;
-	if (debug) {
-	    debugOutput(nodeInfo, forWrite ? "+w" : "+r", key,
-			operation, operationArg);
-	}
 	synchronized (nodeInfo) {
 	    LockConflict<Object> conflict =
 		lockManager.lockNoWait(nodeInfo, key, forWrite);
-	    if (conflict != null) {
+	    if (conflict == null) {
+		if (debug) {
+		    debugOutput(nodeInfo, forWrite ? "w " : "r ", key,
+				operation, operationArg);
+		}
+	    } else {
+		if (debug) {
+		    debugOutput(nodeInfo, forWrite ? "wB" : "rB", key,
+				operation, operationArg);
+		}
 		callbackRequests.add(
 		    new CallbackRequest(nodeInfo, key, forWrite));
 		conflict = lockManager.waitForLock(nodeInfo);
-		if (conflict != null) {
+		if (conflict == null) {
+		    if (debug) {
+			debugOutput(nodeInfo, forWrite ? "wY" : "rY", key,
+				    operation, operationArg);
+		    }
+		} else {
+		    if (debug) {
+			debugOutput(nodeInfo, forWrite ? "wN" : "rN", key,
+				    operation, operationArg);
+		    }
 		    String accessMsg = "Access nodeId:" + nodeInfo.nodeId +
 		    ", key:" + key +
 		    ", forWrite:" + forWrite +
@@ -1495,7 +1509,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     private void releaseLock(NodeInfo nodeInfo, Object key, String operation) {
 	assert key instanceof Long || key instanceof BindingKey;
 	if (debug) {
-	    debugOutput(nodeInfo, "-r", key, operation, null);
+	    debugOutput(nodeInfo, "e ", key, operation, null);
 	}
 	lockManager.releaseLock(nodeInfo, key);
 	nodeInfo.noteUnlocked(key);
@@ -1515,7 +1529,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     {
 	assert key instanceof Long || key instanceof BindingKey;
 	if (debug) {
-	    debugOutput(nodeInfo, "-w", key, operation, null);
+	    debugOutput(nodeInfo, "d ", key, operation, null);
 	}
 	lockManager.downgradeLock(nodeInfo, key);
     }
