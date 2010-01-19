@@ -753,8 +753,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
     /** {@inheritDoc} */
     @Override
     public String toString() {
-	return getClass().getName() +
-	    "[" + channelRefId + "]";
+	return getClass().getName() + "[" + channelRefId + "]";
     }
 
     /* -- Serialization methods -- */
@@ -1229,7 +1228,12 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	}
 	dataService.removeObject(this);
 	if (listenerRef != null) {
-	    ChannelListener maybeWrappedListener = listenerRef.get();
+	    ChannelListener maybeWrappedListener = null;
+	    try {
+		maybeWrappedListener = listenerRef.get();
+	    } catch (ObjectNotFoundException ignore) {
+		// listener already removed
+	    }
 	    if (maybeWrappedListener instanceof ManagedSerializable) {
 		dataService.removeObject(maybeWrappedListener);
 	    }
@@ -1700,8 +1704,10 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	public String toString() {
 	    try {
 		ChannelImpl channel = getChannel();
-		return "EventQueue[channelId:" + channel.channelRefId +
-		    ", name:" + channel.name + "]";
+		return "EventQueue[" +
+		    "channelId:" + channel.channelRefId +
+		    ", name:" + channel.name +
+		    "]";
 	    } catch (ObjectNotFoundException e) {
 		return super.toString();
 	    }
@@ -1810,11 +1816,15 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    return completed;
 	}
 
-
+	/**
+	 * Returns a string representation of field:value pairs, separated
+	 * by commas.
+	 */
 	protected String toStringFieldsOnly() {
 	    return
-		"timestamp:" + timestamp + ", processingOnNodeId:" +
-		(processingOnNodeId == -1 ? "(none)" : processingOnNodeId) +
+		"timestamp:" + timestamp +
+		(processingOnNodeId == -1 ? "" : 
+		 ", processingOnNodeId:" + processingOnNodeId) +
 		", completed: " + isCompleted();
 	}
     }
@@ -1860,8 +1870,10 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
-	    return "JoinEvent[sessionRefId:" + sessionRefId + ", " +
-		toStringFieldsOnly() + "]";
+	    return "JoinEvent[" +
+		"sessionRefId:" + sessionRefId + ", " +
+		toStringFieldsOnly() +
+		"]";
 		
 	}
     }
@@ -2245,8 +2257,10 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
-	    return "LeaveEvent[sessionRefId:" + sessionRefId + ", " +
-		toStringFieldsOnly() + "]";
+	    return "LeaveEvent[" +
+		"sessionRefId:" + sessionRefId + ", " +
+		toStringFieldsOnly() +
+		"]";
 	}
     }
 
@@ -2417,9 +2431,11 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
-	    return "SendEvent[senderRefId:" + senderRefId +
+	    return "SendEvent[" +
+		"senderRefId:" + senderRefId +
 		", message:byte[" + message.length + "], " +
-		toStringFieldsOnly() + "]";
+		toStringFieldsOnly() +
+		"]";
 		
 	}
     }
@@ -2532,8 +2548,10 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
-	    return "CloseEvent[removeName:" + removeName + ", " +
-		toStringFieldsOnly() + "]";
+	    return "CloseEvent[" +
+		"removeName:" + removeName + ", " +
+		toStringFieldsOnly() +
+		"]";
 	}
     }
 

@@ -1537,6 +1537,53 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     }
 
     @Test
+    public void testChannelCloseAfterRemovingManagedChannelListener()
+	throws Exception
+    {
+	final String channelName = "closeTest";
+	final String listenerName = channelName + ".listener";
+	int count = getObjectCount();
+	// Create channel with managed ChannelListener.
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		ManagedChannelListener listener = new ManagedChannelListener();
+		Channel channel = AppContext.getChannelManager().
+		    createChannel(channelName, listener, Delivery.RELIABLE);
+		DataManager dataManager = AppContext.getDataManager();
+		dataManager.setBinding(channelName, channel);
+		dataManager.setBinding(listenerName, listener);
+	    }
+	}, taskOwner);
+	printServiceBindings("after channel create");
+	// Remove managed channel listener and close channel.
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		DataManager dataManager = AppContext.getDataManager();
+		ManagedChannelListener listener = (ManagedChannelListener)
+		    dataManager.getBinding(listenerName);
+		Channel channel = (Channel) dataManager.getBinding(channelName);
+		dataManager.removeBinding(listenerName);
+		dataManager.removeObject(listener);
+		dataManager.removeObject(channel);
+	    }
+	}, taskOwner);
+	Thread.sleep(100);
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = getChannel(channelName);
+		if (getChannel(channelName) != null) {
+		    fail("obtained closed channel");
+		}
+	    }
+	}, taskOwner);
+	printServiceBindings("after channel close");
+	// If object count is not equal, then channel data structures were not
+	// cleaned up properly probably due to the fact that obtaining the
+	// managed channel listener threw an ObjectNotFoundException.
+        assertEquals(count, getObjectCount());
+    }
+    
+    @Test
     @IntegrationTest
     public void testChannelCloseWithMembers() throws Exception {
 	final String channelName = "closeTest";
@@ -2028,5 +2075,10 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		Channel channel = channelService.getChannel(name);
 		dataService.removeObject(channel);
 	    }}, taskOwner);
+    }
+
+    private static class ManagedChannelListener
+	extends DummyChannelListener implements ManagedObject
+    {
     }
 }
