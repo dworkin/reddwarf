@@ -1357,7 +1357,7 @@ public final class ClientSessionServiceImpl
         taskScheduler.scheduleTask(
             new AbstractKernelRunnable("ReportHealth") {
                 public void run() {
-                   watchdogService.reportHealth(localNodeId, health, CLASSNAME);
+                   watchdogService.reportLocalHealth(health, CLASSNAME);
                 }
             }, taskOwner);
     }
