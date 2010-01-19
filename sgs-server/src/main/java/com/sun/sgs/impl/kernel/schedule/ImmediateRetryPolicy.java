@@ -23,6 +23,7 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.kernel.schedule.SchedulerRetryAction;
 import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
@@ -43,12 +44,30 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
                                            class.getName()));
 
     /**
+     * The property used to define the retry count threshold to use before
+     * printing a WARNING message.
+     */
+    static final String RETRY_WARNING_THRESHOLD =
+            "com.sun.sgs.impl.kernel.schedule.retry.warning.threshold";
+
+    /**
+     * The default retry warning threshold
+     */
+    static final Integer DEFAULT_RETRY_WARNING_THRESHOLD = 100;
+
+    // the task retry count at which a warning should be printed
+    private final int retryWarningThreshold;
+
+    /**
      * Constructs an {@code ImmediateRetryPolicy}.
      *
      * @param properties the system properties available
      */
     public ImmediateRetryPolicy(Properties properties) {
-
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        this.retryWarningThreshold = wrappedProps.getIntProperty(
+                RETRY_WARNING_THRESHOLD, DEFAULT_RETRY_WARNING_THRESHOLD,
+                0, Integer.MAX_VALUE);
     }
 
     /** {@inheritDoc} */
@@ -70,6 +89,15 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
         // (like the number of times re-tried) might be considered later
         if ((result instanceof ExceptionRetryStatus) &&
             (((ExceptionRetryStatus) result).shouldRetry())) {
+
+            // Print a WARNING message if a task's retry count is a
+            // multiple of a configurable threshold
+            if (task.getTryCount() % retryWarningThreshold == 0) {
+                logger.logThrow(Level.WARNING,
+                                task.getLastFailure(),
+                                "Task has been retried {0} times: {1}",
+                                task.getTryCount(), task);
+            }
 
             // NOTE: this is a very simple initial policy that always causes
             // tasks to re-try "in place"
