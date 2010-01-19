@@ -40,9 +40,9 @@ public class TestClientSessionServiceImplv5 extends TestClientSessionServiceImpl
     private IdentityAssigner identityAssigner;
     
     /** Number of managed objects per client session: 4 (ClientSessionImpl,
-     * ClientSessionWrapper, EventQueue, ManagedQueue).
+     * ClientSessionListener, ClientSessionWrapper, EventQueue, ManagedQueue).
      */
-    private static final int MANAGED_OBJECTS_PER_SESSION = 4;
+    private static final int MANAGED_OBJECTS_PER_SESSION = 5;
 
     /** Constructs a test instance. */
     public TestClientSessionServiceImplv5() throws Exception {
