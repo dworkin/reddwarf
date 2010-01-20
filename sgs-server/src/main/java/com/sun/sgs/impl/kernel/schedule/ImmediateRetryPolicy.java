@@ -67,7 +67,7 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
     /**
      * The default retry warning threshold
      */
-    static final Integer DEFAULT_RETRY_WARNING_THRESHOLD = 100;
+    static final int DEFAULT_RETRY_WARNING_THRESHOLD = 100;
 
     // the task retry count at which a warning should be printed
     private final int retryWarningThreshold;

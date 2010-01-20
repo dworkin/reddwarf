@@ -86,6 +86,7 @@ public class TestImmediateRetryPolicy {
     @Test
     public void testRetryableTrueResult() {
         setupTask(new RetryableException(true));
+        EasyMock.expect(task.getTryCount()).andStubReturn(1);
         replayMocks();
 
         // verify
