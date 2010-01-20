@@ -67,7 +67,7 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
     /**
      * The default retry warning threshold
      */
-    static final int DEFAULT_RETRY_WARNING_THRESHOLD = 100;
+    static final int DEFAULT_RETRY_WARNING_THRESHOLD = 25;
 
     // the task retry count at which a warning should be printed
     private final int retryWarningThreshold;
@@ -82,7 +82,7 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
         this.retryWarningThreshold = wrappedProps.getIntProperty(
                 RETRY_WARNING_THRESHOLD_PROPERTY,
                 DEFAULT_RETRY_WARNING_THRESHOLD,
-                0, Integer.MAX_VALUE);
+                1, Integer.MAX_VALUE);
 
         logger.log(Level.CONFIG,
                    "Created ImmediateRetryPolicy with properties:" +
