@@ -141,7 +141,7 @@ import javax.management.JMException;
  * <dt> <i>Property:</i> <code><b>
  *	{@value #LOGIN_HIGH_WATER_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> {@code Integer.MAX_VALUE}
+ *	<i>Default:</i> {@code Integer.MAX_VALUE / 2}
  *
  * <dd style="padding-top: .5em">Specifies the login high water. When the
  * number of logins reaches the high water, the service's health is set
@@ -401,7 +401,7 @@ public final class ClientSessionServiceImpl
  		ALLOW_NEW_LOGIN_PROPERTY, false);
             loginHighWater = wrappedProps.getIntProperty(
                 LOGIN_HIGH_WATER_PROPERTY,
-                Integer.MAX_VALUE, 0, Integer.MAX_VALUE);
+                Integer.MAX_VALUE / 2, 0, Integer.MAX_VALUE / 2);
 	    relocationKeyLength = wrappedProps.getIntProperty(
  		RELOCATION_KEY_LENGTH_PROPERTY, DEFAULT_RELOCATION_KEY_LENGTH,
 		16, Integer.MAX_VALUE);

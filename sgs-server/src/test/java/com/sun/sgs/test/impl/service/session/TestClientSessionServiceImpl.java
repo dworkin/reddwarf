@@ -197,6 +197,47 @@ public class TestClientSessionServiceImpl extends Assert {
 	}
     }
 
+//    @Test
+//    public void testConstructorHighWater() throws Exception {
+//        Properties props =
+//            createProperties(
+//                StandardProperties.APP_NAME, APP_NAME,
+//                "com.sun.sgs.impl.service.session.login.high.water", "42");
+//        ClientSessionServiceImpl cssi = new ClientSessionServiceImpl(
+//            props, serverNode.getSystemRegistry(),
+//            serverNode.getProxy());
+//        assertTrue(cssi.getHighWater() == 42);
+//    }
+
+    @Test
+    public void testConstructorBadHighWater() throws Exception {
+	try {
+	    Properties props =
+		createProperties(
+		    StandardProperties.APP_NAME, APP_NAME,
+                    "com.sun.sgs.impl.service.session.login.high.water", "-1");
+	    new ClientSessionServiceImpl(
+		props, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+        try {
+	    Properties props =
+		createProperties(
+		    StandardProperties.APP_NAME, APP_NAME,
+                    "com.sun.sgs.impl.service.session.login.high.water",
+                    String.valueOf((Integer.MAX_VALUE / 2) + 1));
+	    new ClientSessionServiceImpl(
+		props, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     @Test
     public void testConstructedVersion() throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {

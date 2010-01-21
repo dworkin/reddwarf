@@ -866,37 +866,23 @@ public final class NodeMappingServerImpl
     void moveIdentity(Identity id, Node node, long targetNodeId)
         throws NoNodesAvailableException
     {
-        try {
-            // If we're already trying to move the identity,
-            // but the old node failed before preparations are
-            // complete, just make the move now. If the old node is alive,
-            // ignore this request.
-            MoveIdTask moveTask = moveMap.remove(id);
-            if (moveTask != null) {
-                if (node.isAlive()) {
-                    if (logger.isLoggable(Level.FINER)) {
-                        logger.log(Level.FINER,
-                                   "Identity {0} is already moving and node is alive",
-                                   id);
-                    }
-                    return;
+        // If we're already trying to move the identity,
+        // but the old node failed before preparations are
+        // complete, just make the move now. If the old node is alive,
+        // ignore this request.
+        MoveIdTask moveTask = moveMap.remove(id);
+        if (moveTask != null) {
+            if (node.isAlive()) {
+                if (logger.isLoggable(Level.FINER)) {
+                    logger.log(Level.FINER,
+                               "Identity {0} is already moving and node is alive",
+                               id);
                 }
-                moveIdAndNotifyListeners(moveTask);
-            } else {
-                mapToNewNode(id, null, node, targetNodeId,
-                             NodeAssignPolicy.SERVER_NODE);
+                return;
             }
-        } catch (NoNodesAvailableException e) {
-            // This can be thrown from mapToNewNode if there are
-            // no live nodes.
-            //
-            // TODO - not convinced this is correct.
-            // I think the task service needs a positive
-            // action here.  I think I need to keep a list
-            // somewhere of failed nodes, and have a background
-            // thread that tries to move them.
-            removeQueue.add(new RemoveInfo(id));
-            throw e;
+            moveIdAndNotifyListeners(moveTask);
+        } else {
+            mapToNewNode(id, null, node, targetNodeId, NodeAssignPolicy.SERVER_NODE);
         }
     }
 

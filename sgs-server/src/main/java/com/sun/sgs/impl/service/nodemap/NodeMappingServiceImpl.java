@@ -450,8 +450,8 @@ public class NodeMappingServiceImpl
                                              NodeType.class, 
                                              NodeType.singleNode);
 
-            final boolean useAffinityGroups = false;    // TODO - enable property
-//                    wrappedProps.getBooleanProperty(USE_AFFINITY_GROUPS_PROPERTY,
+            final boolean useAffinityGroups =
+                    wrappedProps.getBooleanProperty(USE_AFFINITY_GROUPS_PROPERTY, false);
 //                                                   nodeType != NodeType.singleNode);
             if (!useAffinityGroups) {
                 // do not instantiate anything
