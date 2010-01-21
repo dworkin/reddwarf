@@ -455,7 +455,9 @@ public class TestNodeMappingServiceImpl {
         watchdogService.reportHealth(
                                 serverNode.getDataService().getLocalNodeId(),
                                 Health.YELLOW, "A");
-
+        while (watchdogService.getLocalNodeHealthNonTransactional() != Health.YELLOW) {
+            Thread.sleep(100);
+        }
         long nodeId = nodeMappingService.assignNode(NodeMappingService.class,
                                                     new IdentityImpl("first"));
 

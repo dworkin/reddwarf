@@ -539,8 +539,7 @@ public class NodeMappingServiceImpl
                 server.unregisterNodeListener(localNodeId);
             }
         } catch (IOException ex) {
-            logger.logThrow(Level.WARNING, ex, 
-                    "Problem encountered during shutdown");
+            logger.logThrow(Level.INFO, ex, "Problem encountered during shutdown");
         }
         
         // Ordering counts here.  We need to do whatever we might with

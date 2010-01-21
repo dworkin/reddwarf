@@ -94,6 +94,24 @@ public class TestScalableList extends Assert {
     }
 
     /**
+     * Shuts down and starts a new data store.  To be used by tests
+     * that require a fresh data store.
+     * @throws Exception
+     */
+    private void restart() throws Exception {
+        serverNode.shutdown(true);
+
+        serverNode =
+		new SgsTestNode("TestScalableList", null,
+			createProps("TestScalableList"));
+	txnScheduler =
+		serverNode.getSystemRegistry().getComponent(
+			TransactionScheduler.class);
+	taskOwner = serverNode.getProxy().getCurrentOwner();
+	dataService = serverNode.getDataService();
+    }
+    
+    /**
      * Tests instantiating a ScalableList using the copy constructor.
      * 
      * @throws Exception
@@ -3769,6 +3787,13 @@ public class TestScalableList extends Assert {
 	return (T) object;
     }
 
+    /**
+     * Returns the number of objects in the data store.  Tests using
+     * this method should restart the system to ensure no interference
+     * with previous tests.
+     * @return the number of objects in the data store.
+     * @throws Exception
+     */
     private int getObjectCount() throws Exception {
 	GetObjectCountTask task = new GetObjectCountTask();
 	txnScheduler.runTask(task, taskOwner);
@@ -3815,6 +3840,7 @@ public class TestScalableList extends Assert {
      */
     @Test
     public void testClearLeavesNoArtifacts() throws Exception {
+        restart();
 	coreClearTest(10);
     }
 
@@ -3823,6 +3849,7 @@ public class TestScalableList extends Assert {
      */
     @Test
     public void testRemovingObjectOnEmptyList() throws Exception {
+        restart();
 	coreRemovingObjectTest(0);
     }
 
@@ -3831,6 +3858,7 @@ public class TestScalableList extends Assert {
      */
     @Test
     public void testRemovingObject() throws Exception {
+        restart();
 	coreRemovingObjectTest(10);
     }
 
@@ -3894,6 +3922,7 @@ public class TestScalableList extends Assert {
      */
     @Test
     public void testScalableListStressTest() throws Exception {
+        restart();
 	coreClearTest(100);
     }
 

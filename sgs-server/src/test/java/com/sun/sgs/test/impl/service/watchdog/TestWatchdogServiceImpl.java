@@ -72,6 +72,8 @@ import java.util.MissingResourceException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -1464,24 +1466,42 @@ public class TestWatchdogServiceImpl extends Assert {
      * Check that a node can shutdown and report a failure when it detects 
      * that the renew process from the watchdog service fails
      */
-    @Test public void testReportFailureDueToNoRenewal() throws Exception {        
+    @Test public void testReportFailureDueToNoRenewal() throws Exception {
+        Logger logger = Logger.getLogger("testlogger");
         final SgsTestNode node = new SgsTestNode(serverNode, null, null);
-        
+
+        // This number is very high to account for times when RMI clients
+        // cannot contact the server because it is going away, and happen
+        // to call the server when the socket is still open.  We need to
+        // wait for the socket to time out.
+        final int MAX_TRIES = 100;
+
         // Shutdown the server 
         serverNode.shutdown(true);
         serverNode = null;
 
-        // Wait for the renew to fail and the shutdown to begin
-        Thread.sleep(renewTime*4);
-
-        try {
-            // The node should be shut down
-            assertFalse(node.getWatchdogService().isLocalNodeAliveNonTransactional());
-        } catch (IllegalStateException ise) {
-            // May happen if service is shutting down.
-        } catch (Exception e) {
-            fail ("Not expecting an Exception: " + e.getLocalizedMessage());
+        // Wait for the renew to fail and the shutdown to begin.  Keep trying
+        // several times, as different systems might require more or less time
+        // for the node state to change.
+        int attemptNum = 1;
+        while (attemptNum <= MAX_TRIES) {
+            logger.log(Level.SEVERE, "test about to sleep");
+            Thread.sleep(renewTime);
+            try {
+                if (!node.getWatchdogService().isLocalNodeAliveNonTransactional()) {
+                    // All is well.
+                    break;
+                }
+            } catch (IllegalStateException ise) {
+                // May happen if service is shutting down.
+                System.err.println("Caught IllegalStateException");
+                ise.printStackTrace();
+                break;
+            }
+            attemptNum++;
         }
+        System.err.println("Finished with " + attemptNum + " attempts");
+        assertTrue("Expected node to shut down ", attemptNum <= MAX_TRIES);
     }
 
     /**
