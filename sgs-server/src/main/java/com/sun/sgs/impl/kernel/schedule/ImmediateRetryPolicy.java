@@ -23,6 +23,7 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.kernel.schedule.SchedulerRetryAction;
 import com.sun.sgs.kernel.schedule.SchedulerRetryPolicy;
@@ -33,7 +34,22 @@ import java.util.logging.Logger;
 /**
  * A simple retry "in place" {@code SchedulerRetryPolicy}.  This
  * {@code SchedulerRetryPolicy} always causes a task that throws a
- * retryable exception to retry immediately.
+ * retryable exception to retry immediately.  This class supports the following
+ * configuration properties:
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #RETRY_WARNING_THRESHOLD_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_RETRY_WARNING_THRESHOLD}
+ *
+ * <dd style="padding-top: .5em">If a task has been retried a multiple of
+ *      times equal to the value of this property, then a {@code WARNING}
+ *      message will be logged as feedback to the user.  This value must be
+ *      greater than or equal to {@code 1}.
+ *
+ * </dl> <p>
  */
 public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
 
@@ -43,12 +59,36 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
                                            class.getName()));
 
     /**
+     * The property used to define the retry count threshold to use before
+     * printing a WARNING message.
+     */
+    static final String RETRY_WARNING_THRESHOLD_PROPERTY =
+            "com.sun.sgs.impl.kernel.schedule.retry.warning.threshold";
+
+    /**
+     * The default retry warning threshold
+     */
+    static final int DEFAULT_RETRY_WARNING_THRESHOLD = 25;
+
+    // the task retry count at which a warning should be printed
+    private final int retryWarningThreshold;
+
+    /**
      * Constructs an {@code ImmediateRetryPolicy}.
      *
      * @param properties the system properties available
      */
     public ImmediateRetryPolicy(Properties properties) {
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        this.retryWarningThreshold = wrappedProps.getIntProperty(
+                RETRY_WARNING_THRESHOLD_PROPERTY,
+                DEFAULT_RETRY_WARNING_THRESHOLD,
+                1, Integer.MAX_VALUE);
 
+        logger.log(Level.CONFIG,
+                   "Created ImmediateRetryPolicy with properties:" +
+                   "\n  " + RETRY_WARNING_THRESHOLD_PROPERTY + "=" +
+                   retryWarningThreshold);
     }
 
     /** {@inheritDoc} */
@@ -70,6 +110,15 @@ public class ImmediateRetryPolicy implements SchedulerRetryPolicy {
         // (like the number of times re-tried) might be considered later
         if ((result instanceof ExceptionRetryStatus) &&
             (((ExceptionRetryStatus) result).shouldRetry())) {
+
+            // Print a WARNING message if a task's retry count is a
+            // multiple of a configurable threshold
+            if (task.getTryCount() % retryWarningThreshold == 0) {
+                logger.logThrow(Level.WARNING,
+                                task.getLastFailure(),
+                                "Task has been retried {0} times: {1}",
+                                task.getTryCount(), task);
+            }
 
             // NOTE: this is a very simple initial policy that always causes
             // tasks to re-try "in place"

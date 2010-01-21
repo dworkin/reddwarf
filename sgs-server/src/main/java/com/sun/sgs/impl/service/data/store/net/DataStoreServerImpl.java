@@ -31,6 +31,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
@@ -831,7 +832,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 	long reapDelay = wrappedProps.getLongProperty(
 	    REAP_DELAY_PROPERTY, DEFAULT_REAP_DELAY);
-	executor = Executors.newSingleThreadScheduledExecutor();
+	executor = Executors.newSingleThreadScheduledExecutor(
+                new NamedThreadFactory("DataStoreServer-TransactionReaper"));
 	executor.scheduleAtFixedRate(
 	    new Runnable() {
 		public void run() {

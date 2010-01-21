@@ -36,6 +36,8 @@ import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
+import com.sun.sgs.impl.util.NamedThreadFactory;
+
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.PriorityScheduler;
@@ -245,7 +247,8 @@ final class TransactionSchedulerImpl
         this.requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
-        this.executor = Executors.newCachedThreadPool();
+        this.executor = Executors.newCachedThreadPool(
+                new NamedThreadFactory("TransactionScheduler"));
         for (int i = 0; i < requestedThreads; i++) {
             executor.submit(new TaskConsumer());
         }

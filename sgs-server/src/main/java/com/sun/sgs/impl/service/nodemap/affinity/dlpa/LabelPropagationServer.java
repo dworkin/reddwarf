@@ -33,6 +33,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
@@ -186,7 +187,8 @@ public class LabelPropagationServer extends BasicState
     /** A thread pool.  Will create as many threads as needed, with a timeout
      * of 60 sec before unused threads are reaped.
      */
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor = Executors.newCachedThreadPool(
+            new NamedThreadFactory("LabelPropagationServer"));
 
     // TBD:  we need to have a state, and not allow a run when we're shutting
     //     down, or shutdown while we're running.  Will also need an
