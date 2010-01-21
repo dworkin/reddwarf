@@ -1,4 +1,6 @@
 Version 0.9.12
+- Added support in the node mapping service for moving clients
+  based on node health
 - Added support for client session relocation to client session
   and channel services (issue #12)
 - Added affinity graph builders and group finders, for load balancing

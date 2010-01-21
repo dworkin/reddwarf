@@ -407,6 +407,9 @@ class GroupCoordinator extends BasicState {
         if (identities.isEmpty()) {
             return false;
         }
+        // TODO - Consider keeping track of these tasks, so that a) they could be
+        // aborted if a new collocation iteration comes in, or b) so we can make
+        // the next iteration wait until all of the ongoing moves are done.
         taskScheduler.scheduleTask(
                 new AbstractKernelRunnable("MoveTask") {
                     public void run() {
@@ -425,6 +428,12 @@ class GroupCoordinator extends BasicState {
                             }
                             try {
                                 server.moveIdentity(identity, targetNodeId);
+                            } catch (NoNodesAvailableException e) {
+                                logger.logThrow(Level.FINE, e,
+                                            "Target node {0} node no longer available",
+                                            targetNodeId);
+                                // If the target is not available, all will fail so exit
+                                return;
                             } catch (Exception e) {
                                 logger.logThrow(Level.FINE, e,
                                                 "Exception moving id {0}",
