@@ -71,7 +71,7 @@ public interface ClientSessionServiceMXBean {
     /**
      * Sets the login high water.
      *
-     * @param highWater
+     * @param highWater the high water value
      */
     void setLoginHighWater(int highWater);
     

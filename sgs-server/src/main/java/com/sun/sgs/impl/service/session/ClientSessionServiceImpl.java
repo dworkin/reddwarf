@@ -32,8 +32,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
-import com.sun.sgs.impl.service.session.ClientSessionHandler.
-    SetupCompletionFuture;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.SetupCompletionFuture;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -1335,7 +1334,7 @@ public final class ClientSessionServiceImpl
     private synchronized void checkHighWater() {
         if (handlers.size() > loginHighWater * 1.1) {
             setHealth(Health.ORANGE);
-        } else if(handlers.size() >= loginHighWater) {
+        } else if (handlers.size() >= loginHighWater) {
             setHealth(Health.YELLOW);
         } else {
             setHealth(Health.GREEN);
@@ -1348,7 +1347,9 @@ public final class ClientSessionServiceImpl
      * @param newHealth the service's health
      */
     private void setHealth(Health newHealth) {
-        if (newHealth == health) return;
+        if (newHealth == health) {
+            return;
+        }
         health = newHealth;
 
         if (logger.isLoggable(Level.FINE)) {

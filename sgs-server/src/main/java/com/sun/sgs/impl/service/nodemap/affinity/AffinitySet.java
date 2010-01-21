@@ -65,11 +65,10 @@ public class AffinitySet implements AffinityGroup, Serializable {
      * @param generation the generation number of this group
      * @param identitySet the initial set of identities to include
      */
-    public AffinitySet(long id, long generation, Set<Identity> identitySet)
-    {
+    public AffinitySet(long id, long generation, Set<Identity> identitySet) {
         this.id = id;
         this.generation = generation;
-        identities = identitySet;
+        identities = new HashSet<Identity>(identitySet);
     }
 
     /** {@inheritDoc} */

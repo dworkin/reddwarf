@@ -23,37 +23,22 @@ package com.sun.sgs.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Container for affinity groups.
+ * A factory for creating @{link AffinityGroup} instances.
+ *
+ * @param <E> the type of groups created by this factory
  */
-public interface GroupSet {
+public interface AffinityGroupFactory<E extends AffinityGroup> {
 
     /**
-     * Add an affinity group to this set.
+     * Create a instance of an affinity group.
      *
      * @param groupId the group ID
-     * @param members the set of members
-     * @param generation the generation
+     * @param generation the generation number
+     * @param members the set of member identities
+     * 
+     * @return a new affinity group
      */
-    void add(long groupId, Map<Identity, Long> members, long generation);
-
-    /**
-     * Return the number of member groups.
-     * @return the number of member groups
-     */
-    int size();
-
-    /**
-     * Return {@code true} if the member set is empty, otherwise {@code false}.
-     * @return {@code true} if the member set is empty, otherwise {@code false}
-     */
-    boolean isEmpty();
-
-    /**
-     * Get the set of member groups.
-     * @return the set of member groups
-     */
-    Set<AffinityGroup> getGroups();
+    E newInstance(long groupId, long generation, Map<Identity, Long> members);
 }

@@ -116,21 +116,23 @@ import javax.management.JMException;
  *   {@value #USE_AFFINITY_GROUPS_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> When configured for multi-node:
- *      {@code true} (enabled), otherwise {@code false}
- * <br>
+ *      {@code true}, otherwise {@code false}
  *
- * <dd style="padding-top: .5em">Specifies whether to enable or disable the
- * affinity group sub-system. By default the group sub-system is enabled when
- * configured in multi-node, and is disabled when in single-node mode.<p>
- * </dl>
+ * <dd style="padding-top: .5em">Specifies whether to install the
+ *      affinity group subsystem. By default the group subsystem is installed
+ *      when configured in multi-node, and is not installed when in single-node
+ *      mode.<p>
+ * <b>Note: This property is currently ignored and the group subsystem
+ *    is not installed</b>
  *
  * <dt>	<i>Property:</i> <code><b>
  *   {@value #GRAPH_CLASS_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_GRAPH_CLASS}
- * <br>
  *
  * <dd style="padding-top: .5em">The name of the graph builder class to use.<p>
+ * <b>Note: This property is currently ignored and the group subsystem
+ *    is not installed</b>
  * </dl> 
  *
  * <p>
@@ -308,15 +310,15 @@ public class NodeMappingServiceImpl
     private static final int DEFAULT_CLIENT_PORT = 0;
 
     /** The property to enable/disable affinity group use. */
-    private static final String USE_AFFINITY_GROUPS_PROPERTY =
+    static final String USE_AFFINITY_GROUPS_PROPERTY =
             PKG_NAME + ".use.affinity.groups";
 
     /** The property for specifying the graph builder class. */
-    private static final String GRAPH_CLASS_PROPERTY =
+    static final String GRAPH_CLASS_PROPERTY =
             PKG_NAME + ".graphbuilder.class";
 
     /** The default graph builder class. */
-    private static final String DEFAULT_GRAPH_CLASS =
+    static final String DEFAULT_GRAPH_CLASS =
         "com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.WeightedGraphBuilder";
 
     /** The watchdog service. */
@@ -448,9 +450,8 @@ public class NodeMappingServiceImpl
                                              NodeType.class, 
                                              NodeType.singleNode);
 
-            final boolean useAffinityGroups =
-                    wrappedProps.getBooleanProperty(USE_AFFINITY_GROUPS_PROPERTY,
-                                                    false);
+            final boolean useAffinityGroups = false;    // TODO - enable property
+//                    wrappedProps.getBooleanProperty(USE_AFFINITY_GROUPS_PROPERTY,
 //                                                   nodeType != NodeType.singleNode);
             if (!useAffinityGroups) {
                 // do not instantiate anything

@@ -26,6 +26,7 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.SystemIdentity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
@@ -53,6 +54,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -761,7 +763,8 @@ public class GraphBuilderTests {
     @Test(expected=IllegalStateException.class)
     public void testShutdownFindGroups() throws Exception {
         groupBuilder.shutdown();
-        groupBuilder.getAffinityGroupFinder().findAffinityGroups(new SimpleGroupSet());
+        groupBuilder.getAffinityGroupFinder().
+                    findAffinityGroups(new HashSet<AffinityGroup>(), new GroupFactory());
     }
 
     @Test

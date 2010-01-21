@@ -22,10 +22,12 @@
 package com.sun.sgs.impl.service.nodemap.affinity.dgb;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
-import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFactory;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AbstractAffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilderStats;
@@ -44,8 +46,13 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.UnknownIdentityException;
 import edu.uci.ics.jung.graph.UndirectedGraph;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import javax.management.JMException;
 
@@ -129,7 +136,7 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
  
         // Create our group finder and graph builder JMX MBeans
         AffinityGroupFinderStats stats =
-                new AffinityGroupFinderStats(this, col, -1);
+                new AffinityGroupFinderStats(col, -1);
         builderStats = new AffinityGraphBuilderStats(col,
                                                      builder.getAffinityGraph(),
                                                      periodCount, snapshot);
@@ -238,43 +245,47 @@ public class DistGraphBuilderServerImpl extends AbstractAffinityGraphBuilder
      * this would be some work, it might be worthwhile to implement if we
      * find this LPA implementation is useful in deployed systems.
      */
-    public long findAffinityGroups(GroupSet groupSet)
-            throws AffinityGroupFinderFailedException
+    public <T extends AffinityGroup>
+            long findAffinityGroups(Set<T> groupSet, AffinityGroupFactory<T> factory)
+        throws AffinityGroupFinderFailedException
     {
         checkForDisabledOrShutdownState();
 
-        return lpa.findAffinityGroups(groupSet);
-        // TODO - really should figure out the node for the identities.
-        // Otherwise, entire groups may switch form node to node. (perhaps
-        // chage coordinator to not move groups where no one is known?
-        // However this is not expected to be used in production so,
-        // is currently being left out.
-//        // Need to translate each group into a relocating affinity group
-//        // Create our final return values.  This is much like what the
-//        // single group finder needed to do, but we ask the node mapping
-//        // service for the real node assignments.
-//        NavigableSet<RelocatingAffinityGroup> retVal =
-//                new TreeSet<RelocatingAffinityGroup>();
-//        for (AffinityGroup ag : groups) {
-//            long gen = ag.getGeneration();
-//            Map<Identity, Long> idMap = new HashMap<Identity, Long>();
-//            for (Identity id : ag.getIdentities()) {
-//                try {
-//                    GetNodeIdTask getNodeIdTask = new GetNodeIdTask(id);
-//                    runTransactionally(getNodeIdTask);
-//                    idMap.put(id, getNodeIdTask.getNodeId());
-//                } catch (UnknownIdentityException e) {
-//                    // just leave this one out
-//                } catch (Exception e) {
-//                    // We don't know what the assignment is.
-//                    logger.log(Level.INFO,
-//                               "Unknown node assignment for identity {0}", id);
-//                    idMap.put(id, Long.valueOf(-1));
-//                }
-//            }
-//            retVal.add(new RelocatingAffinityGroup(ag.getId(), idMap, gen));
-//        }
-//        return retVal;
+        final Set<AffinityGroup> interimSet = new HashSet<AffinityGroup>();
+        final long time = lpa.findAffinityGroups(interimSet, new GroupFactory());
+
+        // SingleLabelPropagation does not generation node IDs for its
+        // members. So we ask the node mapping service for node assignments.
+        for (AffinityGroup ag : interimSet) {
+            long gen = ag.getGeneration();
+            Map<Identity, Long> idMap = new HashMap<Identity, Long>();
+            for (Identity id : ag.getIdentities()) {
+                try {
+                    GetNodeIdTask getNodeIdTask = new GetNodeIdTask(id);
+                    runTransactionally(getNodeIdTask);
+                    idMap.put(id, getNodeIdTask.getNodeId());
+                } catch (UnknownIdentityException e) {
+                    // just leave this one out
+                } catch (Exception e) {
+                    // We don't know what the assignment is.
+                    logger.log(Level.INFO,
+                               "Unknown node assignment for identity {0}", id);
+                    idMap.put(id, Long.valueOf(-1));
+                }
+            }
+            groupSet.add(factory.newInstance(ag.getId(), gen, idMap));
+        }
+        return time;
+    }
+
+    // Factory passed to SingleLablePropagation to fill interim group set
+    private static class GroupFactory implements AffinityGroupFactory<AffinityGroup> {
+        @Override
+        public AffinityGroup newInstance(long groupId, long generation,
+                                         Map<Identity, Long> members)
+        {
+            return new AffinitySet(groupId, generation, members.keySet());
+        }
     }
 
     /**

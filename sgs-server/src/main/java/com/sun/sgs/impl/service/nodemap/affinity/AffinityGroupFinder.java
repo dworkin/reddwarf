@@ -21,9 +21,11 @@
 
 package com.sun.sgs.impl.service.nodemap.affinity;
 
+import java.util.Set;
+
 /**
  *  The affinity group finder finds affinity groups within a
- *  Darkstar cluster using the LPA algorithm.
+ *  Darkstar cluster.
  */
 public interface AffinityGroupFinder {
 
@@ -33,12 +35,16 @@ public interface AffinityGroupFinder {
      * {@code AffinityGroupFinderFailedException}
      * is thrown. Errors include nodes not responding to server requests.
      *
+     * @param <T> type of affinity group
      * @param groupSet the group set to populate
+     * @param factory the factory for creating elements to be placed in groupSet
      * @return how long the find process took in milliseconds
      * @throws AffinityGroupFinderFailedException if there is an error
      * @throws IllegalStateException if the finder is disabled or shut down
      */
-    long findAffinityGroups(GroupSet groupSet) throws AffinityGroupFinderFailedException;
+    <T extends AffinityGroup> long findAffinityGroups(Set<T> groupSet,
+                                                      AffinityGroupFactory<T> factory)
+        throws AffinityGroupFinderFailedException;
 
     /** Enables the finder. */
     void enable();

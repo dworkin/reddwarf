@@ -25,11 +25,9 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
-import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFactory;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -95,6 +93,15 @@ import java.util.logging.Logger;
  *
  * <dd style="padding-top: .5em">The frequency that we find affinity groups,
  *  in seconds.  The value must be between {@code 5} and {@code 65535}.<p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *   {@value #COLLOCATE_DELAY_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value DEFAULT_COLLOCATE_DELAY} (milliseconds)
+ * <br>
+ *
+ * <dd style="padding-top: .5em">The delay between collocating groups.  The value
+ * must be between {@code 0} and {@code Long.MAX_VALUE}.<p>
  * </dl><p>
  */
 class GroupCoordinator extends BasicState {
@@ -104,7 +111,7 @@ class GroupCoordinator extends BasicState {
                     "com.sun.sgs.impl.service.nodemap";
 
     /** The property name for the update frequency. */
-    private static final String UPDATE_FREQ_PROPERTY = PKG_NAME + ".update.freq";
+    static final String UPDATE_FREQ_PROPERTY = PKG_NAME + ".update.freq";
 
     /** The default value of the update frequency, in seconds. */
     static final int DEFAULT_UPDATE_FREQ = 60;
@@ -184,7 +191,7 @@ class GroupCoordinator extends BasicState {
             updatePeriod = updateSeconds * 1000L;
             collocateDelay = wrappedProps.getLongProperty(COLLOCATE_DELAY_PROPERTY,
                                                           DEFAULT_COLLOCATE_DELAY,
-                                                          100, Long.MAX_VALUE);
+                                                          0, Long.MAX_VALUE);
             taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
             taskOwner = txnProxy.getCurrentOwner();
             nodeSets =
@@ -431,9 +438,6 @@ class GroupCoordinator extends BasicState {
 
     /**
      * Try to gather a new set of groups, pushing the results if successful.
-     *
-     * TODO - Need to weed out bad groups, i.e. monster groups, only one group, etc.
-     * May need to do that here and/or in CollocateTask.
      */
     private void findGroups() {
         checkForDisabledOrShutdownState();
@@ -448,15 +452,17 @@ class GroupCoordinator extends BasicState {
         }
 
         try {
-            GroupSetImpl newGroups = new GroupSetImpl();
+            NavigableSet<RelocatingAffinityGroup> newGroups =
+                                            new TreeSet<RelocatingAffinityGroup>();
 
             // TODO - use time to adjust delay between runs?
-            long time = finder.findAffinityGroups(newGroups);
+            long time = finder.findAffinityGroups(newGroups, new GroupFactoryImpl());
 
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER,
-                           "findAffinityGroups returned {0} groups",
-                           groups.size());
+                           "findAffinityGroups returned {0} groups, " +
+                           "taking {1} milliseconds",
+                           groups.size(), time);
             }
             synchronized (nodeSets) {
                 groups = newGroups;
@@ -473,24 +479,15 @@ class GroupCoordinator extends BasicState {
         }
     }
 
-    /**
-     * Group set that sorts its members.
-     */
-    private static class GroupSetImpl extends TreeSet<RelocatingAffinityGroup>
-                                      implements GroupSet
+    private static class GroupFactoryImpl
+            implements AffinityGroupFactory<RelocatingAffinityGroup>
     {
         @Override
-        public void add(long groupId,
-                        Map<Identity, Long> members,
-                        long generation)
+        public RelocatingAffinityGroup newInstance(long groupId,
+                                                   long generation,
+                                                   Map<Identity, Long> members)
         {
-            add(new RelocatingAffinityGroup(groupId, members, generation));
-        }
-
-        @Override
-        public Set<AffinityGroup> getGroups() {
-            Set<AffinityGroup> groups = Objects.uncheckedCast(this);
-            return Collections.unmodifiableSet(groups);
+            return new RelocatingAffinityGroup(groupId, members, generation);
         }
     }
 
@@ -627,11 +624,11 @@ class GroupCoordinator extends BasicState {
                 String key = dataService.nextServiceBoundName(nodekey);
                 done = (key == null || !key.contains(nodekey));
                 if (!done) {
-                    idmo = (IdentityMO)dataService.getServiceBinding(key);
+                    idmo = (IdentityMO) dataService.getServiceBinding(key);
                 }
             } catch (Exception e) {
                 if ((e instanceof ExceptionRetryStatus) &&
-                    (((ExceptionRetryStatus)e).shouldRetry()))
+                    (((ExceptionRetryStatus) e).shouldRetry()))
                 {
                     throw e;
                 }

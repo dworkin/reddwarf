@@ -807,9 +807,10 @@ public final class NodeMappingServerImpl
     
     
     /**
-     *  Run the given task synchronously, and transactionally, retrying
-     *  if the exception is of type <@code ExceptionRetryStatus>.
+     * Run the given task synchronously, and transactionally, retrying
+     * if the exception is of type <@code ExceptionRetryStatus>.
      * @param task the task
+     * @throws Exception if there is an exception running the task
      */
     public void runTransactionally(KernelRunnable task) throws Exception {
         transactionScheduler.runTask(task, taskOwner);
@@ -1306,7 +1307,7 @@ public final class NodeMappingServerImpl
                 // a node can never improve once there.
             } catch (Exception e) {
                 if ((e instanceof ExceptionRetryStatus) &&
-                    (((ExceptionRetryStatus)e).shouldRetry()))
+                    (((ExceptionRetryStatus) e).shouldRetry()))
                 {
                     throw e;
                 }

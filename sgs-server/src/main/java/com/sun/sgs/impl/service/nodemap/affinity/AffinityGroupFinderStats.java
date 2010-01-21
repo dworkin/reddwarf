@@ -48,9 +48,6 @@ public class AffinityGroupFinderStats extends StandardMBean
      */
     private final int stopIteration;
 
-    /** The affinity group finder. */
-    private final AffinityGroupFinder finder;
-
     /** The number of groups found in the last algorithm run. */
     protected int numGroups;
 
@@ -76,16 +73,12 @@ public class AffinityGroupFinderStats extends StandardMBean
 
     /**
      * Constructs the MXBean for affinity group finder information.
-     * @param finder the affinity group finder
      * @param collector the profile collector
      * @param stopIter the maximum iterations a run will perform
      */
-    public AffinityGroupFinderStats(AffinityGroupFinder finder,
-                                    ProfileCollector collector, int stopIter)
-    {
+    public AffinityGroupFinderStats(ProfileCollector collector, int stopIter) {
         super(AffinityGroupFinderMXBean.class, true);
         stopIteration = stopIter;
-        this.finder = finder;
 
         ProfileConsumer consumer = collector.getConsumer(CONS_NAME);
         ProfileLevel level = ProfileLevel.MEDIUM;
@@ -210,16 +203,12 @@ public class AffinityGroupFinderStats extends StandardMBean
     protected String getDescription(MBeanOperationInfo op) {
         if (op.getName().equals("clear")) {
             return "Clears all data in this bean.";
-        } else if (op.getName().equals("findAffinityGroups")) {
-            return "Starts an algorithm run to find affinity groups.";
         }
         return null;
     }
     /** {@inheritDoc} */
     protected int getImpact(MBeanOperationInfo op) {
         if (op.getName().equals("clear")) {
-            return MBeanOperationInfo.ACTION;
-        } else if (op.getName().equals("findAffinityGroups")) {
             return MBeanOperationInfo.ACTION;
         }
         return MBeanOperationInfo.UNKNOWN;

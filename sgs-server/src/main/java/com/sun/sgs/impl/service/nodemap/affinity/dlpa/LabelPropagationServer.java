@@ -27,7 +27,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.BasicState;
-import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFactory;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
@@ -239,7 +239,7 @@ public class LabelPropagationServer extends BasicState
         exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
 
         // Create our JMX MBean
-        stats = new AffinityGroupFinderStats(this, col, MAX_ITERATIONS);
+        stats = new AffinityGroupFinderStats(col, MAX_ITERATIONS);
         try {
             col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
         } catch (JMException e) {
@@ -249,11 +249,12 @@ public class LabelPropagationServer extends BasicState
         }
     }
 
-    // ---- Implement LPAAffinityGroupFinder --- //
+    // ---- Implement AffinityGroupFinder --- //
 
     /** {@inheritDoc} */
-    public long findAffinityGroups(GroupSet groupSet)
-            throws AffinityGroupFinderFailedException
+    public <T extends AffinityGroup>
+            long findAffinityGroups(Set<T> groupSet, AffinityGroupFactory<T> factory)
+        throws AffinityGroupFinderFailedException
     {
         checkForDisabledOrShutdownState();
         synchronized (runningLock) {
@@ -335,7 +336,7 @@ public class LabelPropagationServer extends BasicState
         // return the information that we have.
         // Assuming a node has failed, we won't report the identities
         // on the failed node as being part of any group.
-        gatherFinalGroups(clientProxyCopy, groupSet);
+        gatherFinalGroups(clientProxyCopy, groupSet, factory);
 
         long runTime = System.currentTimeMillis() - startTime;
         stats.runtimeSample(runTime);
@@ -347,7 +348,7 @@ public class LabelPropagationServer extends BasicState
             StringBuilder sb = new StringBuilder();
             sb.append(" LPA found " +  groupSet.size() + " groups ");
 
-            for (AffinityGroup group : groupSet.getGroups()) {
+            for (AffinityGroup group : groupSet) {
                 sb.append(" id: " + group.getId() + ", members: ");
                 for (Identity id : group.getIdentities()) {
                     sb.append("\n" + id);
@@ -653,9 +654,12 @@ public class LabelPropagationServer extends BasicState
      *
      * @param clientProxies a map of node ids to LPAClient proxies
      * @param groupSet the group set to populate
-     * @return the merged affinity groups found on each LPAClient
      */
-    private void gatherFinalGroups(Map<Long, LPAClient> clientProxies, GroupSet groupSet)
+    private <T extends AffinityGroup> void
+                gatherFinalGroups(Map<Long,
+                                  LPAClient> clientProxies,
+                                  Set<T> groupSet,
+                                  AffinityGroupFactory<T> factory)
     {
         // If, after this point, we cannot contact a node, simply
         // return the information that we have.
@@ -729,7 +733,7 @@ public class LabelPropagationServer extends BasicState
         for (Map.Entry<Long, Map<Identity, Long>> e : groupMap.entrySet()) {
             Map<Identity, Long> idMap = e.getValue();
             if (!idMap.isEmpty()) {
-                groupSet.add(e.getKey(), idMap, runNum);
+                groupSet.add(factory.newInstance(e.getKey(), runNum, idMap));
             }
         }
     }

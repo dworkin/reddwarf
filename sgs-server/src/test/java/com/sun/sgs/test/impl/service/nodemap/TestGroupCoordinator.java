@@ -23,9 +23,10 @@ package com.sun.sgs.test.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFactory;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
-import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
@@ -39,8 +40,8 @@ import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.NavigableSet;
 import java.util.Properties;
+import java.util.Set;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -132,7 +133,7 @@ public class TestGroupCoordinator {
     @Test(expected=IllegalArgumentException.class)
     public void testBadCollocateDelay() throws Exception {
         Properties properties = new Properties();
-        properties.setProperty("com.sun.sgs.impl.service.nodemap.collocate.delay", "90");
+        properties.setProperty("com.sun.sgs.impl.service.nodemap.collocate.delay", "-1");
         newGroupCoordinator(properties, systemRegistry, txnProxy,
                             null,  new DummyBuilder());
     }
@@ -178,8 +179,9 @@ public class TestGroupCoordinator {
     private class DummyFinder implements AffinityGroupFinder {
 
         @Override
-        public long findAffinityGroups(GroupSet groupSet)
-                throws AffinityGroupFinderFailedException
+        public <T extends AffinityGroup>
+                long findAffinityGroups(Set<T> groupSet, AffinityGroupFactory<T> factory)
+            throws AffinityGroupFinderFailedException
         {
             throw new UnsupportedOperationException("Not supported yet.");
         }

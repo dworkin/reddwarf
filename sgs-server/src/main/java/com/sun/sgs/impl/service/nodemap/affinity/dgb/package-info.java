@@ -32,9 +32,6 @@
  * It is expected this implementation will be useful for testing, as it
  * is decoupled from the caching data store.
  * <p>
- * Affinity groups returned by this implementation are of type
- * {@link com.sun.sgs.impl.service.nodemap.affinity.RelocatingAffinityGroup}.
- * <p>
  * If a node fails or becomes unreachable during a run of the algorithm, no
  * special actions are taken.
  */

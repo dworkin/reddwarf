@@ -28,7 +28,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinder;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderStats;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
-import com.sun.sgs.impl.service.nodemap.affinity.GroupSet;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFactory;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
@@ -113,7 +113,7 @@ public class SingleLabelPropagation extends AbstractLPA
         this.builder = builder;
         if (stats == null) {
             // Create our JMX MBean
-            stats = new AffinityGroupFinderStats(this, col, MAX_ITERATIONS);
+            stats = new AffinityGroupFinderStats(col, MAX_ITERATIONS);
             try {
                 col.registerMBean(stats, AffinityGroupFinderMXBean.MXBEAN_NAME);
             } catch (JMException e) {
@@ -175,8 +175,9 @@ public class SingleLabelPropagation extends AbstractLPA
      *
      * @return the affinity groups
      */
-    public long findAffinityGroups(GroupSet groupSet)
-            throws AffinityGroupFinderFailedException
+    public <T extends AffinityGroup>
+            long findAffinityGroups(Set<T> groupSet, AffinityGroupFactory<T> factory)
+        throws AffinityGroupFinderFailedException
     {
         checkForDisabledOrShutdownState();
         long startTime = System.currentTimeMillis();
@@ -307,7 +308,7 @@ public class SingleLabelPropagation extends AbstractLPA
             for (Identity id : ag.getIdentities()) {
                 idMap.put(id, -1L);
             }
-            groupSet.add(ag.getId(), idMap, gen);
+            groupSet.add(factory.newInstance(ag.getId(), gen, idMap));
         }
         return runTime;
     }
