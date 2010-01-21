@@ -21,6 +21,7 @@
 
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.impl.sharedutil.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadFactory;
 
@@ -43,6 +44,7 @@ public class NamedThreadFactory implements ThreadFactory {
      * @param name the prefix to use for each thread's name
      */
     public NamedThreadFactory(String name) {
+        Objects.checkNull("name", name);
         this.name = name;
         this.count = new AtomicInteger();
     }

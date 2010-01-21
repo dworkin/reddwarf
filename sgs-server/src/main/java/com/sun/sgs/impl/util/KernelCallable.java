@@ -70,8 +70,11 @@ public abstract class KernelCallable<R>
      * This implementation invokes the {@code call} method of this
      * instance and sets the result.
      *
-     * @throws IllegalStateException if this method has already been
-     *		invoked 
+     * @throws IllegalStateException if this task has already been successfully
+     *         run via an invocation of the {@link
+     *         #call(com.sun.sgs.impl.util.KernelCallable,
+     *         com.sun.sgs.kernel.TransactionScheduler,
+     *         com.sun.sgs.auth.Identity) call} method
      */
     @Override
     public synchronized void run() throws Exception {

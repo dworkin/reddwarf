@@ -46,7 +46,8 @@ import java.util.logging.Logger;
  *
  * <dd style="padding-top: .5em">If a task has been retried a multiple of
  *      times equal to the value of this property, then a {@code WARNING}
- *      message will be logged as feedback to the user.
+ *      message will be logged as feedback to the user.  This value must be
+ *      greater than or equal to {@code 1}.
  *
  * </dl> <p>
  */
