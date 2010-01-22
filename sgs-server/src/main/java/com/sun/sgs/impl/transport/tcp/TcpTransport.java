@@ -79,7 +79,15 @@ import com.sun.sgs.impl.net.ssl.SSLEngineFactory;
  *	Specifies the acceptor backlog. This value is passed as the second
  *      argument to the
  *      {@link AsynchronousServerSocketChannel#bind(SocketAddress,int)
- *      AsynchronousServerSocketChannel.bind} method.
+ *      AsynchronousServerSocketChannel.bind} method.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *      {@value #ISSECURE_TRANSPORT_PROPERTY}
+ *      </b></code><br>
+ *      <i>Default:</i> false<br>
+ *
+ * <dd style="padding-top: .5em">
+ *      Specifies whether the transport should use SSL or not.
  * </dl> <p>
  */
 public class TcpTransport implements Transport {
@@ -132,10 +140,10 @@ public class TcpTransport implements Transport {
     /** The transport descriptor */
     private final TcpDescriptor descriptor;
 
-    // Determines whether the transport should be secure or not
+    /** Determines whether the transport should use SSL or not. */
     private final boolean isSecure;
 
-    // The name of the issecure transport property
+    /** The name of the secure transport property. */
     public static final String ISSECURE_TRANSPORT_PROPERTY =
             PKG_NAME + ".secure";
 
@@ -214,7 +222,7 @@ public class TcpTransport implements Transport {
                        acceptorBacklog +
                        "\n  " + LISTEN_HOST_PROPERTY + "=" + host +
                        "\n  " + LISTEN_PORT_PROPERTY + "=" + port +
-                       "\n  " + ISSECURE_TRANSPORT_PROPERTY + isSecure);
+                       "\n  " + ISSECURE_TRANSPORT_PROPERTY + "=" + isSecure);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

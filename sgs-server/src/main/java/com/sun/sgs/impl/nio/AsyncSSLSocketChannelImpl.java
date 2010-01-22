@@ -48,8 +48,8 @@ import com.sun.sgs.nio.channels.ShutdownType;
 class AsyncSSLSocketChannelImpl
     extends AsyncSocketChannelImpl
 {
-    // The SSL/TLS secure channel
-    final SSLChannel sslChannel;
+    /** The SSL/TLS secure channel. */
+    private final SSLChannel sslChannel;
 
     /**
      * Creates a new instance registered with the given channel group.

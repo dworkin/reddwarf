@@ -29,7 +29,6 @@ import java.security.PrivilegedAction;
 import java.util.concurrent.ExecutorService;
 
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
-import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.ProtocolFamily;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;

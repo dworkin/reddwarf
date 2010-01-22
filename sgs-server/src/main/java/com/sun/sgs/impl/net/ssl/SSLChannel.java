@@ -29,69 +29,75 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
 import java.util.logging.Level;
-import javax.net.ssl.*;
-import javax.net.ssl.SSLEngineResult.*;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLEngineResult.HandshakeStatus;
+import javax.net.ssl.SSLEngineResult.Status;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSession;
 
-/*
- * Sets up Server side SSLEngine and has methods to read and write
- * data to and from the network
+/**
+ * Sets up server side SSLEngine and has methods to read and write SSL/TLS
+ * encrypted data to and from the network.
  */
-
 public class SSLChannel {
 
+    /** The logger for this class */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(SSLChannel.class.getName()));
 
-    // The SSLEngine
+    /** The SSLEngine */
     private SSLEngine sslEngine = null;
 
-    // The SSLSession
+    /** The SSLSession */
     private SSLSession sslSession = null;
 
-    // The SSL handshake status
+    /** The SSL handshake status */
     private HandshakeStatus hsStatus = null;
 
-    // Indicates whether the initial handshake has been completed
+    /** Indicates whether the initial handshake has been completed */
     private boolean initialHSComplete = false;
 
-    // The SSL cipher suites enabled on this SSLEngine
-    //private final String[] enabledCipherSuites = {};
-
-    // An object used for synchronizing on SSLEngine.unwrap()
+    /** An object used for synchronizing on SSLEngine.unwrap() */
     private final Object inLock = new Object();
 
-    // An object used for synchronizing on SSLEngine.wrap()
+    /** An object used for synchronizing on SSLEngine.wrap() */
     private final Object outLock = new Object();
 
-    // The inbound network ByteBuffer
+    /** The inbound network ByteBuffer */
     private ByteBuffer inNetBB = null;
 
-    // The outbound network ByteBuffer
+    /** The outbound network ByteBuffer */
     private ByteBuffer outNetBB = null;
 
-    // An empty ByteBuffer for consuming inbound handshake data
+    /** An empty ByteBuffer for consuming inbound handshake data */
     private ByteBuffer inhsData = null;
 
-    // An empty ByteBuffer for producing outbound handshake data
+    /** An empty ByteBuffer for producing outbound handshake data */
     private ByteBuffer outhsData = null;
 
-    // The application ByteBuffer size
+    /** The application ByteBuffer size */
     private int appBBsize = 4096;
 
-    // The network ByteBuffer size
+    /** The network ByteBuffer size */
     private int netBBsize = 4096;
 
-    // The underlying socketchannel
+    /** The underlying socketchannel */
     private final SocketChannel sc;
 
-    // Constructs an instance of this class
+    /**
+     * Constructs an instance of this class and calls {@code startSSLEngine()}.
+     *
+     * @param sc the socketchannel
+     */
     public SSLChannel(SocketChannel sc) {
         this.sc = sc;
         startSSLEngine();
     }
 
-    // Creates the SSLEngine and set to server mode
-    // and sets the ByteBuffer sizes
+    /**
+     * Sets the SSLEngine and to server mode and sets the ByteBuffer sizes.
+     */
     private void startSSLEngine() {
         
         sslEngine = SSLEngineFactory.getSSLEngine();
@@ -111,8 +117,13 @@ public class SSLChannel {
         hsStatus = HandshakeStatus.NEED_UNWRAP;
     }
 
-    // Performs an SSL handshake
-    void doHandshake() throws IOException, SSLException {
+    /**
+     * Performs an SSL handshake.
+     *
+     * @throws SSLException if an SSL error occurs
+     * @throws IOException if an I/O error occurs
+     */
+    void doHandshake() throws SSLException, IOException {
 
         SSLEngineResult result;
 
@@ -129,12 +140,11 @@ public class SSLChannel {
                     while (hsStatus == HandshakeStatus.NEED_UNWRAP) {
                         if (sc.read(inNetBB) == -1) {
                             sslEngine.closeInbound();
-                            //return initialHSComplete;
                         }
 
-                        // expected room for unwrap
                         if (inhsData.remaining() < appBBsize) {
-                            inhsData = ByteBuffer.allocate(inhsData.capacity() * 2);
+                            inhsData = ByteBuffer.allocate(
+                                                    inhsData.capacity() * 2);
                         }
                         inNetBB.flip();
                         synchronized(inLock) {
@@ -150,8 +160,9 @@ public class SSLChannel {
                             case OK:
                                 switch (hsStatus) {
                                     case NOT_HANDSHAKING:
-                                        throw new IOException(
-                                            "Not handshaking during initial handshake");
+                                        throw new IOException("Not " +
+                                                "handshaking during initial " +
+                                                "handshake");
 
                                     case NEED_TASK:
                                         hsStatus = doTasks();
@@ -164,24 +175,21 @@ public class SSLChannel {
                             break needIO;
 
                             case BUFFER_UNDERFLOW:
-                                // Resize buffer if needed.
                                 netBBsize = sslSession.getPacketBufferSize();
                                 if (netBBsize > inNetBB.capacity()) {
                                     inNetBB = ByteBuffer.allocate(netBBsize);
                                 }
-
-                                // Need to go reread the Channel for more data.
-
                             break needIO;
 
                             case BUFFER_OVERFLOW:
-                                // Reset the application buffer size.
-                                appBBsize = sslSession.getApplicationBufferSize();
+                                appBBsize =
+                                        sslSession.getApplicationBufferSize();
                             break needIO;
 
                             default: //CLOSED:
-                                throw new IOException("Received " + result.getStatus() +
-                                    "during initial handshaking");
+                                throw new IOException("Received " +
+                                        result.getStatus() +
+                                        " during initial handshaking");
                         }
                     }  // "needIO" block.
                 break;
@@ -196,10 +204,8 @@ public class SSLChannel {
 
                     hsStatus = result.getHandshakeStatus();
 
-                    // Flush out the outgoing buffer, if there's anything left in it.
                     if (outNetBB.hasRemaining()) {
-
-                        if (!tryFlush(outNetBB)) {  // writes to the socket channel
+                        if (!tryFlush(outNetBB)) {
                             initialHSComplete = false;
                         }
                     }
@@ -212,13 +218,13 @@ public class SSLChannel {
                         break;
 
                         default: // BUFFER_OVERFLOW/BUFFER_UNDERFLOW/CLOSED:
-                            throw new IOException("Received" + result.getStatus() +
-                                "during initial handshaking");
+                            throw new IOException("Received" +
+                                    result.getStatus() +
+                                " during initial handshaking");
                     }
                 break;
 
-                case FINISHED:
-                    // HANDSHAKE COMPLETE
+                case FINISHED: // HANDSHAKE COMPLETE
                     initialHSComplete = true;
                     logger.log(Level.FINE, "SSL handshake completed");
                 break;
@@ -226,50 +232,54 @@ public class SSLChannel {
                 default: // NOT_HANDSHAKING/NEED_TASK
                     throw new RuntimeException("Invalid Handshaking State" +
                             hsStatus);
-            } // switch
+            }
+        }
+    }
 
-        } // while
-        
-    } // end doHandshake
-
-    // Do all outstanding handshake tasks in a separate thread
+    /**
+     * Does all outstanding handshake tasks in a separate thread.
+     *
+     * @return {@code sslEngine.getHandshakeStatus()}
+     */
     private HandshakeStatus doTasks() {
         Executor exec = Executors.newSingleThreadExecutor();
         Runnable task;
 
         while ((task = sslEngine.getDelegatedTask()) != null) {
-            //exec.execute(task);
+            exec.execute(task);
             task.run();
         }
 
         return sslEngine.getHandshakeStatus();
     }
 
-    /*
-     * Read the channel for more information, then unwrap the
-     * application data we get.
-     *
-     * Each call to this method will perform at most one underlying read().
+    /**
+     * Reads the {@link socketChannel} for more information, then unwraps the
+     * application data.
+     * <p>
+     * Each call to this method will perform at most one underlying read.
+     * 
+     * @param dst destination ByteBuffer
+     * @return the number of bytes read from the inbound network ByteBuffer
+     * @throws SSLException if an SSL error occurs
+     * @throws IOException if an I/O error occurs
      */
-    public int read(ByteBuffer dst) throws IOException, SSLException {
+    public int read(ByteBuffer dst) throws SSLException, IOException {
 	SSLEngineResult result;
 
 	if (!initialHSComplete) {
-	    //throw new IllegalStateException();
             doHandshake();
 	}
 
-        // clear the inward byte buffers
         inNetBB.clear();
         dst.clear();
 
 	if (sc.read(inNetBB) == -1) {
-	    sslEngine.closeInbound();  // probably throws exception
+	    sslEngine.closeInbound();
 	    return -1;
 	}
 
 	do {
-            // expected room for unwrap
             if (dst.remaining() < appBBsize) {
                 dst = ByteBuffer.allocate(dst.capacity() * 2);
             }
@@ -280,27 +290,21 @@ public class SSLChannel {
             }
 	    inNetBB.compact();
 
-            /*
-	    * Could check here for a SSL handshake renegotiation.
-            */
-
-	    switch (result.getStatus()) {
+            switch (result.getStatus()) {
 
                 case BUFFER_OVERFLOW:
-                    // Reset the application buffer size.
                     appBBsize = sslSession.getApplicationBufferSize();
 		break;
 
                 case BUFFER_UNDERFLOW:
-                    // Resize buffer if needed.
                     if (netBBsize > inNetBB.capacity()) {
                         inNetBB = ByteBuffer.allocate(netBBsize);
                     }
-
-                break; // break, next read will support larger buffer.
+                break;
 
                 case OK:
-                    if (result.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
+                    if (result.getHandshakeStatus() ==
+                            HandshakeStatus.NEED_TASK) {
                         doTasks();
                     }
 		break;
@@ -315,29 +319,38 @@ public class SSLChannel {
 	return (dst.position());
     }
 
+    /**
+     * Reads the {@link socketChannel} for more information, then unwraps the
+     * application data.
+     * <p>
+     * Each call to this method will perform at most one underlying read.
+     *
+     * @param dsts array of destination ByteBuffers
+     * @param offset offset within the first buffer of the buffer array
+     * @param length maximum number of buffers to be accessed
+     * @return the number of bytes read from the inbound network ByteBuffer
+     * @throws IOException if an I/O error occurs
+     */
     public long read(ByteBuffer[] dsts, int offset, int length)
-            throws IOException, SSLException {
+            throws SSLException, IOException {
 	SSLEngineResult result;
         long dataRead = 0;
 
 	if (!initialHSComplete) {
-	    //throw new IllegalStateException();
             doHandshake();
 	}
 
-        // clear the inward byte buffers
         inNetBB.clear();
         for(int i = 0; i <= length - 1; i++) {
             dsts[i].clear();
         }
 
 	if (sc.read(inNetBB) == -1) {
-	    sslEngine.closeInbound();  // probably throws exception
+	    sslEngine.closeInbound();
 	    return -1;
 	}
 
 	do {
-            // expected room for unwrap
             for(int count = 0; count <= length - 1; count++) {
                 if (dsts[count].remaining() < appBBsize) {
                     dsts[count] =
@@ -352,27 +365,21 @@ public class SSLChannel {
             }
 	    inNetBB.compact();
 
-            /*
-	    * Could check here for a SSL handshake renegotiation.
-            */
-            
-	    switch (result.getStatus()) {
+            switch (result.getStatus()) {
 
                 case BUFFER_OVERFLOW:
-                    // Reset the application buffer size.
                     appBBsize = sslSession.getApplicationBufferSize();
 		break;
 
                 case BUFFER_UNDERFLOW:
-                    // Resize buffer if needed.
                     if (netBBsize > inNetBB.capacity()) {
                         inNetBB = ByteBuffer.allocate(netBBsize);
                     }
-
-                break; // break, next read will support larger buffer.
+                break;
 
                 case OK:
-                    if (result.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
+                    if (result.getHandshakeStatus() ==
+                                                HandshakeStatus.NEED_TASK) {
                         doTasks();
                     }
 		break;
@@ -391,39 +398,52 @@ public class SSLChannel {
 	return dataRead;
     }
 
-    /*
-     * Try to write out as much as possible from the src buffer.
+    /**
+     * Ensures SSL handshake is complete before writing TLS/SSL encrypted data
+     * to the network.
+     *
+     * @param src the source ByteBuffer
+     * @return the result of (@code doWrite(src)}
+     * @throws IOException if an I/O error occurs
      */
     public int write(ByteBuffer src) throws IOException {
 
 	if (!initialHSComplete) {
-	    // throw new IllegalStateException();
             doHandshake();
 	}
 
 	return doWrite(src);
     }
 
+    /**
+     * Ensures SSL handshake is complete before writing TLS/SSL encrypted data
+     * to the network.
+     *
+     * @param srcs the array of source ByteBuffers
+     * @param offset offset within the first buffer of the Bytebuffer array
+     * @param length maximum number of buffers to be accessed
+     * @return the result of (@code doWrite(src, offset, length)}
+     * @throws IOException if an I/O error occurs
+     */
     public long write(ByteBuffer[] srcs, int offset, int length)
             throws IOException {
 
 	if (!initialHSComplete) {
-	    //throw new IllegalStateException();
             doHandshake();
 	}
 
 	return doWrite(srcs, offset, length);
     }
 
-    /*
-     * Try to flush out any existing outbound data, then try to wrap
-     * anything new contained in the src buffer.
-     * <P>
-     * Return the number of bytes actually consumed from the buffer,
-     * but the data may actually be still sitting in the output buffer,
-     * waiting to be flushed.
+    /**
+     * Writes outbound data to the underlying {@link SocketChannel}.
+     *
+     * @param src the source ByteBuffer
+     * @return the number of bytes actually consumed from the buffer
+     * @throws SSLException if an SSL error occurs
+     * @throws IOException if an I/O error occurs
      */
-    private int doWrite(ByteBuffer src) throws IOException {
+    private int doWrite(ByteBuffer src) throws SSLException, IOException {
         SSLEngineResult result;
 	int retValue = 0;
 
@@ -431,9 +451,6 @@ public class SSLChannel {
 	    return retValue;
 	}
 
-	/*
-	 * The data buffer is empty, we can reuse the entire buffer.
-	 */
 	outNetBB.clear();
 
         synchronized(outLock) {
@@ -441,7 +458,6 @@ public class SSLChannel {
             outLock.notifyAll();
         }
 	retValue = result.bytesConsumed();
-        //retValue = result.bytesProduced();
 
 	outNetBB.flip();
 
@@ -458,11 +474,6 @@ public class SSLChannel {
                     result.getStatus());
 	}
 
-	/*
-	 * Try to flush the data, regardless of whether or not
-	 * it's been selected.  Odds of a write buffer being full
-	 * is less than a read buffer being empty.
-	 */
 	if (outNetBB.hasRemaining()) {
 	    tryFlush(outNetBB);
 	}
@@ -470,8 +481,18 @@ public class SSLChannel {
 	return retValue;
     }
 
+    /**
+     * Writes outbound data to the underlying {@link SocketChannel}.
+     *
+     * @param srcs the array of source ByteBuffers
+     * @param offset offset within the first buffer of the Bytebuffer array
+     * @param length maximum number of buffers to be accessed
+     * @return the number of bytes actually consumed from the buffer
+     * @throws SSLException if an SSL error occurs
+     * @throws IOException if an I/O error occurs
+     */
     private long doWrite(ByteBuffer[] srcs, int offset, int length)
-                throws IOException {
+                throws SSLException, IOException {
         SSLEngineResult result;
 	int retValue = 0;
 
@@ -479,9 +500,6 @@ public class SSLChannel {
 	    return retValue;
 	}
 
-	/*
-	 * The data buffer is empty, we can reuse the entire buffer.
-	 */
 	outNetBB.clear();
 
         synchronized(outLock) {
@@ -489,7 +507,6 @@ public class SSLChannel {
             outLock.notifyAll();
         }
 	retValue = result.bytesConsumed();
-        //retValue = result.bytesProduced();
 
 	outNetBB.flip();
 
@@ -506,11 +523,6 @@ public class SSLChannel {
                     result.getStatus());
 	}
 
-	/*
-	 * Try to flush the data, regardless of whether or not
-	 * it's been selected.  Odds of a write buffer being full
-	 * is less than a read buffer being empty.
-	 */
 	if (outNetBB.hasRemaining()) {
 	    tryFlush(outNetBB);
 	}
@@ -518,22 +530,28 @@ public class SSLChannel {
 	return retValue;
     }
 
-    // Flushes the given output Bytebuffer to the network
+    /**
+     * Flushes the given output Bytebuffer to the network.
+     *
+     * @param bb the source ByteBuffer
+     * @return {@code true} if the ByteBuffer is empty
+     * @throws IOException if an I/O error occurs
+     */
     boolean tryFlush(ByteBuffer bb) throws IOException {
         sc.write(bb);
 
         return !bb.hasRemaining();
     }
 
-    /*
-     * Begin the shutdown process.
-     * <P>
-     * Close out the SSLEngine if not already done so, then
-     * wrap our outgoing close_notify message and try to send it on.
-     * <P>
-     * Return true when we're done passing the shutdown messsages.
+    /**
+     * Begins the shutdown process. Closes the outbound SSLEngine; by RFC 2616,
+     * the close_notify message can be a "fire and forget" message.
+     *
+     * @return {@code true} if the shutdown messsages have been sent
+     * @throws SSLException if an SSL error occurs
+     * @throws IOException if an I/O error occurs
      */
-    public boolean shutdown() throws IOException {
+    public boolean shutdown() throws SSLException, IOException {
         SSLEngineResult result;
 
 	sslEngine.closeOutbound();
@@ -542,10 +560,6 @@ public class SSLChannel {
 	    return false;
 	}
 
-	/*
-	 * By RFC 2616, we can "fire and forget" our close_notify
-	 * message.
-	 */
 	outNetBB.clear();
         synchronized(outLock) {
             result = sslEngine.wrap(outhsData, outNetBB);

@@ -37,66 +37,172 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
+/**
+ * Creates the singleton server side {@link SSLEngine}.
+ * The {@code SSLEngineFactory.initialize} method supports the following
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #KEYSTORE_PASSWORD_PROPERTY}
+ *	</b></code><br>
+ *
+ * <dd style="padding-top: .5em">Specifies the keystore password.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #TRUSTSTORE_PASSWORD_PROPERTY}
+ *	</b></code><br>
+ *
+ * <dd style="padding-top: .5em">Specifies the truststore password.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #KEYSTORE_LOCATION_PROPERTY}
+ *	</b></code><br>
+ *
+ * <dd style="padding-top: .5em">Specifies the path name of the keystore in
+ *      the file system.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #TRUSTSTORE_LOCATION_PROPERTY}
+ *	</b></code><br>
+ *
+ * <dd style="padding-top: .5em">Specifies the path name of the truststore in
+ *      the file system.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #KEYSTORE_TYPE_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> jks<br>
+ *
+ * <dd style="padding-top: .5em">Specifies the type of the keystore.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #KEYSTORE_PROVIDER_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> SunJSSE<br>
+ *
+ * <dd style="padding-top: .5em">Specifies the name of the provider of the
+ *      keystore.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #KEYMANAGER_ALGORITHM_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> SunX509<br>
+ *
+ * <dd style="padding-top: .5em">Specifies the standard name of the requested
+ *      keymanager algorithm.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #KEYMANAGER_PROVIDER_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> SunJSSE<br>
+ *
+ * <dd style="padding-top: .5em">Specifies the name of the provider of the
+ *      keymanager.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #TRUSTMANAGER_ALGORITHM_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> SunX509<br>
+ *
+ * <dd style="padding-top: .5em">Specifies the standard name of the requested
+ *      trustmanager algorithm.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #TRUSTMANAGER_PROVIDER_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> SunJSSE<br>
+ *
+ * <dd style="padding-top: .5em">Specifies the name of the provider of the
+ *      trustmanager.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #CLIENT_AUTHENTICATION_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> false<br>
+ *
+ * <dd style="padding-top: .5em">Specifies whether client authentication is
+ *      required.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #ENABLED_CIPHER_SUITES_PROPERTY}
+ *	</b></code><br>
+ *
+ * <dd style="padding-top: .5em">Specifies the enabled cipher suites for the
+ *      {@link SSLEngine}.
+ * </dl> <p>
+ */
 public class SSLEngineFactory {
 
-    // The package name
+    /** The package name */
     private static final String PKG_NAME = "com.sun.sgs.impl.net.ssl";
 
-    // The keyStore password property
-    public static final String KEYSTORE_PASSWORD_PROPERTY =
+    /** The name of the keystore keyStorePassword property */
+    private static final String KEYSTORE_PASSWORD_PROPERTY =
             PKG_NAME + ".keystore.password";
 
-    // The keyStore location property
-    public static final String KEYSTORE_LOCATION_PROPERTY = 
+    /** The name of the truststore keyStorePassword property */
+    private static final String TRUSTSTORE_PASSWORD_PROPERTY =
+            PKG_NAME + ".truststore.password";
+
+    /** The name of the keystore location property */
+    private static final String KEYSTORE_LOCATION_PROPERTY =
             PKG_NAME + ".keystore.location";
     
-    // The trustStore location property
-    public static final String TRUSTSTORE_LOCATION_PROPERTY = 
+    /** The name of the truststore location property */
+    private static final String TRUSTSTORE_LOCATION_PROPERTY =
             PKG_NAME + ".truststore.location";
     
-    // The keyStore type property
-    public static final String KEYSTORE_TYPE_PROPERTY = 
-            PKG_NAME + "keystore.type";
+    /** The name of the keystore type property */
+    private static final String KEYSTORE_TYPE_PROPERTY =
+            PKG_NAME + ".keystore.type";
     
-    // The keyStore provider property
-    public static final String KEYSTORE_PROVIDER_PROPERTY = 
-            PKG_NAME + "keystore.provider";
+    /** The name of the keystore provider property */
+    private static final String KEYSTORE_PROVIDER_PROPERTY =
+            PKG_NAME + ".keystore.provider";
 
-    // The keymanager algorithm property
-    public static final String KEYMANAGER_ALGORITHM_PROPERTY =
-            PKG_NAME + "keymanager.algorithm";
+    /** The name of the key manager algorithm property */
+    private static final String KEYMANAGER_ALGORITHM_PROPERTY =
+            PKG_NAME + ".keymanager.algorithm";
 
-    // The trustmanager provider property
-    public static final String KEYMANAGER_PROVIDER_PROPERTY =
-            PKG_NAME + "keymanager.provider";
+    /** The name of the key manager provider property */
+    private static final String KEYMANAGER_PROVIDER_PROPERTY =
+            PKG_NAME + ".keymanager.provider";
 
-    // The trustmanager algorithm property
-    public static final String TRUSTMANAGER_ALGORITHM_PROPERTY = 
-            PKG_NAME + "trustmanager.algorithm";
+    /** The name of the trust manager algorithm property */
+    private static final String TRUSTMANAGER_ALGORITHM_PROPERTY =
+            PKG_NAME + ".trustmanager.algorithm";
     
-    // The trustmanager provider property
-    public static final String TRUSTMANAGER_PROVIDER_PROPERTY = 
-            PKG_NAME + "trustmanager.provider";
+    /** The name of the trust manager provider property */
+    private static final String TRUSTMANAGER_PROVIDER_PROPERTY =
+            PKG_NAME + ".trustmanager.provider";
 
-    // The client authorization property
-    public static final String CLIENT_AUTHORIZATION_PROPERTY =
-            PKG_NAME + "client.authorization";
+    /** The name of the client authentication property */
+    private static final String CLIENT_AUTHENTICATION_PROPERTY =
+            PKG_NAME + ".client.authentication";
 
-    // The enabled cipher suites property
-    public static final String ENABLED_CIPHER_SUITES_PROPERTY =
-            PKG_NAME + "enabled.cipher.suites";
+    /** The name of the enabled cipher suites property */
+    private static final String ENABLED_CIPHER_SUITES_PROPERTY =
+            PKG_NAME + ".enabled.cipher.suites";
     
-    // The SSLEngine
+    /** The SSLEngine */
     private static SSLEngine sslEngine = null;
 
-    // The logger for this class
+    /** The logger for this class */
     private static final LoggerWrapper logger = new LoggerWrapper(
             Logger.getLogger(SSLEngineFactory.class.getName()));
     
-    /* 
+    /**
      * Initializes and creates the SSLContext with key material
+     *
+     * @param properties SSLContext properties
      */ 
-    public static void initialize(Properties properties) {
+    public static synchronized void initialize(Properties properties) {
+
+        if (sslEngine != null) {
+            throw new AssertionError("SSLEngine already initialized");
+        }
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
@@ -116,7 +222,7 @@ public class SSLEngineFactory {
                                             TRUSTMANAGER_PROVIDER_PROPERTY);
 
         boolean needClientAuth = wrappedProps.getBooleanProperty(
-                                        CLIENT_AUTHORIZATION_PROPERTY, false);
+                                        CLIENT_AUTHENTICATION_PROPERTY, false);
 
         List<String> enabledCipherSuites = wrappedProps.getListProperty(
                 ENABLED_CIPHER_SUITES_PROPERTY, String.class, "");
@@ -125,23 +231,23 @@ public class SSLEngineFactory {
                 new String[0]);
 
         try {
-            char[] password = properties.getProperty(
+            char[] keyStorePassword = properties.getProperty(
                     KEYSTORE_PASSWORD_PROPERTY).toCharArray();
 
-            // First initialize the key and trust material.
+            char[] trustStorePassword = properties.getProperty(
+                    TRUSTSTORE_PASSWORD_PROPERTY).toCharArray();
+
             KeyStore ksKeys = KeyStore.getInstance(keyStoreType,
                                                             keyStoreProvider);
-            ksKeys.load(new FileInputStream(keyStore), password);
+            ksKeys.load(new FileInputStream(keyStore), keyStorePassword);
             KeyStore ksTrust = KeyStore.getInstance(keyStoreType,
                                                             keyStoreProvider);
-            ksTrust.load(new FileInputStream(trustStore), password);
+            ksTrust.load(new FileInputStream(trustStore), trustStorePassword);
 
-            // KeyManager's decide which key material to use.
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(
                     keyManagerAlgorithm, keyManagerProvider);
-            kmf.init(ksKeys, password);
+            kmf.init(ksKeys, keyStorePassword);
 
-            // TrustManager's decide whether to allow connections.
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(
                     trustManagerAlgorithm, trustManagerProvider);
             tmf.init(ksTrust);
@@ -170,13 +276,35 @@ public class SSLEngineFactory {
             logger.logThrow(Level.WARNING, e,
                     "problem creating SSLContext {0}", e.getMessage());
         }
+
+        logger.log(Level.CONFIG,
+                    "Created SSLEngine with properties:" +
+                    "\n " + KEYSTORE_LOCATION_PROPERTY + "=" + keyStore +
+                    "\n " + TRUSTSTORE_LOCATION_PROPERTY + "=" + trustStore +
+                    "\n " + KEYSTORE_TYPE_PROPERTY + "=" + keyStoreType +
+                    "\n " + KEYSTORE_PROVIDER_PROPERTY + "=" +
+                    keyStoreProvider +
+                    "\n " + KEYMANAGER_ALGORITHM_PROPERTY + "=" +
+                    keyManagerAlgorithm +
+                    "\n " + KEYMANAGER_PROVIDER_PROPERTY + "=" +
+                    keyManagerProvider +
+                    "\n " + TRUSTMANAGER_ALGORITHM_PROPERTY + "=" +
+                    trustManagerAlgorithm +
+                    "\n " + TRUSTMANAGER_PROVIDER_PROPERTY + "=" +
+                    trustManagerProvider +
+                    "\n " + CLIENT_AUTHENTICATION_PROPERTY + "=" +
+                    needClientAuth +
+                    "\n " + ENABLED_CIPHER_SUITES_PROPERTY + "=" +
+                    cipherSuites);
         
     }
 
-    /*
-     * Returns SSLEngine
+    /**
+     * Returns the {@link SSLEngine}.
+     *
+     * @return {@code sslEngine}
      */
-    public static SSLEngine getSSLEngine() {
+    public static synchronized SSLEngine getSSLEngine() {
 
         if (sslEngine == null) {
             throw new AssertionError("SSLEngine not initialized");
