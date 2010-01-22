@@ -22,7 +22,7 @@
 package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AbstractAffinityGroup;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,9 +38,8 @@ import java.util.Set;
  * some external control of the relocation in case we merge affinity groups
  * or find that an algorithm run returns a single group.
  */
-class RelocatingAffinityGroup implements AffinityGroup, Comparable {
-    // The group id
-    private final long agid;
+class RelocatingAffinityGroup extends AbstractAffinityGroup implements Comparable {
+   
     // Map Identity -> nodeId
     private final Map<Identity, Long> identities;
 
@@ -51,9 +50,6 @@ class RelocatingAffinityGroup implements AffinityGroup, Comparable {
 
     // List of identities not on the target node, or null
     private Set<Identity> stragglers;
-
-    // Generation number
-    private final long generation;
 
     // The weight of this group. Currently this is simply the size of the
     // group.
@@ -70,15 +66,14 @@ class RelocatingAffinityGroup implements AffinityGroup, Comparable {
      * @throws IllegalArgumentException if {@code identities} is empty
      */
     RelocatingAffinityGroup(long agid,
-                            Map<Identity, Long> identities,
-                            long generation)
+                            long generation,
+                            Map<Identity, Long> identities)
     {
+        super(agid, generation);
         if (identities.size() == 0) {
             throw new IllegalArgumentException("Identities must not be empty");
         }
-        this.agid = agid;
         this.identities = identities;
-        this.generation = generation;
         setTargetNode();    // will also init stragglers
         weight = identities.size(); // if this changes, fix equals() etc...
     }
@@ -160,18 +155,8 @@ class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     /* --- Implement AffinityGroup --- */
 
     /** {@inheritDoc} */
-    public long getId() {
-        return agid;
-    }
-
-    /** {@inheritDoc} */
     public Set<Identity> getIdentities() {
         return Collections.unmodifiableSet(identities.keySet());
-    }
-
-    /** {@inheritDoc} */
-    public long getGeneration() {
-        return generation;
     }
 
     /* --- Implement Comparable --- */
@@ -210,7 +195,7 @@ class RelocatingAffinityGroup implements AffinityGroup, Comparable {
             return false;
         }
         RelocatingAffinityGroup other = (RelocatingAffinityGroup) obj;
-        return (agid == other.agid) &&
+        return (id == other.id) &&
                (generation == other.generation) &&
                (identities.equals(other.identities));
     }
@@ -220,7 +205,7 @@ class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     public int hashCode() {
         if (hashcode == 0) {
             int result = 17;
-            result = result * 37 + (int) (agid  ^ agid >>> 32);
+            result = result * 37 + (int) (id  ^ id >>> 32);
             result = result * 37 + (int) (generation ^ generation >>> 32);
             result = result * 37 + identities.hashCode();
             hashcode = result;
@@ -231,7 +216,9 @@ class RelocatingAffinityGroup implements AffinityGroup, Comparable {
     /** {@inheritDoc} */
     @Override
     public String toString() {
-        return "AffinityGroup: " + agid + " targetNodeId: " + targetNodeId +
-               " #identities: " + identities.size();
+        return getClass().getName() + "[" + id +
+               ", gen: " + generation +
+               ", size: " + identities.size() +
+               ", targetNodeId: " + targetNodeId + "]";
     }
 }

@@ -496,7 +496,7 @@ class GroupCoordinator extends BasicState {
                                                    long generation,
                                                    Map<Identity, Long> members)
         {
-            return new RelocatingAffinityGroup(groupId, members, generation);
+            return new RelocatingAffinityGroup(groupId, generation, members);
         }
     }
 

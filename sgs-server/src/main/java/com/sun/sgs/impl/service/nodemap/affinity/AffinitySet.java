@@ -32,17 +32,14 @@ import java.util.Set;
  * can be sent between nodes and the server.  These affinity groups are
  * data containers only.
  */
-public class AffinitySet implements AffinityGroup, Serializable {
+public class AffinitySet extends AbstractAffinityGroup implements Serializable {
     /** Serialization version. */
     private static final long serialVersionUID = 1L;
-    /** The identity of the affinity group. */
-    private final long id;
+    
     /** The set of identities comprising the group. Note this needs
      *  to be declared a concrete class so we know it is serializable.
      */
     private final Set<Identity> identities;
-    /** The generation of this affinity set. */
-    private final long generation;
 
     /**
      * Constructs a new affinity group with the given ID, generation number,
@@ -52,8 +49,7 @@ public class AffinitySet implements AffinityGroup, Serializable {
      * @param identity the first identity in this affinity set
      */
     public AffinitySet(long id, long generation, Identity identity) {
-        this.id = id;
-        this.generation = generation;
+        super(id, generation);
         identities = new HashSet<Identity>();
         identities.add(identity);
     }
@@ -66,30 +62,20 @@ public class AffinitySet implements AffinityGroup, Serializable {
      * @param identitySet the initial set of identities to include
      */
     public AffinitySet(long id, long generation, Set<Identity> identitySet) {
-        this.id = id;
-        this.generation = generation;
+        super(id, generation);
         identities = new HashSet<Identity>(identitySet);
-    }
-
-    /** {@inheritDoc} */
-    public long getId() {
-        return id;
     }
 
     /** {@inheritDoc} */
     public synchronized Set<Identity> getIdentities() {
         return Collections.unmodifiableSet(identities);
     }
-
-    /** {@inheritDoc} */
-    public long getGeneration() {
-        return generation;
-    }
     
     /** {@inheritDoc} */
     public String toString() {
         return getClass().getName() + "[" + id +
-               ",  size: " + identities.size() + "]";
+               ", gen: " + generation +
+               ", size: " + identities.size() + "]";
     }
 
     /**
@@ -98,5 +84,6 @@ public class AffinitySet implements AffinityGroup, Serializable {
      */
     synchronized void addIdentity(Identity id) {
         identities.add(id);
+        System.out.println("ADD TO " + id);
     }
 }
