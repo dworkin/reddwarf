@@ -55,8 +55,8 @@ public class TestRelocatingAffinityGroup extends Assert {
                     "com.sun.sgs.impl.service.nodemap.RelocatingAffinityGroup");
             RAPConstructor = UtilReflection.getConstructor(RAPClass,
                                                            long.class,
-                                                           Map.class,
-                                                           long.class);
+                                                           long.class,
+                                                           Map.class);
             getTargetNodeMethod = UtilReflection.getMethod(RAPClass, "getTargetNode");
             setTargetNodeMethod = UtilReflection.getMethod(RAPClass, "setTargetNode",
                                                            long.class);
@@ -73,7 +73,7 @@ public class TestRelocatingAffinityGroup extends Assert {
         throws Exception
     {
         try {
-            return (AffinityGroup)RAPConstructor.newInstance(gid, groups, gen);
+            return (AffinityGroup)RAPConstructor.newInstance(gid, gen, groups);
         } catch (InvocationTargetException ie) {
             throw (Exception)ie.getCause();
         }
