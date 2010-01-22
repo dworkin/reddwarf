@@ -27,6 +27,7 @@ import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 import edu.uci.ics.jung.graph.UndirectedGraph;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -132,7 +133,8 @@ public abstract class AbstractLPA extends BasicState {
         numThreads = wrappedProps.getIntProperty(
             NUM_THREADS_PROPERTY, DEFAULT_NUM_THREADS, 1, 65535);
         if (numThreads > 1) {
-            executor = Executors.newFixedThreadPool(numThreads);
+            executor = Executors.newFixedThreadPool(numThreads,
+                    new NamedThreadFactory("LPA"));
         } else {
             executor = null;
         }
