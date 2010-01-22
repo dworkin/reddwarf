@@ -124,11 +124,19 @@ class NodeInfo extends MultiLocker<Object> {
 	}
     }
 
-    /** Releases all locks held by this node. */
-    void releaseAllLocks() {
+    /**
+     * Releases all locks held by this node.
+     *
+     * @param	debug whether to print debugging output
+     */
+    void releaseAllLocks(boolean debug) {
 	LockManager<Object> lockManager = getLockManager();
 	synchronized (locksHeld) {
 	    for (Object key : locksHeld) {
+		if (debug) {
+		    CachingDataStoreServerImpl.debugOutput(
+			this, "e ", key, "shutdown", null);
+		}
 		lockManager.releaseLock(this, key);
 	    }
 	}

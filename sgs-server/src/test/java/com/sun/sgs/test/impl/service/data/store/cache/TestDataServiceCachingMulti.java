@@ -450,22 +450,19 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
     }
 
     /**
-     * Test that the server correctly accounts for newly created bindings with
-     * earlier names. <p>
-     *
-     * Here's the test: <ul>
-     * <li> Node 1: setBinding "b"
-     * <li> Node 1: commit
-     * <li> Node 1: setBinding "a" (write lock "b")
-     * <li> Node 2: setBinding "a" (write lock "b" blocks)
-     * <li> Node 1: commit (set "a")
-     * <li> Node 2: (write lock "b", write lock "a")
-     * <li> Node 2: (should see existing value of "a")
+     * Test that {@code getBinding} gets the right result when a new, earlier,
+     * binding is introduced while waiting for the lock on an existing, later,
+     * binding.
      */
     @Test
-    public void testConcurrentCreateEarlierBinding() throws Exception {
+    public void testConcurrentEarlierBindingGet() throws Exception {
+	/* Set up */
 	new RunTask(appNodes.get(0)) { public void run() {
-	    dataService.getBindingForUpdate("b");
+	    try {
+		dataService.removeBinding("a");
+	    } catch (NameNotBoundException e) {
+	    }
+	    dataService.setBinding("b", new ManagedInteger(33));
 	} }.runTask();
 	final AwaitDone waitA = new AwaitDone(1);
 	final AwaitDone waitB = new AwaitDone(1);
@@ -476,15 +473,10 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 		return;
 	    }
 	    try {
-		try {
-		    dataService.getBindingForUpdate("a");
-		    throw new RuntimeException("Expected a to be unbound");
-		} catch (NameNotBoundException e) {
-		    dataService.setBinding("a", new ManagedInteger(1));
-		}
+		dataService.setBinding("a", new ManagedInteger(1));
 		waitA.taskSucceeded();
 		waitB.await(1, SECONDS);
-		Thread.sleep(1000);
+		Thread.sleep(10);
 		done.taskSucceeded();
 	    } catch (Throwable e) {
 		done.taskFailed(e);
@@ -499,16 +491,300 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 		    return;
 		}
 		waitB.taskSucceeded();
-		dataService.getBindingForUpdate("a");
+		dataService.getBinding("a");
+		ok = true;
+	    }
+	}.runTask();
+	done.await(1, SECONDS);
+	/* Clean up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.removeBinding("a");
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
+	    dataService.removeBinding("b");
+	} }.runTask();
+    }
+
+    /**
+     * Test that {@code setBinding} gets the right result when a new, earlier,
+     * binding is introduced while waiting for the lock on an existing, later,
+     * binding.
+     */
+    @Test
+    public void testConcurrentEarlierBindingSet() throws Exception {
+	/* Set up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    try {
+		dataService.removeBinding("a");
+	    } catch (NameNotBoundException e) {
+	    }
+	    dataService.setBinding("b", new ManagedInteger(33));
+	} }.runTask();
+	final AwaitDone waitA = new AwaitDone(1);
+	final AwaitDone waitB = new AwaitDone(1);
+	final AwaitDone done = new AwaitDone(1);
+	/* Node 1 */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    if (done.getDone()) {
+		return;
+	    }
+	    try {
+		dataService.setBinding("a", new ManagedInteger(1));
+		waitA.taskSucceeded();
+		waitB.await(1, SECONDS);
+		Thread.sleep(10);
+		done.taskSucceeded();
+	    } catch (Throwable e) {
+		done.taskFailed(e);
+	    }
+	} }.scheduleTask();
+	waitA.await(1, SECONDS);
+	/* Node 2 */
+	new RunTask(appNodes.get(1)) {
+	    private boolean ok;
+	    public void run() {
+		if (ok) {
+		    return;
+		}
+		waitB.taskSucceeded();
 		dataService.setBinding("a", new ManagedInteger(2));
 		ok = true;
 	    }
 	}.runTask();
-	done.await(2, SECONDS);
+	done.await(1, SECONDS);
 	/* Clean up */
 	new RunTask(appNodes.get(0)) { public void run() {
 	    dataService.removeBinding("a");
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
 	    dataService.removeBinding("b");
+	} }.runTask();
+    }
+
+    /**
+     * Test that {@code removeBinding} gets the right result when a new,
+     * earlier, binding is introduced while waiting for the lock on an
+     * existing, later, binding.
+     */
+    @Test
+    public void testConcurrentEarlierBindingRemove() throws Exception {
+	/* Set up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    try {
+		dataService.removeBinding("a");
+	    } catch (NameNotBoundException e) {
+	    }
+	    dataService.setBinding("b", new ManagedInteger(33));
+	} }.runTask();
+	final AwaitDone waitA = new AwaitDone(1);
+	final AwaitDone waitB = new AwaitDone(1);
+	final AwaitDone done = new AwaitDone(1);
+	/* Node 1 */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    if (done.getDone()) {
+		return;
+	    }
+	    try {
+		dataService.setBinding("a", new ManagedInteger(1));
+		waitA.taskSucceeded();
+		waitB.await(1, SECONDS);
+		Thread.sleep(10);
+		done.taskSucceeded();
+	    } catch (Throwable e) {
+		done.taskFailed(e);
+	    }
+	} }.scheduleTask();
+	waitA.await(1, SECONDS);
+	/* Node 2 */
+	new RunTask(appNodes.get(1)) {
+	    private boolean ok;
+	    public void run() {
+		if (ok) {
+		    return;
+		}
+		waitB.taskSucceeded();
+		dataService.removeBinding("a");
+		ok = true;
+	    }
+	}.runTask();
+	done.await(1, SECONDS);
+	/* Clean up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    try {
+		dataService.removeBinding("a");
+	    } catch (NameNotBoundException e) {
+	    }
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
+	    dataService.removeBinding("b");
+	} }.runTask();
+    }
+
+    /**
+     * Test that {@code nextBoundName} gets the right result when a new,
+     * earlier, binding is introduced while waiting for the lock on an
+     * existing, later, binding.
+     */
+    @Test
+    public void testConcurrentEarlierBindingNext() throws Exception {
+	/* Set up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    try {
+		dataService.removeBinding("b");
+	    } catch (NameNotBoundException e) {
+	    }
+	    dataService.setBinding("c", new ManagedInteger(33));
+	} }.runTask();
+	final AwaitDone waitA = new AwaitDone(1);
+	final AwaitDone waitB = new AwaitDone(1);
+	final AwaitDone done = new AwaitDone(1);
+	/* Node 1 */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    if (done.getDone()) {
+		return;
+	    }
+	    try {
+		dataService.setBinding("b", new ManagedInteger(1));
+		waitA.taskSucceeded();
+		waitB.await(1, SECONDS);
+		Thread.sleep(10);
+		done.taskSucceeded();
+	    } catch (Throwable e) {
+		done.taskFailed(e);
+	    }
+	} }.scheduleTask();
+	waitA.await(1, SECONDS);
+	/* Node 2 */
+	new RunTask(appNodes.get(1)) {
+	    private boolean ok;
+	    public void run() {
+		if (ok) {
+		    return;
+		}
+		waitB.taskSucceeded();
+		assertEquals("b", dataService.nextBoundName("a"));
+		ok = true;
+	    }
+	}.runTask();
+	done.await(1, SECONDS);
+	/* Clean up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.removeBinding("b");
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
+	    dataService.removeBinding("c");
+	} }.runTask();
+    }
+
+    /**
+     * Test that eviction of an in-use name that has been removed only evicts
+     * the next name, not the unbound name.
+     */
+    @Test
+    public void testEvictInUseRemoved() throws Exception {
+	/* Set up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.setBinding("a", new ManagedInteger(1));
+	    dataService.setBinding("b", new ManagedInteger(2));
+	} }.runTask();
+	final AwaitDone waitA = new AwaitDone(1);
+	final AwaitDone waitB = new AwaitDone(1);
+	final AwaitDone done = new AwaitDone(1);
+	/* Node 1 */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    if (done.getDone()) {
+		return;
+	    }
+	    try {
+		dataService.removeBinding("b");
+		waitA.taskSucceeded();
+		waitB.await(1, SECONDS);
+		Thread.sleep(10);
+		done.taskSucceeded();
+	    } catch (Throwable e) {
+		done.taskFailed(e);
+	    }
+	} }.scheduleTask();
+	waitA.await(1, SECONDS);
+	/* Node 2 */
+	new RunTask(appNodes.get(1)) {
+	    private boolean ok;
+	    public void run() {
+		if (ok) {
+		    return;
+		}
+		waitB.taskSucceeded();
+		dataService.setBinding("b", new ManagedInteger(3));
+		ok = true;
+	    }
+	}.runTask();
+	done.await(1, SECONDS);
+	/* Clean up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.removeBinding("a");
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
+	    dataService.removeBinding("b");
+	} }.runTask();
+    }
+
+    /**
+     * Test that downgrade of an in-use name that has been removed only
+     * downgrades the next name, not the unbound name.
+     */
+    @Test
+    public void testDowngradeInUseRemoved() throws Exception {
+	/* Set up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.setBinding("a", new ManagedInteger(1));
+	    dataService.setBinding("b", new ManagedInteger(2));
+	} }.runTask();
+	final AwaitDone waitA = new AwaitDone(1);
+	final AwaitDone waitB = new AwaitDone(1);
+	final AwaitDone done = new AwaitDone(1);
+	/* Node 1 */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    if (done.getDone()) {
+		return;
+	    }
+	    try {
+		dataService.removeBinding("b");
+		waitA.taskSucceeded();
+		waitB.await(1, SECONDS);
+		Thread.sleep(10);
+		done.taskSucceeded();
+	    } catch (Throwable e) {
+		done.taskFailed(e);
+	    }
+	} }.scheduleTask();
+	waitA.await(1, SECONDS);
+	/* Node 2 */
+	new RunTask(appNodes.get(1)) {
+	    private boolean ok;
+	    public void run() {
+		if (ok) {
+		    return;
+		}
+		waitB.taskSucceeded();
+		try {
+		    dataService.getBinding("b");
+		    fail("Expected NameNotBoundException");
+		} catch (NameNotBoundException e) {
+		}
+		ok = true;
+	    }
+	}.runTask();
+	done.await(1, SECONDS);
+	Thread.sleep(1000);
+	/* Clean up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.removeBinding("a");
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
+	    try {
+		dataService.removeBinding("b");
+	    } catch (NameNotBoundException e) {
+	    }
 	} }.runTask();
     }
 

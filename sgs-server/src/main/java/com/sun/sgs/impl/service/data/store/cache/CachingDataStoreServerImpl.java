@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
@@ -91,6 +92,12 @@ import java.util.logging.Logger;
 
 /*
  * TBD: Add profiling.  -tjb@sun.com (11/17/2009)
+ *
+ * TBD: Maybe shutdown node immediately when cache consistency is found.
+ * -tjb@sun.com (01/20/2010)
+ *
+ * TBD: Consider using a data structure that supports range-locking, to avoid
+ * looping to lock the next binding key.  -tjb@sun.com (01/20/2010)
  */
 
 /**
@@ -278,6 +285,13 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 
     /** The number of node IDs to allocate at once. */
     private static final int NODE_ID_ALLOCATION_BLOCK_SIZE = 100;
+
+    /**
+     * The number of times to retry locking the next binding keys in the face
+     * earlier keys being added concurrently before throwing a resource
+     * exception.
+     */
+    private static final int MAX_RANGE_LOCK_RETRIES = 100;
 
     /** The transaction timeout. */
     private final long txnTimeout;
@@ -773,34 +787,59 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkNull("name", name);
-	    DbTransaction txn = env.beginTransaction(txnTimeout);
-	    boolean txnDone = false;
-	    String nextName;
-	    boolean found;
-	    long oid;
-	    try {
-		DbCursor cursor = namesDb.openCursor(txn);
+	    GetBindingResults results = null;
+	    BindingKey nextNameKey = null;
+	    /*
+	     * Since the implementation doesn't have range locking, find the
+	     * next key, lock it, and confirm that it is indeed the next key
+	     * after locking it, repeating as necessary.
+	     */
+	    for (int i = 0; true; i++) {
+		if (i > MAX_RANGE_LOCK_RETRIES) {
+		    throw new ResourceUnavailableException("Too many retries");
+		}
+		DbTransaction txn = env.beginTransaction(txnTimeout);
+		boolean txnDone = false;
+		String nextName;
+		boolean found;
+		long oid;
 		try {
-		    boolean hasNext = cursor.findNext(encodeString(name));
-		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
-		    found = hasNext && name.equals(nextName);
-		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    DbCursor cursor = namesDb.openCursor(txn);
+		    try {
+			boolean hasNext = cursor.findNext(encodeString(name));
+			nextName =
+			    hasNext ? decodeString(cursor.getKey()) : null;
+			found = hasNext && name.equals(nextName);
+			oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    } finally {
+			cursor.close();
+		    }
+		    txnDone = true;
+		    txn.commit();
 		} finally {
-		    cursor.close();
+		    if (!txnDone) {
+			txn.abort();
+		    }
 		}
-		txnDone = true;
-		txn.commit();
-	    } finally {
-		if (!txnDone) {
-		    txn.abort();
+		if (results != null &&
+		    found == results.found &&
+		    safeEquals(found ? null : nextName, results.nextName))
+		{
+		    return results;
 		}
+		/*
+		 * TBD: Maybe include all locks obtained in the results?  Right
+		 * now, the node doesn't hear about any additional locks that
+		 * are grabbed while trying to find the true next key.
+		 * -tjb@sun.com (01/20/2010)
+		 */
+		nextNameKey = BindingKey.getAllowLast(nextName);
+		lock(nodeInfo, nextNameKey, false, "getBinding",
+		     found ? null : name);
+		results = new GetBindingResults(
+		    found, found ? null : nextName, oid,
+		    getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
 	    }
-	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    lock(nodeInfo, nextNameKey, false, "getBinding",
-		 !found ? name : null);
-	    return new GetBindingResults(
-		found, found ? null : nextName, oid,
-		getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -819,40 +858,51 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkNull("name", name);
-	    DbTransaction txn = env.beginTransaction(txnTimeout);
-	    boolean txnDone = false;
-	    String nextName;
-	    boolean found;
-	    long oid;
-	    try {
-		DbCursor cursor = namesDb.openCursor(txn);
+	    GetBindingForUpdateResults results = null;
+	    BindingKey key = null;
+	    for (int i = 0; true; i++) {
+		if (i > MAX_RANGE_LOCK_RETRIES) {
+		    throw new ResourceUnavailableException("Too many retries");
+		}
+		DbTransaction txn = env.beginTransaction(txnTimeout);
+		boolean txnDone = false;
+		String nextName;
+		boolean found;
+		long oid;
 		try {
-		    boolean hasNext = cursor.findNext(encodeString(name));
-		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
-		    found = hasNext && name.equals(nextName);
-		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    DbCursor cursor = namesDb.openCursor(txn);
+		    try {
+			boolean hasNext = cursor.findNext(encodeString(name));
+			nextName =
+			    hasNext ? decodeString(cursor.getKey()) : null;
+			found = hasNext && name.equals(nextName);
+			oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    } finally {
+			cursor.close();
+		    }
+		    txnDone = true;
+		    txn.commit();
 		} finally {
-		    cursor.close();
+		    if (!txnDone) {
+			txn.abort();
+		    }
 		}
-		txnDone = true;
-		txn.commit();
-	    } finally {
-		if (!txnDone) {
-		    txn.abort();
+		if (results != null &&
+		    found == results.found &&
+		    safeEquals(found ? null : nextName, results.nextName))
+		{
+		    return results;
 		}
+		key = found ?
+		    BindingKey.get(name) : BindingKey.getAllowLast(nextName);
+		lock(nodeInfo, key, true, "getBindingUpdate",
+		     found ? null : name);
+		GetWaitingResult waiting = getWaiting(key);
+		results = new GetBindingForUpdateResults(
+		    found, found ? null : nextName, oid,
+		    waiting == GetWaitingResult.WRITERS,
+		    waiting == GetWaitingResult.READERS);
 	    }
-	    BindingKey nameKey = BindingKey.get(name);
-	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    lock(nodeInfo, nameKey, true, "getBindingUpdate");
-	    if (!found) {
-		lock(nodeInfo, nextNameKey, true, "getBindingUpdate", name);
-	    }
-	    GetWaitingResult waiting =
-		getWaiting(found ? nameKey : nextNameKey);
-	    return new GetBindingForUpdateResults(
-		found, found ? null : nextName, oid,
-		waiting == GetWaitingResult.WRITERS,
-		waiting == GetWaitingResult.READERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -871,52 +921,66 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
 	    checkNull("name", name);
-	    DbTransaction txn = env.beginTransaction(txnTimeout);
-	    boolean txnDone = false;
-	    String nextName;
-	    long oid;
-	    long nextOid;
-	    try {
-		DbCursor cursor = namesDb.openCursor(txn);
+	    GetBindingForRemoveResults results = null;
+	    BindingKey nameKey = BindingKey.get(name);
+	    BindingKey nextNameKey = null;
+	    for (int i = 0; true; i++) {
+		if (i > MAX_RANGE_LOCK_RETRIES) {
+		    throw new ResourceUnavailableException("Too many retries");
+		}
+		DbTransaction txn = env.beginTransaction(txnTimeout);
+		boolean txnDone = false;
+		String nextName;
+		long oid;
+		long nextOid;
 		try {
-		    boolean hasNext = cursor.findNext(encodeString(name));
-		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
-		    if (hasNext && name.equals(nextName)) {
-			oid = decodeLong(cursor.getValue());
-			/* Move to name after matching name */
-			hasNext = cursor.findNext();
+		    DbCursor cursor = namesDb.openCursor(txn);
+		    try {
+			boolean hasNext = cursor.findNext(encodeString(name));
 			nextName =
 			    hasNext ? decodeString(cursor.getKey()) : null;
-		    } else {
-			oid = -1;
+			if (hasNext && name.equals(nextName)) {
+			    oid = decodeLong(cursor.getValue());
+			    /* Move to name after matching name */
+			    hasNext = cursor.findNext();
+			    nextName =
+				hasNext ? decodeString(cursor.getKey()) : null;
+			} else {
+			    oid = -1;
+			}
+			nextOid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    } finally {
+			cursor.close();
 		    }
-		    nextOid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    txnDone = true;
+		    txn.commit();
 		} finally {
-		    cursor.close();
+		    if (!txnDone) {
+			txn.abort();
+		    }
 		}
-		txnDone = true;
-		txn.commit();
-	    } finally {
-		if (!txnDone) {
-		    txn.abort();
+		boolean found = (oid != -1);
+		if (results != null &&
+		    found == results.found &&
+		    safeEquals(nextName, results.nextName))
+		{
+		    return results;
 		}
+		nextNameKey = BindingKey.getAllowLast(nextName);
+		if (found) {
+		    lock(nodeInfo, nameKey, true, "getBindingRemove");
+		}
+		lock(nodeInfo, nextNameKey, found, "getBindingRemove", name);
+		GetWaitingResult waitingName = getWaiting(nameKey);
+		GetWaitingResult waitingNextName = getWaiting(nextNameKey);
+		results = new GetBindingForRemoveResults(
+		    found, nextName, oid,
+		    found && waitingName == GetWaitingResult.WRITERS,
+		    found && waitingName == GetWaitingResult.READERS,
+		    nextOid,
+		    waitingNextName == GetWaitingResult.WRITERS,
+		    waitingNextName == GetWaitingResult.READERS);
 	    }
-	    BindingKey nameKey = BindingKey.get(name);
-	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    boolean found = (oid != -1);
-	    if (found) {
-		lock(nodeInfo, nameKey, true, "getBindingRemove");
-	    }
-	    lock(nodeInfo, nextNameKey, found, "getBindingRemove", name);
-	    GetWaitingResult waitingName = getWaiting(nameKey);
-	    GetWaitingResult waitingNextName = getWaiting(nextNameKey);
-	    return new GetBindingForRemoveResults(
-		found, nextName, oid,
-		found && waitingName == GetWaitingResult.WRITERS,
-		found && waitingName == GetWaitingResult.READERS,
-		nextOid,
-		waitingNextName == GetWaitingResult.WRITERS,
-		waitingNextName == GetWaitingResult.READERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -932,37 +996,50 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     public NextBoundNameResults nextBoundName(long nodeId, String name) {
 	NodeInfo nodeInfo = nodeCallStarted(nodeId);
 	try {
-	    DbTransaction txn = env.beginTransaction(txnTimeout);
-	    boolean txnDone = false;
-	    long oid;
-	    String nextName;
-	    try {
-		DbCursor cursor = namesDb.openCursor(txn);
+	    NextBoundNameResults results = null;
+	    BindingKey nextNameKey = null;
+	    for (int i = 0; true; i++) {
+		if (i > MAX_RANGE_LOCK_RETRIES) {
+		    throw new ResourceUnavailableException("Too many retries");
+		}
+		DbTransaction txn = env.beginTransaction(txnTimeout);
+		boolean txnDone = false;
+		long oid;
+		String nextName;
 		try {
-		    boolean hasNext = (name == null) ? cursor.findFirst()
-			: cursor.findNext(encodeString(name));
-		    nextName = hasNext ? decodeString(cursor.getKey()) : null;
-		    if ((name != null) && name.equals(nextName)) {
-			hasNext = cursor.findNext();
-			nextName = (hasNext) ? decodeString(cursor.getKey())
-			    : null;
+		    DbCursor cursor = namesDb.openCursor(txn);
+		    try {
+			boolean hasNext = (name == null) ? cursor.findFirst()
+			    : cursor.findNext(encodeString(name));
+			nextName =
+			    hasNext ? decodeString(cursor.getKey()) : null;
+			if ((name != null) && name.equals(nextName)) {
+			    hasNext = cursor.findNext();
+			    nextName = (hasNext)
+				? decodeString(cursor.getKey()) : null;
+			}
+			oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    } finally {
+			cursor.close();
 		    }
-		    oid = hasNext ? decodeLong(cursor.getValue()) : -1;
+		    txnDone = true;
+		    txn.commit();
 		} finally {
-		    cursor.close();
+		    if (!txnDone) {
+			txn.abort();
+		    }
 		}
-		txnDone = true;
-		txn.commit();
-	    } finally {
-		if (!txnDone) {
-		    txn.abort();
+		if (results != null &&
+		    safeEquals(nextName, results.nextName))
+		{
+		    return results;
 		}
+		nextNameKey = BindingKey.getAllowLast(nextName);
+		lock(nodeInfo, nextNameKey, false, "nextBoundName", name);
+		results = new NextBoundNameResults(
+		    nextName, oid,
+		    getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
 	    }
-	    BindingKey nextNameKey = BindingKey.getAllowLast(nextName);
-	    lock(nodeInfo, nextNameKey, false, "nextBoundName", name);
-	    return new NextBoundNameResults(
-		nextName, oid,
-		getWaiting(nextNameKey) == GetWaitingResult.WRITERS);
 	} finally {
 	    nodeCallFinished(nodeInfo);
 	}
@@ -1325,20 +1402,22 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST, "Releasing all locks for " + nodeInfo);
 	    }
-	    scheduleTask(new ReleaseNodeLocksTask(nodeInfo));
+	    scheduleTask(new ReleaseNodeLocksTask(nodeInfo, debug));
 	}
     }
 
     /** A {@link KernelRunnable} that releases the locks owned by a node. */
     private static class ReleaseNodeLocksTask extends AbstractKernelRunnable {
 	private final NodeInfo nodeInfo;
-	ReleaseNodeLocksTask(NodeInfo nodeInfo) {
+	private final boolean debug;
+	ReleaseNodeLocksTask(NodeInfo nodeInfo, boolean debug) {
 	    super(null);
 	    this.nodeInfo = nodeInfo;
+	    this.debug = debug;
 	}
 	@Override
 	public void run() {
-	    nodeInfo.releaseAllLocks();
+	    nodeInfo.releaseAllLocks(debug);
 	}
     }
 
@@ -1544,11 +1623,11 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      * @param	operationArg an expression representing the argument provided
      *		for the operation, or {@code null} if there is no argument.
      */
-    private static void debugOutput(NodeInfo nodeInfo,
-				    String lockOp,
-				    Object key,
-				    String operation,
-				    Object operationArg)
+    static void debugOutput(NodeInfo nodeInfo,
+			    String lockOp,
+			    Object key,
+			    String operation,
+			    Object operationArg)
     {
 	StringBuilder sb = new StringBuilder();
 	sb.append("nid:").append(nodeInfo.nodeId);
@@ -1726,6 +1805,11 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
      */
     private void scheduleTask(KernelRunnable task) {
 	taskScheduler.scheduleTask(task, taskOwner);
+    }
+
+    /** Checks two possibly null arguments for equality. */
+    private static boolean safeEquals(Object x, Object y) {
+	return x == y || (x != null && x.equals(y));
     }
 
     /* -- Nested classes -- */

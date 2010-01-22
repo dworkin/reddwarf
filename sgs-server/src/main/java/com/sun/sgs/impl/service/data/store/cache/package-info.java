@@ -62,13 +62,19 @@
  * Here is a chart of the various operations and the locks they need to obtain:
  *
  * <table border="1">
- * <tr><th>Operation		<th>Lock name	<th>Lock next name
- * <tr><td>read (bound)		<td>read	<td>
- * <tr><td>read (not bound)	<td>		<td>read
- * <tr><td>write (bound)	<td>write	<td>
- * <tr><td>write (not bound)	<td>		<td>write
- * <tr><td>remove (bound)	<td>write	<td>write
- * <tr><td>remove (not bound)	<td>		<td>read
+ * <tr><th>Operation		<th>Name	<th>Next name
+ * <tr><td>get (bound)		<td>lock read	<td>
+ * <tr><td>get (not bound)	<td>		<td>lock read
+ * <tr><td>set (bound)		<td>lock write	<td>
+ * <tr><td>set (not bound)	<td>		<td>lock write
+ * <tr><td>remove (bound)	<td>lock write	<td>lock write
+ * <tr><td>remove (not bound)	<td>		<td>lock read
+ * <tr><td>commit (newly bound)	<td>lock write	<td>
+ * <tr><td>commit (remove bound)<td>unlock	<td>
+ * <tr><td>evict (bound)	<td>unlock	<td>
+ * <tr><td>evict (not bound)	<td>		<td>
+ * <tr><td>downgrade (bound)	<td>downgrade	<td>
+ * <tr><td>downgrade (not bound)<td>		<td>
  * </table> <p>
  *
  * For more information on next-key locking, see Chapter 7.8.5, "Dynamic

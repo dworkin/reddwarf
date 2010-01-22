@@ -2348,50 +2348,52 @@ public final class CachingDataStore extends AbstractDataStore
 	    }
 	    Object lock = cache.getBindingLock(entry.key);
 	    synchronized (lock) {
-		if (!nameKey.equals(entry.key)) {
-		    /* Check for the right next entry */
-		    BindingCacheEntry checkEntry =
-			cache.getHigherBindingEntry(nameKey);
-		    if (checkEntry != entry) {
-			/* Not next entry -- try again */
-			continue;
-		    } else if (!entry.getIsNextEntry(nameKey)) {
-			/*
-			 * Next entry does not cover name, so name must already
-			 * be evicted
-			 */
-			return true;
-		    }
-		}
-		if (entry.getPendingPrevious() || inUseForWrite(entry)) {
+		/*
+		 * Check that this is the right next entry, but don't wait if
+		 * the entry is pending previous.
+		 */
+		BindingCacheEntry checkEntry =
+		    cache.getCeilingBindingEntry(nameKey);
+		if (checkEntry != entry) {
+		    /* Not next entry -- try again */
+		    continue;
+		} else if (entry.getPendingPrevious()) {
 		    /*
-		     * Downgrade when not pending previous or in use for write
+		     * Wait until not pending previous, even if the entry does
+		     * not cover the name, in case the operation returns the
+		     * requested name
 		     */
 		    scheduleTask(new DowngradeBindingTask(nameKey));
 		    return false;
+		} else if (!nameKey.equals(entry.key) &&
+			   !entry.getIsNextEntry(nameKey))
+		{
+		    /*
+		     * Next entry does not cover name, so name must already be
+		     * evicted
+		     */
+		    return true;
+		} else if (!entry.getWritable()) {
+		    /* Already downgraded */
+		    return true;
 		} else if (entry.getDowngrading()) {
 		    /*
 		     * Already being downgraded, but need to wait for
 		     * completion
 		     */
 		    return false;
-		} else if (!entry.getWritable()) {
-		    /* Already downgraded */
+		} else if (inUseForWrite(entry)) {
+		    /* Wait until not in use */
+		    scheduleTask(new DowngradeBindingTask(nameKey));
+		    return false;
+		} else if (nameKey.equals(entry.key)) {
+		    /* Downgrade */
+		    entry.setEvictedDowngradeImmediate(lock);
 		    return true;
 		} else {
-		    /* OK to downgrade immediately */
-		    entry.setEvictedDowngradeImmediate(lock);
-		    if (!nameKey.equals(entry.key)) {
-			/*
-			 * Name was unbound -- tell server that the next bound
-			 * key has also been downgraded.  OK to use the
-			 * earliest possible context ID since the entry is not
-			 * in use for write
-			 */
-			updateQueue.downgradeBinding(
-			    1, entry.key.getName(),
-			    new NullCompletionHandler());
-		    }
+		    /* Update previous key to not cover the downgraded part */
+		    assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+		    entry.setPreviousKey(nameKey, false);
 		    return true;
 		}
 	    }
@@ -2426,48 +2428,40 @@ public final class CachingDataStore extends AbstractDataStore
 		}
 		Object lock = cache.getBindingLock(entry.key);
 		synchronized (lock) {
-		    if (nameKey.equals(entry.key)) {
-			if (!entry.awaitNotPendingPrevious(lock, stop)) {
-			    /* Decached */
-			    continue;
-			}
-		    } else if (!assureNextEntry(entry, nameKey, true, lock,
-						stop))
-		    {
+		    /*
+		     * Check that this is the right next entry, waiting if it
+		     * is pending previous
+		     */
+		    if (!assureNextEntry(entry, nameKey, true, lock, stop)) {
 			/* Not next entry -- try again */
 			continue;
-		    } else if (!entry.getIsNextEntry(nameKey)) {
+		    } else if (!nameKey.equals(entry.key) &&
+			       !entry.getIsNextEntry(nameKey))
+		    {
 			/*
 			 * Next entry does not cover name, so name must already
 			 * be evicted
 			 */
 			return;
-		    }
-		    if (entry.getDecaching() ||
-			entry.getDowngrading() ||
-			!entry.getWritable())
+		    } else if (!entry.getWritable() ||
+			       entry.getDowngrading())
 		    {
-			/*
-			 * Already being evicted or downgraded, or already
-			 * downgraded
-			 */
+			/* Already downgraded or being downgraded */
 			return;
-		    }
-		    assert !entry.getPendingPrevious();
-		    /* Downgrade */
-		    entry.setEvictingDowngrade(lock);
-		    updateQueue.downgradeBinding(
-			entry.getContextId(), entry.key.getName(),
-			new DowngradeCompletionHandler(entry.key));
-		    if (!nameKey.equals(entry.key)) {
-			/*
-			 * Notify the server that the requested name was
-			 * downgraded in addition to the name for the entry
-			 * found
-			 */
+		    } else if (nameKey.equals(entry.key)) {
+			/* Queue downgrade */
+			entry.setEvictingDowngrade(lock);
 			updateQueue.downgradeBinding(
 			    entry.getContextId(), nameKey.getName(),
-			    new NullCompletionHandler());
+			    new DowngradeCompletionHandler(nameKey));
+			return;
+		    } else {
+			/*
+			 * Update previous key to not cover the downgraded part
+			 */
+			assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+			entry.setPreviousKey(nameKey, false);
+			return;
 		    }
 		}
 	    }
@@ -2518,45 +2512,47 @@ public final class CachingDataStore extends AbstractDataStore
 	    }
 	    Object lock = cache.getBindingLock(entry.key);
 	    synchronized (lock) {
-		if (!nameKey.equals(entry.key)) {
-		    /* Check for the right next entry */
-		    BindingCacheEntry checkEntry =
-			cache.getHigherBindingEntry(nameKey);
-		    if (checkEntry != entry) {
-			/* Not next entry -- try again */
-			continue;
-		    } else if (!entry.getIsNextEntry(nameKey)) {
-			/*
-			 * Next entry does not cover name, so name must already
-			 * be evicted
-			 */
-			return true;
-		    }
-		}
-		if (entry.getPendingPrevious() ||
-		    entry.getDowngrading() ||
-		    inUse(entry))
-		{
+		/*
+		 * Check that this is the right next entry, but don't wait if
+		 * the entry is pending previous.
+		 */
+		BindingCacheEntry checkEntry =
+		    cache.getCeilingBindingEntry(nameKey);
+		if (checkEntry != entry) {
+		    /* Not next entry -- try again */
+		    continue;
+		} else if (entry.getPendingPrevious()) {
 		    /*
-		     * Evict when not pending previous, downgrading, or in use
+		     * Wait until not pending previous, even if the entry does
+		     * not cover the name, in case the operation returns the
+		     * requested name
 		     */
 		    scheduleTask(new EvictBindingTask(nameKey));
 		    return false;
+		} else if (!nameKey.equals(entry.key) &&
+			   !entry.getIsNextEntry(nameKey))
+		{
+		    /*
+		     * Next entry does not cover name, so name must already be
+		     * evicted
+		     */
+		    return true;
 		} else if (entry.getDecaching()) {
 		    /*
 		     * Already being evicted, but need to wait for completion
 		     */
 		    return false;
+		} else if (entry.getDowngrading() || inUse(entry)) {
+		    /* Wait until not downgrading or in use */
+		    scheduleTask(new EvictBindingTask(nameKey));
+		    return false;
 		} else if (nameKey.equals(entry.key)) {
-		    /* Entry is not in use -- evict */
+		    /* Evict */
 		    entry.setEvictedImmediate(lock);
 		    cache.removeBindingEntry(nameKey);
 		    return true;
 		} else {
-		    /*
-		     * Entry not in use -- update previous key to not cover the
-		     * evicted part
-		     */
+		    /* Update previous key to not cover the evicted part */
 		    assert nameKey.compareTo(entry.getPreviousKey()) > 0;
 		    entry.setPreviousKey(nameKey, false);
 		    return true;
@@ -2585,45 +2581,44 @@ public final class CachingDataStore extends AbstractDataStore
 		    throw new ResourceUnavailableException("Too many retries");
 		}
 		/* Find cache entry for name or next higher name */
-		BindingCacheEntry entry = cache.getCeilingBindingEntry(nameKey);
+		BindingCacheEntry entry =
+		    cache.getCeilingBindingEntry(nameKey);
 		if (entry == null) {
 		    /* No entry -- already evicted */
 		    return;
 		}
 		Object lock = cache.getBindingLock(entry.key);
 		synchronized (lock) {
-		    if (nameKey.equals(entry.key)) {
-			if (!entry.awaitNotPendingPrevious(lock, stop)) {
-			    /* Decached */
-			    return;
-			}
-		    } else if (!assureNextEntry(entry, nameKey, true, lock,
-						stop))
-		    {
-			/* Not the next entry -- try again */
+		    /*
+		     * Check that this is the right next entry, waiting if it
+		     * is pending previous
+		     */
+		    if (!assureNextEntry(entry, nameKey, true, lock, stop)) {
+			/* Not next entry -- try again */
 			continue;
-		    } else if (!entry.getIsNextEntry(nameKey)) {
+		    } else if (!nameKey.equals(entry.key) &&
+			       !entry.getIsNextEntry(nameKey))
+		    {
 			/*
-			 * The next entry does not cover the name, so the name
-			 * must already be evicted
+			 * Next entry does not cover name, so name must already
+			 * be evicted
 			 */
 			return;
-		    }
-		    assert !entry.getDowngrading()
-			: "Entry should not be downgrading: " + entry;
-		    /* Evict */
-		    if (nameKey.equals(entry.key)) {
-			assert !entry.getPendingPrevious();
+		    } else if (entry.getDecaching()) {
+			/* Already being evicted */
+			return;
+		    } else if (nameKey.equals(entry.key)) {
+			/* Queue eviction */
 			entry.setEvicting(lock);
 			updateQueue.evictBinding(
 			    entry.getContextId(), nameKey.getName(),
 			    new EvictBindingCompletionHandler(nameKey));
+			return;
 		    } else {
-			entry.setPendingPrevious();
-			updateQueue.evictBinding(
-			    entry.getContextId(), nameKey.getName(),
-			    new EvictUnboundNameCompletionHandler(
-				nameKey, entry.key));
+			/* Update previous key to not cover the evicted part */
+			assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+			entry.setPreviousKey(nameKey, false);
+			return;
 		    }
 		}
 	    }
