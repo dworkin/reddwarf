@@ -1542,8 +1542,11 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    }
 		} else {
 		    if (debug) {
-			debugOutput(nodeInfo, forWrite ? "wN" : "rN", key,
-				    operation, operationArg);
+			debugOutput(
+			    nodeInfo, forWrite ? "wN" : "rN", key,
+			    operation,
+			    (operationArg == null
+			     ? conflict : operationArg + " " + conflict));
 		    }
 		    String accessMsg = "Access nodeId:" + nodeInfo.nodeId +
 		    ", key:" + key +
@@ -1910,6 +1913,9 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 		    } else {
 			releaseLock(ownerNodeInfo, key, "callback");
 		    }
+		} else if (debug) {
+		    debugOutput(ownerNodeInfo, downgrade ? "dB" : "eB",
+				key, "callback", null);
 		}
 	    }
 	}

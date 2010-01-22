@@ -694,8 +694,13 @@ public final class RequestQueueClient extends Thread {
 		    Constructor<? extends Throwable> constructor
 			= exceptionClass.getConstructor(String.class);
 		    return constructor.newInstance(message);
-		} catch (InvocationTargetException e) {
-		    return e.getCause();
+		} catch (Exception e) {
+		    return new RuntimeException(
+			"Problem creating received exception: " +
+			"class:" + className +
+			", message:" + message +
+			", failure:" + e,
+			e);
 		}
 	    }
 

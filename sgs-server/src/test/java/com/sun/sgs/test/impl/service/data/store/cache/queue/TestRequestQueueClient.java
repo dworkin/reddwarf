@@ -452,6 +452,59 @@ public class TestRequestQueueClient extends BasicRequestQueueTest {
 	failureReporter.checkCalled(2 * MAX_RETRY);
     }
 
+    @Test
+    public void testSendRequestThrowsException() throws Exception {
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		1,
+		new SimpleRequestHandler() {
+		    public void performRequest(SimpleRequest request)
+			throws Exception
+		    {
+			throw new Exception("Test");
+		    }
+		}));
+	NoteFailure failureReporter = new NoteFailure();
+	client = new RequestQueueClient(
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
+	client.addRequest(new SimpleRequest(1));
+	failureReporter.checkCalled(0);
+	Throwable exception = failureReporter.getException();
+	System.err.println("Exception: " + String.valueOf(exception));
+	assertTrue("Expected Exception with message 'Test'",
+		   exception instanceof Exception &&
+		   "Test".equals(exception.getMessage()));
+    }
+
+    @Test
+    public void testSendRequestThrowsAssertionError() throws Exception {
+	serverDispatcher.setServer(
+	    1,
+	    new RequestQueueServer<SimpleRequest>(
+		1,
+		new SimpleRequestHandler() {
+		    public void performRequest(SimpleRequest request)
+			throws Exception
+		    {
+			throw new AssertionError("Test");
+		    }
+		}));
+	NoteFailure failureReporter = new NoteFailure();
+	client = new RequestQueueClient(
+	    1, socketFactory, failureReporter, MAX_RETRY, RETRY_WAIT,
+	    QUEUE_SIZE);
+	client.addRequest(new SimpleRequest(1));
+	failureReporter.checkCalled(0);
+	Throwable exception = failureReporter.getException();
+	System.err.println("Exception: " + String.valueOf(exception));
+	assertTrue(
+	    "Expected RuntimeException with non-null message: " + exception,
+	    exception instanceof RuntimeException &&
+	    exception.getMessage() != null);
+    }
+
     /* -- Other classes and methods -- */
 
     /** A request handler for {@link SimpleRequest}. */

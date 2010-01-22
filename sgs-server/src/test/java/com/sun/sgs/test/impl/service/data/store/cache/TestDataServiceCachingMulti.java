@@ -788,6 +788,67 @@ public class TestDataServiceCachingMulti extends BasicDataServiceMultiTest {
 	} }.runTask();
     }
 
+    /** Test multi-node upgrade/upgrade deadlock. */
+    @Test
+    public void testUpgradeUpgradeDeadlock() throws Exception {
+	/* Set up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.setBinding("a", new ManagedInteger(1));
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
+	    dataService.getBinding("a");
+	} }.runTask();
+	final AwaitDone waitA = new AwaitDone(1);
+	final AwaitDone waitB = new AwaitDone(1);
+	final AwaitDone done1 = new AwaitDone(1);
+	final AwaitDone done2 = new AwaitDone(1);
+	/* Node 1 */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    if (done1.getDone() || done2.getDone()) {
+		done1.taskSucceeded();
+		return;
+	    }
+	    try {
+		dataService.getBinding("a");
+		waitA.taskSucceeded();
+		waitB.await(1, SECONDS);
+		Thread.sleep(10);
+		dataService.setBinding("a", new ManagedInteger(2));
+		txnScheduler.scheduleTask(this, taskOwner);
+	    } catch (RuntimeException e) {
+		if (isRetryable(e)) {
+		    throw e;
+		} else {
+		    done1.taskFailed(e);
+		}
+	    } catch (Throwable e) {
+		done1.taskFailed(e);
+	    }
+	} }.scheduleTask();
+	waitA.await(1, SECONDS);
+	/* Node 2 */
+	new RunTask(appNodes.get(1)) {
+	    private boolean ok;
+	    public void run() {
+		if (ok) {
+		    return;
+		}
+		waitB.taskSucceeded();
+		dataService.setBinding("a", new ManagedInteger(3));
+		ok = true;
+	    }
+	}.runTask();
+	done2.taskSucceeded();
+	done1.await(10, SECONDS);
+	/* Clean up */
+	new RunTask(appNodes.get(0)) { public void run() {
+	    dataService.getBinding("a");
+	} }.runTask();
+	new RunTask(appNodes.get(1)) { public void run() {
+	    dataService.removeBinding("a");
+	} }.runTask();
+    }
+
     /** Test random concurrent name binding accesses. */
     @Test
     public void testConcurrentBindings() throws Exception {
