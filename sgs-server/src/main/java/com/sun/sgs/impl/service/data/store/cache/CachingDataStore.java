@@ -2392,7 +2392,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    return true;
 		} else {
 		    /* Update previous key to not cover the downgraded part */
-		    assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+		    assert nameKey.compareTo(entry.getPreviousKey()) >= 0;
 		    entry.setPreviousKey(nameKey, false);
 		    return true;
 		}
@@ -2459,7 +2459,7 @@ public final class CachingDataStore extends AbstractDataStore
 			/*
 			 * Update previous key to not cover the downgraded part
 			 */
-			assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+			assert nameKey.compareTo(entry.getPreviousKey()) >= 0;
 			entry.setPreviousKey(nameKey, false);
 			return;
 		    }
@@ -2553,7 +2553,7 @@ public final class CachingDataStore extends AbstractDataStore
 		    return true;
 		} else {
 		    /* Update previous key to not cover the evicted part */
-		    assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+		    assert nameKey.compareTo(entry.getPreviousKey()) >= 0;
 		    entry.setPreviousKey(nameKey, false);
 		    return true;
 		}
@@ -2616,7 +2616,7 @@ public final class CachingDataStore extends AbstractDataStore
 			return;
 		    } else {
 			/* Update previous key to not cover the evicted part */
-			assert nameKey.compareTo(entry.getPreviousKey()) > 0;
+			assert nameKey.compareTo(entry.getPreviousKey()) >= 0;
 			entry.setPreviousKey(nameKey, false);
 			return;
 		    }
