@@ -38,7 +38,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 /**
- * Creates the singleton server side {@link SSLEngine}.
+ * Creates the singleton server side {@code SSLEngine}.
  * The {@code SSLEngineFactory.initialize} method supports the following
  * properties: <p>
  *
@@ -194,7 +194,7 @@ public class SSLEngineFactory {
             Logger.getLogger(SSLEngineFactory.class.getName()));
     
     /**
-     * Initializes and creates the SSLContext with key material
+     * Initializes and creates the {@code SSLContext} with key material
      *
      * @param properties SSLContext properties
      */ 
@@ -300,7 +300,7 @@ public class SSLEngineFactory {
     }
 
     /**
-     * Returns the {@link SSLEngine}.
+     * Returns the {@code SSLEngine}.
      *
      * @return {@code sslEngine}
      */

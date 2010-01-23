@@ -58,10 +58,10 @@ public class SSLChannel {
     /** Indicates whether the initial handshake has been completed */
     private boolean initialHSComplete = false;
 
-    /** An object used for synchronizing on SSLEngine.unwrap() */
+    /** An object used for synchronizing on {@code SSLEngine.unwrap} */
     private final Object inLock = new Object();
 
-    /** An object used for synchronizing on SSLEngine.wrap() */
+    /** An object used for synchronizing on {@code SSLEngine.wrap} */
     private final Object outLock = new Object();
 
     /** The inbound network ByteBuffer */
@@ -96,7 +96,8 @@ public class SSLChannel {
     }
 
     /**
-     * Sets the SSLEngine and to server mode and sets the ByteBuffer sizes.
+     * Sets the {@code SSLEngine} and to server mode and sets the
+     * {@code ByteBuffer} sizes.
      */
     private void startSSLEngine() {
         
@@ -239,7 +240,7 @@ public class SSLChannel {
     /**
      * Does all outstanding handshake tasks in a separate thread.
      *
-     * @return {@code sslEngine.getHandshakeStatus()}
+     * @return the handshake status {@code sslEngine.getHandshakeStatus}
      */
     private HandshakeStatus doTasks() {
         Executor exec = Executors.newSingleThreadExecutor();
@@ -254,7 +255,7 @@ public class SSLChannel {
     }
 
     /**
-     * Reads the {@link socketChannel} for more information, then unwraps the
+     * Reads the {@code socketChannel} for more information, then unwraps the
      * application data.
      * <p>
      * Each call to this method will perform at most one underlying read.
@@ -320,7 +321,7 @@ public class SSLChannel {
     }
 
     /**
-     * Reads the {@link socketChannel} for more information, then unwraps the
+     * Reads the {@code socketChannel} for more information, then unwraps the
      * application data.
      * <p>
      * Each call to this method will perform at most one underlying read.
@@ -436,7 +437,8 @@ public class SSLChannel {
     }
 
     /**
-     * Writes outbound data to the underlying {@link SocketChannel}.
+     * Writes outbound TLS encrypted data to the underlying
+     * {@code socketChannel}.
      *
      * @param src the source ByteBuffer
      * @return the number of bytes actually consumed from the buffer
@@ -482,7 +484,8 @@ public class SSLChannel {
     }
 
     /**
-     * Writes outbound data to the underlying {@link SocketChannel}.
+     * Writes outbound TLS encrypted data to the underlying
+     * {@code SocketChannel}.
      *
      * @param srcs the array of source ByteBuffers
      * @param offset offset within the first buffer of the Bytebuffer array
