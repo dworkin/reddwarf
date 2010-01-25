@@ -113,6 +113,13 @@ public interface ScheduledTask {
     void setPriority(Priority priority);
 
     /**
+     * Sets the transaction timeout for this task.
+     *
+     * @param timeout the new transaction timeout for this task
+     */
+    void setTimeout(long timeout);
+
+    /**
      * Returns whether this is a recurring task. If this is not a recurring
      * task then {@code getPeriod} should always return {@code NON_RECURRING}.
      *

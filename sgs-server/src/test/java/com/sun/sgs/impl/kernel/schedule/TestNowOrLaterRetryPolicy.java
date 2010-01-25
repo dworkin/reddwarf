@@ -19,13 +19,10 @@
  * --
  */
 
-package com.sun.sgs.test.impl.kernel.schedule;
+package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.TaskRejectedException;
-import com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy;
 import com.sun.sgs.kernel.schedule.ScheduledTask;
-import com.sun.sgs.kernel.schedule.SchedulerQueue;
 import com.sun.sgs.kernel.schedule.SchedulerRetryAction;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.util.Properties;
@@ -37,18 +34,18 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /**
- * Test the {@code ImmediateRetryPolicy} in isolation.
+ * Test for the {@code NowOrLaterRetryPolicy} class in isolation.
  */
 @RunWith(FilteredNameRunner.class)
-public class TestImmediateRetryPolicy {
+public class TestNowOrLaterRetryPolicy {
 
-    private ImmediateRetryPolicy policy;
+    private NowOrLaterRetryPolicy policy;
     private ScheduledTask task;
 
     @Before
     public void setup() {
         Properties emptyProps = new Properties();
-        policy = new ImmediateRetryPolicy(emptyProps);
+        policy = new NowOrLaterRetryPolicy(emptyProps);
 
         task = EasyMock.createMock(ScheduledTask.class);
     }
@@ -108,6 +105,22 @@ public class TestImmediateRetryPolicy {
     }
 
     @Test
+    public void testRetryableTrueResultAndRetryCountAboveBackoffThreshold() {
+        setupTask(new RetryableException(true));
+        // program the expected behavior of the task
+        EasyMock.expect(task.getTryCount()).andStubReturn(
+                NowOrLaterRetryPolicy.DEFAULT_RETRY_BACKOFF_THRESHOLD + 1);
+        EasyMock.expect(task.getTimeout()).andStubReturn(100L);
+        task.setTimeout(100 * 2);
+        replayMocks();
+
+        // verify
+        SchedulerRetryAction action = policy.getRetryAction(task);
+        Assert.assertEquals(SchedulerRetryAction.RETRY_LATER, action);
+        verifyMocks();
+    }
+
+    @Test
     public void testNotRetryableExceptionAndRecurringTask() {
         setupTask(new Exception());
         // record recurring task
@@ -135,7 +148,7 @@ public class TestImmediateRetryPolicy {
 
     private static class RetryableException extends Exception
             implements ExceptionRetryStatus {
-        
+
         private final boolean retryable;
 
         public RetryableException(boolean retryable) {
@@ -149,3 +162,4 @@ public class TestImmediateRetryPolicy {
     }
 
 }
+
