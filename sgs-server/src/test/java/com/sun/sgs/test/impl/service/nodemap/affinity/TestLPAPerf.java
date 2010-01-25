@@ -141,7 +141,7 @@ public class TestLPAPerf {
                     String.valueOf(numThreads));
         SingleLabelPropagation lpa =
            new SingleLabelPropagation(new ZachBuilder(), collector, props);
-
+        lpa.enable();
         for (int i = 0; i < WARMUP_RUNS; i++) {
             lpa.findAffinityGroups(new HashSet<AffinityGroup>(), new GroupFactory());
         }
@@ -157,7 +157,7 @@ public class TestLPAPerf {
         // third argument true:  gather statistics
         SingleLabelPropagation lpa =
             new SingleLabelPropagation(builder, collector, props);
-
+        lpa.enable();
         AffinityGroupFinderMXBean bean = (AffinityGroupFinderMXBean)
             collector.getRegisteredMBean(AffinityGroupFinderMXBean.MXBEAN_NAME);
         assertNotNull(bean);
@@ -222,6 +222,9 @@ public class TestLPAPerf {
                         wdog, DistributedZachBuilder.NODE3, props);
         }
 
+        if (server != null) {
+            server.enable();
+        }
         for (int i = 0; i < WARMUP_RUNS; i++) {
             server.findAffinityGroups(new HashSet<AffinityGroup>(), new GroupFactory());
         }
@@ -239,6 +242,7 @@ public class TestLPAPerf {
                    String.valueOf(serverPort));
         LabelPropagationServer server = 
                 new LabelPropagationServer(collector, wdog, props);
+        server.enable();
         props.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
                     String.valueOf(numThreads));
         props.put("com.sun.sgs.impl.service.nodemap.use.affinity.groups", "true");

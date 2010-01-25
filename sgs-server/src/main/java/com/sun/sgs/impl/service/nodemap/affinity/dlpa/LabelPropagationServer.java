@@ -811,6 +811,7 @@ public class LabelPropagationServer extends BasicState
                 try {
                     // TBD: what back-off policy do we want here?
                     Thread.sleep(waitTime);
+                    maxAttempts--;
                 } catch (InterruptedException ie) {
                 }
             }

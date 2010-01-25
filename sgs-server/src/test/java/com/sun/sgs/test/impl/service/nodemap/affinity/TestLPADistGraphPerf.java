@@ -29,7 +29,6 @@ import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupGoodness;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dgb.DistGraphBuilderServerImpl;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.AffinityGraphBuilder;
-import com.sun.sgs.impl.service.nodemap.affinity.graph.GraphListener;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.LabelVertex;
 import com.sun.sgs.impl.service.nodemap.affinity.graph.WeightedEdge;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
@@ -142,6 +141,7 @@ public class TestLPADistGraphPerf {
         for (int i = 0; i < WARMUP_RUNS; i++) {
             AffinityGraphBuilder builder = (AffinityGraphBuilder)
                         builderField.get(serverNode.getNodeMappingService());
+            builder.enable();
             builder.getAffinityGroupFinder().
                     findAffinityGroups(new HashSet<AffinityGroup>(), new GroupFactory());
         }
@@ -160,6 +160,10 @@ public class TestLPADistGraphPerf {
             node2 = createNode();
             node3 = createNode();
 
+            AffinityGraphBuilder builder = (AffinityGraphBuilder)
+                        builderField.get(serverNode.getNodeMappingService());
+            builder.enable();
+
             // Send updates to each of the node's graph listeners
             AffinityGraphBuilder builder1 = (AffinityGraphBuilder)
                 builderField.get(node1.getNodeMappingService());
@@ -167,6 +171,12 @@ public class TestLPADistGraphPerf {
                 builderField.get(node2.getNodeMappingService());
             AffinityGraphBuilder builder3 = (AffinityGraphBuilder)
                 builderField.get(node3.getNodeMappingService());
+
+            // The server does not keep track of all other builders...
+            // all clients must be manually enabled.
+            builder1.enable();
+            builder2.enable();
+            builder3.enable();
 
             DummyIdentity[] idents = new DummyIdentity[35];
             // Create identities for zach karate club
@@ -382,10 +392,7 @@ public class TestLPADistGraphPerf {
             UndirectedGraph<LabelVertex, WeightedEdge> graphModel =
                     new ZachBuilder().getAffinityGraph();
             System.out.println("MODEL GRAPH IS " + graphModel);
-            GraphListener serverListener = (GraphListener)
-                        listenerField.get(serverNode.getNodeMappingService());
-            AffinityGraphBuilder builder = (AffinityGraphBuilder)
-                        builderField.get(serverNode.getNodeMappingService());
+
             // The graph can only be found on the server side.  Let's make
             // sure it looks like the expected Zachary graph.
             // The core server graph listener builds a DistGraphBuilder,
@@ -452,14 +459,14 @@ public class TestLPADistGraphPerf {
     private SgsTestNode createNode() throws Exception {
         Properties p =
                 SgsTestNode.getDefaultProperties("PerfTest", serverNode, null);
-            p.setProperty(DistGraphBuilderServerImpl.SERVER_PORT_PROPERTY,
-                    String.valueOf(serverPort));
-            p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups", "true");
-            p.setProperty("com.sun.sgs.impl.service.nodemap.graphbuilder.class",
-                          DistGraphBuilder.class.getName());
-            p.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
-                        String.valueOf(numThreads));
-            return new SgsTestNode(serverNode, null, p);
+        p.setProperty(DistGraphBuilderServerImpl.SERVER_PORT_PROPERTY,
+                String.valueOf(serverPort));
+        p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups", "true");
+        p.setProperty("com.sun.sgs.impl.service.nodemap.graphbuilder.class",
+                      DistGraphBuilder.class.getName());
+        p.put("com.sun.sgs.impl.service.nodemap.affinity.numThreads",
+                    String.valueOf(numThreads));
+        return new SgsTestNode(serverNode, null, p);
     }
     /**
      * Private implementation of {@code AccessedObjectsDetail}.

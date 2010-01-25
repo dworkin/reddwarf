@@ -124,6 +124,8 @@ public class TestDistLPABuilder extends GraphBuilderTests {
         SgsTestNode newNode = null;
         try {
             Properties p = getProps(serverNode);
+            p.setProperty("com.sun.sgs.impl.service.nodemap.use.affinity.groups",
+                          "false");
             p.remove("com.sun.sgs.impl.service.nodemap.graphbuilder.class");
             newNode =  new SgsTestNode(serverNode, null, p);
             Assert.assertNull(
