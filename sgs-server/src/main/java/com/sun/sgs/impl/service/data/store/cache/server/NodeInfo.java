@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.server;
 
+import com.sun.sgs.impl.service.data.store.cache.CallbackServer;
 import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueServer;
 import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueueRequest;
 import com.sun.sgs.impl.util.lock.LockManager;
@@ -33,8 +34,7 @@ import java.util.Set;
  * A {@link Locker} that stores information about a node, including storing
  * information about locks held, the associated update queue server, whether
  * the node has been shutdown, and the number of currently active calls being
- * made by the node.  This class is part of the implementation of {@link
- * CachingDataStoreServerImpl}.
+ * made by the node.
  */
 class NodeInfo extends MultiLocker<Object> {
 

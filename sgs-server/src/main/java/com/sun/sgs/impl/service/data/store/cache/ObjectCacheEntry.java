@@ -23,9 +23,7 @@ package com.sun.sgs.impl.service.data.store.cache;
  * A cache entry for an object.  Only the {@link #key} field may be accessed
  * without holding the associated lock (see {@link Cache#getBindingLock} and
  * {@link Cache#getObjectLock}.  For all other fields and methods, the lock
- * must be held. <p>
- *
- * This class is part of the implementation of {@link CachingDataStore}.
+ * must be held.
  */
 final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 

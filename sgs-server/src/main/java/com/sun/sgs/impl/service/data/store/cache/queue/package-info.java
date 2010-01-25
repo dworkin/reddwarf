@@ -21,7 +21,7 @@
  * Provides facilities to allow the {@link
  * com.sun.sgs.impl.service.data.store.cache.CachingDataStore} to send updates
  * to the {@link
- * com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl},
+ * com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServerImpl},
  * preserving the order of the updates in the face of network errors. <p>
  *
  * Two layers of facilities are provided. <p>

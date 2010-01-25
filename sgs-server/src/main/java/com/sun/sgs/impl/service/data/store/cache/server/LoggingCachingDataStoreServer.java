@@ -17,8 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.server;
 
+import com.sun.sgs.impl.service.data.store.cache.CacheConsistencyException;
+import com.sun.sgs.impl.service.data.store.cache.CallbackServer;
 import static com.sun.sgs.impl.sharedutil.Exceptions.throwUnchecked;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
@@ -28,8 +30,6 @@ import static java.util.logging.Level.FINEST;
 /**
  * A {@code CachingDataStoreServer} that delegates its operations to an
  * underlying server and logs all calls at level {@link Level#FINEST FINEST}.
- * This class is part of the implementation of {@link
- * CachingDataStoreServerImpl}.
  */
 class LoggingCachingDataStoreServer implements CachingDataStoreServer {
 

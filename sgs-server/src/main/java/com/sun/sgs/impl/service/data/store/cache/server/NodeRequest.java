@@ -17,14 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.server;
 
 import com.sun.sgs.impl.util.lock.LockRequest;
 
 /**
  * A lock request from a node, which also tracks whether the associated item
- * has been called back.  This class is part of the implementation of {@link
- * CachingDataStoreServerImpl}.
+ * has been called back.
  */
 class NodeRequest extends LockRequest<Object> {
 

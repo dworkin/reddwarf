@@ -31,30 +31,34 @@ import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.service.data.store.NetworkException;
 import com.sun.sgs.impl.service.data.store.cache.
     BasicCacheEntry.AwaitWritableResult;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.GetBindingForRemoveResults;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.GetBindingForUpdateResults;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.GetBindingResults;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.GetObjectForUpdateResults;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.GetObjectResults;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.NextBoundNameResults;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.NextObjectResults;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.RegisterNodeResult;
-import com.sun.sgs.impl.service.data.store.cache.
-    CachingDataStoreServer.UpgradeObjectResults;
 import static com.sun.sgs.impl.service.data.store.cache.BindingKey.LAST;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.BOUND;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNBOUND;
 import static com.sun.sgs.impl.service.data.store.cache.BindingState.UNKNOWN;
 import com.sun.sgs.impl.service.data.store.cache.queue.CompletionHandler;
 import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueue;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.GetBindingForRemoveResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.GetBindingForUpdateResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.GetBindingResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.GetObjectForUpdateResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.GetObjectResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.NextBoundNameResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.NextObjectResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.RegisterNodeResult;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServer.UpgradeObjectResults;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServerImpl;
 import static com.sun.sgs.impl.service.transaction.
     TransactionCoordinator.TXN_TIMEOUT_PROPERTY;
 import static com.sun.sgs.impl.service.transaction.
@@ -183,10 +187,10 @@ import java.util.logging.Logger;
  *	CachingDataStoreServer}. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value
- *	com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl#SERVER_PORT_PROPERTY}
+ *	com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServerImpl#SERVER_PORT_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i>	<code> {@value
- *	com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl#DEFAULT_SERVER_PORT}
+ *	com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServerImpl#DEFAULT_SERVER_PORT}
  *	</code>
  *
  * <dd style="padding-top: .5em">The network port used to make server requests.

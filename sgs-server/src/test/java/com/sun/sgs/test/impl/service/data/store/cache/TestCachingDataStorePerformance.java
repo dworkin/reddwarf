@@ -22,15 +22,15 @@ package com.sun.sgs.test.impl.service.data.store.cache;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import static com.sun.sgs.impl.kernel.StandardProperties.NODE_TYPE;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_HOST_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.
+import static com.sun.sgs.impl.service.data.store.cache.server.
     CachingDataStoreServerImpl.DEFAULT_SERVER_PORT;
-import static com.sun.sgs.impl.service.data.store.cache.
+import static com.sun.sgs.impl.service.data.store.cache.server.
     CachingDataStoreServerImpl.DIRECTORY_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.
+import static com.sun.sgs.impl.service.data.store.cache.server.
     CachingDataStoreServerImpl.SERVER_PORT_PROPERTY;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.store.DataStore;
 import com.sun.sgs.test.impl.service.data.store.BasicDataStoreTestEnv;

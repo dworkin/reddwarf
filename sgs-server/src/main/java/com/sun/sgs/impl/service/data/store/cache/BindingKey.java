@@ -24,19 +24,17 @@ import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 /**
  * A key to represent binding names that is {@link Comparable} and provides
  * non-{@code null} values to represent keys before and after any possible
- * name. <p>
- *
- * This class is part of the implementation of {@link CachingDataStore}.
+ * name.
  */
-abstract class BindingKey implements Comparable<BindingKey> {
+public abstract class BindingKey implements Comparable<BindingKey> {
 
     /**
      * A key before all possible names.  This value is only used for previous
      * key information.
      */
-    static final BindingKey FIRST = new BindingKey() {
+    public static final BindingKey FIRST = new BindingKey() {
 	@Override
-	String getNameAllowFirst() {
+	public String getNameAllowFirst() {
 	    return null;
 	}
 	@Override
@@ -58,9 +56,9 @@ abstract class BindingKey implements Comparable<BindingKey> {
     };
 
     /** A key after all possible names. */
-    static final BindingKey LAST = new BindingKey() {
+    public static final BindingKey LAST = new BindingKey() {
 	@Override
-	String getNameAllowLast() {
+	public String getNameAllowLast() {
 	    return null;
 	}
 	@Override
@@ -91,7 +89,7 @@ abstract class BindingKey implements Comparable<BindingKey> {
      * @param	name the name of the binding
      * @return	the key to represent the binding
      */
-    static BindingKey get(String name) {
+    public static BindingKey get(String name) {
 	return new BindingKeyName(name);
     }
 
@@ -102,7 +100,7 @@ abstract class BindingKey implements Comparable<BindingKey> {
      * @param	name the name of the binding or {@code null} for the first key
      * @return	the key
      */
-    static BindingKey getAllowFirst(String name) {
+    public static BindingKey getAllowFirst(String name) {
 	return (name == null) ? FIRST : new BindingKeyName(name);
     }
 
@@ -113,7 +111,7 @@ abstract class BindingKey implements Comparable<BindingKey> {
      * @param	name the name of the binding or {@code null} for the last key
      * @return	the key
      */
-    static BindingKey getAllowLast(String name) {
+    public static BindingKey getAllowLast(String name) {
 	return (name == null) ? LAST : new BindingKeyName(name);
     }
 
@@ -123,7 +121,7 @@ abstract class BindingKey implements Comparable<BindingKey> {
      * @return	the name
      * @throws	UnsupportedOperationException if this is the first or last key
      */
-    String getName() {
+    public String getName() {
 	throw new UnsupportedOperationException("getName is not supported");
     }
 
@@ -134,7 +132,7 @@ abstract class BindingKey implements Comparable<BindingKey> {
      * @return	the name or {@code null}
      * @throws	UnsupportedOperationException if this is the last key
      */
-    String getNameAllowFirst() {
+    public String getNameAllowFirst() {
 	throw new UnsupportedOperationException(
 	    "getNameAllowFirst is not supported");
     }
@@ -146,7 +144,7 @@ abstract class BindingKey implements Comparable<BindingKey> {
      * @return	the name or {@code null}
      * @throws	UnsupportedOperationException if this is the first key
      */
-    String getNameAllowLast() {
+    public String getNameAllowLast() {
 	throw new UnsupportedOperationException(
 	    "getNameAllowLast is not supported");
     }
@@ -159,15 +157,15 @@ abstract class BindingKey implements Comparable<BindingKey> {
 	    this.name = name;
 	}
 	@Override
-	String getName() {
+	public String getName() {
 	    return name;
 	}
 	@Override
-	String getNameAllowFirst() {
+	public String getNameAllowFirst() {
 	    return name;
 	}
 	@Override
-	String getNameAllowLast() {
+	public String getNameAllowLast() {
 	    return name;
 	}
 	@Override

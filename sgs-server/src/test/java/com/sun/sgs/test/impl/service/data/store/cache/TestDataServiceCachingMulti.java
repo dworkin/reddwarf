@@ -27,15 +27,15 @@ import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import static com.sun.sgs.impl.kernel.StandardProperties.NODE_TYPE;
 import static com.sun.sgs.impl.service.data.
     DataServiceImpl.DATA_STORE_CLASS_PROPERTY;
+import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.CHECK_BINDINGS_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.cache.
     CachingDataStore.SERVER_HOST_PROPERTY;
-import static com.sun.sgs.impl.service.data.store.cache.
+import static com.sun.sgs.impl.service.data.store.cache.server.
     CachingDataStoreServerImpl.DEFAULT_SERVER_PORT;
-import static com.sun.sgs.impl.service.data.store.cache.
+import static com.sun.sgs.impl.service.data.store.cache.server.
     CachingDataStoreServerImpl.SERVER_PORT_PROPERTY;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;

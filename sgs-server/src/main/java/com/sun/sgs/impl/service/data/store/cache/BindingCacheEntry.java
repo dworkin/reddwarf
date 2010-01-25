@@ -63,9 +63,7 @@ import java.util.logging.Logger;
  * transaction that aborts while the operation using the entry is in progress.
  * In these cases, the binding entry is marked <tt>FETCHING_READ</tt> as a way
  * of noting that the entry should be removed from the cache if the server
- * request does not return an entry with that same key. <p>
- *
- * This class is part of the implementation of {@link CachingDataStore}.
+ * request does not return an entry with that same key.
  *
  * @see	Cache#getBindingLock Cache.getBindingLock
  */

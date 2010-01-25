@@ -17,21 +17,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
-
 /**
- * Represents the information available about whether a name is bound.
+ * Provides the interface and implementation of the server for the {@link
+ * com.sun.sgs.impl.service.data.store.cache.CachingDataStore}. <p>
  *
- * @see	BindingCacheEntry
+ * The caches on the various nodes communicate with a central {@link
+ * com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServer},
+ * implemented by {@link
+ * com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServerImpl},
+ * which responds to requests from the caches, supplying the requested object
+ * and name binding data.
  */
-enum BindingState {
-
-    /** The name is bound. */
-    BOUND,
-
-    /** The name is unbound. */
-    UNBOUND,
-
-    /** It is unknown whether the name is bound or unbound. */
-    UNKNOWN;
-}
+package com.sun.sgs.impl.service.data.store.cache.server;

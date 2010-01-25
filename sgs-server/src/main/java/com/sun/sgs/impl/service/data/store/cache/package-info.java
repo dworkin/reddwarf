@@ -25,11 +25,11 @@
  * com.sun.sgs.impl.service.data.store.cache.CachingDataStore} class, which is
  * responsible for obtaining and caching information about objects and name
  * bindings.  The caches on the various nodes communicate with a central {@link
- * com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServer},
+ * com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServer},
  * implemented by {@link
- * com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl}, which
- * responds to requests from the caches, supplying the requested object and
- * name binding data.  The {@code CachingDataStore} also provides a {@link
+ * com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServerImpl},
+ * which responds to requests from the caches, supplying the requested object
+ * and name binding data.  The {@code CachingDataStore} also provides a {@link
  * com.sun.sgs.impl.service.data.store.cache.CallbackServer}, which the central
  * server contacts to request that nodes return lock ownership of cached
  * entries that have been requested by other nodes. <p>

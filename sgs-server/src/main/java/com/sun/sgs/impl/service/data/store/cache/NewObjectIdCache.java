@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.cache;
 
+import com.sun.sgs.impl.service.data.store.cache.server.CachingDataStoreServer;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.io.IOException;
 import static java.util.logging.Level.FINER;
@@ -30,9 +31,7 @@ import java.util.logging.Logger;
  * in the constructor.  When half of the current batch of IDs is used up, it
  * allocates another batch in a separate thread, in hopes that the next batch
  * of IDs will be available by the time the current batch is completely
- * used. <p>
- *
- * This class is part of the implementation of {@link CachingDataStore}.
+ * used.
  */
 class NewObjectIdCache {
 

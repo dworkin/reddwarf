@@ -17,35 +17,39 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.cache;
+package com.sun.sgs.impl.service.data.store.cache.server;
 
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import static com.sun.sgs.impl.kernel.StandardProperties.APP_ROOT;
-import static com.sun.sgs.impl.service.data.store.
-    DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS;
-import static com.sun.sgs.impl.service.data.store.
-    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeLong;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.decodeString;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeLong;
 import static com.sun.sgs.impl.service.data.store.DataEncoding.encodeString;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreImpl.DEFAULT_ENVIRONMENT_CLASS;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreImpl.ENVIRONMENT_CLASS_PROPERTY;
 import com.sun.sgs.impl.service.data.store.DbUtilities;
 import com.sun.sgs.impl.service.data.store.DbUtilities.Databases;
-import com.sun.sgs.impl.service.data.store.cache.queue.
-    UpdateQueueRequest.UpdateQueueRequestHandler;
+import com.sun.sgs.impl.service.data.store.cache.BindingKey;
+import com.sun.sgs.impl.service.data.store.cache.CacheConsistencyException;
+import com.sun.sgs.impl.service.data.store.cache.CallbackServer;
+import com.sun.sgs.impl.service.data.store.cache.FailureReporter;
 import com.sun.sgs.impl.service.data.store.cache.queue.LoggingUpdateQueueServer;
 import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueListener;
 import com.sun.sgs.impl.service.data.store.cache.queue.RequestQueueServer;
 import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueueRequest;
+import com.sun.sgs.impl.service.data.store.cache.queue.
+    UpdateQueueRequest.UpdateQueueRequestHandler;
 import com.sun.sgs.impl.service.data.store.cache.queue.UpdateQueueServer;
-import static com.sun.sgs.impl.service.transaction.
-    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
+import static com.sun.sgs.impl.service.transaction.
+    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -191,7 +195,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 {
     /** The package for this class. */
     private static final String PKG =
-	"com.sun.sgs.impl.service.data.store.cache";
+	"com.sun.sgs.impl.service.data.store.cache.server";
 
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -210,7 +214,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     private static final String DEFAULT_DIRECTORY = "dsdb";
 
     /** The property for specifying the server port. */
-    public static final String SERVER_PORT_PROPERTY = PKG + ".server.port";
+    public static final String SERVER_PORT_PROPERTY = PKG + ".port";
 
     /** The default server port. */
     public static final int DEFAULT_SERVER_PORT = 44540;
@@ -417,7 +421,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
 	throws IOException
     {
 	super(properties, systemRegistry, txnProxy,
-	      new LoggerWrapper(Logger.getLogger(PKG + ".server")));
+	      new LoggerWrapper(Logger.getLogger(CLASSNAME)));
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	String dbEnvClass = wrappedProps.getProperty(
 	    ENVIRONMENT_CLASS_PROPERTY, DEFAULT_ENVIRONMENT_CLASS);
@@ -1619,7 +1623,7 @@ public class CachingDataStoreServerImpl extends AbstractBasicService
     /**
      * Prints debugging output for a locking operation.
      *
-     * @param	nodeId the node info for the node performing the operation
+     * @param	nodeInfo the node info for the node performing the operation
      * @param	lockOp the locking operation
      * @param	key the name of the binding or the object ID
      * @param	operation a string representation of the operation

@@ -36,9 +36,7 @@ import java.util.EnumSet;
  * A given entry maintains information for the associated object or binding
  * only so long as that item remains in the cache.  Once an item is removed
  * from the cache, a new entry will be created to represent that item the next
- * time that it enters the cache. <p>
- *
- * This class is part of the implementation of {@link CachingDataStore}.
+ * time that it enters the cache.
  *
  * @param	<K> the key type
  * @param	<V> the value type

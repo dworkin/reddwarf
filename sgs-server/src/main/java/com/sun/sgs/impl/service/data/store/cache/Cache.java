@@ -67,9 +67,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *     that lock is available for eviction
  *   <li> Wait for lock to become available
  *   </ol>
- * </ul> <p>
- *
- * This class is part of the implementation of {@link CachingDataStore}.
+ * </ul>
  */
 class Cache {
 

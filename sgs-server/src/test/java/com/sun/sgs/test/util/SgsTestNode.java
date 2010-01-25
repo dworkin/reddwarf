@@ -30,7 +30,8 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.cache.CachingDataStore;
-import com.sun.sgs.impl.service.data.store.cache.CachingDataStoreServerImpl;
+import com.sun.sgs.impl.service.data.store.cache.server.
+    CachingDataStoreServerImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
