@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.nodemap.affinity.dlpa;
@@ -31,6 +33,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 import com.sun.sgs.management.AffinityGroupFinderMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
@@ -184,7 +187,8 @@ public class LabelPropagationServer extends BasicState
     /** A thread pool.  Will create as many threads as needed, with a timeout
      * of 60 sec before unused threads are reaped.
      */
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor = Executors.newCachedThreadPool(
+            new NamedThreadFactory("LabelPropagationServer"));
 
     // TBD:  we need to have a state, and not allow a run when we're shutting
     //     down, or shutdown while we're running.  Will also need an
@@ -525,9 +529,7 @@ public class LabelPropagationServer extends BasicState
      * @param nodeId the Id of the failed node
      */
     private void removeNode(long nodeId) {
-        synchronized (clientProxyMap) {
-            clientProxyMap.remove(nodeId);
-        }
+        clientProxyMap.remove(nodeId);
     }
 
     /**

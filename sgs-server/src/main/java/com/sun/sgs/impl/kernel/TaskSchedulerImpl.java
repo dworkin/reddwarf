@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.kernel;
@@ -25,6 +27,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
@@ -135,7 +138,8 @@ final class TaskSchedulerImpl implements TaskScheduler {
         // fixed-size pool for running tasks, but in practice we may
         // want a flexible pool that allows (e.g.) for tasks that run
         // for the lifetime of a stack
-        this.executor = Executors.newScheduledThreadPool(requestedThreads);
+        this.executor = Executors.newScheduledThreadPool(
+                requestedThreads, new NamedThreadFactory("TaskScheduler"));
 
         logger.log(Level.CONFIG,
                    "Created TaskSchedulerImpl with properties:" +

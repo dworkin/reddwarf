@@ -3,7 +3,7 @@ Version 0.9.12
   and channel services (issue #12)
 - Added affinity graph builders and group finders, for load balancing
   multi-node clusters (required for issue #54)
-- Fix issues #201
+- Fix issues #201, #213, #215, #216
 
 Version 0.9.11:
 - Introduced application level clock accessible via the watchdog service.
