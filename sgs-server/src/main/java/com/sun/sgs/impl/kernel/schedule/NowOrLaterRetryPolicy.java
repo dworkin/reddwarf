@@ -46,18 +46,6 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	{@value
- * com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy#RETRY_WARNING_THRESHOLD_PROPERTY}
- *	</b></code><br>
- *	<i>Default:</i> {@value
- * com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy#DEFAULT_RETRY_WARNING_THRESHOLD}
- *
- * <dd style="padding-top: .5em">If a task has been retried a multiple of
- *      times equal to the value of this property, then a {@code WARNING}
- *      message will be logged as feedback to the user.  This value must be
- *      greater than or equal to {@code 1}.
- *
- * <dt> <i>Property:</i> <code><b>
  *	{@value #RETRY_BACKOFF_THRESHOLD_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_RETRY_BACKOFF_THRESHOLD}
@@ -89,9 +77,6 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
      */
     static final int DEFAULT_RETRY_BACKOFF_THRESHOLD = 25;
 
-    // the task retry count at which a warning should be printed
-    private final int retryWarningThreshold;
-
     // the task retry count at which a backoff should occur
     private final int retryBackoffThreshold;
 
@@ -102,10 +87,6 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
      */
     public NowOrLaterRetryPolicy(Properties properties) {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-        this.retryWarningThreshold = wrappedProps.getIntProperty(
-                ImmediateRetryPolicy.RETRY_WARNING_THRESHOLD_PROPERTY,
-                ImmediateRetryPolicy.DEFAULT_RETRY_WARNING_THRESHOLD,
-                1, Integer.MAX_VALUE);
         this.retryBackoffThreshold = wrappedProps.getIntProperty(
                 RETRY_BACKOFF_THRESHOLD_PROPERTY,
                 DEFAULT_RETRY_BACKOFF_THRESHOLD,
@@ -113,9 +94,6 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
 
         logger.log(Level.CONFIG,
                    "Created NowOrLaterRetryPolicy with properties:" +
-                   "\n  " +
-                   ImmediateRetryPolicy.RETRY_WARNING_THRESHOLD_PROPERTY + "=" +
-                   retryWarningThreshold +
                    "\n  " + RETRY_BACKOFF_THRESHOLD_PROPERTY + "=" +
                    retryBackoffThreshold);
     }
@@ -149,17 +127,14 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
         if ((result instanceof ExceptionRetryStatus) &&
             (((ExceptionRetryStatus) result).shouldRetry())) {
 
-            // Print a WARNING message if a task's retry count is a
-            // multiple of a configurable threshold
-            if (task.getTryCount() % retryWarningThreshold == 0) {
-                logger.logThrow(Level.WARNING,
-                                task.getLastFailure(),
-                                "Task has been retried {0} times: {1}",
-                                task.getTryCount(), task);
-            }
-
             // Always retry in place unless we are above the backoff threshold
             if (task.getTryCount() > retryBackoffThreshold) {
+                logger.logThrow(Level.WARNING,
+                                task.getLastFailure(),
+                                "Task has been retried {0} times: {1}\n" +
+                                "Increasing its timeout to {2} ms and " +
+                                "scheduling its retry for later",
+                                task.getTryCount(), task, task.getTimeout() * 2);
                 task.setTimeout(task.getTimeout() * 2);
                 return SchedulerRetryAction.RETRY_LATER;
             } else {
