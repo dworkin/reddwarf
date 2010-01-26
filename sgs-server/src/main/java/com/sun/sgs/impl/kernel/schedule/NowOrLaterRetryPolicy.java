@@ -38,18 +38,19 @@ import java.util.logging.Logger;
  * through tasks that are frequently timing out.  This
  * {@code SchedulerRetryPolicy} causes a task that throws a
  * retryable exception to retry immediately.  However, once a task has been
- * retried more than a certain threshold (configured via the
- * {@value #RETRY_BACKOFF_TRESHOLD_PROPERTY} property), the transaction timeout
- * for the task is doubled, and the task is scheduled to be retried later
- * (rather than immediately).  This class supports the following
+ * retried more than the configurable threshold (see below), then the
+ * transaction timeout for the task is doubled, and the task is scheduled to be
+ * retried later (rather than immediately).  This class supports the following
  * configuration properties:
  *
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	{@value ImmediateRetryPolicy#RETRY_WARNING_THRESHOLD_PROPERTY}
+ *	{@value
+ * com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy#RETRY_WARNING_THRESHOLD_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> {@value ImmediateRetryPolicy#DEFAULT_RETRY_WARNING_THRESHOLD}
+ *	<i>Default:</i> {@value
+ * com.sun.sgs.impl.kernel.schedule.ImmediateRetryPolicy#DEFAULT_RETRY_WARNING_THRESHOLD}
  *
  * <dd style="padding-top: .5em">If a task has been retried a multiple of
  *      times equal to the value of this property, then a {@code WARNING}
@@ -121,7 +122,7 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
 
     /**
      * {@inheritDoc}
-     *
+     * <p>
      * This implementation normally returns a value of
      * {@link SchedulerRetryAction#RETRY_NOW} for any task that has most
      * recently failed with a retryable exception.  However, if the given task
