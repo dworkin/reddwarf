@@ -61,9 +61,10 @@ public interface LPAServer extends Remote {
      * @param nodeId the node the proxy represents
      * @param client the client proxy, which this server and other nodes
      *        can call
+     * @return {@code true} if the client should be enabled
      * @throws IOException if there is a communication problem
      */
-    void register(long nodeId, LPAClient client) throws IOException;
+    boolean register(long nodeId, LPAClient client) throws IOException;
 
     /**
      * Returns the {@code LPAClient} for the given {@code nodeId}.

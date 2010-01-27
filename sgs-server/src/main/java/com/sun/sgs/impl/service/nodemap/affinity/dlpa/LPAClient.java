@@ -41,6 +41,7 @@ public interface LPAClient extends Remote {
      * Called by the LPAServer.
      *
      * @param runNumber the number of this algorithm run
+     * @throws IllegalStateException if not enabled
      * @throws IOException if there is a communication problem
      */
     void prepareAlgorithm(long runNumber) throws IOException;
@@ -51,6 +52,7 @@ public interface LPAClient extends Remote {
      * Called by the LPAServer.
      *
      * @param iteration the iteration number
+     * @throws IllegalStateException if not enabled
      * @throws IOException if there is a communication problem
      */
     void startIteration(int iteration) throws IOException;
@@ -66,6 +68,7 @@ public interface LPAClient extends Remote {
      *                  {@link #prepareAlgorithm} call
      * @param done {@code true} if all iterations are done, allowing cleanup
      * @return the affinity groups on this node
+     * @throws IllegalStateException if not enabled
      * @throws IllegalArgumentException if runNumber does not match the last
      *         call to {@code prepareAlgorithm}
      * @throws IOException if there is a communication problem
@@ -83,6 +86,7 @@ public interface LPAClient extends Remote {
      * @param objIds the collection of objects, representing edges, that
      *               probably have endpoints to vertices on this node
      * @param nodeId the node with vertices attached to the edges
+     * @throws IllegalStateException if not enabled
      * @throws IOException if there is a communication problem
      */
     void notifyCrossNodeEdges(Collection<Object> objIds, long nodeId)
@@ -98,6 +102,7 @@ public interface LPAClient extends Remote {
      *               edges, that we want neighbor node information for
      * @return a map of Objects (one for each element of {@code objIds}) to
      *               neighbor labels, with a count of each use
+     * @throws IllegalStateException if not enabled
      * @throws IOException if there is a communication problem
      */
     Map<Object, Map<Integer, List<Long>>> getRemoteLabels(
@@ -113,7 +118,7 @@ public interface LPAClient extends Remote {
     void shutdown() throws IOException;
 
     /**
-     * Indicates that the affinity group finding system is disabled,
+     * Indicates that the affinity group finding system is ENABLED,
      * so no new data should be collected (old can be disgarded).
      *
      * @throws IOException if there is a communication problem

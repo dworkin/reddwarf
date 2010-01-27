@@ -495,8 +495,9 @@ public class LabelPropagationServer extends BasicState
 
 
     /** {@inheritDoc} */
-    public void register(long nodeId, LPAClient client) throws IOException {
+    public boolean register(long nodeId, LPAClient client) throws IOException {
         clientProxyMap.put(nodeId, client);
+        return state == State.ENABLED;
     }
 
     /**

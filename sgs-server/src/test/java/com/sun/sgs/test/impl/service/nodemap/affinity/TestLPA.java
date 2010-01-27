@@ -23,6 +23,7 @@ package com.sun.sgs.test.impl.service.nodemap.affinity;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroup;
+import com.sun.sgs.impl.service.nodemap.affinity.AffinityGroupFinderFailedException;
 import com.sun.sgs.impl.service.nodemap.affinity.AffinitySet;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.graph.DLPAGraphBuilder;
 import com.sun.sgs.impl.service.nodemap.affinity.dlpa.LPAClient;
@@ -259,6 +260,46 @@ public class TestLPA {
         assertTrue(groupSet.size() != 0);
     }
 
+    @Test(expected = AffinityGroupFinderFailedException.class)
+    public void testLPAAlgorithmOneDisabledClient() throws Exception {
+        // We'll just use the server's watchdog - safe because we aren't
+        // testing node failures here.
+        //
+        // We choose node 3 here because it has no reported conflicts with
+        // other nodes, so it doesn't fail immediately because the other nodes
+        // are down.
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    wdog, PartialToyBuilder.NODE3, props);
+        lp3.disable();
+        Set<AffinityGroup> groupSet = new HashSet<AffinityGroup>();
+        try {
+            server.findAffinityGroups(groupSet, new GroupFactory());
+        } catch (AffinityGroupFinderFailedException e) {
+            System.out.println("Got expected exception " + e);
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    @Test
+    public void testLPAAlgorithmLateEnableClient() throws Exception {
+        server.disable();
+        // We'll just use the server's watchdog - safe because we aren't
+        // testing node failures here.
+        //
+        // We choose node 3 here because it has no reported conflicts with
+        // other nodes, so it doesn't fail immediately because the other nodes
+        // are down.
+        LabelPropagation lp3 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE3),
+                    wdog, PartialToyBuilder.NODE3, props);
+        server.enable();
+        Set<AffinityGroup> groupSet = new HashSet<AffinityGroup>();
+        server.findAffinityGroups(groupSet, new GroupFactory());
+        assertTrue(groupSet.size() != 0);
+    }
+
     @Test
     public void testLPAAlgorithmNoClient() throws Exception {
         Set<AffinityGroup> groupSet = new HashSet<AffinityGroup>();
@@ -290,7 +331,8 @@ public class TestLPA {
                 new Exporter<TestLPAClientIface>(TestLPAClientIface.class);
         exporter.export(client1, 0);
         try {
-            server.register(nodeId, exporter.getProxy());
+            boolean enable = server.register(nodeId, exporter.getProxy());
+            assertTrue("should be told to enable", enable);
 
             TestLPAClientIface proxy =
                     (TestLPAClientIface) server.getLPAClientProxy(nodeId);
@@ -301,6 +343,57 @@ public class TestLPA {
             assertTrue(client1.finishedExchangeInfo);
         } finally {
             exporter.unexport();
+        }
+    }
+
+    @Test
+    public void testRegisterStates() throws Exception {
+        Exporter<TestLPAClientIface> exporter1 =
+                new Exporter<TestLPAClientIface>(TestLPAClientIface.class);
+        Exporter<TestLPAClientIface> exporter2 =
+                new Exporter<TestLPAClientIface>(TestLPAClientIface.class);
+        Exporter<TestLPAClientIface> exporter3 =
+                new Exporter<TestLPAClientIface>(TestLPAClientIface.class);
+        
+        server.disable();
+        try {
+            final int nodeId = 10;
+            TestLPAClient client1 = new TestLPAClient(server, nodeId, 10, 3,
+                   new HashSet<AffinityGroup>());
+            Exporter<TestLPAClientIface> exporter =
+                    new Exporter<TestLPAClientIface>(TestLPAClientIface.class);
+            exporter1.export(client1, 0);
+
+            boolean enable = server.register(nodeId, exporter1.getProxy());
+            assertFalse("should not be told to enable", enable);
+
+            server.enable();
+            final int nodeId1 = 11;
+            TestLPAClient client2 = new TestLPAClient(server, nodeId1, 10, 3,
+                   new HashSet<AffinityGroup>());
+            exporter2.export(client2, 0);
+            enable = server.register(nodeId1, exporter2.getProxy());
+            assertTrue("should be told to enable", enable);
+
+
+            server.shutdown();
+            final int nodeId2 = 12;
+            TestLPAClient client3 = new TestLPAClient(server, nodeId2, 10, 3,
+                   new HashSet<AffinityGroup>());
+            exporter3.export(client3, 0);
+            enable = server.register(nodeId2, exporter2.getProxy());
+            assertFalse("should not be told to enable", enable);
+        
+        } finally {
+            if (exporter1 != null) {
+                exporter1.unexport();
+            }
+            if (exporter2 != null) {
+                exporter2.unexport();
+            }
+            if (exporter3 != null) {
+                exporter3.unexport();
+            }
         }
     }
 
@@ -714,6 +807,106 @@ public class TestLPA {
         weight = labelWeight.get(2);
         assertTrue(weight != null);
         assertEquals(1, weight.intValue());
+    }
+
+    // Ensure client throws IllegalStateException if disabled
+    @Test(expected = IllegalStateException.class)
+    public void testDisabledPrepare() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.disable();
+        lp1.prepareAlgorithm(1);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testDisabledStart() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.disable();
+        lp1.startIteration(1);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testDisabledGetGroups() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.disable();
+        lp1.getAffinityGroups(1, false);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testDisabledCrossNodeEdges() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.disable();
+        lp1.notifyCrossNodeEdges(new HashSet<Object>(), PartialToyBuilder.NODE1);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testDisabledGetRemoteLabels() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.disable();
+        lp1.getRemoteLabels(new HashSet<Object>());
+    }
+
+    // Ensure client throws IllegalStateException if shutdown
+    @Test(expected = IllegalStateException.class)
+    public void testShutdownPrepare() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.shutdown();
+        lp1.prepareAlgorithm(1);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testShutdownStart() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.shutdown();
+        lp1.startIteration(1);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testShutdownGetGroups() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.shutdown();
+        lp1.getAffinityGroups(1, false);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testShutdownCrossNodeEdges() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.shutdown();
+        lp1.notifyCrossNodeEdges(new HashSet<Object>(), PartialToyBuilder.NODE1);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testShutdownGetRemoteLabels() throws Exception {
+        LabelPropagation lp1 =
+            new LabelPropagation(new PartialToyBuilder(PartialToyBuilder.NODE1),
+                    wdog, PartialToyBuilder.NODE1, props);
+        lp1.prepareAlgorithm(1);
+        lp1.shutdown();
+        lp1.getRemoteLabels(new HashSet<Object>());
     }
 
     public interface TestLPAClientIface extends LPAClient {

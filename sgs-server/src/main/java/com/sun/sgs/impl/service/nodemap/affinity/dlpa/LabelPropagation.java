@@ -171,7 +171,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     }
 
     /** The current state of this instance. */
-    private State state = State.FINISHED;
+    private State algState = State.FINISHED;
 
     /**
      * The current algorithm run number, used to ensure we're returning
@@ -185,12 +185,12 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     private int iteration = -1;
 
     /**
-     * Synchronization for state, runNumber, and iteration.
+     * Synchronization for algState, runNumber, and iteration.
      * Using this lock ensures that results from each phase of the algorithm
      * runs (prepare and iterations) are seen by the next phase, no matter
      * which thread actually runs the next phase.
      */
-    private final Object stateLock = new Object();
+    private final Object algStateLock = new Object();
 
     /** The groups collected in the last run. */
     private Set<AffinityGroup> groups;
@@ -262,7 +262,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                                         DEFAULT_CLIENT_PORT, 0, 65535);
         clientExporter = new Exporter<LPAClient>(LPAClient.class);
         int exportPort = clientExporter.export(this, clientPort);
-        server.register(nodeId, clientExporter.getProxy());
+        if (server.register(nodeId, clientExporter.getProxy())) {
+            enable();
+        }
         if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "Created label propagation node on {0} " +
                     " using server on {1}:{2}, and exported self on {3}",
@@ -276,7 +278,8 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     public Set<AffinityGroup> getAffinityGroups(long runNumber, boolean done)
         throws IOException
     {
-        synchronized (stateLock) {
+        checkForDisabledOrShutdownState();
+        synchronized (algStateLock) {
             if (this.runNumber != runNumber) {
                 throw new IllegalArgumentException(
                     "bad run number " + runNumber +
@@ -286,14 +289,14 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 // If done is true, we will be initializing the graph for
                 // our next iteration as we gather the final group data,
                 // making it impossible for us to gather the data again.
-                while (state == State.GATHERING_GROUPS) {
+                while (algState == State.GATHERING_GROUPS) {
                     try {
-                        stateLock.wait();
+                        algStateLock.wait();
                     } catch (InterruptedException e) {
-                        // Do nothing - ignore until state changes
+                        // Do nothing - ignore until algState changes
                     }
                 }
-                if (state == State.FINISHED) {
+                if (algState == State.FINISHED) {
                     // We have collected data for this run already, just return
                     // them.
                     logger.log(Level.FINE,
@@ -301,7 +304,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                             localNodeId, groups.size());
                     return Collections.unmodifiableSet(groups);
                 }
-                state = State.GATHERING_GROUPS;
+                algState = State.GATHERING_GROUPS;
             }
         }
 
@@ -322,9 +325,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             nodeConflictMap.clear();
             vertices = null;
 
-            synchronized (stateLock) {
-                state = State.FINISHED;
-                stateLock.notifyAll();
+            synchronized (algStateLock) {
+                algState = State.FINISHED;
+                algStateLock.notifyAll();
             }
         }
         logger.log(Level.FINEST, "{0}: returning {1} groups",
@@ -338,6 +341,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * Asynchronously prepare ourselves for a run.
      */
     public void prepareAlgorithm(long runNumber) throws IOException {
+        checkForDisabledOrShutdownState();
         PrepareRun pr = new PrepareRun(runNumber);
         String name = "PrepareAlgorithm-" + runNumber;
         new Thread(pr, name).start();
@@ -372,20 +376,20 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      *           between the server and clients
      */
     private void prepareAlgorithmInternal(long runNumber) {
-        synchronized (stateLock) {
+        synchronized (algStateLock) {
             if (runNumber == this.runNumber) {
                 // We assume this happened if the server called us twice
                 // due to IO retries.
                 return;
             }
-            while (state == State.PREPARING) {
+            while (algState == State.PREPARING) {
                 // We don't worry about it if we're busy preparing for
                 // a previous run that the server gave up on.  We will
                 // go through the prepare actions again below.
                 try {
-                    stateLock.wait();
+                    algStateLock.wait();
                 } catch (InterruptedException e) {
-                    // Do nothing - ignore until state changes
+                    // Do nothing - ignore until algState changes
                 }
             }
             if (this.runNumber > runNumber) {
@@ -399,7 +403,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             }
             this.runNumber = runNumber;
             iteration = -1;
-            state = State.PREPARING;
+            algState = State.PREPARING;
         }
 
         initializeLPARun(builder);
@@ -449,9 +453,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             public void run() throws IOException {
                 server.readyToBegin(localNodeId, runFailed);
             } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
-        synchronized (stateLock) {
-            state = State.WAITING_FOR_SERVER;
-            stateLock.notifyAll();
+        synchronized (algStateLock) {
+            algState = State.WAITING_FOR_SERVER;
+            algStateLock.notifyAll();
         }
     }
 
@@ -459,6 +463,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     public void notifyCrossNodeEdges(Collection<Object> objIds, long nodeId)
         throws IOException
     {
+        checkForDisabledOrShutdownState();
         if (objIds == null) {
             // This is unexpected;  the other node should have sent
             // an empty collection.
@@ -529,6 +534,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
      * This method is run asynchronously.
      */
     public void startIteration(int iteration) throws IOException {
+        checkForDisabledOrShutdownState();
         IterationRun ir = new IterationRun(iteration);
         String name = "StartIteration-" + iteration;
         new Thread(ir, name).start();
@@ -559,17 +565,17 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
         assert (vertices != null);
        
         // Block any additional threads entering this iteration
-        synchronized (stateLock) {
+        synchronized (algStateLock) {
             if (this.iteration == iteration) {
                 // We have been called more than once by the server. Assume this
                 // is due to IO retries, so no action is needed.
                 return;
             }
-            while (state == State.IN_ITERATION) {
+            while (algState == State.IN_ITERATION) {
                 try {
-                    stateLock.wait();
+                    algStateLock.wait();
                 } catch (InterruptedException e) {
-                    // Do nothing - ignore until state changes
+                    // Do nothing - ignore until algState changes
                 }
             }
             if (this.iteration > iteration) {
@@ -583,7 +589,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
             }
             // Record the current iteration so we can use it for error checks.
             this.iteration = iteration;
-            state = State.IN_ITERATION;
+            algState = State.IN_ITERATION;
         }
 
         if (logger.isLoggable(Level.FINEST)) {
@@ -665,9 +671,9 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                                          runFailed, iteration);
             } }, wdog, localNodeId, maxIoAttempts, retryWaitTime, CLASS_NAME);
 
-        synchronized (stateLock) {
-            state = State.WAITING_FOR_SERVER;
-            stateLock.notifyAll();
+        synchronized (algStateLock) {
+            algState = State.WAITING_FOR_SERVER;
+            algStateLock.notifyAll();
         }
     }
 
@@ -676,6 +682,7 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
                 Collection<Object> objIds)
             throws IOException
     {
+        checkForDisabledOrShutdownState();
         Map<Object, Map<Integer, List<Long>>> retMap =
                 new HashMap<Object, Map<Integer, List<Long>>>();
         if (objIds == null) {
@@ -728,20 +735,26 @@ public class LabelPropagation extends AbstractLPA implements LPAClient {
     }
 
     /** {@inheritDoc} */
-    public void enable() {
-        builder.enable();
+    public synchronized void enable() {
+        if (setEnabledState()) {
+            builder.enable();
+        }
     }
 
     /** {@inheritDoc} */
-    public void disable() {
-        builder.disable();
+    public synchronized void disable() {
+        if (setDisabledState()) {
+            builder.disable();
+        }
     }
 
     /** {@inheritDoc} */
-    public void shutdown() {
-        clientExporter.unexport();
-        if (executor != null) {
-            executor.shutdown();
+    public synchronized void shutdown() {
+        if (setShutdownState()) {
+            clientExporter.unexport();
+            if (executor != null) {
+                executor.shutdown();
+            }
         }
     }
 
