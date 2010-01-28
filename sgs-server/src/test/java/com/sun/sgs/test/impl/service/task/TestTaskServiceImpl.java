@@ -769,6 +769,7 @@ public class TestTaskServiceImpl extends Assert {
                     PeriodicTaskCanceler canceler = (PeriodicTaskCanceler)
                             dataService.getBinding("canceler");
                     Assert.assertEquals(1, canceler.getRunCount());
+		    Assert.assertTrue(canceler.getRanAgain());
                 }
         }, taskOwner);
     }
@@ -777,21 +778,29 @@ public class TestTaskServiceImpl extends Assert {
 
         private PeriodicTaskHandle handle = null;
         private int runCount = 0;
+	private boolean ranAgain = false;
 
         @Override
         public void run() throws Exception {
             if (handle != null) {
                 handle.cancel();
+		handle = null;
                 runCount++;
-            }
+		AppContext.getTaskManager().scheduleTask(this);
+            } else {
+		ranAgain = true;
+	    }
         }
 
         public void setHandle(PeriodicTaskHandle handle) {
-            this.handle = null;
+            this.handle = handle;
         }
         public int getRunCount() {
             return runCount;
         }
+	public boolean getRanAgain() {
+	    return ranAgain;
+	}
 
     }
     
