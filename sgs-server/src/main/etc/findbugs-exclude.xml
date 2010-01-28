@@ -397,6 +397,7 @@
   <Match>
     <Or>
       <Class name="com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer$1"/>
+      <Class name="com.sun.sgs.impl.service.nodemap.affinity.dlpa.LabelPropagationServer$3"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
   </Match>
