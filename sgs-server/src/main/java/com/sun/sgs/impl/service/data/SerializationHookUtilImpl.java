@@ -22,7 +22,7 @@ package com.sun.sgs.impl.service.data;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.service.data.SerializationHookUtil;
 
-public class SerializationHookUtilImpl implements SerializationHookUtil {
+class SerializationHookUtilImpl implements SerializationHookUtil {
 
     private Context context;
 

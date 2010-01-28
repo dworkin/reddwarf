@@ -23,7 +23,7 @@ import com.sun.sgs.service.data.SerializationHook;
 import com.sun.sgs.service.data.SerializationHookFactory;
 import com.sun.sgs.service.data.SerializationHookUtil;
 
-public class NullSerializationHookFactory implements SerializationHookFactory {
+class NullSerializationHookFactory implements SerializationHookFactory {
 
     public SerializationHook create(SerializationHookUtil util) {
         return new NullSerializationHook();
