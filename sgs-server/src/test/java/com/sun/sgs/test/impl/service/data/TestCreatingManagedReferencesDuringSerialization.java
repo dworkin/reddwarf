@@ -25,9 +25,9 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.NullSerializationHook;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.service.data.ManagedReferenceFactory;
 import com.sun.sgs.service.data.SerializationHook;
 import com.sun.sgs.service.data.SerializationHookFactory;
+import com.sun.sgs.service.data.SerializationHookUtil;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -47,7 +47,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
     private TransactionScheduler txnScheduler;
     private DataServiceImpl dataService;
     private Identity taskOwner;
-    private ManagedReferenceFactory referenceFactory;
+    private SerializationHookUtil hookUtil;
 
     @Before
     public void setUp() throws Exception {
@@ -64,9 +64,8 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
 
     private void useSerializationHook(final SerializationHook hook) {
         dataService.setSerializationHookFactory(new SerializationHookFactory() {
-            @Override
-            public SerializationHook create(ManagedReferenceFactory factory) {
-                referenceFactory = factory;
+            public SerializationHook create(SerializationHookUtil util) {
+                hookUtil = util;
                 return hook;
             }
         });
@@ -79,7 +78,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
         useSerializationHook(new NullSerializationHook() {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (isMyObjectIdentifiedBy(object, "known")) {
-                    ManagedReference<?> ref = referenceFactory.createReference(object);
+                    ManagedReference<?> ref = hookUtil.createReference(object);
                     referenceWasCreated.set(ref != null);
                 }
                 return object;
@@ -103,7 +102,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
             public Object replaceObject(Object topLevelObject, Object object) {
                 if (isMyObjectIdentifiedBy(object, "known")) {
                     MyObject newObject = new MyObject("new");
-                    ManagedReference<?> ref = referenceFactory.createReference(newObject);
+                    ManagedReference<?> ref = hookUtil.createReference(newObject);
                     referenceWasCreated.set(ref != null);
                 }
                 return object;
@@ -132,7 +131,7 @@ public class TestCreatingManagedReferencesDuringSerialization extends Assert {
             }
 
             private void wrapOtherToManagedReference(MyObject object) {
-                ManagedReference<?> otherRef = referenceFactory.createReference(object.getOther());
+                ManagedReference<?> otherRef = hookUtil.createReference(object.getOther());
                 object.setOther(otherRef);
                 numberOfReferencesCreated.incrementAndGet();
             }

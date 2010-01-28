@@ -19,14 +19,14 @@
 
 package com.sun.sgs.impl.service.data;
 
-import com.sun.sgs.service.data.ManagedReferenceFactory;
 import com.sun.sgs.service.data.SerializationHook;
 import com.sun.sgs.service.data.SerializationHookFactory;
+import com.sun.sgs.service.data.SerializationHookUtil;
 
 public class NullSerializationHookFactory implements SerializationHookFactory {
 
     @Override
-    public SerializationHook create(ManagedReferenceFactory referenceFactory) {
+    public SerializationHook create(SerializationHookUtil util) {
         return new NullSerializationHook();
     }
 }

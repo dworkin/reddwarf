@@ -317,13 +317,12 @@ public final class DataServiceImpl implements DataService {
 			"Service is shutting down");
 		}
 	    }
-            ManagedReferenceFactoryImpl referenceFactory =
-                    new ManagedReferenceFactoryImpl();
+            SerializationHookUtilImpl util = new SerializationHookUtilImpl();
             Context context = new Context(
                     DataServiceImpl.this, store, txn, debugCheckInterval,
                     detectModifications, classesTable, trackStaleObjects,
-                    serializationHookFactory.create(referenceFactory));
-            referenceFactory.setContext(context);
+                    serializationHookFactory.create(util));
+            util.setContext(context);
             return context;
         }
     }

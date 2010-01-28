@@ -21,5 +21,5 @@ package com.sun.sgs.service.data;
 
 public interface SerializationHookFactory {
 
-    SerializationHook create(ManagedReferenceFactory referenceFactory);
+    SerializationHook create(SerializationHookUtil util);
 }

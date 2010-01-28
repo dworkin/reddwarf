@@ -20,9 +20,9 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.service.data.ManagedReferenceFactory;
+import com.sun.sgs.service.data.SerializationHookUtil;
 
-public class ManagedReferenceFactoryImpl implements ManagedReferenceFactory {
+public class SerializationHookUtilImpl implements SerializationHookUtil {
 
     private Context context;
 

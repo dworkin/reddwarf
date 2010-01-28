@@ -21,7 +21,11 @@ package com.sun.sgs.service.data;
 
 import com.sun.sgs.app.ManagedReference;
 
-public interface ManagedReferenceFactory {
+/**
+ * Utilities for the special needs of {@link SerializationHook}
+ * implementations.
+ */
+public interface SerializationHookUtil {
 
     /**
      * Otherwise the same as {@link com.sun.sgs.app.DataManager#createReference},
