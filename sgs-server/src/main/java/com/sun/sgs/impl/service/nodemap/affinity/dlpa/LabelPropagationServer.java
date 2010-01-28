@@ -258,59 +258,6 @@ public class LabelPropagationServer extends BasicState
             long findAffinityGroups(Set<T> groupSet, AffinityGroupFactory<T> factory)
         throws AffinityGroupFinderFailedException
     {
-        FindThread findThread = new FindThread<T>(groupSet, factory);
-        findThread.start();
-        try {
-            // Wait for the thread to finish
-            findThread.join();
-        } catch (InterruptedException e) {
-            throw new AffinityGroupFinderFailedException("Interrupted", e);
-        }
-        if (findThread.failure != null) {
-            if (findThread.failure instanceof AffinityGroupFinderFailedException) {
-                throw (AffinityGroupFinderFailedException) findThread.failure;
-            } else if (findThread.failure instanceof RuntimeException) {
-                throw (RuntimeException) findThread.failure;
-            }
-        }
-        return findThread.result;
-    }
-
-    /**
-     * A private thread for calling findAffinityGroupsInternal.  This ensures
-     * we are in control of the thread.
-     * FindAffinityGroupsInternal calls remote methods, so we want to be sure
-     * we're returning to the same thread called (in case the caller was
-     * synchronized).
-     */
-    private class FindThread<T extends AffinityGroup>  extends Thread {
-        private final Set<T> groupSet;
-        private final AffinityGroupFactory<T> factory;
-
-        // The result
-        volatile long result;
-        // The possible exception
-        volatile Exception failure;
-        public FindThread(Set<T> groupSet, AffinityGroupFactory<T> factory) {
-            this.groupSet = groupSet;
-            this.factory = factory;
-        }
-        public void run() {
-            try {
-                result = findAffinityGroupsInternal(groupSet, factory);
-            } catch (Exception e) {
-                failure = e;
-            }
-        }
-    }
-
-    /**
-     * Private implementation of findAffinityGroups.
-     */
-    private <T extends AffinityGroup>
-        long findAffinityGroupsInternal(Set<T> groupSet, AffinityGroupFactory<T> factory)
-        throws AffinityGroupFinderFailedException
-    {
         checkForDisabledOrShutdownState();
         synchronized (runningLock) {
             while (running) {
@@ -438,22 +385,10 @@ public class LabelPropagationServer extends BasicState
     /** {@inheritDoc} */
     public void disable() {
         if (setDisabledState()) {
-            Thread stateChange = new Thread(new Runnable() {
-                public void run() {
-                    for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
-                        runIoTask(new DisableTask(ce.getValue()),
-                                      wdog, ce.getKey(), maxIoAttempts,
-                                      retryWaitTime, CLASS_NAME);
-                    }
-                }
-            });
-            stateChange.start();
-            try {
-                // Wait for the thread to finish
-                stateChange.join();
-            } catch (InterruptedException e) {
-                logger.logThrow(Level.FINE, e, "Disable interrupted");
-                return;
+            for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
+                runIoTask(new DisableTask(ce.getValue()),
+                              wdog, ce.getKey(), maxIoAttempts,
+                              retryWaitTime, CLASS_NAME);
             }
         }
     }
@@ -472,22 +407,10 @@ public class LabelPropagationServer extends BasicState
     /** {@inheritDoc} */
     public void enable() {
         if (setEnabledState()) {
-            Thread stateChange = new Thread(new Runnable() {
-                public void run() {
-                    for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
-                        runIoTask(new EnableTask(ce.getValue()),
-                                      wdog, ce.getKey(), maxIoAttempts,
-                                      retryWaitTime, CLASS_NAME);
-                    }
-                }
-            });
-            stateChange.start();
-            try {
-                // Wait for the thread to finish
-                stateChange.join();
-            } catch (InterruptedException e) {
-                logger.logThrow(Level.FINE, e, "Enable interrupted");
-                return;
+            for (Map.Entry<Long, LPAClient> ce : clientProxyMap.entrySet()) {
+                runIoTask(new EnableTask(ce.getValue()),
+                              wdog, ce.getKey(), maxIoAttempts,
+                              retryWaitTime, CLASS_NAME);
             }
         }
     }

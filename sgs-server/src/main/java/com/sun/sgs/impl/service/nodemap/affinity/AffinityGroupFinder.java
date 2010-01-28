@@ -34,6 +34,10 @@ public interface AffinityGroupFinder {
      * If an error is encountered during a run, an
      * {@code AffinityGroupFinderFailedException}
      * is thrown. Errors include nodes not responding to server requests.
+     * If an {@code AffinityGroupFinderFailedException} exception is thrown,
+     * it is transient and applies only to the current method call.
+     * <p>
+     * This might be a long running call, as remote method calls might be made.
      *
      * @param <T> type of affinity group
      * @param groupSet the group set to populate

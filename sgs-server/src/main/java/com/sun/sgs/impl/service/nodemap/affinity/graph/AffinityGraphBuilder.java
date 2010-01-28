@@ -83,14 +83,16 @@ public interface AffinityGraphBuilder {
 
     /**
      * Enables this builder.  Enabled builders can be disabled or shutdown.
-     * Multiple calls to enable are allowed.
+     * Multiple calls to enable are allowed.  This might be a long running
+     * call, as remote method calls might be made.
      * @throws IllegalStateException if the builder has been shut down
      */
     void enable();
 
     /**
      * Disables this builder. Disabled builders can be enabled or shutdown.
-     * Multiple calls to disable are allowed.
+     * Multiple calls to disable are allowed. This might be a long running
+     * call, as remote method calls might be made.
      * <p>
      * While disabled, no new graph updates are applied, but the graph
      * pruners continue to discard old data.
