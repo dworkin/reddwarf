@@ -265,6 +265,7 @@ public final class DataServiceImpl implements DataService {
     private SerializationHookFactory serializationHookFactory = 
             new NullSerializationHookFactory();
 
+    /** Inject a custom {@link SerializationHookFactory}. */
     public void setSerializationHookFactory(
             SerializationHookFactory serializationHookFactory) {
         this.serializationHookFactory = serializationHookFactory;

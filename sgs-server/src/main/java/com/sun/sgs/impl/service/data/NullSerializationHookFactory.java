@@ -25,7 +25,6 @@ import com.sun.sgs.service.data.SerializationHookUtil;
 
 public class NullSerializationHookFactory implements SerializationHookFactory {
 
-    @Override
     public SerializationHook create(SerializationHookUtil util) {
         return new NullSerializationHook();
     }
