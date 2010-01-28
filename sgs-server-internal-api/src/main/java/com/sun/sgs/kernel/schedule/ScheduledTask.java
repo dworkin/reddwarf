@@ -139,22 +139,17 @@ public interface ScheduledTask {
 
     /**
      * Cancel this {@code ScheduledTask}. Note that if the task is already
-     * running then calling this method may not have any affect.
+     * running then calling this method may not have any affect.  Also note
+     * that this method should never be called with a value of {@code true}
+     * for the {@code block} parameter if the calling thread is also currently
+     * running this {@code ScheduledTask}.
      *
-     * @param allowInterrupt {@code true} if this call is allowed to throw
-     *                       {@code InterruptedException} if the calling
-     *                       thread is interrupted, {@code false} if the
-     *                       call should always block until the task is
-     *                       cancelled or has completed
+     * @param block if {@code true}, this call will block until the task is
+     *              cancelled or has completed, if {@code false}, it will not
+     *              block
      *
-     * @return {@code true} if the task was cancelled, {@code false} if
-     *         the task was already cancelled or has completed
-     *
-     * @throws InterruptedException if the caller is interrupted while
-     *                              waiting to learn if the cancellation
-     *                              succeeded and {@code allowInterrupt}
-     *                              is {@code true}
+     * @return {@code true} if the task was cancelled, {@code false} otherwise
      */
-    boolean cancel(boolean allowInterrupt) throws InterruptedException;
+    boolean cancel(boolean block);
 
 }
