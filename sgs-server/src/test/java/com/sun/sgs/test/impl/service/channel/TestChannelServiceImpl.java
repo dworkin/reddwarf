@@ -1539,7 +1539,21 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
     }
 
     @Test
+    public void testChannelCloseDoesNotRemoveManagedChannelListener()
+	throws Exception
+    {
+	testChannelCloseWithManagedChanneListener(false);
+    }	
+    
+    @Test
     public void testChannelCloseAfterRemovingManagedChannelListener()
+	throws Exception
+    {
+	testChannelCloseWithManagedChanneListener(true);
+    }
+
+    private void testChannelCloseWithManagedChanneListener(
+	final boolean removeListener)
 	throws Exception
     {
 	final String channelName = "closeTest";
@@ -1565,7 +1579,9 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 		    dataManager.getBinding(listenerName);
 		Channel channel = (Channel) dataManager.getBinding(channelName);
 		dataManager.removeBinding(listenerName);
-		dataManager.removeObject(listener);
+		if (removeListener) {
+		    dataManager.removeObject(listener);
+		}
 		dataManager.removeObject(channel);
 	    }
 	}, taskOwner);
@@ -1579,10 +1595,12 @@ public class TestChannelServiceImpl extends AbstractChannelServiceTest {
 	    }
 	}, taskOwner);
 	printServiceBindings("after channel close");
-	// If object count is not equal, then channel data structures were not
-	// cleaned up properly probably due to the fact that obtaining the
-	// managed channel listener threw an ObjectNotFoundException.
-        assertEquals(count, getObjectCount());
+	// The object count should be equal if the listener was removed and
+	// be one more if the listener was not removed.  If the object
+	// count is not what is expected, then channel data structures were
+	// not properly cleaned up (possibly due to the fact that obtaining
+	// the managed channel listener threw an ObjectNotFoundException).
+        assertEquals(count  + (removeListener ? 0 : 1), getObjectCount());
     }
     
     @Test

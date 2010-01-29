@@ -712,7 +712,21 @@ public class TestClientSessionServiceImplv4 extends Assert {
     }
     
     @Test
+    public void testClientSessionRemoveDoesNotRemoveManagedListener()
+	throws Exception
+    {
+	testClientSessionRemoveWithManagedListener(false);
+    }
+    
+    @Test
     public void testClientSessionRemoveObjectAfterRemovingManagedListener()
+	throws Exception
+    {
+	testClientSessionRemoveWithManagedListener(true);
+    }
+
+    private void testClientSessionRemoveWithManagedListener(
+	final boolean removeListener)
 	throws Exception
     {
 	final String name = "testClient";
@@ -731,12 +745,15 @@ public class TestClientSessionServiceImplv4 extends Assert {
 			DummyClientSessionListener listener =
 			    (DummyClientSessionListener)
 			    dataService.getBinding(name + ".listener");
-			dataService.removeObject(listener);
+			if (removeListener) {
+			    dataService.removeObject(listener);
+			}
 			dataService.removeObject(session);
 		    }
 		}, taskOwner);
 	    Thread.sleep(500);
-	    assertEquals(getObjectCount(), objectCount);
+	    assertEquals(objectCount + (removeListener ? 0 : 1),
+			 getObjectCount());
 	} finally {
 	    client.disconnect();
 	}
@@ -1391,13 +1408,14 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	    } catch (ObjectNotFoundException e) {
 		// session already removed
 	    }
+	    /*
 	    try {
 		dataManager.removeObject(
 		    dataManager.getBinding(name + ".listener"));
 	    } catch (ObjectNotFoundException e) {
 		// listener already removed
 	    }
-	    
+	    */
 	    DummyClient client =
                     reconnectKey == null ? null :
                                            dummyClients.get(reconnectKey);
