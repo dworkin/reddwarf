@@ -6,18 +6,18 @@
 
   <!-- Inherit from the global SGS super POM -->
   <parent>
-    <groupId>com.projectdarkstar</groupId>
+    <groupId>org.reddwarfserver</groupId>
     <artifactId>sgs</artifactId>
-    <version>16</version>
+    <version>17</version>
   </parent>
 
-  <groupId>com.projectdarkstar.tools.test</groupId>
+  <groupId>org.reddwarfserver.tools.test</groupId>
   <artifactId>sgs-test-ext</artifactId>
-  <name>Project Darkstar Test Extension</name>
+  <name>RedDwarf Test Extension</name>
   <packaging>jar</packaging>
-  <version>1.1</version>
+  <version>1.2</version>
   <description>
-    Build utilities used by the Project Darkstar build process.
+    Build utilities used by the RedDwarf build process.
     Includes custom classes used for filtering JUnit tests.
   </description>
 

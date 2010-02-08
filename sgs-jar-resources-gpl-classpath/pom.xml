@@ -6,19 +6,19 @@
 
   <!-- Inherit from the global SGS super POM -->
   <parent>
-    <groupId>com.projectdarkstar</groupId>
+    <groupId>org.reddwarfserver</groupId>
     <artifactId>sgs</artifactId>
-    <version>16</version>
+    <version>17</version>
   </parent>
 
-  <groupId>com.projectdarkstar.tools.build</groupId>
+  <groupId>org.reddwarfserver.tools.build</groupId>
   <artifactId>sgs-jar-resources-gpl-classpath</artifactId>
-  <name>Project Darkstar Server GPL Classpath Exception License Bundle</name>
+  <name>RedDwarf GPL Classpath Exception License Bundle</name>
   <packaging>jar</packaging>
-  <version>1.1</version>
+  <version>1.2</version>
   <description>
     Resource bundle of GPL + Classpath Exception License files 
-    for Project Darkstar.
+    for RedDwarf.
     This package should be included using the remote-resources
     plugin to bundle a GPL + Classpath Exception license file 
     into a jar.
