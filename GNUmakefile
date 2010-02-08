@@ -1,4 +1,4 @@
-# Project Darkstar Example C Client Makefile
+# RedDwarf Example C Client Makefile
 
 TOPDIR=.
 
@@ -16,7 +16,7 @@ SRCS = \
 
 LIB = libsgsclient.a
 
-VERSION = 0.9.11
+VERSION = 0.10.0
 
 DIST_FILE = sgs-c-client-dist-$(VERSION).zip
 
