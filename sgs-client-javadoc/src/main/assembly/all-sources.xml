@@ -15,8 +15,8 @@
     <!-- Include the sources jars-->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.client:sgs-client:jar:sources</include>
-	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
+	<include>org.reddwarfserver.client:sgs-client:jar:sources</include>
+	<include>org.reddwarfserver.server:sgs-shared:jar:sources</include>
       </includes>
       <unpack>true</unpack>
       <outputDirectory></outputDirectory>

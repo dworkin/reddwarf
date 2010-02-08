@@ -5,15 +5,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.projectdarkstar.client</groupId>
+    <groupId>org.reddwarfserver.client</groupId>
     <artifactId>sgs-client-parent</artifactId>
-    <version>0.9.11-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-client-api</artifactId>
-  <name>Project Darkstar Client API</name>
+  <name>RedDwarf Client API</name>
   <packaging>jar</packaging>
-  <url>http://www.projectdarkstar.com</url>
   <description>
     The sgs-client-api package produces a jar artifact which includes
     only the core classes required at compile time to develop
@@ -53,20 +52,20 @@
             <configuration>
 	      <artifactSet>
 		<includes>
-		  <include>com.projectdarkstar.client:sgs-client</include>
-		  <include>com.projectdarkstar.server:sgs-shared</include>
+		  <include>org.reddwarfserver.client:sgs-client</include>
+		  <include>org.reddwarfserver.server:sgs-shared</include>
 		</includes>
 	      </artifactSet>
               <filters>
 		<filter>
-                  <artifact>com.projectdarkstar.client:sgs-client</artifact>
+                  <artifact>org.reddwarfserver.client:sgs-client</artifact>
                   <includes>
 		    <include>META-INF/*</include>
                     <include>com/sun/sgs/client/**</include>
                   </includes>
 		</filter>
 		<filter>
-		  <artifact>com.projectdarkstar.server:sgs-shared</artifact>
+		  <artifact>org.reddwarfserver.server:sgs-shared</artifact>
 		  <includes>
 		    <include>com/sun/sgs/protocol/simple/SimpleSgsProtocol*</include>
 		  </includes>
@@ -103,12 +102,12 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.projectdarkstar.client</groupId>
+      <groupId>org.reddwarfserver.client</groupId>
       <artifactId>sgs-client</artifactId>
       <optional>true</optional>
     </dependency>
     <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
+      <groupId>org.reddwarfserver.server</groupId>
       <artifactId>sgs-shared</artifactId>
       <optional>true</optional>
     </dependency>
