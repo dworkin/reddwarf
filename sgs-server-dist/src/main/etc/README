@@ -1,19 +1,19 @@
-Project Darkstar Server Distribution
+RedDwarf Server Distribution
 Version ${sgs.version}
 
 INTRODUCTION
 
-Project Darkstar lets developers write scalable, reliable, persistent
+RedDwarf lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-This distribution of the Project Darkstar Server contains everything you
-need to develop game servers that run as applications in the Project
-Darkstar Server environment.  Information about building client
+This distribution of the RedDwarf Server contains everything you
+need to develop game servers that run as applications in the RedDwarf
+Server environment.  Information about building client
 applications is available as separate downloads.
 
 In addition to the documents, APIs and examples, this distribution
-contains a complete single-system version of the Project Darkstar
+contains a complete single-system version of the RedDwarf
 Server.
 
 See the CHANGELOG file for a summary of recent changes, and the RELEASE
@@ -25,7 +25,7 @@ This distribution contains the following subdirectories:
 
 - bin
   The bootstrap JAR files used to bootup and shutdown a 
-  Project Darkstar Server and the application deployed into it
+  RedDwarf Server and the application deployed into it
 
 - conf
   Configuration files used to configure the runtime state of
@@ -39,15 +39,15 @@ This distribution contains the following subdirectories:
   Javadoc documentation for the server API
 
 - lib
-  JAR files needed to develop for the Project Darkstar Server, and to
+  JAR files needed to develop for the RedDwarf Server, and to
   run server applications
 
 - license
-  License files for Project Darkstar Server and included third party
+  License files for RedDwarf Server and included third party
   libraries
 
 - src
-  The source code for the Project Darkstar server
+  The source code for the RedDwarf server
 
 - tutorial
   Documentation and sample code for the server tutorial
@@ -72,7 +72,7 @@ platforms.
 
 REQUIRED LIBRARIES
 
-The Project Darkstar server depends on several additional libraries.
+The RedDwarf server depends on several additional libraries.
 
 This distribution requires Berkeley DB version ${bdb.version}, which may be
 bundled with this distribution, or else can be obtained and compiled
@@ -88,26 +88,26 @@ can be obtained from:
 
 DEVELOPING AND RUNNING
 
-The Project Darkstar server can be started up using the executable bootstrapper
+The RedDwarf server can be started up using the executable bootstrapper
 JAR file in the bin directory.
 
   java -jar bin/sgs-boot.jar
 
-The Project Darkstar server can be shutdown using the executable stopper JAR
+The RedDwarf server can be shutdown using the executable stopper JAR
 file in the bin directory.
 
   java -jar bin/sgs-stop.jar
 
-Project Darkstar is an application container in which applications (or games)
+RedDwarf is an application container in which applications (or games)
 can be deployed.  By default, any JAR files that are placed into the
 deploy directory are considered part of the deployed application.
 Additionally, a single application JAR should contain an embedded 
 META-INF/app.properties file.  This file is automatically used by the 
-Project Darkstar server to set the runtime configuration properties of the
+RedDwarf server to set the runtime configuration properties of the
 application.
 
 For example, to deploy the Hello World tutorial application into the default
-Project Darkstar container, copy the tutorial.jar file from the tutorial 
+RedDwarf container, copy the tutorial.jar file from the tutorial 
 directory into the deploy directory.  Then bootup the server using the 
 executable bootstrapper described above.
 
@@ -118,11 +118,11 @@ conf directory for additional details.
 
 RELEASE COMPATIBILITY
 
-Release 0.9.12:
+Release 0.10.0:
 
 - The persistent data stored by the ChannelService is incompatible with
   the previous releases.  The ChannelService's persistent data created
-  using releases prior to 0.9.12 will not be automatically upgraded to the
+  using releases prior to 0.10.0 will not be automatically upgraded to the
   current release format.
 
 - The ClientSessionService implementation can be configured to support
@@ -173,7 +173,7 @@ Release 0.9.6:
 
 KNOWN ISSUES
 
-This version of the Project Darkstar Server has the following
+This version of the RedDwarf Server has the following
 limitations:
 
 - Multi-node operation is currently not scalable.  Depending on the
@@ -199,10 +199,5 @@ MORE INFORMATION
 
 For more information, please see the tutorial in the tutorial directory
 and the documentation in the doc directory.  Also check the
-http://www.projectdarkstar.com website, which has links to more
-information and to the Project Darkstar forums.
-
-If you cannot find an answer to your question in any of these places,
-please email the Darkstar team at:
-
-   dev@games-darkstar.dev.java.net
+http://www.reddwarfserver.org website, which has links to more
+information and to the RedDwarf forums.

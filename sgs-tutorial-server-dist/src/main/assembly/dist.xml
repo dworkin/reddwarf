@@ -9,7 +9,7 @@
     <!-- Include the sgs-tutorial-server jar file -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.server:sgs-tutorial-server:jar</include>
+	<include>org.reddwarfserver.server:sgs-tutorial-server:jar</include>
       </includes>
       <outputDirectory>tutorial</outputDirectory>
       <outputFileNameMapping>tutorial.jar</outputFileNameMapping>
@@ -20,7 +20,7 @@
 	 module into the src directory -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.server:sgs-tutorial-server:jar:sources</include>
+	<include>org.reddwarfserver.server:sgs-tutorial-server:jar:sources</include>
       </includes>
       <unpack>true</unpack>
       <unpackOptions>
