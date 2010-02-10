@@ -1,4 +1,9 @@
-Copyright (c) #if ($project.inceptionYear)${project.inceptionYear}-${projectYear}#else${projectYear}#end, Sun Microsystems, Inc.
+Copyright ${forkYear} The RedDwarf Authors.  All rights reserved
+Portions of this distribution have been modified as part of RedDwarf
+The source code is governed by a BSD-style license that can be found
+in the LICENSE file.
+
+Copyright (c) 2007-2010, Sun Microsystems, Inc.
 
 All rights reserved.
 
