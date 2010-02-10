@@ -85,18 +85,6 @@
 	</executions>
       </plugin>
 
-      <!-- Verify correct license headers in each source code file -->
-      <plugin>
-	<groupId>com.google.code.maven-license-plugin</groupId>
-        <artifactId>maven-license-plugin</artifactId>
-	<executions>
-	  <execution>
-	    <id>check-license</id>
-	    <phase>compile</phase>
-	  </execution>
-	</executions>
-      </plugin>
-
       <!-- Ensure 1.5 target -->
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>

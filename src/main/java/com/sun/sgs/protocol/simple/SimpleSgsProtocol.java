@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2007-2010, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -78,7 +84,7 @@ package com.sun.sgs.protocol.simple;
  * <p>
  * Behavior not specified in this document is left as an implementation 
  * decision for the particular client and server. Information on the
- * implementation characteristics of the Project Darkstar server can be found
+ * implementation characteristics of the RedDwarf server can be found
  * in the <a href="../../../../../overview-summary.html"> overview</a> for the 
  * implementation.
  */
