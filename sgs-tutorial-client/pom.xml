@@ -62,12 +62,6 @@
 	<artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
 
-      <!-- Activate the license plugin to check for license headers -->
-      <plugin>
-	<groupId>com.google.code.maven-license-plugin</groupId>
-        <artifactId>maven-license-plugin</artifactId>
-      </plugin>
-
     </plugins>
   </build>
 

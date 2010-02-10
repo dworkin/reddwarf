@@ -112,6 +112,8 @@
 	      </footer>
 	      <bottom>
 		<![CDATA[<font size="-1">Copyright &copy; 
+                ${forkYear} The RedDwarf Authors.
+                All rights reserved<br/>Copyright &copy; 
                 ${inceptionYear}-${forkYear} Sun Microsystems,
                 Inc. All rights reserved</font>]]>
 	      </bottom>
@@ -145,6 +147,8 @@
 	      </footer>
 	      <bottom>
 		<![CDATA[<font size="-1">Copyright &copy; 
+                ${forkYear} The RedDwarf Authors.
+                All rights reserved<br/>Copyright &copy; 
                 ${inceptionYear}-${forkYear} Sun Microsystems,
                 Inc. All rights reserved</font>]]>
 	      </bottom>

@@ -65,20 +65,6 @@
 	  </executions>
 	</plugin>
 
-	<!-- The license plugin should be activated in modules that
-	     contain source code and thus need to verify correct license
-	     headers in each source code file -->
-	<plugin>
-	  <groupId>com.google.code.maven-license-plugin</groupId>
-          <artifactId>maven-license-plugin</artifactId>
-	  <executions>
-	    <execution>
-	      <id>check-license</id>
-	      <phase>compile</phase>
-	    </execution>
-	  </executions>
-	</plugin>
-	
       </plugins>
     </pluginManagement>
 
