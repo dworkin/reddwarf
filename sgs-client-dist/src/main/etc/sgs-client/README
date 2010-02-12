@@ -1,16 +1,16 @@
-Project Darkstar Java Client SDK Distribution
+RedDwarf Java Client SDK Distribution
 Version ${sgs-client.version}
 
 INTRODUCTION
 
-Project Darkstar lets developers write scalable, reliable, persistent
+RedDwarf lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-This distribution of the Project Darkstar Java Client SDK contains everything
+This distribution of the RedDwarf Java Client SDK contains everything
 you need to develop and run game clients that communicate with each
-other and with game servers implemented with the Project Darkstar
-Server.  The Project Darkstar Server is available as a separate
+other and with game servers implemented with the RedDwarf
+Server.  The RedDwarf Server is available as a separate
 download.
 
 See the CHANGELOG file for a summary of recent changes, and the
@@ -57,7 +57,7 @@ classpath:
 
 KNOWN ISSUES
 
-This version of the Project Darkstar Java Client SDK has the following
+This version of the RedDwarf Java Client SDK has the following
 limitations:
 
 - This release supports only limited I/O throttling, so it is possible
@@ -71,10 +71,5 @@ MORE INFORMATION
 
 For more information, please see the tutorial in the tutorial directory
 and the documentation in the doc directory.  Also check the
-http://www.projectdarkstar.com website, which has links to more
-information and to the Project Darkstar forums.
-
-If you cannot find an answer to your question in any of these places,
-please email the Darkstar team at:
-
-   dev@games-darkstar.dev.java.net
+http://www.reddwarfserver.org website, which has links to more
+information and to the RedDwarf forums.

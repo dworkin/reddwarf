@@ -5,15 +5,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.projectdarkstar.client</groupId>
+    <groupId>org.reddwarfserver.client</groupId>
     <artifactId>sgs-client-parent</artifactId>
-    <version>0.9.11-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-client-dist</artifactId>
-  <name>Project Darkstar Client Distribution</name>
+  <name>RedDwarf Client Distribution</name>
   <packaging>pom</packaging>
-  <url>http://www.projectdarkstar.com</url>
   <description>
     The sgs-client-dist module produces a zip artifact
     which is the main distribution of the darkstar client intended
@@ -22,18 +21,18 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.projectdarkstar.client</groupId>
+      <groupId>org.reddwarfserver.client</groupId>
       <artifactId>sgs-client</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>com.projectdarkstar.client</groupId>
+      <groupId>org.reddwarfserver.client</groupId>
       <artifactId>sgs-client-javadoc</artifactId>
       <classifier>api</classifier>
     </dependency>
 
     <dependency>
-      <groupId>com.projectdarkstar.client</groupId>
+      <groupId>org.reddwarfserver.client</groupId>
       <artifactId>sgs-tutorial-client-dist</artifactId>
       <type>zip</type>
     </dependency>

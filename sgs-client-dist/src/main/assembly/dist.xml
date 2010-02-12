@@ -11,7 +11,7 @@
 	 simplify usage -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.client:sgs-client:jar</include>
+	<include>org.reddwarfserver.client:sgs-client:jar</include>
       </includes>
       <outputDirectory>sgs-client-${sgs-client.version}/lib</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
@@ -21,7 +21,7 @@
     <!-- Include the sgs-client source files -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.client:sgs-client:jar:sources</include>
+	<include>org.reddwarfserver.client:sgs-client:jar:sources</include>
       </includes>
       <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
@@ -31,7 +31,7 @@
 	 client packages and place them in the lib directory -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.server:sgs-shared:jar</include>
+	<include>org.reddwarfserver.server:sgs-shared:jar</include>
 	<include>org.apache.mina:mina-core</include>
         <include>org.slf4j:slf4j-api</include>
         <include>org.slf4j:slf4j-jdk14</include>
@@ -43,7 +43,7 @@
     <!-- Include the sgs-shared source files -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
+	<include>org.reddwarfserver.server:sgs-shared:jar:sources</include>
       </includes>
       <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
@@ -52,7 +52,7 @@
     <!-- Unpack the sgs-tutorial-client-dist tutorial component -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.client:sgs-tutorial-client-dist:zip</include>
+	<include>org.reddwarfserver.client:sgs-tutorial-client-dist:zip</include>
       </includes>
       <unpack>true</unpack>
       <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
@@ -63,7 +63,7 @@
 	 into the doc directory -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.client:sgs-client-javadoc:jar:api</include>
+	<include>org.reddwarfserver.client:sgs-client-javadoc:jar:api</include>
       </includes>
       <unpack>true</unpack>
       <unpackOptions>

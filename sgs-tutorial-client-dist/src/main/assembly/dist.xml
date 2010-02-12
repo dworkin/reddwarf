@@ -9,7 +9,7 @@
     <!-- Include the sgs-tutorial-client jar file -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.client:sgs-tutorial-client:jar</include>
+	<include>org.reddwarfserver.client:sgs-tutorial-client:jar</include>
       </includes>
       <outputDirectory>tutorial</outputDirectory>
       <outputFileNameMapping>tutorial-client.jar</outputFileNameMapping>
@@ -20,7 +20,7 @@
 	 into the src directory -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.client:sgs-tutorial-client:jar:sources</include>
+	<include>org.reddwarfserver.client:sgs-tutorial-client:jar:sources</include>
       </includes>
       <unpack>true</unpack>
       <unpackOptions>

@@ -6,31 +6,31 @@
 
   <!-- Inherit from the global SGS super POM -->
   <parent>
-    <groupId>com.projectdarkstar</groupId>
+    <groupId>org.reddwarfserver</groupId>
     <artifactId>sgs</artifactId>
-    <version>16</version>
+    <version>17</version>
   </parent>
 
-  <groupId>com.projectdarkstar.client</groupId>
+  <groupId>org.reddwarfserver.client</groupId>
   <artifactId>sgs-client-parent</artifactId>
-  <name>Project Darkstar Client Parent POM</name>
+  <name>RedDwarf Client Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.9.11-SNAPSHOT</version>
+  <version>0.10.0-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
-  <url>http://www.projectdarkstar.com</url>
+  <url>http://www.reddwarfserver.org</url>
   <scm>
     <connection>
-      scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/trunk
+      scm:svn:https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-java-client/trunk
     </connection>
     <developerConnection>
-      scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/trunk
+      scm:svn:https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-java-client/trunk
     </developerConnection>
     <url>
-      https://sgs-java-client.dev.java.net/source/browse/sgs-java-client/trunk
+      https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-java-client/trunk
     </url>
   </scm>
   <description>
-    Parent POM for the Project Darkstar Client
+    Parent POM for the RedDwarf Client
   </description>
 
   <modules>
@@ -65,20 +65,6 @@
 	  </executions>
 	</plugin>
 
-	<!-- The license plugin should be activated in modules that
-	     contain source code and thus need to verify correct license
-	     headers in each source code file -->
-	<plugin>
-	  <groupId>com.google.code.maven-license-plugin</groupId>
-          <artifactId>maven-license-plugin</artifactId>
-	  <executions>
-	    <execution>
-	      <id>check-license</id>
-	      <phase>compile</phase>
-	    </execution>
-	  </executions>
-	</plugin>
-	
       </plugins>
     </pluginManagement>
 
@@ -97,53 +83,53 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-shared</artifactId>
 	<version>${sgs-shared.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-shared</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs-shared.version}</version>
       </dependency>
 
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-client</artifactId>
 	<version>${sgs-client.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-client-api</artifactId>
 	<scope>provided</scope>
 	<version>${sgs-client.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-client-javadoc</artifactId>
 	<classifier>api</classifier>
 	<version>${sgs-client.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-client</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs-client.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-tutorial-client</artifactId>
 	<version>${sgs-client.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-tutorial-client</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs-client.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-tutorial-client-dist</artifactId>
 	<type>zip</type>
 	<version>${sgs-client.version}</version>
@@ -178,7 +164,7 @@
 
   <properties>
     <sgs-client.version>${version}</sgs-client.version>
-    <sgs-shared.version>1.11</sgs-shared.version>
+    <sgs-shared.version>1.12</sgs-shared.version>
     <org.apache.mina.version>1.1.0</org.apache.mina.version>
     <slf4j-api.version>1.4.0</slf4j-api.version>
     <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>

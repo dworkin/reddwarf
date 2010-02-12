@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2007-2010, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -34,6 +40,6 @@
 
 /**
  * Defines the interfaces for client communication with the
- * Project Darkstar Server.
+ * RedDwarf Server.
  */
 package com.sun.sgs.impl.client.comm;
