@@ -4,13 +4,13 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.projectdarkstar.tools.build</groupId>
+  <groupId>org.reddwarfserver.tools.build</groupId>
   <artifactId>sgs-build-utilities</artifactId>
-  <name>Project Darkstar Build Utilities</name>
+  <name>RedDwarf Build Utilities</name>
   <packaging>jar</packaging>
-  <version>1.2</version>
+  <version>1.3</version>
   <description>
-    Build utilities used by the Project Darkstar build process.
+    Build utilities used by the RedDwarf build process.
     Includes custom checkstyle configuration files.
   </description>
 

@@ -4,12 +4,12 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.projectdarkstar</groupId>
+  <groupId>org.reddwarfserver</groupId>
   <artifactId>sgs</artifactId>
-  <name>Project Darkstar Master POM</name>
+  <name>RedDwarf Master POM</name>
   <packaging>pom</packaging>
-  <version>16</version>
-  <url>http://www.projectdarkstar.com</url>
+  <version>17</version>
+  <url>http://www.reddwarfserver.org</url>
   <description>
     This is the super POM inherited by all sgs modules
     It defines settings common to all projects
@@ -122,6 +122,7 @@
 	  <version>${maven-remote-resources-plugin.version}</version>
 	  <configuration>
 	    <properties>
+	      <forkYear>${forkYear}</forkYear>
 	      <projectYear>${projectYear}</projectYear>
 	    </properties>
 	  </configuration>
@@ -134,7 +135,7 @@
 	      <phase></phase>
 	      <configuration>
 		<resourceBundles>
-		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl:${sgs-jar-resources-gpl.version}</resourceBundle>
+		  <resourceBundle>org.reddwarfserver.tools.build:sgs-jar-resources-gpl:${sgs-jar-resources-gpl.version}</resourceBundle>
 		</resourceBundles>
 	      </configuration>
 	    </execution>
@@ -146,7 +147,7 @@
 	      <phase></phase>
 	      <configuration>
 		<resourceBundles>
-		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl-classpath:${sgs-jar-resources-gpl-classpath.version}</resourceBundle>
+		  <resourceBundle>org.reddwarfserver.tools.build:sgs-jar-resources-gpl-classpath:${sgs-jar-resources-gpl-classpath.version}</resourceBundle>
 		</resourceBundles>
 	      </configuration>
 	    </execution>
@@ -158,7 +159,7 @@
 	      <phase></phase>
 	      <configuration>
 		<resourceBundles>
-		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
+		  <resourceBundle>org.reddwarfserver.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
 		</resourceBundles>
 	      </configuration>
 	    </execution>
@@ -215,47 +216,6 @@
           </configuration>
 	</plugin>
 
-
-	<!-- The license plugin should be activated in modules that
-	     wish to verify correct headers are included in every source file.
-	     This should be used in conjunction with the remote-resources
-	     plugin above as it checks that the header for each source
-	     file is equal to either the LICENSE or NOTICE file pulled
-	     over by the remote-resources plugin -->
-	<plugin>
-	  <groupId>com.google.code.maven-license-plugin</groupId>
-          <artifactId>maven-license-plugin</artifactId>
-          <version>${maven-license-plugin.version}</version>
-	  <executions>
-	    <execution>
-	      <id>check-notice</id>
-	      <goals>
-		<goal>check</goal>
-	      </goals>
-	      <phase></phase>
-	      <configuration>
-		<header>${basedir}/target/classes/META-INF/NOTICE</header>
-		<includes>
-		  <include>**/*.java</include>
-		</includes>
-	      </configuration>
-	    </execution>
-	    <execution>
-	      <id>check-license</id>
-	      <goals>
-		<goal>check</goal>
-	      </goals>
-	      <phase></phase>
-	      <configuration>
-		<header>${basedir}/target/classes/META-INF/LICENSE</header>
-		<includes>
-		  <include>**/*.java</include>
-		</includes>
-	      </configuration>
-	    </execution>
-	  </executions>
-	</plugin>
-
 	<plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
@@ -285,7 +245,7 @@
 	<version>${maven-checkstyle-plugin.version}</version>
 	<dependencies>
 	  <dependency>
-	    <groupId>com.projectdarkstar.tools.build</groupId>
+	    <groupId>org.reddwarfserver.tools.build</groupId>
 	    <artifactId>sgs-build-utilities</artifactId>
 	    <version>${sgs-build-utilities.version}</version>
 	  </dependency>
@@ -430,12 +390,6 @@
       <name>java.net Maven2 Repository</name>
       <url>java-net:/maven2-repository/trunk/repository/</url>
     </repository>
-    <snapshotRepository>
-      <id>games-darkstar-snapshot-repository</id>
-      <name>games-darkstar SNAPSHOT Repository</name>
-      <url>java-net:/games-darkstar/trunk/www/snapshots/</url>
-      <uniqueVersion>false</uniqueVersion>
-    </snapshotRepository>
   </distributionManagement>
 
   <!-- Include the java.net repository to retrieve dependent
@@ -460,13 +414,16 @@
   <properties>
     
     <projectYear>2010</projectYear>
+    
+    <!-- The year that RedDwarf was started as a fork of Darkstar -->
+    <forkYear>2010</forkYear>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     
-    <sgs-build-utilities.version>1.2</sgs-build-utilities.version>
-    <sgs-jar-resources-gpl.version>1.2</sgs-jar-resources-gpl.version>
-    <sgs-jar-resources-gpl-classpath.version>1.1</sgs-jar-resources-gpl-classpath.version>
-    <sgs-jar-resources-bsd.version>1.2</sgs-jar-resources-bsd.version>
+    <sgs-build-utilities.version>1.3</sgs-build-utilities.version>
+    <sgs-jar-resources-gpl.version>1.3</sgs-jar-resources-gpl.version>
+    <sgs-jar-resources-gpl-classpath.version>1.2</sgs-jar-resources-gpl-classpath.version>
+    <sgs-jar-resources-bsd.version>1.3</sgs-jar-resources-bsd.version>
 
     <!-- Versions for org.apache.maven.plugins listed in alphabetical order -->
     <maven-antrun-plugin.version>1.3</maven-antrun-plugin.version>
@@ -486,9 +443,6 @@
     <maven-site-plugin.version>2.1</maven-site-plugin.version>
     <maven-source-plugin.version>2.1.1</maven-source-plugin.version>
     <maven-surefire-plugin.version>2.4.3</maven-surefire-plugin.version>
-
-    <!-- Versions for com.google.code plugins listed in alphabetical order -->
-    <maven-license-plugin.version>1.4.0</maven-license-plugin.version>
 
     <!-- Versions for org.codehaus.mojo plugins listed in alphabetical order -->
     <build-helper-maven-plugin.version>1.3</build-helper-maven-plugin.version>

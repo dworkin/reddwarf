@@ -1,13 +1,18 @@
-Copyright #if ($project.inceptionYear)${project.inceptionYear}-${projectYear}#else${projectYear}#end Sun Microsystems, Inc.
+Copyright ${forkYear} The RedDwarf Authors.  All rights reserved
+Portions of this distribution have been modified as part of RedDwarf
+The source code is governed by a GPLv2 license that can be found
+in the LICENSE file.
 
-This file is part of #if ($projectName)$projectName#else${project.name}#end.
+Copyright 2007-2010 Sun Microsystems, Inc.
 
-#if ($projectName)$projectName#else${project.name}#end is free software: you can redistribute it
+This file is part of Project Darkstar Server.
+
+Project Darkstar Server is free software: you can redistribute it
 and/or modify it under the terms of the GNU General Public License
 version 2 as published by the Free Software Foundation and
 distributed hereunder to you.
 
-#if ($projectName)$projectName#else${project.name}#end is distributed in the hope that it will be useful,
+Project Darkstar Server is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
