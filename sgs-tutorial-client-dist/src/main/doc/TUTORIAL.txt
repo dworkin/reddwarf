@@ -1,0 +1,4 @@
+The Sun tutorial document for the Project Darkstar client has been
+removed due to copyright reasons.  Later versions of RedDwarf should
+contain a new and improved tutorial for consumption.  The original
+tutorial code is still available in the src directory, however.
