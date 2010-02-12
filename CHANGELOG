@@ -1,4 +1,5 @@
-Version 0.9.12
+Version 0.10.0
+ - Rebranded as RedDwarf
  - Included missing test files testCallbacks.h and README.txt in distribution
 
 Version 0.9.11

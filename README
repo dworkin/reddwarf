@@ -1,10 +1,10 @@
-Project Darkstar Example C Client
-Version 0.9.11
+RedDwarf Example C Client
+Version 0.10.0
 
 INTRODUCTION
 
 This directory contains example code for developing clients in the C
-programming language that can communicate with the Project Darkstar
+programming language that can communicate with the RedDwarf
 Server.
 
 
