@@ -6,27 +6,27 @@
 
   <!-- Inherit from the global SGS super POM -->
   <parent>
-    <groupId>com.projectdarkstar</groupId>
+    <groupId>org.reddwarfserver</groupId>
     <artifactId>sgs</artifactId>
-    <version>16</version>
+    <version>17</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
+  <groupId>org.reddwarfserver.server</groupId>
   <artifactId>sgs-shared</artifactId>
-  <name>Project Darkstar Shared</name>
+  <name>RedDwarf Shared</name>
   <packaging>jar</packaging>
-  <version>1.11</version>
+  <version>1.12</version>
   <inceptionYear>2007</inceptionYear>
-  <url>http://www.projectdarkstar.com</url>
+  <url>http://www.reddwarfserver.org</url>
   <scm>
     <connection>
-      scm:svn:https://sgs-shared.dev.java.net/svn/sgs-shared/trunk
+      scm:svn:https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-shared/trunk
     </connection>
     <developerConnection>
-      scm:svn:https://sgs-shared.dev.java.net/svn/sgs-shared/trunk
+      scm:svn:https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-shared/trunk
     </developerConnection>
     <url>
-      https://sgs-shared.dev.java.net/source/browse/sgs-shared/trunk
+      https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-shared/trunk
     </url>
   </scm>
   <description>
@@ -41,7 +41,7 @@
     </dependency>
 
     <dependency>
-	<groupId>com.projectdarkstar.tools.test</groupId>
+	<groupId>org.reddwarfserver.tools.test</groupId>
 	<artifactId>sgs-test-ext</artifactId>
 	<scope>test</scope>
 	<version>${sgs-test-ext.version}</version>
@@ -85,18 +85,6 @@
 	</executions>
       </plugin>
 
-      <!-- Verify correct license headers in each source code file -->
-      <plugin>
-	<groupId>com.google.code.maven-license-plugin</groupId>
-        <artifactId>maven-license-plugin</artifactId>
-	<executions>
-	  <execution>
-	    <id>check-license</id>
-	    <phase>compile</phase>
-	  </execution>
-	</executions>
-      </plugin>
-
       <!-- Ensure 1.5 target -->
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
@@ -124,7 +112,7 @@
     <findbugs-exclude.filter>
       ${basedir}/src/main/etc/findbugs-exclude.xml
     </findbugs-exclude.filter>
-    <sgs-test-ext.version>1.1</sgs-test-ext.version>
+    <sgs-test-ext.version>1.2</sgs-test-ext.version>
   </properties>
 
 </project>
