@@ -5,15 +5,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.projectdarkstar.server</groupId>
+    <groupId>org.reddwarfserver.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.12-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server</artifactId>
-  <name>Project Darkstar Server</name>
+  <name>RedDwarf Server</name>
   <packaging>jar</packaging>
-  <url>http://www.projectdarkstar.com</url>
   <description>
     The sgs-server module is a standard jar package of sgs classes
     used exclusively by the server
@@ -29,29 +28,29 @@
       <artifactId>easymock</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.projectdarkstar.client</groupId>
+      <groupId>org.reddwarfserver.client</groupId>
       <artifactId>sgs-client</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
+      <groupId>org.reddwarfserver.server</groupId>
       <artifactId>sgs-server-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
+      <groupId>org.reddwarfserver.server</groupId>
       <artifactId>sgs-server-internal-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
+      <groupId>org.reddwarfserver.server</groupId>
       <artifactId>sgs-shared</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
       <artifactId>db</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
       <artifactId>db-binaries</artifactId>
       <type>zip</type>
     </dependency>
@@ -67,7 +66,7 @@
     </dependency>
 
     <dependency>
-      <groupId>com.projectdarkstar.tools.test</groupId>
+      <groupId>org.reddwarfserver.tools.test</groupId>
       <artifactId>sgs-test-ext</artifactId>
     </dependency>
   </dependencies>
@@ -231,12 +230,6 @@
 	    <phase>generate-resources</phase>
 	  </execution>
 	</executions>
-      </plugin>
-
-      <!-- Activate the license plugin to check for license headers -->
-      <plugin>
-	<groupId>com.google.code.maven-license-plugin</groupId>
-        <artifactId>maven-license-plugin</artifactId>
       </plugin>
 
     </plugins>

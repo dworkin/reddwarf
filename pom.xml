@@ -6,31 +6,31 @@
 
   <!-- Inherit from the global SGS super POM -->
   <parent>
-    <groupId>com.projectdarkstar</groupId>
+    <groupId>org.reddwarfserver</groupId>
     <artifactId>sgs</artifactId>
-    <version>16</version>
+    <version>17</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
+  <groupId>org.reddwarfserver.server</groupId>
   <artifactId>sgs-server-parent</artifactId>
-  <name>Project Darkstar Server Parent POM</name>
+  <name>RedDwarf Server Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.9.12-SNAPSHOT</version>
+  <version>0.10.0-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
-  <url>http://www.projectdarkstar.com</url>
+  <url>http://www.reddwarfserver.org</url>
   <scm>
     <connection>
-      scm:svn:https://sgs-server.dev.java.net/svn/sgs-server/trunk
+      scm:svn:https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-server/trunk
     </connection>
     <developerConnection>
-      scm:svn:https://sgs-server.dev.java.net/svn/sgs-server/trunk
+      scm:svn:https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-server/trunk
     </developerConnection>
     <url>
-      https://sgs-server.dev.java.net/source/browse/sgs-server/trunk
+      https://svn.reddwarfserver.org/svnroot/reddwarf/sgs-server/trunk
     </url>
   </scm>
   <description>
-    Parent POM of the Project Darkstar Server
+    Parent POM of the RedDwarf Server
   </description>
 
   <!-- Require at least Maven version 2.0.9 to build -->
@@ -60,25 +60,6 @@
 	<plugin>
 	  <groupId>org.apache.maven.plugins</groupId>
 	  <artifactId>maven-remote-resources-plugin</artifactId>
-	  <configuration>
-	    <properties>
-	      <projectName>Project Darkstar Server</projectName>
-	    </properties>
-	  </configuration>
-	</plugin>
-
-	<!-- The license plugin should be activated in modules that
-	     contain source code and thus need to verify correct license
-	     headers in each source code file -->
-	<plugin>
-	  <groupId>com.google.code.maven-license-plugin</groupId>
-          <artifactId>maven-license-plugin</artifactId>
-	  <executions>
-	    <execution>
-	      <id>check-notice</id>
-	      <phase>package</phase>
-	    </execution>
-	  </executions>
 	</plugin>
 
 	<!-- The berkeleydb binary package must be retrieved and unpacked
@@ -98,7 +79,7 @@
               <configuration>
 		<artifactItems>
                   <artifactItem>
-                    <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+                    <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
                     <artifactId>db-binaries</artifactId>
 		    <type>zip</type>
                     <overWrite>false</overWrite>
@@ -133,98 +114,98 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
+	<groupId>org.reddwarfserver.client</groupId>
 	<artifactId>sgs-client</artifactId>
 	<version>${sgs-client.version}</version>
 	<scope>test</scope>
       </dependency>
 
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-shared</artifactId>
 	<version>${sgs-shared.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-shared</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs-shared.version}</version>
       </dependency>
 
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-boot</artifactId>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-stop</artifactId>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-server</artifactId>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-server</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-server-api</artifactId>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-server-api</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-server-internal-api</artifactId>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-server-internal-api</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-server-javadoc</artifactId>
 	<classifier>api</classifier>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-tutorial-server</artifactId>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-tutorial-server</artifactId>
 	<classifier>sources</classifier>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
+	<groupId>org.reddwarfserver.server</groupId>
 	<artifactId>sgs-tutorial-server-dist</artifactId>
 	<type>zip</type>
 	<version>${sgs.version}</version>
       </dependency>
 
       <dependency>
-	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	<groupId>org.reddwarfserver.ext.berkeleydb</groupId>
 	<artifactId>db</artifactId>
 	<version>${bdb.version}</version>
       </dependency>
       <dependency>
-	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	<groupId>org.reddwarfserver.ext.berkeleydb</groupId>
 	<artifactId>db-binaries</artifactId>
 	<version>${bdb.version}</version>
 	<type>zip</type>
@@ -242,7 +223,7 @@
       </dependency>
     
       <dependency>
-	<groupId>com.projectdarkstar.tools.test</groupId>
+	<groupId>org.reddwarfserver.tools.test</groupId>
 	<artifactId>sgs-test-ext</artifactId>
 	<scope>test</scope>
 	<version>${sgs-test-ext.version}</version>
@@ -380,7 +361,7 @@
 	  <artifactId>je</artifactId>
 	</dependency>
 	<dependency>
-	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
 	  <artifactId>db</artifactId>
 	</dependency>
       </dependencies>
@@ -408,7 +389,7 @@
       </properties>
       <dependencies>
 	<dependency>
-	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
 	  <artifactId>db</artifactId>
 	</dependency>
 	<dependency>
@@ -437,12 +418,12 @@
 
   <properties>
     <sgs.version>${version}</sgs.version>
-    <sgs-shared.version>1.11</sgs-shared.version>
-    <sgs-client.version>0.9.11</sgs-client.version>
+    <sgs-shared.version>1.12</sgs-shared.version>
+    <sgs-client.version>0.10.0</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
     <jung.version>2.0</jung.version>
-    <sgs-test-ext.version>1.1</sgs-test-ext.version>
+    <sgs-test-ext.version>1.2</sgs-test-ext.version>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.bdb.env>
