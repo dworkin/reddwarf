@@ -23,18 +23,22 @@ package com.sun.sgs.impl.service.data.store.cache;
  * A cache entry for an object.  Only the {@link #key} field may be accessed
  * without holding the associated lock (see {@link Cache#getBindingLock} and
  * {@link Cache#getObjectLock}.  For all other fields and methods, the lock
- * must be held.
+ * must be held. <p>
+ *
+ * The value associated with the entry will be {@code null} if the object has
+ * been removed from the data store, or {@code NEWLY_CREATED} if the real value
+ * isn't known yet because the object is newly created.
  */
 final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
 
     /**
-     * Records whether the entry has not been provided with the data associated
-     * with the object.
+     * A value to mark entries for newly allocated object IDs which do not yet
+     * have the data for the associated object.
      */
-    private boolean noData;
+    private static final byte[] NEWLY_CREATED = new byte[0];
 
     /**
-     * Creates an object cache entry with no data.
+     * Creates an object cache entry whose data value is being fetched.
      *
      * @param	oid the object ID
      * @param	contextId the context ID associated with the transaction on
@@ -43,24 +47,23 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      */
     private ObjectCacheEntry(long oid, long contextId, State state) {
 	super(oid, contextId, state);
-	noData = true;
     }
 
     /**
-     * Creates an object cache entry with data.
+     * Creates an object cache entry with the specified data, which may be
+     * {@code NEWLY_CREATED} for a newly created object, or {@code null} for a
+     * removed object.
      *
      * @param	oid the object ID
+     * @param	data the object data or {@code null}
      * @param	contextId the context ID associated with the transaction on
      *		whose behalf the entry was created
      * @param	state the state
-     * @param	data the object data or {@code null} for a removed object
      */
     private ObjectCacheEntry(
-	long oid, long contextId, State state, byte[] data)
+	long oid, byte[] data, long contextId, State state)
     {
-	super(oid, contextId, state);
-	setValue(data);
-	noData = false;
+	super(oid, data, contextId, state);
     }
 
     /**
@@ -71,7 +74,8 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      * @return	the cache entry
      */
     static ObjectCacheEntry createNew(long oid, long contextId) {
-	return new ObjectCacheEntry(oid, contextId, State.CACHED_WRITE);
+	return new ObjectCacheEntry(
+	    oid, NEWLY_CREATED, contextId, State.CACHED_WRITE);
     }
 
     /**
@@ -97,24 +101,26 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
      * entry marked as being fetched.
      *
      * @param	oid the object ID
+     * @param	data the object data or {@code null} for a removed object
      * @param	contextId the context ID associated with the transaction
-     * @param	data the object data
      * @return	the cache entry     
      */
     static ObjectCacheEntry createCached(
-	long oid, long contextId, byte[] data)
+	long oid, byte[] data, long contextId)
     {
-	return new ObjectCacheEntry(oid, contextId, State.CACHED_READ, data);
+	return new ObjectCacheEntry(oid, data, contextId, State.CACHED_READ);
     }
 
     @Override
     public String toString() {
-	byte[] data = super.getValue();
+	boolean hasValue = hasValue();
+	byte[] data = hasValue ? super.getValue() : null;
 	return "ObjectCacheEntry[" +
 	    "oid:" + key +
-	    ", data:" + (noData ? "NONE"
-			 : data == null ? "null"
-			 : "byte[" + data.length + "]") +
+	    (!hasValue ? "" :
+	     ", data:" + ((data == NEWLY_CREATED) ? "new"
+			  : (data == null) ? "null"
+			  : "byte[" + data.length + "]")) +
 	    ", contextId:" + getContextId() +
 	    ", state:" + getState() +
 	    "]";
@@ -142,35 +148,26 @@ final class ObjectCacheEntry extends BasicCacheEntry<Long, byte[]> {
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation checks that the {@code noData} field is {@code
-     * false}.
+     * This implementation checks that entry is not for a newly created that
+     * has no data yet.
      */
     @Override
     byte[] getValue() {
-	if (noData) {
-	    throw new IllegalStateException("Entry contains no data: " + this);
+	byte[] data = super.getValue();
+	if (data == NEWLY_CREATED) {
+	    throw new IllegalStateException(
+		"Entry value is not valid: " + this);
 	}
-	return super.getValue();
+	return data;
     }
 
     /**
-     * {@inheritDoc} <p>
+     * Returns whether the entry represents a newly created object ID which
+     * does not yet contain the data for the associated object.
      *
-     * This implementation also sets the {@code noData} field to {@code false}.
+     * @return	whether the entry is for a newly created object
      */
-    @Override
-    void setValue(byte[] newValue) {
-	super.setValue(newValue);
-	noData = false;
-    }
-
-    /**
-     * Returns whether the object associated with this entry has been provided
-     * with data.
-     *
-     * @return	whether the entry has data
-     */
-    boolean getHasData() {
-	return !noData;
+    boolean isNewlyCreated() {
+	return super.getValue() == NEWLY_CREATED;
     }
 }

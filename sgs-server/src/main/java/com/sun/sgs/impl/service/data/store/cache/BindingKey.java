@@ -22,9 +22,8 @@ package com.sun.sgs.impl.service.data.store.cache;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 
 /**
- * A key to represent binding names that is {@link Comparable} and provides
- * non-{@code null} values to represent keys before and after any possible
- * name.
+ * A key that represent a binding name that is {@link Comparable} and provides
+ * non-{@code null} value to represent keys before and after any possible name.
  */
 public abstract class BindingKey implements Comparable<BindingKey> {
 

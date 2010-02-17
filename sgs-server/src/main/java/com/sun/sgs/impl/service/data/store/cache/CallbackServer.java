@@ -88,9 +88,9 @@ public interface CallbackServer extends Remote {
      * Requests that the node give up access to a name binding.  If the method
      * returns {@code true}, then the name binding is no longer present in the
      * cache.  If the method returns {@code false}, then the node will arrange
-     * to call {@link UpdateQueue#downgradeBinding} to notify the server when
-     * it has evicted the name binding.  This method returns {@code true} if
-     * the name binding was already not present in the cache.
+     * to call {@link UpdateQueue#evictBinding} to notify the server when it
+     * has evicted the name binding.  This method returns {@code true} if the
+     * name binding was already not present in the cache.
      *
      * @param	name the name
      * @param	conflictNodeId the ID of the node requesting the eviction

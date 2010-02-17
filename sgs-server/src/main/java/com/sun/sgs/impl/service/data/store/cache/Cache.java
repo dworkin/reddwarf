@@ -37,8 +37,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The implementation uses concurrent skip lists so that cache eviction can
  * walk over cache entries concurrently with other operations.  The weak
  * consistency of the skip list's iterator is well suited to this purpose
- * because it is OK for cache eviction miss entries during eviction -- they can
- * always be evicted the next time. <p>
+ * because it is OK for cache eviction to miss entries during eviction -- they
+ * can always be evicted the next time. <p>
  *
  * The implementation also uses a set of locks that should be held when
  * manipulating the entry for an associated key.  Since the lock to use is
@@ -199,8 +199,9 @@ class Cache {
     }
 
     /**
-     * Returns the cache entry for the binding with a key that is equal to or
-     * higher than the one specified, or {@code null} if none is found.
+     * Returns the cache entry for the binding with the lowest key that is
+     * equal to or higher than the one specified, or {@code null} if none is
+     * found.
      *
      * @param	key the binding key
      * @return	the associated or next higher cache entry, or {@code null}
@@ -213,8 +214,8 @@ class Cache {
     }
 
     /**
-     * Returns the cache entry for the binding with a key that is higher than
-     * the one specified, or {@code null} if none is found.
+     * Returns the cache entry for the binding with the lowest key that is
+     * higher than the one specified, or {@code null} if none is found.
      *
      * @param	key the binding key
      * @return	the next higher cache entry or {@code null}
@@ -382,7 +383,8 @@ class Cache {
     }
 
     /**
-     * Reserves space in the cache for the specified number of new entries.
+     * Reserves space in the cache for the specified number of new entries,
+     * blocking until the specified number of entries is available.
      *
      * @param	count the number of entries
      */

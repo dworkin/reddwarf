@@ -73,9 +73,6 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(BindingCacheEntry.class.getName()));
 
-    /** The dummy value used for the last key. */
-    private static final long LAST_KEY_VALUE = -2;
-
     /**
      * The lowest-valued previous key such that names between that key and this
      * entry's key are known to be unbound, else {@code null} if no information
@@ -96,15 +93,44 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     private boolean pendingPrevious;
 
     /**
-     * Creates a binding cache entry.
+     * Creates a binding cache entry whose value is being fetched.
      *
      * @param	key the key
      * @param	contextId the context ID associated with the transaction on
      *		whose behalf the entry was created
      * @param	state the state
+     * @throw	IllegalArgumentException if {@code key} is {@link
+     *		BindingKey#FIRST}
      */
     private BindingCacheEntry(BindingKey key, long contextId, State state) {
 	super(key, contextId, state);
+	if (key == BindingKey.FIRST) {
+	    throw new IllegalArgumentException(
+		"The key must not be BindingKey.FIRST");
+	}
+    }
+
+    /**
+     * Creates a binding cache entry with a cached value.
+     *
+     * @param	key the key
+     * @param	value the value
+     * @param	contextId the context ID associated with the transaction on
+     *		whose behalf the entry was created
+     * @param	state the state
+     * @throws	IllegalArgumentException if {@code key} is {@link
+     *		BindingKey#FIRST}, or if {@code value} is negative
+     */
+    private BindingCacheEntry(
+	BindingKey key, long value, long contextId, State state)
+    {
+	super(key, value, contextId, state);
+	if (key == BindingKey.FIRST) {
+	    throw new IllegalArgumentException(
+		"The key must not be BindingKey.FIRST");
+	} else if (value < 0) {
+	    throw new IllegalArgumentException("Value must not be negative");
+	}
     }
 
     /**
@@ -119,11 +145,9 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
     static BindingCacheEntry createCached(
 	BindingKey key, long contextId, long value, boolean forUpdate)
     {
-	BindingCacheEntry entry = new BindingCacheEntry(
-	    key, contextId,
-	    forUpdate ? State.CACHED_WRITE : State.CACHED_READ);
-	entry.setValue(value);
-	return entry;
+	return new BindingCacheEntry(
+	    key, value,
+	    contextId, forUpdate ? State.CACHED_WRITE : State.CACHED_READ);
     }
 
     /**
@@ -133,18 +157,16 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      * @param	contextId the context ID associated with the transaction
      */
     static BindingCacheEntry createLast(long contextId) {
-	BindingCacheEntry entry = new BindingCacheEntry(
+	return new BindingCacheEntry(
 	    BindingKey.LAST, contextId, State.FETCHING_READ);
-	/* Give this last entry a numeric value, but an illegal one */
-	entry.setValue(LAST_KEY_VALUE);
-	return entry;
     }
 
     @Override
     public String toString() {
 	return "BindingCacheEntry[" +
 	    "name:" + key +
-	    ", value:" + getValue() +
+	    (!hasValue() ? "" :
+	     ", value:" + getValue()) +
 	    ", contextId:" + getContextId() +
 	    ", state:" + getState() +
 	    ", previousKey:" + previousKey +
@@ -152,6 +174,47 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 	     ", previousKeyUnbound:" + previousKeyUnbound) +
 	    ", pendingPrevious:" + pendingPrevious +
 	    "]";
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation also returns {@code false} if the key is {@link
+     * BindingKey#LAST}.
+     */
+    @Override
+    boolean hasValue() {
+	return (key != BindingKey.LAST) && super.hasValue();
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation also checks to see that {@code newValue} is not
+     * negative, unless this entry's key is {@link BindingKey#LAST}, in which
+     * case only {@code -1} is allowed.
+     *
+     * @throws	IllegalArgumentException if {@code newValue} is negative and
+     *		this entry's key is not {@link BindingKey#LAST}, or if it isn't
+     *		{@code -1} if the key is {@code LAST}
+     */
+    @Override
+    void setValue(Long newValue) {
+	if (newValue == null) {
+	    throw new NullPointerException(
+		"New value must not be null");
+	} else if (key == BindingKey.LAST) {
+	    if (newValue != -1) {
+		throw new IllegalStateException(
+		    "New value must be -1 for LAST entry");
+	    }
+	    /* Store null, since the LAST entry doesn't really have a value */
+	    newValue = null;
+	} else if (newValue < 0) {
+	    throw new IllegalArgumentException(
+		"New value must not be negative");
+	}
+	super.setValue(newValue);
     }
 
     /**
@@ -242,16 +305,6 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 		throw new AssertionError(
 		    "No binding entry should be present for first key: "
 		    + this);
-	    } else if (key == BindingKey.LAST) {
-		if (getValue() != LAST_KEY_VALUE) {
-		    throw new AssertionError(
-			"Binding entry for last key should have value " +
-			LAST_KEY_VALUE + ": " + this);
-		}
-	    } else if (getValue() == -1) {
-		throw new AssertionError(
-		    "No binding entry should be found for removed binding: " +
-		    this);
 	    }
 	    /*
 	     * Check for permitting fetching, evicting, and pending previous
@@ -332,15 +385,13 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
 
     /**
      * Returns whether this entry is known to be the next entry in the cache
-     * after the specified key.  Note that if this entry does not represent a
-     * bound name then this entry does not represent the next bound name after
-     * the specified key.
+     * after the specified key.
      *
      * @param	forKey the key to check
      * @return	whether this entry is known to be the next entry in the cache
      *		after {@code forKey}
      */
-    boolean getIsNextEntry(BindingKey forKey) {
+    boolean isNextEntry(BindingKey forKey) {
 	assert forKey != null;
 	return forKey.compareTo(key) < 0 &&
 	    previousKey != null &&
@@ -364,7 +415,7 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      *
      * @return	whether the previous key is known to be unbound
      */
-    boolean getPreviousKeyUnbound() {
+    boolean isPreviousKeyUnbound() {
 	return previousKeyUnbound;
     }
 
@@ -393,6 +444,8 @@ final class BindingCacheEntry extends BasicCacheEntry<BindingKey, Long> {
      *
      * @param	lock the associated lock, which should be held
      * @param	stop the time in milliseconds when waiting should fail
+     * @throws	TransactionInterruptedException if the current thread is
+     *		interrupted while waiting
      * @throws	TransactionTimeoutException if the operation does not succeed
      *		before the specified stop time
      */

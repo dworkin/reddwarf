@@ -75,8 +75,14 @@ class NewObjectIdCache {
      *
      * @param	store the data store
      * @param	batchSize the number of new object IDs to allocate at a time
+     * @throws	IllegalArgumentException if {@code batchSize} is less than
+     *		{@code 2}
      */
     NewObjectIdCache(CachingDataStore store, int batchSize) {
+	if (batchSize < 2) {
+	    throw new IllegalArgumentException(
+		"The batchSize must be at least 2");
+	}
 	this.store = store;
 	this.batchSize = batchSize;
 	synchronized (this) {
