@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this distribution have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license with "Classpath"
+ * exception that can be found in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -24,7 +30,7 @@
  */
 
 /**
- * Provides utilities for use by Project Darkstar Server application
+ * Provides utilities for use by RedDwarf Server application
  * developers.
  */
 package com.sun.sgs.app.util;

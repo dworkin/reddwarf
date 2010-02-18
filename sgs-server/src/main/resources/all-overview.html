@@ -1,7 +1,7 @@
 <html>
 <body>
 
-Complete implementation of the Project Darkstar Server. <p>
+Complete implementation of the RedDwarf Server. <p>
 
 <h3>Implementation-specific information</h3>
 
@@ -9,15 +9,15 @@ Complete implementation of the Project Darkstar Server. <p>
 
 See <a href="com/sun/sgs/impl/kernel/doc-files/config-properties.html">this
 document</a> for a list of configuration properties supported by the
-current implementation of the Project Darkstar Server.
+current implementation of the RedDwarf Server.
 
 <h4>Additional Protocol Semantics</h4>
 
 In addition to the semantics for protocol messages given in {@link 
 com.sun.sgs.protocol.simple.SimpleSgsProtocol}, the current implementation of 
-the Project Darkstar Server provides the following semantics for messages:
+the RedDwarf Server provides the following semantics for messages:
 <ul>
-    <li> If a Project Darkstar server receives a message with an <code>Opcode
+    <li> If a RedDwarf server receives a message with an <code>Opcode
     </code> other than those specified in the protocol specification, or with an 
     <code>Opcode</code> that defines a message that should only be sent to 
     a client, or the message is malformed in other ways, the server will 
@@ -36,10 +36,10 @@ the Project Darkstar Server provides the following semantics for messages:
     login is allowed to proceed.</li>
 </ul>
 
-At this time, the Project Darkstar Server does not implement a response to the 
+At this time, the RedDwarf Server does not implement a response to the
 <code>RECONNECT_REQUEST Opcode</code>. The current implementation treats such a 
 request as an unknown <code>Opcode</code> and will disconnect any client sending 
-such a  request. Similarly, the current implementation of the Project Darkstar 
+such a  request. Similarly, the current implementation of the RedDwarf
 server will not send messages beginning with the <code>RECONNECT_SUCCESS</code> 
 or <code>RECONNECT_FALURE Opcodes</code>.
 
