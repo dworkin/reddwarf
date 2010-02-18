@@ -8,8 +8,8 @@
     <!-- Include the sgs-boot bootstrapper -->
     <dependencySet>
       <includes>
-        <include>com.projectdarkstar.server:sgs-boot</include>
-	<include>com.projectdarkstar.server:sgs-stop</include>
+        <include>org.reddwarfserver.server:sgs-boot</include>
+	<include>org.reddwarfserver.server:sgs-stop</include>
       </includes>
       <outputDirectory>bin</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
@@ -19,11 +19,11 @@
     <!-- Include the sgs-server jar files required in the lib directory -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.server:sgs-server:jar</include>
-	<include>com.projectdarkstar.server:sgs-shared:jar</include>
-	<include>com.projectdarkstar.server:sgs-server-api:jar</include>
-	<include>com.projectdarkstar.server:sgs-server-internal-api:jar</include>
-	<include>com.projectdarkstar.ext.berkeleydb:db:jar</include>
+	<include>org.reddwarfserver.server:sgs-server:jar</include>
+	<include>org.reddwarfserver.server:sgs-shared:jar</include>
+	<include>org.reddwarfserver.server:sgs-server-api:jar</include>
+	<include>org.reddwarfserver.server:sgs-server-internal-api:jar</include>
+	<include>org.reddwarfserver.ext.berkeleydb:db:jar</include>
 	<include>com.sleepycat:je:jar</include>
         <include>net.sf.jung:jung-graph-impl:jar</include>
       </includes>
@@ -34,10 +34,10 @@
     <!-- Include the sgs-server source files -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.server:sgs-server:jar:sources</include>
-	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
-	<include>com.projectdarkstar.server:sgs-server-api:jar:sources</include>
-	<include>com.projectdarkstar.server:sgs-server-internal-api:jar:sources</include>
+	<include>org.reddwarfserver.server:sgs-server:jar:sources</include>
+	<include>org.reddwarfserver.server:sgs-shared:jar:sources</include>
+	<include>org.reddwarfserver.server:sgs-server-api:jar:sources</include>
+	<include>org.reddwarfserver.server:sgs-server-internal-api:jar:sources</include>
       </includes>
       <outputDirectory>src</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
@@ -46,7 +46,7 @@
     <!-- Unpack the tutorial component -->
     <dependencySet>
       <includes>       
-	<include>com.projectdarkstar.server:sgs-tutorial-server-dist:zip</include>
+	<include>org.reddwarfserver.server:sgs-tutorial-server-dist:zip</include>
       </includes>
       <unpack>true</unpack>
       <outputDirectory></outputDirectory>
@@ -57,7 +57,7 @@
 	 into the doc directory -->
     <dependencySet>
       <includes>
-	<include>com.projectdarkstar.server:sgs-server-javadoc:jar:api</include>
+	<include>org.reddwarfserver.server:sgs-server-javadoc:jar:api</include>
       </includes>
       <unpack>true</unpack>
       <unpackOptions>

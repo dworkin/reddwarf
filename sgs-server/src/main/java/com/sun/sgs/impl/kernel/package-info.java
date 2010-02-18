@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -20,6 +26,6 @@
  */
 
 /**
- * Provides an implementation of the Project Darkstar Server kernel.
+ * Provides an implementation of the RedDwarf Server kernel.
  */
 package com.sun.sgs.impl.kernel;
