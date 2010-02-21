@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -75,7 +81,7 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
     /**
      * The default retry backoff threshold.
      */
-    static final int DEFAULT_RETRY_BACKOFF_THRESHOLD = 25;
+    static final int DEFAULT_RETRY_BACKOFF_THRESHOLD = 10;
 
     // the task retry count at which a backoff should occur
     private final int retryBackoffThreshold;
@@ -121,13 +127,13 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
                                             "cannot be null");
         }
 
-        // NOTE: as a first-pass implementation this simply instructs the
-        // caller to try again if retry is requested, but other strategies
-        // (like the number of times re-tried) might be considered later
         if ((result instanceof ExceptionRetryStatus) &&
             (((ExceptionRetryStatus) result).shouldRetry())) {
 
             // Always retry in place unless we are above the backoff threshold
+            // Also note, once a task is retried more than the backoff
+            // threshold, each subsequent retry will trigger this condition,
+            // double the timeout, and reschedule for RETRY_LATER
             if (task.getTryCount() > retryBackoffThreshold) {
                 logger.logThrow(Level.WARNING,
                                 task.getLastFailure(),

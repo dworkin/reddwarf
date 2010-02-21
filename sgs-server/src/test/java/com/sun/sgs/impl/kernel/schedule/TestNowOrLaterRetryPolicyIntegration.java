@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -99,6 +105,14 @@ public class TestNowOrLaterRetryPolicyIntegration {
         txnScheduler.runTask(l, taskOwner);
         Assert.assertTrue(l.isFinished());
         Assert.assertTrue(l.getRunCount() > 5);
+    }
+
+    @Test
+    public void testRetryableAboveDoubleBackoffThreshold() throws Exception {
+        LongTransactionRunner l = new LongTransactionRunner(250);
+        txnScheduler.runTask(l, taskOwner);
+        Assert.assertTrue(l.isFinished());
+        Assert.assertTrue(l.getRunCount() > 6);
     }
 
     private class CountTestRunner implements KernelRunnable {
