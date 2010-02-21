@@ -1561,6 +1561,7 @@ public final class ClientSessionServiceImpl
 	// Notify session listeners of disconnection
 	notifyStatusListenersOfDisconnection(sessionRefId, isRelocating);
 	handlers.remove(sessionRefId);
+        checkHighWater();
 	sessionTaskQueues.remove(sessionRefId);
 	prepareRelocationMap.remove(sessionRefId); // just in case...
     }
