@@ -238,7 +238,7 @@ public final class WatchdogServiceImpl
     final Thread renewThread = new RenewThread();
 
     /** The local nodeId. */
-    final long localNodeId;
+    private final long localNodeId;
 
     /** The interval for renewals with the watchdog server. */
     private final long renewInterval;
@@ -463,7 +463,7 @@ public final class WatchdogServiceImpl
         }
 
         // Report this component is healthy and ready for work
-        reportHealth(localNodeId, Health.GREEN, CLASSNAME);
+        reportLocalHealth(Health.GREEN, CLASSNAME);
     }
 
     /** {@inheritDoc} */
@@ -584,6 +584,11 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public void reportFailure(long nodeId, String component) {
         reportHealth(nodeId, Health.RED, component);
+    }
+
+    /** {@inheritDoc} */
+    public void reportLocalHealth(Health nodeHealth, String component) {
+        reportHealth(localNodeId, nodeHealth, component);
     }
 
     /** {@inheritDoc} */
