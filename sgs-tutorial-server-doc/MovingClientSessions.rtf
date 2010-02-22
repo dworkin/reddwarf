@@ -1,0 +1,134 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf250
+{\fonttbl\f0\fnil\fcharset0 Verdana;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww9000\viewh9000\viewkind0
+\deftab720
+\pard\pardeftab720\ql\qnatural
+
+\f0\fs24 \cf0 Ann Wollrath<br>\
+4/21/09\
+\
+\
+This is a design sketch of how the ClientSessionService can be modified\
+to support relocating client sessions from one node to another.\
+\
+'''Notification of Identity's reassignment'''\
+\
+The ClientSessionService needs to register a NodeMappingListener with\
+the NodeMappingService to receive notifications of identity\
+reassignment.  When the ClientSessionService's NodeMappingListener\
+receives a 'mappingRemoved' notification for a given client session\
+identity, the ClientSessionService needs to add a MoveEvent to the\
+associated ClientSessionImpl's queue.  The MoveEvent takes care of the\
+details of terminating the existing connection on the local node, and\
+establishing a new connection on the new node that the identity has\
+been assigned to (which can be obtained by the\
+NodeMappingService.getNode method).  By the time the MoveEvent is\
+processed in the client session's queue, all reliable messages\
+previously sent to the client session should be "complete" (i.e.,\
+enqueued as commit actions via the ClientSessionServiceImpl.Context),\
+therefore a MoveEvent can proceed safely without the possibility of the\
+client session missing messages sent before a move takes place.\
+\
+'''MoveEvent'''\
+\
+The persistent state to be modified by a MoveEvent includes the\
+ClientSessionImpl's 'nodeId' field and a flag indicating that a move is\
+in progress.  The commit action of a MoveEvent (performed on the\
+current node) needs to:\
+<ol>\
+<li> Send notification to new node that a session with a given identity is being established on that node (supplying a reconnection key).\
+\
+<li> Inform the client that it needs to terminate the connection with the current node and establish a connection with the new node with a reconnection key.  When the client session's connection is established with the new node, the ClientSessionService on the new node adds transient state for the client session (modifying the 'handlers', 'sessionTaskQueues', and 'loggedInIdentityMap' maps) and clear the flag in the ClientSessionHandler indicating that a move is in progress.  The ClientSessionImpl's event queue should be serviced (and perhaps all of the pending events) so that no event queue notifications are missed.\
+\
+<li> Remove the transient state kept for the client session on the current node which entails removing the client session from the 'handlers' and 'sessionTaskQueues' maps, removing the identity from the 'loggedInIdentityMap'.  Ensure that the client's connection is terminated without notifying the ClientSessionListener of the disconnection. \
+</ol>\
+Notes:\
+<ul>\
+<li> Need to make sure that client connection on current node is terminated, but without notifying the application's ClientSessionListener of the disconnection (since the client session isn't disconnected, just relocated).\
+<li>Any 'send' events for a client session that occurs during a move need to be enqueued and not processed until a connection is established on the new node. A flag in the ClientSessionImpl's persistent state indicates whether a move is in progress, and SendEvents can be enqueued until the flag is cleared.\
+<li>Need to make sure that 'serviceEventQueue' notifications to the new node are not lost.\
+<li>If the client does not establish a connection with the new node after a certain (configurable) timeout period, the new node assumes that the client session is disconnected, and proceeds with notifying the corresponding ClientSessionListener of the disconnection. Currently, the ClientSessionService does not keep a map from Identity to ClientSession, but would have to in order to determine the ClientSession for an identity if the old node fails to send the move notification with the client session information (1) to the new node. \
+</ul>\
+\
+'''Failures'''\
+<ul>\
+<li>Of current node, before MoveEvent is processed:\
+\
+The client has become disconnected from the current node.  During\
+recovery for the failed node, the ClientSessionListener for the\
+failed session is notified and the ClientSession is removed.  The\
+MoveEvent is removed when the ClientSession is cleaned up.\
+\
+<li> Of current node, before #1 processed at new node:\
+\
+The new node's NodeMappingListener will receive a 'mappingAdded'\
+notification that indicates that the specified identity has been\
+reassigned from the 'oldNode'.  After certain period of time elapses\
+without receiving the move notification with a reconnection key from\
+the 'oldNode', the new node initiates client session disconnection\
+notification and cleanup.  It needs the reconnection key in order to\
+accept a moved client session, and since the old node failed, it\
+can't determine what that reconnection key is.  Basically, once a\
+client session's nodeId has been changed to a new node, it is that new\
+node's responsibility to handle disconnection notification and\
+session removal.\
+\
+<li> Of current node, after #1 processed at new node:\
+\
+New node waits for configurable period of time for client session to\
+establish connection, and initiates disconnection notification and\
+session cleanup if the client hasn't established a connection in\
+time.\
+\
+<li> Of new node, before MoveEvent is processed:\
+\
+Nothing.  The MoveEvent will be processed.\
+\
+<li> Of new node, after MoveEvent:\
+\
+Proceed with other steps on current node as usual.  Client will\
+attempt to establish a connection with the new node, but will not\
+have success, so will have to log in again.  If it is known that the\
+new node has failed (due to IOException when attempting to contact\
+the node), then either the identity can be assigned and moved to\
+another node.  The NodeMappingService needs to be consulted for the\
+new node assignment.  Alternatively, the session can be disconnected.\
+</ul>\
+\
+'''Cascading Moves'''\
+\
+If mapping is removed from newNode before move is complete from old\
+node to new node, finish the current move before handling the next\
+move.   Need to check when a mapping is removed if a session is\
+already moving to this node and delay the next relocation until the\
+earlier one has completed.\
+\
+\
+'''Protocol considerations'''\
+\
+The protocol layer needs to be modified to handle relocating\
+client sessions.  The client needs to be notified that its\
+session is being relocated to another node.  So, the\
+SessionProtocol interface needs another method, 'relocate' for\
+example, that take the new node and relocation key as parameters.\
+\
+Additionally, when the client relocates the connection to the new\
+node, the ClientSessionService needs to be informed of the new\
+client session.  Once possibility is to add a method to\
+ProtocolListener, 'relocatedSession' for example, that takes the\
+same arguments as the 'newLogin' method, but has a relocation key\
+argument instead of an identity.  The ProtocolListener can then\
+construct a SessionProtocolHandler (AKA ClientSessionHandler) for\
+the relocated session.\
+\
+SimpleSgsProtocol will need to be modified to add another\
+protocol message--the relocation request from server to client\
+that contains the host, port, and relocation key in the payload.\
+The relocation "reconnection" request from client to the new node\
+can possibly use the existing RECONNECT_REQUEST protocol message\
+(with associated responses),  however for clarity, it may be\
+beneficial to define new protocol messages for the message\
+exchange to establish a relocated connection versus the messages\
+needed for reconnecting a client to the same node.\
+}

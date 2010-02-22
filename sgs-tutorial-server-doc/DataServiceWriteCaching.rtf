@@ -1,0 +1,284 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf250
+{\fonttbl\f0\fnil\fcharset0 Verdana;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww9000\viewh9000\viewkind0
+\deftab720
+\pard\pardeftab720\ql\qnatural
+
+\f0\fs24 \cf0 Tim Blackman <br>\
+1/27/2009 <br>\
+('''status''' - ''complete'')\
+\
+==Introduction==\
+\
+Like many other online applications, online games and virtual worlds\
+produce high volume access to large quantities of persistent data.\
+Although techniques for implementing highly scalable databases for\
+typical online applications are well known, some of the special\
+characteristics of these virtual environments make the standard\
+approaches to database scaling ineffective.  To support fast response\
+times for users, the latency of data access is more important than\
+throughput.  Unlike most data-intensive applications, where data reads\
+predominate, a higher proportion of data accesses in virtual\
+environments involve data modification, perhaps as high as 50%.  Unlike\
+applications involving real world goods and payments, users are more\
+willing to tolerate the loss of data or history due to a failure in the\
+server, so long as these failures are infrequent, the amount of data\
+lost is small, and the recovered state remains consistent.  This reduced\
+requirement for data durability provides an opportunity to explore new\
+approaches to scalable persistence that can satisfy the needs of games\
+and virtual worlds for low latency in the presence of frequent writes.\
+\
+When storing data on a single node, the way to provide low latency is\
+to avoid the cost of flushing modifications to disk.  Since these\
+applications can tolerate an occasional lack of durability, a single\
+node system can skip disk flushing so long as it can preserve integrity\
+even if some updates are lost during a node failure.  Avoiding disk\
+flushes in this way allows the system to take full advantage of disk\
+throughput.  In our tests, a database transaction that modifies a single\
+data item takes more than 10 milliseconds if performing a disk flush,\
+but as little as 25 microseconds without flushing.\
+\
+Network latency poses a similar problem for data storage in\
+multi-node systems.  As network speeds have increased, network\
+throughput has increased dramatically, but latency continues to be\
+substantial.  In our tests using 8 Gigabit Infiniband, we were only able\
+to achieve a network round trip latency of at best 40 microseconds, in\
+this case using standard Java sockets in an prerelease version of Java 7\
+that uses Sockets Direct Protocol (SDP) to perform TCP/IP operations\
+over Infiniband. Adding an additional 40 microseconds to the current 25\
+microsecond transaction time threatens to reduce performance\
+significantly.\
+\
+To fulfill the Project Darkstar vision, increasing system capacity\
+should be as simple as adding additional application nodes.  This\
+process can only really be considered easy if the newly added nodes are\
+stateless &mdash; they should not store vital data that needs to be\
+maintained to insure the system's integrity.  If an application node\
+fails, it should be possible to replace it with a new node without\
+needing to recover data from the failed one.  Users that were connected\
+to the failed node will need to reconnect to a new node, and may find\
+that some modest amount of their recent in-world history has been rolled\
+back, but should otherwise be able to proceed with their experience.\
+\
+The first approach to implementing such a scalable data storage scheme\
+was to use a central data server with no caching.  This scheme was easy\
+to implement, and was introduced in the Project Darkstar 0.9.2 release.\
+Unfortunately, the need for a network round trip for each operation\
+results in poor performance due to network latency.  Faster networks\
+with improved throughput would not change these results significantly.\
+\
+The original plan had been to improve the scalability of the no-caching\
+scheme by implementing support for multiple data servers.  If a central\
+data server had provided good performance, then switching to multiple\
+data servers would have added the needed scalability.  The prohibitive\
+cost of network latency, though, makes this approach unworkable.  A\
+further complication would be the need to migrate data explicitly among\
+the multiple data servers, which would have introduced further\
+complexity.\
+\
+Another, more recent, idea was to store data on each application node.\
+That idea had the drawback of requiring backup and failover redundancy\
+for each application node, and also clashed with the desired ability to\
+add and remove applications nodes on demand.  This scheme, too, would\
+have required explicit migration of data, this time among application\
+nodes.\
+\
+This document describes a third approach, to use write caching with a\
+central data server.  The idea is to cache data locally, including\
+modified data, so long as it is only being used by the local node.  If\
+local modifications need to be made visible to another application node,\
+because the node wants to access the modified data, then all local\
+changes need to be flushed back to the central server, to insure\
+consistency.\
+\
+This scheme avoids network latency so long as the system can arrange for\
+transactions that modify a particular piece of data to be performed on\
+the same node.  It avoids the need for explicit object migration:\
+objects will be cached on demand by the local node.  It also permits\
+adding and removing application nodes, and avoids the need for\
+redundancy and backup, since application nodes do not store globally\
+important data.\
+\
+==Architecture==\
+\
+Each application node has its own '''Data Cache''', which maintains\
+local copies of recently used items.  Data caches communicate with the\
+central '''Data Server''', which maintains persistent storage for items.\
+The data server also keeps track of which items are stored in which data\
+caches, and makes callback requests to those caches to request the\
+return items that are needed elsewhere.\
+\
+===Data Cache===\
+\
+When an application node asks the data cache for access to an item,\
+whether a name binding or an object, the cache first checks to see if\
+the item is present.  If the item is present and is not being used in a\
+conflicting mode (write access by one transaction blocks all other\
+access), then the cache provides the item to the application\
+immediately.  If a conflicting access is being made by another\
+transaction, the access request is queued in the data cache's lock\
+manager and blocks until all current transactions with conflicting\
+access, as well as any other conflicting accesses that appear earlier in\
+the queue, have completed.\
+\
+If the item is not present in the cache, or if write access is needed\
+but the item is only cached for read, then the data cache contacts the\
+data server to request the desired access.  The request either returns\
+the requested access, or else throws an exception if a timeout or\
+deadlock occurred.  If additional transactions request an item for\
+reading from the cache while an earlier read request to the server is\
+pending, the additional access waits for the results of the original\
+request, issuing an additional request as needed if the first one fails.\
+\
+Because data stored in the data cache can be used by multiple\
+transactions on the application node, requests to the data server are\
+not made on behalf of a particular transaction.  The lack of a direct\
+connection between transactions and requests means we need to decide how\
+to specify the timeout for a request.  One possibility would be to\
+provide a specific timeout for each request, based on the time remaining\
+in the transaction that initiated the request.  Another approach would\
+be to use a fixed timeout, similar to the standard transaction timeout,\
+and to better model the fact that a request may be shared by multiple\
+transactions.  The second approach would increase the chance that a\
+request would succeed so that its results could be used by other\
+transactions on the application node, even if the transaction initiating\
+the request had timed out.\
+\
+When a transaction modifies an item, the modifications are cached during\
+the course of the transaction in the <tt>DataService</tt>.  The data\
+service already caches changes to objects so that it can compute the\
+serialized form of modified objects once at commit time.  Extending\
+modification caching to include both object removal and changes to name\
+bindings will simplify the data cache by removing the need for it to\
+rollback cache values on transaction aborts, while consolidating all\
+caching in a single place.\
+\
+When a transaction commits, the commit will update the data cache with\
+the new values, insuring that the cache updates appear atomically.  The\
+changes will then be stored in the '''Change Queue''', which will\
+forward the updates, in order, to the data server.  Ordering the updates\
+by transaction insures that the persistent state of the data managed by\
+the data server represents a view of the data as seen by the application\
+node at some point in time.  The data service does not guarantee that\
+all modifications will be made durable, but it does guarantee that any\
+durable state will be consistent with the state of the system as seen at\
+some, slightly earlier, point in time.  Since transactions will commit\
+locally before any associated modifications are made persistent on the\
+server, users of the data service need to be aware of the fact that a\
+failure of an application node may result in committed modifications\
+made by that node being rolled back.  This behavior may have\
+implications for services and clients.\
+\
+If an item needs to be evicted from the data cache, either to make space\
+for new items or in response to a callback request from the data server,\
+the data cache will wait to remove the item until any modifications made\
+by transactions that accessed that item have been sent to the data\
+server.  This requirement insures the integrity of transactions by\
+making sure that the node does not release locks on any transactional\
+data until the transaction has completed by storing its modifications.\
+\
+Note that, just for maintaining integrity, the change queue does not\
+need to send changes to the data server immediately, so long as changes\
+are sent before an item is evicted from the cache.  There is no obvious\
+way to predict when an eviction will be requested, though, and the speed\
+of eviction will affect the time needed to migrate data among\
+application nodes.  To reduce the time needed for eviction, the best\
+strategy is probably to send changes to the data server as the changes\
+become available.  The node need not wait for the server to acknowledge\
+the updates, but it should make sure that the backlog of changes waiting\
+to be sent does not get too large.  This strategy takes advantage of the\
+large network throughput typically available without placing\
+requirements on latency, a key advantage over the no caching scheme.\
+There are various possibilities for optimizations, including reordering\
+unrelated updates, coalescing small updates, and eliminating redundant\
+updates.\
+\
+The data cache provides a '''Callback Server''' to handle callback\
+requests from the data server for items in the cache.  If an item is not\
+in use by any current transactions, and was not used by any transactions\
+whose changes have not been flushed to the server, then the cache\
+removes the item, or write access to the item if the request is for a\
+downgrade from write to read access, and responds affirmatively.\
+Otherwise, the callback server responds negatively.  If the item is in\
+use, the callback server queues a request to access the cached item.\
+When access is granted, or if the item was not in use, the callback\
+server queues the callback acknowledgement to the change queue.  Once\
+the acknowledgement has been successfully sent to the data server, then\
+the change queue arranges to remove the access from the cache.\
+\
+The data cache assigns a monotonically increasing number to transactions\
+that contained modifications as the changes are added to the change\
+queue at commit time.  Items that were used during a transaction are\
+marked with the number of the highest transaction in which they were\
+used.  This number is used to determine when an item can be evicted in\
+response to a callback request, as well as for the algorithm the cache\
+uses to select old items for eviction.\
+\
+For simplicity, we may want to specify a fixed number of entries as a\
+way of limiting the amount of data held in the cache.  Another approach\
+would be to include the size of the item cached in the estimate of cache\
+size, and specify the cache size as a configuration option.  A still\
+more complicated approach would involve making an estimate of the actual\
+number of bytes consumed by a particular cache entry, and computing the\
+amount of memory available as a proportion of the total memory limit for\
+the virtual machine.\
+\
+Our previous experience with Berkeley DB, reinforced by published\
+research (Agrawal et al. 1987), suggests that the data cache should\
+perform deadlock detection whenever a blocking access occurs, and should\
+choose either the youngest transaction or the one holding the fewest\
+locks when selecting the transaction to abort.\
+\
+===Data Server===\
+\
+The central data server maintains information about which items are\
+cached in the various data caches, and whether they are cached for read\
+or write.  Nodes that need access to items that are not available in\
+their cache send requests to the data server to obtain the items or to\
+upgrade access.  If a requested item is has not been provided to any\
+data caches, or if the item is only encached for read and has been\
+requested for read, then the data server obtains the item from the\
+underlying persistence mechanism, makes a note of the new access, and\
+returns it to the caller.\
+\
+If there are conflicting accesses to the item in other data caches, the\
+data server makes requests to each of those caches in turn to call back\
+the conflicting access.  If all those requests succeed, then the server\
+returns the result to the requesting node immediately.  If any of the\
+requests are denied, then the server arranges to wait for notifications\
+from the various data caches that access has been relinquished, or\
+throws an exception if the request is not satisfied within the required\
+timeout.\
+\
+When the data server supplies an item to a data cache, it might be\
+useful for the server to specify whether conflicting requests for that\
+item by other data caches are already queued.  In that case, the data\
+cache receiving the item could queue a request to flush the item from\
+the cache after the requesting transaction was complete.  This scheme\
+would probably improve performance for highly contended items.\
+\
+===Networking and Locking===\
+\
+The data caches and the data server communicate with each other over the\
+network, with the communication at least initially implemented using\
+RMI, for simplicity.  In the future, it might be possible to improve\
+performance by replacing RMI with a simpler facility based directly on\
+sockets.  For the data cache's callback queue, it might also be possible\
+to improve performance by pipelining requests and using asynchronous\
+acknowledgements.\
+\
+Both the data cache and the data server have a common need to implement\
+locking, with support for shared and exclusive locks, upgrading and\
+downgrading locks, and blocking.  The implementation of these facilities\
+should be shared as much as possible.  Note that, because the server\
+does not have information about transactions, there is no way for it to\
+check for deadlocks.\
+\
+==References==\
+\
+Agrawal, Rakesh, Michael J. Carey, and Lawrence W. McVoy.  December\
+1987.  The Performance of Alternative Strategies for Dealing with\
+Deadlocks in Database Management Systems.\
+''IEEE Transactions on Software Engineering'' 13, no. 12: 1348-1363.\
+}
