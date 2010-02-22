@@ -1,3 +1,8 @@
+Version 0.10.1
+- Added an optional transaction retry policy (NowOrLaterRetryPolicy)
+  that is more robust in handling problematic tasks.  This policy is
+  most useful and recommended for production deployments. (ticket #38)
+
 Version 0.10.0
 - Rebranded as RedDwarf (ticket #2)
 - Added support for client session relocation to client session
