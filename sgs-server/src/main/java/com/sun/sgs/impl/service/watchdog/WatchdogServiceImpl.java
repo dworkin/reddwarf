@@ -463,7 +463,7 @@ public final class WatchdogServiceImpl
         }
 
         // Report this component is healthy and ready for work
-        reportLocalHealth(Health.GREEN, CLASSNAME);
+        reportHealth(Health.GREEN, CLASSNAME);
     }
 
     /** {@inheritDoc} */
@@ -587,7 +587,7 @@ public final class WatchdogServiceImpl
     }
 
     /** {@inheritDoc} */
-    public void reportLocalHealth(Health nodeHealth, String component) {
+    public void reportHealth(Health nodeHealth, String component) {
         reportHealth(localNodeId, nodeHealth, component);
     }
 
@@ -712,8 +712,9 @@ public final class WatchdogServiceImpl
 
         if (!health.isAlive()) {
             logger.log(Level.SEVERE,
-                       "Node:{0} forced to shutdown due to service failure",
-                       localNodeId);
+                       "Node:{0} forced to shutdown due to service failure " +
+                       "reported by {1}",
+                       localNodeId, component);
 
             shutdownController.shutdownNode(this);
         }

@@ -1,3 +1,6 @@
+Version 0.10.1
+- Add client session login limit (ticket #41)
+
 Version 0.10.0
 - Rebranded as RedDwarf (ticket #2)
 - Added support for client session relocation to client session

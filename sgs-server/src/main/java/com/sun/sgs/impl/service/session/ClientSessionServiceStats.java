@@ -85,7 +85,7 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
     }
 
     @Override
-    public int getNumClients() {
+    public int getNumSessions() {
         return service.getNumSessions();
     }
 

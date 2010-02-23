@@ -1360,7 +1360,7 @@ public final class ClientSessionServiceImpl
         taskScheduler.scheduleTask(
             new AbstractKernelRunnable("ReportHealth") {
                 public void run() {
-                   watchdogService.reportLocalHealth(health, CLASSNAME);
+                   watchdogService.reportHealth(health, CLASSNAME);
                 }
             }, taskOwner);
     }

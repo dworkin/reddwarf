@@ -189,7 +189,7 @@ public interface WatchdogService extends Service {
      * @throws	IllegalStateException if this method is invoked from a
      *		transactional context
      */
-    void reportLocalHealth(Health health, String component);
+    void reportHealth(Health health, String component);
 
     /**
      * Informs the watchdog of a node's health. Multiple components may report

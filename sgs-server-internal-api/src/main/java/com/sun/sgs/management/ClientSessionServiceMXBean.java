@@ -55,11 +55,11 @@ public interface ClientSessionServiceMXBean {
     Node.Health getSessionServiceHealth();
 
     /**
-     * Gets the number of clients logged into the session service.
+     * Gets the number of sessions logged into the session service.
      *
-     * @return the number of clients logged in
+     * @return the number of sessions logged in
      */
-    int getNumClients();
+    int getNumSessions();
 
     /**
      * Gets the login high water.
