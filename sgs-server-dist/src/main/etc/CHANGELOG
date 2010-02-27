@@ -1,4 +1,5 @@
 Version 0.10.1
+- Add client session login limit (ticket #41)
 - Added an optional transaction retry policy (NowOrLaterRetryPolicy)
   that is more robust in handling problematic tasks.  This policy is
   most useful and recommended for production deployments. (ticket #38)

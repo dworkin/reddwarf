@@ -172,6 +172,26 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
 
     /**
+     * Informs the watchdog of this node's health. Multiple components may report
+     * on a node's health. The watchdog will use these reports to determine the
+     * overall node's health. The {@code component} parameter may be
+     * any identifying string, but is typically the class name of the component.
+     * <p>
+     * Once {@code reportLocalHealth} has been called with a health that returns
+     * {@code false} from its {@code Health.isAlive} method, the health
+     * of the local node can not be changed. <p>
+     *
+     * This method must be invoked outside of a transaction.
+     *
+     * @param health the health
+     * @param component the name of the component reporting health
+     *
+     * @throws	IllegalStateException if this method is invoked from a
+     *		transactional context
+     */
+    void reportHealth(Health health, String component);
+
+    /**
      * Informs the watchdog of a node's health. Multiple components may report
      * on a node's health. The watchdog will use these reports to determine the
      * overall node's health. The node specified as the {@code nodeId} can be
