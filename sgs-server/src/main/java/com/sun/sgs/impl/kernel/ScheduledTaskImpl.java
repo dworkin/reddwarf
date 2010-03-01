@@ -341,7 +341,7 @@ final class ScheduledTaskImpl implements ScheduledTask {
      *
      * @param timeout the new transaction timeout for this task
      */
-    void setTimeout(long timeout) {
+    public void setTimeout(long timeout) {
         this.timeout = timeout;
     }
 
