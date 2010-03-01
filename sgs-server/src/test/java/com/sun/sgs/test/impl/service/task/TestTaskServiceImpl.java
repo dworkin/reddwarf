@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -769,7 +775,6 @@ public class TestTaskServiceImpl extends Assert {
                     PeriodicTaskCanceler canceler = (PeriodicTaskCanceler)
                             dataService.getBinding("canceler");
                     Assert.assertEquals(1, canceler.getRunCount());
-		    Assert.assertTrue(canceler.getRanAgain());
                 }
         }, taskOwner);
     }
@@ -778,18 +783,14 @@ public class TestTaskServiceImpl extends Assert {
 
         private PeriodicTaskHandle handle = null;
         private int runCount = 0;
-	private boolean ranAgain = false;
 
         @Override
         public void run() throws Exception {
+            runCount++;
             if (handle != null) {
                 handle.cancel();
 		handle = null;
-                runCount++;
-		AppContext.getTaskManager().scheduleTask(this);
-            } else {
-		ranAgain = true;
-	    }
+            }
         }
 
         public void setHandle(PeriodicTaskHandle handle) {
@@ -798,10 +799,6 @@ public class TestTaskServiceImpl extends Assert {
         public int getRunCount() {
             return runCount;
         }
-	public boolean getRanAgain() {
-	    return ranAgain;
-	}
-
     }
     
     private class GetManagedHandleTask extends TestAbstractKernelRunnable {

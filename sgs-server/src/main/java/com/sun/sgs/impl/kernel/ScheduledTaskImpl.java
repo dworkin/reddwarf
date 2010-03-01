@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -301,6 +307,8 @@ final class ScheduledTaskImpl implements ScheduledTask {
             case RUNNING:
                 if (block) {
                     while (state == State.RUNNING) {
+                        // if the task is already running, we just wait for
+                        // it to complete
                         try {
                             wait();
                         } catch (InterruptedException ie) {
