@@ -3,6 +3,7 @@ Version 0.10.1
 - Added an optional transaction retry policy (NowOrLaterRetryPolicy)
   that is more robust in handling problematic tasks.  This policy is
   most useful and recommended for production deployments. (ticket #38)
+- Fix ticket #34
 
 Version 0.10.0
 - Rebranded as RedDwarf (ticket #2)
