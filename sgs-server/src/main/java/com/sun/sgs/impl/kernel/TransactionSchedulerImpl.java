@@ -451,7 +451,7 @@ final class TransactionSchedulerImpl
             // we were interrupted, so try to cancel the task, re-throwing
             // the interruption if that succeeds or looking at the result
             // if the task completes before it can be cancelled
-            if (task.cancel(false)) {
+            if (task.cancel(true)) {
                 backingQueue.notifyCancelled(task);
                 throw ie;
             }
