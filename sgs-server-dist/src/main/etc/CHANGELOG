@@ -3,7 +3,7 @@ Version 0.10.1
 - Added an optional transaction retry policy (NowOrLaterRetryPolicy)
   that is more robust in handling problematic tasks.  This policy is
   most useful and recommended for production deployments. (ticket #38)
-- Fix ticket #34
+- Fix tickets #34, #35, #36, #37
 
 Version 0.10.0
 - Rebranded as RedDwarf (ticket #2)
@@ -11,7 +11,7 @@ Version 0.10.0
   and channel services (issue #12)
 - Added affinity graph builders and group finders, for load balancing
   multi-node clusters (required for issue #54)
-- Fix issues #201, #213, #214, #215, #216, #217, #218
+- Fix issues #201, #213, #215, #216
 
 Version 0.9.11:
 - Introduced application level clock accessible via the watchdog service.
