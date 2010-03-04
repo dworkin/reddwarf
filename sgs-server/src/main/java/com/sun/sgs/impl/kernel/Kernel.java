@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -135,7 +141,14 @@ import javax.management.JMException;
  *      constructor with the three parameters {@link Properties},
  *      {@link TransactionProxy}, and {@link ProfileCollectorHandle}.<p>
  *
- * 
+ * <dt> <i>Property:</i> <code><b>{@value #SHUTDOWN_TIMEOUT_PEOPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_SHUTDOWN_TIMEOUT}</code> (15 minutes)
+ *
+ * <dd style="padding-top: .5em">Specifies the time, in milliseconds, that the kernel
+ *      will wait for services to complete shutting down. After this time, if shutdown
+ *      has not completed {@link System#exit System.exit(1)} is called to
+ *      to force the process to quit.<p>
  * </dl>
  */
 class Kernel {
@@ -179,10 +192,16 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
-    
+
+    /** The property for setting the shutdown timeout */
+    public static final String SHUTDOWN_TIMEOUT_PEOPERTY =
+        "com.sun.sgs.impl.kernel.shutdown.property";
+
     // default timeout the kernel's shutdown method (15 minutes)
-    private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 60000;
-    
+    public static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 60000;
+
+    private final int shutdownTimeout;
+
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
     
@@ -244,6 +263,8 @@ class Kernel {
         checkProperties(appProperties);
         this.wrappedProperties = new PropertiesWrapper(appProperties);
 
+        shutdownTimeout = wrappedProperties.getIntProperty(SHUTDOWN_TIMEOUT_PEOPERTY,
+                                                           DEFAULT_SHUTDOWN_TIMEOUT);
         try {
             // See if we're doing any profiling.
             String level = wrappedProperties.getProperty(PROFILE_LEVEL_PROPERTY,
@@ -355,7 +376,7 @@ class Kernel {
                 logger.logThrow(Level.SEVERE, e, "Failed on Kernel boot");
             }
             // shut down whatever we've started
-            shutdown();
+            shutdown(false);
             throw e;
         }
     }
@@ -833,26 +854,32 @@ class Kernel {
      * too long. The timer is started as a daemon so the task won't be run if
      * a shutdown completes successfully.
      */
-    private void startShutdownTimeout(final int timeout) {
+    private void startShutdownTimeout() {
         new Timer(true).schedule(new TimerTask() {
             public void run() {
                 System.exit(1);
             }
-        }, timeout);
+        }, shutdownTimeout);
     }
     
     /**
-     * Shut down all services (in reverse order) and the schedulers.
+     * Shut down all services (in reverse order) and the schedulers. If {@code prepare}
+     * is {@code true} each service is checked whether it implements
+     * {@link ShutdownPrepare} and if so, calls {@code prepareToShutdown} before shutting
+     * down any service.
+     *
+     * @param prepare if {@code true} prepare services to shutdown, before shutting down
+     *                any service
      */
-    synchronized void shutdown() {
+    synchronized void shutdown(boolean prepare) {
         if (isShutdown) { 
             return;
         }
-        startShutdownTimeout(DEFAULT_SHUTDOWN_TIMEOUT);
+        startShutdownTimeout();
 
         logger.log(Level.FINE, "Kernel.shutdown() called.");
         if (application != null) {
-            application.shutdownServices();
+            application.shutdownServices(prepare);
         }
         if (profileCollector != null) {
             profileCollector.shutdown();
@@ -1137,12 +1164,16 @@ class Kernel {
          * {@inheritDoc}
          */
         public void shutdownNode(Object caller) {
+            shutdownNode(caller, false);
+        }
+
+        private void shutdownNode(Object caller, boolean prepare) {
             synchronized (shutdownQueueLock) {
                 if (isReady) {
                     // service shutdown; we have already gone through notifying
                     // the server, so shutdown the node right now
                     if (caller instanceof WatchdogService) {
-                        runShutdown();
+                        runShutdown(prepare);
                     } else {
                         // component shutdown; we go through the watchdog to
                         // cleanup and notify the server first
@@ -1153,7 +1184,7 @@ class Kernel {
                         } else {
                             // shutdown directly if data service and watchdog
                             // have not been setup
-                            runShutdown();
+                            runShutdown(prepare);
                         }
                     }
                 } else {
@@ -1170,12 +1201,12 @@ class Kernel {
          * For example, the watchdog service's shutdown method would block if
          * a Kernel shutdown was called from RenewThread.
          */
-        private void runShutdown() {
+        private void runShutdown(final boolean prepare) {
             logger.log(Level.WARNING, "Controller issued node shutdown.");
 
             new Thread(new Runnable() {
                 public void run() {
-                    shutdown();
+                    shutdown(prepare);
                 }
             }).start();
         }
@@ -1185,7 +1216,7 @@ class Kernel {
     public class KernelManager implements KernelMXBean {
         /** {@inheritDoc} */
         public void requestShutdown() {
-            shutdownCtrl.shutdownNode(this);
+            shutdownCtrl.shutdownNode(this, true);
         }
     }
     

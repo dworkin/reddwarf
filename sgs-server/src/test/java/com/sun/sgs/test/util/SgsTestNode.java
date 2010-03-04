@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -85,7 +91,7 @@ public class SgsTestNode {
             kernelCtor.setAccessible(true);
 
             kernelShutdownMethod = 
-                    kernelClass.getDeclaredMethod("shutdown");
+                    kernelClass.getDeclaredMethod("shutdown", boolean.class);
             kernelShutdownMethod.setAccessible(true);
 
             kernelProxy = kernelClass.getDeclaredField("proxy");
@@ -302,7 +308,7 @@ public class SgsTestNode {
      * @param clean if {@code true}, also delete the data store directory
      */
     public void shutdown(boolean clean) throws Exception {
-        kernelShutdownMethod.invoke(kernel);
+        kernelShutdownMethod.invoke(kernel, true);
         if (clean) {
             deleteDirectory(dbDirectory);
         }

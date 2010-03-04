@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -31,6 +37,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.service.Service;
+import com.sun.sgs.service.ShutdownPrepare;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -228,13 +235,22 @@ class KernelContext {
 
     /**
      * Shut down all the service components in the reverse order that
-     * they were added.
+     * they were added. If {@code prepare} is {@code true} each service is checked
+     * whether it implements {@link ShutdownPrepare} and if so, calls
+     * {@code prepareToShutdown} before shutting down any service.
+     *
+     * @param prepare if {@code true} prepare services to shutdown, before shutting down
+     *                any service
      */
-    void shutdownServices() {
+    void shutdownServices(boolean prepare) {
         // reverse the list of services
         ArrayList<Object> list = new ArrayList<Object>();
         for (Object service : serviceComponents) {
             list.add(service);
+
+            if (service instanceof ShutdownPrepare) {
+                ((ShutdownPrepare)service).prepareToShutdown();
+            }
         }
         Collections.reverse(list);
         for (Object service : list) {
