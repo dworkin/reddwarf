@@ -67,6 +67,7 @@ import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.ShutdownPrepare;
 import com.sun.sgs.service.SimpleCompletionHandler;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
@@ -184,7 +185,7 @@ import javax.management.JMException;
  */
 public final class ClientSessionServiceImpl
     extends AbstractService
-    implements ClientSessionService
+    implements ClientSessionService, ShutdownPrepare
 {
     /** The package name. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.session";
@@ -625,6 +626,13 @@ public final class ClientSessionServiceImpl
 		throw e;
 	    }
 	}
+    }
+
+    /* -- Implement ShutdownPrepare -- */
+
+    @Override
+    public void prepareToShutdown() {
+//        setConnectionEnable(false);
     }
 
     /* -- Implement ClientSessionService -- */
