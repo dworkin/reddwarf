@@ -745,7 +745,55 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	    client.disconnect();
 	}
     }
+    
+    @Test
+    public void testClientSessionRemoveDoesNotRemoveManagedListener()
+	throws Exception
+    {
+	testClientSessionRemoveWithManagedListener(false);
+    }
+    
+    @Test
+    public void testClientSessionRemoveObjectAfterRemovingManagedListener()
+	throws Exception
+    {
+	testClientSessionRemoveWithManagedListener(true);
+    }
 
+    private void testClientSessionRemoveWithManagedListener(
+	final boolean removeListener)
+	throws Exception
+    {
+	final String name = "testClient";
+	int objectCount = getObjectCount();
+	DummyClient client = createDummyClient(name);
+	try {
+	    assertTrue(client.connect(serverNode.getAppPort()).login());
+	    System.err.println("Objects added: " +
+			       (getObjectCount() - objectCount));
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		    public void run() {
+			System.err.println(
+			    "forcing disconnection, session:" + name);
+			ClientSession session = (ClientSession)
+			    dataService.getBinding(name);
+			DummyClientSessionListener listener =
+			    (DummyClientSessionListener)
+			    dataService.getBinding(name + ".listener");
+			if (removeListener) {
+			    dataService.removeObject(listener);
+			}
+			dataService.removeObject(session);
+		    }
+		}, taskOwner);
+	    Thread.sleep(500);
+	    assertEquals(objectCount + (removeListener ? 0 : 1),
+			 getObjectCount());
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
     @Test
     public void testClientSessionToString() throws Exception {
 	final String name = "testClient";
@@ -1299,12 +1347,10 @@ public class TestClientSessionServiceImplv4 extends Assert {
                                                     Serializable {
 
 	private final static long serialVersionUID = 1L;
-
-	private final Map<ManagedReference<ClientSession>,
-			  ManagedReference<DummyClientSessionListener>>
-	    sessions = Collections.synchronizedMap(
-		new HashMap<ManagedReference<ClientSession>,
-			    ManagedReference<DummyClientSessionListener>>());
+	
+	private final Set<ManagedReference<ClientSession>>
+	    sessions = Collections.synchronizedSet(
+		new HashSet<ManagedReference<ClientSession>>());
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
@@ -1331,13 +1377,13 @@ public class TestClientSessionServiceImplv4 extends Assert {
 		listener = new DummyClientSessionListener(name, session, false);
 	    }
 	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.markForUpdate(this);
 	    ManagedReference<ClientSession> sessionRef =
 		dataManager.createReference(session);
-	    ManagedReference<DummyClientSessionListener> listenerRef =
-		dataManager.createReference(listener);
-	    dataManager.markForUpdate(this);
-	    sessions.put(sessionRef, listenerRef);
-	    dataManager.setBinding(session.getName(), session);
+	    sessions.add(sessionRef);
+	    String sessionName = session.getName();
+	    dataManager.setBinding(sessionName, session);
+	    dataManager.setBinding(sessionName + ".listener", listener);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}
@@ -1347,11 +1393,8 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	}
 
 	private Set<ClientSession> getSessions() {
-	    Set<ClientSession> sessionSet =
-		new HashSet<ClientSession>();
-	    for (ManagedReference<ClientSession> sessionRef
-		     : sessions.keySet())
-	    {
+	    Set<ClientSession> sessionSet = new HashSet<ClientSession>();
+	    for (ManagedReference<ClientSession> sessionRef : sessions) {
 		sessionSet.add(sessionRef.get());
 	    }
 	    return sessionSet;
@@ -1394,7 +1437,20 @@ public class TestClientSessionServiceImplv4 extends Assert {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
-	    AppContext.getDataManager().removeObject(sessionRef.get());
+	    DataManager dataManager = AppContext.getDataManager();
+	    try {
+		dataManager.removeObject(sessionRef.get());
+	    } catch (ObjectNotFoundException e) {
+		// session already removed
+	    }
+	    /*
+	    try {
+		dataManager.removeObject(
+		    dataManager.getBinding(name + ".listener"));
+	    } catch (ObjectNotFoundException e) {
+		// listener already removed
+	    }
+	    */
 	    DummyClient client =
                     reconnectKey == null ? null :
                                            dummyClients.get(reconnectKey);

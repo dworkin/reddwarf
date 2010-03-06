@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -290,38 +296,50 @@ final class ScheduledTaskImpl implements ScheduledTask {
 
     /**
      * {@inheritDoc}
-     * <p>
-     * Note that in the current scheduler implementation this is only
-     * called at the point where {@code runTask()} is using its calling
-     * thread to run a task. In this case calling cancel() will always
-     * return, so no extra logic has been implemented to make sure that
-     * canceling the task keeps it from re-trying. Were this method to be
-     * used when a task could be handed-off between threads or
-     * re-tried many times then this implementation should probably be
-     * extended to note the cancelation request and disallow further
-     * attempts at execution.
      */
-    public synchronized boolean cancel(boolean allowInterrupt)
-        throws InterruptedException
+    public synchronized boolean cancel(boolean block)
     {
-        if (isDone()) {
-            return false; 
-        }
-        while (state == State.RUNNING) {
-            try {
-                wait();
-            } catch (InterruptedException ie) {
-                if (allowInterrupt) {
-                    throw ie;
+        switch (state) {
+            case COMPLETED:
+            case CANCELLED:
+                // the task has already completed or been cancelled
+                return false;
+            case RUNNING:
+                if (block) {
+                    while (state == State.RUNNING) {
+                        // if the task is already running, we just wait for
+                        // it to complete
+                        try {
+                            wait();
+                        } catch (InterruptedException ie) {
+                            // ignore this exception because we must block
+                            // until the task has completed
+                        }
+                    }
+                    if (!isDone()) {
+                        cancel();
+                        return true;
+                    }
                 }
-            }
+                return false;
+            case RUNNABLE:
+            case INTERRUPTED:
+                // the task has not started yet or has already been interrupted,
+                // so we can cancel it safely
+                cancel();
+                return true;
+            default:
+                // should never get here
+                return false;
         }
-        if (!isDone()) {
-            state = State.CANCELLED;
-            notifyAll();
-            return true;
-        }
-        return false;
+    }
+
+    /**
+     * Private cancel utility method used by {@link #cancel(boolean) cancel}.
+     */
+    private void cancel() {
+        state = State.CANCELLED;
+        notifyAll();
     }
 
     /** Package-private utility methods. */
