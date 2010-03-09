@@ -4,7 +4,7 @@
   <groupId>org.reddwarfserver.maven.plugin</groupId>
   <artifactId>sgs-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
-  <version>1.0-beta-2</version>
+  <version>1.0-beta-3-SNAPSHOT</version>
   <name>RedDwarf Maven Plugin</name>
   <url>http://www.reddwarfserver.org</url>
   <inceptionYear>2010</inceptionYear>
