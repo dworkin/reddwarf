@@ -4,27 +4,27 @@
  Owen Kellett
  <owen.kellett@sun.com>
  ------
- November 2, 2009
+ March 8, 2010
  ------
 
-Project Darkstar Maven Plugin
+RedDwarf Server Maven Plugin
 
 * Overview
 
-  This plugin provides the ability to control a Project Darkstar server installation.
+  This plugin provides the ability to control a RedDwarf server installation.
   Capabilities include: installation of the server distribution itself, deploying 
   application JAR files into the server, deploying extension JAR files into the server,
   configuring the server, booting up the server, or shutting down the server. This plugin
-  is compatible with Project Darkstar server version 0.9.11 or later.
+  is compatible with RedDwarf server version 0.10.0 or later.
 
-  Since the plugin also can install Project Darkstar server directly from the distribution
+  Since the plugin also can install RedDwarf server directly from the distribution
   zip file (resolved and downloaded from the Maven repository), there are generally two
   ways to use this plugin:
 
   * To install the server, deploy and configure an application, and then boot it up for
     testing or one-off executions
 
-  * To deploy and configure an application into an existing Project Darkstar server
+  * To deploy and configure an application into an existing RedDwarf server
     installation (for actual production deployments)
 
 * Goals
@@ -34,5 +34,5 @@ Project Darkstar Maven Plugin
 
 * Examples
 
-  A few examples of what can be done with the Project Darkstar Maven Plugin
+  A few examples of what can be done with the RedDwarf Maven Plugin
   can be found in the {{{examples.html}Examples}} section.

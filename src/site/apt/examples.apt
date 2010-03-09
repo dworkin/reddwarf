@@ -4,25 +4,25 @@
  Owen Kellett
  <owen.kellett@sun.com>
  ------
- November 2, 2009
+ March 8, 2010
  ------
 
 Examples
 
-  This plugin provides the ability to control a Project Darkstar server installation.
-  Since the plugin also can install Project Darkstar server directly from the distribution
+  This plugin provides the ability to control a RedDwarf server installation.
+  Since the plugin also can install RedDwarf server directly from the distribution
   zip file (resolved and downloaded from the Maven repository), there are generally two
   ways to use this plugin:
 
   * To install the server, deploy and configure an application, and then boot it up for
     testing or one-off executions
 
-  * To deploy and configure an application into an existing Project Darkstar server
+  * To deploy and configure an application into an existing RedDwarf server
     installation (for actual production deployments)
 
   []
 
-  These are just examples of what can be done with the Project Darkstar Maven Plugin.
+  These are just examples of what can be done with the RedDwarf Maven Plugin.
   Please see the {{{plugin-info.html}Goals}} section for more information about its
   full potential.
 
@@ -30,7 +30,7 @@ Examples
 
   This example binds a single execution of four goals, <<<install>>>, <<<configure>>>,
   <<<deploy>>>, and <<<boot>>> to the integration-test phase.  When executed,
-  Project Darkstar server version 0.9.11 will be installed by default into the
+  RedDwarf server version 0.10.0 will be installed by default into the
   the <<<${project.build.directory}>>>.  The resulting <<<sgsHome>>> then becomes
   <<<${project.build.directory}/sgs-server-dist-${sgs.version}>>> as seen in the
   configuration.  The given <<<sgsBoot>>> and <<<sgsServer>>> properties files will
@@ -59,8 +59,8 @@ Examples
           </execution>
         </executions>
         <configuration>
-          <version>0.9.11</version>
-          <sgsHome>${project.build.directory}/sgs-server-dist-0.9.11</sgsHome>
+          <version>0.10.0</version>
+          <sgsHome>${project.build.directory}/sgs-server-dist-0.10.0</sgsHome>
           <sgsBoot>${basedir}/src/test/properties/my.boot</sgsBoot>
           <sgsServer>${basedir}/src/test/properties/my.properties</sgsServer>
           <files>
@@ -80,7 +80,7 @@ Examples
 * Production Deployment
 
   This example shows what one might do if using this plugin to deploy into a production
-  Project Darkstar server installation.
+  RedDwarf server installation.
 
 +------------------------------------------+
 <project>
@@ -118,9 +118,9 @@ Examples
 
   The <<<deploy-dependencies>>> goal can deploy artifacts directly from project dependencies.
   It (as well as the <<<deploy>>> goal) also has the ability to unpack those dependencies
-  directly into the Project Darkstar server installation's deploy directory.  This example
+  directly into the RedDwarf server installation's deploy directory.  This example
   will take all of a project's direct dependencies (excluding transitives), will unpack
-  them into the Project Darkstar server's deploy directory, and then will boot the server.
+  them into the RedDwarf server's deploy directory, and then will boot the server.
   This is useful if, for example, an application's deployable JAR files are bundled into
   a zip artifact.
 
@@ -144,8 +144,8 @@ Examples
           </execution>
         </executions>
         <configuration>
-          <version>0.9.11</version>
-          <sgsHome>${project.build.directory}/sgs-server-dist-0.9.11</sgsHome>
+          <version>0.10.0</version>
+          <sgsHome>${project.build.directory}/sgs-server-dist-0.10.0</sgsHome>
           <excludeTransitive>true</excludeTransitive>
         </configuration>
       </plugin>
@@ -183,8 +183,8 @@ Examples
           </execution>
         </executions>
         <configuration>
-          <version>0.9.11</version>
-          <sgsHome>${project.build.directory}/sgs-server-dist-0.9.11</sgsHome>
+          <version>0.10.0</version>
+          <sgsHome>${project.build.directory}/sgs-server-dist-0.10.0</sgsHome>
           <files>
             <file>${project.artifact.file}</file>
           </files>
@@ -200,13 +200,13 @@ Examples
 
 * Extend and Deploy
 
-  Often a project's artifact is the item that should be deployed into the Project
-  Darkstar server for use.  However, some of the dependencies should be included
+  Often a project's artifact is the item that should be deployed into the RedDwarf
+  server for use.  However, some of the dependencies should be included
   as extensions while others are simply runtime dependencies that should also
   be deployed along with the project's main artifact.  This example combines
   six distinct goals, <<<install>>>, <<<configure>>>, <<<extend-dependencies>>>,
   <<<deploy>>>, <<<deploy-dependencies>>>, and <<<boot>>> to setup the
-  Project Darkstar server instance.  It will deploy the darkstar services project
+  RedDwarf server instance.  It will deploy the darkstar services project
   as an extension and the remaining dependencies and project artifact as normal
   deployment artifacts before booting the server.
 
@@ -252,8 +252,8 @@ Examples
           </execution>
         </executions>
         <configuration>
-          <version>0.9.11</version>
-          <sgsHome>${project.build.directory}/sgs-server-dist-0.9.11</sgsHome>
+          <version>0.10.0</version>
+          <sgsHome>${project.build.directory}/sgs-server-dist-0.10.0</sgsHome>
           <sgsBoot>${basedir}/src/test/properties/my.boot</sgsBoot>
           <sgsServer>${basedir}/src/test/properties/my.properties</sgsServer>
         </configuration>

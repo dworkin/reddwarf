@@ -1,19 +1,19 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.projectdarkstar.maven.plugin</groupId>
+  <groupId>org.reddwarfserver.maven.plugin</groupId>
   <artifactId>sgs-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
   <version>1.0-beta-2-SNAPSHOT</version>
-  <name>Project Darkstar Maven Plugin</name>
-  <url>https://sgs-maven-plugin.dev.java.net</url>
-  <inceptionYear>2009</inceptionYear>
+  <name>RedDwarf Server Maven Plugin</name>
+  <url>https://www.reddwarfserver.org</url>
+  <inceptionYear>2010</inceptionYear>
   <description>
-    This plugin provides the ability to control a Project Darkstar server
+    This plugin provides the ability to control a RedDwarf server
     installation from Maven.  Capabilities include: installation of the server
     distribution itself, deploying application JAR files into the server,
     configuring the server, booting up the server, or shutting down the server.
-    This plugin is compatible with Project Darkstar server version 0.9.8 or
+    This plugin is compatible with RedDwarf server version 0.10.0 or
     later.
   </description>
   
@@ -47,7 +47,7 @@
 	    <phase>generate-resources</phase>
 	    <configuration>
 	      <resourceBundles>
-		<resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
+		<resourceBundle>org.reddwarfserver.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
 	      </resourceBundles>
 	    </configuration>
 	  </execution>
@@ -179,9 +179,9 @@
   </dependencies>
 
   <properties>
-    <projectYear>2009</projectYear>
-    <minimum.sgs.version>0.9.11</minimum.sgs.version>
-    <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
+    <projectYear>2010</projectYear>
+    <minimum.sgs.version>0.10.0</minimum.sgs.version>
+    <sgs-jar-resources-bsd.version>1.3</sgs-jar-resources-bsd.version>
 
     <maven.version>2.0.9</maven.version>
     <maven-common-artifact-filters.version>1.2</maven-common-artifact-filters.version>

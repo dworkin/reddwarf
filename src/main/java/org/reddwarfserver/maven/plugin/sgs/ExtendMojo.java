@@ -30,50 +30,29 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package org.reddwarfserver.maven.plugin.sgs;
 
-import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import java.io.File;
 
 /**
- * Abstract Mojo which provides common functionality to all Project Darkstar
- * Mojos.
+ * Deploys an extension jar or jar files into a Project Darkstar server
+ * installation.
+ *
+ * @goal extend
  */
-public abstract class AbstractSgsMojo extends AbstractMojo {
-    
+public class ExtendMojo extends AbstractExtendMojo {
+
     /**
-     * Directory where the Project Darkstar server is installed.
-     * 
+     * The extension jar files to deploy into the Project Darkstar server.
+     *
      * @parameter
      * @required
-     * @since 1.0-alpha-1
+     * @since 1.0-beta-1
      */
-    protected File sgsHome;
+    private File[] files;
 
-    protected void checkConfig() throws MojoExecutionException {
-        if (sgsHome == null) {
-            throw new MojoExecutionException(
-                    "The sgsHome configuration parameter is not set!");
-        } else if(!sgsHome.exists()) {
-            throw new MojoExecutionException(
-                    "The directory specified by sgsHome does not exist : " + 
-                    sgsHome);
-        }
+    public File[] getFiles() throws MojoExecutionException {
+        return files;
     }
-    
-    protected void checkDirectory(File dir) throws MojoExecutionException {
-        if(dir == null || !dir.exists() || !dir.isDirectory()) {
-            throw new MojoExecutionException(
-                    "Directory does not exist or is not a directory : " + dir);
-        }
-    }
-    
-    protected void checkFile(File file) throws MojoExecutionException {
-        if(file == null || !file.exists() || !file.isFile()) {
-            throw new MojoExecutionException(
-                    "File does not exist or is not a file : " + file);
-        }
-    }
-    
 }

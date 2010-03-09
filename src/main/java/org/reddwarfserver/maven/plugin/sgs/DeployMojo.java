@@ -30,34 +30,28 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package org.reddwarfserver.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import java.io.File;
 
 /**
- * Abstract Mojo which provides common functionality to all Project Darkstar
- * Extend Mojos.
+ * Deploys a jar or jar files into a Project Darkstar server installation.
+ *
+ * @goal deploy
  */
-public abstract class AbstractExtendMojo extends AbstractDirectoryMojo {
-
-    static final String EXTEND = "ext";
-
+public class DeployMojo extends AbstractDeployMojo {
+    
     /**
-     * The extend directory of the Project Darkstar installation.
-     * Defaults to the "ext" subdirectory under sgsHome.
-     *
+     * The jar files to deploy into the Project Darkstar server.
+     * 
      * @parameter
-     * @since 1.0-beta-1
+     * @required
+     * @since 1.0-alpha-1
      */
-    protected File extDir;
-
-    public File getDirectory() throws MojoExecutionException {
-        if(extDir == null) {
-            extDir = new File(sgsHome, EXTEND);
-        }
-
-        return extDir;
+    private File[] files;
+    
+    public File[] getFiles() throws MojoExecutionException {
+        return files;
     }
 }
-

@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package org.reddwarfserver.maven.plugin.sgs;
 
 import org.codehaus.plexus.util.FileUtils;
 import org.junit.runner.RunWith;

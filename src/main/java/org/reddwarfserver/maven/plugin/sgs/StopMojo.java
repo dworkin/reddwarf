@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package org.reddwarfserver.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.codehaus.plexus.util.cli.Commandline;
@@ -40,14 +40,14 @@ import org.codehaus.plexus.util.cli.StreamConsumer;
 import java.io.File;
 
 /**
- * Boots up a Project Darkstar server installation.
+ * Stops a Project Darkstar server installation.
  * 
- * @goal boot
+ * @goal stop
  */
-public class BootMojo extends AbstractSgsMojo {
+public class StopMojo extends AbstractSgsMojo {
     
     static final String BIN = "bin";
-    static final String BOOTJAR = "sgs-boot.jar";
+    static final String STOPJAR = "sgs-stop.jar";
     
     /**
      * Optional parameter to specify a boot properties file to feed on the
@@ -58,7 +58,7 @@ public class BootMojo extends AbstractSgsMojo {
      * @since 1.0-alpha-1
      */
     private File alternateBoot;
-
+    
     public void execute()
         throws MojoExecutionException
     {
@@ -66,15 +66,15 @@ public class BootMojo extends AbstractSgsMojo {
         this.checkConfig();
         File binDir = new File(sgsHome, BIN);
         this.checkDirectory(binDir);
-        File bootJar = new File(binDir, BOOTJAR);
-        this.checkFile(bootJar);
+        File stopJar = new File(binDir, STOPJAR);
+        this.checkFile(stopJar);
 
         //prepare the java command
         Commandline command = new Commandline();
         String javaCmd = System.getProperty("java.home") + File.separator + 
                 "bin" + File.separator + "java";
         command.setExecutable(javaCmd);
-        command.addArguments(new String[]{"-jar", bootJar.getAbsolutePath()});
+        command.addArguments(new String[]{"-jar", stopJar.getAbsolutePath()});
         
         //add the boot properties argument if it is specified
         if(alternateBoot != null) {
@@ -87,16 +87,15 @@ public class BootMojo extends AbstractSgsMojo {
             LogStreamConsumer l = new LogStreamConsumer();
             CommandLineUtils.executeCommandLine(command, l, l);
         } catch (CommandLineException e) {
-            throw new MojoExecutionException("Unable to boot server", e);
+            throw new MojoExecutionException("Unable to stop server", e);
         }
     }
 
     private class LogStreamConsumer implements StreamConsumer {
 
         public void consumeLine(String line) {
-            BootMojo.this.getLog().info(line);
+            StopMojo.this.getLog().info(line);
         }
         
     }
-
 }

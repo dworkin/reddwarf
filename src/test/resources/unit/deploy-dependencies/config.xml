@@ -2,7 +2,7 @@
   <build>
     <plugins>
       <plugin>
-	<groupId>com.projectdarkstar.maven.plugin</groupId>
+	<groupId>org.reddwarfserver.maven.plugin</groupId>
         <artifactId>sgs-maven-plugin</artifactId>
         <executions>
           <execution>
@@ -21,7 +21,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
+      <groupId>org.reddwarfserver.server</groupId>
       <artifactId>sgs-boot</artifactId>
       <version>${minimum.sgs.version}</version>
     </dependency>

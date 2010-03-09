@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package org.reddwarfserver.maven.plugin.sgs;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.repository.DefaultArtifactRepository;
@@ -50,10 +50,10 @@ import java.util.Collections;
 public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
 
     // support install for all subclass tests
-    private String groupId = "com.projectdarkstar.server";
+    private String groupId = "org.reddwarfserver.server";
     private String artifactId = "sgs-server-dist";
     private String type = "zip";
-    private String version = "0.9.11";
+    private String version = "0.10.0";
     private boolean cleanSgsHome = true;
 
     protected void fillDefaultValues(InstallMojo mojo) throws Exception {

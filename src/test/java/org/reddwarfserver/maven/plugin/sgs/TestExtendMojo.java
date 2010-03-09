@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package org.reddwarfserver.maven.plugin.sgs;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.codehaus.plexus.util.FileUtils;
@@ -43,49 +43,49 @@ import org.junit.After;
 import java.io.File;
 
 /**
- * Test the {@code DeployMojo} class
+ * Test the {@code ExtendMojo} class
  */
 @RunWith(JUnit4.class)
-public class TestDeployMojo extends AbstractTestSgsMojo {
+public class TestExtendMojo extends AbstractTestSgsMojo {
 
-    private static final String POM = "target/test-classes/unit/deploy/config.xml";
+    private static final String POM = "target/test-classes/unit/extend/config.xml";
     private File outputDirectory;
 
     private AbstractSgsMojo mojo;
     private File sgsHome;
-    private File deployDir;
+    private File extDir;
     private File dummyFile1;
     private File dummyFile2;
     private File dummyZip;
     private File noFile;
 
     protected AbstractSgsMojo buildEmptyMojo() {
-        return new DeployMojo();
+        return new ExtendMojo();
     }
 
     @Before
     public void buildDummyHomeMojo() throws Exception {
-        mojo = this.lookupDummyMojo(DeployMojo.class, "deploy", POM);
+        mojo = this.lookupDummyMojo(ExtendMojo.class, "extend", POM);
         sgsHome = (File) this.getVariableValueFromObject(mojo, "sgsHome");
-        deployDir = new File(sgsHome, "deploy");
+        extDir = new File(sgsHome, "ext");
 
         dummyFile1 = new File(getBasedir(),
                               "target" + File.separator +
                               "test-classes" + File.separator +
                               "unit" + File.separator +
-                              "deploy" + File.separator +
+                              "extend" + File.separator +
                               "dummy.file");
         dummyFile2 = new File(getBasedir(),
                               "target" + File.separator +
                               "test-classes" + File.separator +
                               "unit" + File.separator +
-                              "deploy" + File.separator +
+                              "extend" + File.separator +
                               "dummy2.file");
         dummyZip = new File(getBasedir(),
                             "target" + File.separator +
                             "test-classes" + File.separator +
                             "unit" + File.separator +
-                            "deploy" + File.separator +
+                            "extend" + File.separator +
                             "dummy.zip");
         noFile = new File("does-not-exist");
 
@@ -93,7 +93,7 @@ public class TestDeployMojo extends AbstractTestSgsMojo {
                                    "target" + File.separator +
                                    "test-classes" + File.separator +
                                    "unit" + File.separator +
-                                   "deploy");
+                                   "extend");
     }
 
     @After
@@ -109,11 +109,11 @@ public class TestDeployMojo extends AbstractTestSgsMojo {
         this.setVariableValueToObject(mojo, "files", new File[]{dummyFile1});
         mojo.execute();
 
-        Assert.assertTrue(deployDir.exists());
-        Assert.assertTrue(deployDir.isDirectory());
-        Assert.assertEquals(1, deployDir.listFiles().length);
+        Assert.assertTrue(extDir.exists());
+        Assert.assertTrue(extDir.isDirectory());
+        Assert.assertEquals(1, extDir.listFiles().length);
 
-        Assert.assertEquals(FileUtils.fileRead(deployDir.listFiles()[0]),
+        Assert.assertEquals(FileUtils.fileRead(extDir.listFiles()[0]),
                             FileUtils.fileRead(dummyFile1));
     }
 
@@ -123,15 +123,15 @@ public class TestDeployMojo extends AbstractTestSgsMojo {
         this.setVariableValueToObject(mojo, "files", new File[]{dummyFile1, dummyFile2});
         mojo.execute();
 
-        Assert.assertTrue(deployDir.exists());
-        Assert.assertTrue(deployDir.isDirectory());
-        Assert.assertEquals(2, deployDir.listFiles().length);
+        Assert.assertTrue(extDir.exists());
+        Assert.assertTrue(extDir.isDirectory());
+        Assert.assertEquals(2, extDir.listFiles().length);
 
-        // verify that both files have been deployed
-        Assert.assertTrue(FileUtils.fileRead(deployDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile1)) ||
-                          FileUtils.fileRead(deployDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile2)));
-        Assert.assertTrue(FileUtils.fileRead(deployDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile1)) ||
-                          FileUtils.fileRead(deployDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile2)));
+        // verify that both files have been extended
+        Assert.assertTrue(FileUtils.fileRead(extDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile1)) ||
+                          FileUtils.fileRead(extDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile2)));
+        Assert.assertTrue(FileUtils.fileRead(extDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile1)) ||
+                          FileUtils.fileRead(extDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile2)));
     }
 
     @Test(expected=MojoExecutionException.class)
@@ -142,9 +142,9 @@ public class TestDeployMojo extends AbstractTestSgsMojo {
     }
 
     @Test(expected=MojoExecutionException.class)
-    public void testExecuteInvalidDeployDir() throws Exception{
+    public void testExecuteInvalidExtDir() throws Exception{
         this.executeInstall(POM, outputDirectory);
-        this.setVariableValueToObject(mojo, "deployDir", noFile);
+        this.setVariableValueToObject(mojo, "extDir", noFile);
         mojo.execute();
     }
 
@@ -155,15 +155,15 @@ public class TestDeployMojo extends AbstractTestSgsMojo {
         this.setVariableValueToObject(mojo, "unpack", true);
         mojo.execute();
 
-        Assert.assertTrue(deployDir.exists());
-        Assert.assertTrue(deployDir.isDirectory());
-        Assert.assertEquals(2, deployDir.listFiles().length);
+        Assert.assertTrue(extDir.exists());
+        Assert.assertTrue(extDir.isDirectory());
+        Assert.assertEquals(2, extDir.listFiles().length);
 
         // verify that the zip file has been unpacked
-        Assert.assertTrue(FileUtils.fileRead(deployDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile1)) ||
-                          FileUtils.fileRead(deployDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile2)));
-        Assert.assertTrue(FileUtils.fileRead(deployDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile1)) ||
-                          FileUtils.fileRead(deployDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile2)));
+        Assert.assertTrue(FileUtils.fileRead(extDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile1)) ||
+                          FileUtils.fileRead(extDir.listFiles()[0]).equals(FileUtils.fileRead(dummyFile2)));
+        Assert.assertTrue(FileUtils.fileRead(extDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile1)) ||
+                          FileUtils.fileRead(extDir.listFiles()[1]).equals(FileUtils.fileRead(dummyFile2)));
     }
 
     @Test(expected=MojoExecutionException.class)
@@ -174,4 +174,3 @@ public class TestDeployMojo extends AbstractTestSgsMojo {
         mojo.execute();
     }
 }
-

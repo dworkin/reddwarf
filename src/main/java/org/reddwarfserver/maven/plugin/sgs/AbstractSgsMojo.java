@@ -30,28 +30,50 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package org.reddwarfserver.maven.plugin.sgs;
 
+import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import java.io.File;
 
 /**
- * Deploys a jar or jar files into a Project Darkstar server installation.
- *
- * @goal deploy
+ * Abstract Mojo which provides common functionality to all Project Darkstar
+ * Mojos.
  */
-public class DeployMojo extends AbstractDeployMojo {
+public abstract class AbstractSgsMojo extends AbstractMojo {
     
     /**
-     * The jar files to deploy into the Project Darkstar server.
+     * Directory where the Project Darkstar server is installed.
      * 
      * @parameter
      * @required
      * @since 1.0-alpha-1
      */
-    private File[] files;
-    
-    public File[] getFiles() throws MojoExecutionException {
-        return files;
+    protected File sgsHome;
+
+    protected void checkConfig() throws MojoExecutionException {
+        if (sgsHome == null) {
+            throw new MojoExecutionException(
+                    "The sgsHome configuration parameter is not set!");
+        } else if(!sgsHome.exists()) {
+            throw new MojoExecutionException(
+                    "The directory specified by sgsHome does not exist : " + 
+                    sgsHome);
+        }
     }
+    
+    protected void checkDirectory(File dir) throws MojoExecutionException {
+        if(dir == null || !dir.exists() || !dir.isDirectory()) {
+            throw new MojoExecutionException(
+                    "Directory does not exist or is not a directory : " + dir);
+        }
+    }
+    
+    protected void checkFile(File file) throws MojoExecutionException {
+        if(file == null || !file.exists() || !file.isFile()) {
+            throw new MojoExecutionException(
+                    "File does not exist or is not a file : " + file);
+        }
+    }
+    
 }
