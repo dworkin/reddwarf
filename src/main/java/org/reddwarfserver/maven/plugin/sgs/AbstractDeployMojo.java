@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -36,7 +42,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import java.io.File;
 
 /**
- * Abstract Mojo which provides common functionality to all Project Darkstar
+ * Abstract Mojo which provides common functionality to all RedDwarf
  * Deploy Mojos.
  */
 public abstract class AbstractDeployMojo extends AbstractDirectoryMojo {
@@ -44,7 +50,7 @@ public abstract class AbstractDeployMojo extends AbstractDirectoryMojo {
     static final String DEPLOY = "deploy";
     
     /**
-     * The deploy directory of the Project Darkstar installation.
+     * The deploy directory of the RedDwarf installation.
      * Defaults to the "deploy" subdirectory under sgsHome.
      * 
      * @parameter

@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -49,24 +55,24 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Installs a Project Darkstar server
+ * Installs a RedDwarf server
  * 
  * @goal install
  */
 public class InstallMojo extends AbstractSgsMojo {
     
     /**
-     * The groupId of the Project Darkstar server distribution.
-     * Default value is com.projectdarkstar.server
+     * The groupId of the RedDwarf server distribution.
+     * Default value is org.reddwarfserver.server
      * 
-     * @parameter default-value="com.projectdarkstar.server"
+     * @parameter default-value="org.reddwarfserver.server"
      * @required
      * @since 1.0-alpha-1
      */
     private String groupId;
     
     /**
-     * The artifactId of the Project Darkstar server distribution.
+     * The artifactId of the RedDwarf server distribution.
      * Default value is sgs-server-dist.
      * 
      * @parameter default-value="sgs-server-dist"
@@ -76,7 +82,7 @@ public class InstallMojo extends AbstractSgsMojo {
     private String artifactId;
     
     /**
-     * The type of the Project Darkstar server distribution.
+     * The type of the RedDwarf server distribution.
      * Default value is zip.
      * 
      * @parameter default-value="zip"
@@ -85,7 +91,7 @@ public class InstallMojo extends AbstractSgsMojo {
     private String type;
     
     /**
-     * The classifier of the Project Darkstar server distribution.
+     * The classifier of the RedDwarf server distribution.
      * Default is no classifier
      * 
      * @parameter
@@ -94,7 +100,7 @@ public class InstallMojo extends AbstractSgsMojo {
     private String classifier;
     
     /**
-     * The version of the Project Darkstar server distribution.
+     * The version of the RedDwarf server distribution.
      * 
      * @parameter
      * @required
@@ -103,7 +109,7 @@ public class InstallMojo extends AbstractSgsMojo {
     private String version;
     
     /**
-     * The location to unpack and install the Project Darkstar server
+     * The location to unpack and install the RedDwarf server
      * distribution.  Default value is ${project.build.directory}
      * 
      * @parameter expression="${project.build.directory}"
@@ -198,7 +204,7 @@ public class InstallMojo extends AbstractSgsMojo {
         if (sgsHome.exists() && sgsHome.isDirectory()) {
             if (cleanSgsHome) {
                 try {
-                    this.getLog().info("Removing previous Project Darkstar " +
+                    this.getLog().info("Removing previous RedDwarf " +
                                        "installation at " + sgsHome);
                     FileUtils.deleteDirectory(sgsHome);
                 } catch(IOException e) {
@@ -206,7 +212,7 @@ public class InstallMojo extends AbstractSgsMojo {
                                                      sgsHome, e);
                 }
             } else {
-                this.getLog().info("Previous Project Darkstar installation " +
+                this.getLog().info("Previous RedDwarf installation " +
                                    "found.  Skipping install.");
                 return;
             }

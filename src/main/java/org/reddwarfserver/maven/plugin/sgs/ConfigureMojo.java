@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -38,7 +44,7 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Configures a Project Darkstar server installation by overlaying
+ * Configures a RedDwarf server installation by overlaying
  * sgs-boot.properties, sgs-server.properties, and sgs-logging.properties
  * files into the conf directory of the installation.
  *
@@ -54,7 +60,7 @@ public class ConfigureMojo extends AbstractSgsMojo
     
     /**
      * The file used to override the sgs-boot.properties configuration
-     * file of the Project Darkstar server.
+     * file of the RedDwarf server.
      * 
      * @parameter
      * @since 1.0-alpha-1
@@ -63,7 +69,7 @@ public class ConfigureMojo extends AbstractSgsMojo
     
     /**
      * The file used to override the sgs-server.properties configuration
-     * file of the Project Darkstar server.
+     * file of the RedDwarf server.
      * 
      * @parameter
      * @since 1.0-alpha-1
@@ -72,7 +78,7 @@ public class ConfigureMojo extends AbstractSgsMojo
     
     /**
      * The file used to override the sgs-logging.properties configuration
-     * file of the Project Darkstar server.
+     * file of the RedDwarf server.
      * 
      * @parameter
      * @since 1.0-alpha-1

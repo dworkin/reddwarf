@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -37,13 +43,13 @@ import org.apache.maven.plugin.MojoExecutionException;
 import java.io.File;
 
 /**
- * Abstract Mojo which provides common functionality to all Project Darkstar
+ * Abstract Mojo which provides common functionality to all RedDwarf
  * Mojos.
  */
 public abstract class AbstractSgsMojo extends AbstractMojo {
     
     /**
-     * Directory where the Project Darkstar server is installed.
+     * Directory where the RedDwarf server is installed.
      * 
      * @parameter
      * @required

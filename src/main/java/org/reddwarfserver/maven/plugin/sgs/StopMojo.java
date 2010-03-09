@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -40,7 +46,7 @@ import org.codehaus.plexus.util.cli.StreamConsumer;
 import java.io.File;
 
 /**
- * Stops a Project Darkstar server installation.
+ * Stops a RedDwarf server installation.
  * 
  * @goal stop
  */
@@ -52,7 +58,7 @@ public class StopMojo extends AbstractSgsMojo {
     /**
      * Optional parameter to specify a boot properties file to feed on the
      * command line.  By default, the sgs-boot.properties file from the
-     * Project Darkstar server installation conf directory is used.
+     * RedDwarf server installation conf directory is used.
      * 
      * @parameter
      * @since 1.0-alpha-1

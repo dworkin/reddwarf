@@ -1,10 +1,7 @@
  ------
  Usage
  ------
- Owen Kellett
- <owen.kellett@sun.com>
- ------
- March 8, 2010
+ March 9, 2010
  ------
 
 Examples
@@ -44,7 +41,7 @@ Examples
   <build>
     <plugins>
       <plugin>
-        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <groupId>org.reddwarfserver.maven.plugin</groupId>
         <artifactId>sgs-maven-plugin</artifactId>
         <executions>
           <execution>
@@ -88,7 +85,7 @@ Examples
   <build>
     <plugins>
       <plugin>
-        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <groupId>org.reddwarfserver.maven.plugin</groupId>
         <artifactId>sgs-maven-plugin</artifactId>
         <executions>
           <execution>
@@ -130,7 +127,7 @@ Examples
   <build>
     <plugins>
       <plugin>
-        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <groupId>org.reddwarfserver.maven.plugin</groupId>
         <artifactId>sgs-maven-plugin</artifactId>
         <executions>
           <execution>
@@ -170,7 +167,7 @@ Examples
   <build>
     <plugins>
       <plugin>
-        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <groupId>org.reddwarfserver.maven.plugin</groupId>
         <artifactId>sgs-maven-plugin</artifactId>
         <executions>
           <execution>
@@ -216,7 +213,7 @@ Examples
   <build>
     <plugins>
       <plugin>
-        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <groupId>org.reddwarfserver.maven.plugin</groupId>
         <artifactId>sgs-maven-plugin</artifactId>
         <executions>
           <execution>

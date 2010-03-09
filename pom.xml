@@ -5,8 +5,8 @@
   <artifactId>sgs-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
   <version>1.0-beta-2-SNAPSHOT</version>
-  <name>RedDwarf Server Maven Plugin</name>
-  <url>https://www.reddwarfserver.org</url>
+  <name>RedDwarf Maven Plugin</name>
+  <url>http://www.reddwarfserver.org</url>
   <inceptionYear>2010</inceptionYear>
   <description>
     This plugin provides the ability to control a RedDwarf server

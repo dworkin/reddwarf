@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a BSD-style license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright (c) 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
@@ -36,7 +42,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import java.io.File;
 
 /**
- * Deploys an extension jar or jar files into a Project Darkstar server
+ * Deploys an extension jar or jar files into a RedDwarf server
  * installation.
  *
  * @goal extend
@@ -44,7 +50,7 @@ import java.io.File;
 public class ExtendMojo extends AbstractExtendMojo {
 
     /**
-     * The extension jar files to deploy into the Project Darkstar server.
+     * The extension jar files to deploy into the RedDwarf server.
      *
      * @parameter
      * @required
