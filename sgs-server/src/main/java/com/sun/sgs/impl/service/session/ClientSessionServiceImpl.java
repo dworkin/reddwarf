@@ -607,27 +607,32 @@ public final class ClientSessionServiceImpl
 
     @Override
     public void prepareToShutdown() {
-        connectionsEnabled = false;
+
+        synchronized (handlers) {
+            if (!connectionsEnabled) {
+                return;
+            }
+            connectionsEnabled = false;
+        }
         setHealth(Health.YELLOW);
         logger.log(Level.FINEST, "preparing to shudown, disconnecting {0} sessions",
                    handlers.size());
 
-        while (!handlers.isEmpty()) {
-            for (final ClientSessionHandler handler : handlers.values()) {
-                taskScheduler.scheduleTask(
-                    new AbstractKernelRunnable("ClientDisconnect") {
-                        public void run() {
-                                handler.handleDisconnect(false, true);
-                        } }, taskOwner);
-            }
+        for (final ClientSessionHandler handler : handlers.values()) {
+            taskScheduler.scheduleTask(
+                new AbstractKernelRunnable("ClientDisconnect") {
+                    public void run() {
+                            handler.handleDisconnect(false, true);
+                    } }, taskOwner);
+        }
 
-            if (!handlers.isEmpty()) {
-                logger.log(Level.FINEST, "waiting for {0} sessions to disconnect",
-                           handlers.size());
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ignore) { }
-            }
+        while (!handlers.isEmpty()) {
+            
+            logger.log(Level.FINEST, "waiting for {0} sessions to disconnect",
+                       handlers.size());
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ignore) { }
         }
     }
 
