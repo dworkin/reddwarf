@@ -58,6 +58,7 @@ import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.service.ClientSessionStatusListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -272,8 +273,7 @@ public final class ClientSessionServiceImpl
 
     /** A map of local session handlers, keyed by session ID . */
     private final Map<BigInteger, ClientSessionHandler> handlers =
-	Collections.synchronizedMap(
-	    new HashMap<BigInteger, ClientSessionHandler>());
+	    new ConcurrentHashMap<BigInteger, ClientSessionHandler>();
 
     /** Queue of contexts that are prepared (non-readonly) or committed. */
     private final Queue<Context> contextQueue =
@@ -373,6 +373,9 @@ public final class ClientSessionServiceImpl
 
     /** Our JMX exposed statistics. */
     final ClientSessionServiceStats serviceStats;
+
+    /** Connections are disabled once {@code prepareToShutdown} is called */
+    private boolean connectionsEnabled = true;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -523,7 +526,7 @@ public final class ClientSessionServiceImpl
                        "\n  " + PROTOCOL_ACCEPTOR_PROPERTY + "=" +
                        protocolAcceptor.getClass().getName() +
                        "\n  " + SERVER_PORT_PROPERTY + "=" + serverPort);
-	    
+	  
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -599,6 +602,35 @@ public final class ClientSessionServiceImpl
 	}
     }
 
+
+    /* -- Implement ShutdownPrepare -- */
+
+    @Override
+    public void prepareToShutdown() {
+        connectionsEnabled = false;
+        setHealth(Health.YELLOW);
+        logger.log(Level.FINEST, "preparing to shudown, disconnecting {0} sessions",
+                   handlers.size());
+
+        while (!handlers.isEmpty()) {
+            for (final ClientSessionHandler handler : handlers.values()) {
+                taskScheduler.scheduleTask(
+                    new AbstractKernelRunnable("ClientDisconnect") {
+                        public void run() {
+                                handler.handleDisconnect(false, true);
+                        } }, taskOwner);
+            }
+
+            if (!handlers.isEmpty()) {
+                logger.log(Level.FINEST, "waiting for {0} sessions to disconnect",
+                           handlers.size());
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ignore) { }
+            }
+        }
+    }
+
     /**
      * Returns the proxy for the client session server on the specified
      * {@code nodeId}, or {@code null} if no server exists.
@@ -626,13 +658,6 @@ public final class ClientSessionServiceImpl
 		throw e;
 	    }
 	}
-    }
-
-    /* -- Implement ShutdownPrepare -- */
-
-    @Override
-    public void prepareToShutdown() {
-//        setConnectionEnable(false);
     }
 
     /* -- Implement ClientSessionService -- */
@@ -834,6 +859,14 @@ public final class ClientSessionServiceImpl
 	    Identity identity, SessionProtocol protocol,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 	{
+            if (!connectionsEnabled) {
+                new SetupCompletionFuture(null,  completionHandler).
+                    setException(
+                        new LoginFailureException(
+                            ClientSessionHandler.LOGIN_REFUSED_REASON,
+                            LoginFailureException.FailureReason.SERVER_UNAVAILABLE));
+                return;
+            }
 	    new ClientSessionHandler(
 		ClientSessionServiceImpl.this, dataService, protocol,
 		identity, completionHandler);
@@ -864,6 +897,15 @@ public final class ClientSessionServiceImpl
 			    RelocateFailureException.FailureReason.OTHER));
 		return;
 	    }
+
+            if (!connectionsEnabled) {
+                new SetupCompletionFuture(null,  completionHandler).
+                    setException(
+                        new RelocateFailureException(
+                            ClientSessionHandler.RELOCATE_REFUSED_REASON,
+                            RelocateFailureException.FailureReason.SERVER_UNAVAILABLE));
+                return;
+            }
 	    new ClientSessionHandler(
 		ClientSessionServiceImpl.this, dataService, protocol,
 		info.identity, completionHandler, info.sessionRefId);
@@ -1357,7 +1399,13 @@ public final class ClientSessionServiceImpl
      * @param newHealth the service's health
      */
     private void setHealth(Health newHealth) {
-        if (newHealth == health) {
+        // Don't report if
+        // 1. the health has not changed, or
+        // 2. connections are disabled and trying to set the health to GREEN or ORANGE
+        //
+        if ((newHealth == health) || (!connectionsEnabled &&
+                                      (newHealth.equals(Health.GREEN) ||
+                                       newHealth.equals(Health.ORANGE)))) {
             return;
         }
         health = newHealth;

@@ -82,7 +82,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    "com.sun.sgs.impl.service.session.handler"));
 
     /** Message indicating login was refused for a non-specific reason. */
-    private static final String LOGIN_REFUSED_REASON = "Login refused";
+    static final String LOGIN_REFUSED_REASON = "Login refused";
 
     /** Message indicating relocation was refused for a non-specific reason. */
     static final String RELOCATE_REFUSED_REASON = "Relocate refused";
