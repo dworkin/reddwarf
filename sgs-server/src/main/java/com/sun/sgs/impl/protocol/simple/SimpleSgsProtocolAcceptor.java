@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -72,7 +78,7 @@ import javax.security.auth.login.LoginException;
  * <dd style="padding-top: .5em">Specifies the <code>SimpleSgsProtocol</code>
  *	version for this acceptor's connections. Valid values for the protocol
  *	version are <b><code>0x05</code></b> which supports client session
- *	relocation, and <b><code>0x04</code></b> (the default), which does not
+ *	relocation, and <b><code>0x04</code></b>, which does not
  *	support client session relocation but is compatible with clients
  *	using the older protocol version.  Protocol version
  *	<b><code>0x05</code></b> is incompatible with clients using
@@ -147,7 +153,7 @@ public class SimpleSgsProtocolAcceptor
     public static final int PROTOCOL4 = 4;
 
     /** The default protocol version: {@value #DEFAULT_PROTOCOL_VERSION}. */
-    public static final int DEFAULT_PROTOCOL_VERSION = PROTOCOL4;
+    public static final int DEFAULT_PROTOCOL_VERSION = 5;
             
     /** The name of the disconnect delay property. */
     public static final String DISCONNECT_DELAY_PROPERTY =
