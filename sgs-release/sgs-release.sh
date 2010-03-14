@@ -1,4 +1,4 @@
-#!/usr/xpg4/bin/sh -xe
+#!/bin/sh -xe
 #
 # This script is used to automatically increment the version number of a project,
 # verify that the updates are correct, and then tag and deploy it to the
