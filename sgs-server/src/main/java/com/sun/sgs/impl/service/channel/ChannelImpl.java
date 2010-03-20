@@ -246,8 +246,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	this.channelRefId = ref.getId();
 	this.coordNodeId = getLocalNodeId();
 	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER, "Created ChannelImpl:{0}",
-		       HexDumper.toHexString(channelRefId));
+	    logger.log(Level.FINER, "Created ChannelImpl:{0}", channelRefId);
 	}
 	getChannelsMap().putOverride(name, this);
 	EventQueue eventQueue = new EventQueue(this);
@@ -756,8 +755,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
     /** {@inheritDoc} */
     @Override
     public String toString() {
-	return getClass().getName() +
-	    "[" + HexDumper.toHexString(channelRefId) + "]";
+	return getClass().getName() + "[" + channelRefId + "]";
     }
 
     /* -- Serialization methods -- */
@@ -1078,8 +1076,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			    logger.log(
 				Level.FINEST,
 				"Removing saved message, channel:{0} " +
-				"timestamp:{1}",
-				HexDumper.toHexString(channelRefId),
+				"timestamp:{1}", channelRefId,
 				messageInfo.timestamp);
 			}
 			iter.remove();
@@ -1152,9 +1149,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(
 		Level.FINER,
 		"channel:{0} reassigning coordinator from:{1} to:{2}",
-		HexDumper.toHexString(channelRefId),
-		failedCoordNodeId,
-		coordNodeId);
+		channelRefId, failedCoordNodeId, coordNodeId);
 	}
 	EventQueue eventQueue = eventQueueRef.get();
 	getEventQueuesMap(coordNodeId).
@@ -1235,7 +1230,12 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	}
 	dataService.removeObject(this);
 	if (listenerRef != null) {
-	    ChannelListener maybeWrappedListener = listenerRef.get();
+	    ChannelListener maybeWrappedListener = null;
+	    try {
+		maybeWrappedListener = listenerRef.get();
+	    } catch (ObjectNotFoundException ignore) {
+		// listener already removed
+	    }
 	    if (maybeWrappedListener instanceof ManagedSerializable) {
 		dataService.removeObject(maybeWrappedListener);
 	    }
@@ -1570,19 +1570,16 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		    Level.WARNING,
 		    "Attempt at node:{0} channel:{1} to service events; " +
 		    "instead of current coordinator:{2}",
-		    getLocalNodeId(),
-		    HexDumper.toHexString(channel.channelRefId),
+		    getLocalNodeId(), channel.channelRefId,
 		    channel.coordNodeId);
 		return;
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "coordinator:{0} channelId:{1}",
-			   getLocalNodeId(),
-			   HexDumper.toHexString(channel.channelRefId));
+			   getLocalNodeId(), channel.channelRefId);
 	    }
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getInstance();
-	    DataService dataService = getDataService();
 
 	    /*
 	     * Process channel events
@@ -1599,31 +1596,20 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			logger.log(Level.FINEST,
 				   "coordinator:{0} channelId:{1} " +
 				   "no more events",
-				   getLocalNodeId(),
-				   HexDumper.toHexString(channel.channelRefId));
+				   getLocalNodeId(), channel.channelRefId);
 		    }
 		    return;
 		} else if (event.isCompleted()) {
 		    // Remove completed event and get next event to
 		    // process. Return if there are no more events.
-		    if (logger.isLoggable(Level.FINEST)) {
-			logger.log(Level.FINEST,
-				   "coordinator:{0} channelId:{1} " +
-				   "removing completed event:{2}",
-				   getLocalNodeId(),
-				   HexDumper.toHexString(channel.channelRefId),
-				   event);
-		    }
-		    eventQueue.poll();
+		    removeCompletedEvent(channel, eventQueue, event);
 		    event = eventQueue.peek();
 		    if (event == null) {
 			if (logger.isLoggable(Level.FINEST)) {
 			    logger.log(Level.FINEST,
 				       "coordinator:{0} channelId:{1} " +
 				       "no more events",
-				       getLocalNodeId(),
-				       HexDumper.toHexString(
-					   channel.channelRefId));
+				       getLocalNodeId(), channel.channelRefId);
 			}
 			return;
 		    }
@@ -1632,51 +1618,21 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			logger.log(Level.FINEST,
 				   "coordinator:{0} channelId:{1} " +
 				   "event:{2} is already processing",
-				   getLocalNodeId(),
-				   HexDumper.toHexString(channel.channelRefId),
+				   getLocalNodeId(), channel.channelRefId,
 				   event);
 		    }
 		    return;
 		} 
 
-		int cost = event.getCost();
-		if (cost > 0) {
-		    dataService.markForUpdate(this);
-		    writeBufferAvailable += cost;
+		// Mark event as "processing", and then service event.
+		completed = startProcessingEvent(channel, event);
+		if (completed) {
+		    removeCompletedEvent(channel, eventQueue, event);
 		    
-		    if (logger.isLoggable(Level.FINEST)) {
-			logger.log(
-			    Level.FINEST,
-			    "{0} cleared reservation of {1,number,#} bytes, " +
-			    "leaving {2,number,#}",
-			    this, cost, writeBufferAvailable);
-		    }
 		}
 		
-		// Mark event as "processing", and then service event.
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST,
-			       "coordinator:{0} channelId:{1} " +
-			       "service event:{2}",
-			       getLocalNodeId(),
-			       HexDumper.toHexString(channel.channelRefId),
-			       event);
-		}
-		completed = startProcessingEvent(getChannel(), event);
-		if (completed) {
-		    if (logger.isLoggable(Level.FINEST)) {
-			logger.log(Level.FINEST,
-				   "coordinator:{0} channelId:{1} " +
-				   "remove completed event:{2}",
-				   getLocalNodeId(),
-				   HexDumper.toHexString(channel.channelRefId),
-				   event);
-		    }
-		    eventQueue.poll();
-		}
-
 	    } while (completed && --eventsPerTxn > 0);
-
+	
 	    if (eventQueue.peek() != null) {
 		channelService.
 		    addServiceEventQueueTaskOnCommit(channel.channelRefId);
@@ -1691,11 +1647,48 @@ final class ChannelImpl implements ManagedObject, Serializable {
 					     ChannelEvent event)
 	{
 	    event.processing();
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "coordinator:{0} channelId:{1} " +
+			   "processing event:{2}",
+			   getLocalNodeId(), channel.channelRefId,
+			   event);
+	    }
 	    if (event instanceof SendEvent) {
 		getDataService().markForUpdate(this);
 		currentTimestamp = event.timestamp;
 	    }
 	    return event.serviceEvent(channel);
+	}
+
+	/**
+	 * Removes completed event from the event queue.
+	 */
+	private void removeCompletedEvent(
+ 	    ChannelImpl channel, ManagedQueue<ChannelEvent> eventQueue,
+	    ChannelEvent event)
+	{
+	    assert eventQueue.peek() == event && event.isCompleted();
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "coordinator:{0} channelId:{1} " +
+			   "removing completed event:{2}",
+			   getLocalNodeId(), channel.channelRefId, event);
+	    }
+	    eventQueue.poll();
+	    int cost = event.getCost();
+	    if (cost > 0) {
+		getDataService().markForUpdate(this);
+		writeBufferAvailable += cost;
+		
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"{0} cleared reservation of {1,number,#} bytes, " +
+			"leaving {2,number,#}",
+			this, cost, writeBufferAvailable);
+		}
+	    }
 	}
 
 	/* -- Implement ManagedObjectRemoval -- */
@@ -1706,6 +1699,19 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		getDataService().removeObject(queueRef.get());
 	    } catch (ObjectNotFoundException e) {
 		// already removed.
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public String toString() {
+	    try {
+		ChannelImpl channel = getChannel();
+		return "EventQueue[" +
+		    "channelId:" + channel.channelRefId +
+		    ", name:" + channel.name +
+		    "]";
+	    } catch (ObjectNotFoundException e) {
+		return super.toString();
 	    }
 	}
     }
@@ -1732,7 +1738,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/** The ID of the coordinator node on which this event is being
 	 * processed. -1 indicates that event hasn't ever started
 	 * processing. */
-	protected long processingOnNodeId = -1;
+	private long processingOnNodeId = -1;
 
 	/** Constructs an instance with the specified {@code timestamp} */
 	ChannelEvent(long timestamp) {
@@ -1759,6 +1765,15 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
+	 * Marks this event as being processed on the local node.
+	 */
+	void processing() {
+	    logger.log(Level.FINEST, "processing event:{0}", this);
+	    getDataService().markForUpdate(this);
+	    processingOnNodeId = getLocalNodeId();
+	}
+	
+	/**
 	 * Marks this event as completed.
 	 */
 	boolean completed() {
@@ -1779,24 +1794,6 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/**
-	 * Marks this event as being processed on the local node.
-	 */
-	void processing() {
-	    logger.log(Level.FINEST, "processing event:{0}", this);
-	    getDataService().markForUpdate(this);
-	    processingOnNodeId = getLocalNodeId();
-	}
-	
-	/**
-	 * Returns {@code true} if this event is completed and it is safe
-	 * to service the next event in the queue, otherwise returns {@code
-	 * false}.
-	 */
-	boolean isCompleted() {
-	    return completed;
-	}
-
-	/**
 	 * Returns {@code true} if this event is being processed on this
 	 * node, and {@code false} otherwise.  Events are marked as
 	 * processing on a given node.  Therefore, if this event is marked
@@ -1810,6 +1807,27 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	boolean isProcessing() {
 	    return processingOnNodeId == getLocalNodeId();
+	}
+	
+	/**
+	 * Returns {@code true} if this event is completed and it is safe
+	 * to service the next event in the queue, otherwise returns {@code
+	 * false}.
+	 */
+	boolean isCompleted() {
+	    return completed;
+	}
+
+	/**
+	 * Returns a string representation of field:value pairs, separated
+	 * by commas.
+	 */
+	protected String toStringFieldsOnly() {
+	    return
+		"timestamp:" + timestamp +
+		(processingOnNodeId == -1 ? "" : 
+		 ", processingOnNodeId:" + processingOnNodeId) +
+		", completed: " + isCompleted();
 	}
     }
 
@@ -1854,8 +1872,11 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
-	    return getClass().getName() + ": " +
-		HexDumper.toHexString(sessionRefId);
+	    return "JoinEvent[" +
+		"sessionRefId:" + sessionRefId + ", " +
+		toStringFieldsOnly() +
+		"]";
+		
 	}
     }
 
@@ -1907,7 +1928,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			    logger.log(
 				Level.SEVERE,
 				"channel:{0}: event removed before completed",
-				HexDumper.toHexString(channelRefId));
+				channelRefId);
 			}
 		    }
 		}); 
@@ -2172,8 +2193,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		    Level.FINEST,
 		    "Sent join, name:{0} channel:{1} session:{2} " +
 		    "coordinator:{3} returned {4}", name,
-		    HexDumper.toHexString(channelRefId),
-		    HexDumper.toHexString(sessionRefId),
+		    channelRefId, sessionRefId,
 		    getLocalNodeId(), success);
 	    }
 	    return success;
@@ -2239,8 +2259,10 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
-	    return getClass().getName() + ": " +
-		HexDumper.toHexString(sessionRefId);
+	    return "LeaveEvent[" +
+		"sessionRefId:" + sessionRefId + ", " +
+		toStringFieldsOnly() +
+		"]";
 	}
     }
 
@@ -2272,8 +2294,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		    Level.FINEST,
 		    "Sent leave, channel:{0} session:{1} " +
 		    "coordinator:{2} returned {3}",
-		    HexDumper.toHexString(channelRefId),
-		    HexDumper.toHexString(sessionRefId),
+		    channelRefId, sessionRefId,
 		    getLocalNodeId(), success);
 	    }
 	    return success;
@@ -2351,9 +2372,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			logger.log(
 			    Level.FINEST,
 			    "send attempt by disconnected session:{0} " +
-			    "to channel:{1}",
-			    HexDumper.toHexString(senderRefId),
-			    channel);
+			    "to channel:{1}", senderRefId, channel);
 		    }
 		    return completed();
 		    
@@ -2375,10 +2394,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			    logger.log(
 				Level.FINEST,
 				"send attempt by non-member session:{0} " +
-				"to channel:{1}",
-				HexDumper.toHexString(
-				    senderRefId),
-				channel);
+				"to channel:{1}", senderRefId, channel);
 			}
 			return completed();
 		    }
@@ -2408,21 +2424,21 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    return isCompleted();
 	}
 
-	/** Use the message length as the cost for sending messages.
-	 * 
-	 * Only return a non-zero cost if the message hasn't started
-	 * processing yet so that the cost calculation can be
-	 * idempotent.
-	 */
+	/** Use the message length as the cost for sending messages. */
 	@Override
 	int getCost() {
-	    return processingOnNodeId == -1 ? message.length : 0;
+	    return message.length;
 	}
 
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
-	    return getClass().getName();
+	    return "SendEvent[" +
+		"senderRefId:" + senderRefId +
+		", message:byte[" + message.length + "], " +
+		toStringFieldsOnly() +
+		"]";
+		
 	}
     }
 
@@ -2532,9 +2548,12 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	@Override
+        @Override
 	public String toString() {
-	    return getClass().getName();
+	    return "CloseEvent[" +
+		"removeName:" + removeName + ", " +
+		toStringFieldsOnly() +
+		"]";
 	}
     }
 
@@ -2610,7 +2629,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 			    logger.log(
 				Level.SEVERE,
 				"channel:{0} removed before closed",
-				HexDumper.toHexString(channelRefId));
+				channelRefId);
 			}
 		    }
 		});
@@ -2633,7 +2652,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(
 		Level.WARNING,
 		"Event queue for channel:{0} does not exist",
-		HexDumper.toHexString(channelRefId));
+		channelRefId);
 	}
 	return eventQueue;
     }
@@ -2661,8 +2680,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		logger.log(
  		    Level.FINE,
 		    "Dropping message:{0}: from:{1} for unknown channel: {2}",
-		    HexDumper.format(message), sender,
-		    HexDumper.toHexString(channelRefId));
+		    HexDumper.format(message), sender, channelRefId);
 	    }
 	}
     }

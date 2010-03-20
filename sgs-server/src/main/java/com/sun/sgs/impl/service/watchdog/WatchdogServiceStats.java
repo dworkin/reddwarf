@@ -89,8 +89,7 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
 
     /** {@inheritDoc} */
     public void setNodeHealth(Health health) {
-        watchdog.reportHealth(watchdog.localNodeId, health,
-                              WatchdogServiceStats.class.getName());
+        watchdog.reportHealth(health, WatchdogServiceStats.class.getName());
     }
 
     /** {@inheritDoc} */

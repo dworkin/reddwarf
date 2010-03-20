@@ -63,6 +63,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.IdentityRelocationListener;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.Node.Health;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryListener;
@@ -137,7 +138,18 @@ import javax.management.JMException;
  * the same username as an already connected client will not be permitted
  * to login.  If {@code true}, the user's existing session will be
  * disconnected and the new login is allowed to proceed.<p>
- * 
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #LOGIN_HIGH_WATER_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@code Integer.MAX_VALUE / 2}
+ *
+ * <dd style="padding-top: .5em">Specifies the login high water. When the
+ * number of logins reaches the high water, the service's health is set
+ * to {@link Health#YELLOW}. If the number of logins exceeds 10% above the high water
+ * the service's health is set to {@link Health#ORANGE}. Legal values are between 0 and
+ * {@code Integer.MAX_VALUE}.<p>
+ *
  * <dt> <i>Property:</i> <code><b>
  *	{@value #PROTOCOL_ACCEPTOR_PROPERTY}
  *	</b></code><br>
@@ -222,6 +234,10 @@ public final class ClientSessionServiceImpl
     /** The name of the allow new login property. */
     static final String ALLOW_NEW_LOGIN_PROPERTY =
 	PKG_NAME + ".allow.new.login";
+
+    /** The name of the login high water property. */
+    static final String LOGIN_HIGH_WATER_PROPERTY =
+        PKG_NAME + ".login.high.water";
 
     /** The protocol acceptor property name. */
     static final String PROTOCOL_ACCEPTOR_PROPERTY =
@@ -342,6 +358,12 @@ public final class ClientSessionServiceImpl
      */
     final boolean allowNewLogin;
 
+    /** Health of the client session service. */
+    private Health health = Health.GREEN;
+
+    /** Login high water. */
+    private int loginHighWater;
+
     /** The session relocation key length. */
     final int relocationKeyLength;
 
@@ -380,6 +402,9 @@ public final class ClientSessionServiceImpl
 		1, Integer.MAX_VALUE);
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
+            loginHighWater = wrappedProps.getIntProperty(
+                LOGIN_HIGH_WATER_PROPERTY,
+                Integer.MAX_VALUE / 2, 0, Integer.MAX_VALUE / 2);
 	    relocationKeyLength = wrappedProps.getIntProperty(
  		RELOCATION_KEY_LENGTH_PROPERTY, DEFAULT_RELOCATION_KEY_LENGTH,
 		16, Integer.MAX_VALUE);
@@ -464,7 +489,7 @@ public final class ClientSessionServiceImpl
             /* Create our service profiling info and register our MBean */
             ProfileCollector collector = 
 		systemRegistry.getComponent(ProfileCollector.class);
-            serviceStats = new ClientSessionServiceStats(collector);
+            serviceStats = new ClientSessionServiceStats(collector, this);
             try {
                 collector.registerMBean(serviceStats,
                                         ClientSessionServiceStats.MXBEAN_NAME);
@@ -485,6 +510,7 @@ public final class ClientSessionServiceImpl
             logger.log(Level.CONFIG,
                        "Created ClientSessionServiceImpl with properties:" +
                        "\n  " + ALLOW_NEW_LOGIN_PROPERTY + "=" + allowNewLogin +
+                       "\n  " + LOGIN_HIGH_WATER_PROPERTY + "=" + loginHighWater +
                        "\n  " + WRITE_BUFFER_SIZE_PROPERTY + "=" +
                        writeBufferSize +
                        "\n  " + EVENTS_PER_TXN_PROPERTY + "=" + eventsPerTxn +
@@ -1303,6 +1329,77 @@ public final class ClientSessionServiceImpl
 	}
     }
 
+    /**
+     * Checks if the number of logins has passed the high water mark, and if
+     * so, sets this service's health accordingly.
+     */
+    private synchronized void checkHighWater() {
+        if (handlers.size() > loginHighWater * 1.1) {
+            setHealth(Health.ORANGE);
+        } else if (handlers.size() >= loginHighWater) {
+            setHealth(Health.YELLOW);
+        } else {
+            setHealth(Health.GREEN);
+        }
+    }
+
+    /**
+     * Set the health of this service. If the specified health has changed,
+     * report it.
+     * @param newHealth the service's health
+     */
+    private void setHealth(Health newHealth) {
+        if (newHealth == health) {
+            return;
+        }
+        health = newHealth;
+
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "Reporting change in health to " + health);
+        }
+        taskScheduler.scheduleTask(
+            new AbstractKernelRunnable("ReportHealth") {
+                public void run() {
+                   watchdogService.reportHealth(health, CLASSNAME);
+                }
+            }, taskOwner);
+    }
+
+    /**
+     * Get the number of connected sessions.
+     * @return the number of connected sessions
+     */
+    int getNumSessions() {
+        return handlers.size();
+    }
+
+    /**
+     * Get the login high water.
+     * @return the login high water
+     */
+    int getLoginHighWater() {
+        return loginHighWater;
+    }
+
+    /**
+     * Set the login high water. This call may cause the service's
+     * health to change.
+     * @param highWater the login high water
+     */
+    void setLoginHighWater(int highWater) {
+        loginHighWater = highWater;
+        logger.log(Level.CONFIG, "Login high water set to {0}", loginHighWater);
+        checkHighWater();
+    }
+
+    /**
+     * Get the service's health.
+     * @return the service's health
+     */
+    Health getHealth() {
+        return health;
+    }
+
    /**
      * Obtains information associated with the current transaction,
      * throwing TransactionNotActiveException if there is no current
@@ -1424,6 +1521,7 @@ public final class ClientSessionServiceImpl
     {
         assert handler != null;
 	handlers.put(sessionRefId, handler);
+        checkHighWater();
 	incomingSessionRelocationInfo.remove(sessionRefId);
 	if (identity != null) {
 	    incomingRelocatingIdentities.remove(identity);
@@ -1463,6 +1561,7 @@ public final class ClientSessionServiceImpl
 	// Notify session listeners of disconnection
 	notifyStatusListenersOfDisconnection(sessionRefId, isRelocating);
 	handlers.remove(sessionRefId);
+        checkHighWater();
 	sessionTaskQueues.remove(sessionRefId);
 	prepareRelocationMap.remove(sessionRefId); // just in case...
     }

@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -748,6 +754,51 @@ public class TestTaskServiceImpl extends Assert {
                     dataService.removeBinding("TestTaskServiceImpl.handle");
                 }
         }, taskOwner);
+    }
+
+    @Test(timeout=1000)
+    public void testCancelPeriodicTaskWithItself() throws Exception {
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    PeriodicTaskCanceler canceler = new PeriodicTaskCanceler();
+                    dataService.setBinding("canceler", canceler);
+                    PeriodicTaskHandle handle =
+                        taskService.schedulePeriodicTask(canceler, 100L, 100L);
+                    canceler.setHandle(handle);
+                }
+        }, taskOwner);
+        Thread.sleep(300L);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+                public void run() {
+                    PeriodicTaskCanceler canceler = (PeriodicTaskCanceler)
+                            dataService.getBinding("canceler");
+                    Assert.assertEquals(1, canceler.getRunCount());
+                }
+        }, taskOwner);
+    }
+
+    private static class PeriodicTaskCanceler implements Task, ManagedObject, Serializable {
+
+        private PeriodicTaskHandle handle = null;
+        private int runCount = 0;
+
+        @Override
+        public void run() throws Exception {
+            runCount++;
+            if (handle != null) {
+                handle.cancel();
+		handle = null;
+            }
+        }
+
+        public void setHandle(PeriodicTaskHandle handle) {
+            this.handle = handle;
+        }
+        public int getRunCount() {
+            return runCount;
+        }
     }
     
     private class GetManagedHandleTask extends TestAbstractKernelRunnable {
