@@ -728,12 +728,11 @@ public class NodeMappingServiceImpl
         }
         
         public void run() throws UnknownIdentityException { 
-            // Exceptions thrown by getServiceBinding are handled by caller.
-            IdentityMO idmo = 
-		(IdentityMO) dataService.getServiceBinding(idKey);
             
             if (active) {
-                dataService.setServiceBinding(statusKey, idmo);
+                // Exceptions thrown by getServiceBinding are handled by caller.
+                dataService.setServiceBinding(statusKey,
+                                              dataService.getServiceBinding(idKey));
             } else {
                 // Note that NameNotBoundException can be thrown
                 // if this is our second time calling this method.
