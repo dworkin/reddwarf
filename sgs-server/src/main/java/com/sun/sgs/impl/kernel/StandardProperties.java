@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.kernel;
@@ -305,4 +307,16 @@ public final class StandardProperties {
      */
     public static final String SYSTEM_JMX_REMOTE_PORT =
         "com.sun.management.jmxremote.port";
+
+    /**
+     * The property for specifying the maximum length of time, in
+     * milliseconds, for a client session to relocate to a new node.
+     */
+    public static final String SESSION_RELOCATION_TIMEOUT_PROPERTY =
+	"com.sun.sgs.impl.service.session.relocation.timeout";
+
+    /**
+     * The default session relocation timeout, in milliseconds.
+     */
+    public static final long DEFAULT_SESSION_RELOCATION_TIMEOUT = 10000;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.kernel;
@@ -445,7 +447,7 @@ class Kernel {
         }
 
         // start the service creation 
-        IdentityImpl owner = new IdentityImpl("app:" + appName);
+        IdentityImpl owner = new SystemIdentity("app:" + appName);
         createServices(appName, owner);
         startApplication(appName, owner);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.transport.tcp;
@@ -22,6 +24,7 @@ package com.sun.sgs.impl.transport.tcp;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.NamedThreadFactory;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
@@ -166,7 +169,8 @@ public class TcpTransport implements Transport {
                 AsynchronousChannelProvider.provider();
             asyncChannelGroup =
                 provider.openAsynchronousChannelGroup(
-                    Executors.newCachedThreadPool());
+                    Executors.newCachedThreadPool(
+                    new NamedThreadFactory("TcpTransport-Acceptor")));
             acceptor =
                 provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
 	    try {

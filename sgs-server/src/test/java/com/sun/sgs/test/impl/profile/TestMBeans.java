@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.test.impl.profile;
@@ -723,7 +725,7 @@ public class TestMBeans {
     }
     
     @Test
-    public void tesNodeMapServiceMXBean() throws Exception {
+    public void testNodeMapServiceMXBean() throws Exception {
         // Turn on profiling for the service
         ProfileConsumer cons = 
             getCollector(serverNode).getConsumer(
@@ -838,7 +840,7 @@ public class TestMBeans {
         
         // Get individual fields
         long reg = (Long) mbsc.getAttribute(name, 
-                                "RegisterSessionDisconnectListenerCalls");
+                                "AddSessionStatusListenerCalls");
         long get = (Long) mbsc.getAttribute(name, 
                                 "GetSessionProtocolCalls");
         
@@ -846,7 +848,7 @@ public class TestMBeans {
         ClientSessionServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, ClientSessionServiceMXBean.class);
         
-        assertTrue(reg <= proxy.getRegisterSessionDisconnectListenerCalls());
+        assertTrue(reg <= proxy.getAddSessionStatusListenerCalls());
         assertTrue(get <= proxy.getGetSessionProtocolCalls());
         
         serverNode.getClientSessionService().

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.kernel;
@@ -33,6 +35,8 @@ import com.sun.sgs.impl.service.transaction.TransactionHandle;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+
+import com.sun.sgs.impl.util.NamedThreadFactory;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -243,7 +247,8 @@ final class TransactionSchedulerImpl
         this.requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
-        this.executor = Executors.newCachedThreadPool();
+        this.executor = Executors.newCachedThreadPool(
+                new NamedThreadFactory("TransactionScheduler"));
         for (int i = 0; i < requestedThreads; i++) {
             executor.submit(new TaskConsumer());
         }

@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>15</version>
+    <version>16</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
@@ -236,6 +236,12 @@
       </dependency>
 
       <dependency>
+        <groupId>net.sf.jung</groupId>
+        <artifactId>jung-graph-impl</artifactId>
+        <version>${jung.version}</version>
+      </dependency>
+    
+      <dependency>
 	<groupId>com.projectdarkstar.tools.test</groupId>
 	<artifactId>sgs-test-ext</artifactId>
 	<scope>test</scope>
@@ -432,10 +438,11 @@
   <properties>
     <sgs.version>${version}</sgs.version>
     <sgs-shared.version>1.11</sgs-shared.version>
-    <sgs-client.version>0.9.10</sgs-client.version>
+    <sgs-client.version>0.9.11</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
-    <sgs-test-ext.version>1.0</sgs-test-ext.version>
+    <jung.version>2.0</jung.version>
+    <sgs-test-ext.version>1.1</sgs-test-ext.version>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.bdb.env>

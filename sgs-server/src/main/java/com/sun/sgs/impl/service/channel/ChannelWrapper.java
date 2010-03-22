@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.channel;
@@ -49,7 +51,7 @@ class ChannelWrapper
     private static final long serialVersionUID = 1L;
 
     /** The reference to the channel that this instance wraps. */
-    private final ManagedReference<ChannelImpl> channelRef;
+    private ManagedReference<ChannelImpl> channelRef;
 
     /**
      * Constructs an instance with the specified {@code channelRef}.
@@ -113,6 +115,12 @@ class ChannelWrapper
     }
 
     /** {@inheritDoc} */
+    public Channel send(ByteBuffer message) {
+	getChannel().send(null, message);
+	return this;
+    }
+    
+    /** {@inheritDoc} */
     public Channel send(ClientSession sender, ByteBuffer message) {
 	getChannel().send(sender, message);
 	return this;
@@ -120,12 +128,20 @@ class ChannelWrapper
 
     /* -- Implement ManagedObjectRemoval -- */
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     * 
+     * The application removed the wrapper, so close the channel,
+     * indicating that the the channel name mapping should be removed as
+     * well.
+     */
     public void removingObject() {
-	try {
-	    channelRef.get().close();
-	} catch (ObjectNotFoundException e) {
-	    // already closed.
+	if (channelRef != null) {
+	    try {
+		channelRef.get().close(true);
+	    } catch (ObjectNotFoundException e) {
+		// already closed.
+	    }
+	    channelRef = null;
 	}
     }
 
@@ -178,15 +194,33 @@ class ChannelWrapper
     /* -- Other methods -- */
 
     /**
+     * Set the channel reference for this wrapper to the specified {@code
+     * channelRef}.  The underlying channel reference changes when the
+     * application invokes {@code leaveAll} on the channel, which closes
+     * and removes the old channel (except for the channel's name binding)
+     * and reuses the existing wrapper, replacing the previous channel
+     * reference with a reference to the "next generation" channel of the
+     * same name.
+     *
+     * @param	channelRef the new channel reference
+     */
+    void setChannelRef(ManagedReference<ChannelImpl> channelRef) {
+	ChannelServiceImpl.getInstance().getDataService().markForUpdate(this);
+	this.channelRef = channelRef;
+    }
+
+    /**
      * Returns the underlying {@code ChannelImpl} instance for this
      * wrapper.  If the underlying channel has been removed, then the
      * channel has been closed, so {@code IllegalStateException} is thrown.
      */
     private ChannelImpl getChannel() {
-	try {
-	    return channelRef.get();
-	} catch (ObjectNotFoundException e) {
-	    throw new IllegalStateException("channel is closed");
+	if (channelRef != null) {
+	    try {
+		return channelRef.get();
+	    } catch (ObjectNotFoundException e) {
+	    }
 	}
+	throw new IllegalStateException("channel is closed");
     }
 }

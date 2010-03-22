@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.watchdog;
@@ -624,8 +626,9 @@ public final class WatchdogServerImpl
                                  String component, int maxNumberOfAttempts)
     {
         if (!isLocal) {
-            // Try to report the failure to the watchdog so that the node can 
-            // be shutdown. Try a few times if we run into an IOException.
+            // Try to report the failure to the remote failed node so that
+            // the node can be shutdown itself. Try a few times if we run
+            // into an IOException.
             int retries = maxNumberOfAttempts;
             while (retries-- > 0) {
                 try {
@@ -633,9 +636,11 @@ public final class WatchdogServerImpl
                     break;
                 } catch (IOException ioe) {
                     if (retries == 0) {
-                        logger.log(Level.WARNING, "Could not retrieve " +
-                                "watchdog client given " +
-                                maxNumberOfAttempts + " attempt(s)");
+                        logger.logThrow(
+			    Level.WARNING, ioe, "Reporting failure " +
+			    "to node:{0} from node:{1}, className:{2} after " +
+			    "{3} attempt(s), throws", node.getId(), localNodeId,
+			    component, maxNumberOfAttempts);
                     }
                 }
             }
@@ -896,12 +901,8 @@ public final class WatchdogServerImpl
 	    NodeImpl choice = null;
             // Copy of the alive nodes
             NodeImpl[] values;
-            final int numAliveNodes;
-	    synchronized (aliveNodes) {
-		numAliveNodes = aliveNodes.size();
-                values =
-		    aliveNodes.values().toArray(new NodeImpl[numAliveNodes]);
-            }
+            values = aliveNodes.values().toArray(new NodeImpl[0]);
+            final int numAliveNodes = values.length;
 	    int random = numAliveNodes > 0
 		? backupChooser.nextInt(numAliveNodes) : 0;
 	    for (int i = 0; i < numAliveNodes; i++) {
@@ -1049,10 +1050,12 @@ public final class WatchdogServerImpl
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the
 		// client may have failed too.
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "Notifying {0} of node status changes failed:",
-		    notifyNode.getId());
+		if (!shuttingDown()) {
+		    logger.logThrow(
+		    	Level.WARNING, e,
+			"Notifying {0} of node status changes failed:",
+			notifyNode.getId());
+		}
 	    }
 	}
     }

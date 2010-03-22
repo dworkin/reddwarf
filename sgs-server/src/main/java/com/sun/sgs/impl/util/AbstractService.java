@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.util;
@@ -153,16 +155,12 @@ public abstract class AbstractService extends AbstractBasicService {
 	Version oldVersion, Version currentVersion);
     
     /**
-     * Returns the data service relevant to the current context.
+     * Returns the data service.
      *
-     * @return the data service relevant to the current context
+     * @return the data service
      */
-    public static synchronized DataService getDataService() {
-	if (txnProxy == null) {
-	    throw new IllegalStateException("Service not initialized");
-	} else {
-	    return txnProxy.getService(DataService.class);
-	}
+    public DataService getDataService() {
+	return dataService;
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.util;
@@ -354,7 +356,7 @@ public abstract class AbstractBasicService implements Service {
      *
      * @return	{@code true} if this service is shutting down
      */
-    protected boolean shuttingDown() {
+    public boolean shuttingDown() {
 	synchronized (lock) {
 	    return
 		state == State.SHUTTING_DOWN ||
@@ -431,18 +433,20 @@ public abstract class AbstractBasicService implements Service {
      * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
      *
-     * @param ioTask a task with IO-related operations
-     * @param nodeId the node that is the target of the IO operations
-     * @throws IllegalStateException if this method is invoked within a
-     * transactional context
+     * @param	ioTask a task with IO-related operations
+     * @param	nodeId the node that is the target of the IO operations
+     * @return	{@code true} if the task was successfully executed and
+     * 		{@code false} if the specified node is no longer alive
+     * @throws	IllegalStateException if this method is invoked within a
+     *		transactional context
      */
-    public void runIoTask(IoRunnable ioTask, long nodeId) {
+    public boolean runIoTask(IoRunnable ioTask, long nodeId) {
         int maxAttempts = maxIoAttempts;
         checkNonTransactionalContext();
         do {
             try {
                 ioTask.run();
-                return;
+                return true;
             } catch (IOException e) {
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.logThrow(Level.FINEST, e,
@@ -450,7 +454,7 @@ public abstract class AbstractBasicService implements Service {
                 }
                 if (maxAttempts-- == 0) {
                     logger.logThrow(Level.WARNING, e,
-                            "A communication error occured while running an" +
+                            "A communication error occured while running an " +
                             "IO task. Reporting node {0} as failed.", nodeId);
 
                     // Report failure of remote node since are
@@ -467,6 +471,7 @@ public abstract class AbstractBasicService implements Service {
                 }
             }
         } while (isAlive(nodeId));
+	return false;
     }
     
     /**
@@ -519,7 +524,7 @@ public abstract class AbstractBasicService implements Service {
      * and throws {@code IllegalStateException} if the thread is in a
      * transactional context.
      */
-    protected void checkNonTransactionalContext() {
+    public void checkNonTransactionalContext() {
 	checkNonTransactionalContext(txnProxy);
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.watchdog;
@@ -598,7 +600,6 @@ public final class WatchdogServiceImpl
         }
 
         boolean isLocal = (nodeId == localNodeId);
-
         if (logger.isLoggable(Level.FINER) || !nodeHealth.isAlive()) {
             logger.log((nodeHealth.isAlive() ? Level.WARNING : Level.FINER),
                        "{1} reported {2} health in {3} node with id: {0}",
@@ -646,8 +647,10 @@ public final class WatchdogServiceImpl
                 break;
             } catch (IOException ioe) {
                 if (retries == 0) {
-                    logger.logThrow(Level.SEVERE, ioe,
-                                    "Cannot report failure to Watchdog server");
+                    logger.logThrow(
+ 			Level.SEVERE, ioe,
+			"node:{0} cannot report failure of node:{1} to " +
+			"Watchdog server", localNodeId, nodeId);
                     setFailedThenNotify();
                     return;
                 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 package com.sun.sgs.test.util;
 
@@ -133,13 +135,13 @@ public class SimpleTestIdentityAuthenticator implements IdentityAuthenticator {
     /**
      * Identity returned by the SimpleTestIdentityAuthenticator.
      */
-    private static class DummyIdentity implements Identity, Serializable {
+    public static class DummyIdentity implements Identity, Serializable {
 
         private static final long serialVersionUID = 1L;
 
         private final String name;
 
-        DummyIdentity(String name) {
+        public DummyIdentity(String name) {
             this.name = name;
         }
 

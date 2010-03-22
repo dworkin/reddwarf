@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 package com.sun.sgs.test.util;
 
@@ -35,6 +37,7 @@ import com.sun.sgs.impl.service.data.store.cache.server.
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
+import com.sun.sgs.impl.service.nodemap.affinity.LPADriver;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.NodeType;
@@ -365,6 +368,18 @@ public class SgsTestNode {
     }
 
     /**
+     * Returns the node mapping server.
+     */
+    NodeMappingServerImpl getNodeMappingServer()
+	throws Exception
+    {
+        Field serverImplField = 
+            NodeMappingServiceImpl.class.getDeclaredField("serverImpl");
+        serverImplField.setAccessible(true);
+	return (NodeMappingServerImpl) serverImplField.get(nodeMappingService);
+    }
+    
+    /**
      * Returns the task service.
      */
     public TaskService getTaskService() {
@@ -430,8 +445,7 @@ public class SgsTestNode {
         int requestedNodeMapPort =
             isServerNode ?
             getNextUniquePort() :
-            getNodeMapServerPort((NodeMappingServiceImpl)
-				 serverNode.getNodeMappingService());
+            getNodeMapServerPort(serverNode.getNodeMappingServer());
 
         String dir = System.getProperty("java.io.tmpdir") +
                                 File.separator + appName;
@@ -474,11 +488,10 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.watchdog.server.renew.interval", "1500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
-            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
+            LPADriver.GRAPH_CLASS_PROPERTY, "None",
+            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "1000",
             "com.sun.sgs.impl.service.task.continue.threshold", "10"
         );
-        
-        
 
         return retProps;
     }
@@ -570,18 +583,12 @@ public class SgsTestNode {
     /**
      * Returns the bound port for the node mapping server.
      */
-    private static int getNodeMapServerPort(
-        NodeMappingServiceImpl nodemapService)
+    private static int getNodeMapServerPort(NodeMappingServerImpl nodemapServer)
 	throws Exception
     {
-        Field serverImplField = 
-            NodeMappingServiceImpl.class.getDeclaredField("serverImpl");
-        serverImplField.setAccessible(true);
         Method getPortMethod = 
                 NodeMappingServerImpl.class.getDeclaredMethod("getPort");
         getPortMethod.setAccessible(true);
-	NodeMappingServerImpl server =
-	    (NodeMappingServerImpl) serverImplField.get(nodemapService);
-	return (Integer) getPortMethod.invoke(server);
+	return (Integer) getPortMethod.invoke(nodemapServer);
     }
 }

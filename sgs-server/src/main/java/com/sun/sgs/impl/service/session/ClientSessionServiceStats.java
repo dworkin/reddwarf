@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 Sun Microsystems, Inc.
+ * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --
  */
 
 package com.sun.sgs.impl.service.session;
@@ -33,8 +35,9 @@ import com.sun.sgs.profile.ProfileOperation;
  */
 class ClientSessionServiceStats implements ClientSessionServiceMXBean {
 
-    final ProfileOperation registerSessionDisconnectListenerOp;
+    final ProfileOperation addSessionStatusListenerOp;
     final ProfileOperation getSessionProtocolOp;
+    final ProfileOperation isRelocatingToLocalNodeOp;
     
     ClientSessionServiceStats(ProfileCollector collector) {
         ProfileConsumer consumer = 
@@ -43,22 +46,30 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         
-        registerSessionDisconnectListenerOp =
-            consumer.createOperation("registerSessionDisconnectListener", 
+        addSessionStatusListenerOp =
+            consumer.createOperation("addSessionStatusListener", 
                                      type, level);
         getSessionProtocolOp =
             consumer.createOperation("getSessionProtocol", type, level);
+        isRelocatingToLocalNodeOp =
+            consumer.createOperation("isRelocatingToLocalNode", type, level);
     }
 
     /** {@inheritDoc} */
-    public long getRegisterSessionDisconnectListenerCalls() {
+    public long getAddSessionStatusListenerCalls() {
         return ((AggregateProfileOperation) 
-                    registerSessionDisconnectListenerOp).getCount();
+                    addSessionStatusListenerOp).getCount();
     }
 
     /** {@inheritDoc} */
     public long getGetSessionProtocolCalls() {
         return ((AggregateProfileOperation) 
                     getSessionProtocolOp).getCount();
+    }
+
+    /** {@inheritDoc} */
+    public long getIsRelocatingToLocalNodeCalls() {
+        return ((AggregateProfileOperation)
+		    isRelocatingToLocalNodeOp).getCount();
     }
 }
