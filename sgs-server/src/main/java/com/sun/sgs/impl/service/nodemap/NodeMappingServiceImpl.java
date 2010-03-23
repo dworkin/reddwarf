@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -728,12 +734,11 @@ public class NodeMappingServiceImpl
         }
         
         public void run() throws UnknownIdentityException { 
-            // Exceptions thrown by getServiceBinding are handled by caller.
-            IdentityMO idmo = 
-		(IdentityMO) dataService.getServiceBinding(idKey);
             
             if (active) {
-                dataService.setServiceBinding(statusKey, idmo);
+                // Exceptions thrown by getServiceBinding are handled by caller.
+                dataService.setServiceBinding(statusKey,
+                                              dataService.getServiceBinding(idKey));
             } else {
                 // Note that NameNotBoundException can be thrown
                 // if this is our second time calling this method.

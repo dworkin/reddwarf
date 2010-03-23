@@ -1,3 +1,6 @@
+Version 0.10.2
+- Fix ticket #44
+
 Version 0.10.1
 - Add client session login limit (ticket #41)
 - Added an optional transaction retry policy (NowOrLaterRetryPolicy)
