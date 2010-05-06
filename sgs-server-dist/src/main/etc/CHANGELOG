@@ -1,4 +1,15 @@
-Version 0.9.12
+Version 0.10.2
+- Fix ticket #44
+
+Version 0.10.1
+- Add client session login limit (ticket #41)
+- Added an optional transaction retry policy (NowOrLaterRetryPolicy)
+  that is more robust in handling problematic tasks.  This policy is
+  most useful and recommended for production deployments. (ticket #38)
+- Fix tickets #34, #35, #36, #37, #42
+
+Version 0.10.0
+- Rebranded as RedDwarf (ticket #2)
 - Added support for client session relocation to client session
   and channel services (issue #12)
 - Added affinity graph builders and group finders, for load balancing

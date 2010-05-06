@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this distribution have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license with "Classpath"
+ * exception that can be found in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -24,11 +30,11 @@
  */
 
 /**
- * Provides the Project Darkstar management interfaces exposed via JMX.
+ * Provides the RedDwarf management interfaces exposed via JMX.
  * <p>
  * <b>
  * These interfaces should not be considered stable;  they will evolve
- * as we gather more experience using JMX with Project Darkstar.  In
+ * as we gather more experience using JMX with RedDwarf.  In
  * particular, more data and statistics might be exposed and notifications
  * might be added, and some might be removed if we find they are not
  * generally useful.

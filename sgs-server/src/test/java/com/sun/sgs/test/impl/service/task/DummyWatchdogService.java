@@ -186,6 +186,9 @@ public class DummyWatchdogService implements WatchdogService {
             return getLocalNodeHealth();
         }
     }
+    public void reportHealth(Health health, String component) {
+        // Don't do anything for now
+    }
     public void reportHealth(long nodeId, Health health, String component) {
         // Don't do anything for now
     }
