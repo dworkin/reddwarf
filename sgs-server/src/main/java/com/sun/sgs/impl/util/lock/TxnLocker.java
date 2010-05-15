@@ -122,7 +122,7 @@ public class TxnLocker<K> extends BasicLocker<K> {
      */
     @Override
     protected LockConflict<K> getConflict() {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
 	    return conflict;
 	}
@@ -137,7 +137,7 @@ public class TxnLocker<K> extends BasicLocker<K> {
      */
     @Override
     protected void clearConflict() {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
 	    if (conflict != null) {
 		if (conflict.type == LockConflictType.DEADLOCK) {
@@ -153,21 +153,18 @@ public class TxnLocker<K> extends BasicLocker<K> {
 
     /**
      * Specifies a conflict that should cause this locker's current request to
-     * be denied, and notifies waiters.
+     * be denied, and notifies waiters.  Does nothing if the locker already has
+     * a conflict.
      *
      * @param	conflict the conflicting request
-     * @throws	IllegalStateException if a conflicting request has already been
-     *		specified
      */
     protected void setConflict(LockConflict<K> conflict) {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
-            if (this.conflict != null) {
-                throw new IllegalStateException(
-		    "This locker already has a conflict");
+	    if (this.conflict == null) {
+		this.conflict = conflict;
+		notifyAll();
 	    }
-	    this.conflict = conflict;
-	    notifyAll();
 	}
     }
 }

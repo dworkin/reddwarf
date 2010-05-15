@@ -60,9 +60,9 @@ public final class LockConflict<K> {
     }
 
     /**
-     * Returns a transaction that caused the conflict.
+     * Returns a locker that caused the conflict.
      *
-     * @return	a transaction that caused the conflict
+     * @return	a locker that caused the conflict
      */
     public Locker<K> getConflictingLocker() {
 	return conflictingLocker;

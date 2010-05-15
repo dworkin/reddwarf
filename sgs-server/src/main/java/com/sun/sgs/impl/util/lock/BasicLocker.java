@@ -57,7 +57,7 @@ public class BasicLocker<K> extends Locker<K> {
      */
     @Override
     LockAttemptResult<K> getWaitingFor() {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
 	    return waitingFor;
 	}
@@ -73,7 +73,7 @@ public class BasicLocker<K> extends Locker<K> {
      */
     @Override
     void setWaitingFor(LockAttemptResult<K> waitingFor) {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	if (waitingFor != null && waitingFor.conflict == null) {
 	    throw new IllegalArgumentException(
 		"Attempt to specify a lock attempt result that is not a" +
