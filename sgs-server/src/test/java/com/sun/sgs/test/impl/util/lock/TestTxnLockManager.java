@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -22,6 +28,8 @@
 package com.sun.sgs.test.impl.util.lock;
 
 import com.sun.sgs.impl.util.lock.BasicLocker;
+import com.sun.sgs.impl.util.lock.LockConflict;
+import com.sun.sgs.impl.util.lock.LockConflictType;
 import com.sun.sgs.impl.util.lock.LockManager;
 import com.sun.sgs.impl.util.lock.Locker;
 import com.sun.sgs.impl.util.lock.TxnLockManager;
@@ -61,8 +69,26 @@ public class TestTxnLockManager extends TestLockManager {
 				      Transaction txn,
 				      long requestedStartTime)
     {
-	return new TxnLocker<String>(
+	return new StringTxnLocker(
 	    (TxnLockManager<String>) lockManager, txn, requestedStartTime);
+    }
+
+    /** A transaction-locker with a nice toString method. */
+    private static class StringTxnLocker extends TxnLocker<String> {
+	private static long nextId = 1;
+	private final long id;
+	StringTxnLocker(TxnLockManager<String> lockManager,
+			Transaction txn,
+			long requestedStartTime)
+	{
+	    super(lockManager, txn, requestedStartTime);
+	    synchronized (StringTxnLocker.class) {
+		id = nextId++;
+	    }
+	}
+	public String toString() {
+	    return "StringTxnLocker-" + id;
+	}
     }
 
     /* -- Test lock -- */
@@ -468,6 +494,49 @@ public class TestTxnLockManager extends TestLockManager {
 	lockManager.releaseLock(locker4, "o1");
 	lockManager.releaseLock(locker4, "o2");
 	assertGranted(acquire.getResult());
+    }
+
+    /**
+     * Test case with simultaneous deadlock and timeout
+     *
+     * locker is youngest
+     *
+     * locker:  lockNoWait o1, write	=> granted
+     * locker2: lockNoWait o2, write	=> granted
+     * locker:  lockNoWait o2, write	=> blocked
+     * locker2: lockNoWait o1, write	=> blocked
+     * locker:				=> deadlock victim
+     * locker2: waitForLock		=> timeout
+     * locker2: abort
+     * locker:	waitForLock		=> deadlock reported
+     */
+    @Test
+    public void testDeadlockAndTimeout() throws Exception {
+	Locker<String> locker = createTxnLocker(lockManager, 2000);
+	Locker<String> locker2 = createTxnLocker(lockManager, 1000);
+	LockConflict<String> conflict =
+	    lockManager.lockNoWait(locker, "o1", true);
+	assertSame(null, conflict);
+	LockConflict<String> conflict2 =
+	    lockManager.lockNoWait(locker2, "o2", true);
+	assertSame(null, conflict);
+	conflict = lockManager.lockNoWait(locker, "o2", true);
+	assertTrue("Should be blocked",
+		   conflict != null &&
+		   conflict.getType() == LockConflictType.BLOCKED);
+	conflict2 = lockManager.lockNoWait(locker2, "o1", true);
+	assertTrue("Should be blocked",
+		   conflict2 != null &&
+		   conflict2.getType() == LockConflictType.BLOCKED);
+	conflict2 = lockManager.waitForLock(locker2);
+	assertTrue("Should be timed out",
+		   conflict2 != null &&
+		   conflict2.getType() == LockConflictType.TIMEOUT);
+	lockManager.releaseLock(locker2, "o2");
+	conflict = lockManager.waitForLock(locker);
+	assertTrue("Should be deadlock victim",
+		   conflict != null &&
+		   conflict.getType() == LockConflictType.DEADLOCK);
     }
 
     /* -- Test waitForLock -- */

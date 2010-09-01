@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -22,6 +28,7 @@
 package com.sun.sgs.test.impl.util.lock;
 
 import com.sun.sgs.impl.util.lock.BasicLocker;
+import com.sun.sgs.impl.util.lock.LockConflictType;
 import com.sun.sgs.impl.util.lock.LockManager;
 import com.sun.sgs.impl.util.lock.Locker;
 import com.sun.sgs.impl.util.lock.MultiLockManager;
@@ -43,7 +50,22 @@ public class TestMultiLockManager extends TestLockManager {
 
     /** Creates a locker. */
     protected Locker<String> createLocker(LockManager<String> lockManager) {
-	return new MultiLocker<String>((MultiLockManager<String>) lockManager);
+	return new StringMultiLocker((MultiLockManager<String>) lockManager);
+    }
+
+    /** A multi-locker with a nice toString method. */
+    private static class StringMultiLocker extends MultiLocker<String> {
+	private static long nextId = 1;
+	private final long id;
+	StringMultiLocker(MultiLockManager<String> lockManager) {
+	    super(lockManager);
+	    synchronized (StringMultiLocker.class) {
+		id = nextId++;
+	    }
+	}
+	public String toString() {
+	    return "StringMultiLocker-" + id;
+	}
     }
 
     /** Returns the lock manager as a {@link MultiLockManager}. */
@@ -197,5 +219,123 @@ public class TestMultiLockManager extends TestLockManager {
 	acquire2.assertBlocked();
 	lockManager.releaseLock(locker, "o1");
 	assertGranted(acquire2.getResult());
+    }
+
+    /* -- Conflict tests -- */
+
+    /**
+     * Tests the following case:
+     *
+     * Locker1	Read
+     * Locker2	Read
+     * Locker1	Write BLOCKED
+     * Locker3	Read  BLOCKED
+     * Locker1	Abort
+     * Locker1  Write DENIED
+     * Locker3	Read  GRANTED
+     */
+    @Test
+    public void testReleaseWhileUpgrading() {
+	assertGranted(acquireLock(locker, "o1", false));
+	Locker<String> locker2 = createLocker(lockManager);
+	lockManager.lock(locker2, "o1", false);
+	AcquireLock acquire = new AcquireLock(locker, "o1", true);
+	acquire.assertBlocked();
+	Locker<String> locker3 = createLocker(lockManager);
+	AcquireLock acquire3 = new AcquireLock(locker3, "o1", false);
+	acquire3.assertBlocked();
+	lockManager.releaseLock(locker, "o1");
+	assertDenied(LockConflictType.DENIED, acquire.getResult(), locker2);
+	assertGranted(acquire3.getResult());
+    }	
+
+    /**
+     * Test locking the same item for read while the first attempt is blocked.
+     *
+     * Locker1  Write
+     * Locker2a Read  BLOCKED
+     * Locker2b Read  BLOCKED
+     * Locker1	Abort
+     * Locker2a Read  GRANTED
+     * Locker2b Read  GRANTED
+     */
+    @Test
+    public void testLockReadWhileBlockedRead() {
+	assertGranted(acquireLock(locker, "o1", true));
+	Locker<String> locker2 = createLocker(lockManager);
+	AcquireLock acquire2a = new AcquireLock(locker2, "o1", false);
+	acquire2a.assertBlocked();
+	AcquireLock acquire2b = new AcquireLock(locker2, "o1", false);
+	acquire2b.assertBlocked();
+	lockManager.releaseLock(locker, "o1");
+	assertGranted(acquire2a.getResult());
+	assertGranted(acquire2b.getResult());
+    }
+
+    /**
+     * Test locking the same item for write while the first attempt is blocked.
+     *
+     * Locker1  Read
+     * Locker2a Write  BLOCKED
+     * Locker2b Write  BLOCKED
+     * Locker1	Abort
+     * Locker2a Write  GRANTED
+     * Locker2b Write  GRANTED
+     */
+    @Test
+    public void testLockWriteWhileBlockedWrite() {
+	assertGranted(acquireLock(locker, "o1", false));
+	Locker<String> locker2 = createLocker(lockManager);
+	AcquireLock acquire2a = new AcquireLock(locker2, "o1", true);
+	acquire2a.assertBlocked();
+	AcquireLock acquire2b = new AcquireLock(locker2, "o1", true);
+	acquire2b.assertBlocked();
+	lockManager.releaseLock(locker, "o1");
+	assertGranted(acquire2a.getResult());
+	assertGranted(acquire2b.getResult());
+    }
+
+    /**
+     * Test locking the same item for read while an attempt for write is
+     * blocked.
+     *
+     * Locker1  Read
+     * Locker2a Write  BLOCKED
+     * Locker2b Read   DENIED
+     * Locker1	Abort
+     * Locker2a Write  GRANTED
+     */
+    @Test
+    public void testLockReadWhileBlockedWrite() {
+	assertGranted(acquireLock(locker, "o1", false));
+	Locker<String> locker2 = createLocker(lockManager);
+	AcquireLock acquire2a = new AcquireLock(locker2, "o1", true);
+	acquire2a.assertBlocked();
+	AcquireLock acquire2b = new AcquireLock(locker2, "o1", false);
+	assertDenied(LockConflictType.DENIED, acquire2b.getResult(), locker2);
+	lockManager.releaseLock(locker, "o1");
+	assertGranted(acquire2a.getResult());
+    }
+
+    /**
+     * Test locking the same item for write while an attempt for read is
+     * blocked.
+     *
+     * Locker1  Write
+     * Locker2a Read  BLOCKED
+     * Locker2b Write   DENIED
+     * Locker1	Abort
+     * Locker2a Read  GRANTED
+     */
+    @Test
+    public void testLockWriteWhileBlockedRead() {
+	assertGranted(acquireLock(locker, "o1", true));
+	Locker<String> locker2 = createLocker(lockManager);
+	AcquireLock acquire2a = new AcquireLock(locker2, "o1", false);
+	acquire2a.assertBlocked();
+	AcquireLock acquire2b = new AcquireLock(locker2, "o1", true);
+	assertDenied(LockConflictType.DENIED, acquire2b.getResult(), locker2);
+	lockManager.releaseLock(locker, "o1");
+	assertGranted(acquire2a.getResult());
     }
 }

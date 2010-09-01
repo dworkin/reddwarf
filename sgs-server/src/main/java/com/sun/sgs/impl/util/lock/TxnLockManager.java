@@ -80,32 +80,6 @@ public final class TxnLockManager<K> extends LockManager<K> {
      * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
      *		not an instance of {@link TxnLocker}
      */
-    @Override
-    public LockConflict<K> lock(Locker<K> locker, K key, boolean forWrite) {
-	checkTxnLocker(locker);
-	return super.lock(locker, key, forWrite);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
-     *		not an instance of {@link TxnLocker}
-     */
-    @Override
-    public LockConflict<K> lockNoWait(
-	Locker<K> locker, K key, boolean forWrite)
-    {
-	checkTxnLocker(locker);
-	return super.lockNoWait(locker, key, forWrite);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @throws	IllegalArgumentException {@inheritDoc}, or if {@code locker} is
-     *		not an instance of {@link TxnLocker}
-     */
     public LockConflict<K> waitForLock(Locker<K> locker) {
 	checkTxnLocker(locker);
 	return super.waitForLock(locker);
@@ -118,12 +92,13 @@ public final class TxnLockManager<K> extends LockManager<K> {
      *
      * This implementation calls the deadlock checker if the request blocks.
      *
-     * @throws	IllegalStateException {@inheritDoc}     
+     * @throws	IllegalStateException {@inheritDoc}
      */
     @Override
     LockConflict<K> lockNoWaitInternal(
 	Locker<K> locker, K key, boolean forWrite)
     {
+	checkTxnLocker(locker);
 	LockConflict<K> conflict =
 	    super.lockNoWaitInternal(locker, key, forWrite);
 	if (conflict != null) {
@@ -133,10 +108,32 @@ public final class TxnLockManager<K> extends LockManager<K> {
 			   "\n  returns blocked -- checking for deadlocks",
 			   locker, key, forWrite);
 	    }
-	    LockConflict<K> deadlockConflict =
-		new DeadlockChecker((TxnLocker<K>) locker).check();
-	    if (deadlockConflict != null) {
-		conflict = deadlockConflict;
+	    try {
+		LockConflict<K> deadlockConflict =
+		    new DeadlockChecker((TxnLocker<K>) locker).check();
+		if (deadlockConflict != null) {
+		    if (logger.isLoggable(FINER)) {
+			logger.log(FINER,
+				   "lock {0}, {1}, forWrite:{2} found" +
+				   " deadlock with {3}",
+				   locker, key, forWrite, deadlockConflict);
+		    }
+		    conflict = deadlockConflict;
+		}
+	    } catch (RuntimeException e) {
+		if (logger.isLoggable(FINER)) {
+		    logger.logThrow(FINER, e,
+				    "lock {0}, {1}, forWrite:{2} throws",
+				    locker, key, forWrite);
+		}
+		throw e;
+	    } catch (Error e) {
+		if (logger.isLoggable(FINER)) {
+		    logger.logThrow(FINER, e,
+				    "lock {0}, {1}, forWrite:{2} throws",
+				    locker, key, forWrite);
+		}
+		throw e;
 	    }
 	}
 	return conflict;
@@ -237,6 +234,9 @@ public final class TxnLockManager<K> extends LockManager<K> {
 	private boolean checkInternal(
 	    TxnLocker<K> locker, WaiterInfo<K> waiterInfo)
 	{
+	    if (waiterInfo.waitingFor == null) {
+		return false;
+	    }
 	    waiterInfo.pass = pass;
 	    for (LockRequest<K> request : waiterInfo.waitingFor) {
 		TxnLocker<K> owner = (TxnLocker<K>) request.getLocker();
@@ -303,14 +303,14 @@ public final class TxnLockManager<K> extends LockManager<K> {
 		} else {
 		    K key = result.request.getKey();
 		    Map<K, Lock<K>> keyMap = getKeyMap(key);
-		    assert Lock.noteSync(TxnLockManager.this, key);
+		    assert TxnLockManager.this.noteKeySync(key);
 		    try {
 			synchronized (keyMap) {
 			    waitingFor = getLock(key, keyMap).copyOwners(
 				TxnLockManager.this);
 			}
 		    } finally {
-			assert Lock.noteUnsync(TxnLockManager.this, key);
+			assert TxnLockManager.this.noteKeyUnsync(key);
 		    }
 		}
 		waiterInfo = new WaiterInfo<K>(waitingFor);

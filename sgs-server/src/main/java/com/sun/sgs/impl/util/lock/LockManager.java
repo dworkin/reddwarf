@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -41,9 +47,9 @@ import java.util.logging.Logger;
  * <ul>
  * <li> {@link Level#FINER FINER} - Releasing locks; requesting, waiting for,
  *	and returning from lock requests
- * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
- *	requesting locks before waiting, releasing locks, results of attempting
- *	to assign locks to waiters
+ * <li> {@link Level#FINEST FINEST} - Initial lock and lock waiting requests,
+ *	notifying new lock owners, results of requesting locks before waiting,
+ *	releasing locks, results of attempting to assign locks to waiters
  * </ul> <p>
  *
  * The implementation of this class uses the following thread synchronization
@@ -125,14 +131,14 @@ public class LockManager<K> {
      * When assertions are enabled, holds the {@code Locker} that the
      * current thread is synchronized on, if any.
      */
-    final ThreadLocal<Locker<K>> currentLockerSync =
+    private final ThreadLocal<Locker<K>> currentLockerSync =
 	new ThreadLocal<Locker<K>>();
 
     /**
      * When assertions are enabled, hold the {@code Key} whose associated
      * {@code Map} the current thread is synchronized on, if any.
      */
-    final ThreadLocal<K> currentKeySync = new ThreadLocal<K>();
+    private final ThreadLocal<K> currentKeySync = new ThreadLocal<K>();
 
     /* -- Constructor -- */
 
@@ -169,8 +175,8 @@ public class LockManager<K> {
      * prevented the lock from being acquired, or else {@code null} if the lock
      * was acquired.  If the {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.  Otherwise, the caller can repeat this call, and
+     * transaction, and any subsequent lock or wait requests will return the
+     * same deadlock conflict.  Otherwise, the caller can repeat this call, and
      * any conflicts from earlier calls will be ignored.
      *
      * @param	locker the locker requesting the lock
@@ -180,9 +186,8 @@ public class LockManager<K> {
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
      *		manager
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
+     * @throws	IllegalStateException if still waiting for an earlier attempt
+     *		to complete
      */
     public LockConflict<K> lock(Locker<K> locker, K key, boolean forWrite) {
 	LockConflict<K> conflict = lockNoWait(locker, key, forWrite);
@@ -197,8 +202,8 @@ public class LockManager<K> {
      * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
      * {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any subsequent lock or wait requests will throw {@code
-     * IllegalStateException}.  Otherwise, the caller can repeat this call, and
+     * transaction, and any subsequent lock or wait requests will return the
+     * same deadlock conflict.  Otherwise, the caller can repeat this call, and
      * any conflicts from earlier calls will be ignored.
      *
      * @param	locker the locker requesting the lock
@@ -208,9 +213,8 @@ public class LockManager<K> {
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
      *		manager
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
+     * @throws	IllegalStateException if still waiting for an earlier attempt
+     *		to complete
      */
     public LockConflict<K> lockNoWait(
 	Locker<K> locker, K key, boolean forWrite)
@@ -226,13 +230,13 @@ public class LockManager<K> {
      * transaction was not waiting.  If the {@code type} field of the return
      * value is {@link LockConflictType#DEADLOCK DEADLOCK}, then the caller
      * should abort the transaction, and any subsequent lock or wait requests
-     * will throw {@code IllegalStateException}.
+     * will return the same deadlock conflict.
      *
      * @param	locker the locker requesting the lock
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
+     *		manager
      */
     public LockConflict<K> waitForLock(Locker<K> locker) {
 	checkLockManager(locker);
@@ -246,7 +250,7 @@ public class LockManager<K> {
      * @param	locker the locker holding the lock
      * @param	key the key identifying the lock
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
+     *		manager
      */
     public void releaseLock(Locker<K> locker, K key) {
 	if (logger.isLoggable(FINER)) {
@@ -264,13 +268,13 @@ public class LockManager<K> {
      */
     public List<LockRequest<K>> getOwners(K key) {
 	Map<K, Lock<K>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
+	assert noteKeySync(key);
 	try {
 	    synchronized (keyMap) {
 		return getLock(key, keyMap).copyOwners(this);
 	    }
 	} finally {
-	    assert Lock.noteUnsync(this, key);
+	    assert noteKeyUnsync(key);
 	}
     }
 
@@ -283,13 +287,13 @@ public class LockManager<K> {
      */
     public List<LockRequest<K>> getWaiters(K key) {
 	Map<K, Lock<K>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
+	assert noteKeySync(key);
 	try {
 	    synchronized (keyMap) {
 		return getLock(key, keyMap).copyWaiters(this);
 	    }
 	} finally {
-	    assert Lock.noteUnsync(this, key);
+	    assert noteKeyUnsync(key);
 	}
     }
 
@@ -336,65 +340,90 @@ public class LockManager<K> {
      * @param	forWrite whether to request a write lock
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
-     * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if still waiting for an
-     *		earlier attempt to complete
+     * @throws	IllegalStateException if still waiting for an earlier attempt
+     *		to complete
      */
     LockConflict<K> lockNoWaitInternal(
 	Locker<K> locker, K key, boolean forWrite)
     {
-	if (locker.getWaitingFor() != null) {
-	    throw new IllegalStateException(
-		"Attempt to obtain a new lock while waiting");
+	if (logger.isLoggable(FINEST)) {
+	    logger.log(FINEST, "lock {0}, {1}, forWrite:{2}",
+		       locker, key, forWrite);
 	}
-	LockConflict<K> conflict = locker.getConflict();
-	if (conflict != null) {
-	    if (conflict.type == LockConflictType.DEADLOCK) {
-		throw new IllegalStateException(
-		    "Attempt to obtain a new lock after a deadlock");
-	    } else {
-		/* Ignoring the previous conflict */
-		locker.clearConflict();
-	    }
-	}
-	LockAttemptResult<K> result;
-	Map<K, Lock<K>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
 	try {
-	    synchronized (keyMap) {
-		Lock<K> lock = getLock(key, keyMap);
-		result = lock.lock(locker, forWrite, false);
+	    if (locker.getWaitingFor() != null) {
+		throw new IllegalStateException(
+		    "Attempt to obtain a new lock while waiting: " +
+		    "locker:" + locker + ", key:" + key +
+		    ", forWrite:" + forWrite);
 	    }
-	} finally {
-	    assert Lock.noteUnsync(this, key);
-	}
-	if (result == null) {
+	    LockConflict<K> conflict = locker.getConflict();
+	    if (conflict != null) {
+		if (conflict.type == LockConflictType.DEADLOCK) {
+		    if (logger.isLoggable(FINER)) {
+			logger.log(FINER,
+				   "lock {0}, {1}, forWrite:{2}\n  returns {3}",
+				   locker, key, forWrite, conflict);
+		    }
+		    return conflict;
+		} else {
+		    /* Ignoring the previous conflict */
+		    locker.clearConflict();
+		}
+	    }
+	    LockAttemptResult<K> result;
+	    Map<K, Lock<K>> keyMap = getKeyMap(key);
+	    assert noteKeySync(key);
+	    try {
+		synchronized (keyMap) {
+		    Lock<K> lock = getLock(key, keyMap);
+		    result = lock.lock(locker, forWrite, false);
+		}
+	    } finally {
+		assert noteKeyUnsync(key);
+	    }
+	    if (result == null) {
+		if (logger.isLoggable(FINER)) {
+		    logger.log(FINER,
+			       "lock {0}, {1}, forWrite:{2}" +
+			       "\n  returns null (already granted)",
+			       locker, key, forWrite);
+		}
+		return null;
+	    }
+	    if (result.conflict == null) {
+		if (logger.isLoggable(FINER)) {
+		    logger.log(FINER,
+			       "lock {0}, {1}, forWrite:{2}" +
+			       "\n  returns null (granted)",
+			       locker, key, forWrite);
+		}
+		return null;
+	    }
+	    if (result.conflictType == LockConflictType.BLOCKED) {
+		locker.setWaitingFor(result);
+	    }
+	    conflict = new LockConflict<K>(
+		result.conflictType, result.conflict);
 	    if (logger.isLoggable(FINER)) {
 		logger.log(FINER,
-			   "lock {0}, {1}, forWrite:{2}" +
-			   "\n  returns null (already granted)",
-			   locker, key, forWrite);
+			   "lock {0}, {1}, forWrite:{2}\n  returns {3}",
+			   locker, key, forWrite, conflict);
 	    }
-	    return null;
-	}
-	if (result.conflict == null) {
+	    return conflict;
+	} catch (RuntimeException e) {
 	    if (logger.isLoggable(FINER)) {
-		logger.log(FINER,
-			   "lock {0}, {1}, forWrite:{2}" +
-			   "\n  returns null (granted)",
-			   locker, key, forWrite);
+		logger.logThrow(FINER, e, "lock {0}, {1}, forWrite:{2} throws",
+				locker, key, forWrite);
 	    }
-	    return null;
+	    throw e;
+	} catch (Error e) {
+	    if (logger.isLoggable(FINER)) {
+		logger.logThrow(FINER, e, "lock {0}, {1}, forWrite:{2} throws",
+				locker, key, forWrite);
+	    }
+	    throw e;
 	}
-	locker.setWaitingFor(result);
-	conflict = new LockConflict<K>(
-	    LockConflictType.BLOCKED, result.conflict);
-	if (logger.isLoggable(FINER)) {
-	    logger.log(FINER,
-		       "lock {0}, {1}, forWrite:{2}\n  returns {3}",
-			locker, key, forWrite, conflict);
-	}
-	return conflict;
     }
 
     /**
@@ -407,96 +436,127 @@ public class LockManager<K> {
      *		conflict
      */
     LockConflict<K> waitForLockInternal(Locker<K> locker) {
-	assert locker.noteSync();
+	logger.log(FINEST, "wait for lock {0}", locker);
 	try {
-	    synchronized (locker) {
-		LockAttemptResult<K> result = locker.getWaitingFor();
-		if (result == null) {
-		    logger.log(FINER, "lock {0}\n  returns null (not waiting)",
-			       locker);
-		    return null;
-		}
-		Lock<K> lock;
-		K key = result.request.getKey();
-		Map<K, Lock<K>> keyMap = getKeyMap(key);
-		assert Lock.noteSync(this, key);
-		try {
-		    synchronized (keyMap) {
-			lock = getLock(key, keyMap);
+	    assert noteLockerSync(locker);
+	    try {
+		synchronized (locker) {
+		    LockAttemptResult<K> result = locker.getWaitingFor();
+		    if (result == null) {
+			logger.log(FINER,
+				   "lock {0}\n  returns null (not waiting)",
+				   locker);
+			return null;
 		    }
-		} finally {
-		    assert Lock.noteUnsync(this, key);
-		}
-		long now = System.currentTimeMillis();
-		long stop = locker.getLockTimeoutTime(now, lockTimeout);
-		LockConflict<K> conflict = null;
-		while (true) {
-		    if (conflict == null) {
-			conflict = locker.getConflict();
-		    }
-		    boolean isOwner;
-		    boolean timedOut = false;
-		    assert Lock.noteSync(this, key);
+		    Lock<K> lock;
+		    K key = result.request.getKey();
+		    Map<K, Lock<K>> keyMap = getKeyMap(key);
+		    assert noteKeySync(key);
 		    try {
 			synchronized (keyMap) {
-			    isOwner = lock.isOwner(result.request);
-			    if (!isOwner) {
-				if (conflict != null) {
-				    lock.flushWaiter(locker);
-				} else if (now >= stop) {
-				    timedOut = true;
-				    lock.flushWaiter(locker);
-				}
-			    }
+			    lock = getLock(key, keyMap);
 			}
 		    } finally {
-			assert Lock.noteUnsync(this, key);
+			assert noteKeyUnsync(key);
 		    }
-		    if (isOwner) {
-			locker.setWaitingFor(null);
-			locker.clearConflict();
-			if (logger.isLoggable(FINER)) {
-			    logger.log(
-				FINER,
-				"lock {0}, {1}, forWrite:{2}" +
-				"\n  returns null (granted)",
-				locker, key, result.request.getForWrite());
+		    long now = System.currentTimeMillis();
+		    long stop = locker.getLockTimeoutTime(now, lockTimeout);
+		    LockConflict<K> conflict = null;
+		    while (true) {
+			if (conflict == null) {
+			    conflict = locker.getConflict();
 			}
-			return null;
-		    } else if (timedOut) {
-			conflict = new LockConflict<K>(
-			    LockConflictType.TIMEOUT, result.conflict);
-			break;
-		    } else if (conflict != null) {
-			break;
+			boolean isOwner;
+			boolean timedOut = false;
+			boolean upgradeFailed = false;
+			assert noteKeySync(key);
+			try {
+			    synchronized (keyMap) {
+				LockRequest<K> owner = lock.getOwner(locker);
+				boolean upgrade = result.request.getUpgrade();
+				isOwner = (owner != null) &&
+				    (!upgrade || owner.getUpgrade());
+				if (!isOwner) {
+				    if (conflict != null) {
+					lock.flushWaiter(locker);
+				    } else if (now >= stop) {
+					timedOut = true;
+					lock.flushWaiter(locker);
+				    } else if (upgrade && owner == null) {
+					upgradeFailed = true;
+				    }
+				}
+			    }
+			} finally {
+			    assert noteKeyUnsync(key);
+			}
+			if (isOwner) {
+			    if (conflict != null &&
+				(conflict.getType() ==
+				 LockConflictType.DEADLOCK))
+			    {
+				/*
+				 * Being the deadlock victim takes precedence
+				 * even if we have become the owner
+				 */
+				break;
+			    }
+			    locker.setWaitingFor(null);
+			    locker.clearConflict();
+			    if (logger.isLoggable(FINER)) {
+				logger.log(
+				    FINER,
+				    "lock {0}, {1}, forWrite:{2}" +
+				    "\n  returns null (granted)",
+				    locker, key, result.request.getForWrite());
+			    }
+			    return null;
+			} else if (timedOut) {
+			    conflict = new LockConflict<K>(
+				LockConflictType.TIMEOUT, result.conflict);
+			    break;
+			} else if (upgradeFailed) {
+			    conflict = new LockConflict<K>(
+				LockConflictType.DENIED, result.conflict);
+			} else if (conflict != null) {
+			    break;
+			}
+			if (logger.isLoggable(FINER)) {
+			    logger.log(FINER,
+				       "wait for lock {0}, {1}, forWrite:{2}" +
+				       ", wait:{3,number,#}",
+				       locker, key,
+				       result.request.getForWrite(),
+				       stop - now);
+			}
+			try {
+			    locker.wait(stop - now);
+			} catch (InterruptedException e) {
+			    conflict = new LockConflict<K>(
+				LockConflictType.INTERRUPTED, result.conflict);
+			    /* Loop again to check owners and waiters */
+			}
+			now = System.currentTimeMillis();
 		    }
+		    locker.setWaitingFor(null);
 		    if (logger.isLoggable(FINER)) {
-			logger.log(FINER,
-				   "wait for lock {0}, {1}, forWrite:{2}" +
-				   ", wait:{3,number,#}",
-				   locker, key, result.request.getForWrite(),
-				   stop - now);
+			logger.log(
+			    FINER,
+			    "lock {0}, {1}, forWrite:{2}\n  returns {3}",
+			    locker, key, result.request.getForWrite(),
+			    conflict);
 		    }
-		    try {
-			locker.wait(stop - now);
-		    } catch (InterruptedException e) {
-			conflict = new LockConflict<K>(
-			    LockConflictType.INTERRUPTED, result.conflict);
-			/* Loop again to check owners and waiters */
-		    }
-		    now = System.currentTimeMillis();
+		    return conflict;
 		}
-		locker.setWaitingFor(null);
-		if (logger.isLoggable(FINER)) {
-		    logger.log(FINER,
-			       "lock {0}, {1}, forWrite:{2}\n  returns {3}",
-			       locker, key, result.request.getForWrite(),
-			       conflict);
-		}
-		return conflict;
+	    } finally {
+		assert noteLockerUnsync(locker);
 	    }
-	} finally {
-	    assert locker.noteUnsync();
+	} catch (RuntimeException e) {
+	    logger.logThrow(FINER, e, "wait for lock {0} throws", locker);
+	    throw e;
+	} catch (Error e) {
+	    logger.logThrow(FINER, e, "wait for lock {0} throws", locker);
+	    throw e;
 	}
     }
 
@@ -509,38 +569,177 @@ public class LockManager<K> {
      * @param	key the key identifying the lock
      * @param	downgrade whether the lock should only be downgraded
      * @throws	IllegalArgumentException if {@code locker} has a different lock
-     *		manager 
+     *		manager
      */
     void releaseLockInternal(Locker<K> locker, K key, boolean downgrade) {
 	checkLockManager(locker);
-	List<Locker<K>> newOwners = Collections.emptyList();
+	List<Locker<K>> lockersToNotify = Collections.emptyList();
 	Map<K, Lock<K>> keyMap = getKeyMap(key);
-	assert Lock.noteSync(this, key);
+	assert noteKeySync(key);
 	try {
 	    synchronized (keyMap) {
 		/* Don't create the lock if it isn't present */
 		Lock<K> lock = keyMap.get(key);
 		if (lock != null) {
-		    newOwners = lock.release(locker, downgrade);
+		    lockersToNotify = lock.release(locker, downgrade);
 		    if (!lock.inUse(this)) {
 			keyMap.remove(key);
 		    }
 		}
 	    }
 	} finally {
-	    assert Lock.noteUnsync(this, key);
+	    assert noteKeyUnsync(key);
 	}
-	for (Locker<K> newOwner : newOwners) {
+	for (Locker<K> newOwner : lockersToNotify) {
 	    logger.log(FINEST, "notify new owner {0}", newOwner);
-	    assert newOwner.noteSync();
+	    assert noteLockerSync(newOwner);
 	    try {
 		synchronized (newOwner) {
 		    newOwner.notifyAll();
 		}
 	    } finally {
-		assert newOwner.noteUnsync();
+		assert noteLockerUnsync(newOwner);
 	    }
 	}
+    }
+
+    /**
+     * Notes the start of synchronization on the map associated with {@code
+     * key}.  Throws {@link AssertionError} if already synchronized on a key,
+     * otherwise returns {@code true}.
+     *
+     * @param	key the key
+     */
+    boolean noteKeySync(K key) {
+	assert key != null;
+	K currentKey = currentKeySync.get();
+	if (currentKey != null) {
+	    throw new AssertionError(
+		"Attempt to synchronize on map for key " + key +
+		", but already synchronized on " + currentKey);
+	}
+	currentKeySync.set(key);
+	return true;
+    }
+
+    /**
+     * Notes the end of synchronization on the map associated with {@code key}.
+     * Throws {@link AssertionError} if not already synchronized on {@code
+     * key}, otherwise returns {@code true}.
+     *
+     * @param	key the key
+     */
+    boolean noteKeyUnsync(K key) {
+	assert key != null;
+	K currentKey = currentKeySync.get();
+	if (currentKey == null) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on map for key " + key +
+		", but not currently synchronized on a key");
+	} else if (!currentKey.equals(key)) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on map for key " + key +
+		", but currently synchronized on " + currentKey);
+	}
+	currentKeySync.remove();
+	return true;
+    }
+
+    /**
+     * Checks that the current thread is synchronized on the map associated
+     * with {@code key}, throwing {@link AssertionError} if it is not, and
+     * otherwise returning {@code true}.
+     *
+     * @param	key the key
+     */
+    boolean checkKeySync(K key) {
+	assert key != null;
+	K currentKey = currentKeySync.get();
+	if (currentKey == null) {
+	    throw new AssertionError("Currently not synchronized on a key");
+	} else if (!currentKey.equals(key)) {
+	    throw new AssertionError(
+		"Should be synchronized on " + key +
+		", but currently synchronized on " + currentKey);
+	}
+	return true;
+    }
+
+    /**
+     * Checks that the current thread is not synchronized on the map associated
+     * with any key, throwing {@link AssertionError} if it is, and otherwise
+     * returning {@code true}.
+     */
+    boolean checkNoKeySync() {
+	K currentKey = currentKeySync.get();
+	if (currentKey != null) {
+	    throw new AssertionError(
+		"Currently synchronized on key " + currentKey);
+	}
+	return true;
+    }
+
+    /**
+     * Notes the start of synchronization on the specified locker.  Throws
+     * {@link AssertionError} if already synchronized on any locker or lock,
+     * otherwise returns {@code true}.
+     *
+     * @param	locker the locker
+     */
+    boolean noteLockerSync(Locker<K> locker) {
+	assert locker != null;
+	Locker<K> currentLocker = currentLockerSync.get();
+	if (currentLocker != null) {
+	    throw new AssertionError(
+		"Attempt to synchronize on locker " + this +
+		", but already synchronized on " + currentLocker);
+	}
+	checkNoKeySync();
+	currentLockerSync.set(locker);
+	return true;
+    }
+
+    /**
+     * Notes the end of synchronization on the specified locker.  Throws {@link
+     * AssertionError} if not already synchronized on the locker, otherwise
+     * returns {@code true}.
+     *
+     * @param	locker the locker     
+     */
+    boolean noteLockerUnsync(Locker<K> locker) {
+	assert locker != null;
+	Locker<K> currentLocker = currentLockerSync.get();
+	if (currentLocker == null) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on locker " + this +
+		", but not currently synchronized on a locker");
+	} else if (currentLocker != locker) {
+	    throw new AssertionError(
+		"Attempt to unsynchronize on locker " + locker +
+		", but currently synchronized on " + currentLocker);
+	}
+	currentLockerSync.remove();
+	return true;
+    }
+
+    /**
+     * Checks that the current thread is permitted to synchronize on the
+     * specified locker locker.  Throws an {@link AssertionError} if already
+     * synchronized on a locker other than this one or any lock, otherwise
+     * returns {@code true}.
+     *
+     * @param	locker the locker     
+     */
+    boolean checkAllowLockerSync(Locker<K> locker) {
+	assert locker != null;
+	Locker<K> currentLocker = currentLockerSync.get();
+	if (currentLocker != null && currentLocker != locker) {
+	    throw new AssertionError(
+		"Attempt to synchronize on locker " + locker +
+		", but already synchronized on " + currentLocker);
+	}
+	checkNoKeySync();
+	return true;
     }
 
     /* -- Private methods -- */

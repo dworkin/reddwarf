@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -281,6 +287,30 @@ public class TestLockManager extends Assert {
     }
 
     /**
+     * Test write/multiple read conflict
+     *
+     * locker:	write o1	=> granted
+     * locker2: read o1		=> blocked
+     * locker3: read o1		=> blocked
+     * locker:	commit
+     * locker2:			=> granted
+     * locker3:			=> granted
+     */
+    @Test
+    public void testWriteMultipleReadConflict() throws Exception {
+	assertGranted(acquireLock(locker, "o1", true));
+	Locker<String> locker2 = createLocker(lockManager);
+	AcquireLock acquire2 = new AcquireLock(locker2, "o1", false);
+	acquire2.assertBlocked();
+	Locker<String> locker3 = createLocker(lockManager);
+	AcquireLock acquire3 = new AcquireLock(locker3, "o1", false);
+	acquire3.assertBlocked();
+	lockManager.releaseLock(locker, "o1");
+	assertGranted(acquire2.getResult());
+	assertGranted(acquire3.getResult());
+    }
+
+    /**
      * Test read/upgrade conflict
      *
      * locker2: read o1		=> granted
@@ -298,6 +328,24 @@ public class TestLockManager extends Assert {
 	acquire.assertBlocked();
 	lockManager.releaseLock(locker2, "o1");
 	assertGranted(acquire.getResult());
+    }
+
+    /**
+     * Test write/write conflict
+     *
+     * locker:  write o1	=> granted
+     * locker2:	write o1	=> blocked
+     * locker:  commit
+     * locker2:			=> granted
+     */
+    @Test
+    public void testWriteWriteConflict() throws Exception {
+	assertGranted(acquireLock(locker, "o1", true));
+	Locker<String> locker2 = createLocker(lockManager);
+	AcquireLock acquire2 = new AcquireLock(locker2, "o1", true);
+	acquire2.assertBlocked();
+	lockManager.releaseLock(locker, "o1");
+	assertGranted(acquire2.getResult());
     }
 
     /**
@@ -328,35 +376,18 @@ public class TestLockManager extends Assert {
     }
 
     /**
-     * Test upgrade conflict with owner
-     *
-     * locker:  read o1		=> granted
-     * locker2: read o1		=> granted
-     * locker2: write o1	=> blocked
-     * locker:  commit
-     * locker2:			=> granted
-     */
-    @Test
-    public void testUpgradeOwnerConflict() {
-	assertGranted(acquireLock(locker, "o1", false));
-	Locker<String> locker2 = createLocker(lockManager);
-	assertGranted(acquireLock(locker2, "o1", false));
-	AcquireLock acquire2 = new AcquireLock(locker2, "o1", true);
-	acquire2.assertBlocked();
-	lockManager.releaseLock(locker, "o1");
-	assertGranted(acquire2.getResult());
-    }
-
-    /**
-     * Test upgrade conflict with waiter
+     * Test upgrade conflict with earlier waiter, making sure that the upgrade
+     * precedes the other waiter
      *
      * locker:  read o1		=> granted
      * locker2: read o1		=> granted
      * locker3: write o1	=> blocked
      * locker2: write o1	=> blocked
      * locker:  commit
-     * locker2:			=> blocked
+     * locker2:			=> granted
      * locker3:			=> blocked
+     * locker2: commit
+     * locker3:			=> granted
      */
     @Test
     public void testUpgradeWaiterConflict() {
@@ -369,8 +400,10 @@ public class TestLockManager extends Assert {
 	AcquireLock acquire2 = new AcquireLock(locker2, "o1", true);
 	acquire2.assertBlocked();
 	lockManager.releaseLock(locker, "o1");
-	acquire2.assertBlocked();
+	assertGranted(acquire2.getResult());
 	acquire3.assertBlocked();
+	lockManager.releaseLock(locker2, "o1");
+	assertGranted(acquire3.getResult());
     }
 
     /* -- Test waitForLock -- */

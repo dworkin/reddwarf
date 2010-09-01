@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -57,7 +63,7 @@ public class BasicLocker<K> extends Locker<K> {
      */
     @Override
     LockAttemptResult<K> getWaitingFor() {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	synchronized (this) {
 	    return waitingFor;
 	}
@@ -73,7 +79,7 @@ public class BasicLocker<K> extends Locker<K> {
      */
     @Override
     void setWaitingFor(LockAttemptResult<K> waitingFor) {
-	assert checkAllowSync();
+	assert lockManager.checkAllowLockerSync(this);
 	if (waitingFor != null && waitingFor.conflict == null) {
 	    throw new IllegalArgumentException(
 		"Attempt to specify a lock attempt result that is not a" +

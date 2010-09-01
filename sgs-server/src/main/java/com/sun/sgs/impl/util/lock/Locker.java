@@ -1,4 +1,10 @@
 /*
+ * Copyright 2010 The RedDwarf Authors.  All rights reserved
+ * Portions of this file have been modified as part of RedDwarf
+ * The source code is governed by a GPLv2 license that can be found
+ * in the LICENSE file.
+ */
+/*
  * Copyright 2007-2010 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -139,58 +145,4 @@ public abstract class Locker<K> {
      *		null} and its {@code conflict} field is {@code null}
      */
     abstract void setWaitingFor(LockAttemptResult<K> waitingFor);
-
-    /**
-     * Checks that the current thread is permitted to synchronize on this
-     * locker.  Throws an {@link AssertionError} if already synchronized on
-     * a locker other than this one or any lock, otherwise returns {@code
-     * true}.
-     */
-    boolean checkAllowSync() {
-	Locker<K> locker = lockManager.currentLockerSync.get();
-	if (locker != null && locker != this) {
-	    throw new AssertionError(
-		"Attempt to synchronize on locker " + this +
-		", but already synchronized on " + locker);
-	}
-	Lock.checkNoSync(lockManager);
-	return true;
-    }
-
-    /**
-     * Notes the start of synchronization on this locker.  Throws {@link
-     * AssertionError} if already synchronized on any locker or lock,
-     * otherwise returns {@code true}.
-     */
-    boolean noteSync() {
-	Locker<K> locker = lockManager.currentLockerSync.get();
-	if (locker != null) {
-	    throw new AssertionError(
-		"Attempt to synchronize on locker " + this +
-		", but already synchronized on " + locker);
-	}
-	Lock.checkNoSync(lockManager);
-	lockManager.currentLockerSync.set(this);
-	return true;
-    }
-
-    /**
-     * Notes the end of synchronization on this locker.  Throws {@link
-     * AssertionError} if not already synchronized on this locker,
-     * otherwise returns {@code true}.
-     */
-    boolean noteUnsync() {
-	Locker<K> locker = lockManager.currentLockerSync.get();
-	if (locker == null) {
-	    throw new AssertionError(
-		"Attempt to unsynchronize on locker " + this +
-		", but not currently synchronized on a locker");
-	} else if (locker != this) {
-	    throw new AssertionError(
-		"Attempt to unsynchronize on locker " + this +
-		", but currently synchronized on " + locker);
-	}
-	lockManager.currentLockerSync.remove();
-	return true;
-    }
 }
