@@ -165,7 +165,7 @@ public final class BootEnvironment {
     /**
      * The default value for the {@code BDB_TYPE} property.
      */
-    public static final String DEFAULT_BDB_TYPE = "db";
+    public static final String DEFAULT_BDB_TYPE = "je";
     /**
      * The standard location to look for application properties config
      * file in jars from the {@code SGS_DEPLOY} directory.

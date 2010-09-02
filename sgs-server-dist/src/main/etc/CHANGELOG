@@ -1,5 +1,7 @@
 Version 0.10.2
-- Fix ticket #44
+- Update default database implementation to BDB-JE, enabled active
+  deadlock detection by default when using BDB-JE (ticket #1)
+- Fix tickets #39, #44
 
 Version 0.10.1
 - Add client session login limit (ticket #41)

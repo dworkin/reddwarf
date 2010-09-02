@@ -129,7 +129,7 @@ public class DataStoreImpl extends AbstractDataStore {
     
     /** The default environment class. */
     public static final String DEFAULT_ENVIRONMENT_CLASS =
-        "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
+        "com.sun.sgs.impl.service.data.store.db.je.JeEnvironment";
 
     /** The object data for a placeholder. */
     private static final byte[] PLACEHOLDER_DATA = { PLACEHOLDER_OBJ_VALUE };
