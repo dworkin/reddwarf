@@ -22,6 +22,7 @@
 package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.kernel.schedule.ScheduledTask;
 import com.sun.sgs.kernel.schedule.SchedulerRetryAction;
 import com.sun.sgs.tools.test.FilteredNameRunner;
@@ -111,7 +112,39 @@ public class TestNowOrLaterRetryPolicy {
         EasyMock.expect(task.getTryCount()).andStubReturn(
                 NowOrLaterRetryPolicy.DEFAULT_RETRY_BACKOFF_THRESHOLD + 1);
         EasyMock.expect(task.getTimeout()).andStubReturn(100L);
-        task.setTimeout(100 * 2);
+        replayMocks();
+
+        // verify
+        SchedulerRetryAction action = policy.getRetryAction(task);
+        Assert.assertEquals(SchedulerRetryAction.RETRY_LATER, action);
+        verifyMocks();
+    }
+
+    @Test
+    public void testTimeoutResultAndRetryCountAboveBackoffThreshold() {
+        setupTask(new TransactionTimeoutException("timed out"));
+        // program the expected behavior of the task
+        EasyMock.expect(task.getTryCount()).andStubReturn(
+                NowOrLaterRetryPolicy.DEFAULT_RETRY_BACKOFF_THRESHOLD + 1);
+        EasyMock.expect(task.getTimeout()).andStubReturn(100L);
+        task.setTimeout(100L * 2);
+        replayMocks();
+
+        // verify
+        SchedulerRetryAction action = policy.getRetryAction(task);
+        Assert.assertEquals(SchedulerRetryAction.RETRY_LATER, action);
+        verifyMocks();
+    }
+
+    @Test
+    public void testTimeoutResultAndTimeoutSetTooHigh() {
+        setupTask(new TransactionTimeoutException("timed out"));
+        // program the expected behavior of the task
+        EasyMock.expect(task.getTryCount()).andStubReturn(
+                NowOrLaterRetryPolicy.DEFAULT_RETRY_BACKOFF_THRESHOLD + 1);
+        EasyMock.expect(task.getTimeout()).andStubReturn(
+                (long) (Integer.MAX_VALUE / 2 + Integer.MAX_VALUE / 4));
+        // note that task.setTimeout is not called, which is verified below
         replayMocks();
 
         // verify
