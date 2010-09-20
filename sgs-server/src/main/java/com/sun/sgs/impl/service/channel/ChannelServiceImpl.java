@@ -271,6 +271,13 @@ public final class ChannelServiceImpl
 	    new ConcurrentHashMap<BigInteger,
 				  Map<BigInteger, LocalMemberInfo>>();
 
+    /**
+     * Set of session ids that are currently in the process of being
+     * disconnected
+     */
+    private final Set<BigInteger> localSessionDisconnectingSet =
+        Collections.synchronizedSet(new HashSet<BigInteger>());
+
     /** The map of per-session locks, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, Lock> sessionLocks =
 	new ConcurrentHashMap<BigInteger, Lock>();
@@ -1215,23 +1222,32 @@ public final class ChannelServiceImpl
      */
     private void removeLocalSessionFromAllChannels(BigInteger sessionRefId) {
 
-	/*
-	 * Remove the per-session channel map for the session.
-	 */
-	Map<BigInteger, LocalMemberInfo> channelMap =
-	    localPerSessionChannelMap.remove(sessionRefId);		
-	
-	/*
-	 * Remove the session from the local membership set of each channel
-	 * that it is currently a member of.
-	 */
-	if (channelMap != null) {
-	    synchronized (channelMap) {
-		for (BigInteger channelRefId : channelMap.keySet()) {
-		    removeLocalChannelMember(channelRefId, sessionRefId);
-		}
-	    }
-	}
+        try {
+            /**
+             * Indicate that we are disconnecting the session
+             */
+            localSessionDisconnectingSet.add(sessionRefId);
+
+            /*
+             * Remove the per-session channel map for the session.
+             */
+            Map<BigInteger, LocalMemberInfo> channelMap =
+                localPerSessionChannelMap.remove(sessionRefId);
+
+            /*
+             * Remove the session from the local membership set of each channel
+             * that it is currently a member of.
+             */
+            if (channelMap != null) {
+                synchronized (channelMap) {
+                    for (BigInteger channelRefId : channelMap.keySet()) {
+                        removeLocalChannelMember(channelRefId, sessionRefId);
+                    }
+                }
+            }
+        } finally {
+            localSessionDisconnectingSet.remove(sessionRefId);
+        }
     }
     
     /**
@@ -2224,7 +2240,23 @@ public final class ChannelServiceImpl
 		    // The session doesn't belong to any channels.
 		    return;
 		}
-		LocalMemberInfo memberInfo = channelMap.get(channelRefId);
+                // There is a small window here where the channelMap may
+                // have been removed from the localPerSessionChannelMap by a
+                // disconnect handler after it has been retrieved from the map
+                // by this task above.  Therefore, we need to check if
+                // disconnection is in progress before synchronizing on the
+                // channelMap
+                LocalMemberInfo memberInfo = null;
+                synchronized (localSessionDisconnectingSet) {
+                    if (localSessionDisconnectingSet.contains(sessionRefId)) {
+                        // The session is disconnecting so the channelMap
+                        // has been removed
+                        return;
+                    }
+                    memberInfo = channelMap.get(channelRefId);
+                }
+                
+		
 		if (memberInfo == null) {
 		    // The session is no longer a member.
 		    return;
