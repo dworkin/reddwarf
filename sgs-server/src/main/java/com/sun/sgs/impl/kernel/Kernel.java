@@ -154,6 +154,16 @@ class Kernel {
     public static final String ACCESS_COORDINATOR_PROPERTY =
 	"com.sun.sgs.impl.kernel.access.coordinator";
 
+    // The default access coordinator to use if we are using je
+    private static final String DEFAULT_ACCESS_COORDINATOR_JE =
+        "com.sun.sgs.impl.kernel.LockingAccessCoordinator";
+    // the default access coordinator to use if we are using bdb
+    private static final String DEFAULT_ACCESS_COORDINATOR_BDB =
+        "com.sun.sgs.impl.kernel.TrackingAccessCoordinator";
+    // the default access coordinator to use if the db type is unknown
+    private static final String DEFAULT_ACCESS_COORDINATOR =
+        "com.sun.sgs.impl.kernel.LockingAccessCoordinator";
+
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
         "com.sun.sgs.impl.auth.NullAuthenticator";
@@ -297,20 +307,8 @@ class Kernel {
 	    }
 
             // create the access coordinator
-            AccessCoordinatorHandle accessCoordinator =
-		wrappedProperties.getClassInstanceProperty(
-		    ACCESS_COORDINATOR_PROPERTY,
-		    AccessCoordinatorHandle.class,
-		    new Class[] {
-			Properties.class,
-			TransactionProxy.class,
-			ProfileCollectorHandle.class
-		    },
-		    appProperties, proxy, profileCollectorHandle);
-	    if (accessCoordinator == null) {
-		accessCoordinator = new TrackingAccessCoordinator(
-		    appProperties, proxy, profileCollectorHandle);
-	    }
+            AccessCoordinatorHandle accessCoordinator = getAccessCoordinator(
+                    appProperties, proxy, profileCollectorHandle);
 
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work
@@ -358,6 +356,41 @@ class Kernel {
             shutdown();
             throw e;
         }
+    }
+    
+    /**
+     * Construct the AccessCoordinatorHandle.  Our default access
+     * coordinator is different depending on whether we are using bdb or je.
+     * This of course assumes we are using the default BerkeleyDB backed data
+     * store, if we aren't, or we don't know, use the global default.
+     */
+    private AccessCoordinatorHandle getAccessCoordinator(
+            Properties properties,
+            TransactionProxy proxy,
+            ProfileCollectorHandle profileCollectorHandle) {
+        String dbType = properties.getProperty(
+                "com.sun.sgs.impl.service.data.store.db.environment.class");
+        String defaultCoordinatorClass = DEFAULT_ACCESS_COORDINATOR;
+        if (dbType == null) {
+            defaultCoordinatorClass = DEFAULT_ACCESS_COORDINATOR;
+        } else if (dbType.equals(
+                "com.sun.sgs.impl.service.data.store.db.je.JeEnvironment")) {
+            defaultCoordinatorClass = DEFAULT_ACCESS_COORDINATOR_JE;
+        } else if (dbType.equals(
+                "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment")) {
+            defaultCoordinatorClass = DEFAULT_ACCESS_COORDINATOR_BDB;
+        }
+        
+        return wrappedProperties.getClassInstanceProperty(
+                ACCESS_COORDINATOR_PROPERTY,
+                defaultCoordinatorClass,
+                AccessCoordinatorHandle.class,
+                new Class[]{
+                    Properties.class,
+                    TransactionProxy.class,
+                    ProfileCollectorHandle.class
+                },
+                properties, proxy, profileCollectorHandle);
     }
 
     /** Private helper that registers MXBeans for management. */
