@@ -118,6 +118,14 @@ conf directory for additional details.
 
 RELEASE COMPATIBILITY
 
+Release 0.10.2:
+
+- The default BerkeleyDB implementation used is now set to the BerkeleyDB
+  Java Edition.  This conflicts with the previous default of the BerkeleyDB
+  Native Edition.  If upgrading a live instance of RedDwarf with existing
+  persistent data, the BDB_TYPE property in the conf/sgs-boot.properties
+  should be set to db to use the old default of BerkeleyDB Native Edition.
+
 Release 0.10.0:
 
 - The persistent data stored by the ChannelService is incompatible with

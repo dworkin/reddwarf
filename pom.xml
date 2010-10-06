@@ -200,6 +200,11 @@
       </dependency>
 
       <dependency>
+	<groupId>com.sleepycat</groupId>
+	<artifactId>je</artifactId>
+	<version>${bdb.je.version}</version>
+      </dependency>
+      <dependency>
 	<groupId>org.reddwarfserver.ext.berkeleydb</groupId>
 	<artifactId>db</artifactId>
 	<version>${bdb.version}</version>
@@ -209,11 +214,6 @@
 	<artifactId>db-binaries</artifactId>
 	<version>${bdb.version}</version>
 	<type>zip</type>
-      </dependency>
-      <dependency>
-	<groupId>com.sleepycat</groupId>
-	<artifactId>je</artifactId>
-	<version>${bdb.je.version}</version>
       </dependency>
 
       <dependency>
@@ -421,13 +421,13 @@
     <sgs-shared.version>1.12</sgs-shared.version>
     <sgs-client.version>0.10.0</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
-    <bdb.je.version>3.3.75</bdb.je.version>
+    <bdb.je.version>3.3.98</bdb.je.version>
     <jung.version>2.0</jung.version>
     <sgs-test-ext.version>1.2</sgs-test-ext.version>
 
-    <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
+    <run.javapath></run.javapath>
     <run.bdb.env>
-      com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+      com.sun.sgs.impl.service.data.store.db.je.JeEnvironment
     </run.bdb.env>
   </properties>
 

@@ -46,6 +46,11 @@
     </dependency>
 
     <dependency>
+      <groupId>com.sleepycat</groupId>
+      <artifactId>je</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
       <artifactId>db</artifactId>
     </dependency>
@@ -53,11 +58,6 @@
       <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
       <artifactId>db-binaries</artifactId>
       <type>zip</type>
-    </dependency>
-
-    <dependency>
-      <groupId>com.sleepycat</groupId>
-      <artifactId>je</artifactId>
     </dependency>
 
     <dependency>
