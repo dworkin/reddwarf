@@ -1459,6 +1459,7 @@ final class ChannelImpl implements ManagedObject, Serializable {
 		// the event now.
 		if (startProcessingEvent(channel, event)) {
 		    // Event completed processing, so return success.
+                    getDataService().removeObject(event);
 		    return true;
 		}
 		// The event needs to be added to the head of the queue
