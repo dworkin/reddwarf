@@ -2,7 +2,7 @@ Version 0.10.2
 - Update default database implementation to BDB-JE, enabled active
   deadlock detection by default when using BDB-JE (ticket #1)
 - Switch to BDB-JE 3.3.98 (ticket #54)
-- Fix tickets #39, #43, #44, #47, #52, #53
+- Fix tickets #39, #43, #44, #47, #52, #53, #55
 
 Version 0.10.1
 - Add client session login limit (ticket #41)
