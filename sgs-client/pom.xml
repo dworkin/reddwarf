@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.reddwarfserver.client</groupId>
     <artifactId>sgs-client-parent</artifactId>
-    <version>0.10.2-SNAPSHOT</version>
+    <version>0.10.3-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-client</artifactId>
