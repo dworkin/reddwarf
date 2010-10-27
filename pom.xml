@@ -15,7 +15,7 @@
   <artifactId>sgs-server-parent</artifactId>
   <name>RedDwarf Server Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.10.2-SNAPSHOT</version>
+  <version>0.10.3-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.reddwarfserver.org</url>
   <scm>
