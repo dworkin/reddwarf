@@ -1500,8 +1500,8 @@ public class TaskServiceImpl
             // a mapping available, there's really nothing to be done except
             // just run the task locally, and in a separate thread try to get
             // the assignment taken care of
-            if (logger.isLoggable(Level.INFO)) {
-                logger.logThrow(Level.INFO, uie, "No mapping exists for " +
+            if (logger.isLoggable(Level.FINE)) {
+                logger.logThrow(Level.FINE, uie, "No mapping exists for " +
                                 "identity {0} so task {1} will run locally",
                                 identity.getName(), objName);
             }
@@ -1513,8 +1513,8 @@ public class TaskServiceImpl
         // failed node, check for this case first
         if (!handoffNode.isAlive()) {
             // since the mapped node is down, run the task locally
-            if (logger.isLoggable(Level.INFO)) {
-                logger.log(Level.INFO, "Mapping for identity {0} was to " +
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "Mapping for identity {0} was to " +
                            "node {1} which has failed so task {2} will " +
                            "run locally", identity.getName(),
                            handoffNode.getId(), objName);

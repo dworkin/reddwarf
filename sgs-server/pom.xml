@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.reddwarfserver.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.10.2-SNAPSHOT</version>
+    <version>0.10.3-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server</artifactId>
@@ -46,6 +46,11 @@
     </dependency>
 
     <dependency>
+      <groupId>com.sleepycat</groupId>
+      <artifactId>je</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
       <artifactId>db</artifactId>
     </dependency>
@@ -53,11 +58,6 @@
       <groupId>org.reddwarfserver.ext.berkeleydb</groupId>
       <artifactId>db-binaries</artifactId>
       <type>zip</type>
-    </dependency>
-
-    <dependency>
-      <groupId>com.sleepycat</groupId>
-      <artifactId>je</artifactId>
     </dependency>
 
     <dependency>

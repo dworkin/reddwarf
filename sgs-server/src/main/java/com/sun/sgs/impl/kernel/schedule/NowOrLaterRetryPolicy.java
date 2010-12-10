@@ -28,6 +28,7 @@
 package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.schedule.ScheduledTask;
@@ -132,16 +133,28 @@ public class NowOrLaterRetryPolicy implements SchedulerRetryPolicy {
 
             // Always retry in place unless we are above the backoff threshold
             // Also note, once a task is retried more than the backoff
-            // threshold, each subsequent retry will trigger this condition,
-            // double the timeout, and reschedule for RETRY_LATER
+            // threshold, each subsequent retry will trigger this condition
             if (task.getTryCount() > retryBackoffThreshold) {
-                logger.logThrow(Level.WARNING,
-                                task.getLastFailure(),
-                                "Task has been retried {0} times: {1}\n" +
-                                "Increasing its timeout to {2} ms and " +
-                                "scheduling its retry for later",
-                                task.getTryCount(), task, task.getTimeout() * 2);
-                task.setTimeout(task.getTimeout() * 2);
+                if (result instanceof TransactionTimeoutException &&
+                    task.getTimeout() * 2L < (long) Integer.MAX_VALUE) {
+                    // double the timeout, and reschedule for RETRY_LATER
+                    // if the timeout has not exceeded max int
+                    logger.logThrow(Level.WARNING,
+                                    task.getLastFailure(),
+                                    "Task has been retried {0} times: {1}\n" +
+                                    "Increasing its timeout to {2} ms and " +
+                                    "scheduling its retry for later",
+                                    task.getTryCount(), task, task.getTimeout() * 2);
+                    task.setTimeout(task.getTimeout() * 2);
+                } else {
+                    // just schedule to retry later if the task failure is
+                    // not due to transaction timeout
+                    logger.logThrow(Level.WARNING,
+                                    task.getLastFailure(),
+                                    "Task has been retried {0} times: {1}\n" +
+                                    "scheduling its retry for later",
+                                    task.getTryCount(), task);
+                }
                 return SchedulerRetryAction.RETRY_LATER;
             } else {
                 return SchedulerRetryAction.RETRY_NOW;
