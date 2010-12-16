@@ -1,3 +1,6 @@
+Version 0.10.2.1
+- Fix boot issue when BDB_TYPE db is configured (ticket #59)
+
 Version 0.10.2
 - Update default database implementation to BDB-JE, enabled active
   deadlock detection by default when using BDB-JE (ticket #1)

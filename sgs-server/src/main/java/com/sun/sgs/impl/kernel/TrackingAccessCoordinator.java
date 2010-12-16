@@ -66,7 +66,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * to find a conflicting transaction, so a larger backlog may provide more
  * detail about failure but will also be more compute-intensive.
  */
-class TrackingAccessCoordinator extends AbstractAccessCoordinator
+public class TrackingAccessCoordinator extends AbstractAccessCoordinator
     implements NonDurableTransactionParticipant
 {
     /**
@@ -106,8 +106,9 @@ class TrackingAccessCoordinator extends AbstractAccessCoordinator
      * @throws IllegalArgumentException if the requested backlog queue size
      *                                  is not a valid number greater than 0
      */
-    TrackingAccessCoordinator(Properties properties, TransactionProxy txnProxy,
-			      ProfileCollectorHandle profileCollector) 
+    public TrackingAccessCoordinator(Properties properties,
+                                     TransactionProxy txnProxy,
+                                     ProfileCollectorHandle profileCollector)
     {
 	super(txnProxy, profileCollector);
 	Objects.checkNull("properties", properties);
