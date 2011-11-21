@@ -414,6 +414,12 @@
       <url>http://download.java.net/maven/2/</url>
       <layout>default</layout>
     </repository>
+    <repository>
+      <id>oracle.com</id>
+      <name>Oracle public download repository</name>
+      <url>http://download.oracle.com/maven</url>
+      <layout>default</layout>
+    </repository>
   </repositories>
 
   <properties>
