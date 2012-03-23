@@ -1,0 +1,44 @@
+This is the github release of Reddwarf server, formerly Project Darkstar.
+
+This repository is converted from a compilation of SVN repositories:
+
+    https://svn.java.net/svn/sgs-server~svn
+    https://svn.java.net/svn/sgs-shared~svn
+    https://svn.java.net/svn/sgs-java-client~svn
+    https://svn.java.net/svn/sgs-c-client~svn
+    https://svn.java.net/svn/sgs-build~svn
+    https://svn.java.net/svn/sgs-maven-plugin~svn
+    https://svn.java.net/svn/sgs-tests~svn
+    https://svn.java.net/svn/darkstar-chat~svn
+    https://svn.java.net/svn/darkstar-hack~svn
+    https://svn.java.net/svn/darkstar-request~svn
+    https://svn.java.net/svn/dtc~svn
+    https://reddwarf.svn.sourceforge.net/svnroot/reddwarf
+
+Everything originates from a single sunlabs SVN repository.  This repository
+was later imported into the sgs-server repository at java.net, and also
+seeded various spinoffs; the sgs-maven-plugin repository was added later.
+Eventually, the reddwarf repository was created from a snapshot of the
+sgs-server, sgs-shared, sgs-java-client, sgs-c-client, sgs-build and
+sgs-maven-plugin source code.
+
+Everything is gathered in a single repository.  The merge history, which was
+missing or faulty in the SVN repositories, has been manually reconstructed
+from commit comments and svnbranch information.
+
+Each project has its own branch in the repository:
+
+    sgs-server			(the master branch)
+    sgs-shared
+    sgs-java-client
+    sgs-c-client
+    sgs-build
+    sgs-maven-plugin
+    analysis
+    dtc
+    chat
+    hack
+    request
+    qa				(sgs-tests)
+
+Various developer branches with non-trivial changes have also been preserved.
